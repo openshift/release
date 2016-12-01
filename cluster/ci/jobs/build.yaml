@@ -1,0 +1,53 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  generateName: ci-run-
+spec:
+  restartPolicy: Never
+  containers:
+  - name: run
+    image: openshift/origin-release:golang-1.6
+    command:
+    - /bin/bash
+    - -ce
+    args:
+    - |
+      #!/bin/bash
+      set -uo pipefail
+      export HOME=/tmp
+      git config --global user.email "ci@openshift.com"
+      git config --global user.name  "ci-openshift"
+      git clone --depth 1 --single-branch -b ${GIT_BRANCH} https://github.com/openshift/origin.git .
+      if [[ -n "${GIT_PR-}" ]]; then
+        git fetch --depth 1 origin pull/${GIT_PR}/head:pr
+        git merge pr
+      fi
+      if [[ -n "${GIT_AS_TAG-}" ]]; then
+        git tag "${GIT_AS_TAG:-v0.0.0}"
+      else
+        git fetch --tags
+      fi
+      unset OS_VERSION_FILE
+      which protoc
+      make verify -j
+    env:
+    - name: GIT_BRANCH
+      value: master
+    - name: GIT_PR
+      value: ""
+    - name: GIT_AS_TAG
+      value: v1.4.0-alpha.1
+    volumeMounts:
+    - name: empty
+      mountPath: /openshifttmp
+    - name: empty2
+      mountPath: /go/bin
+    - name: working
+      mountPath: /go/src/github.com/openshift/origin
+  volumes:
+  - name: working
+    emptyDir: {}
+  - name: empty
+    emptyDir: {}
+  - name: empty2
+    emptyDir: {}
