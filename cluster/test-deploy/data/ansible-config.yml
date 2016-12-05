@@ -21,7 +21,7 @@
       openshift_master_console_port: "8443"
       openshift_master_public_api_url: "https://api.origin-ci-int-gce.dev.rhcloud.com/"
       openshift_master_public_console_url: "https://api.origin-ci-int-gce.dev.rhcloud.com/console"
-      openshift_master_identity_providers: "{{ lookup('file', playbook_dir + '/identity-providers.json' ) || default('[]') }}"
+      openshift_master_identity_providers: [{'name': 'htpasswd_auth', 'login': 'true', 'challenge': 'true', 'kind': 'HTPasswdPasswordIdentityProvider', 'filename': '/etc/origin/master/htpasswd'}]
       # Paths on the local system for the certificate files. If empty, self-signed
       # certificate will be generated
       provision_master_https_cert_file:
@@ -91,4 +91,5 @@
 
   - include: "{{ item }}"
     with_first_found:
-      - ansible-private.yml
+    - files: ansible-private.yml
+      skip: true
