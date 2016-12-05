@@ -2,10 +2,10 @@
 
 set -euo pipefail
 
-docker rm gce-ci || true
-docker create --name gce-ci -e STARTUP_SCRIPT_FILE=/usr/local/install/data/startup.sh openshift/origin-gce:latest $@
-docker cp data gce-ci:/usr/local/install
-docker start -a gce-ci
+docker rm gce-pr || true
+docker create --name gce-pr -e STARTUP_SCRIPT_FILE=/usr/local/install/data/startup.sh openshift/origin-gce:latest $@
+docker cp data gce-pr:/usr/local/install
+docker start -a gce-pr
 
 # source data/config.sh
 # oc login "https://${MASTER_DNS_NAME}" # has to be through UI
