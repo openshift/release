@@ -16,5 +16,7 @@ docker start -a gce-ci
 # oc secrets new origin-gce data -o yaml > setup/secrets.yaml
 # oadm policy remove-cluster-role-from-group self-provisioner system:authenticated:oauth
 # add self-provisioner to "self-provisioners" group
+# oadm policy add-cluster-role-to-user cluster-reader system:serviceaccount:kube-system:heapster
+# oc process -f setup/heapster-standalone.yaml | oc apply -f - -n kube-system
 # change registry DNS name to registry.svc.ci.openshift.org
 # set env var COCKPIT_KUBE_URL=https://registry-console-default.svc.ci.openshift.org
