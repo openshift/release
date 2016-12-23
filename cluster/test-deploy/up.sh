@@ -29,7 +29,7 @@ STARTUP
 
 # start a container with the custom playbook inside it
 docker rm gce-pr &>/dev/null || true
-docker create --name gce-pr -e STARTUP_SCRIPT_FILE=/usr/local/install/data/startup.sh openshift/origin-gce:latest ansible-gce -e "pull_identifier=pr${build}" "${playbook}" >/dev/null
+docker create --name gce-pr openshift/origin-gce:latest ansible-gce -e "pull_identifier=pr${build}" "${playbook}" >/dev/null
 docker cp "${data}" gce-pr:/usr/local/install
 docker cp "${startup}" gce-pr:/usr/local/install/data/
 rm "${startup}"
