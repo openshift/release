@@ -34,4 +34,4 @@ docker cp "${data}" gce-pr-$build:/usr/local/install
 docker cp "${startup}" gce-pr-$build:/usr/local/install/data/
 rm "${startup}"
 docker start -a gce-pr-$build
-docker cp gce-pr-$build:/usr/local/install/data/admin.kubeconfig admin.kubeconfig || true
+docker cp gce-pr-$build:/usr/local/install/data/admin.kubeconfig admin.kubeconfig &>/dev/null || true
