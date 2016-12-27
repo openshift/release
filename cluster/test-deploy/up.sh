@@ -29,8 +29,17 @@ STARTUP
 
 # start a container with the custom playbook inside it
 docker rm gce-pr-$build &>/dev/null || true
-docker create --name gce-pr-$build openshift/origin-gce:latest ansible-gce -e "pull_identifier=pr${build}" "${playbook}" >/dev/null
+args=""
+if [[ -n "${OPENSHIFT_ANSIBLE_REPO-}" ]]; then
+  docker volume rm gce-pr-$build-volume &>/dev/null || true
+  docker volume create --name gce-pr-$build-volume >/dev/null
+  args="-v gce-pr-$build-volume:/usr/share/ansible/openshift-ansible "
+fi
+docker create --name gce-pr-$build $args openshift/origin-gce:latest ansible-gce -e "pull_identifier=pr${build}" "${playbook}" >/dev/null
 docker cp "${data}" gce-pr-$build:/usr/local/install
+if [[ -n "${OPENSHIFT_ANSIBLE_REPO-}" ]]; then
+  docker cp "${OPENSHIFT_ANSIBLE_REPO}/" gce-pr-$build:/usr/share/ansible/
+fi
 docker cp "${startup}" gce-pr-$build:/usr/local/install/data/
 rm "${startup}"
 docker start -a gce-pr-$build
