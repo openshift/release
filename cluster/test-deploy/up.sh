@@ -35,7 +35,7 @@ if [[ -n "${OPENSHIFT_ANSIBLE_REPO-}" ]]; then
   docker volume create --name gce-pr-$build-volume >/dev/null
   args="-v gce-pr-$build-volume:/usr/share/ansible/openshift-ansible "
 fi
-docker create --name gce-pr-$build $args openshift/origin-gce:latest ansible-gce -e "pull_identifier=pr${build}" "${playbook}" >/dev/null
+docker create --name gce-pr-$build $args openshift/origin-gce:latest ansible-gce -e "pull_identifier=pr${build}" "${@:5}" "${playbook}" >/dev/null
 docker cp "${data}" gce-pr-$build:/usr/local/install
 if [[ -n "${OPENSHIFT_ANSIBLE_REPO-}" ]]; then
   docker cp "${OPENSHIFT_ANSIBLE_REPO}/" gce-pr-$build:/usr/share/ansible/
