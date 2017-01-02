@@ -1,21 +1,22 @@
 # Package and target versions
 
 deployment_type: origin
-openshift_pkg_version: "-0.0.1"
+openshift_pkg_version: "-{{ ansible_env.PR_REPO_VERSION | default('0.0.1') }}"
+openshift_additional_repos: [{'id': 'origin-pr', 'baseurl': '{{ lookup("env", "PR_REPO_URL") }}', 'enabled': 1, 'gpgcheck': 0}]
 ansible_pkg_mgr: yum
-openshift_version: 1.4.0 # work around 1.5 not being a valid option
+openshift_version: 1.4.0 # work around 1.5 not being a valid option yet
 
 # URLs and certs
 
-provision_prefix: ci-{{ pull_identifier }}-
-gce_network_name: "ci-{{ pull_identifier }}-ocp-network"
+provision_prefix: ci-{{ lookup('env', 'PR_NUMBER') | mandatory }}-
+gce_network_name: "ci-{{ lookup('env', 'PR_NUMBER') | mandatory }}-ocp-network"
 
-provision_gce_registry_gcs_bucket: origin-ci-test-{{ pull_identifier }}
-openshift_master_cluster_public_hostname: api.{{ pull_identifier }}.origin-ci-int-gce.dev.rhcloud.com
-openshift_master_cluster_hostname: internal-api.{{ pull_identifier }}.origin-ci-int-gce.dev.rhcloud.com
-wildcard_zone: apps.{{ pull_identifier }}.origin-ci-int-gce.dev.rhcloud.com
-openshift_master_public_api_url: "https://api.{{ pull_identifier }}.origin-ci-int-gce.dev.rhcloud.com/"
-openshift_master_public_console_url: "https://api.{{ pull_identifier }}.origin-ci-int-gce.dev.rhcloud.com/console"
+provision_gce_registry_gcs_bucket: origin-ci-test-{{ lookup('env', 'PR_NUMBER') | mandatory }}
+openshift_master_cluster_public_hostname: api.{{ lookup('env', 'PR_NUMBER') | mandatory }}.origin-ci-int-gce.dev.rhcloud.com
+openshift_master_cluster_hostname: internal-api.{{ lookup('env', 'PR_NUMBER') | mandatory }}.origin-ci-int-gce.dev.rhcloud.com
+wildcard_zone: apps.{{ lookup('env', 'PR_NUMBER') | mandatory }}.origin-ci-int-gce.dev.rhcloud.com
+openshift_master_public_api_url: "https://api.{{ lookup('env', 'PR_NUMBER') | mandatory }}.origin-ci-int-gce.dev.rhcloud.com/"
+openshift_master_public_console_url: "https://api.{{ lookup('env', 'PR_NUMBER') | mandatory }}.origin-ci-int-gce.dev.rhcloud.com/console"
 
 public_hosted_zone: origin-ci-int-gce.dev.rhcloud.com
 dns_managed_zone: origin-ci-int-gce
@@ -48,9 +49,9 @@ gce_project_id: openshift-gce-devel-ci
 gce_region_name: us-central1
 gce_zone_name: us-central1-a
 gce_service_account: jenkins-ci-provisioner@openshift-gce-devel.iam.gserviceaccount.com
-gce_service_account_path: "{{ playbook_dir }}/gce.pem"
+gce_service_account_keyfile: "gce.json"
 gce_ssh_private_key: /home/cloud-user/.ssh/google_compute_engine
-gcs_registry_keyfile: "{{ playbook_dir }}/gce.json"
+gcs_registry_keyfile: "gce.json"
 inventory_ip_type: external
 
 gce_extra_tags_master:
@@ -87,6 +88,6 @@ provision_rh_pool_id:
 provision_gce_router_network_instance_group: ig-m # default: ig-i
 
 # Provide a startup script file to the GCE instances
-provision_gce_startup_script_file: "{{ playbook_dir }}/startup.sh"
+provision_gce_startup_script_file: # "startup.sh"
 # Provide userdata to the gce instances
 provision_gce_user_data_file:

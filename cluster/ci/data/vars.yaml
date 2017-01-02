@@ -21,13 +21,13 @@ openshift_node_port_range: 30000-32000
 
 # Authentication and authorization
 
-openshift_master_identity_providers: "{{ (lookup('file', playbook_dir + '/identity-providers.json' ) | default('{\"items\":[]}') | from_json).get('items') }}"
+openshift_master_identity_providers: "{{ (lookup('file', ansible_env.HOME + '/identity-providers.json' ) | default('{\"items\":[]}') | from_json).get('items') }}"
 provision_role_mappings: [{'user': 'smarterclayton', 'role': 'cluster-admin'}]
 
 # Paths on the local system for the certificate files. If empty, self-signed
 # certificate will be generated
-provision_master_https_cert_file: "{{ playbook_dir }}/ssl.crt"
-provision_master_https_key_file: "{{ playbook_dir }}/ssl.key"
+provision_master_https_cert_file: "{{ playbook_dir }}/files/ssl.crt"
+provision_master_https_key_file: "{{ playbook_dir }}/files/ssl.key"
 
 # Post config setting sizes
 
@@ -42,9 +42,9 @@ gce_project_id: openshift-gce-devel
 gce_region_name: us-central1
 gce_zone_name: us-central1-a
 gce_service_account: ci-provisioner@openshift-gce-devel.iam.gserviceaccount.com
-gce_service_account_path: "{{ playbook_dir }}/gce.pem"
+gce_service_account_keyfile: "{{ lookup('file', 'files/gce.json') }}"
 gce_ssh_private_key: /home/cloud-user/.ssh/google_compute_engine
-gcs_registry_keyfile: "{{ playbook_dir }}/gcs-registry.json"
+gcs_registry_keyfile: "{{ lookup('file', 'files/gce.json') }}"
 inventory_ip_type: external
 
 gce_extra_tags_master: ",preserve"
@@ -86,6 +86,6 @@ provision_gce_registry_gcs_bucket: openshift-gce-devel-origin-ci-registry-bucket
 provision_gce_router_network_instance_group: ig-m # default: ig-i
 
 # Provide a startup script file to the GCE instances
-provision_gce_startup_script_file: "{{ playbook_dir }}/startup.sh"
+provision_gce_startup_script_file: "{{ playbook_dir }}/files/startup.sh"
 # Provide userdata to the gce instances
 provision_gce_user_data_file:
