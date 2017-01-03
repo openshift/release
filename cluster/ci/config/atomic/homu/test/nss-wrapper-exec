@@ -1,0 +1,13 @@
+#!/usr/bin/bash
+set -euo pipefail
+export USER_ID=$(id -u)
+export GROUP_ID=$(id -g)
+passwd=$(mktemp -t 'nss-wrapper-passwd.XXXXXX')
+cat > ${passwd} << EOF
+root:x:0:0:root:/root:/bin/bash
+user:x:${USER_ID}:${GROUP_ID}:user:${HOME}:/bin/bash
+EOF
+export LD_PRELOAD=libnss_wrapper.so
+export NSS_WRAPPER_PASSWD=${passwd}
+export NSS_WRAPPER_GROUP=/etc/group
+exec "$@"
