@@ -4,6 +4,10 @@ deployment_type: origin
 openshift_pkg_version: "-0.0.1"
 ansible_pkg_mgr: yum
 docker_upgrade: false
+openshift_version: 1.4.0 # work around 1.5 not being a valid option yet
+openshift_image_tag: v1.5.0-alpha.1
+openshift_additional_repos: [{'id': 'origin-pr', 'baseurl': '{{ lookup("env", "PR_REPO_URL") | default("https://https://storage.googleapis.com/origin-ci-test/branch-logs/master/zz_test_gcloud/latest/artifacts/rpms") }}', 'enabled': 1, 'gpgcheck': 0}]
+openshift_enable_origin_repo: false
 
 # URLs and certs
 
@@ -22,13 +26,13 @@ openshift_node_port_range: 30000-32000
 
 # Authentication and authorization
 
-openshift_master_identity_providers: "{{ (lookup('file', ansible_env.HOME + '/identity-providers.json' ) | default('{\"items\":[]}') | from_json).get('items') }}"
+openshift_master_identity_providers: "{{ (lookup('file', 'files/identity-providers.json' ) | default('{\"items\":[]}') | from_json).get('items') }}"
 provision_role_mappings: [{'user': 'smarterclayton', 'role': 'cluster-admin'}]
 
 # Paths on the local system for the certificate files. If empty, self-signed
 # certificate will be generated
-provision_master_https_cert_file: "{{ playbook_dir }}/files/ssl.crt"
-provision_master_https_key_file: "{{ playbook_dir }}/files/ssl.key"
+provision_master_https_cert_file: "ssl.crt"
+provision_master_https_key_file: "ssl.key"
 
 # Post config setting sizes
 
@@ -43,9 +47,9 @@ gce_project_id: openshift-gce-devel
 gce_region_name: us-central1
 gce_zone_name: us-central1-a
 gce_service_account: ci-provisioner@openshift-gce-devel.iam.gserviceaccount.com
-gce_service_account_keyfile: "{{ lookup('file', 'files/gce.json') }}"
+gce_service_account_keyfile: "gce.json"
 gce_ssh_private_key: /home/cloud-user/.ssh/google_compute_engine
-gcs_registry_keyfile: "{{ lookup('file', 'files/gce.json') }}"
+gcs_registry_keyfile: "gcs-registry.json"
 inventory_ip_type: external
 
 gce_extra_tags_master: ",preserve"
@@ -87,6 +91,6 @@ provision_gce_registry_gcs_bucket: openshift-gce-devel-origin-ci-registry-bucket
 provision_gce_router_network_instance_group: ig-m # default: ig-i
 
 # Provide a startup script file to the GCE instances
-provision_gce_startup_script_file: "{{ playbook_dir }}/files/startup.sh"
+provision_gce_startup_script_file: # "startup.sh"
 # Provide userdata to the gce instances
 provision_gce_user_data_file:
