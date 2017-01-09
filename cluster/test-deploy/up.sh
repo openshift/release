@@ -23,9 +23,9 @@ if [[ -n "${OPENSHIFT_ANSIBLE_REPO-}" ]]; then
   args="-v $ctr-volume:/usr/share/ansible/openshift-ansible "
 fi
 docker create -e "PR_NUMBER=pr${build}" -e "PR_REPO_URL=${url}" --name $ctr $args openshift/origin-gce:latest ansible-playbook "${@:5}" "${playbook}" >/dev/null
-tar -c -C "${data}" . | docker cp - $ctr:/usr/share/ansible/openshift-ansible-gce/playbooks/files
+tar --mode='ug+rwX' -c -C "${data}" . | docker cp - $ctr:/usr/share/ansible/openshift-ansible-gce/playbooks/files
 if [[ -n "${OPENSHIFT_ANSIBLE_REPO-}" ]]; then
-  tar -c -C "${OPENSHIFT_ANSIBLE_REPO}" . | docker cp - $ctr:/usr/share/ansible/openshift-ansible/
+  tar --mode='ug+rwX' -c -C "${OPENSHIFT_ANSIBLE_REPO}" . | docker cp - $ctr:/usr/share/ansible/openshift-ansible/
 fi
 docker start -a $ctr
 docker cp $ctr:/tmp/admin.kubeconfig admin.kubeconfig &>/dev/null || true
