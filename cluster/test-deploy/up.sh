@@ -13,6 +13,7 @@ if [[ -z "${3-}" && -z "${4-}" ]]; then
 fi
 
 ctr=gce-pr-$build
+opts="--mode='ug+rwX' --owner=root --group=root"
 
 # start a container with the custom playbook inside it
 docker rm $ctr &>/dev/null || true
@@ -23,9 +24,9 @@ if [[ -n "${OPENSHIFT_ANSIBLE_REPO-}" ]]; then
   args="-v $ctr-volume:/usr/share/ansible/openshift-ansible "
 fi
 docker create -e "PR_NUMBER=pr${build}" -e "PR_REPO_URL=${url}" --name $ctr $args openshift/origin-gce:latest ansible-playbook "${@:5}" "${playbook}" >/dev/null
-tar --mode='ug+rwX' -c -C "${data}" . | docker cp - $ctr:/usr/share/ansible/openshift-ansible-gce/playbooks/files
+tar ${opts} -c -C "${data}" . | docker cp - $ctr:/usr/share/ansible/openshift-ansible-gce/playbooks/files
 if [[ -n "${OPENSHIFT_ANSIBLE_REPO-}" ]]; then
-  tar --mode='ug+rwX' -c -C "${OPENSHIFT_ANSIBLE_REPO}" . | docker cp - $ctr:/usr/share/ansible/openshift-ansible/
+  tar ${opts} -c -C "${OPENSHIFT_ANSIBLE_REPO}" . | docker cp - $ctr:/usr/share/ansible/openshift-ansible/
 fi
 docker start -a $ctr
 docker cp $ctr:/tmp/admin.kubeconfig admin.kubeconfig &>/dev/null || true
