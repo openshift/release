@@ -13,7 +13,7 @@ if [[ -z "${3-}" && -z "${4-}" ]]; then
 fi
 
 ctr=gce-pr-$build
-opts="--mode='ug+rwX' --owner=root --group=root"
+opts="--mode=ug+rwX --owner=0 --group=0"
 
 # start a container with the custom playbook inside it
 docker rm $ctr &>/dev/null || true

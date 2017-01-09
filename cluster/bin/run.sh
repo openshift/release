@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ctr=gce-cluster
-opts="--mode='ug+rwX' --owner=root --group=root"
+opts="--mode=ug+rwX --owner=0 --group=0"
 
 docker rm $ctr &>/dev/null || true
 docker create $@ --name $ctr -it openshift/origin-gce:latest /bin/bash >/dev/null
