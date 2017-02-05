@@ -23,7 +23,7 @@ if [[ -n "${OPENSHIFT_ANSIBLE_REPO-}" ]]; then
   docker volume create --name $ctr-volume >/dev/null
   args="-v $ctr-volume:/usr/share/ansible/openshift-ansible "
 fi
-docker create -e "PR_NUMBER=pr${build}" -e "PR_REPO_URL=${url}" --name $ctr $args openshift/origin-gce:latest ansible-playbook "${@:5}" "${playbook}" >/dev/null
+docker create -e "OPENSHIFT_ANSIBLE_COMMIT=${OPENSHIFT_ANSIBLE_COMMIT-}" -e "PR_NUMBER=pr${build}" -e "PR_REPO_URL=${url}" --name $ctr $args openshift/origin-gce:latest ansible-playbook "${@:5}" "${playbook}" >/dev/null
 tar ${opts} -c -C "${data}" . | docker cp - $ctr:/usr/share/ansible/openshift-ansible-gce/playbooks/files
 if [[ -n "${OPENSHIFT_ANSIBLE_REPO-}" ]]; then
   tar ${opts} -c -C "${OPENSHIFT_ANSIBLE_REPO}" . | docker cp - $ctr:/usr/share/ansible/openshift-ansible/
