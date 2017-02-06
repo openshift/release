@@ -16,6 +16,7 @@ ctr=gce-pr-$build
 opts="--mode=ug+rwX --owner=0 --group=0"
 
 # start a container with the custom playbook inside it
+docker kill $ctr &>/dev/null || true
 docker rm $ctr &>/dev/null || true
 args=""
 if [[ -n "${OPENSHIFT_ANSIBLE_REPO-}" ]]; then
