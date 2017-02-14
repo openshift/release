@@ -1,6 +1,6 @@
 # Deploy the OpenShift CI instance to GCE
 
-    $ ../bin/run.sh
+    $ ../bin/local.sh
     $ export PR_REPO_URL=<a yum repo base URL containing OpenShift RPMs>
     $ ansible-playbook playbooks/provision.yaml
 
