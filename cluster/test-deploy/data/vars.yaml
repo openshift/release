@@ -3,33 +3,28 @@
 deployment_type: origin
 ansible_pkg_mgr: yum
 
-# for initial install
-openshift_pkg_version: "-{{ ansible_env.PR_REPO_VERSION | default('0.0.1') }}" # try to remove
 openshift_additional_repos: [
-  {'id': 'origin-pr', 'baseurl': '{{ lookup("env", "PR_REPO_URL") }}', 'enabled': 1, 'gpgcheck': 0},
+  {'id': 'origin-pr', 'baseurl': '{{ openshift_test_repo }}', 'enabled': 1, 'gpgcheck': 0},
   {'id': 'origin-pr-dependencies', 'baseurl': 'http://buildlogs.centos.org/centos/7/paas/x86_64/openshift-future/', 'enabled': 1, 'gpgcheck': 0}
   ]
-openshift_version: 1.4.0 # work around 1.5 not being a valid option yet
-openshift_image_tag: v1.5.0-alpha.2 # necessary for upgrade?
-openshift_enable_origin_repo: false # must be true for upgrade
 
 # for upgrading
-#openshift_pkg_version: "-1.3.1"
-#openshift_version: 1.4.0 # work around 1.5 not being a valid option
-#docker_upgrade: false
-#openshift_enable_origin_repo: true
+# openshift_pkg_version: "-1.3.1"
+# openshift_version: 1.4.0 # work around 1.5 not being a valid option
+# docker_upgrade: false
+# openshift_enable_origin_repo: true
 
 # URLs and certs
 
-provision_prefix: ci-{{ lookup('env', 'PR_NUMBER') | mandatory }}-
-gce_network_name: "ci-{{ lookup('env', 'PR_NUMBER') | mandatory }}-ocp-network"
+provision_prefix: ci-{{ lookup('env', 'INSTANCE_PREFIX') | mandatory }}-
+gce_network_name: "ci-{{ lookup('env', 'INSTANCE_PREFIX') | mandatory }}-ocp-network"
 
-provision_gce_registry_gcs_bucket: origin-ci-test-{{ lookup('env', 'PR_NUMBER') | mandatory }}
-openshift_master_cluster_public_hostname: api.{{ lookup('env', 'PR_NUMBER') | mandatory }}.origin-ci-int-gce.dev.rhcloud.com
-openshift_master_cluster_hostname: internal-api.{{ lookup('env', 'PR_NUMBER') | mandatory }}.origin-ci-int-gce.dev.rhcloud.com
-wildcard_zone: apps.{{ lookup('env', 'PR_NUMBER') | mandatory }}.origin-ci-int-gce.dev.rhcloud.com
-openshift_master_public_api_url: "https://api.{{ lookup('env', 'PR_NUMBER') | mandatory }}.origin-ci-int-gce.dev.rhcloud.com/"
-openshift_master_public_console_url: "https://api.{{ lookup('env', 'PR_NUMBER') | mandatory }}.origin-ci-int-gce.dev.rhcloud.com/console"
+provision_gce_registry_gcs_bucket: origin-ci-test-{{ lookup('env', 'INSTANCE_PREFIX') | mandatory }}
+openshift_master_cluster_public_hostname: api.{{ lookup('env', 'INSTANCE_PREFIX') | mandatory }}.origin-ci-int-gce.dev.rhcloud.com
+openshift_master_cluster_hostname: internal-api.{{ lookup('env', 'INSTANCE_PREFIX') | mandatory }}.origin-ci-int-gce.dev.rhcloud.com
+wildcard_zone: apps.{{ lookup('env', 'INSTANCE_PREFIX') | mandatory }}.origin-ci-int-gce.dev.rhcloud.com
+openshift_master_public_api_url: "https://api.{{ lookup('env', 'INSTANCE_PREFIX') | mandatory }}.origin-ci-int-gce.dev.rhcloud.com/"
+openshift_master_public_console_url: "https://api.{{ lookup('env', 'INSTANCE_PREFIX') | mandatory }}.origin-ci-int-gce.dev.rhcloud.com/console"
 
 public_hosted_zone: origin-ci-int-gce.dev.rhcloud.com
 dns_managed_zone: origin-ci-int-gce
@@ -84,7 +79,6 @@ provision_gce_instance_group_size_node: 3
 provision_gce_disk_size_node_docker: 75
 provision_gce_disk_size_node_openshift: 50
 
-provision_rh_channel_version: "3.3"
 provision_gce_gcloud_version: '130.0.0'
 
 # An image or image family to pull from
