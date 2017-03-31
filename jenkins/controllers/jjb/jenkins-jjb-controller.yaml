@@ -1,0 +1,146 @@
+apiVersion: v1
+kind: Template
+labels:
+  template: jenkins-jjb-controller
+metadata:
+  name: jenkins-jjb-controller
+  openshift.io/display-name: Jenkins JJB Controller
+  iconClass: icon-jenkins
+  tags: instant-app,jenkins
+  template.openshift.io/long-description: |-
+    The Jenkins JJB controller synchronizes config maps created in the current namespace with 
+    Jenkins jobs. ConfigMaps to be synchronized with Jenkins require an annotation of
+    'ci.openshift.io/jenkins-job' to be set to "true".
+parameters:
+- name: NAME
+  displayName: Application Name
+  description: The name to use for the objects created by this template
+  value: jenkins-jjb-controller
+  required: true
+- name: OPENSHIFT_ORIGIN_IMAGE
+  displayName: OpenShift Origin Image Reference
+  description: Reference to the OpenShift Origin image to be used as the base for the controller. This image provides the oc client.
+  value: openshift/origin:latest
+  required: true
+- name: SOURCE_REF
+  displayName: Source Ref
+  description: Git reference to use for building the JJB controller image
+  value: master
+  required: false
+- name: SOURCE_URL
+  displayName: Source URL
+  description: Git source URL to use for building the JJB controller image
+  value: https://github.com/openshift/release.git
+  required: true
+- name: SOURCE_CONTEXT
+  displayName: Source Context
+  description: Git source context to use for building the JJB controller image
+  value: jenkins/controllers/jjb
+  required: false
+- name: JENKINS_ADMIN_SA
+  displayName: Jenkins Administrator Service Account
+  description: Service account to use as a Jenkins administrator
+  value: jenkins-admin
+  required: true
+- name: JENKINS_TEMPLATE_NAME
+  displayName: Jenkins Template Name
+  description: Name of template to instantiate if Jenkins not present
+  value: jenkins-persistent
+  required: true
+objects:
+- apiVersion: v1
+  kind: ImageStream
+  metadata:
+    labels:
+      app: "${NAME}"
+    name: origin
+  spec:
+    tags:
+    - annotations:
+        openshift.io/imported-from: "${OPENSHIFT_ORIGIN_IMAGE}"
+      from:
+        kind: DockerImage
+        name: "${OPENSHIFT_ORIGIN_IMAGE}"
+      name: latest
+- apiVersion: v1
+  kind: ImageStream
+  metadata:
+    labels:
+      app: "${NAME}"
+    name: "${NAME}"
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    labels:
+      app: "${NAME}"
+    name: "${NAME}"
+  spec:
+    output:
+      to:
+        kind: ImageStreamTag
+        name: "${NAME}:latest"
+    source:
+      contextDir: "${SOURCE_CONTEXT}"
+      git:
+        ref: "${SOURCE_REF}"
+        uri: "${SOURCE_URL}"
+      type: Git
+    strategy:
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: origin:latest
+      type: Docker
+    triggers:
+    - type: ConfigChange
+    - imageChange: {}
+      type: ImageChange
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    name: "${JENKINS_ADMIN_SA}"
+- apiVersion: v1
+  kind: RoleBinding
+  metadata:
+    name: "${JENKINS_ADMIN_SA}"
+  roleRef:
+    name: admin
+  subjects:
+  - kind: ServiceAccount
+    name: "${JENKINS_ADMIN_SA}"
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    labels:
+      app: "${NAME}"
+    name: "${NAME}"
+  spec:
+    replicas: 1
+    selector:
+      app: "${NAME}"
+      deploymentconfig: "${NAME}"
+    template:
+      metadata:
+        labels:
+          app: "${NAME}"
+          deploymentconfig: "${NAME}"
+      spec:
+        containers:
+        - image: "${NAME}:latest"
+          name: "${NAME}"
+          resources: {}
+          env:
+          - name: JENKINS_TEMPLATE_NAME
+            value: "${JENKINS_TEMPLATE_NAME}"
+        serviceAccountName: "${JENKINS_ADMIN_SA}"
+    test: false
+    triggers:
+    - type: ConfigChange
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - "${NAME}"
+        from:
+          kind: ImageStreamTag
+          name: "${NAME}:latest"
+      type: ImageChange
