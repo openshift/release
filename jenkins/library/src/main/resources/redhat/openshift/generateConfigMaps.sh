@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -o errexit
+
 main="$( dirname "${BASH_SOURCE[0]}" )/../../.."
 resources="${main}/resources/redhat/openshift"
 groovy="${main}/groovy/redhat/openshift"
