@@ -5,8 +5,8 @@ import sys
 import tempfile
 from subprocess import call
 
+from kubernetes import client, config
 from kubernetes.client.rest import ApiException
-import oc_common
 import jobs_common
 
 def main(argv):
@@ -20,7 +20,8 @@ def process_config(namespace, name, annotation_value=None):
         print("configmap {}/{} is not applicable to Jenkins".format(namespace, name))
         return
 
-    core_instance = oc_common.connect_to_kube_core()    
+    config.load_incluster_config()
+    core_instance = client.CoreV1Api()
 
     try:
         config_map = core_instance.read_namespaced_config_map(name, namespace)
