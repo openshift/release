@@ -1,11 +1,7 @@
 #!/usr/bin/python
 
-import sys
-import os
 import re
 
-from oc_requester import OpenShiftRequester
-from jenkinsapi.jenkins import Jenkins 
 import oc_common
 
 
@@ -16,6 +12,7 @@ def main():
         match = descRegex.match(descr)
         if match:
             print("{}/{}".format(match.group(1), match.group(2)))
+
 
 if __name__ == "__main__":
     main()

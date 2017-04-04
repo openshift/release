@@ -2,7 +2,7 @@
 
 from __future__ import print_function
 import sys
-import kubernetes.client
+from kubernetes import client, config
 import base64
 
 from kubernetes.client.rest import ApiException
@@ -23,7 +23,8 @@ def processSecret(namespace, name, annotation_value=None):
         print("secret {}/{} is not applicable to Jenkins".format(namespace, name))
         return
 
-    core_instance = oc_common.connect_to_kube_core()
+    config.load_incluster_config()
+    core_instance = client.CoreV1Api()
 
     try:
         secret = core_instance.read_namespaced_secret(name, namespace)
