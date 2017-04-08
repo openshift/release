@@ -1,18 +1,17 @@
 # Package and target versions
 
 deployment_type: origin
-openshift_pkg_version: "-0.0.1"
 ansible_pkg_mgr: yum
 docker_upgrade: false
-openshift_version: 1.4.0 # work around 1.5 not being a valid option yet
-openshift_image_tag: v1.5.0-alpha.1
 openshift_additional_repos: [
-  {'id': 'origin-pr', 'baseurl': '{{ lookup("env", "PR_REPO_URL") | default("https://storage.googleapis.com/origin-ci-test/branch-logs/origin/master/builds/latest/artifacts/rpms") }}', 'enabled': 1, 'gpgcheck': 0},
-  {'id': 'origin-pr-dependencies', 'baseurl': 'http://buildlogs.centos.org/centos/7/paas/x86_64/openshift-future/', 'enabled': 1, 'gpgcheck': 0}
+  {'id': 'origin-pr', 'baseurl': '{{ openshift_test_repo }}', 'enabled': 1, 'gpgcheck': 0},
+  {'id': 'origin-pr-dependencies', 'baseurl': 'http://mirror.centos.org/centos/7/paas/x86_64/openshift-origin/', 'enabled': 1, 'gpgcheck': 0}
   ]
-openshift_enable_origin_repo: false
 
 # URLs and certs
+
+provision_prefix: origin-ci-
+gce_network_name: "origin-ci-ocp-network"
 
 openshift_master_cluster_public_hostname: api.ci.openshift.org
 openshift_master_cluster_hostname: internal-master.ci.openshift.org
@@ -69,17 +68,15 @@ provision_gce_instance_group_size_master: 1
 provision_gce_instance_group_size_node_infra: 0
 provision_gce_instance_group_size_node: 2
 
-provision_gce_disk_size_node_docker: 25
+provision_gce_disk_size_node_docker: 75
 provision_gce_disk_size_node_openshift: 50
 
-provision_rh_channel_version: "3.3"
 provision_gce_gcloud_version: '130.0.0'
-
-provision_prefix: origin-ci-
-gce_network_name: "origin-ci-ocp-network"
 
 # An image or image family to pull from
 provision_gce_registered_image: rhel-7
+
+provision_gce_docker_storage_driver: devicemapper
 
 # Username and password for Red Hat Customer Portal
 provision_rh_username:
