@@ -17,7 +17,7 @@ $ cd data
 
 # launch cluster
 $ INSTANCE_PREFIX=pr345 ../../bin/local.sh ansible-playbook \
-    -e openshift_test_repo=https://storage.googleapis.com/origin-ci-test/pr-logs/12940/test_pull_requests_origin_gce/559/artifacts/rpms \
+    -e openshift_test_repo=$( curl https://storage.googleapis.com/origin-ci-test/branch-logs/origin/master/builds/.latest )/artifacts/rpms \
     playbooks/launch.yaml
 
 # after cluster is launched, admin.kubeconfig is copied locally
