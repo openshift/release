@@ -1,0 +1,73 @@
+apiVersion: v1
+kind: Template
+objects:
+- kind: ImageStream
+  apiVersion: v1
+  metadata:
+    name: oauth-proxy
+- kind: BuildConfig
+  apiVersion: v1
+  metadata:
+    name: oauth-proxy-binary
+  spec:
+    output:
+      to:
+        kind: ImageStreamTag
+        name: oauth-proxy:binaries
+    source:
+      git:
+        uri: https://github.com/openshift/oauth-proxy.git
+      type: Git
+      dockerfile: |
+        FROM openshift/origin-release:golang-1.7
+        COPY . /go/src/github.com/bitly/oauth2_proxy
+        RUN cd /go/src/github.com/bitly/oauth2_proxy && \
+            curl -s https://raw.githubusercontent.com/pote/gpm/v1.4.0/bin/gpm | bash && \
+            CGO_ENABLED=0 go build -a -tags netgo . && \
+            go test ./...
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: openshift/origin-release:golang-1.7
+        imageOptimizationPolicy: SkipLayers
+    triggers:
+    - type: ConfigChange
+    - type: GitHub
+      github:
+        secret: pohRLhJWRgBHOvv6wcfi
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    name: oauth-proxy
+  spec:
+    output:
+      to:
+        kind: ImageStreamTag
+        name: oauth-proxy:latest
+    source:
+      dockerfile: |
+        FROM        quay.io/prometheus/busybox:latest
+        MAINTAINER  Clayton Coleman <ccoleman@redhat.com>
+
+        COPY oauth2_proxy                         /bin/oauth-proxy
+
+        ENTRYPOINT [ "/bin/oauth-proxy" ]
+      images:
+      - from:
+          kind: ImageStreamTag
+          name: oauth-proxy:binaries
+        paths:
+        - destinationDir: .
+          sourcePath: /go/src/github.com/bitly/oauth2_proxy/.
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: busybox:latest
+    triggers:
+    - imageChange:
+        from:
+          kind: ImageStreamTag
+          name: oauth-proxy:binaries
+      type: ImageChange
