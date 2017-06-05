@@ -1,0 +1,98 @@
+#!/usr/bin/groovy
+def jenkinsAdminToken=""
+pipeline {
+  agent any
+  stages {
+    stage('Clone') {
+      steps {
+        checkout scm
+      }
+    }
+    stage("Get Admin Credentials") {
+      steps {
+        script {
+          openshift.withCluster() {
+            def tokenSecretName = ""
+            def adminSA = openshift.selector("sa/${env.JENKINS_ADMIN_SA}").object()
+            for (secret in adminSA.secrets) {
+              if (secret.name.indexOf("token") >= 0) {
+                tokenSecretName = secret.name
+                break
+              }
+            }
+            if (tokenSecretName == "") {
+              error("could not find token secret for jenkins admin sa ${env.JENKINS_ADMIN_SA}")
+            }
+            def tokenSecret = openshift.selector("secret/${tokenSecretName}").object()
+            def encodedToken = tokenSecret.data.token
+            jenkinsAdminToken=sh(script:"set +x; echo ${encodedToken} | base64 --decode", returnStdout: true)
+          }
+        }
+      }
+    }
+    stage("Deploy Secrets Controller") {
+      steps {
+        script {
+          openshift.doAs(jenkinsAdminToken) {
+            secretsControllerResources = openshift.process(
+              "--filename=jenkins/controllers/secrets/jenkins-secrets-controller.yaml",
+              "-p", "SOURCE_REF=${env.SOURCE_REF}", 
+              "-p", "SOURCE_URL=${env.SOURCE_URL}",
+              "-p", "OPENSHIFT_ORIGIN_IMAGE=${env.OPENSHIFT_ORIGIN_IMAGE}",
+              "-p", "JENKINS_ADMIN_SA=${env.JENKINS_ADMIN_SA}")
+            openshift.apply(secretsControllerResources)
+          }
+        }
+      }
+    }
+    stage("Deploy JJB Controller") {
+      steps {
+        script {
+          openshift.doAs(jenkinsAdminToken) {
+            jjbControllerResources = openshift.process(
+              "--filename=jenkins/controllers/jjb/jenkins-jjb-controller.yaml",
+              "-p", "SOURCE_REF=${env.SOURCE_REF}", 
+              "-p", "SOURCE_URL=${env.SOURCE_URL}",
+              "-p", "OPENSHIFT_ORIGIN_IMAGE=${env.OPENSHIFT_ORIGIN_IMAGE}",
+              "-p", "JENKINS_ADMIN_SA=${env.JENKINS_ADMIN_SA}")
+            openshift.apply(jjbControllerResources)
+          }
+        }
+      }
+    }
+    stage("Generate ConfigMaps") {
+      steps {
+        script {
+          openshift.withCluster() {
+            // Create the build and run it
+            def builderObjects = openshift.process("--filename=jenkins/setup/resources/config-generator-build.yaml")
+            openshift.apply(builderObjects)
+            def jobBuilder = openshift.selector("buildconfig/configmap-job-builder")
+            sh "cp -R jenkins/library/src jenkins/setup/images/config-job-image"
+            openshift.startBuild("configmap-job", "--from-dir=./jenkins/setup/images/config-job-image", "--follow")
+
+            // Wait for an imagestream tag for the builder to be available
+            def imageStream = openshift.selector("imagestream/configmap-job")
+            def jobImageRef = ""
+            imageStream.watch {
+              is = it.object()
+              if ((is.status.tags != null) && (is.status.tags.size() > 0)) {
+                jobImageRef = is.status.tags[0].items[0].dockerImageReference
+                return true
+              }
+            }
+
+            openshift.selector("job/configmap-job").delete("--ignore-not-found")
+
+            // Run the job to create config maps
+            def configMapJob = openshift.process(
+              "--filename=jenkins/setup/resources/config-generator-job.yaml",
+              "-p", "JOB_IMAGE=${jobImageRef}",
+              "-p", "JENKINS_ADMIN_SA=${env.JENKINS_ADMIN_SA}")
+            openshift.apply(configMapJob)
+          }
+        }
+      }
+    }
+  }
+}
