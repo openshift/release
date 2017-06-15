@@ -1,0 +1,65 @@
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: deck
+  spec:
+    selector:
+      app: deck
+    ports:
+    - port: 80
+      targetPort: 8080
+    type: NodePort
+- apiVersion: extensions/v1beta1
+  kind: Deployment
+  metadata:
+    name: deck
+  spec:
+    replicas: 1
+    template:
+      metadata:
+        labels:
+          app: deck
+      spec:
+        serviceAccountName: deck
+        containers:
+        - name: deck
+          image: registry.svc.ci.openshift.org/prow-images/deck:latest
+          args:
+          - --jenkins-url=$(JENKINS_ADDRESS)
+          - --jenkins-user=$(JENKINS_USER)
+          env:
+            - name: JENKINS_ADDRESS
+              valueFrom:
+                configMapKeyRef:
+                  name: jenkins-config
+                  key: jenkins_address
+            - name: JENKINS_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: jenkins-config
+                  key: jenkins_user
+          ports:
+            - name: http
+              containerPort: 8080
+          volumeMounts:
+          - mountPath: /etc/jenkins
+            name: jenkins
+            readOnly: true
+          - name: config
+            mountPath: /etc/config
+            readOnly: true
+        volumes:
+        - name: jenkins
+          secret:
+            defaultMode: 420
+            secretName: jenkins-token
+        - name: config
+          configMap:
+            name: config
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    name: deck
+kind: List
