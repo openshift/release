@@ -3,8 +3,7 @@ FROM openshift/origin:latest
 USER root
 
 RUN yum -y install python-pip && \
-    pip install kubernetes && \
-    pip install git+https://github.com/pycontribs/jenkinsapi.git
+    pip install kubernetes jenkinsapi
 
 RUN mkdir -p /home/user/bin && \
     chmod -R g+rwx /home/user

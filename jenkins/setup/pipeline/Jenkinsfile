@@ -30,13 +30,37 @@ pipeline {
         }
       }
     }
+    stage("Deploy Permissions Job") {
+      steps {
+        script {
+          openshift.doAs(jenkinsAdminToken) {
+            permissionsJobResources = openshift.process(
+              "--filename=jenkins/jobs/teams/jenkins-permissions-job.yaml",
+              "-p", "SOURCE_REF=${env.SOURCE_REF}",
+              "-p", "SOURCE_URL=${env.SOURCE_URL}")
+            created = openshift.apply(permissionsJobResources)
+            buildConfig = created.narrow("bc")
+            build = buildConfig.startBuild()
+            build.untilEach(1) {
+              return it.object().status.phase == "Complete"
+            }
+            destinationImage = buildConfig.object().spec.output.to.name
+            // need to strip tag from destination ImageStreamTag
+            destinationImage = destinationImage.substring(0, destinationImage.indexOf(":"))
+            openshift.set("image-lookup", destinationImage)
+            cronjob = created.narrow("cronjob").name()
+            openshift.raw("patch", cronjob, "--patch='{\"spec\":{\"suspend\":false}}'")
+          }
+        }
+      }
+    }
     stage("Deploy Secrets Controller") {
       steps {
         script {
           openshift.doAs(jenkinsAdminToken) {
             secretsControllerResources = openshift.process(
               "--filename=jenkins/controllers/secrets/jenkins-secrets-controller.yaml",
-              "-p", "SOURCE_REF=${env.SOURCE_REF}", 
+              "-p", "SOURCE_REF=${env.SOURCE_REF}",
               "-p", "SOURCE_URL=${env.SOURCE_URL}",
               "-p", "OPENSHIFT_ORIGIN_IMAGE=${env.OPENSHIFT_ORIGIN_IMAGE}",
               "-p", "JENKINS_ADMIN_SA=${env.JENKINS_ADMIN_SA}")
@@ -51,7 +75,7 @@ pipeline {
           openshift.doAs(jenkinsAdminToken) {
             jjbControllerResources = openshift.process(
               "--filename=jenkins/controllers/jjb/jenkins-jjb-controller.yaml",
-              "-p", "SOURCE_REF=${env.SOURCE_REF}", 
+              "-p", "SOURCE_REF=${env.SOURCE_REF}",
               "-p", "SOURCE_URL=${env.SOURCE_URL}",
               "-p", "OPENSHIFT_ORIGIN_IMAGE=${env.OPENSHIFT_ORIGIN_IMAGE}",
               "-p", "JENKINS_ADMIN_SA=${env.JENKINS_ADMIN_SA}")
