@@ -1,0 +1,609 @@
+apiVersion: v1
+kind: Template
+labels:
+  template: build-images
+parameters:
+- description: Name of the build to associate with the source image and artifacts
+  displayName: Build Name
+  name: BUILD_NAME
+  required: true
+- description: The name of the push secret for the builder service account
+  displayName: Push Secret
+  name: PUSH_SECRET_NAME
+  required: true
+objects:
+- apiVersion: v1
+  kind: Build
+  metadata:
+    labels:
+      build: "${BUILD_NAME}"
+    name: "${BUILD_NAME}-origin-base"
+  spec:
+    output:
+      pushSecret:
+        name: "${PUSH_SECRET_NAME}"
+      to:
+        kind: ImageStreamTag
+        name: "${BUILD_NAME}:origin-base"
+    runPolicy: Serial
+    serviceAccount: builder
+    source:
+      contextDir: "base"
+      images:
+      - from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:src"
+        paths:
+        - destinationDir: "."
+          sourcePath: "/go/src/github.com/openshift/origin/images/base"
+      type: Image
+    strategy:
+      dockerStrategy:
+        dockerfilePath: Dockerfile.centos7
+        from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:origin-source"
+      type: Docker
+- apiVersion: v1
+  kind: Build
+  metadata:
+    labels:
+      build: "${BUILD_NAME}"
+    name: "${BUILD_NAME}-cluster-capacity"
+  spec:
+    output:
+      pushSecret:
+        name: "${PUSH_SECRET_NAME}"
+      to:
+        kind: ImageStreamTag
+        name: "${BUILD_NAME}:origin-cluster-capacity"
+    runPolicy: Serial
+    serviceAccount: builder
+    source:
+      contextDir: "cluster-capacity"
+      images:
+      - from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:src"
+        paths:
+        - destinationDir: "."
+          sourcePath: "/go/src/github.com/openshift/origin/images/cluster-capacity"
+      type: Image
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:origin-source"
+      type: Docker
+- apiVersion: v1
+  kind: Build
+  metadata:
+    labels:
+      build: "${BUILD_NAME}"
+    name: "${BUILD_NAME}-service-catalog"
+  spec:
+    output:
+      pushSecret:
+        name: "${PUSH_SECRET_NAME}"
+      to:
+        kind: ImageStreamTag
+        name: "${BUILD_NAME}:origin-service-catalog"
+    runPolicy: Serial
+    serviceAccount: builder
+    source:
+      contextDir: "service-catalog"
+      images:
+      - from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:src"
+        paths:
+        - destinationDir: "."
+          sourcePath: "/go/src/github.com/openshift/origin/images/service-catalog"
+      type: Image
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:origin-source"
+      type: Docker
+- apiVersion: v1
+  kind: Build
+  metadata:
+    labels:
+      build: "${BUILD_NAME}"
+    name: "${BUILD_NAME}-origin"
+  spec:
+    output:
+      pushSecret:
+        name: "${PUSH_SECRET_NAME}"
+      to:
+        kind: ImageStreamTag
+        name: "${BUILD_NAME}:origin"
+    runPolicy: Serial
+    serviceAccount: builder
+    source:
+      contextDir: "origin"
+      images:
+      - from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:src"
+        paths:
+        - destinationDir: "."
+          sourcePath: "/go/src/github.com/openshift/origin/images/origin"
+      type: Image
+    strategy:
+      dockerStrategy:
+        dockerfilePath: Dockerfile.centos7
+        from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:origin-base"
+      type: Docker
+- apiVersion: v1
+  kind: Build
+  metadata:
+    labels:
+      build: "${BUILD_NAME}"
+    name: "${BUILD_NAME}-haproxy-router"
+  spec:
+    output:
+      pushSecret:
+        name: "${PUSH_SECRET_NAME}"
+      to:
+        kind: ImageStreamTag
+        name: "${BUILD_NAME}:origin-haproxy-router"
+    runPolicy: Serial
+    serviceAccount: builder
+    source:
+      contextDir: "haproxy"
+      images:
+      - from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:src"
+        paths:
+        - destinationDir: "."
+          sourcePath: "/go/src/github.com/openshift/origin/images/router/haproxy"
+      type: Image
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:origin"
+      type: Docker
+- apiVersion: v1
+  kind: Build
+  metadata:
+    labels:
+      build: "${BUILD_NAME}"
+    name: "${BUILD_NAME}-keepalived-ipfailover"
+  spec:
+    output:
+      pushSecret:
+        name: "${PUSH_SECRET_NAME}"
+      to:
+        kind: ImageStreamTag
+        name: "${BUILD_NAME}:origin-keepalived-ipfailover"
+    runPolicy: Serial
+    serviceAccount: builder
+    source:
+      contextDir: "keepalived"
+      images:
+      - from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:src"
+        paths:
+        - destinationDir: "."
+          sourcePath: "/go/src/github.com/openshift/origin/images/ipfailover/keepalived"
+      type: Image
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:origin"
+      type: Docker
+- apiVersion: v1
+  kind: Build
+  metadata:
+    labels:
+      build: "${BUILD_NAME}"
+    name: "${BUILD_NAME}-docker-registry"
+  spec:
+    output:
+      pushSecret:
+        name: "${PUSH_SECRET_NAME}"
+      to:
+        kind: ImageStreamTag
+        name: "${BUILD_NAME}:origin-docker-registry"
+    runPolicy: Serial
+    serviceAccount: builder
+    source:
+      contextDir: "dockerregistry"
+      images:
+      - from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:src"
+        paths:
+        - destinationDir: "."
+          sourcePath: "/go/src/github.com/openshift/origin/images/dockerregistry"
+      type: Image
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:origin-base"
+      type: Docker
+- apiVersion: v1
+  kind: Build
+  metadata:
+    labels:
+      build: "${BUILD_NAME}"
+    name: "${BUILD_NAME}-egress-router"
+  spec:
+    output:
+      pushSecret:
+        name: "${PUSH_SECRET_NAME}"
+      to:
+        kind: ImageStreamTag
+        name: "${BUILD_NAME}:origin-egress-router"
+    runPolicy: Serial
+    serviceAccount: builder
+    source:
+      contextDir: "router"
+      images:
+      - from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:src"
+        paths:
+        - destinationDir: "."
+          sourcePath: "/go/src/github.com/openshift/origin/images/egress/router"
+      type: Image
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:origin-base"
+      type: Docker
+- apiVersion: v1
+  kind: Build
+  metadata:
+    labels:
+      build: "${BUILD_NAME}"
+    name: "${BUILD_NAME}-egress-http-proxy"
+  spec:
+    output:
+      pushSecret:
+        name: "${PUSH_SECRET_NAME}"
+      to:
+        kind: ImageStreamTag
+        name: "${BUILD_NAME}:origin-egress-http-proxy"
+    runPolicy: Serial
+    serviceAccount: builder
+    source:
+      contextDir: "http-proxy"
+      images:
+      - from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:src"
+        paths:
+        - destinationDir: "."
+          sourcePath: "/go/src/github.com/openshift/origin/images/egress/http-proxy"
+      type: Image
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:origin-base"
+      type: Docker
+- apiVersion: v1
+  kind: Build
+  metadata:
+    labels:
+      build: "${BUILD_NAME}"
+    name: "${BUILD_NAME}-federation"
+  spec:
+    output:
+      pushSecret:
+        name: "${PUSH_SECRET_NAME}"
+      to:
+        kind: ImageStreamTag
+        name: "${BUILD_NAME}:origin-federation"
+    runPolicy: Serial
+    serviceAccount: builder
+    source:
+      contextDir: "federation"
+      images:
+      - from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:rpms"
+        paths:
+        - destinationDir: "."
+          sourcePath: "/go/src/github.com/openshift/origin/images/federation"
+      type: Image
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:origin-base"
+      type: Docker
+- apiVersion: v1
+  kind: Build
+  metadata:
+    labels:
+      build: "${BUILD_NAME}"
+    name: "${BUILD_NAME}-gitserver"
+  spec:
+    output:
+      pushSecret:
+        name: "${PUSH_SECRET_NAME}"
+      to:
+        kind: ImageStreamTag
+        name: "${BUILD_NAME}:origin-gitserver"
+    runPolicy: Serial
+    serviceAccount: builder
+    source:
+      contextDir: "gitserver"
+      images:
+      - from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:rpms"
+        paths:
+        - destinationDir: "."
+          sourcePath: "/go/src/github.com/openshift/origin/examples/gitserver"
+        - destinationDir: "gitserver/bin"
+          sourcePath: "/go/src/github.com/openshift/origin/_output/local/bin/linux/amd64/gitserver"
+      type: Image
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:origin"
+      type: Docker
+- apiVersion: v1
+  kind: Build
+  metadata:
+    labels:
+      build: "${BUILD_NAME}"
+    name: "${BUILD_NAME}-deployer"
+  spec:
+    output:
+      pushSecret:
+        name: "${PUSH_SECRET_NAME}"
+      to:
+        kind: ImageStreamTag
+        name: "${BUILD_NAME}:origin-deployer"
+    runPolicy: Serial
+    serviceAccount: builder
+    source:
+      contextDir: "deployer"
+      images:
+      - from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:src"
+        paths:
+        - destinationDir: "."
+          sourcePath: "/go/src/github.com/openshift/origin/images/deployer"
+      type: Image
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:origin"
+      type: Docker
+- apiVersion: v1
+  kind: Build
+  metadata:
+    labels:
+      build: "${BUILD_NAME}"
+    name: "${BUILD_NAME}-recycler"
+  spec:
+    output:
+      pushSecret:
+        name: "${PUSH_SECRET_NAME}"
+      to:
+        kind: ImageStreamTag
+        name: "${BUILD_NAME}:origin-recycler"
+    runPolicy: Serial
+    serviceAccount: builder
+    source:
+      contextDir: "recycler"
+      images:
+      - from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:src"
+        paths:
+        - destinationDir: "."
+          sourcePath: "/go/src/github.com/openshift/origin/images/recycler"
+      type: Image
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:origin"
+      type: Docker
+- apiVersion: v1
+  kind: Build
+  metadata:
+    labels:
+      build: "${BUILD_NAME}"
+    name: "${BUILD_NAME}-docker-builder"
+  spec:
+    output:
+      pushSecret:
+        name: "${PUSH_SECRET_NAME}"
+      to:
+        kind: ImageStreamTag
+        name: "${BUILD_NAME}:origin-docker-builder"
+    runPolicy: Serial
+    serviceAccount: builder
+    source:
+      contextDir: "docker-builder"
+      images:
+      - from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:src"
+        paths:
+        - destinationDir: "."
+          sourcePath: "/go/src/github.com/openshift/origin/images/builder/docker/docker-builder"
+      type: Image
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:origin"
+      type: Docker
+- apiVersion: v1
+  kind: Build
+  metadata:
+    labels:
+      build: "${BUILD_NAME}"
+    name: "${BUILD_NAME}-sti-builder"
+  spec:
+    output:
+      pushSecret:
+        name: "${PUSH_SECRET_NAME}"
+      to:
+        kind: ImageStreamTag
+        name: "${BUILD_NAME}:origin-sti-builder"
+    runPolicy: Serial
+    serviceAccount: builder
+    source:
+      contextDir: "sti-builder"
+      images:
+      - from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:src"
+        paths:
+        - destinationDir: "."
+          sourcePath: "/go/src/github.com/openshift/origin/images/builder/docker/sti-builder"
+      type: Image
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:origin"
+      type: Docker
+- apiVersion: v1
+  kind: Build
+  metadata:
+    labels:
+      build: "${BUILD_NAME}"
+    name: "${BUILD_NAME}-f5-router"
+  spec:
+    output:
+      pushSecret:
+        name: "${PUSH_SECRET_NAME}"
+      to:
+        kind: ImageStreamTag
+        name: "${BUILD_NAME}:origin-f5-router"
+    runPolicy: Serial
+    serviceAccount: builder
+    source:
+      contextDir: "f5"
+      images:
+      - from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:src"
+        paths:
+        - destinationDir: "."
+          sourcePath: "/go/src/github.com/openshift/origin/images/router/f5"
+      type: Image
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:origin"
+      type: Docker
+- apiVersion: v1
+  kind: Build
+  metadata:
+    labels:
+      build: "${BUILD_NAME}"
+    name: "${BUILD_NAME}-node"
+  spec:
+    output:
+      pushSecret:
+        name: "${PUSH_SECRET_NAME}"
+      to:
+        kind: ImageStreamTag
+        name: "${BUILD_NAME}:node"
+    runPolicy: Serial
+    serviceAccount: builder
+    source:
+      contextDir: "node"
+      images:
+      - from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:src"
+        paths:
+        - destinationDir: "."
+          sourcePath: "/go/src/github.com/openshift/origin/images/node"
+      type: Image
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:origin"
+      type: Docker
+- apiVersion: v1
+  kind: Build
+  metadata:
+    labels:
+      build: "${BUILD_NAME}"
+    name: "${BUILD_NAME}-openvswitch"
+  spec:
+    output:
+      pushSecret:
+        name: "${PUSH_SECRET_NAME}"
+      to:
+        kind: ImageStreamTag
+        name: "${BUILD_NAME}:openvswitch"
+    runPolicy: Serial
+    serviceAccount: builder
+    source:
+      contextDir: "openvswitch"
+      images:
+      - from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:src"
+        paths:
+        - destinationDir: "."
+          sourcePath: "/go/src/github.com/openshift/origin/images/openvswitch"
+      type: Image
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:node"
+      type: Docker
+- apiVersion: v1
+  kind: Build
+  metadata:
+    labels:
+      build: "${BUILD_NAME}"
+    name: "${BUILD_NAME}-hello-openshift"
+  spec:
+    output:
+      pushSecret:
+        name: "${PUSH_SECRET_NAME}"
+      to:
+        kind: ImageStreamTag
+        name: "${BUILD_NAME}:hello-openshift"
+    runPolicy: Serial
+    serviceAccount: builder
+    source:
+      contextDir: "hello-openshift"
+      images:
+      - from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:rpms"
+        paths:
+        - destinationDir: "."
+          sourcePath: "/go/src/github.com/openshift/origin/examples/hello-openshift"
+        - destinationDir: "hello-openshift/bin"
+          sourcePath: "/go/src/github.com/openshift/origin/_output/local/bin/linux/amd64/hello-openshift"
+      type: Image
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: "${BUILD_NAME}:origin"
+      type: Docker
