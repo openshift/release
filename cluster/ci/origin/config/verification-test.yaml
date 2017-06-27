@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: Template
+labels:
+  template: verification-tests
+parameters:
+- description: Name of the build to associate with the source image and artifacts
+  displayName: Build Name
+  name: BUILD_NAME
+  required: true
+- description: The reference to the image that contains the source to build
+  displayName: Source Image Reference
+  name: SOURCE_IMAGE_REF
+  required: true
+- description: The image pull secret of the default service account
+  displayName: Image Pull Secret
+  name: PULL_SECRET_NAME
+  required: true
+- description: The name of the verify test to execute
+  displayName: Test Name
+  name: TEST_NAME
+  required: true
+- description: The id of the run
+  displayName: Run ID
+  name: RUN_ID
+  required: true
+objects:
+- apiVersion: v1
+  kind: Pod
+  metadata:
+    generateName: "${BUILD_NAME}-verify-"
+    labels:
+      build: "${BUILD_NAME}"
+      test: "verify-${TEST_NAME}"
+      run: "${RUN_ID}"
+  spec:
+    containers:
+    - command:
+      - /bin/bash
+      - -c
+      - hack/verify-${TEST_NAME}.sh
+      image: "${SOURCE_IMAGE_REF}"
+      imagePullPolicy: IfNotPresent
+      name: verify-${TEST_NAME}
+      resources: {}
+      securityContext: {}
+    dnsPolicy: ClusterFirst
+    imagePullSecrets:
+    - name: "${PULL_SECRET_NAME}"
+    restartPolicy: Never
+    terminationGracePeriodSeconds: 5
