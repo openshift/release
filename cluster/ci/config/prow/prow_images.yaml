@@ -1,0 +1,225 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: prow-images
+objects:
+- kind: ImageStream
+  apiVersion: v1
+  metadata:
+    name: prow
+- kind: BuildConfig
+  apiVersion: v1
+  metadata:
+    name: prow
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: prow:binaries
+    source:
+      git:
+        uri: https://github.com/openshift/test-infra.git
+      type: Git
+      dockerfile: |
+        FROM openshift/origin-release:golang-1.8
+
+        COPY . /go/src/k8s.io/test-infra
+        RUN cd /go/src/k8s.io/test-infra && \
+            godep restore && \
+            cd prow && \
+            mkdir -p /static && \
+            cp -r cmd/deck/static/* /static && \
+            CGO_ENABLED=0 go install -a -installsuffix cgo -ldflags '-w' ./cmd/... && \
+            rm -rf /go/src /go/pkg
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: openshift/origin-release:golang-1.8
+        imageOptimizationPolicy: SkipLayers
+    triggers:
+    - type: ConfigChange
+
+- kind: ImageStream
+  apiVersion: v1
+  metadata:
+    name: hook
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    name: hook
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: hook:latest
+    source:
+      git:
+        uri: https://github.com/openshift/test-infra.git
+      images:
+      - from:
+          kind: ImageStreamTag
+          name: prow:binaries
+        paths:
+        - destinationDir: .
+          sourcePath: /go/bin/hook
+    strategy:
+      dockerStrategy:
+        imageOptimizationPolicy: SkipLayers
+        dockerfilePath: prow/cmd/hook/Dockerfile
+    triggers:
+    - imageChange:
+        from:
+          kind: ImageStreamTag
+          name: prow:binaries
+      type: ImageChange
+
+- kind: ImageStream
+  apiVersion: v1
+  metadata:
+    name: deck
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    name: deck
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: deck:latest
+    source:
+      git:
+        uri: https://github.com/openshift/test-infra.git
+      images:
+      - from:
+          kind: ImageStreamTag
+          name: prow:binaries
+        paths:
+        - destinationDir: .
+          sourcePath: /go/bin/deck
+        - destinationDir: .
+          sourcePath: /static
+    strategy:
+      dockerStrategy:
+        imageOptimizationPolicy: SkipLayers
+        dockerfilePath: prow/cmd/deck/Dockerfile
+    triggers:
+    - imageChange:
+        from:
+          kind: ImageStreamTag
+          name: prow:binaries
+      type: ImageChange
+
+- kind: ImageStream
+  apiVersion: v1
+  metadata:
+    name: plank
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    name: plank
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: plank:latest
+    source:
+      git:
+        uri: https://github.com/openshift/test-infra.git
+      images:
+      - from:
+          kind: ImageStreamTag
+          name: prow:binaries
+        paths:
+        - destinationDir: .
+          sourcePath: /go/bin/plank
+    strategy:
+      dockerStrategy:
+        imageOptimizationPolicy: SkipLayers
+        dockerfilePath: prow/cmd/plank/Dockerfile
+    triggers:
+    - imageChange:
+        from:
+          kind: ImageStreamTag
+          name: prow:binaries
+      type: ImageChange
+
+- kind: ImageStream
+  apiVersion: v1
+  metadata:
+    name: splice
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    name: splice
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: splice:latest
+    source:
+      git:
+        uri: https://github.com/openshift/test-infra.git
+      images:
+      - from:
+          kind: ImageStreamTag
+          name: prow:binaries
+        paths:
+        - destinationDir: .
+          sourcePath: /go/bin/splice
+    strategy:
+      dockerStrategy:
+        imageOptimizationPolicy: SkipLayers
+        dockerfilePath: prow/cmd/splice/Dockerfile
+    triggers:
+    - imageChange:
+        from:
+          kind: ImageStreamTag
+          name: prow:binaries
+      type: ImageChange
+
+- kind: ImageStream
+  apiVersion: v1
+  metadata:
+    name: sinker
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    name: sinker
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: sinker:latest
+    source:
+      git:
+        uri: https://github.com/openshift/test-infra.git
+      images:
+      - from:
+          kind: ImageStreamTag
+          name: prow:binaries
+        paths:
+        - destinationDir: .
+          sourcePath: /go/bin/sinker
+    strategy:
+      dockerStrategy:
+        imageOptimizationPolicy: SkipLayers
+        dockerfilePath: prow/cmd/sinker/Dockerfile
+    triggers:
+    - imageChange:
+        from:
+          kind: ImageStreamTag
+          name: prow:binaries
+      type: ImageChange
