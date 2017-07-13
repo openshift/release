@@ -8,10 +8,20 @@ metadata:
   iconClass: icon-jenkins
   tags: instant-app,jenkins
   template.openshift.io/long-description: |-
-    The Jenkins JJB controller synchronizes config maps created in the current namespace with 
+    The Jenkins JJB controller synchronizes config maps created in the current namespace with
     Jenkins jobs. ConfigMaps to be synchronized with Jenkins require an annotation of
     'ci.openshift.io/jenkins-job' to be set to "true".
 parameters:
+- name: APP
+  displayName: Application Name
+  description: Name of the larger application this deployment is part of.
+  value: jenkins
+  required: false
+- name: COMPONENT
+  displayName: Application Component Name
+  description: Name of this component in the larger application
+  value: jenkins-jjb-controller
+  required: false
 - name: NAME
   displayName: Application Name
   description: The name to use for the objects created by this template
@@ -51,15 +61,17 @@ objects:
 - apiVersion: v1
   kind: ImageStream
   metadata:
-    labels:
-      app: "${NAME}"
     name: "${NAME}"
+    labels:
+      app: "${APP}"
+      component: "${COMPONENT}"
 - apiVersion: v1
   kind: BuildConfig
   metadata:
-    labels:
-      app: "${NAME}"
     name: "${NAME}"
+    labels:
+      app: "${APP}"
+      component: "${COMPONENT}"
   spec:
     output:
       to:
@@ -83,10 +95,16 @@ objects:
   kind: ServiceAccount
   metadata:
     name: "${JENKINS_ADMIN_SA}"
+    labels:
+      app: "${APP}"
+      component: "${COMPONENT}"
 - apiVersion: v1
   kind: RoleBinding
   metadata:
     name: "${JENKINS_ADMIN_SA}"
+    labels:
+      app: "${APP}"
+      component: "${COMPONENT}"
   roleRef:
     name: admin
   subjects:
@@ -95,18 +113,22 @@ objects:
 - apiVersion: v1
   kind: DeploymentConfig
   metadata:
-    labels:
-      app: "${NAME}"
     name: "${NAME}"
+    labels:
+      app: "${APP}"
+      component: "${COMPONENT}"
   spec:
     replicas: 1
     selector:
-      app: "${NAME}"
+      app: "${APP}"
+      component: "${COMPONENT}"
       deploymentconfig: "${NAME}"
     template:
       metadata:
+        name: "${NAME}"
         labels:
-          app: "${NAME}"
+          app: "${APP}"
+          component: "${COMPONENT}"
           deploymentconfig: "${NAME}"
       spec:
         containers:

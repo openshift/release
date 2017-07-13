@@ -10,6 +10,16 @@ metadata:
   template.openshift.io/long-description: |-
     This template sets up a Jenkins instance to run OpenShift CI jobs.
 parameters:
+- name: APP
+  displayName: Application Name
+  description: Name of the larger application this deployment is part of.
+  value: jenkins
+  required: false
+- name: COMPONENT
+  displayName: Application Component Name
+  description: Name of this component in the larger application
+  value: jenkins-server
+  required: false
 - name: SOURCE_REF
   displayName: Source Ref
   description: Git reference to use for setup
@@ -79,7 +89,8 @@ objects:
   metadata:
     name: "${JENKINS_SERVICE_NAME}"
     labels:
-      app: jenkins
+      app: "${APP}"
+      component: "${COMPONENT}"
   spec:
     to:
       kind: Service
@@ -92,7 +103,8 @@ objects:
   metadata:
     name: "${JENKINS_SERVICE_NAME}"
     labels:
-      app: jenkins
+      app: "${APP}"
+      component: "${COMPONENT}"
   spec:
     accessModes:
     - ReadWriteOnce
@@ -104,7 +116,8 @@ objects:
   metadata:
     name: "${JENKINS_SERVICE_NAME}"
     labels:
-      app: jenkins
+      app: "${APP}"
+      component: "${COMPONENT}"
   spec:
     strategy:
       type: Recreate
@@ -123,11 +136,14 @@ objects:
     replicas: 1
     selector:
       name: "${JENKINS_SERVICE_NAME}"
+      app: "${APP}"
+      component: "${COMPONENT}"
     template:
       metadata:
-        creationTimestamp: 
         labels:
           name: "${JENKINS_SERVICE_NAME}"
+          app: "${APP}"
+          component: "${COMPONENT}"
       spec:
         serviceAccountName: "${JENKINS_SERVICE_NAME}"
         containers:
@@ -184,7 +200,8 @@ objects:
   metadata:
     name: "${JENKINS_SERVICE_NAME}"
     labels:
-      app: jenkins
+      app: "${APP}"
+      component: "${COMPONENT}"
     annotations:
       serviceaccounts.openshift.io/oauth-redirectreference.jenkins: '{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"${JENKINS_SERVICE_NAME}"}}'
 - kind: RoleBinding
@@ -192,8 +209,9 @@ objects:
   metadata:
     name: "${JENKINS_SERVICE_NAME}_edit"
     labels:
-      app: jenkins
-  groupNames: 
+      app: "${APP}"
+      component: "${COMPONENT}"
+  groupNames:
   subjects:
   - kind: ServiceAccount
     name: "${JENKINS_SERVICE_NAME}"
@@ -204,7 +222,8 @@ objects:
   metadata:
     name: "${JNLP_SERVICE_NAME}"
     labels:
-      app: jenkins
+      app: "${APP}"
+      component: "${COMPONENT}"
   spec:
     ports:
     - name: agent
@@ -214,6 +233,8 @@ objects:
       nodePort: 0
     selector:
       name: "${JENKINS_SERVICE_NAME}"
+      app: "${APP}"
+      component: "${COMPONENT}"
     type: ClusterIP
     sessionAffinity: None
 - kind: Service
@@ -221,12 +242,12 @@ objects:
   metadata:
     name: "${JENKINS_SERVICE_NAME}"
     labels:
-      app: jenkins
+      app: "${APP}"
+      component: "${COMPONENT}"
     annotations:
       service.alpha.openshift.io/dependencies: '[{"name": "${JNLP_SERVICE_NAME}",
         "namespace": "", "kind": "Service"}]'
       service.openshift.io/infrastructure: 'true'
-    creationTimestamp: 
   spec:
     ports:
     - name: web
@@ -236,6 +257,8 @@ objects:
       nodePort: 0
     selector:
       name: "${JENKINS_SERVICE_NAME}"
+      app: "${APP}"
+      component: "${COMPONENT}"
     type: ClusterIP
     sessionAffinity: None
 - apiVersion: v1
@@ -257,6 +280,8 @@ objects:
     name: ci-setup
     labels:
       name: ci-setup
+      app: "${APP}"
+      component: "${COMPONENT}"
   spec:
     triggers:
       - type: ConfigChange
