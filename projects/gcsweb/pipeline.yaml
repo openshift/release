@@ -1,0 +1,185 @@
+apiVersion: v1
+kind: Template
+labels:
+  template: gcsweb
+metadata:
+  name: gcsweb
+  openshift.io/display-name: GCS Web UI
+  iconClass: icon-storage
+  tags: instant-app,storage
+  template.openshift.io/long-description: |-
+    The GCS Web interface is a web frontend to Google Cloud Storage that uses
+    the public, no-login-required API. Obviously this means it can only browse
+    public buckets.
+parameters:
+- name: NAME
+  displayName: Application Name
+  description: The name to use for the objects created by this template
+  value: gcsweb
+  required: true
+- name: SOURCE_REF
+  displayName: Source Ref
+  description: Git reference to use for building the GCS Web UI image
+  value: master
+  required: false
+- name: SOURCE_URL
+  displayName: Source URL
+  description: Git source URL to use for building the GCS Web UI image
+  value: https://github.com/openshift/test-infra.git
+  required: true
+- name: SOURCE_CONTEXT
+  displayName: Source Context
+  description: Git source context to use for building the GCS Web UI image
+  value: gcsweb
+  required: false
+- name: SERVICE_NAME
+  displayName: GCS Web UI Service Name
+  description: The name of the OpenShift Service exposed for the GCS Web UI container.
+  value: gcsweb
+objects:
+- kind: ImageStream
+  apiVersion: v1
+  metadata:
+    labels:
+      app: "${NAME}"
+    name: "${NAME}"
+- kind: BuildConfig
+  apiVersion: v1
+  metadata:
+    labels:
+      app: "${NAME}"
+    name: "${NAME}-binary"
+  spec:
+    output:
+      to:
+        kind: ImageStreamTag
+        name: "${NAME}:binaries"
+    source:
+      git:
+        ref: "${SOURCE_REF}"
+        uri: "${SOURCE_URL}"
+      contextDir: "${SOURCE_CONTEXT}"
+      type: Git
+      dockerfile: |
+        FROM openshift/origin-release:golang-1.8
+
+        ENV ARCH=amd64 VERSION=v1.0.4 PKG=k8s.io/test-infra/gcsweb
+        COPY . /go/src/k8s.io/test-infra/gcsweb
+        RUN cd /go/src/k8s.io/test-infra/gcsweb && \
+            ./build/build.sh
+        RUN mkdir -p /go/src/k8s.io/test-infra/gcsweb/bin/${ARCH}/
+        RUN mv /go/bin/gcsweb /go/src/k8s.io/test-infra/gcsweb/bin/${ARCH}/
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: openshift/origin-release:golang-1.8
+        imageOptimizationPolicy: SkipLayers
+    triggers:
+    - type: ConfigChange
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    labels:
+      app: "${NAME}"
+    name: "${NAME}"
+  spec:
+    output:
+      to:
+        kind: ImageStreamTag
+        name: "${NAME}:latest"
+    source:
+      dockerfile: |
+        FROM        centos:7
+        MAINTAINER  Steve Kuznetsov <skuznets@redhat.com>
+
+        ADD bin/amd64/gcsweb /bin/gcsweb
+        ADD icons /icons
+        RUN chmod -R go+r /icons
+
+        ENTRYPOINT [ "/bin/gcsweb" ]
+      images:
+      - from:
+          kind: ImageStreamTag
+          name: "${NAME}:binaries"
+        paths:
+        - destinationDir: .
+          sourcePath: /go/src/k8s.io/test-infra/gcsweb/.
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: centos:7
+        imageOptimizationPolicy: SkipLayers
+    triggers:
+    - imageChange:
+        from:
+          kind: ImageStreamTag
+          name: "${NAME}:binaries"
+      type: ImageChange
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    labels:
+      app: "${NAME}"
+    name: "${NAME}"
+  spec:
+    replicas: 1
+    selector:
+      app: "${NAME}"
+      deploymentconfig: "${NAME}"
+    template:
+      metadata:
+        labels:
+          app: "${NAME}"
+          deploymentconfig: "${NAME}"
+      spec:
+        containers:
+        - image: "${NAME}:latest"
+          name: "${NAME}"
+          args:
+          - "-b"
+          - "origin-ci-test"
+    test: false
+    triggers:
+    - type: ConfigChange
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - "${NAME}"
+        from:
+          kind: ImageStreamTag
+          name: "${NAME}:latest"
+      type: ImageChange
+- kind: Service
+  apiVersion: v1
+  metadata:
+    name: "${SERVICE_NAME}"
+    labels:
+      app: "${NAME}"
+    annotations:
+      service.openshift.io/infrastructure: 'true'
+  spec:
+    ports:
+    - name: web
+      protocol: TCP
+      port: 80
+      targetPort: 8080
+      nodePort: 0
+    selector:
+      name: "${SERVICE_NAME}"
+    type: ClusterIP
+    sessionAffinity: None
+- kind: Route
+  apiVersion: v1
+  metadata:
+    name: "${SERVICE_NAME}"
+    labels:
+      app: "${NAME}"
+  spec:
+    to:
+      kind: Service
+      name: "${SERVICE_NAME}"
+    tls:
+      termination: edge
+      insecureEdgeTerminationPolicy: Redirect
