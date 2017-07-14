@@ -20,8 +20,8 @@ objects:
       type: Git
       dockerfile: |
         FROM openshift/origin-release:golang-1.7
-        COPY . /go/src/github.com/bitly/oauth2_proxy
-        RUN cd /go/src/github.com/bitly/oauth2_proxy && \
+        COPY . /go/src/github.com/openshift/oauth-proxy
+        RUN cd /go/src/github.com/openshift/oauth-proxy && \
             CGO_ENABLED=0 go build -a -tags netgo .
     strategy:
       dockerStrategy:
@@ -45,10 +45,10 @@ objects:
         name: oauth-proxy:latest
     source:
       dockerfile: |
-        FROM        quay.io/prometheus/busybox:latest
+        FROM        centos:7
         MAINTAINER  Clayton Coleman <ccoleman@redhat.com>
 
-        COPY oauth2_proxy                         /bin/oauth-proxy
+        COPY oauth-proxy /bin/oauth-proxy
 
         ENTRYPOINT [ "/bin/oauth-proxy" ]
       images:
@@ -57,7 +57,7 @@ objects:
           name: oauth-proxy:binaries
         paths:
         - destinationDir: .
-          sourcePath: /go/src/github.com/bitly/oauth2_proxy/.
+          sourcePath: /go/src/github.com/openshift/oauth-proxy/.
     strategy:
       dockerStrategy:
         from:
