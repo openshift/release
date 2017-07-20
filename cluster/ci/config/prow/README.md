@@ -52,7 +52,7 @@ oc create secret generic hmac-token --from-file=hmac=hmac-token
 The `oauth-token` is an OAuth2 token that has read and write access to the bot account.
 Make sure that this and the SubmitQueue bots are different.
 ```
-oc create secret generic oauth-token --from-file=oauth=oauth-token --from-literal=github-bot=kargakis-bot
+oc create secret generic oauth-token --from-file=oauth=oauth-token --from-literal=github-bot=openshift-ci-robot
 ```
 [1] https://gist.github.com/kargakis/ef003a13c0e1f708836b60100f6e1aef
 
@@ -61,18 +61,21 @@ oc create secret generic oauth-token --from-file=oauth=oauth-token --from-litera
 oc create -f config.yaml -f plugins.yaml
 ```
 
+While the plugins configuration is used specifically by hook, the prow config
+file is used by all prow components.
+
 1. Create the hook service and deployment.
 ```
 oc create -f gke/hook.yaml
 ```
 
-Create the Github webhook in the repository you want to run tests for.
+1. Create the Github webhook in the repository you want to run tests for.
 
 https://developer.github.com/webhooks/creating/
 
-Use application/json for the content type and the hmac-token created in
+Use `application/json` for the content type and the hmac-token created in
 the first step for the secret. Add the URL exposed by the route plus a
-/hook suffix as the payload URL. Eg. https://hook-ci.svc.ci.openshift.org/hook
+/hook suffix as the payload URL. Eg. `https://hook-ci.svc.ci.openshift.org/hook`.
 
 ## plank turn-up
 
@@ -96,12 +99,6 @@ oc create cm jenkins-config --from-literal=jenkins_address=https://ci.openshift.
 plank also needs a Github Oauth token for updating PR statuses based on the
 outcome of ProwJobs. For now, I reuse the same token used by hook. Eventually,
 we should probably have a separate token per deployment.
-
-Also, note that plank is reusing the prow config used by hook in order to get
-the URL template that is set in the Github "Details" button in every pull request.
-
-Lastly, make sure the plank deployment specifies correctly the Github bot you
-want to use and create the deployment:
 ```
 oc create -f gke/plank.yaml
 ```
@@ -120,15 +117,14 @@ oc create -f gke/deck.yaml
 
 splice polls the SubmitQueue for mergeable PRs, and creates ProwJobs for batches.
 Make sure the options specified in the deployment manifest match your setup
-(submit queue location, Github organization, and repository). Note that this component
-also uses the prow config used by hook and plank. Create with:
+(submit queue location, Github organization, and repository).
 ```
 oc create -f gke/splice.yaml
 ```
 
 ## sinker turn-up
 
-sinker is used for garbage-collecting ProwJobs and Pods. Create with:
+sinker is used for garbage-collecting ProwJobs and Pods.
 ```
 oc create -f gke/sinker.yaml
 ```
