@@ -21,7 +21,7 @@ objects:
         uri: https://github.com/openshift/prometheus.git
       type: Git
       dockerfile: |
-        FROM openshift/origin-release:golang-1.7
+        FROM openshift/origin-release:golang-1.8
         COPY . /go/src/github.com/prometheus/prometheus
         RUN cd /go/src/github.com/prometheus/prometheus && \
             CGO_ENABLED=0 make
@@ -29,7 +29,7 @@ objects:
       dockerStrategy:
         from:
           kind: DockerImage
-          name: openshift/origin-release:golang-1.7
+          name: openshift/origin-release:golang-1.8
         imageOptimizationPolicy: SkipLayers
     triggers:
     - type: ConfigChange
@@ -85,4 +85,84 @@ objects:
         from:
           kind: ImageStreamTag
           name: prometheus:binaries
+      type: ImageChange
+
+- kind: ImageStream
+  apiVersion: v1
+  metadata:
+    name: prometheus-alertmanager
+- kind: BuildConfig
+  apiVersion: v1
+  metadata:
+    name: prometheus-alertmanager-binary
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: prometheus-alertmanager:binaries
+    source:
+      git:
+        uri: https://github.com/openshift/prometheus-alertmanager.git
+      type: Git
+      dockerfile: |
+        FROM openshift/origin-release:golang-1.8
+        COPY . /go/src/github.com/prometheus/alertmanager
+        RUN cd /go/src/github.com/prometheus/alertmanager && \
+            CGO_ENABLED=0 make
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: openshift/origin-release:golang-1.8
+        imageOptimizationPolicy: SkipLayers
+    triggers:
+    - type: ConfigChange
+    - type: GitHub
+      github:
+        secret: pohRLhJWRgBHOvv6wcfi
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    name: prometheus-alertmanager
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: prometheus-alertmanager:latest
+    source:
+      dockerfile: |
+        FROM        centos:7
+        MAINTAINER  Clayton Coleman <ccoleman@redhat.com>
+
+        COPY alertmanager            /bin/alertmanager
+        COPY amtool                  /bin/amtool
+        COPY doc/examples/simple.yml /etc/alertmanager/config.yml
+
+        EXPOSE     9093
+        VOLUME     [ "/alertmanager" ]
+        WORKDIR    /alertmanager
+        ENTRYPOINT [ "/bin/alertmanager" ]
+        CMD        [ "-config.file=/etc/alertmanager/config.yml", \
+                    "-storage.path=/alertmanager" ]
+      images:
+      - from:
+          kind: ImageStreamTag
+          name: prometheus-alertmanager:binaries
+        paths:
+        - destinationDir: .
+          sourcePath: /go/src/github.com/prometheus/alertmanager/.
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: centos:7
+    triggers:
+    - imageChange:
+        from:
+          kind: ImageStreamTag
+          name: prometheus-alertmanager:binaries
       type: ImageChange
