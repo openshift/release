@@ -1,0 +1,305 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: submit-queue
+  labels:
+    app: k8sci
+    target-repo: origin
+parameters:
+- name: NAME
+  displayName: Application Name
+  description: The name to use for the objects created by this template
+  value: submit-queue
+  required: true
+- name: SERVICE_NAME
+  displayName: Service Name
+  description: The name to use for the service that will report the SubmitQueue status
+  value: origin-sq-status
+  required: true
+- name: SOURCE_URL
+  displayName: Source URL
+  description: Git source URL to use for building the Submit Queue image
+  value: https://github.com/openshift/test-infra.git
+  required: true
+- name: HMAC_TOKEN
+  displayName: HMAC token
+  description: hmac token used for decoding webhook content
+  value: needs-to-be-overriden
+  required: true
+- name: OAUTH_TOKEN
+  displayName: Oauth token
+  description: Oauth token used for munging pull requests
+  value: needs-to-be-overriden
+  required: true
+objects:
+- kind: ImageStream
+  apiVersion: v1
+  metadata:
+    name: submit-queue
+    labels:
+      app: k8sci
+      component: "${NAME}"
+      target-repo: origin
+- kind: BuildConfig
+  apiVersion: v1
+  metadata:
+    name: "${NAME}-binary"
+    labels:
+      app: k8sci
+      component: "${NAME}-binary"
+      target-repo: origin
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: "${NAME}:binaries"
+    source:
+      git:
+        uri: "${SOURCE_URL}"
+      type: Git
+      dockerfile: |
+        FROM openshift/origin-release:golang-1.8
+
+        COPY . /go/src/k8s.io/test-infra
+        RUN cd /go/src/k8s.io/test-infra && \
+            godep restore && \
+            cd mungegithub && \
+            CGO_ENABLED=0 GOOS=linux go install -a -installsuffix cgo -ldflags '-w' && \
+            # 'godep clean' would be nice
+            mkdir -p /tmp/src/k8s.io/test-infra && \
+            mv /go/src/k8s.io/test-infra/* /tmp/src/k8s.io/test-infra && \
+            rm -rf /go/src && \
+            mkdir -p /go/src/k8s.io/test-infra && \
+            mv /tmp/src/k8s.io/test-infra/* /go/src/k8s.io/test-infra
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: openshift/origin-release:golang-1.8
+        imageOptimizationPolicy: SkipLayers
+    triggers:
+    - type: ConfigChange
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    name: "${NAME}"
+    labels:
+      app: k8sci
+      component: "${NAME}"
+      target-repo: origin
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: "${NAME}:latest"
+    source:
+      git:
+        uri: "${SOURCE_URL}"
+      contextDir: mungegithub
+      images:
+      - from:
+          kind: ImageStreamTag
+          name: "${NAME}:binaries"
+        paths:
+        - destinationDir: mungegithub/
+          sourcePath: /go/bin/mungegithub
+      dockerfile: |
+        FROM        alpine:3.6
+        MAINTAINER  Michail Kargakis <mkargaki@redhat.com>
+        RUN apk update --no-cache && \
+            apk add ca-certificates git --no-cache
+        EXPOSE 8080
+        ADD mungegithub /mungegithub
+        ADD submit-queue/www /www
+        ENTRYPOINT [ "/mungegithub" ]
+    strategy:
+      dockerStrategy:
+        imageOptimizationPolicy: SkipLayers
+    triggers:
+    - imageChange:
+        from:
+          kind: ImageStreamTag
+          name: "${NAME}:binaries"
+      type: ImageChange
+- kind: PersistentVolumeClaim
+  apiVersion: v1
+  metadata:
+    name: origin-cache
+    labels:
+      app: k8sci
+      component: "${NAME}"
+      target-repo: origin
+  spec:
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 10Gi
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    name: "${NAME}"
+  spec:
+    replicas: 1
+    revisionHistoryLimit: 2
+    template:
+      metadata:
+        labels:
+          app: k8sci
+          component: "${NAME}"
+          target-repo: origin
+      spec:
+        containers:
+        - name: "${NAME}"
+          image: "${NAME}"
+          command:
+          - /mungegithub
+          # TODO: Change to false once we are ready to switch.
+          - --dry-run=true
+          - --alsologtostderr
+          - --stderrthreshold=INFO
+          - --config-path=/etc/munge-config/config
+          ports:
+          - name: status
+            containerPort: 8080
+          resources:
+            requests:
+              cpu: 100m
+            limits:
+              cpu: 100m
+          volumeMounts:
+          - mountPath: /etc/munge-config
+            name: munge-config
+          - mountPath: /etc/hmac-token
+            name: hmac-token
+          - mountPath: /etc/oauth-token
+            name: oauth-token
+          - mountPath: /gitrepos
+            name: repo
+          - mountPath: /cache
+            name: cache-volume
+        volumes:
+        - name: munge-config
+          configMap:
+            name: "${NAME}"
+        - name: hmac-token
+          secret:
+            secretName: sq-hmac-token
+        - name: oauth-token
+          secret:
+            secretName: sq-oauth-token
+        - name: repo
+          emptyDir: {}
+        - name: cache-volume
+          persistentVolumeClaim:
+            claimName: origin-cache
+    triggers:
+    - type: ConfigChange
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - "${NAME}"
+        from:
+          kind: ImageStreamTag
+          name: "${NAME}:latest"
+      type: ImageChange
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: "${NAME}"
+  data:
+    config: |
+      # https://trello.com/c/eJrRpm7S/230-ci-k8sci-evaluate-using-a-gcs-bucket-for-the-submitqueue-or-querying-jenkins-directly
+      fake-e2e: "true"
+      # basic config options.
+      http-cache-dir: /cache/httpcache
+      organization: openshift
+      project: origin
+      # Make sure approval-handler and blunderbuss run before submit-queue.
+      # Otherwise it's going to take an extra-cycle to detect the label change.
+      # Run blunderbuss before approval-handler, so that we can suggest approvers
+      # based on assigned reviewer.
+      pr-mungers: lgtm-after-commit,needs-rebase,size,comment-deleter,submit-queue,docs-need-no-retest
+      state: open
+      token-file: /etc/oauth-token/token
+      period: 20s
+      repo-dir: /gitrepos
+      github-key-file: /etc/hmac-token/token
+
+      required-retest-contexts: "\
+        continuous-integration/openshift-jenkins/test"
+
+      protected-branches: ""
+      do-not-merge-milestones: ""
+
+      # chart-url: https://storage.googleapis.com/origin-test-history/k8s-queue-health.svg
+      # history-url: https://storage.googleapis.com/origin-test-history/static/index.html
+      batch-url: https://deck-ci.svc.ci.openshift.org/data.js
+      context-url: https://origin-sq-status-ci.svc.ci.openshift.org
+
+      # options used by the GCS feature.
+      # gcs-bucket: origin-ci-test
+      # gcs-logs-dir: logs
+      # pull-logs-dir: pr-logs
+      # pull-key: pull
+
+      use-reviewers: "false"
+      gate-approved: "false"
+      gate-cla: "false"
+- apiVersion: v1
+  data:
+    token: "${HMAC_TOKEN}"
+  kind: Secret
+  metadata:
+    name: sq-hmac-token
+  type: Opaque
+- apiVersion: v1
+  data:
+    token: "${OAUTH_TOKEN}"
+  kind: Secret
+  metadata:
+    name: sq-oauth-token
+  type: Opaque
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: "${SERVICE_NAME}"
+    labels:
+      app: k8sci
+      component: "${NAME}"
+      target-repo: origin
+    annotations:
+      service.openshift.io/infrastructure: 'true'
+  spec:
+    ports:
+    - name: status
+      protocol: TCP
+      port: 80
+      targetPort: 8080
+    selector:
+      app: k8sci
+      component: "${NAME}"
+      target-repo: origin
+    type: ClusterIP
+    sessionAffinity: None
+- apiVersion: v1
+  kind: Route
+  metadata:
+    name: "${SERVICE_NAME}"
+    labels:
+      app: k8sci
+      component: "${NAME}"
+      target-repo: origin
+  spec:
+    to:
+      kind: Service
+      name: "${SERVICE_NAME}"
+    port:
+      targetPort: status
+    tls:
+      termination: edge
+      insecureEdgeTerminationPolicy: Redirect
