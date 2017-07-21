@@ -5,6 +5,21 @@ we don't support ThirdPartyResources in Openshift. Once we release 3.7, with
 support for CustomResourceDefinitions (the new TPR), we will be able to move
 prow on top of Openshift.
 
+With that limitation in mind, we concluded to terminate https connections from
+Github on Openshift, which means that the hook and deck services need to be
+created and exposed as routes in our CI cluster. As a backend to those services
+we will run two nginx instances, one for each route, that will proxy to GKE.
+We could possibly run a single nginx instance but that would require switching
+the labels in the services to use different label keys and also switch them back
+to point to separate instances once we remove the proxies in favor of the actual
+pods (3.7).
+
+In an Openshift cluster, process the template that creates the proxies. Make
+sure the template contains the correct GKE IP.
+```
+oc process -f proxy/proxies.yaml | oc create -f -
+```
+
 ## GKE k8s cluster turn-up
 
 Set up CLUSTER to the desired cluster name (can be whatever you want), ZONE to a [valid GCE zone](https://cloud.google.com/compute/docs/regions-zones/regions-zones),
