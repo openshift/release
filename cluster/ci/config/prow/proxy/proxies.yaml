@@ -1,0 +1,189 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: prow-proxies
+  labels:
+    app: k8sci
+    target-repo: origin
+parameters:
+- name: DECK_NAME
+  displayName: deck proxy name
+  value: deck
+  required: true
+- name: HOOK_NAME
+  displayName: hook proxy name
+  value: hook
+  required: true
+- name: IMAGE_PULL_SPEC
+  value: docker.io/nginx:1.12
+  display: Proxy pull specification
+  required: true
+objects:
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: nginx
+  data:
+    nginx.conf: |-
+      error_log  /var/log/nginx/error.log warn;
+
+      events {
+          worker_connections  1024;
+      }
+
+      http {
+          server {
+              listen       8080;
+              server_name  localhost;
+
+              location / {
+                  # Proxying to a static IP in GKE
+                  proxy_pass       http://35.190.43.185;
+              }
+          }
+      }
+- apiVersion: v1
+  kind: Route
+  metadata:
+    name: "${DECK_NAME}"
+    labels:
+      app: k8sci
+      component: "${DECK_NAME}"
+      target-repo: origin
+  spec:
+    to:
+      kind: Service
+      name: "${DECK_NAME}"
+    tls:
+      termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: "${DECK_NAME}"
+    labels:
+      app: k8sci
+      component: "${DECK_NAME}"
+      target-repo: origin
+    annotations:
+      service.openshift.io/infrastructure: 'true'
+  spec:
+    ports:
+    - name: status
+      protocol: TCP
+      port: 80
+      targetPort: 8080
+    selector:
+      app: k8sci
+      component: "${DECK_NAME}"
+      target-repo: origin
+    type: NodePort
+- apiVersion: extensions/v1beta1
+  kind: Deployment
+  metadata:
+    name: "${DECK_NAME}-proxy"
+  spec:
+    template:
+      metadata:
+        labels:
+          app: k8sci
+          component: "${DECK_NAME}"
+          target-repo: origin
+      spec:
+        containers:
+        - image: "${IMAGE_PULL_SPEC}"
+          name: nginx
+          ports:
+          - containerPort: 8080
+            protocol: TCP
+          volumeMounts:
+          - mountPath: /etc/nginx
+            name: conf
+          # Both emptyDir mounts are required so we can run
+          # nginx w/o getting any permission errors back.
+          - mountPath: /var/cache/nginx
+            name: cache
+          - mountPath: /var/run
+            name: runtime
+        volumes:
+        - configMap:
+            defaultMode: 420
+            name: nginx
+          name: conf
+        - emptyDir: {}
+          name: cache
+        - emptyDir: {}
+          name: runtime
+- apiVersion: v1
+  kind: Route
+  metadata:
+    name: "${HOOK_NAME}"
+    labels:
+      app: k8sci
+      component: "${HOOK_NAME}"
+      target-repo: origin
+  spec:
+    path: /hook
+    to:
+      kind: Service
+      name: "${HOOK_NAME}"
+    tls:
+      termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: "${HOOK_NAME}"
+    labels:
+      app: k8sci
+      component: "${HOOK_NAME}"
+      target-repo: origin
+    annotations:
+      service.openshift.io/infrastructure: 'true'
+  spec:
+    ports:
+    - name: status
+      protocol: TCP
+      port: 8888
+      targetPort: 8080
+    selector:
+      app: k8sci
+      component: "${HOOK_NAME}"
+      target-repo: origin
+    type: NodePort
+- apiVersion: extensions/v1beta1
+  kind: Deployment
+  metadata:
+    name: "${HOOK_NAME}-proxy"
+  spec:
+    template:
+      metadata:
+        labels:
+          app: k8sci
+          component: "${HOOK_NAME}"
+          target-repo: origin
+      spec:
+        containers:
+        - image: "${IMAGE_PULL_SPEC}"
+          name: nginx
+          ports:
+          - containerPort: 8080
+            protocol: TCP
+          volumeMounts:
+          - mountPath: /etc/nginx
+            name: conf
+          # Both emptyDir mounts are required so we can run
+          # nginx w/o getting any permission errors back.
+          - mountPath: /var/cache/nginx
+            name: cache
+          - mountPath: /var/run
+            name: runtime
+        volumes:
+        - configMap:
+            defaultMode: 420
+            name: nginx
+          name: conf
+        - emptyDir: {}
+          name: cache
+        - emptyDir: {}
+          name: runtime
