@@ -173,6 +173,8 @@ objects:
           volumeMounts:
           - mountPath: /etc/munge-config
             name: munge-config
+          - mountPath: /path-label
+            name: path-label
           - mountPath: /etc/hmac-token
             name: hmac-token
           - mountPath: /etc/oauth-token
@@ -185,6 +187,9 @@ objects:
         - name: munge-config
           configMap:
             name: "${NAME}"
+        - name: path-label
+          configMap:
+            name: path-label
         - name: hmac-token
           secret:
             secretName: sq-hmac-token
@@ -222,7 +227,7 @@ objects:
       # Otherwise it's going to take an extra-cycle to detect the label change.
       # Run blunderbuss before approval-handler, so that we can suggest approvers
       # based on assigned reviewer.
-      pr-mungers: lgtm-after-commit,needs-rebase,size,comment-deleter,submit-queue,docs-need-no-retest,blunderbuss,approval-handler
+      pr-mungers: lgtm-after-commit,needs-rebase,size,comment-deleter,submit-queue,docs-need-no-retest,blunderbuss,approval-handler,path-label
       state: open
       token-file: /etc/oauth-token/token
       period: 20s
@@ -255,9 +260,29 @@ objects:
       # pull-logs-dir: pr-logs
       # pull-key: pull
 
+      path-label-config: /path-label/path-label.txt
+
       use-reviewers: "false"
       gate-approved: "true"
       gate-cla: "false"
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: path-label
+  data:
+    path-label.txt: |-
+      # This file is used by the path-label munger and is of the form:
+      # PATH REGEXP     LABEL
+
+      # examples:
+      # pkg/api/types.go
+      # pkg/api/*/types.go
+      .*/api/([^/]+/)*types.go$   needs-api-review
+
+      # examples:
+      # pkg/*/apis/*/types.go
+      # pkg/*/apis/*/*/types.go
+      .*/apis/([^/]+/)*types.go$   needs-api-review
 - apiVersion: v1
   data:
     token: "${HMAC_TOKEN}"
