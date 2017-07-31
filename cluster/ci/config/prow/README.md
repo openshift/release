@@ -23,11 +23,19 @@ oc process -f proxy/proxies.yaml | oc create -f -
 ## GKE k8s cluster turn-up
 
 Set up CLUSTER to the desired cluster name (can be whatever you want), ZONE to a [valid GCE zone](https://cloud.google.com/compute/docs/regions-zones/regions-zones),
-and PROJECT to *openshift-gce-devel*.
+and PROJECT to *openshift-gce-devel*. Adding the empty label `preserve` protects the GCE instances this command will create by excluding it from our [long-running instance report and our instance pruning script](https://github.com/openshift/li/blob/9618207bcf5014071354ce591c4e90b04056b93a/build/lib/openshift/gce.rb#L241-L245). This should only be added for our production environment.
 
 Then, create a cluster in GKE:
 ```
-gcloud -q container --project $PROJECT clusters create $CLUSTER --zone $ZONE --machine-type n1-standard-4 --num-nodes 2 --scopes "https://www.googleapis.com/auth/compute","https://www.googleapis.com/auth/devstorage.full_control","https://www.googleapis.com/auth/logging.write","https://www.googleapis.com/auth/servicecontrol","https://www.googleapis.com/auth/service.management" --network "default"
+gcloud container clusters create $CLUSTER \
+       --machine-type n1-standard-4 \
+       --num-nodes 2 \
+       --scopes "https://www.googleapis.com/auth/compute","https://www.googleapis.com/auth/devstorage.full_control","https://www.googleapis.com/auth/logging.write","https://www.googleapis.com/auth/servicecontrol","https://www.googleapis.com/auth/service.management" \
+       --network "default" \
+       --labels=preserve="" \
+       --project $PROJECT \
+       --zone $ZONE \
+       --quiet
 ```
 
 Get the cluster kubeconfig:
