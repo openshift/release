@@ -223,3 +223,39 @@ objects:
           kind: ImageStreamTag
           name: prow:binaries
       type: ImageChange
+
+- kind: ImageStream
+  apiVersion: v1
+  metadata:
+    name: horologium
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    name: horologium
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: horologium:latest
+    source:
+      git:
+        uri: https://github.com/openshift/test-infra.git
+      images:
+      - from:
+          kind: ImageStreamTag
+          name: prow:binaries
+        paths:
+        - destinationDir: .
+          sourcePath: /go/bin/horologium
+    strategy:
+      dockerStrategy:
+        imageOptimizationPolicy: SkipLayers
+        dockerfilePath: prow/cmd/horologium/Dockerfile
+    triggers:
+    - imageChange:
+        from:
+          kind: ImageStreamTag
+          name: prow:binaries
+      type: ImageChange
