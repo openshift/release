@@ -1,0 +1,78 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: commenter
+objects:
+- kind: ImageStream
+  apiVersion: v1
+  metadata:
+    name: commenter
+- kind: BuildConfig
+  apiVersion: v1
+  metadata:
+    name: commenter-binary
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: commenter:binaries
+    source:
+      # git:
+      #   uri: https://github.com/openshift/test-infra.git
+      # type: Git
+      dockerfile: |
+        FROM openshift/origin-release:golang-1.8
+
+        COPY . /go/src/k8s.io/test-infra
+        RUN cd /go/src/k8s.io/test-infra && \
+            rm -rf * && \
+            git init && \
+            git remote add experiment https://github.com/kargakis/test-infra && \
+            git fetch experiment && \
+            git checkout experiment/retest && \
+            godep restore && \
+            cd experiment/commenter && \
+            CGO_ENABLED=0 go install -a -installsuffix cgo -ldflags '-w' && \
+            rm -rf /go/src /go/pkg
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: openshift/origin-release:golang-1.8
+        imageOptimizationPolicy: SkipLayers
+    triggers:
+    - type: ConfigChange
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    name: commenter
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: commenter:latest
+    source:
+      git:
+        ref: retest
+        uri: https://github.com/kargakis/test-infra.git
+      images:
+      - from:
+          kind: ImageStreamTag
+          name: commenter:binaries
+        paths:
+        - destinationDir: .
+          sourcePath: /go/bin/commenter
+    strategy:
+      dockerStrategy:
+        imageOptimizationPolicy: SkipLayers
+        dockerfilePath: experiment/commenter/Dockerfile
+    triggers:
+    - imageChange:
+        from:
+          kind: ImageStreamTag
+          name: commenter:binaries
+      type: ImageChange
