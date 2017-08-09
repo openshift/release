@@ -1,0 +1,91 @@
+# oc process -f splice.yaml | oc create -f -
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: splice-prow
+  annotations:
+    "openshift.io/display-name": splice-prow
+    description: |
+      splice manifest for prow
+parameters:
+- description: The namespace to get the image from.
+  name: IMAGE_NAMESPACE
+  value: prow-images
+- description: The namespace to instantiate splice under.
+  name: NAMESPACE
+  value: ci
+- description: The name of the component.
+  name: NAME
+  value: splice
+objects:
+- apiVersion: apps.openshift.io/v1
+  kind: DeploymentConfig
+  metadata:
+    name: "${NAME}"
+    namespace: "${NAMESPACE}"
+  spec:
+    replicas: 1
+    template:
+      metadata:
+        labels:
+          app: k8sci
+          component: "${NAME}"
+      spec:
+        serviceAccountName: "${NAME}"
+        containers:
+        - name: "${NAME}"
+          image: "${NAME}"
+          args:
+          - --submit-queue-endpoint=http://origin-sq-status-ci.svc.ci.openshift.org/github-e2e-queue
+          - --remote-url=https://github.com/openshift/origin
+          - --org=openshift
+          - --repo=origin
+          volumeMounts:
+          - name: config
+            mountPath: /etc/config
+            readOnly: true
+        volumes:
+        - name: config
+          configMap:
+            name: config
+    triggers:
+    - type: ConfigChange
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - "${NAME}"
+        from:
+          kind: ImageStreamTag
+          name: "${NAME}:latest"
+          namespace: "${IMAGE_NAMESPACE}"
+      type: ImageChange
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    name: "${NAME}"
+    namespace: "${NAMESPACE}"
+- kind: ClusterRole
+  apiVersion: v1 # rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: "${NAME}"
+  rules:
+    - apiGroups:
+        - "prow.k8s.io"
+      resources:
+        - prowjobs
+      verbs:
+        - create
+        - list
+- kind: ClusterRoleBinding
+  apiVersion: v1 # rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: "${NAME}"
+  roleRef:
+    apiGroup: "" # rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: "${NAME}"
+  subjects:
+  - kind: ServiceAccount
+    name: "${NAME}"
+    namespace: default
+    namespace: "${NAMESPACE}"
