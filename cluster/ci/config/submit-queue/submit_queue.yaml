@@ -125,20 +125,47 @@ objects:
           kind: ImageStreamTag
           name: "${NAME}:binaries"
       type: ImageChange
-- kind: PersistentVolumeClaim
-  apiVersion: v1
+- apiVersion: v1
+  kind: Route
   metadata:
-    name: origin-cache
+    name: "${SERVICE_NAME}"
     labels:
       app: k8sci
       component: "${NAME}"
       target-repo: origin
   spec:
-    accessModes:
-      - ReadWriteOnce
-    resources:
-      requests:
-        storage: 10Gi
+    to:
+      kind: Service
+      name: "${SERVICE_NAME}"
+    port:
+      targetPort: status
+    tls:
+      termination: edge
+      insecureEdgeTerminationPolicy: Redirect
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: "${SERVICE_NAME}"
+    labels:
+      app: k8sci
+      component: "${NAME}"
+      target-repo: origin
+    annotations:
+      prometheus.io/path: /prometheus
+      prometheus.io/scrape: "true"
+      service.openshift.io/infrastructure: 'true'
+  spec:
+    ports:
+    - name: status
+      protocol: TCP
+      port: 80
+      targetPort: 8080
+    selector:
+      app: k8sci
+      component: "${NAME}"
+      target-repo: origin
+    type: ClusterIP
+    sessionAffinity: None
 - apiVersion: v1
   kind: DeploymentConfig
   metadata:
@@ -299,42 +326,17 @@ objects:
   metadata:
     name: sq-oauth-token
   type: Opaque
-- apiVersion: v1
-  kind: Service
+- kind: PersistentVolumeClaim
+  apiVersion: v1
   metadata:
-    name: "${SERVICE_NAME}"
-    labels:
-      app: k8sci
-      component: "${NAME}"
-      target-repo: origin
-    annotations:
-      service.openshift.io/infrastructure: 'true'
-  spec:
-    ports:
-    - name: status
-      protocol: TCP
-      port: 80
-      targetPort: 8080
-    selector:
-      app: k8sci
-      component: "${NAME}"
-      target-repo: origin
-    type: ClusterIP
-    sessionAffinity: None
-- apiVersion: v1
-  kind: Route
-  metadata:
-    name: "${SERVICE_NAME}"
+    name: origin-cache
     labels:
       app: k8sci
       component: "${NAME}"
       target-repo: origin
   spec:
-    to:
-      kind: Service
-      name: "${SERVICE_NAME}"
-    port:
-      targetPort: status
-    tls:
-      termination: edge
-      insecureEdgeTerminationPolicy: Redirect
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 10Gi
