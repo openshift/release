@@ -15,11 +15,11 @@ type fakeRunner struct {
 	commands []fakeCmd
 }
 
-func (r *fakeRunner) Add(name string, args ...string) {
-	r.AddAt("", name, args...)
+func (r *fakeRunner) Add(func() error) {
+	// no-op
 }
 
-func (r *fakeRunner) AddAt(dir, name string, args ...string) {
+func (r *fakeRunner) AddCmd(dir, name string, args ...string) {
 	r.commands = append(r.commands, fakeCmd{
 		name: name,
 		dir:  dir,
@@ -36,7 +36,7 @@ func runner() *fakeRunner {
 }
 
 func (r *fakeRunner) c(dir, name string, args ...string) *fakeRunner {
-	r.AddAt(dir, name, args...)
+	r.AddCmd(dir, name, args...)
 	return r
 }
 
@@ -63,7 +63,6 @@ func TestCloneRef(t *testing.T) {
 				RepositoryURL: repoURL,
 			},
 			expect: runner().
-				c("", "mkdir", "-p", dir).
 				c("", "git", "clone", repoURL, dir),
 		},
 		{
@@ -73,7 +72,6 @@ func TestCloneRef(t *testing.T) {
 				Branch:        "test",
 			},
 			expect: runner().
-				c("", "mkdir", "-p", dir).
 				c("", "git", "clone", repoURL, dir).
 				c(dir, "git", "checkout", "test"),
 		},
@@ -85,7 +83,6 @@ func TestCloneRef(t *testing.T) {
 				BranchCommit:  "12345",
 			},
 			expect: runner().
-				c("", "mkdir", "-p", dir).
 				c("", "git", "clone", repoURL, dir).
 				c(dir, "git", "checkout", "12345"),
 		},
@@ -103,7 +100,6 @@ func TestCloneRef(t *testing.T) {
 				},
 			},
 			expect: runner().
-				c("", "mkdir", "-p", dir).
 				c("", "git", "clone", repoURL, dir).
 				c(dir, "git", "checkout", "12345").
 				c(dir, "git", "fetch", "origin", "pull/123/head").
@@ -127,7 +123,6 @@ func TestCloneRef(t *testing.T) {
 				},
 			},
 			expect: runner().
-				c("", "mkdir", "-p", dir).
 				c("", "git", "clone", repoURL, dir).
 				c(dir, "git", "checkout", "12345").
 				c(dir, "git", "fetch", "origin", "pull/123/head").

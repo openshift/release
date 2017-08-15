@@ -3,14 +3,15 @@ package pullrefs
 import (
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 )
 
 // Runner is an object that knows how to keep track of a list
 // of commands and execute them
 type Runner interface {
-	Add(cmd string, args ...string)
-	AddAt(dir, cmd string, args ...string)
+	Add(func() error)
+	AddCmd(dir, cmd string, args ...string)
 	Run() error
 }
 
@@ -21,21 +22,21 @@ func CloneRef(ref SourceRef, dir string, existing bool, runner Runner) error {
 	}
 
 	if !existing {
-		runner.Add("mkdir", "-p", dir)
-		runner.Add("git", "clone", ref.RepositoryURL, dir)
+		runner.Add(func() error { return os.MkdirAll(dir, 0644) })
+		runner.AddCmd("", "git", "clone", ref.RepositoryURL, dir)
 	} else {
-		runner.AddAt(dir, "git", "fetch", "origin")
+		runner.AddCmd(dir, "git", "fetch", "origin")
 	}
 	if len(ref.BranchCommit) > 0 {
-		runner.AddAt(dir, "git", "checkout", ref.BranchCommit)
+		runner.AddCmd(dir, "git", "checkout", ref.BranchCommit)
 	} else {
 		if len(ref.Branch) > 0 {
-			runner.AddAt(dir, "git", "checkout", ref.Branch)
+			runner.AddCmd(dir, "git", "checkout", ref.Branch)
 		}
 	}
 	for _, prRef := range ref.PullRefs {
-		runner.AddAt(dir, "git", "fetch", "origin", fmt.Sprintf("pull/%d/head", prRef.Number))
-		runner.AddAt(dir, "git", "merge", prRef.Commit)
+		runner.AddCmd(dir, "git", "fetch", "origin", fmt.Sprintf("pull/%d/head", prRef.Number))
+		runner.AddCmd(dir, "git", "merge", prRef.Commit)
 	}
 	return runner.Run()
 }
@@ -49,44 +50,33 @@ func NewExecRunner(stdout, stderr io.Writer) Runner {
 	}
 }
 
+type runnerStep func() error
+
 type execRunner struct {
-	cmds   []cmdLine
+	cmds   []runnerStep
 	stdOut io.Writer
 	stdErr io.Writer
 }
 
 // cmd adds a command to a list of
-func (r *execRunner) Add(name string, args ...string) {
-	r.AddAt("", name, args...)
+func (r *execRunner) Add(f func() error) {
+	r.cmds = append(r.cmds, f)
 }
 
-func (r *execRunner) AddAt(dir, name string, args ...string) {
-	r.cmds = append(r.cmds, cmdLine{
-		name: name,
-		dir:  dir,
-		args: args,
+func (r *execRunner) AddCmd(dir, name string, args ...string) {
+	r.Add(func() error {
+		cmd := exec.Command(name, args...)
+		cmd.Stdout = r.stdOut
+		cmd.Stderr = r.stdErr
+		return cmd.Run()
 	})
 }
 
 func (r *execRunner) Run() error {
 	for _, cmd := range r.cmds {
-		if err := cmd.run(r.stdOut, r.stdErr); err != nil {
+		if err := cmd(); err != nil {
 			return err
 		}
 	}
 	return nil
-}
-
-type cmdLine struct {
-	name string
-	args []string
-	dir  string
-}
-
-func (l *cmdLine) run(stdout, stderr io.Writer) error {
-	cmd := exec.Command(l.name, l.args...)
-	cmd.Dir = l.dir
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
-	return cmd.Run()
 }
