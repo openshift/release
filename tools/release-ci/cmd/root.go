@@ -13,7 +13,7 @@ var cfgFile string
 var RootCmd = &cobra.Command{
 	Use:   "release-ci",
 	Short: "tools for OpenShift release pipelines",
-	Long: `This rool is used by OpenShift release pipelines to clone repository
+	Long: `This tool is used by OpenShift release pipelines to clone repository
 references, generate unique ids for jobs, etc.`,
 }
 
