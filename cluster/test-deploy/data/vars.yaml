@@ -21,7 +21,7 @@ openshift_master_public_console_url: "https://api.{{ lookup('env', 'INSTANCE_PRE
 
 openshift_template_service_broker_namespaces: [ "openshift" ]
 
-openshift_disable_check: disk_availability,docker_image_availability,memory_availability
+openshift_disable_check: disk_availability,docker_image_availability,memory_availability,docker_storage
 
 public_hosted_zone: origin-ci-int-gce.dev.rhcloud.com
 dns_managed_zone: origin-ci-int-gce
@@ -58,11 +58,32 @@ gce_service_account_keyfile: "gce.json"
 gce_ssh_private_key: /home/cloud-user/.ssh/google_compute_engine
 
 gcs_registry_keyfile: "gce.json"
+openshift_hosted_registry_storage_kind: object
 openshift_hosted_registry_storage_gcs_bucket: origin-ci-test-{{ lookup('env', 'INSTANCE_PREFIX') | mandatory }}
 # DEPRECATED: only for backwards compatibilty
 provision_gce_registry_gcs_bucket: origin-ci-test-{{ lookup('env', 'INSTANCE_PREFIX') | mandatory }}
 
 inventory_ip_type: external
+
+provision_gce_node_groups:
+- name: master
+  suffix: m
+  tags: ocp-master
+  machine_type: n1-standard-2
+  boot_disk_size: 150
+  scale: 1
+- name: node
+  suffix: n
+  tags: ocp-node
+  machine_type: n1-standard-2
+  boot_disk_size: 150
+  scale: 3
+- name: node-flex
+  suffix: nf
+  tags: ocp-node
+  machine_type: n1-standard-2
+  boot_disk_size: 150
+  scale: 0
 
 gce_extra_tags_master:
 gce_extra_tags_node:
