@@ -11,6 +11,10 @@ down: check-cluster
 	cd data/ && ../../bin/local.sh ansible-playbook playbooks/terminate.yaml
 .PHONY: down
 
+sh: check-cluster
+	cd data/ && ../../bin/local.sh
+.PHONY: sh
+
 check-cluster:
 ifndef WHAT
 	$(error Must set WHAT= to a unique cluster name)
