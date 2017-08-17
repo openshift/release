@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: Template
+labels:
+  template: build-tools
+metadata:
+  name: build-tools
+parameters:
+- name: RELEASE_REF
+  displayName: Source Ref
+  description: Git reference to use for setup
+  value: master
+  required: false
+- name: RELEASE_URL
+  displayName: Source URL
+  description: Git source URL to use for setup
+  value: https://github.com/openshift/release.git
+  required: true
+objects:
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    name: build-tools
+    labels:
+      name: build-tools
+  spec:
+    triggers:
+      - type: ConfigChange
+    runPolicy: Serial
+    source:
+      type: Git
+      git:
+        uri: "${RELEASE_URL}"
+        ref: "${RELEASE_REF}"
+      contextDir: tools/build/pipeline
+    strategy:
+      type: JenkinsPipeline
+      jenkinsPipelineStrategy:
+        env:
+        - name: RELEASE_URL
+          value: "${RELEASE_URL}"
+        - name: RELEASE_REF
+          value: "${RELEASE_REF}"
