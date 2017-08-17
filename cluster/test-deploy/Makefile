@@ -4,7 +4,7 @@ INSTANCE_PREFIX ?= $(WHAT)
 export INSTANCE_PREFIX
 
 up: check-cluster
-	cd data/ && ../../bin/local.sh ansible-playbook -vvv -e "openshift_test_repo=$(REPO)" playbooks/launch.yaml
+	cd data/ && ../../bin/local.sh ansible-playbook -e "openshift_test_repo=$(REPO)" playbooks/launch.yaml
 .PHONY: up
 
 down: check-cluster
