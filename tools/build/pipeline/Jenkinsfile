@@ -1,0 +1,54 @@
+#!/usr/bin/groovy
+
+@Library('github.com/csrwng/origin-pipeline-library@master')
+
+def contextDir="tools/build/config"
+
+pipeline {
+    agent any
+
+    parameters {
+        string(defaultValue: "${env.RELEASE_URL}", name: "RELEASE_URL", description: "URL of the release repository to build")
+        string(defaultValue: "${env.RELEASE_REF}", name: "RELEASE_REF", description: "Git reference of release repository")
+    }
+
+    stages {
+        stage("Create Objects") {
+            when {
+                not { expression { return imageStreamExists(this, "release-ci") } }
+            }
+            steps {
+                applyTemplate(this, "${contextDir}/build-release-ci.yaml", 
+                    "RELEASE_URL=${params.RELEASE_URL}",
+                    "RELEASE_REF=${params.RELEASE_REF}")
+            }
+        }
+        stage("Build Binary") {
+            when {
+                not { expression { return imageStreamTagExists(this, "release-ci", "binary") } }
+            }
+            steps {
+                waitForTag(this, "origin-release", "golang-1.8")
+                runBuild(this, "release-ci-binary")
+            }
+        }
+        stage("Build Slave") {
+            when {
+                not { expression { return imageStreamTagExists(this, "release-ci", "slave") } }
+            }
+            steps {
+                waitForTag(this, "slave-base", "latest")
+                runBuild(this, "release-ci-slave")
+            }
+        }
+        stage("Annotate Slave Tag") {
+            when {
+                not { expression { return imageStreamTagExists(this, "release-ci", "jenkins-slave") } }
+            }
+            steps {
+                createTag(this, "release-ci:slave", "release-ci:jenkins-slave")
+                annotateTag(this, "release-ci", "jenkins-slave", "role", "jenkins-slave")
+            }
+        }
+    }
+}
