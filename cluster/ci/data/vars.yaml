@@ -2,7 +2,9 @@
 
 deployment_type: origin
 ansible_pkg_mgr: yum
-docker_upgrade: false
+inventory_ip_type: external
+
+openshift_disable_check: disk_availability,docker_image_availability,memory_availability,docker_storage
 openshift_additional_repos: [
   {"id": "origin-pr", "baseurl": "{{ openshift_test_repo }}", "enabled": 1, "gpgcheck": 0},
   {"id": "origin-pr-dependencies", "baseurl": "http://mirror.centos.org/centos/7/paas/x86_64/openshift-origin/", "enabled": 1, "gpgcheck": 0}
@@ -58,9 +60,30 @@ openshift_hosted_registry_storage_provider: gcs
 openshift_hosted_registry_storage_gcs_bucket: openshift-gce-devel-origin-ci-registry-bucket
 # DEPRECATED: only for backwards compatibilty
 provision_gce_registry_gcs_bucket: openshift-gce-devel-origin-ci-registry-bucket
+provision_gce_emptydir_quota: 10Gi
 
+# Control which node group router traffic is targeted at.
+provision_gce_router_network_instance_group: ig-m # default: ig-i
+provision_gce_node_groups:
+- name: master
+  suffix: m
+  tags: ocp-master,preserve
+  machine_type: n1-standard-2
+  boot_disk_size: 150
+  scale: 1
+- name: node
+  suffix: n
+  tags: ocp-node,preserve
+  machine_type: n1-standard-4
+  boot_disk_size: 150
+  scale: 3
+- name: node-flex
+  suffix: nf
+  tags: ocp-node,preserve
+  machine_type: n1-standard-4
+  boot_disk_size: 150
+  scale: 0
 
-inventory_ip_type: external
 
 gce_extra_tags_master: ",preserve"
 gce_extra_tags_node: ",preserve"
@@ -79,8 +102,6 @@ provision_gce_instance_group_size_node: 2
 provision_gce_disk_size_node_docker: 75
 provision_gce_disk_size_node_openshift: 50
 
-provision_gce_gcloud_version: '130.0.0'
-
 # An image or image family to pull from
 provision_gce_registered_image: rhel-7
 
@@ -92,10 +113,41 @@ provision_rh_password:
 # Pool ID which shall be used to register the pre-registered image
 provision_rh_pool_id:
 
-# Control which node group router traffic is targeted at.
-provision_gce_router_network_instance_group: ig-m # default: ig-i
-
 # Provide a startup script file to the GCE instances
 provision_gce_startup_script_file: # "startup.sh"
 # Provide userdata to the gce instances
 provision_gce_user_data_file:
+
+rhsub_skip: true
+provision_custom_repositories: [
+  {
+    "id": "oso-rhui-rhel-server-releases",
+    "baseurl": "https://mirror.ops.rhcloud.com/libra/rhui-rhel-server-7-releases/
+        https://use-mirror1.ops.rhcloud.com/libra/rhui-rhel-server-7-releases/
+        https://use-mirror2.ops.rhcloud.com/libra/rhui-rhel-server-7-releases/
+        https://euw-mirror1.ops.rhcloud.com/libra/rhui-rhel-server-7-releases/
+        https://gce-mirror1.ops.rhcloud.com/libra/rhui-rhel-server-7-releases/
+        https://gce-mirror2.ops.rhcloud.com/libra/rhui-rhel-server-7-releases/",
+    "sslverify": "false",
+    "sslclientkey": "ops-mirror.pem",
+    "sslclientcert": "ops-mirror.pem",
+    "failovermethod": "priority",
+    "gpgcheck": 1,
+    "gpgkey": "https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-release https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-beta https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-openshifthosted"
+  },
+  {
+    "id": "oso-rhui-rhel-server-extras",
+    "baseurl": "https://mirror.ops.rhcloud.com/libra/rhui-rhel-server-7-extras/
+        https://use-mirror1.ops.rhcloud.com/libra/rhui-rhel-server-7-extras/
+        https://use-mirror2.ops.rhcloud.com/libra/rhui-rhel-server-7-extras/
+        https://euw-mirror1.ops.rhcloud.com/libra/rhui-rhel-server-7-extras/
+        https://gce-mirror1.ops.rhcloud.com/libra/rhui-rhel-server-7-extras/
+        https://gce-mirror2.ops.rhcloud.com/libra/rhui-rhel-server-7-extras/",
+    "sslverify": "false",
+    "sslclientkey": "ops-mirror.pem",
+    "sslclientcert": "ops-mirror.pem",
+    "failovermethod": "priority",
+    "gpgcheck": 1,
+    "gpgkey": "https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-release https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-beta https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-openshifthosted"
+  }
+]
