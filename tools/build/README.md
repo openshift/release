@@ -13,7 +13,7 @@ Optional template parameters are:
 - RELEASE_URL - git URL of the source repository to build from
 - RELEASE_REF - git ref of the source repository to build from
 
-For example, to build from one your branches:
+For example, to build from one of your branches:
 ```
 oc new-app -f https://raw.githubusercontent.com/openshift/release/master/tools/build/build-tools.yaml \
   -p RELEASE_URL=https://github.com/yourname/release.git -p RELEASE_REF=your_branch
