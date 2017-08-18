@@ -34,3 +34,8 @@ func (p *Periodic) GcsPath() string {
 func (p *Periodic) Aliases() []string {
 	return []string{}
 }
+
+// Type exposes the type of this configuration
+func (p *Periodic) Type() Type {
+	return PeriodicType
+}

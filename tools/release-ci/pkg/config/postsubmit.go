@@ -19,3 +19,8 @@ func (p *Postsubmit) GcsPath() string {
 func (p *Postsubmit) Aliases() []string {
 	return []string{}
 }
+
+// Type exposes the type of this configuration
+func (p *Postsubmit) Type() Type {
+	return PostsubmitType
+}

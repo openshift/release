@@ -14,10 +14,10 @@ type Configuration struct {
 	// GcsBucket is the bucket where we will store test data
 	GcsBucket string `json:"gcs-bucket"`
 
-	// GcsCredentialsFile is the file where Google Cloud
+	// GceCredentialsFile is the file where Google Cloud
 	// authentication credentials are stored. See:
 	// https://developers.google.com/identity/protocols/OAuth2ServiceAccount
-	GcsCredentialsFile string `json:"gce-credentials-file"`
+	GceCredentialsFile string `json:"gce-credentials-file"`
 
 	// ArtifactDir is the directory to upload to GCS
 	ArtifactDir string `json:"artifact-dir"`

@@ -38,3 +38,10 @@ func TestPresubmit_Aliases(t *testing.T) {
 		t.Errorf("expected presubmit job to have aliases:\n\t%v\n\tgot:\n\t%v", actual, expected)
 	}
 }
+
+func TestPresubmit_Type(t *testing.T) {
+	presubmit := Presubmit{}
+	if actual, expected := presubmit.Type(), PresubmitType; !reflect.DeepEqual(actual, expected) {
+		t.Errorf("expected presubmit type to be %v, but got %v", expected, actual)
+	}
+}

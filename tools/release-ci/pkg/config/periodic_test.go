@@ -1,6 +1,9 @@
 package config
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
 func TestPeriodic_GcsPath(t *testing.T) {
 	periodic := Periodic{
@@ -19,5 +22,12 @@ func TestPeriodic_Aliases(t *testing.T) {
 	periodic := Periodic{}
 	if actual := periodic.Aliases(); len(actual) != 0 {
 		t.Errorf("expected periodic job to have no aliases, got: %v", actual)
+	}
+}
+
+func TestPeriodic_Type(t *testing.T) {
+	periodic := Periodic{}
+	if actual, expected := periodic.Type(), PeriodicType; !reflect.DeepEqual(actual, expected) {
+		t.Errorf("expected periodic type to be %v, but got %v", expected, actual)
 	}
 }

@@ -11,3 +11,8 @@ type Gcs interface {
 	// for a build
 	Aliases() []string
 }
+
+// Data exposes the type of the configuration
+type Data interface{
+	Type() Type
+}
