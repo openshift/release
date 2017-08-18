@@ -10,6 +10,7 @@ const (
 
 // Repo contains configuration for a published
 // repository version involved in a job
+// See: https://github.com/kubernetes/test-infra/tree/master/prow#how-to-add-new-jobs
 type Repo struct {
 	// RepoOwner is the GitHub organization
 	// that triggered this build, provided as
@@ -54,4 +55,9 @@ func (b *Batch) GcsPath() string {
 // Batch jobs have no aliases.
 func (b *Batch) Aliases() []string {
 	return []string{}
+}
+
+// Type exposes the type of this configuration
+func (b *Batch) Type() Type {
+	return BatchType
 }

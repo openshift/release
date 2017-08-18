@@ -3,6 +3,7 @@ package config
 import "fmt"
 
 // PullRequest contains configuration for a pull request under test
+// See: https://github.com/kubernetes/test-infra/tree/master/prow#how-to-add-new-jobs
 type PullRequest struct {
 	// PullNumber is the identifier for the pull
 	// request under test, provided as $PULL_NUMBER
@@ -31,4 +32,9 @@ func (p *Presubmit) GcsPath() string {
 // Pre-submit jobs alias under the pull directory.
 func (p *Presubmit) Aliases() []string {
 	return []string{fmt.Sprintf("%s/%s/%d.txt", PullRequestDirectory, p.JobName, p.BuildNumber)}
+}
+
+// Type exposes the type of this configuration
+func (p *Presubmit) Type() Type {
+	return PresubmitType
 }

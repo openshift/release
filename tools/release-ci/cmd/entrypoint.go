@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -47,6 +48,10 @@ func init() {
 }
 
 func runEntrypoint(args []string) error {
+	if len(configurationFile) == 0 {
+		return errors.New("no configuration file specified")
+	}
+
 	config, err := loadConfig(configurationFile)
 	if err != nil {
 		return err

@@ -14,6 +14,8 @@ import (
 
 	"path/filepath"
 
+	"errors"
+
 	"github.com/fsnotify/fsnotify"
 	"github.com/openshift/release/tools/release-ci/pkg/logging/gcs"
 	"google.golang.org/api/option"
@@ -44,12 +46,16 @@ func init() {
 }
 
 func runSidecar(_ []string) error {
+	if len(configurationFile) == 0 {
+		return errors.New("no configuration file specified")
+	}
+
 	config, err := loadConfig(configurationFile)
 	if err != nil {
 		return err
 	}
 
-	gcsBucket, err := createGcsClient(config.GcsBucket, config.GcsCredentialsFile)
+	gcsBucket, err := createGcsClient(config.GcsBucket, config.GceCredentialsFile)
 	if err != nil {
 		return err
 	}

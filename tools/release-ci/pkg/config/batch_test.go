@@ -1,6 +1,9 @@
 package config
 
-import "testing"
+import (
+	"testing"
+	"reflect"
+)
 
 func TestBatch_GcsPath(t *testing.T) {
 	batch := Batch{
@@ -19,5 +22,12 @@ func TestBatch_Aliases(t *testing.T) {
 	batch := Batch{}
 	if actual := batch.Aliases(); len(actual) != 0 {
 		t.Errorf("expected batch job to have no aliases, got: %v", actual)
+	}
+}
+
+func TestBatch_Type(t *testing.T) {
+	batch := Batch{}
+	if actual, expected := batch.Type(), BatchType; !reflect.DeepEqual(actual, expected) {
+		t.Errorf("expected batch type to be %v, but got %v", expected, actual)
 	}
 }
