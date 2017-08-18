@@ -1,0 +1,106 @@
+apiVersion: v1
+kind: Template
+labels:
+  template: build-release-ci
+metadata:
+  name: build-release-ci
+parameters:
+- name: RELEASE_REF
+  displayName: Source Ref
+  description: Git reference to use for setup
+  value: master
+  required: false
+- name: RELEASE_URL
+  displayName: Source URL
+  description: Git source URL to use for setup
+  value: https://github.com/openshift/release.git
+  required: true
+objects:
+- apiVersion: v1
+  kind: ImageStream
+  metadata:
+    labels:
+      build: release-ci
+    name: release-ci
+- apiVersion: v1
+  kind: ImageStream
+  metadata:
+    name: origin-release
+  spec:
+    tags:
+    - from:
+        kind: DockerImage
+        name: openshift/origin-release:golang-1.8
+      name: golang-1.8
+      referencePolicy:
+        type: Source
+- apiVersion: v1
+  kind: ImageStream
+  metadata:
+    name: slave-base
+  spec:
+    tags:
+    - from:
+        kind: DockerImage
+        name: openshift/jenkins-slave-base-centos7:latest
+      name: latest
+      referencePolicy:
+        type: Source
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    labels:
+      build: release-ci-binary
+    name: release-ci-binary
+  spec:
+    output:
+      to:
+        kind: ImageStreamTag
+        name: release-ci:binary
+    source:
+      git:
+        ref: ${RELEASE_REF}
+        uri: ${RELEASE_URL}
+      contextDir: tools/build/release-ci-binaries-image
+      type: Git
+    strategy:
+      dockerStrategy:
+        env:
+        - name: RELEASE_REF
+          value: ${RELEASE_REF}
+        - name: RELEASE_URL
+          value: ${RELEASE_URL}
+        from:
+          kind: ImageStreamTag
+          name: origin-release:golang-1.8
+      type: Docker
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    labels:
+      build: release-ci-slave
+    name: release-ci-slave
+  spec:
+    output:
+      to:
+        kind: ImageStreamTag
+        name: release-ci:slave
+    source:
+      git:
+        ref: ${RELEASE_REF}
+        uri: ${RELEASE_URL}
+      images:
+      - from:
+          name: release-ci:binary
+          kind: ImageStreamTag
+        paths:
+        - sourcePath: /usr/bin/release-ci
+          destinationDir: tools/build/release-ci-slave-image/bin
+      contextDir: tools/build/release-ci-slave-image
+      type: Git
+    strategy:
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: slave-base:latest
+      type: Docker
