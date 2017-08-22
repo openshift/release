@@ -1,0 +1,173 @@
+apiVersion: v1
+kind: Template
+labels:
+  template: gubernator
+metadata:
+  name: gubernator
+  openshift.io/display-name: Gubernator
+  iconClass: icon-storage
+  tags: instant-app,storage
+  template.openshift.io/long-description: |-
+    The Gubernator interface is a web frontend for displaying CI
+    test results stored in GCS.
+parameters:
+- name: APP
+  displayName: Application Name
+  description: Name of the larger application this deployment is part of.
+  value: k8sci
+  required: false
+- name: COMPONENT
+  displayName: Application Component Name
+  description: Name of this component in the larger application
+  value: gubernator
+  required: false
+- name: NAME
+  displayName: Application Name
+  description: The name to use for the objects created by this template
+  value: gubernator
+  required: true
+- name: SOURCE_REF
+  displayName: Source Ref
+  description: Git reference to use for building the Gubernator image
+  value: master
+  required: false
+- name: SOURCE_URL
+  displayName: Source URL
+  description: Git source URL to use for building the Gubernator image
+  value: https://github.com/openshift/test-infra.git
+  required: true
+- name: SOURCE_CONTEXT
+  displayName: Source Context
+  description: Git source context to use for building the Gubernator image
+  value: gubernator
+  required: false
+- name: SERVICE_NAME
+  displayName: Gubernator Service Name
+  description: The name of the OpenShift Service exposed for the Gubernator container.
+  value: gubernator
+objects:
+- kind: ImageStream
+  apiVersion: v1
+  metadata:
+    name: "${NAME}"
+    labels:
+      app: "${APP}"
+      component: "${COMPONENT}"
+- kind: BuildConfig
+  apiVersion: v1
+  metadata:
+    name: "${NAME}"
+    labels:
+      app: "${APP}"
+      component: "${COMPONENT}"
+  spec:
+    output:
+      to:
+        kind: ImageStreamTag
+        name: "${NAME}:latest"
+    source:
+      git:
+        ref: "${SOURCE_REF}"
+        uri: "${SOURCE_URL}"
+      contextDir: "${SOURCE_CONTEXT}"
+      type: Git
+      dockerfile: |
+        FROM gcr.io/google-appengine/python:latest
+
+        RUN virtualenv /env
+        ENV VIRTUAL_ENV /env
+        ENV PATH /env/bin:$PATH
+
+        ADD requirements.txt /app/requirements.txt
+        RUN pip install -r /app/requirements.txt
+        ADD . /app
+        RUN ln -s /app/secrets.json /var/run/secrets/gubernator/secrets.json
+
+        ENTRYPOINT [ "/app/main.py" ]
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: gcr.io/google-appengine/python:latest
+        imageOptimizationPolicy: SkipLayers
+    triggers:
+    - type: ConfigChange
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    name: "${NAME}"
+    labels:
+      app: "${APP}"
+      component: "${COMPONENT}"
+  spec:
+    replicas: 1
+    selector:
+      app: "${APP}"
+      component: "${COMPONENT}"
+      deploymentconfig: "${NAME}"
+    template:
+      metadata:
+        name: "${NAME}"
+        labels:
+          app: "${APP}"
+          component: "${COMPONENT}"
+          deploymentconfig: "${NAME}"
+      spec:
+        containers:
+        - image: "${NAME}:latest"
+          name: "${NAME}"
+          volumeMounts:
+          - mountPath: /var/run/secrets/gubernator/
+            name: "${NAME}-secrets"
+            readOnly: true
+        volumes:
+        - name: "${NAME}-secrets"
+          secret:
+            defaultMode: 420
+            secretName: "${NAME}-config"
+    test: false
+    triggers:
+    - type: ConfigChange
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - "${NAME}"
+        from:
+          kind: ImageStreamTag
+          name: "${NAME}:latest"
+      type: ImageChange
+- kind: Service
+  apiVersion: v1
+  metadata:
+    name: "${NAME}"
+    labels:
+      app: "${APP}"
+      component: "${COMPONENT}"
+    annotations:
+      service.openshift.io/infrastructure: 'true'
+  spec:
+    ports:
+    - name: web
+      protocol: TCP
+      port: 80
+      targetPort: 8080
+      nodePort: 0
+    selector:
+      app: "${APP}"
+      component: "${COMPONENT}"
+    type: ClusterIP
+    sessionAffinity: None
+- kind: Route
+  apiVersion: v1
+  metadata:
+    name: "${NAME}"
+    labels:
+      app: "${APP}"
+      component: "${COMPONENT}"
+  spec:
+    to:
+      kind: Service
+      name: "${SERVICE_NAME}"
+    tls:
+      termination: edge
+      insecureEdgeTerminationPolicy: Redirect
