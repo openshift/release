@@ -1,0 +1,133 @@
+apiVersion: v1
+kind: Template
+labels:
+  template: origin-release
+metadata:
+  name: origin-release
+  openshift.io/display-name: Origin Release Environment
+  iconClass: icon-go-gopher
+  template.openshift.io/long-description: |-
+    The OpenShift Origin release environment container provides a workspace
+    in which developers can work with the Origin source code without needing
+    to install any tools other than a container runtime on their system.
+parameters:
+- name: NAME
+  displayName: Application Name
+  description: The name to use for the objects created by this template
+  value: origin-release
+  required: true
+- name: SOURCE_REF
+  displayName: Source Ref
+  description: Git reference to use for building the Origin release environment image
+  value: master
+  required: false
+- name: SOURCE_URL
+  displayName: Source URL
+  description: Git source URL to use for building the Origin release environment image
+  value: https://github.com/openshift/release.git
+  required: false
+- name: SOURCE_CONTEXT_BASE
+  displayName: Source Context Base
+  description: Git source context base to use for building the Origin release environment image
+  value: projects/origin-release
+  required: false
+objects:
+- kind: ImageStream
+  apiVersion: v1
+  metadata:
+    labels:
+      app: "${NAME}"
+    name: "${NAME}"
+- kind: BuildConfig
+  apiVersion: v1
+  metadata:
+    labels:
+      app: "${NAME}"
+    name: "${NAME}-base"
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: "origin-release:base"
+    source:
+      git:
+        ref: "${SOURCE_REF}"
+        uri: "${SOURCE_URL}"
+      contextDir: "${SOURCE_CONTEXT_BASE}/base/"
+      type: Git
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: centos:7
+        imageOptimizationPolicy: SkipLayers
+    triggers:
+    - type: ConfigChange
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    labels:
+      app: "${NAME}"
+    name: "${NAME}-golang-1.8"
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: DockerImage
+        name: "docker.io/openshift/${NAME}:golang-1.8"
+      pushSecret:
+        name: "dockerhub"
+    source:
+      git:
+        ref: "${SOURCE_REF}"
+        uri: "${SOURCE_URL}"
+      contextDir: "${SOURCE_CONTEXT_BASE}/golang-1.8/"
+      type: Git
+    strategy:
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: origin-release:base
+        imageOptimizationPolicy: SkipLayers
+    triggers:
+    - imageChange:
+        from:
+          kind: ImageStreamTag
+          name: origin-release:base
+      type: ImageChange
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    labels:
+      app: "${NAME}"
+    name: "${NAME}-golang-1.9"
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: DockerImage
+        name: "docker.io/openshift/${NAME}:golang-1.9"
+      pushSecret:
+        name: "dockerhub"
+    source:
+      git:
+        ref: "${SOURCE_REF}"
+        uri: "${SOURCE_URL}"
+      contextDir: "${SOURCE_CONTEXT_BASE}/golang-1.9/"
+      type: Git
+    strategy:
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: origin-release:base
+        imageOptimizationPolicy: SkipLayers
+    triggers:
+    - imageChange:
+        from:
+          kind: ImageStreamTag
+          name: origin-release:base
+      type: ImageChange
