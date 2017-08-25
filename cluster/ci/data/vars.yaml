@@ -33,7 +33,11 @@ openshift_master_named_certificates: [{"certfile": "{{ inventory_dir }}/ssl.crt"
 # Authentication and authorization
 
 openshift_master_identity_providers: "{{ (lookup('file', '{{ inventory_dir }}/identity-providers.json' ) | default('{\"items\":[]}') | from_json).get('items') }}"
-provision_role_mappings: [{"user": "smarterclayton", "role": "cluster-admin"}]
+provision_role_mappings:
+- user: smarterclayton
+  role: cluster-admin
+- group: "system:authenticated"
+  role: "system:build-strategy-custom"
 
 # Post config setting sizes
 
@@ -95,7 +99,7 @@ provision_gce_user_data_file:
 rhsub_skip: true
 provision_custom_repositories: [
   {
-    "name": "oso-rhui-rhel-server-releases",
+    "id": "oso-rhui-rhel-server-releases",
     "baseurl": "https://mirror.ops.rhcloud.com/libra/rhui-rhel-server-7-releases/
         https://use-mirror1.ops.rhcloud.com/libra/rhui-rhel-server-7-releases/
         https://use-mirror2.ops.rhcloud.com/libra/rhui-rhel-server-7-releases/
@@ -110,7 +114,7 @@ provision_custom_repositories: [
     "gpgkey": "https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-release https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-beta https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-openshifthosted"
   },
   {
-    "name": "oso-rhui-rhel-server-extras",
+    "id": "oso-rhui-rhel-server-extras",
     "baseurl": "https://mirror.ops.rhcloud.com/libra/rhui-rhel-server-7-extras/
         https://use-mirror1.ops.rhcloud.com/libra/rhui-rhel-server-7-extras/
         https://use-mirror2.ops.rhcloud.com/libra/rhui-rhel-server-7-extras/

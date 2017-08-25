@@ -31,6 +31,11 @@ parameters:
   description: Git source context base to use for building the Origin release environment image
   value: projects/origin-release
   required: false
+- name: PUBLISH_REPO
+  displayName: Publish Repo
+  description: Container image registry repo to use for pushing the release environment images
+  value: docker.io/openshift
+  required: false
 objects:
 - kind: ImageStream
   apiVersion: v1
@@ -38,19 +43,124 @@ objects:
     labels:
       app: "${NAME}"
     name: "${NAME}"
+  spec:
+    tags:
+    - from:
+        kind: DockerImage
+        name: centos:7
+      name: x86_64-centos-7
+      importPolicy:
+        scheduled: true
+    - from:
+        kind: DockerImage
+        name: arm64v8/centos:7
+      name: aarch64-centos-7
+      importPolicy:
+        scheduled: true
+    - from:
+        kind: DockerImage
+        name: openshiftmultiarch/ppc64le-centos:7
+      name: ppc64le-centos-7
+      importPolicy:
+        scheduled: true
+    - from:
+        kind: DockerImage
+        name:  "${PUBLISH_REPO}/${NAME}:x86_64-golang-1.8"
+      name: x86_64-golang-1.8
+      importPolicy:
+        scheduled: true
+    - from:
+        kind: DockerImage
+        name:  "${PUBLISH_REPO}/${NAME}:aarch64-golang-1.8"
+      name: aarch64-golang-1.8
+      importPolicy:
+        scheduled: true
+    - from:
+        kind: DockerImage
+        name:  "${PUBLISH_REPO}/${NAME}:ppc64le-golang-1.8"
+      name: ppc64le-golang-1.8
+      importPolicy:
+        scheduled: true
+    - from:
+        kind: DockerImage
+        name:  "${PUBLISH_REPO}/${NAME}:x86_64-golang-1.9"
+      name: x86_64-golang-1.9
+      importPolicy:
+        scheduled: true
 - kind: BuildConfig
   apiVersion: v1
   metadata:
     labels:
       app: "${NAME}"
-    name: "${NAME}-base"
+    name: "${NAME}-release-image-builder"
   spec:
+    runPolicy: SerialLatestOnly
     successfulBuildsHistoryLimit: 1
     failedBuildsHistoryLimit: 2
     output:
       to:
         kind: ImageStreamTag
-        name: "origin-release:base"
+        name: "${NAME}:release-image-builder"
+    source:
+      git:
+        ref: "${SOURCE_REF}"
+        uri: "${SOURCE_URL}"
+      contextDir: "${SOURCE_CONTEXT_BASE}/release-image-builder/"
+      type: Git
+    strategy:
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: "${NAME}:x86_64-centos-7"
+        imageOptimizationPolicy: SkipLayers
+    triggers:
+    - type: ConfigChange
+    - type: ImageChange
+      imageChange: {}
+- kind: BuildConfig
+  apiVersion: v1
+  metadata:
+    labels:
+      app: "${NAME}"
+    name: "${NAME}-manifest-builder"
+  spec:
+    runPolicy: SerialLatestOnly
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: "${NAME}:manifest-builder"
+    source:
+      git:
+        ref: "${SOURCE_REF}"
+        uri: "${SOURCE_URL}"
+      contextDir: "${SOURCE_CONTEXT_BASE}/manifest-builder/"
+      type: Git
+    strategy:
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: "${NAME}:x86_64-centos-7"
+        imageOptimizationPolicy: SkipLayers
+    triggers:
+    - type: ConfigChange
+    - type: ImageChange
+      imageChange: {}
+- kind: BuildConfig
+  apiVersion: v1
+  metadata:
+    labels:
+      app: "${NAME}"
+    name: "${NAME}-x86-64-base"
+  spec:
+    runPolicy: SerialLatestOnly
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: "${NAME}:x86_64-base"
     source:
       git:
         ref: "${SOURCE_REF}"
@@ -58,26 +168,119 @@ objects:
       contextDir: "${SOURCE_CONTEXT_BASE}/base/"
       type: Git
     strategy:
-      dockerStrategy:
+      customStrategy:
         from:
-          kind: DockerImage
-          name: centos:7
-        imageOptimizationPolicy: SkipLayers
+          kind: ImageStreamTag
+          name: "${NAME}:release-image-builder"
+        exposeDockerSocket: true
+        env:
+        - name: ARCH
+          value: x86_64
+        - name: BASE_IMAGE_STREAM_TAG
+          value: "${NAME}:x86_64-centos-7"
     triggers:
     - type: ConfigChange
-- apiVersion: v1
-  kind: BuildConfig
+    - type: ImageChange
+      imageChange: {}
+    - type: ImageChange
+      imageChange:
+        from:
+          kind: ImageStreamTag
+          name: "${NAME}:x86_64-centos-7"
+- kind: BuildConfig
+  apiVersion: v1
   metadata:
     labels:
       app: "${NAME}"
-    name: "${NAME}-golang-1.8"
+    name: "${NAME}-aarch64-base"
   spec:
+    runPolicy: SerialLatestOnly
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: "${NAME}:aarch64-base"
+    source:
+      git:
+        ref: "${SOURCE_REF}"
+        uri: "${SOURCE_URL}"
+      contextDir: "${SOURCE_CONTEXT_BASE}/base/"
+      type: Git
+    strategy:
+      customStrategy:
+        from:
+          kind: ImageStreamTag
+          name: "${NAME}:release-image-builder"
+        exposeDockerSocket: true
+        env:
+        - name: ARCH
+          value: aarch64
+        - name: BASE_IMAGE_STREAM_TAG
+          value: "${NAME}:aarch64-centos-7"
+    triggers:
+    - type: ConfigChange
+    - type: ImageChange
+      imageChange: {}
+    - type: ImageChange
+      imageChange:
+        from:
+          kind: ImageStreamTag
+          name: "${NAME}:aarch64-centos-7"
+- kind: BuildConfig
+  apiVersion: v1
+  metadata:
+    labels:
+      app: "${NAME}"
+    name: "${NAME}-ppc64le-base"
+  spec:
+    runPolicy: SerialLatestOnly
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: "${NAME}:ppc64le-base"
+    source:
+      git:
+        ref: "${SOURCE_REF}"
+        uri: "${SOURCE_URL}"
+      contextDir: "${SOURCE_CONTEXT_BASE}/base/"
+      type: Git
+    strategy:
+      customStrategy:
+        from:
+          kind: ImageStreamTag
+          name: "${NAME}:release-image-builder"
+        exposeDockerSocket: true
+        env:
+        - name: ARCH
+          value: ppc64le
+        - name: BASE_IMAGE_STREAM_TAG
+          value: "${NAME}:ppc64le-centos-7"
+    triggers:
+    - type: ConfigChange
+    - type: ImageChange
+      imageChange: {}
+    - type: ImageChange
+      imageChange:
+        from:
+          kind: ImageStreamTag
+          name: "${NAME}:ppc64le-centos-7"
+- kind: BuildConfig
+  apiVersion: v1
+  metadata:
+    labels:
+      app: "${NAME}"
+    name: "${NAME}-x86-64-golang-1.8"
+  spec:
+    runPolicy: SerialLatestOnly
     successfulBuildsHistoryLimit: 1
     failedBuildsHistoryLimit: 2
     output:
       to:
         kind: DockerImage
-        name: "docker.io/openshift/${NAME}:golang-1.8"
+        name: "${PUBLISH_REPO}/${NAME}:x86_64-golang-1.8"
       pushSecret:
         name: "dockerhub"
     source:
@@ -87,30 +290,166 @@ objects:
       contextDir: "${SOURCE_CONTEXT_BASE}/golang-1.8/"
       type: Git
     strategy:
-      dockerStrategy:
+      customStrategy:
         from:
           kind: ImageStreamTag
-          name: origin-release:base
-        imageOptimizationPolicy: SkipLayers
+          name: "${NAME}:release-image-builder"
+        exposeDockerSocket: true
+        env:
+        - name: ARCH
+          value: x86_64
+        - name: BASE_IMAGE_STREAM_TAG
+          value: "${NAME}:x86_64-base"
     triggers:
-    - imageChange:
+    - type: ConfigChange
+    - type: ImageChange
+      imageChange:
         from:
           kind: ImageStreamTag
-          name: origin-release:base
-      type: ImageChange
-- apiVersion: v1
-  kind: BuildConfig
+          name: "${NAME}:x86_64-base"
+- kind: BuildConfig
+  apiVersion: v1
   metadata:
     labels:
       app: "${NAME}"
-    name: "${NAME}-golang-1.9"
+    name: "${NAME}-aarch64-golang-1.8"
   spec:
+    runPolicy: SerialLatestOnly
     successfulBuildsHistoryLimit: 1
     failedBuildsHistoryLimit: 2
     output:
       to:
         kind: DockerImage
-        name: "docker.io/openshift/${NAME}:golang-1.9"
+        name: "${PUBLISH_REPO}/${NAME}:aarch64-golang-1.8"
+      pushSecret:
+        name: "dockerhub"
+    source:
+      git:
+        ref: "${SOURCE_REF}"
+        uri: "${SOURCE_URL}"
+      contextDir: "${SOURCE_CONTEXT_BASE}/golang-1.8/"
+      type: Git
+    strategy:
+      customStrategy:
+        from:
+          kind: ImageStreamTag
+          name: "${NAME}:release-image-builder"
+        exposeDockerSocket: true
+        env:
+        - name: ARCH
+          value: aarch64
+        - name: BASE_IMAGE_STREAM_TAG
+          value: "${NAME}:aarch64-base"
+    triggers:
+    - type: ConfigChange
+    - type: ImageChange
+      imageChange:
+        from:
+          kind: ImageStreamTag
+          name: "${NAME}:aarch64-base"
+- kind: BuildConfig
+  apiVersion: v1
+  metadata:
+    labels:
+      app: "${NAME}"
+    name: "${NAME}-ppc64le-golang-1.8"
+  spec:
+    runPolicy: SerialLatestOnly
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: DockerImage
+        name: "${PUBLISH_REPO}/${NAME}:ppc64le-golang-1.8"
+      pushSecret:
+        name: "dockerhub"
+    source:
+      git:
+        ref: "${SOURCE_REF}"
+        uri: "${SOURCE_URL}"
+      contextDir: "${SOURCE_CONTEXT_BASE}/golang-1.8/"
+      type: Git
+    strategy:
+      customStrategy:
+        from:
+          kind: ImageStreamTag
+          name: "${NAME}:release-image-builder"
+        exposeDockerSocket: true
+        env:
+        - name: ARCH
+          value: ppc64le
+        - name: BASE_IMAGE_STREAM_TAG
+          value: "${NAME}:ppc64le-base"
+    triggers:
+    - type: ConfigChange
+    - type: ImageChange
+      imageChange:
+        from:
+          kind: ImageStreamTag
+          name: "${NAME}:ppc64le-base"
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    labels:
+      app: "${NAME}"
+    name: "${NAME}-golang-1.8"
+  spec:
+    runPolicy: SerialLatestOnly
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: DockerImage
+        name: "${PUBLISH_REPO}/${NAME}:golang-1.8"
+      pushSecret:
+        name: "dockerhub"
+    source:
+      git:
+        ref: "${SOURCE_REF}"
+        uri: "${SOURCE_URL}"
+      type: Git
+    strategy:
+      customStrategy:
+        from:
+          kind: ImageStreamTag
+          name: "${NAME}:manifest-builder"
+        exposeDockerSocket: true
+        env:
+        - name: ARCHES
+          value: "x86_64 aarch64 ppc64le"
+    triggers:
+    - type: ConfigChange
+    - type: ImageChange
+      imageChange: {}
+    - type: ImageChange
+      imageChange:
+        from:
+          kind: ImageStreamTag
+          name: "${NAME}:x86_64-golang-1.8"
+    - type: ImageChange
+      imageChange:
+        from:
+          kind: ImageStreamTag
+          name: "${NAME}:aarch64-golang-1.8"
+    - type: ImageChange
+      imageChange:
+        from:
+          kind: ImageStreamTag
+          name: "${NAME}:ppc64le-golang-1.8"
+- kind: BuildConfig
+  apiVersion: v1
+  metadata:
+    labels:
+      app: "${NAME}"
+    name: "${NAME}-x86-64-golang-1.9"
+  spec:
+    runPolicy: SerialLatestOnly
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: DockerImage
+        name: "${PUBLISH_REPO}/${NAME}:x86_64-golang-1.9"
       pushSecret:
         name: "dockerhub"
     source:
@@ -120,14 +459,59 @@ objects:
       contextDir: "${SOURCE_CONTEXT_BASE}/golang-1.9/"
       type: Git
     strategy:
-      dockerStrategy:
+      customStrategy:
         from:
           kind: ImageStreamTag
-          name: origin-release:base
-        imageOptimizationPolicy: SkipLayers
+          name: "${NAME}:release-image-builder"
+        exposeDockerSocket: true
+        env:
+        - name: ARCH
+          value: x86_64
+        - name: BASE_IMAGE_STREAM_TAG
+          value: "${NAME}:x86_64-base"
     triggers:
-    - imageChange:
+    - type: ConfigChange
+    - type: ImageChange
+      imageChange:
         from:
           kind: ImageStreamTag
-          name: origin-release:base
-      type: ImageChange
+          name: "${NAME}:x86_64-base"
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    labels:
+      app: "${NAME}"
+    name: "${NAME}-golang-1.9"
+  spec:
+    runPolicy: SerialLatestOnly
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: DockerImage
+        name: "${PUBLISH_REPO}/${NAME}:golang-1.9"
+      pushSecret:
+        name: "dockerhub"
+    source:
+      git:
+        ref: "${SOURCE_REF}"
+        uri: "${SOURCE_URL}"
+      type: Git
+    strategy:
+      customStrategy:
+        from:
+          kind: ImageStreamTag
+          name: "${NAME}:manifest-builder"
+        exposeDockerSocket: true
+        env:
+        - name: ARCHES
+          value: "x86_64"
+    triggers:
+    - type: ConfigChange
+    - type: ImageChange
+      imageChange: {}
+    - type: ImageChange
+      imageChange:
+        from:
+          kind: ImageStreamTag
+          name: "${NAME}:x86_64-golang-1.9"
