@@ -10,24 +10,26 @@ should have:
 
 See `data/vars.yaml` for the default settings.  This depends on the `openshift/origin-gce:latest` image
 which is a pre-built version of the GCE reference architecture and the openshift-ansible playbooks for the
-appropriate release.
+appropriate release. That image is built from https://github.com/openshift/origin-gce.
+
+Other prerequisites:
+
+* Docker 1.12+ installed and available
+* Your system time must be up to date in order for gcloud to
+  authenticate to GCE (run `sudo ntpd -gq` in your VM if necessary)
 
 ```
-$ cd data
-
-# launch cluster
-$ INSTANCE_PREFIX=pr345 ../../bin/local.sh ansible-playbook \
-    -e openshift_test_repo=$( curl https://storage.googleapis.com/origin-ci-test/branch-logs/origin/master/builds/.latest )/artifacts/rpms \
-    playbooks/launch.yaml
+# launch cluster using the latest RPMs
+$ make WHAT=mycluster up
 
 # after cluster is launched, admin.kubeconfig is copied locally
 $ KUBECONFIG=admin.kubeconfig oc status
 
 # teardown cluster
-$ INSTANCE_PREFIX=pr345 ../../bin/local.sh ansible-playbook playbooks/terminate.yaml
+$ make WHAT=mycluster down
 
 # get a shell in the ansible environment
-$ INSTANCE_PREFIX=pr345 ../../bin/local.sh
+$ make WHAT=mycluster sh
 ```
 
 The following ansible variables are commonly used:
@@ -38,6 +40,5 @@ The following ansible variables are commonly used:
 
 The following environment variables can be provided
 
-* `INSTANCE_PREFIX` is a value that should be unique across all clusters running in the project. It is provided as an env var to allow inventory to be calculated by Ansible.
 * `OPENSHIFT_ANSIBLE_IMAGE` (defaults to `openshift/origin-gce:latest`) the image to deploy from
 
