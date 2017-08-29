@@ -18,27 +18,7 @@ parameters:
 - description: The name of the component.
   name: NAME
   value: plank
-- name: JENKINS_TOKEN
-  displayName: Jenkins token
-  description: Jenkins token used for interacting with Jenkins
-  value: ""
-  required: true
 objects:
-- apiVersion: v1
-  kind: ConfigMap
-  metadata:
-    name: jenkins-config
-    namespace: "${NAMESPACE}"
-  data:
-    jenkins_address: https://ci.openshift.redhat.com/jenkins/view/All
-    jenkins_user: openshift-ci-robot
-- apiVersion: v1
-  data:
-    jenkins: "${JENKINS_TOKEN}"
-  kind: Secret
-  metadata:
-    name: jenkins-token
-  type: Opaque
 - apiVersion: apps.openshift.io/v1
   kind: DeploymentConfig
   metadata:
@@ -58,8 +38,6 @@ objects:
         - name: "${NAME}"
           image: "${NAME}"
           args:
-          - --jenkins-url=$(JENKINS_ADDRESS)
-          - --jenkins-user=$(JENKINS_USER)
           - --github-bot-name=$(GITHUB_BOT)
           - --dry-run=false
           env:
@@ -68,20 +46,7 @@ objects:
                 secretKeyRef:
                   name: oauth-token
                   key: github-bot
-            - name: JENKINS_ADDRESS
-              valueFrom:
-                configMapKeyRef:
-                  name: jenkins-config
-                  key: jenkins_address
-            - name: JENKINS_USER
-              valueFrom:
-                configMapKeyRef:
-                  name: jenkins-config
-                  key: jenkins_user
           volumeMounts:
-          - mountPath: /etc/jenkins
-            name: jenkins
-            readOnly: true
           - name: oauth
             mountPath: /etc/github
             readOnly: true
@@ -89,10 +54,6 @@ objects:
             mountPath: /etc/config
             readOnly: true
         volumes:
-        - name: jenkins
-          secret:
-            defaultMode: 420
-            secretName: jenkins-token
         - name: oauth
           secret:
             secretName: oauth-token
