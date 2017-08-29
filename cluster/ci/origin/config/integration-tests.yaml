@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: Template
+labels:
+  template: integration-tests
+parameters:
+- description: Name of the build to associate with the source image and artifacts
+  displayName: Build Name
+  name: BUILD_NAME
+  required: true
+- description: The reference to the image that contains the compiled binaries to test
+  displayName: Binaries Image Reference
+  name: BINARY_IMAGE_REF
+  required: true
+- description: The image pull secret of the default service account
+  displayName: Image Pull Secret
+  name: PULL_SECRET_NAME
+  required: true
+objects:
+- apiVersion: v1
+  kind: Pod
+  metadata:
+    labels:
+      build: "${BUILD_NAME}"
+      test: integration
+    name: "${BUILD_NAME}-integration-tests"
+  spec:
+    containers:
+    - command:
+      - /bin/bash
+      - -c
+      - hack/test-integration.sh
+      image: "${BINARY_IMAGE_REF}"
+      env:
+      - name: SKIP_TEARDOWN
+        value: "1"
+      imagePullPolicy: IfNotPresent
+      name: integration-tests
+      resources: {}
+      securityContext: {}
+    dnsPolicy: ClusterFirst
+    imagePullSecrets:
+    - name: "${PULL_SECRET_NAME}"
+    restartPolicy: Never
+    terminationGracePeriodSeconds: 5
