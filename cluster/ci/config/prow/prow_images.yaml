@@ -259,3 +259,39 @@ objects:
           kind: ImageStreamTag
           name: prow:binaries
       type: ImageChange
+
+- kind: ImageStream
+  apiVersion: v1
+  metadata:
+    name: jenkins-operator
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    name: jenkins-operator
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: jenkins-operator:latest
+    source:
+      git:
+        uri: https://github.com/openshift/test-infra.git
+      images:
+      - from:
+          kind: ImageStreamTag
+          name: prow:binaries
+        paths:
+        - destinationDir: .
+          sourcePath: /go/bin/jenkins-operator
+    strategy:
+      dockerStrategy:
+        imageOptimizationPolicy: SkipLayers
+        dockerfilePath: prow/cmd/jenkins-operator/Dockerfile
+    triggers:
+    - imageChange:
+        from:
+          kind: ImageStreamTag
+          name: prow:binaries
+      type: ImageChange
