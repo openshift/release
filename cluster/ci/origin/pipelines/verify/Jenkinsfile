@@ -1,0 +1,71 @@
+#!/usr/bin/env groovy
+
+@Library('github.com/openshift/release-library@master')
+
+def templateBase = "cluster/ci/origin/config"
+
+pipeline {
+  agent { label "release-ci.jenkins-slave" }
+
+  parameters {
+    string(defaultValue: "${env.ORIGIN_TARGET_BRANCH}", name: "ORIGIN_TARGET_BRANCH", description: "The branch in the origin repository to test against.")
+    string(defaultValue: "${env.PULL_REFS}", name: "PULL_REFS", description: "Used by prow. If this is not a pull request, it should at least contain the branch:hash of the HEAD being tested.")
+    string(defaultValue: "${env.BUILD_ID}", name: "buildId", description: "The ID that prow sets on a Jenkins job in order to correlate it with a ProwJob")
+  }
+
+  stages {
+    stage ("Configure Variables") {
+      steps {
+        script {
+          this._buildName = buildName(this)
+        }
+        echo "Build name is ${this._buildName}"
+      }
+    }
+    stage("Wait for source") {
+      steps {
+        waitForTag(this._buildName, "src", 7200)
+      }
+    }
+    stage("Verify") {
+      steps {
+        script {
+          def tests = [
+            "gofmt",
+            "govet",
+            "imports",
+            "generated-bindata",
+            "generated-deep-copies",
+            "generated-conversions",
+            "generated-clientsets",
+            "generated-defaulters",
+            "generated-listers",
+            "generated-informers",
+            "generated-openapi",
+            "generated-protobuf",
+            "generated-completions",
+            "generated-docs",
+            "cli-conventions",
+            "generated-json-codecs",
+            "generated-swagger-descriptions",
+            "generated-swagger-spec"
+          ]
+          def verifyRunId = "${this._buildName}-verify-${currentBuild.number}"
+          def sourceImageRef = imageStreamTagRef(this, this._buildName, "src")
+          def pullSecretRef = dockerCfgSecret(this, "default")
+
+          for (test in tests) {
+            createTemplate(this, "${templateBase}/verification-test.yaml", 
+              "TEST_NAME=${test}",
+              "BUILD_NAME=${_buildName}",
+              "RUN_ID=${verifyRunId}",
+              "SOURCE_IMAGE_REF=${sourceImageRef}",
+              "PULL_SECRET_NAME=${pullSecretRef}"
+            )
+          }
+          waitForPods(this, ["run": "${verifyRunId}"], 3600)
+        }
+      }
+    }
+  }
+}

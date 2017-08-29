@@ -79,5 +79,8 @@ func (s *SourceRef) ToBuildID() string {
 		fmt.Fprintf(desc, "PR: %d, Ref: %s\n", prRef.Number, prRef.Commit)
 	}
 	sum := sha256.Sum256(desc.Bytes())
-	return fmt.Sprintf("%x", sum)
+	hash := fmt.Sprintf("%x", sum)
+
+	// Shorten the hash to make it usable as an origin name
+	return hash[20:]
 }

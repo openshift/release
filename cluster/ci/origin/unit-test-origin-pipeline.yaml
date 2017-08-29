@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: verify-origin-pipeline
+labels:
+  template: verify-origin-pipeline
+parameters:
+- description: The URL of the origin release source repository
+  displayName: Source URL
+  name: RELEASE_SRC_URL
+  value: https://github.com/openshift/release.git
+  required: true
+- description: The Reference of the origin release source repository
+  displayName: Source Ref
+  name: RELEASE_SRC_REF
+  value: master
+  required: true
+- description: The Context inside the origin release source repository
+  displayName: Source Context
+  name: UNIT_ORIGIN_CONTEXT
+  value: cluster/ci/origin/pipelines/unit
+objects:
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    labels:
+      app: ut-origin
+    name: ut-origin
+  spec:
+    output: {}
+    runPolicy: Parallel
+    source:
+      contextDir: "${UNIT_ORIGIN_CONTEXT}"
+      git:
+        ref: "${RELEASE_SRC_REF}"
+        uri: "${RELEASE_SRC_URL}"
+      type: Git
+    strategy:
+      jenkinsPipelineStrategy:
+        env:
+        - name: RELEASE_SRC_REF
+          value: "${RELEASE_SRC_REF}"
+        - name: RELEASE_SRC_URL
+          value: "${RELEASE_SRC_URL}"
+      type: JenkinsPipeline
