@@ -1,0 +1,92 @@
+# oc process -f sinker.yaml | oc create -f -
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: sinker-prow
+  annotations:
+    "openshift.io/display-name": sinker-prow
+    description: |
+      sinker manifest for prow
+parameters:
+- description: The namespace to get the image from.
+  name: IMAGE_NAMESPACE
+  value: prow-images
+- description: The namespace to instantiate sinker under.
+  name: NAMESPACE
+  value: ci
+- description: The name of the component.
+  name: NAME
+  value: sinker
+objects:
+- apiVersion: apps.openshift.io/v1
+  kind: DeploymentConfig
+  metadata:
+    name: "${NAME}"
+    namespace: "${NAMESPACE}"
+  spec:
+    replicas: 1
+    template:
+      metadata:
+        labels:
+          app: k8sci
+          component: "${NAME}"
+      spec:
+        serviceAccountName: "${NAME}"
+        containers:
+        - name: "${NAME}"
+          image: "${NAME}"
+          volumeMounts:
+          - name: config
+            mountPath: /etc/config
+            readOnly: true
+        volumes:
+        - name: config
+          configMap:
+            name: config
+    triggers:
+    - type: ConfigChange
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - "${NAME}"
+        from:
+          kind: ImageStreamTag
+          name: "${NAME}:latest"
+          namespace: "${IMAGE_NAMESPACE}"
+      type: ImageChange
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    name: "${NAME}"
+    namespace: "${NAMESPACE}"
+- kind: ClusterRole
+  apiVersion: v1 # rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: "${NAME}"
+  rules:
+    - apiGroups:
+        - ""
+      resources:
+        - pods
+      verbs:
+        - delete
+        - list
+    - apiGroups:
+        - "prow.k8s.io"
+      resources:
+        - prowjobs
+      verbs:
+        - delete
+        - list
+- kind: ClusterRoleBinding
+  apiVersion: v1 # rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: "${NAME}"
+  roleRef:
+    apiGroup: "" # rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: "${NAME}"
+  subjects:
+  - kind: ServiceAccount
+    name: "${NAME}"
+    namespace: "${NAMESPACE}"
