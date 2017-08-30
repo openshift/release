@@ -1,3 +1,26 @@
+LATEST = $(shell curl -q "https://storage.googleapis.com/origin-ci-test/branch-logs/origin/master/builds/.latest" 2>/dev/null)/artifacts/rpms
+REPO ?= $(LATEST)
+INSTANCE_PREFIX ?= $(WHAT)
+export INSTANCE_PREFIX
+
+up: check-cluster
+	cd data/ && ../../bin/local.sh ansible-playbook -e "openshift_test_repo=$(REPO)" playbooks/launch.yaml
+.PHONY: up
+
+down: check-cluster
+	cd data/ && ../../bin/local.sh ansible-playbook playbooks/terminate.yaml
+.PHONY: down
+
+sh: check-cluster
+	cd datata/ && ../../bin/local.sh
+.PHONY: sh
+
+check-cluster:
+.PHONY: check-cluster
+
+#
+# Copied code above, deploy custom code below
+#
 
 deploy:
 	-oc apply -f config/
@@ -8,3 +31,4 @@ deploy:
 	oc rollout latest -n default router
 	oadm policy add-cluster-role-to-user -z heapster -n kube-system cluster-reader
 	oc process heapster-standalone | oc apply -f - -n kube-system
+.PHONY: deploy
