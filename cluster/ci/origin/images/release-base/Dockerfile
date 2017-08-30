@@ -5,7 +5,8 @@ ARG SOURCE_URL=https://github.com/openshift/origin.git
 ENV GIT_COMMITTER_NAME=developer \
     GIT_COMMITTER_EMAIL=developer@redhat.com \
     OS_VERSION_FILE="" \
-    PATH="${PATH}:/go/src/github.com/openshift/origin/_output/local/bin/linux/amd64"
+    PATH="${PATH}:/go/src/github.com/openshift/origin/_output/local/bin/linux/amd64" \
+    HOME=/tmp
 
 COPY release-ci /usr/bin/release-ci
 
