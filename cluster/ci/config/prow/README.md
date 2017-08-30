@@ -159,3 +159,64 @@ Delete the cluster with:
 gcloud container clusters delete $CLUSTER
 ```
 If you have setup a static IP, it needs to be manually cleaned up.
+
+## Running on Openshift
+
+1. Register ProwJobs in the cluster with:
+```
+oc create -f prow_crd.yaml
+```
+
+1. Ensure the ci namespace exists and create the prow configuration files:
+```
+oc create ns ci
+oc create -f config.yaml -f plugins.yaml -n ci
+```
+
+1. Ensure that the prow-images namespace exists and create all the build configurations for prow:
+```
+oc create ns prow-images
+oc process -f prow_images.yaml | oc create -f -
+```
+
+1. Start all the prow components:
+
+`hook` needs a hmac token for decrypting Github webhooks and an oauth token for
+responding to Github events.
+```
+oc process -f openshift/hook.yaml -p HMAC_TOKEN=$(cat hmac-token | base64) -p OAUTH_TOKEN=$(cat oauth-token | base64) | oc create -f -
+```
+
+`plank` reuses the oauth token created in the hook template.
+```
+oc process -f openshift/plank.yaml | oc create -f -
+```
+
+`jenkins-operator` needs a jenkins token to start jobs in Jenkins and the oauth token created
+in the hook template.
+```
+oc process -f openshift/jenkins-operator.yaml -p JENKINS_TOKEN=$(cat jenkins-token | base64) | oc create -f -
+```
+
+`deck` reuses the jenkins token created in the jenkins-operator template.
+```
+oc process -f openshift/deck.yaml | oc create -f -
+```
+The rest of the components do not depend on any secrets.
+```
+oc process -f openshift/horologium.yaml | oc create -f -
+oc process -f openshift/splice.yaml | oc create -f -
+oc process -f openshift/sinker.yaml | oc create -f -
+```
+
+1. Allow prow to download images from the namespace where the prow builds run.
+
+```
+oc policy add-role-to-user system:image-puller system:serviceaccount:ci:hook -n prow-images
+oc policy add-role-to-user system:image-puller system:serviceaccount:ci:plank -n prow-images
+oc policy add-role-to-user system:image-puller system:serviceaccount:ci:jenkins-operator -n prow-images
+oc policy add-role-to-user system:image-puller system:serviceaccount:ci:deck -n prow-images
+oc policy add-role-to-user system:image-puller system:serviceaccount:ci:splice -n prow-images
+oc policy add-role-to-user system:image-puller system:serviceaccount:ci:sinker -n prow-images
+oc policy add-role-to-user system:image-puller system:serviceaccount:ci:horologium -n prow-images
+```

@@ -1,0 +1,146 @@
+# oc process -f deck.yaml | oc create -f -
+# Reuses the jenkins token created in the jenkins-operator template.
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: deck-prow
+  annotations:
+    "openshift.io/display-name": deck-prow
+parameters:
+- description: The namespace to get the image from.
+  name: IMAGE_NAMESPACE
+  value: prow-images
+- description: The namespace to instantiate deck under.
+  name: NAMESPACE
+  value: ci
+- description: The name of the component.
+  name: NAME
+  value: deck
+objects:
+- apiVersion: v1
+  kind: Route
+  metadata:
+    name: "${NAME}"
+    namespace: "${NAMESPACE}"
+  spec:
+    tls:
+      insecureEdgeTerminationPolicy: Redirect
+      termination: edge
+    to:
+      kind: Service
+      name: deck
+      namespace: "${NAMESPACE}"
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: "${NAME}"
+    namespace: "${NAMESPACE}"
+  spec:
+    selector:
+      app: k8sci
+      component: "${NAME}"
+    ports:
+    - port: 80
+      targetPort: 8080
+    type: NodePort
+- apiVersion: apps.openshift.io/v1
+  kind: DeploymentConfig
+  metadata:
+    name: "${NAME}"
+    namespace: "${NAMESPACE}"
+  spec:
+    replicas: 1
+    template:
+      metadata:
+        labels:
+          app: k8sci
+          component: "${NAME}"
+      spec:
+        serviceAccountName: "${NAME}"
+        containers:
+        - name: "${NAME}"
+          image: "${NAME}"
+          args:
+          - --jenkins-url=$(JENKINS_ADDRESS)
+          - --jenkins-user=$(JENKINS_USER)
+          env:
+            - name: JENKINS_ADDRESS
+              valueFrom:
+                configMapKeyRef:
+                  name: jenkins-config
+                  key: jenkins_address
+            - name: JENKINS_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: jenkins-config
+                  key: jenkins_user
+          ports:
+            - name: http
+              containerPort: 8080
+          volumeMounts:
+          - mountPath: /etc/jenkins
+            name: jenkins
+            readOnly: true
+          - name: config
+            mountPath: /etc/config
+            readOnly: true
+        volumes:
+        - name: jenkins
+          secret:
+            defaultMode: 420
+            secretName: jenkins-token
+        - name: config
+          configMap:
+            name: config
+    triggers:
+    - type: ConfigChange
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - "${NAME}"
+        from:
+          kind: ImageStreamTag
+          name: "${NAME}:latest"
+          namespace: "${IMAGE_NAMESPACE}"
+      type: ImageChange
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    name: "${NAME}"
+    namespace: "${NAMESPACE}"
+- kind: ClusterRole
+  apiVersion: v1 # rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: "${NAME}"
+  rules:
+    - apiGroups:
+        - ""
+      resources:
+        - pods
+      verbs:
+        - list
+    - apiGroups:
+        - ""
+      resources:
+        - pods/log
+      verbs:
+        - get
+    - apiGroups:
+        - "prow.k8s.io"
+      resources:
+        - prowjobs
+      verbs:
+        - get
+        - list
+- kind: ClusterRoleBinding
+  apiVersion: v1 # rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: "${NAME}"
+  roleRef:
+    apiGroup: "" # rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: "${NAME}"
+  subjects:
+  - kind: ServiceAccount
+    name: "${NAME}"
+    namespace: "${NAMESPACE}"
