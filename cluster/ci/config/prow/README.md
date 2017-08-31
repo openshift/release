@@ -116,13 +116,8 @@ oc policy add-role-to-user system:image-puller system:serviceaccount:ci:horologi
 ## Prow jobs
 
 Build the retester that runs as a periodic prow job and allow it to be pulled
-from the "ci" namespace. Create it in the "experiment" namespace, otherwise you
-will need to change the prow config.
+from the "ci" namespace.
 
 ```
-oc new-project experiment
 oc process -f ../jobs/commenter.yaml | oc create -f -
-oc policy add-role-to-user system:image-puller system:unauthenticated -n experiment
-oc project ci
-oc policy add-role-to-user system:image-puller system:serviceaccount:ci:default -n experiment
 ```
