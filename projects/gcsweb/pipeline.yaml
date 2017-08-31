@@ -12,6 +12,16 @@ metadata:
     the public, no-login-required API. Obviously this means it can only browse
     public buckets.
 parameters:
+- name: APP
+  displayName: Application Name
+  description: Name of the larger application this deployment is part of.
+  value: k8sci
+  required: false
+- name: COMPONENT
+  displayName: Application Component Name
+  description: Name of this component in the larger application
+  value: gcsweb
+  required: false
 - name: NAME
   displayName: Application Name
   description: The name to use for the objects created by this template
@@ -40,15 +50,17 @@ objects:
 - kind: ImageStream
   apiVersion: v1
   metadata:
-    labels:
-      app: "${NAME}"
     name: "${NAME}"
+    labels:
+      app: "${APP}"
+      component: "${COMPONENT}"
 - kind: BuildConfig
   apiVersion: v1
   metadata:
-    labels:
-      app: "${NAME}"
     name: "${NAME}-binary"
+    labels:
+      app: "${APP}"
+      component: "${COMPONENT}"
   spec:
     successfulBuildsHistoryLimit: 1
     failedBuildsHistoryLimit: 2
@@ -82,9 +94,10 @@ objects:
 - apiVersion: v1
   kind: BuildConfig
   metadata:
-    labels:
-      app: "${NAME}"
     name: "${NAME}"
+    labels:
+      app: "${APP}"
+      component: "${COMPONENT}"
   spec:
     successfulBuildsHistoryLimit: 1
     failedBuildsHistoryLimit: 2
@@ -124,19 +137,23 @@ objects:
 - apiVersion: v1
   kind: DeploymentConfig
   metadata:
-    labels:
-      app: "${NAME}"
     name: "${NAME}"
+    labels:
+      app: "${APP}"
+      component: "${COMPONENT}"
   spec:
     replicas: 1
     revisionHistoryLimit: 2
     selector:
-      app: "${NAME}"
+      app: "${APP}"
+      component: "${COMPONENT}"
       deploymentconfig: "${NAME}"
     template:
       metadata:
+        name: "${NAME}"
         labels:
-          app: "${NAME}"
+          app: "${APP}"
+          component: "${COMPONENT}"
           deploymentconfig: "${NAME}"
       spec:
         containers:
@@ -159,9 +176,10 @@ objects:
 - kind: Service
   apiVersion: v1
   metadata:
-    name: "${SERVICE_NAME}"
+    name: "${NAME}"
     labels:
-      app: "${NAME}"
+      app: "${APP}"
+      component: "${COMPONENT}"
     annotations:
       service.openshift.io/infrastructure: 'true'
   spec:
@@ -172,16 +190,19 @@ objects:
       targetPort: 8080
       nodePort: 0
     selector:
-      name: "${SERVICE_NAME}"
+      app: "${APP}"
+      component: "${COMPONENT}"
     type: ClusterIP
     sessionAffinity: None
 - kind: Route
   apiVersion: v1
   metadata:
-    name: "${SERVICE_NAME}"
+    name: "${NAME}"
     labels:
-      app: "${NAME}"
+      app: "${APP}"
+      component: "${COMPONENT}"
   spec:
+    path: /gcs/origin-ci-test
     to:
       kind: Service
       name: "${SERVICE_NAME}"

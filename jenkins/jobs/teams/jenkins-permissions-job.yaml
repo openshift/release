@@ -12,6 +12,16 @@ metadata:
     OpenShift Origin Groups. Special groups in the namespace starting with `jenkins-` will be
     created to give the members of the GitHub teams team in the local Jenkins instance.
 parameters:
+- name: APP
+  displayName: Application Name
+  description: Name of the larger application this deployment is part of.
+  value: jenkins
+  required: false
+- name: COMPONENT
+  displayName: Application Component Name
+  description: Name of this component in the larger application
+  value: jenkins-team-sync
+  required: false
 - name: NAME
   displayName: Application Name
   description: The name to use for the objects created by this template
@@ -46,9 +56,10 @@ objects:
 - apiVersion: v1
   kind: ImageStream
   metadata:
+    name: "centos"
     labels:
-      app: "${NAME}"
-    name: centos
+      app: "${APP}"
+      component: "${COMPONENT}"
   spec:
     tags:
     - annotations:
@@ -60,15 +71,17 @@ objects:
 - apiVersion: v1
   kind: ImageStream
   metadata:
-    labels:
-      app: "${NAME}"
     name: "${NAME}"
+    labels:
+      app: "${APP}"
+      component: "${COMPONENT}"
 - apiVersion: v1
   kind: BuildConfig
   metadata:
-    labels:
-      app: "${NAME}"
     name: "${NAME}"
+    labels:
+      app: "${APP}"
+      component: "${COMPONENT}"
   spec:
     output:
       to:
@@ -90,10 +103,16 @@ objects:
   kind: ServiceAccount
   metadata:
     name: "${GROUP_SYNCER_SERVICEACCOUNT}"
+    labels:
+      app: "${APP}"
+      component: "${COMPONENT}"
 - apiVersion: v1
   kind: RoleBinding
   metadata:
     name: "jenkins-admins"
+    labels:
+      app: "${APP}"
+      component: "${COMPONENT}"
   roleRef:
     name: admin
   subjects:
@@ -103,6 +122,9 @@ objects:
   kind: RoleBinding
   metadata:
     name: "jenkins-editors"
+    labels:
+      app: "${APP}"
+      component: "${COMPONENT}"
   roleRef:
     name: edit
   subjects:
@@ -112,6 +134,9 @@ objects:
   kind: RoleBinding
   metadata:
     name: "jenkins-viewers"
+    labels:
+      app: "${APP}"
+      component: "${COMPONENT}"
   roleRef:
     name: view
   subjects:
@@ -122,7 +147,8 @@ objects:
   metadata:
     name: "${NAME}"
     labels:
-      app: "${NAME}"
+      app: "${APP}"
+      component: "${COMPONENT}"
   spec:
     schedule: "${SCHEDULE}"
     suspend: true
@@ -135,7 +161,8 @@ objects:
           metadata:
             name: "${NAME}"
             labels:
-              app: "${NAME}"
+              app: "${APP}"
+              component: "${COMPONENT}"
           spec:
             restartPolicy: OnFailure
             containers:

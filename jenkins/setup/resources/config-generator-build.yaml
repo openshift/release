@@ -9,20 +9,38 @@ metadata:
   tags: instant-app,jenkins
   template.openshift.io/long-description: |-
     This template creates a builder for the configmap-job image
+parameters:
+- name: APP
+  displayName: Application Name
+  description: Name of the larger application this deployment is part of.
+  value: jenkins
+  required: false
+- name: COMPONENT
+  displayName: Application Component Name
+  description: Name of this component in the larger application
+  value: configmap-job
+  required: false
+- name: NAME
+  displayName: Application Name
+  description: The name to use for the objects created by this template
+  value: configmap-job
+  required: true
 objects:
 - apiVersion: v1
   kind: ImageStream
   metadata:
-    name: configmap-job
+    name: "${NAME}"
     labels:
-      name: configmap-job
+      app: "${APP}"
+      component: "${COMPONENT}"
   spec: {}
 - apiVersion: v1
   kind: BuildConfig
   metadata:
-    name: configmap-job
+    name: "${NAME}"
     labels:
-      name: configmap-job
+      app: "${APP}"
+      component: "${COMPONENT}"
   spec:
     triggers: {}
     runPolicy: Serial
