@@ -51,8 +51,14 @@ objects:
         kind: ImageStreamTag
         name: commenter:latest
     source:
-      git:
-        uri: https://github.com/openshift/test-infra.git
+      dockerfile: |
+        FROM        alpine:3.6
+        MAINTAINER  Michail Kargakis <mkargaki@redhat.com>
+
+        RUN apk add --no-cache git ca-certificates && update-ca-certificates
+
+        COPY commenter /bin/commenter
+        ENTRYPOINT [ "/bin/commenter" ]
       images:
       - from:
           kind: ImageStreamTag
@@ -62,8 +68,10 @@ objects:
           sourcePath: /go/bin/commenter
     strategy:
       dockerStrategy:
+        from:
+          kind: DockerImage
+          name: alpine:3.6
         imageOptimizationPolicy: SkipLayers
-        dockerfilePath: experiment/commenter/Dockerfile
     triggers:
     - imageChange:
         from:
