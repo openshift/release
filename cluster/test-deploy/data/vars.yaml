@@ -6,8 +6,8 @@ inventory_ip_type: external
 
 openshift_disable_check: disk_availability,docker_image_availability,memory_availability,docker_storage
 openshift_additional_repos: [
-  {"id": "origin-pr", "baseurl": "{{ openshift_test_repo }}", "enabled": 1, "gpgcheck": 0},
-  {"id": "origin-pr-dependencies", "baseurl": "http://mirror.centos.org/centos/7/paas/x86_64/openshift-origin/", "enabled": 1, "gpgcheck": 0}
+  {"name": "origin-pr", "baseurl": "{{ openshift_test_repo }}", "enabled": 1, "gpgcheck": 0},
+  {"name": "origin-pr-dependencies", "baseurl": "http://mirror.centos.org/centos/7/paas/x86_64/openshift-origin/", "enabled": 1, "gpgcheck": 0}
   ]
 
 # URLs and certs
@@ -36,11 +36,6 @@ openshift_node_port_range: 30000-32000
 openshift_master_identity_providers: [{"name": "allow_all", "login": "true", "challenge": "true", "kind": "AllowAllPasswordIdentityProvider"}]
 # provision_role_mappings: [{"user": "admin", "role": "cluster-admin"}]
 
-# Paths on the local system for the certificate files. If empty, self-signed
-# certificate will be generated
-provision_master_https_cert_file:
-provision_master_https_key_file:
-
 # Post config setting sizes
 
 openshift_hosted_router_replicas: 1
@@ -54,15 +49,13 @@ gce_project_id: openshift-gce-devel-ci
 gce_region_name: us-central1
 gce_zone_name: us-central1-a
 gce_service_account: jenkins-ci-provisioner@openshift-gce-devel.iam.gserviceaccount.com
-gce_service_account_keyfile: "gce.json"
+gce_service_account_keyfile: "{{ inventory_dir }}/gce.json"
 gce_ssh_private_key: /home/cloud-user/.ssh/google_compute_engine
 
-gcs_registry_keyfile: "gce.json"
+openshift_hosted_registry_storage_gcs_keyfile: "{{ inventory_dir }}/gce.json"
 openshift_hosted_registry_storage_kind: object
 openshift_hosted_registry_storage_provider: gcs
 openshift_hosted_registry_storage_gcs_bucket: origin-ci-test-{{ lookup('env', 'INSTANCE_PREFIX') | mandatory }}
-# DEPRECATED: only for backwards compatibilty
-provision_gce_registry_gcs_bucket: origin-ci-test-{{ lookup('env', 'INSTANCE_PREFIX') | mandatory }}
 
 # Control which node group router traffic is targeted at.
 provision_gce_router_network_instance_group: ig-m # default: ig-i
@@ -86,33 +79,10 @@ provision_gce_node_groups:
   boot_disk_size: 150
   scale: 0
 
-gce_extra_tags_master:
-gce_extra_tags_node:
-gce_extra_tags_node_infra:
-
-# How many instances should be created for this group
-provision_gce_machine_type_master: n1-standard-2
-provision_gce_machine_type_node: n1-standard-2
-provision_gce_machine_type_node_infra: n1-standard-2
-provision_gce_machine_type_bastion: n1-standard-1
-
-provision_gce_instance_group_size_master: 1
-provision_gce_instance_group_size_node_infra: 0
-provision_gce_instance_group_size_node: 3
-
-provision_gce_disk_size_node_docker: 75
-provision_gce_disk_size_node_openshift: 50
-
 # An image or image family to pull from
 provision_gce_registered_image: rhel-7
 
 provision_gce_docker_storage_driver: overlay2
-
-# Username and password for Red Hat Customer Portal
-provision_rh_username:
-provision_rh_password:
-# Pool ID which shall be used to register the pre-registered image
-provision_rh_pool_id:
 
 # Provide a startup script file to the GCE instances
 provision_gce_startup_script_file: # "startup.sh"
@@ -122,7 +92,7 @@ provision_gce_user_data_file:
 rhsub_skip: true
 provision_custom_repositories: [
   {
-    "id": "oso-rhui-rhel-server-releases",
+    "name": "oso-rhui-rhel-server-releases",
     "baseurl": "https://mirror.ops.rhcloud.com/libra/rhui-rhel-server-7-releases/
         https://use-mirror1.ops.rhcloud.com/libra/rhui-rhel-server-7-releases/
         https://use-mirror2.ops.rhcloud.com/libra/rhui-rhel-server-7-releases/
@@ -137,7 +107,7 @@ provision_custom_repositories: [
     "gpgkey": "https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-release https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-beta https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-openshifthosted"
   },
   {
-    "id": "oso-rhui-rhel-server-extras",
+    "name": "oso-rhui-rhel-server-extras",
     "baseurl": "https://mirror.ops.rhcloud.com/libra/rhui-rhel-server-7-extras/
         https://use-mirror1.ops.rhcloud.com/libra/rhui-rhel-server-7-extras/
         https://use-mirror2.ops.rhcloud.com/libra/rhui-rhel-server-7-extras/
