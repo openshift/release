@@ -2,7 +2,7 @@ FROM openshift/origin:latest
 
 USER root
 
-RUN yum -y install python-pip && \
+RUN yum -y install epel-release && yum -y install python-pip && \
     pip install kubernetes
 
 RUN pip install git+https://github.com/csrwng/jenkins-job-builder.git@bearer_token
