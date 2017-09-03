@@ -1,28 +1,27 @@
 apiVersion: v1
-kind: List
 items:
 - apiVersion: v1
   kind: ImageStream
   metadata:
-    name: node-exporter
+    name: kubernetes-autoscaler
 - apiVersion: v1
   kind: BuildConfig
   metadata:
-    name: node-exporter-binary
+    name: kubernetes-autoscaler-binary
   spec:
     failedBuildsHistoryLimit: 2
     output:
       to:
         kind: ImageStreamTag
-        name: node-exporter:binaries
+        name: kubernetes-autoscaler:binaries
     source:
       dockerfile: |
         FROM scratch
-        COPY . /go/src/github.com/prometheus/node_exporter
-        RUN cd /go/src/github.com/prometheus/node_exporter && \
-            make
+        COPY . /go/src/k8s.io/autoscaler
+        RUN cd /go/src/k8s.io/autoscaler/cluster-autoscaler && \
+            make build-binary
       git:
-        uri: https://github.com/openshift/node_exporter.git
+        uri: https://github.com/openshift/kubernetes-autoscaler.git
       type: Git
     strategy:
       dockerStrategy:
@@ -36,30 +35,28 @@ items:
 - apiVersion: v1
   kind: BuildConfig
   metadata:
-    name: node-exporter
+    name: kubernetes-autoscaler
   spec:
     failedBuildsHistoryLimit: 2
     output:
       to:
         kind: ImageStreamTag
-        name: node-exporter:latest
+        name: kubernetes-autoscaler:latest
     source:
       dockerfile: |
-        FROM        scratch
+        FROM        centos:7
         MAINTAINER  Clayton Coleman <ccoleman@redhat.com>
 
-        COPY node_exporter /usr/bin/node_exporter
+        COPY cluster-autoscaler /bin/cluster-autoscaler
 
-        EXPOSE     9100
-        USER       nobody
-        ENTRYPOINT [ "/usr/bin/node_exporter" ]
+        ENTRYPOINT [ "/bin/cluster-autoscaler" ]
       images:
       - from:
           kind: ImageStreamTag
-          name: node-exporter:binaries
+          name: kubernetes-autoscaler:binaries
         paths:
         - destinationDir: .
-          sourcePath: /go/src/github.com/prometheus/node_exporter/.
+          sourcePath: /go/src/k8s.io/autoscaler/cluster-autoscaler
     strategy:
       dockerStrategy:
         from:
@@ -71,5 +68,7 @@ items:
     - imageChange:
         from:
           kind: ImageStreamTag
-          name: node-exporter:binaries
+          name: kubernetes-autoscaler:binaries
       type: ImageChange
+kind: List
+metadata: {}

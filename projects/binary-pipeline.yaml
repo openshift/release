@@ -1,7 +1,9 @@
 apiVersion: v1
 kind: Template
-  template.openshift.io/long-description: |-
-    Assists in creating binary builds with runtime images.
+metadata:
+  annotations:
+    template.openshift.io/long-description: |-
+      Assists in creating binary builds with runtime images.
 parameters:
 - name: NAME
   required: True
@@ -12,7 +14,7 @@ parameters:
 - name: BINARY
   value: |
     FROM scratch
-    COPY . /app/src
+    COPY . ${SOURCE_PATH}
     RUN make
 - name: RUNTIME
   value: |
@@ -46,7 +48,7 @@ objects:
       dockerfile: "${BINARY}"
     strategy:
       dockerStrategy:
-        from: ${{BINARY_FROM}}
+        from: "${{BINARY_FROM}}"
         imageOptimizationPolicy: SkipLayers
     triggers:
     - type: ConfigChange
@@ -75,7 +77,8 @@ objects:
           sourcePath: "${SOURCE_PATH}"
     strategy:
       dockerStrategy:
-        from: ${{RUNTIME_FROM}}
+        from: "${{RUNTIME_FROM}}"
+        imageOptimizationPolicy: SkipLayers
     triggers:
     - imageChange:
         from:
