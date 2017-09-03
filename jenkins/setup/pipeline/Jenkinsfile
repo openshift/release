@@ -3,11 +3,6 @@ def jenkinsAdminToken=""
 pipeline {
   agent any
   stages {
-    stage('Clone') {
-      steps {
-        checkout scm
-      }
-    }
     stage("Get Admin Credentials") {
       steps {
         script {
@@ -39,6 +34,21 @@ pipeline {
               "-p", "SOURCE_REF=${env.SOURCE_REF}",
               "-p", "SOURCE_URL=${env.SOURCE_URL}")
             created = openshift.apply(permissionsJobResources)
+
+            // Wait for an imagestream tag for the builder to be available
+            def imageStream = openshift.selector("imagestream/centos")
+            imageStream.watch {
+              is = it.object()
+              if ((is.status.tags != null) && (is.status.tags.size() > 0)) {
+                for (tagObj in is.status.tags) {
+                  if (tagObj.tag == "7") {
+                    return true
+                  }
+                }
+              }
+              return false
+            }
+
             buildConfig = created.narrow("bc")
             build = buildConfig.startBuild()
             build.untilEach(1) {
