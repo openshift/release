@@ -1,0 +1,99 @@
+apiVersion: v1
+kind: List
+items:
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    name: cluster-autoscaler
+- apiVersion: apps/v1beta1
+  kind: Deployment
+  metadata:
+    name: cluster-autoscaler
+  spec:
+    template:
+      metadata:
+        labels:
+          app: cluster-autoscaler
+          role: infra
+      spec:
+        serviceAccountName: cluster-autoscaler
+        nodeSelector:
+          role: infra
+          subrole: master
+        containers:
+        - name: autoscaler
+          image: docker.io/openshift/kubernetes-autoscaler:v0.6.1
+          args:
+          - --alsologtostderr
+          - --v=3
+          - --leader-elect-resource-lock=configmaps
+          #- --cloud-config=~/.config/gcloud/gce.ini
+          - --nodes=2:9:https://content.googleapis.com/compute/v1/projects/openshift-gce-devel/zones/us-central1-a/instanceGroups/origin-ci-ig-n-scale
+- apiVersion: rbac.authorization.k8s.io/v1beta1
+  kind: ClusterRole
+  metadata:
+    name: system:cluster-autoscaler
+  rules:
+  - apiGroups:
+    - ""
+    resources:
+    - nodes
+    - pods
+    - replicationcontrollers
+    - services
+    - persistentvolumeclaims
+    - persistentvolumes
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - extensions
+    - apps
+    resources:
+    - daemonsets
+    - statefulsets
+    - replicasets
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - policy
+    resources:
+    - poddisruptionbudgets
+    verbs:
+    - get
+    - list
+    - watch
+- apiVersion: rbac.authorization.k8s.io/v1beta1
+  kind: Role
+  metadata:
+    name: cluster-autoscaler
+  rules:
+  - apiGroups:
+    - ""
+    resources:
+    - configmaps
+    resourceNames:
+    - cluster-autoscaler
+    - cluster-autoscaler-status
+    verbs:
+    - create
+    - update
+    - patch
+    - get
+  - apiGroups:
+    - ""
+    resources:
+    - configmaps
+    verbs:
+    - create
+  - apiGroups:
+    - ""
+    resources:
+    - events
+    verbs:
+    - create
+  # oc adm policy add-clusterrole-to-user cluster-autoscaler -z cluster-autoscaler -n kube-system
+  # oc policy add-role-to-user cluster-autoscaler -z cluster-autoscaler --role-namespace kube-system -n kube-system
