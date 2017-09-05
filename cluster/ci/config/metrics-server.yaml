@@ -1,0 +1,84 @@
+kind: List
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      service.alpha.openshift.io/serving-cert-secret-name: metrics-server-tls
+    labels:
+      kubernetes.io/name: Metrics-server
+    name: metrics-server
+    namespace: kube-system
+  spec:
+    ports:
+    - port: 443
+      protocol: TCP
+      targetPort: 8443
+    selector:
+      app: metrics-server
+    type: ClusterIP
+- apiVersion: extensions/v1beta1
+  kind: Deployment
+  metadata:
+    labels:
+      app: metrics-server
+    name: metrics-server
+    namespace: kube-system
+  spec:
+    selector:
+      matchLabels:
+        app: metrics-server
+    template:
+      metadata:
+        labels:
+          app: metrics-server
+      spec:
+        containers:
+        - args:
+          - --v=6
+          - --tls-private-key-file=/etc/tls/tls.key
+          - --tls-cert-file=/etc/tls/tls.crt
+          - --source=kubernetes.summary_api:?kubeletPort=10250&kubeletHttps=1
+          - --secure-port=8443
+          image: docker-registry.default.svc:5000/ci/kubernetes-metrics:latest
+          imagePullPolicy: IfNotPresent
+          name: metrics-server
+          volumeMounts:
+          - mountPath: /etc/tls
+            name: tls
+        restartPolicy: Always
+        serviceAccount: metrics-server
+        serviceAccountName: metrics-server
+        volumes:
+        - name: tls
+          secret:
+            secretName: metrics-server-tls
+- apiVersion: rbac.authorization.k8s.io/v1beta1
+  kind: Role
+  metadata:
+    name: metrics-server
+  rules:
+  - apiGroups:
+    - ""
+    resources:
+    - configmaps
+    resourceNames:
+    - extension-apiserver-authentication
+    verbs:
+    - update
+    - patch
+    - get
+  - apiGroups:
+    - ""
+    resources:
+    - configmaps
+    verbs:
+    - create
+  - apiGroups:
+    - ""
+    resources:
+    - events
+    verbs:
+    - create
+  # oc policy add-role-to-user metrics-server -z metrics-server -n kube-system
