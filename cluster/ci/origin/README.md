@@ -52,20 +52,21 @@ Or they can be started directly in Jenkins where PULL_REFS is passed as a parame
 To test changes to these pipelines in your own branch, push your changes to your own fork of the `release` repository and instantiate them with your own fork URL and branch:
 
 ```sh
-export FORK_URL="https://github.com/myname/release.git"
+export FORK="myname"
 export BRANCH="my_changes"
-oc new-app -f https://raw.githubusercontent.com/openshift/release/master/jenkins/setup/jenkins-setup-template.yaml \
-           -p SOURCE_URL="${FORK_URL}" -p SOURCE_REF="${BRANCH}"
-oc new-app -f https://raw.githubusercontent.com/openshift/release/master/tools/build/build-tools.yaml \
-           -p RELEASE_URL="${FORK_URL}" -p RELEASE_REF="${BRANCH}"
-oc new-app -f https://raw.githubusercontent.com/openshift/release/master/cluster/ci/origin/base-image-pipeline.yaml \
-           -p RELEASE_SRC_URL="${FORK_URL}" -p RELEASE_SRC_REF="${BRANCH}"
-oc new-app -f https://raw.githubusercontent.com/openshift/release/master/cluster/ci/origin/build-origin-pipeline.yaml \
-           -p RELEASE_SRC_URL="${FORK_URL}" -p RELEASE_SRC_REF="${BRANCH}"
-oc new-app -f https://raw.githubusercontent.com/openshift/release/master/cluster/ci/origin/verify-origin-pipeline.yaml \
-           -p RELEASE_SRC_URL="${FORK_URL}" -p RELEASE_SRC_REF="${BRANCH}"
-oc new-app -f https://raw.githubusercontent.com/openshift/release/master/cluster/ci/origin/unit-test-origin-pipeline.yaml \
-           -p RELEASE_SRC_URL="${FORK_URL}" -p RELEASE_SRC_REF="${BRANCH}"
+
+oc new-app -f "https://raw.githubusercontent.com/${FORK}/release/${BRANCH}/jenkins/setup/jenkins-setup-template.yaml" \
+           -p SOURCE_URL="https://github.com/${FORK}/release.git" -p SOURCE_REF="${BRANCH}"
+oc new-app -f https://raw.githubusercontent.com/${FORK}/release/${BRANCH}/tools/build/build-tools.yaml \
+           -p RELEASE_URL="https://github.com/${FORK}/release.git" -p RELEASE_REF="${BRANCH}"
+oc new-app -f https://raw.githubusercontent.com/${FORK}/release/${BRANCH}/cluster/ci/origin/base-image-pipeline.yaml \
+           -p RELEASE_SRC_URL="https://github.com/${FORK}/release.git" -p RELEASE_SRC_REF="${BRANCH}"
+oc new-app -f https://raw.githubusercontent.com/${FORK}/release/${BRANCH}/cluster/ci/origin/build-origin-pipeline.yaml \
+           -p RELEASE_SRC_URL="https://github.com/${FORK}/release.git" -p RELEASE_SRC_REF="${BRANCH}"
+oc new-app -f https://raw.githubusercontent.com/${FORK}/release/${BRANCH}/cluster/ci/origin/verify-origin-pipeline.yaml \
+           -p RELEASE_SRC_URL="https://github.com/${FORK}/release.git" -p RELEASE_SRC_REF="${BRANCH}"
+oc new-app -f https://raw.githubusercontent.com/${FORK}/release/${BRANCH}/cluster/ci/origin/unit-test-origin-pipeline.yaml \
+           -p RELEASE_SRC_URL="https://github.com/${FORK}/release.git" -p RELEASE_SRC_REF="${BRANCH}"
 ```
 
 ## Code Organization
