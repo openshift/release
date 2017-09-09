@@ -7,7 +7,7 @@
 FROM openshift/origin-release:base
 MAINTAINER  Steve Kuznetsov <skuznets@redhat.com>
 
-ENV VERSION=1.9beta2 \
+ENV VERSION=1.9 \
     GOARM=5 \
     GOPATH=/go \
     GOROOT=/usr/local/go \

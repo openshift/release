@@ -1,6 +1,6 @@
 Name:		golang
 Version:	v1.9.0
-Release:	0.beta2%{?dist}
+Release:	1%{?dist}
 Summary:	Go install from source
 Group:		Fake
 License:	BSD
