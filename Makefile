@@ -4,7 +4,7 @@ all: jenkins prow mungegithub projects
 jenkins:
 .PHONY: jenkins
 
-prow: prow-crd prow-config prow-images hook plank jenkins-operator deck horologium splice sinker commenter
+prow: prow-crd prow-config prow-images hook plank jenkins-proxy jenkins-operator deck horologium splice sinker commenter
 .PHONY: prow
 
 prow-crd:
@@ -30,6 +30,15 @@ deck:
 horologium:
 	oc process -f cluster/ci/config/prow/openshift/horologium.yaml | oc apply -f -
 .PHONY: horologium
+
+# BASIC_AUTH_PASS is the openshift-ci-robot password for authenticating in https://ci.openshift.redhat.com/jenkins/
+# BEARER_TOKEN is the openshift-ci-robot token used for authenticating in FILL_ME
+jenkins-proxy:
+	oc create cm jenkins-proxy --from-file=config=config.json -o yaml --dry-run | oc apply -f -
+	oc create secret generic jenkins-tokens --from-literal=basic=${BASIC_AUTH_PASS} --from-literal=bearer=${BEARER_TOKEN} -o yaml --dry-run | oc apply -f -
+	oc process -f tools/jenkins-proxy/openshift/build.yaml | oc apply -f -
+	oc process -f tools/jenkins-proxy/openshift/deploy.yaml | oc apply -f -
+.PHONY: jenkins-proxy
 
 jenkins-operator:
 	oc process -f cluster/ci/config/prow/openshift/jenkins-operator.yaml | oc apply -f -
