@@ -49,6 +49,7 @@ objects:
             CGO_ENABLED=0 go install
     strategy:
       dockerStrategy:
+        noCache: true
         from:
           kind: DockerImage
           name: golang:1.9.0
@@ -70,8 +71,13 @@ objects:
         kind: ImageStreamTag
         name: "${NAME}:latest"
     source:
-      git:
-        uri: "${SOURCE_URL}"
+      dockerfile: |
+        FROM        centos:7
+        MAINTAINER  Michail Kargakis <mkargaki@redhat.com>
+
+        ADD jenkins-proxy /bin/jenkins-proxy
+
+        ENTRYPOINT [ "/bin/jenkins-proxy" ]
       images:
       - from:
           kind: ImageStreamTag
@@ -81,7 +87,7 @@ objects:
           sourcePath: /go/bin/jenkins-proxy
     strategy:
       dockerStrategy:
-        dockerfilePath: Dockerfile
+        noCache: true
         imageOptimizationPolicy: SkipLayers
     triggers:
     - imageChange:
