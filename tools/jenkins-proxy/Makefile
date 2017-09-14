@@ -1,7 +1,10 @@
 all: build test
+.PHONY: all
 
 build:
-	CGO_ENABLED=0 go build
+	go build -v
+.PHONY: build
 
 test:
-	go test
+	go test -v
+.PHONY: test
