@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -25,14 +24,14 @@ type BasicAuthConfig struct {
 	// TokenFile is the location of the token file.
 	TokenFile string `json:"token_file"`
 	// token is the token loaded in memory from the location above.
-	token string
+	Token string
 }
 
 type BearerTokenAuthConfig struct {
 	// TokenFile is the location of the token file.
 	TokenFile string `json:"token_file"`
 	// token is the token loaded in memory from the location above.
-	token string
+	Token string
 }
 
 type JenkinsMaster struct {
@@ -44,8 +43,14 @@ type JenkinsMaster struct {
 	Auth *AuthConfig `json:"auth,omitempty"`
 }
 
-// Proxy is able to proxy requests to different Jenkins masters.
-type Proxy struct {
+type Proxy interface {
+	Auth() *BasicAuthConfig
+	GetDestinationURL(r *http.Request, requestedJob string) (string, error)
+	ProxyRequest(r *http.Request, destURL string) (*http.Response, error)
+}
+
+// proxy is able to proxy requests to different Jenkins masters.
+type proxy struct {
 	client *http.Client
 	// ProxyAuth is used for authenticating with the proxy.
 	ProxyAuth *BasicAuthConfig `json:"proxy_auth,omitempty"`
@@ -57,13 +62,13 @@ type Proxy struct {
 	cache map[string][]string
 }
 
-func NewProxy(path string) (*Proxy, error) {
+func NewProxy(path string) (*proxy, error) {
 	log.Printf("Reading config from %s", path)
 	b, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("error reading %s: %v", path, err)
 	}
-	p := &Proxy{}
+	p := &proxy{}
 	if err := json.Unmarshal(b, p); err != nil {
 		return nil, fmt.Errorf("error unmarshaling %s: %v", path, err)
 	}
@@ -72,7 +77,7 @@ func NewProxy(path string) (*Proxy, error) {
 		if err != nil {
 			return nil, fmt.Errorf("cannot read token file: %v", err)
 		}
-		p.ProxyAuth.token = token
+		p.ProxyAuth.Token = token
 	}
 	if len(p.Masters) == 0 {
 		return nil, fmt.Errorf("at least one Jenkins master needs to be setup in %s", path)
@@ -90,13 +95,13 @@ func NewProxy(path string) (*Proxy, error) {
 				if err != nil {
 					return nil, fmt.Errorf("cannot read token file: %v", err)
 				}
-				p.Masters[i].Auth.Basic.token = token
+				p.Masters[i].Auth.Basic.Token = token
 			} else if m.Auth.BearerToken != nil {
 				token, err := loadToken(m.Auth.BearerToken.TokenFile)
 				if err != nil {
 					return nil, fmt.Errorf("cannot read token file: %v", err)
 				}
-				p.Masters[i].Auth.BearerToken.token = token
+				p.Masters[i].Auth.BearerToken.Token = token
 			}
 		}
 	}
@@ -110,13 +115,13 @@ func NewProxy(path string) (*Proxy, error) {
 	return p, p.syncCache()
 }
 
-func (p *Proxy) syncCache() error {
+func (p *proxy) syncCache() error {
 	p.cacheLock.Lock()
 	defer p.cacheLock.Unlock()
 
 	for _, m := range p.Masters {
 		url := m.url.String()
-		log.Printf("Caching jobs from %s", url)
+		log.Printf("Listing jobs from %s", url)
 		jobs, err := p.listJenkinsJobs(m.url)
 		if err != nil {
 			return fmt.Errorf("cannot list jobs from %s: %v", url, err)
@@ -126,7 +131,7 @@ func (p *Proxy) syncCache() error {
 	return nil
 }
 
-func (p *Proxy) listJenkinsJobs(url *url.URL) ([]string, error) {
+func (p *proxy) listJenkinsJobs(url *url.URL) ([]string, error) {
 	resp, err := p.request(http.MethodGet, fmt.Sprintf("%s/api/json?tree=jobs[name]", url.String()), nil, nil)
 	if err != nil {
 		return nil, err
@@ -157,12 +162,12 @@ func (p *Proxy) listJenkinsJobs(url *url.URL) ([]string, error) {
 const maxRetries = 5
 
 // Retry on transport failures and 500s.
-func (c *Proxy) request(method, path string, body io.Reader, h *http.Header) (*http.Response, error) {
+func (p *proxy) request(method, path string, body io.Reader, h *http.Header) (*http.Response, error) {
 	var resp *http.Response
 	var err error
 	backoff := 100 * time.Millisecond
 	for retries := 0; retries < maxRetries; retries++ {
-		resp, err = c.doRequest(method, path, body, h)
+		resp, err = p.doRequest(method, path, body, h)
 		if err == nil && resp.StatusCode < 500 {
 			break
 		} else if err == nil {
@@ -175,7 +180,7 @@ func (c *Proxy) request(method, path string, body io.Reader, h *http.Header) (*h
 	return resp, err
 }
 
-func (p *Proxy) doRequest(method, path string, body io.Reader, h *http.Header) (*http.Response, error) {
+func (p *proxy) doRequest(method, path string, body io.Reader, h *http.Header) (*http.Response, error) {
 	req, err := http.NewRequest(method, path, body)
 	if err != nil {
 		return nil, err
@@ -187,9 +192,9 @@ func (p *Proxy) doRequest(method, path string, body io.Reader, h *http.Header) (
 	for _, m := range p.Masters {
 		if strings.HasPrefix(path, m.url.String()) {
 			if m.Auth.Basic != nil {
-				req.SetBasicAuth(m.Auth.Basic.User, m.Auth.Basic.token)
+				req.SetBasicAuth(m.Auth.Basic.User, m.Auth.Basic.Token)
 			} else if m.Auth.BearerToken != nil {
-				req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", m.Auth.BearerToken.token))
+				req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", m.Auth.BearerToken.Token))
 			}
 			break
 		}
@@ -197,24 +202,21 @@ func (p *Proxy) doRequest(method, path string, body io.Reader, h *http.Header) (
 	return p.client.Do(req)
 }
 
+func (p *proxy) handler() func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		handle(p, w, r)
+	}
+}
+
 // TODO: Prometheus metrics
-func (p *Proxy) handle(w http.ResponseWriter, r *http.Request) {
+func handle(p Proxy, w http.ResponseWriter, r *http.Request) {
 	log.Print(r.Method + ": " + r.URL.String())
 	w.Header().Set("X-Jenkins-Proxy", "JenkinsProxy")
 
-	if p.ProxyAuth != nil {
-		user, pass, ok := r.BasicAuth()
-		if !ok {
-			http.Error(w, "Basic authentication required.", http.StatusUnauthorized)
-			return
-		}
-		userCmp := subtle.ConstantTimeCompare([]byte(p.ProxyAuth.User), []byte(user))
-		passCmp := subtle.ConstantTimeCompare([]byte(p.ProxyAuth.token), []byte(pass))
-		if userCmp != 1 || passCmp != 1 {
-			http.Error(w, "Basic authentication failed.", http.StatusUnauthorized)
-			return
-		}
-
+	// Authenticate the request.
+	if err := authenticate(r, p.Auth()); err != nil {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
 	}
 
 	// There are three different kinds of requests that the jenkins-operator
@@ -230,64 +232,65 @@ func (p *Proxy) handle(w http.ResponseWriter, r *http.Request) {
 	// request on a prow job. Eventually, this will change (see
 	// https://github.com/kubernetes/test-infra/issues/4366) and then we should
 	// broadcast queue requests to all masters.
-	parts := strings.Split(r.URL.Path, "/")
-	jobIndex := -1
-	for i, part := range parts {
-		if part == "job" {
-			// This is a job-specific request. Record the index.
-			jobIndex = i + 1
-			break
-		}
-	}
-	// If this is not a job-specific request, fail for now. Eventually we
-	// are going to proxy queue requests.
-	if jobIndex == -1 {
-		http.Error(w, "Forbidden.", http.StatusForbidden)
-		return
-	}
-	// Sanity check
-	if jobIndex+1 > len(parts) {
+	requestedJob := getRequestedJob(r.URL.Path)
+	if len(requestedJob) == 0 {
+		// For now this is a forbidden request, in the future we are going
+		// to demux requests to all master build queues.
 		http.Error(w, "Forbidden.", http.StatusForbidden)
 		return
 	}
 
-	requestedJob := parts[jobIndex]
-	// Get the destination URL by looking at the job cache.
-	destURL := p.getDestURL(requestedJob)
+	// Get the destination URL from one of our masters.
+	destURL, err := p.GetDestinationURL(r, requestedJob)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
 	if len(destURL) == 0 {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Proxy the request to the destination URL.
+	log.Printf("Proxying to %s", destURL)
+	resp, err := p.ProxyRequest(r, destURL)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	forwardResponse(w, resp)
+}
+
+func (p *proxy) Auth() *BasicAuthConfig {
+	return p.ProxyAuth
+}
+
+func (p *proxy) ProxyRequest(r *http.Request, destURL string) (*http.Response, error) {
+	return p.request(r.Method, destURL, r.Body, &r.Header)
+}
+
+func (p *proxy) GetDestinationURL(r *http.Request, requestedJob string) (string, error) {
+	// Get the master URL by looking at the job cache.
+	masterURL := p.getMasterURL(requestedJob)
+	if len(masterURL) == 0 {
 		// Update the cache by relisting from all masters.
 		err := p.syncCache()
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadGateway)
-			return
+			return "", err
 		}
-		destURL = p.getDestURL(requestedJob)
-
+		masterURL = p.getMasterURL(requestedJob)
 		// Return 404 back to the client.
-		if len(destURL) == 0 {
-			http.NotFound(w, r)
-			return
+		if len(masterURL) == 0 {
+			return "", nil
 		}
 	}
-
-	for _, m := range p.Masters {
-		if strings.HasPrefix(destURL, m.url.String()) {
-			destURL = fmt.Sprintf("%s%s", destURL, r.URL.Path)
-			log.Printf("Proxying to %s", destURL)
-			resp, err := p.request(r.Method, destURL, r.Body, &r.Header)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadGateway)
-				return
-			}
-			forwardResponse(w, resp)
-			return
-		}
-	}
-
-	http.NotFound(w, r)
+	// The requested job exists in one of our masters, swap
+	// the request hostname for our master hostname and retain
+	// the path and any url parameters.
+	return replaceHostname(r.URL, masterURL), nil
 }
 
-func (p *Proxy) getDestURL(requestedJob string) string {
+func (p *proxy) getMasterURL(requestedJob string) string {
 	p.cacheLock.RLock()
 	defer p.cacheLock.RUnlock()
 

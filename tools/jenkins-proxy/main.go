@@ -17,6 +17,6 @@ func main() {
 	}
 
 	log.Printf("Serving on :8080")
-	http.HandleFunc("/", p.handle)
+	http.HandleFunc("/", p.handler())
 	log.Fatal("Jenkins proxy ListenAndServe returned:", http.ListenAndServe(":8080", nil))
 }
