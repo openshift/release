@@ -1,0 +1,196 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: submit-queue-openshift-ansible
+  labels:
+    app: mungegithub-openshift-ansible
+    target-repo: openshift-ansible
+parameters:
+- name: NAME
+  displayName: Application Name
+  description: The name to use for the objects created by this template
+  value: submit-queue-openshift-ansible
+  required: true
+- name: SERVICE_NAME
+  displayName: Service Name
+  description: The name to use for the service that will report the SubmitQueue status
+  value: openshift-ansible-sq-status
+  required: true
+- name: SOURCE_URL
+  displayName: Source URL
+  description: Git source URL to use for building the Submit Queue image
+  value: https://github.com/openshift/test-infra.git
+  required: true
+objects:
+- apiVersion: v1
+  kind: Route
+  metadata:
+    name: "${SERVICE_NAME}"
+    labels:
+      app: mungegithub-openshift-ansible
+      component: "${NAME}"
+      target-repo: openshift-ansible
+  spec:
+    to:
+      kind: Service
+      name: "${SERVICE_NAME}"
+    port:
+      targetPort: status
+    tls:
+      termination: edge
+      insecureEdgeTerminationPolicy: Redirect
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: "${SERVICE_NAME}"
+    labels:
+      app: mungegithub-openshift-ansible
+      component: "${NAME}"
+      target-repo: openshift-ansible
+    annotations:
+      prometheus.io/path: /prometheus
+      prometheus.io/scrape: "true"
+      service.openshift.io/infrastructure: 'true'
+  spec:
+    ports:
+    - name: status
+      protocol: TCP
+      port: 80
+      targetPort: 8080
+    selector:
+      app: mungegithub-openshift-ansible
+      component: "${NAME}"
+      target-repo: openshift-ansible
+    type: ClusterIP
+    sessionAffinity: None
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    name: "${NAME}"
+    labels:
+      app: mungegithub-openshift-ansible
+      component: "${NAME}"
+  spec:
+    replicas: 1
+    revisionHistoryLimit: 2
+    template:
+      metadata:
+        labels:
+          app: mungegithub-openshift-ansible
+          component: "${NAME}"
+          target-repo: openshift-ansible
+      spec:
+        containers:
+        - name: "${NAME}"
+          image: "${NAME}"
+          command:
+          - /mungegithub
+          - --dry-run=false
+          - --alsologtostderr
+          - --stderrthreshold=INFO
+          - --config-path=/etc/munge-config/config
+          ports:
+          - name: status
+            containerPort: 8080
+          resources:
+            requests:
+              cpu: 100m
+            limits:
+              cpu: 100m
+          volumeMounts:
+          - mountPath: /etc/munge-config
+            name: munge-config
+          - mountPath: /etc/hmac-token
+            name: hmac-token
+          - mountPath: /etc/oauth-token
+            name: oauth-token
+          - mountPath: /gitrepos
+            name: repo
+          - mountPath: /cache
+            name: cache-volume
+        volumes:
+        - name: munge-config
+          configMap:
+            name: "${NAME}"
+        - name: hmac-token
+          secret:
+            secretName: sq-hmac-token
+        - name: oauth-token
+          secret:
+            secretName: sq-oauth-token
+        - name: repo
+          emptyDir: {}
+        - name: cache-volume
+          persistentVolumeClaim:
+            claimName: openshift-ansible-cache
+    triggers:
+    - type: ConfigChange
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - "${NAME}"
+        from:
+          kind: ImageStreamTag
+          name: "${NAME}:latest"
+      type: ImageChange
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: "${NAME}"
+  data:
+    config: |
+      fake-e2e: "true"
+      # basic config options.
+      http-cache-dir: /cache/httpcache
+      organization: openshift
+      project: openshift-ansible
+      pr-mungers: lgtm-after-commit,needs-rebase,comment-deleter,submit-queue,docs-need-no-retest
+      state: open
+      token-file: /etc/oauth-token/token
+      period: 20s
+      pr-max-wait-time: 4h
+      repo-dir: /gitrepos
+      github-key-file: /etc/hmac-token/token
+
+      required-retest-contexts: "\
+        ci/openshift-jenkins/tox,\
+        ci/openshift-jenkins/logging,\
+        ci/openshift-jenkins/install,\
+        ci/openshift-jenkins/upgrade,\
+        ci/openshift-jenkins/system-containers
+        "
+
+      protected-branches: ""
+      do-not-merge-milestones: ""
+
+      # chart-url: https://storage.googleapis.com/origin-test-history/k8s-queue-health.svg
+      # history-url: https://storage.googleapis.com/origin-test-history/static/index.html
+      prow-url: https://deck-ci.svc.ci.openshift.org
+      batch-enabled: true
+      context-url: https://openshift-ansible-sq-status-ci.svc.ci.openshift.org
+
+      # options used by the GCS feature.
+      # gcs-bucket: origin-ci-test
+      # gcs-logs-dir: logs
+      # pull-logs-dir: pr-logs
+      # pull-key: pull
+
+      path-label-config: /path-label/path-label.txt
+
+      use-reviewers: "false"
+      gate-approved: "false"
+      gate-cla: "false"
+- kind: PersistentVolumeClaim
+  apiVersion: v1
+  metadata:
+    name: openshift-ansible-cache
+    labels:
+      app: mungegithub-openshift-ansible
+      component: "${NAME}"
+      target-repo: openshift-ansible
+  spec:
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 10Gi
