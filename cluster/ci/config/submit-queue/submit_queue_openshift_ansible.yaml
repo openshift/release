@@ -16,11 +16,6 @@ parameters:
   description: The name to use for the service that will report the SubmitQueue status
   value: openshift-ansible-sq-status
   required: true
-- name: SOURCE_URL
-  displayName: Source URL
-  description: Git source URL to use for building the Submit Queue image
-  value: https://github.com/openshift/test-infra.git
-  required: true
 objects:
 - apiVersion: v1
   kind: Route
@@ -82,7 +77,7 @@ objects:
       spec:
         containers:
         - name: "${NAME}"
-          image: "${NAME}"
+          image: "submit-queue"
           command:
           - /mungegithub
           - --dry-run=false
@@ -131,7 +126,7 @@ objects:
         - "${NAME}"
         from:
           kind: ImageStreamTag
-          name: "${NAME}:latest"
+          name: "submit-queue:latest"
       type: ImageChange
 - apiVersion: v1
   kind: ConfigMap
@@ -157,7 +152,8 @@ objects:
         ci/openshift-jenkins/logging,\
         ci/openshift-jenkins/install,\
         ci/openshift-jenkins/upgrade,\
-        ci/openshift-jenkins/system-containers
+        ci/openshift-jenkins/system-containers,\
+        continuous-integration/travis-ci/pr
         "
 
       protected-branches: ""
