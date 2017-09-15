@@ -2,9 +2,9 @@ all: build test
 .PHONY: all
 
 build:
-	go build -v
+	go build
 .PHONY: build
 
 test:
-	go test -v
+	go test
 .PHONY: test
