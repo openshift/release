@@ -53,74 +53,94 @@ var _ Proxy = &proxy{}
 
 // proxy is able to proxy requests to different Jenkins masters.
 type proxy struct {
+	sync.RWMutex
 	client *http.Client
 	// ProxyAuth is used for authenticating with the proxy.
 	ProxyAuth *BasicAuthConfig `json:"proxy_auth,omitempty"`
 	// Masters includes all the information for contacting different
 	// Jenkins masters.
-	Masters   []JenkinsMaster `json:"masters"`
-	cacheLock *sync.RWMutex
+	Masters []JenkinsMaster `json:"masters"`
 	// job cache
 	cache map[string][]string
 }
 
 func NewProxy(path string) (*proxy, error) {
+	p := &proxy{}
+	err := p.Load(path)
+
+	go func() {
+		for range time.Tick(1 * time.Minute) {
+			if err := p.Load(path); err != nil {
+				log.Printf("Error loading jenkins proxy config: %v", err)
+			} else {
+				log.Printf("Jenkins proxy config reloaded.")
+			}
+		}
+	}()
+
+	return p, err
+}
+
+func (p *proxy) Load(path string) error {
 	log.Printf("Reading config from %s", path)
 	b, err := ioutil.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("error reading %s: %v", path, err)
+		return fmt.Errorf("error reading %s: %v", path, err)
 	}
-	p := &proxy{}
-	if err := json.Unmarshal(b, p); err != nil {
-		return nil, fmt.Errorf("error unmarshaling %s: %v", path, err)
+	np := &proxy{}
+	if err := json.Unmarshal(b, np); err != nil {
+		return fmt.Errorf("error unmarshaling %s: %v", path, err)
 	}
-	if p.ProxyAuth != nil {
-		token, err := loadToken(p.ProxyAuth.TokenFile)
+	if np.ProxyAuth != nil {
+		token, err := loadToken(np.ProxyAuth.TokenFile)
 		if err != nil {
-			return nil, fmt.Errorf("cannot read token file: %v", err)
+			return fmt.Errorf("cannot read token file: %v", err)
 		}
-		p.ProxyAuth.Token = token
+		np.ProxyAuth.Token = token
 	}
-	if len(p.Masters) == 0 {
-		return nil, fmt.Errorf("at least one Jenkins master needs to be setup in %s", path)
+	if len(np.Masters) == 0 {
+		return fmt.Errorf("at least one Jenkins master needs to be setup in %s", path)
 	}
-	for i, m := range p.Masters {
+	for i, m := range np.Masters {
 		u, err := url.Parse(m.URLString)
 		if err != nil {
-			return nil, fmt.Errorf("cannot parse %s: %v", m.URLString, err)
+			return fmt.Errorf("cannot parse %s: %v", m.URLString, err)
 		}
-		p.Masters[i].url = u
+		np.Masters[i].url = u
 		// Setup auth
 		if m.Auth != nil {
 			if m.Auth.Basic != nil {
 				token, err := loadToken(m.Auth.Basic.TokenFile)
 				if err != nil {
-					return nil, fmt.Errorf("cannot read token file: %v", err)
+					return fmt.Errorf("cannot read token file: %v", err)
 				}
-				p.Masters[i].Auth.Basic.Token = token
+				np.Masters[i].Auth.Basic.Token = token
 			} else if m.Auth.BearerToken != nil {
 				token, err := loadToken(m.Auth.BearerToken.TokenFile)
 				if err != nil {
-					return nil, fmt.Errorf("cannot read token file: %v", err)
+					return fmt.Errorf("cannot read token file: %v", err)
 				}
-				p.Masters[i].Auth.BearerToken.Token = token
+				np.Masters[i].Auth.BearerToken.Token = token
 			}
 		}
 	}
-
-	p.client = &http.Client{
+	np.client = &http.Client{
 		Timeout: 15 * time.Second,
 	}
-	p.cacheLock = new(sync.RWMutex)
-	p.cache = make(map[string][]string)
-
-	return p, p.syncCache()
+	np.cache = make(map[string][]string)
+	if err := np.syncCache(); err != nil {
+		return err
+	}
+	p.Lock()
+	defer p.Unlock()
+	p.ProxyAuth = np.ProxyAuth
+	p.Masters = np.Masters
+	p.client = np.client
+	p.cache = np.cache
+	return nil
 }
 
 func (p *proxy) syncCache() error {
-	p.cacheLock.Lock()
-	defer p.cacheLock.Unlock()
-
 	for _, m := range p.Masters {
 		url := m.url.String()
 		log.Printf("Listing jobs from %s", url)
@@ -211,14 +231,20 @@ func (p *proxy) handler() func(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *proxy) Auth() *BasicAuthConfig {
+	p.RLock()
+	defer p.RUnlock()
 	return p.ProxyAuth
 }
 
 func (p *proxy) ProxyRequest(r *http.Request, destURL string) (*http.Response, error) {
+	p.RLock()
+	defer p.RUnlock()
 	return p.request(r.Method, destURL, r.Body, &r.Header)
 }
 
 func (p *proxy) GetDestinationURL(r *http.Request, requestedJob string) (string, error) {
+	p.Lock()
+	defer p.Unlock()
 	// Get the master URL by looking at the job cache.
 	masterURL := p.getMasterURL(requestedJob)
 	if len(masterURL) == 0 {
@@ -240,9 +266,6 @@ func (p *proxy) GetDestinationURL(r *http.Request, requestedJob string) (string,
 }
 
 func (p *proxy) getMasterURL(requestedJob string) string {
-	p.cacheLock.RLock()
-	defer p.cacheLock.RUnlock()
-
 	for masterURL, jobs := range p.cache {
 		for _, job := range jobs {
 			// This is our master.
