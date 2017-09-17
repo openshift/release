@@ -4,15 +4,20 @@ all: jenkins prow mungegithub projects
 jenkins:
 .PHONY: jenkins
 
-prow: prow-crd prow-config prow-images hook plank jenkins-proxy jenkins-operator deck horologium splice sinker commenter
+prow: prow-crd prow-ns prow-config prow-images hook plank jenkins-proxy jenkins-operator deck horologium splice sinker commenter
 .PHONY: prow
+
+prow-ns:
+	oc create ns ci
+.PHONY: prow-ns
 
 prow-crd:
 	oc apply -f cluster/ci/config/prow/prow_crd.yaml
 .PHONY: prow-crd
 
 prow-config:
-	oc apply -f cluster/ci/config/prow/config.yaml cluster/ci/config/prow/plugins.yaml
+	oc apply -f cluster/ci/config/prow/config.yaml
+	oc apply -f cluster/ci/config/prow/plugins.yaml
 .PHONY: prow-config
 
 prow-images:
