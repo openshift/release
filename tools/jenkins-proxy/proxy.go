@@ -65,7 +65,9 @@ type proxy struct {
 }
 
 func NewProxy(path string) (*proxy, error) {
-	p := &proxy{}
+	p := &proxy{
+		cache: make(map[string][]string),
+	}
 	err := p.Load(path)
 
 	go func() {
@@ -127,12 +129,13 @@ func (p *proxy) Load(path string) error {
 	np.client = &http.Client{
 		Timeout: 15 * time.Second,
 	}
-	np.cache = make(map[string][]string)
-	if err := np.syncCache(); err != nil {
-		return err
-	}
+
 	p.Lock()
 	defer p.Unlock()
+	np.cache = p.cache
+	if err := np.syncCache(true); err != nil {
+		return err
+	}
 	p.ProxyAuth = np.ProxyAuth
 	p.Masters = np.Masters
 	p.client = np.client
@@ -140,9 +143,14 @@ func (p *proxy) Load(path string) error {
 	return nil
 }
 
-func (p *proxy) syncCache() error {
+func (p *proxy) syncCache(avoidKnown bool) error {
 	for _, m := range p.Masters {
 		url := m.url.String()
+		// If the master is already known, do not relist from it.
+		_, isKnown := p.cache[url]
+		if avoidKnown && isKnown {
+			continue
+		}
 		log.Printf("Listing jobs from %s", url)
 		jobs, err := p.listJenkinsJobs(m.url)
 		if err != nil {
@@ -249,7 +257,7 @@ func (p *proxy) GetDestinationURL(r *http.Request, requestedJob string) (string,
 	masterURL := p.getMasterURL(requestedJob)
 	if len(masterURL) == 0 {
 		// Update the cache by relisting from all masters.
-		err := p.syncCache()
+		err := p.syncCache(false)
 		if err != nil {
 			return "", err
 		}
