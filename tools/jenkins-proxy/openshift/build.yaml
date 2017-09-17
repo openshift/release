@@ -46,7 +46,8 @@ objects:
 
         COPY . /go/src/github.com/openshift/release
         RUN cd /go/src/github.com/openshift/release/tools/jenkins-proxy && \
-            CGO_ENABLED=0 go install
+            CGO_ENABLED=0 go install && \
+            go test
     strategy:
       dockerStrategy:
         noCache: true
@@ -71,13 +72,8 @@ objects:
         kind: ImageStreamTag
         name: "${NAME}:latest"
     source:
-      dockerfile: |
-        FROM        centos:7
-        MAINTAINER  Michail Kargakis <mkargaki@redhat.com>
-
-        ADD jenkins-proxy /bin/jenkins-proxy
-
-        ENTRYPOINT [ "/bin/jenkins-proxy" ]
+      git:
+        uri: "${SOURCE_URL}"
       images:
       - from:
           kind: ImageStreamTag
@@ -87,6 +83,7 @@ objects:
           sourcePath: /go/bin/jenkins-proxy
     strategy:
       dockerStrategy:
+        dockerfilePath: tools/jenkins-proxy/Dockerfile
         noCache: true
         imageOptimizationPolicy: SkipLayers
     triggers:
