@@ -31,6 +31,10 @@ func forwardResponse(w http.ResponseWriter, resp *http.Response) {
 	destHeaders := w.Header()
 	copyHeader(&resp.Header, &destHeaders)
 
+	// Forward the status code we got from Jenkins. w.Write by default
+	// returns a 200 if w.WriteHeader is not invoked and the prow Jenkins
+	// operator expects a 201 in case a build was created.
+	w.WriteHeader(resp.StatusCode)
 	w.Write(body)
 }
 
