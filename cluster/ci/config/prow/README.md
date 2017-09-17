@@ -11,11 +11,9 @@ oc create ns ci
 oc create -f config.yaml -f plugins.yaml -n ci
 ```
 
-Ensure that the prow-images namespace exists and create all the
-build configurations for prow:
+Create all the build configurations for prow:
 ```
-oc create ns prow-images
-oc policy add-role-to-user system:image-puller system:unauthenticated -n prow-images
+oc policy add-role-to-user system:image-puller system:unauthenticated -n ci
 oc process -f prow_images.yaml | oc create -f -
 ```
 
@@ -56,8 +54,14 @@ oc process -f openshift/plank.yaml | oc create -f -
 
 ### jenkins-operator
 
-`plank` is responsible for the lifecycle of ProwJobs that run Jenkins jobs.
+`jenkins-operator` is responsible for the lifecycle of ProwJobs that run Jenkins jobs.
 It starts the tests for new ProwJobs, and moves them to completion accordingly.
+
+We run a proxy in front of the Jenkins operator. Build and deploy it with the following templates:
+```
+oc process -f https://raw.githubusercontent.com/openshift/release/master/tools/jenkins-proxy/openshift/build.yaml | oc create -f -
+oc process -f https://raw.githubusercontent.com/openshift/release/master/tools/jenkins-proxy/openshift/deploy.yaml | oc create -f -
+```
 
 `jenkins-operator` needs a jenkins token to start jobs in Jenkins and the oauth
 token created in the hook template.
@@ -98,20 +102,6 @@ oc process -f openshift/splice.yaml | oc create -f -
 oc process -f openshift/sinker.yaml | oc create -f -
 ```
 
-## Prow builds
-
-Allow prow to download images from the namespace where the prow builds run.
-
-```
-oc policy add-role-to-user system:image-puller system:unauthenticated -n ci
-oc policy add-role-to-user system:image-puller system:serviceaccount:ci:hook -n prow-images
-oc policy add-role-to-user system:image-puller system:serviceaccount:ci:plank -n prow-images
-oc policy add-role-to-user system:image-puller system:serviceaccount:ci:jenkins-operator -n prow-images
-oc policy add-role-to-user system:image-puller system:serviceaccount:ci:deck -n prow-images
-oc policy add-role-to-user system:image-puller system:serviceaccount:ci:splice -n prow-images
-oc policy add-role-to-user system:image-puller system:serviceaccount:ci:sinker -n prow-images
-oc policy add-role-to-user system:image-puller system:serviceaccount:ci:horologium -n prow-images
-```
 
 ## Prow jobs
 
