@@ -25,14 +25,6 @@ parameters:
   required: true
 objects:
 - apiVersion: v1
-  kind: ConfigMap
-  metadata:
-    name: jenkins-config
-    namespace: "${NAMESPACE}"
-  data:
-    jenkins_address: https://ci.openshift.redhat.com/jenkins/
-    jenkins_user: openshift-ci-robot
-- apiVersion: v1
   data:
     jenkins: "${JENKINS_TOKEN}"
   kind: Secret
@@ -62,20 +54,8 @@ objects:
         - name: "${NAME}"
           image: "${NAME}"
           args:
-          - --jenkins-url=$(JENKINS_ADDRESS)
-          - --jenkins-user=$(JENKINS_USER)
+          - --jenkins-user=openshift-ci-robot
           - --dry-run=false
-          env:
-            - name: JENKINS_ADDRESS
-              valueFrom:
-                configMapKeyRef:
-                  name: jenkins-config
-                  key: jenkins_address
-            - name: JENKINS_USER
-              valueFrom:
-                configMapKeyRef:
-                  name: jenkins-config
-                  key: jenkins_user
           volumeMounts:
           - mountPath: /etc/jenkins
             name: jenkins
