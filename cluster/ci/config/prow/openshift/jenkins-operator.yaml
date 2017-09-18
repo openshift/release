@@ -1,5 +1,5 @@
-# oc process -f plank.yaml -p JENKINS_TOKEN=$(cat jenkins-token | base64) | oc create -f -
-# Reuses the oauth token created in the hook template.
+# Needs the jenkins-token secret for authenticating with the jenkins-proxy.
+# Needs the oauth-token secret for commenting on Github and updating PR statuses.
 apiVersion: template.openshift.io/v1
 kind: Template
 metadata:
@@ -18,20 +18,7 @@ parameters:
 - description: The name of the component.
   name: NAME
   value: jenkins-operator
-- name: JENKINS_TOKEN
-  displayName: Jenkins token
-  description: Jenkins token used for interacting with Jenkins
-  value: ""
-  required: true
 objects:
-- apiVersion: v1
-  data:
-    jenkins: "${JENKINS_TOKEN}"
-  kind: Secret
-  metadata:
-    name: jenkins-token
-    namespace: "${NAMESPACE}"
-  type: Opaque
 - apiVersion: apps.openshift.io/v1
   kind: DeploymentConfig
   metadata:
