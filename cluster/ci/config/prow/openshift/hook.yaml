@@ -1,4 +1,5 @@
-# oc process -f hook.yaml -p HMAC_TOKEN=$(cat hmac-token | base64) -p OAUTH_TOKEN=$(cat oauth-token | base64) | oc create -f -
+# Needs the hmac-token secret for decrypting webhook payloads.
+# Needs the oauth-token secret for manipulating Github PRs/issues.
 apiVersion: template.openshift.io/v1
 kind: Template
 metadata:
@@ -17,16 +18,6 @@ parameters:
 - description: The name of the component.
   name: NAME
   value: hook
-- name: HMAC_TOKEN
-  displayName: HMAC token
-  description: hmac token used for decoding webhook content
-  value: ""
-  required: true
-- name: OAUTH_TOKEN
-  displayName: Oauth token
-  description: Oauth token used for munging pull requests
-  value: ""
-  required: true
 objects:
 - apiVersion: v1
   kind: Route
@@ -122,23 +113,6 @@ objects:
   metadata:
     name: "${NAME}"
     namespace: "${NAMESPACE}"
-- apiVersion: v1
-  data:
-    hmac: "${HMAC_TOKEN}"
-  kind: Secret
-  metadata:
-    name: hmac-token
-    namespace: "${NAMESPACE}"
-  type: Opaque
-- apiVersion: v1
-  data:
-    oauth: "${OAUTH_TOKEN}"
-    github-bot: b3BlbnNoaWZ0LWNpLXJvYm90Cg==
-  kind: Secret
-  metadata:
-    name: oauth-token
-    namespace: "${NAMESPACE}"
-  type: Opaque
 - kind: ClusterRole
   apiVersion: v1 # rbac.authorization.k8s.io/v1beta1
   metadata:
