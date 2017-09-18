@@ -70,6 +70,9 @@ func ParsePullRefs(pullRefs string) (*SourceRef, error) {
 // ToBuildID returns a sha256 sum rerpesenting the SourceRef
 func (s *SourceRef) ToBuildID() string {
 	desc := &bytes.Buffer{}
+	if len(s.RepositoryURL) > 0 {
+		fmt.Fprintf(desc, "url: %s\n", s.RepositoryURL)
+	}
 	fmt.Fprintf(desc, "branch: %s", s.Branch)
 	if len(s.BranchCommit) > 0 {
 		fmt.Fprintf(desc, ", commit: %s", s.BranchCommit)
