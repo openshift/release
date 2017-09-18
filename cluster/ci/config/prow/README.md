@@ -7,14 +7,30 @@ oc create -f prow_crd.yaml
 
 Ensure the ci namespace exists and create the prow configuration files:
 ```
-oc create ns ci
-oc create -f config.yaml -f plugins.yaml -n ci
+oc new-project ci
+oc apply -f config.yaml
+oc apply -f plugins.yaml
+oc create cm jenkins-proxy --from-file=config=../../../../tools/jenkins-proxy/config.json -o yaml --dry-run | oc apply -f -
 ```
 
 Create all the build configurations for prow:
 ```
 oc policy add-role-to-user system:image-puller system:unauthenticated -n ci
-oc process -f prow_images.yaml | oc create -f -
+oc process -f prow_images.yaml | oc apply -f -
+oc process -f ../../../../tools/jenkins-proxy/openshift/build.yaml | oc apply -f -
+```
+
+Create all required prow secrets:
+```
+# This is the token used by the jenkins-operator and deck to authenticate with the jenkins-proxy.
+oc create secret generic jenkins-token --from-literal=jenkins=${BASIC_AUTH_PASS} -o yaml --dry-run | oc apply -f -
+# BASIC_AUTH_PASS is used by the jenkins-proxy for authenticating with https://ci.openshift.redhat.com/jenkins/
+# BEARER_TOKEN is used by the jenkins-proxy for authenticating with FILL_ME (--from-literal=bearer=${BEARER_TOKEN})
+oc create secret generic jenkins-tokens --from-literal=basic=${BASIC_AUTH_PASS} -o yaml --dry-run | oc apply -f -
+# HMAC_TOKEN is used for encrypting Github webhook payloads.
+oc create secret generic hmac-token --from-literal=hmac=${HMAC_TOKEN} -o yaml --dry-run | oc apply -f -
+# OAUTH_TOKEN is used for manipulating Github PRs/issues (labels, comments, etc.).
+oc create secret generic oauth-token --from-literal=oauth=${OAUTH_TOKEN} -o yaml --dry-run | oc apply -f -
 ```
 
 Start all the prow components:
@@ -29,7 +45,7 @@ that start tests.
 It needs a hmac token for decrypting Github webhooks and an oauth token for
 responding to Github events.
 ```
-oc process -f openshift/hook.yaml -p HMAC_TOKEN=$(cat hmac-token | base64) -p OAUTH_TOKEN=$(cat oauth-token | base64) | oc create -f -
+oc process -f openshift/hook.yaml | oc create -f -
 ```
 
 #### webhook setup
@@ -47,7 +63,7 @@ the payload URL, eg. `https://hook-ci.svc.ci.openshift.org/hook`.
 `plank` is responsible for the lifecycle of ProwJobs that run Kubernetes pods.
 It starts the tests for new ProwJobs, and moves them to completion accordingly.
 
-It reuses the oauth token created in the hook template.
+It needs an oauth token for updating comments and statuses in Github PRs.
 ```
 oc process -f openshift/plank.yaml | oc create -f -
 ```
@@ -57,22 +73,22 @@ oc process -f openshift/plank.yaml | oc create -f -
 `jenkins-operator` is responsible for the lifecycle of ProwJobs that run Jenkins jobs.
 It starts the tests for new ProwJobs, and moves them to completion accordingly.
 
-We run a proxy in front of the Jenkins operator. Build and deploy it with the following templates:
+We run a proxy in front of the Jenkins operator. Deploy it with the following template:
 ```
-oc process -f https://raw.githubusercontent.com/openshift/release/master/tools/jenkins-proxy/openshift/build.yaml | oc create -f -
-oc process -f https://raw.githubusercontent.com/openshift/release/master/tools/jenkins-proxy/openshift/deploy.yaml | oc create -f -
+oc process -f ../../../../tools/jenkins-proxy/openshift/deploy.yaml | oc create -f -
 ```
 
-`jenkins-operator` needs a jenkins token to start jobs in Jenkins and the oauth
-token created in the hook template.
+`jenkins-operator` needs a jenkins token to authenticate with the jenkins-proxy in
+order to start jobs in Jenkins and an oauth token for updating comments and statuses
+in Github PRs.
 ```
-oc process -f openshift/jenkins-operator.yaml -p JENKINS_TOKEN=$(cat jenkins-token | base64) | oc create -f -
+oc process -f openshift/jenkins-operator.yaml | oc create -f -
 ```
 
 ### deck
 
-`deck` is the prow frontend. It reuses the jenkins token created in the
-jenkins-operator template.
+`deck` is the prow frontend. It needs a jenkins token for authenticating with the
+jenkins-proxy in order to get Jenkins logs.
 ```
 oc process -f openshift/deck.yaml | oc create -f -
 ```
