@@ -33,8 +33,11 @@ PULL_REFS can be specified either as an argument or an environment variable
 	},
 }
 
+var sourceURL string
+
 func init() {
 	RootCmd.AddCommand(refhashCmd)
+	refhashCmd.Flags().StringVar(&sourceURL, "source-url", "", "The source URL. If specified, it's used in calculating the hash.")
 }
 
 func printRefHash(args []string) error {
@@ -47,7 +50,7 @@ func printRefHash(args []string) error {
 	if err != nil {
 		return err
 	}
-
+	sourceRef.RepositoryURL = sourceURL
 	fmt.Printf("%s\n", sourceRef.ToBuildID())
 	return nil
 }
