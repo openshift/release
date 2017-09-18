@@ -4,7 +4,7 @@ all: jenkins prow mungegithub projects
 jenkins:
 .PHONY: jenkins
 
-prow: prow-crd prow-config prow-images hook plank jenkins-proxy jenkins-operator deck horologium splice sinker commenter
+prow: prow-crd prow-config prow-secrets prow-images hook plank jenkins-proxy jenkins-operator deck horologium splice sinker commenter
 .PHONY: prow
 
 prow-crd:
@@ -14,10 +14,24 @@ prow-crd:
 prow-config:
 	oc apply -f cluster/ci/config/prow/config.yaml
 	oc apply -f cluster/ci/config/prow/plugins.yaml
+	oc create cm jenkins-proxy --from-file=config=tools/jenkins-proxy/config.json -o yaml --dry-run | oc apply -f -
 .PHONY: prow-config
+
+prow-secrets:
+	# This is the token used by the jenkins-operator and deck to authenticate with the jenkins-proxy.
+	oc create secret generic jenkins-token --from-literal=jenkins=${BASIC_AUTH_PASS} -o yaml --dry-run | oc apply -f -
+	# BASIC_AUTH_PASS is used by the jenkins-proxy for authenticating with https://ci.openshift.redhat.com/jenkins/
+	# BEARER_TOKEN is used by the jenkins-proxy for authenticating with FILL_ME (--from-literal=bearer=${BEARER_TOKEN})
+	oc create secret generic jenkins-tokens --from-literal=basic=${BASIC_AUTH_PASS} -o yaml --dry-run | oc apply -f -
+	# HMAC_TOKEN is used for encrypting Github webhook payloads.
+	oc create secret generic hmac-token --from-literal=hmac=${HMAC_TOKEN} -o yaml --dry-run | oc apply -f -
+	# OAUTH_TOKEN is used for manipulating Github PRs/issues (labels, comments, etc.).
+	oc create secret generic oauth-token --from-literal=oauth=${OAUTH_TOKEN} -o yaml --dry-run | oc apply -f -
+.PHONY: prow-secrets
 
 prow-images:
 	oc process -f cluster/ci/config/prow/prow_images.yaml | oc apply -f -
+	oc process -f tools/jenkins-proxy/openshift/build.yaml | oc apply -f -
 .PHONY: prow-images
 
 hook:
@@ -32,12 +46,7 @@ horologium:
 	oc process -f cluster/ci/config/prow/openshift/horologium.yaml | oc apply -f -
 .PHONY: horologium
 
-# BASIC_AUTH_PASS is the openshift-ci-robot password for authenticating in https://ci.openshift.redhat.com/jenkins/
-# BEARER_TOKEN is the openshift-ci-robot token used for authenticating in FILL_ME
 jenkins-proxy:
-	oc create cm jenkins-proxy --from-file=config=config.json -o yaml --dry-run | oc apply -f -
-	oc create secret generic jenkins-tokens --from-literal=basic=${BASIC_AUTH_PASS} --from-literal=bearer=${BEARER_TOKEN} -o yaml --dry-run | oc apply -f -
-	oc process -f tools/jenkins-proxy/openshift/build.yaml | oc apply -f -
 	oc process -f tools/jenkins-proxy/openshift/deploy.yaml | oc apply -f -
 .PHONY: jenkins-proxy
 
