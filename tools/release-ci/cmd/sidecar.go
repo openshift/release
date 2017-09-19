@@ -55,7 +55,7 @@ func runSidecar(_ []string) error {
 		return err
 	}
 
-	if len(GceCredentialsFile) == 0 {
+	if len(config.GceCredentialsFile) == 0 {
 		// if there is no GCE configuration,
 		// we will just exit early
 		return nil
