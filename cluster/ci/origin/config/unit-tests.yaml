@@ -33,15 +33,14 @@ objects:
     - command:
       - /bin/bash
       - -c
-      - hack/test-go.sh
+      - 'env -i TEST_KUBE=true JUNIT_REPORT=true SKIP_TEARDOWN=1 HOME=/tmp HOSTNAME=$(hostname) TERM=xterm-256color make test-unit -k'
       image: "${BINARY_IMAGE_REF}"
-      env:
-      - name: SKIP_TEARDOWN
-        value: "1"
       imagePullPolicy: IfNotPresent
       name: unit-tests
-      resources: {}
-      securityContext: {}
+      resources:
+        requests:
+          cpu: "2000m"
+          memory: "2Gi"
     dnsPolicy: ClusterFirst
     imagePullSecrets:
     - name: "${PULL_SECRET_NAME}"
