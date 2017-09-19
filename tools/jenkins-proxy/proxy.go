@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -47,6 +48,7 @@ type Proxy interface {
 	Auth() *BasicAuthConfig
 	GetDestinationURL(r *http.Request, requestedJob string) (string, error)
 	ProxyRequest(r *http.Request, destURL string) (*http.Response, error)
+	ListQueues(r *http.Request) (*http.Response, error)
 }
 
 var _ Proxy = &proxy{}
@@ -283,4 +285,68 @@ func (p *proxy) getMasterURL(requestedJob string) string {
 		}
 	}
 	return ""
+}
+
+type JenkinsBuild struct {
+	Actions []struct {
+		Parameters []struct {
+			Name  string `json:"name"`
+			Value string `json:"value"`
+		} `json:"parameters"`
+	} `json:"actions"`
+	Task struct {
+		// Used for tracking unscheduled builds for jobs.
+		Name string `json:"name"`
+	} `json:"task"`
+	Number int     `json:"number"`
+	Result *string `json:"result"`
+}
+
+func (p *proxy) ListQueues(r *http.Request) (*http.Response, error) {
+	p.RLock()
+	defer p.RUnlock()
+
+	total := struct {
+		QueuedBuilds []JenkinsBuild `json:"items"`
+	}{}
+
+	for masterURL := range p.cache {
+		destURL := replaceHostname(r.URL, masterURL)
+		resp, err := p.request(http.MethodGet, destURL, nil, nil)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return nil, fmt.Errorf("response not 2XX??: %s", resp.Status)
+		}
+		data, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+		page := struct {
+			QueuedBuilds []JenkinsBuild `json:"items"`
+		}{}
+		if err := json.Unmarshal(data, &page); err != nil {
+			return nil, err
+		}
+		total.QueuedBuilds = append(total.QueuedBuilds, page.QueuedBuilds...)
+	}
+
+	body, err := json.Marshal(total)
+	if err != nil {
+		return nil, err
+	}
+
+	return &http.Response{
+		Status:        "200 OK",
+		StatusCode:    200,
+		Proto:         "HTTP/1.1",
+		ProtoMajor:    1,
+		ProtoMinor:    1,
+		Body:          ioutil.NopCloser(bytes.NewBuffer(body)),
+		ContentLength: int64(len(body)),
+		Request:       r,
+		Header:        make(http.Header, 0),
+	}, nil
 }
