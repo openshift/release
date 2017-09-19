@@ -17,7 +17,8 @@ type Configuration struct {
 	// GceCredentialsFile is the file where Google Cloud
 	// authentication credentials are stored. See:
 	// https://developers.google.com/identity/protocols/OAuth2ServiceAccount
-	GceCredentialsFile string `json:"gce-credentials-file"`
+	// Optional. If this is not present, no uploads will occur.
+	GceCredentialsFile string `json:"gce-credentials-file,omitempty"`
 
 	// ArtifactDir is the directory to upload to GCS
 	ArtifactDir string `json:"artifact-dir"`
