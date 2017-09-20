@@ -4,6 +4,7 @@ import (
 	"flag"
 	"log"
 	"net/http"
+	_ "net/http/pprof"
 )
 
 // TODO: Prometheus metrics
@@ -25,15 +26,26 @@ func handle(p Proxy, w http.ResponseWriter, r *http.Request) {
 	// * queue requests (does not need a job)
 	//
 	// Requests that need a job will need to be resolved using the proxy
-	// cache. Today, queue requests will always contain the correct hostname
-	// because the operator assigns the queue url it gets back from a build
-	// request on a prow job. Eventually, this will change (see
-	// https://github.com/kubernetes/test-infra/issues/4366) and then we should
-	// broadcast queue requests to all masters.
+	// cache. Queue requests need to be broadcasted to all masters.
 	requestedJob := getRequestedJob(r.URL.Path)
 	if len(requestedJob) == 0 {
-		// For now this is a forbidden request, in the future we are going
-		// to demux requests to all master build queues.
+		// Demux requests to all master build queues.
+		// TODO: Handle queue cancellation requests. These are tricky because
+		// we need to determine to what master to send the request and the
+		// request itself does not contain anything related to the build that
+		// needs to be cancelled apart from its id in the queue. We will likely
+		// need to send the job name inside an http header from prow, and figure
+		// out the master here using the job cache.
+		if isQueueRequest(r) {
+			resp, err := p.ListQueues(r)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadGateway)
+				return
+			}
+			forwardResponse(w, resp)
+			return
+		}
+
 		http.Error(w, "Forbidden.", http.StatusForbidden)
 		return
 	}

@@ -73,6 +73,10 @@ func getRequestedJob(path string) string {
 	return parts[jobIndex]
 }
 
+func isQueueRequest(r *http.Request) bool {
+	return strings.HasPrefix(r.URL.Path, "/queue/api/json") && r.Method == http.MethodGet
+}
+
 // authenticate the request and return whether auth is missing or failed.
 func authenticate(r *http.Request, auth *BasicAuthConfig) error {
 	if auth == nil {

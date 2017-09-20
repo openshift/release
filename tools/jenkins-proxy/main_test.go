@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +16,8 @@ type fakeProxy struct {
 	destURL string
 	destErr error
 
+	masters []string
+
 	respErr error
 }
 
@@ -25,6 +28,21 @@ func (fp *fakeProxy) GetDestinationURL(r *http.Request, requestedJob string) (st
 func (fp *fakeProxy) ProxyRequest(r *http.Request, destURL string) (*http.Response, error) {
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, "<xml>job config</xml>")
+	}
+
+	w := httptest.NewRecorder()
+	handler(w, r)
+
+	if fp.respErr != nil {
+		return nil, fp.respErr
+	}
+	return w.Result(), nil
+}
+func (fp *fakeProxy) ListQueues(r *http.Request) (*http.Response, error) {
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		for _, m := range fp.masters {
+			io.WriteString(w, fmt.Sprintf(`{"%s": "%s"}`, r.URL.RawQuery, m))
+		}
 	}
 
 	w := httptest.NewRecorder()
@@ -123,6 +141,18 @@ func TestHandle(t *testing.T) {
 			},
 
 			expectedBody: "404 page not found\n",
+		},
+		{
+			name: "queue request",
+
+			method: http.MethodGet,
+			url:    "/queue/api/json?task",
+			w:      httptest.NewRecorder(),
+			p: &fakeProxy{
+				masters: []string{"https://jenkins", "https://new-jenkins"},
+			},
+
+			expectedBody: `{"task": "https://jenkins"}{"task": "https://new-jenkins"}`,
 		},
 	}
 
