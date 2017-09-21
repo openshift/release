@@ -15,4 +15,4 @@ RUN chmod g+xw -R /go && \
     mkdir -p /tmp/openshift && chmod g+xw /tmp/openshift && \
     umask 0002 && \
     git clone "${SOURCE_URL}" . && \
-    hack/build-go.sh
+    OS_GOFLAGS="-race" hack/build-go.sh
