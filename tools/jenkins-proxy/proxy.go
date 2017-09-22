@@ -101,6 +101,8 @@ func (p *proxy) Load(path string) error {
 			return fmt.Errorf("cannot read token file: %v", err)
 		}
 		np.ProxyAuth.Token = token
+	} else {
+		log.Print("Authentication to proxy is disabled!")
 	}
 	if len(np.Masters) == 0 {
 		return fmt.Errorf("at least one Jenkins master needs to be setup in %s", path)
@@ -135,9 +137,7 @@ func (p *proxy) Load(path string) error {
 	p.Lock()
 	defer p.Unlock()
 	np.cache = p.cache
-	if err := np.syncCache(true); err != nil {
-		return err
-	}
+	np.syncCache(true)
 	p.ProxyAuth = np.ProxyAuth
 	p.Masters = np.Masters
 	p.client = np.client
@@ -145,7 +145,7 @@ func (p *proxy) Load(path string) error {
 	return nil
 }
 
-func (p *proxy) syncCache(avoidKnown bool) error {
+func (p *proxy) syncCache(avoidKnown bool) {
 	for _, m := range p.Masters {
 		url := m.url.String()
 		// If the master is already known, do not relist from it.
@@ -156,11 +156,12 @@ func (p *proxy) syncCache(avoidKnown bool) error {
 		log.Printf("Listing jobs from %s", url)
 		jobs, err := p.listJenkinsJobs(m.url)
 		if err != nil {
-			return fmt.Errorf("cannot list jobs from %s: %v", url, err)
+			// Do not crash the proxy if a master is unavailable on proxy startup.
+			log.Printf("cannot list jobs from %s: %v", url, err)
+			continue
 		}
 		p.cache[url] = jobs
 	}
-	return nil
 }
 
 func (p *proxy) listJenkinsJobs(url *url.URL) ([]string, error) {
@@ -259,10 +260,8 @@ func (p *proxy) GetDestinationURL(r *http.Request, requestedJob string) (string,
 	masterURL := p.getMasterURL(requestedJob)
 	if len(masterURL) == 0 {
 		// Update the cache by relisting from all masters.
-		err := p.syncCache(false)
-		if err != nil {
-			return "", err
-		}
+		p.syncCache(false)
+
 		masterURL = p.getMasterURL(requestedJob)
 		// Return 404 back to the client.
 		if len(masterURL) == 0 {
