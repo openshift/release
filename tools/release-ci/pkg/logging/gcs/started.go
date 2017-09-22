@@ -3,6 +3,7 @@ package gcs
 import (
 	"encoding/json"
 	"fmt"
+	"path"
 	"time"
 
 	"bytes"
@@ -34,17 +35,19 @@ func UploadStartingData(configurationFile string, gcsBucket *storage.BucketHandl
 
 	gcsPath := metadata.GcsPath()
 	uploadTargets := map[string]uploadFunc{
-		gcsPath + "/configuration.json": fileUpload(configurationFile),
-		gcsPath + "/started.json":       dataUpload(startedData),
+		path.Join(gcsPath, "configuration.json"): fileUpload(configurationFile),
+		path.Join(gcsPath, "started.json"):       dataUpload(startedData),
 	}
 
-	if attrs, err := gcsBucket.Attrs(context.Background()); err != nil {
-		fmt.Errorf("could not determine bucket attributes, skipping alias upload: %v", err)
-	} else {
-		fullGcsPath := fmt.Sprintf("gs://%s/%s", attrs.Name, gcsPath)
-		for _, alias := range metadata.Aliases() {
-			uploadTargets[alias] = dataUpload(strings.NewReader(fullGcsPath))
-		}
+	attrs, err := gcsBucket.Attrs(context.Background())
+	if err != nil {
+		return fmt.Errorf("could not determine bucket attributes, skipping alias upload: %v", err)
+	}
+
+	fullGcsPath := fmt.Sprintf("gs://%s", path.Join(attrs.Name, gcsPath))
+
+	for _, alias := range metadata.Aliases() {
+		uploadTargets[alias] = dataUpload(strings.NewReader(fullGcsPath))
 	}
 
 	return uploadToGCS(gcsBucket, uploadTargets)

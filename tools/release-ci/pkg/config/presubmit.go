@@ -18,6 +18,7 @@ type PullRequest struct {
 
 type Presubmit struct {
 	Job
+	RepoMeta
 	Repo
 	PullRequest
 }
@@ -25,7 +26,7 @@ type Presubmit struct {
 // GcsPath is the base path for job data. Pre-submit jobs
 // store their under the directory of their PR
 func (p *Presubmit) GcsPath() string {
-	return fmt.Sprintf("%s/%d/%s/%d/", PullRequestIndex, p.PullNumber, p.JobName, p.BuildNumber)
+	return fmt.Sprintf("%s/%s_%s/%s/%d/%s/%d/", PullRequestPrefix, p.RepoOwner, p.RepoName, PullRequestIndex, p.PullNumber, p.JobName, p.BuildNumber)
 }
 
 // Aliases are the paths to symlink to the GcsPath.
