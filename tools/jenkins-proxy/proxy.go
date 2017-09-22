@@ -289,8 +289,8 @@ func (p *proxy) getMasterURL(requestedJob string) string {
 type JenkinsBuild struct {
 	Actions []struct {
 		Parameters []struct {
-			Name  string `json:"name"`
-			Value string `json:"value"`
+			Name  string      `json:"name"`
+			Value interface{} `json:"value"`
 		} `json:"parameters"`
 	} `json:"actions"`
 	Task struct {
