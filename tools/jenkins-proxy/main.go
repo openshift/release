@@ -9,7 +9,6 @@ import (
 
 // TODO: Prometheus metrics
 func handle(p Proxy, w http.ResponseWriter, r *http.Request) {
-	log.Print(r.Method + ": " + r.URL.String())
 	w.Header().Set("X-Jenkins-Proxy", "JenkinsProxy")
 
 	// Authenticate the request.
@@ -40,6 +39,7 @@ func handle(p Proxy, w http.ResponseWriter, r *http.Request) {
 			resp, err := p.ListQueues(r)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadGateway)
+				log.Printf("Cannot list from queues: %v, (Request: %s %s)", err, r.Method, r.URL.String())
 				return
 			}
 			forwardResponse(w, resp)
@@ -54,6 +54,7 @@ func handle(p Proxy, w http.ResponseWriter, r *http.Request) {
 	destURL, err := p.GetDestinationURL(r, requestedJob)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadGateway)
+		log.Printf("Cannot get destination URL: %v, (Request: %s %s)", err, r.Method, r.URL.String())
 		return
 	}
 	if len(destURL) == 0 {
@@ -62,10 +63,10 @@ func handle(p Proxy, w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Proxy the request to the destination URL.
-	log.Printf("Proxying to %s", destURL)
 	resp, err := p.ProxyRequest(r, destURL)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadGateway)
+		log.Printf("Cannot proxy to %s: %v, (Request: %s %s)", destURL, err, r.Method, r.URL.String())
 		return
 	}
 	forwardResponse(w, resp)
