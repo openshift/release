@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: base-image-pipeline
+labels:
+  template: base-image-pipeline
+parameters:
+- description: Name of the GCS bucket to use for logging
+  displayName: GCS bucket
+  name: GCS_BUCKET
+  value: origin-ci-test
+  required: true
+objects:
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: logging-config
+  data:
+    logging-config.json: |-
+      {
+        "process-log": "/var/run/logging/process-log",
+        "marker-file": "/var/run/logging/marker",
+        "gcs-bucket": "${GCS_BUCKET}",
+        "gce-credentials-file": "/var/run/secrets/gce/gce.json",
+        "artifact-dir": "/var/run/logging/artifacts",
+        "configuration-file": "/var/run/logging/config.json"
+      }

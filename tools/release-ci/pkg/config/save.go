@@ -10,6 +10,11 @@ import (
 )
 
 func Save(file string) error {
+	repoMeta, err := retrieveRepoMeta()
+	if err != nil {
+		return fmt.Errorf("failed to retrieve repository metadata: %v", err)
+	}
+
 	job, err := retrieveJobConfig()
 	if err != nil {
 		return fmt.Errorf("failed to retieve job config: %v", err)
@@ -27,7 +32,7 @@ func Save(file string) error {
 
 	var data Data
 	if !repoPresent && !pullPresent {
-		data = &Periodic{Job: job}
+		data = &Periodic{Job: job, RepoMeta: repoMeta}
 	}
 	if repoPresent && !pullPresent {
 		sourceRef, err := pullrefs.ParsePullRefs(repo.PullRefs)
@@ -83,6 +88,8 @@ func retrieveJobConfig() (Job, error) {
 		}
 	}
 
+	testName, _ := os.LookupEnv("TEST_NAME")
+
 	if len(missing) > 0 {
 		return Job{}, fmt.Errorf("missing environment variables %v", missing)
 	}
@@ -90,10 +97,11 @@ func retrieveJobConfig() (Job, error) {
 	return Job{
 		JobName:     jobName,
 		BuildNumber: buildNumber,
+		TestName:    testName,
 	}, nil
 }
 
-func retrieveRepoConfig() (Repo, bool, error) {
+func retrieveRepoMeta() (RepoMeta, error) {
 	var missing []string
 	repoOwner, ok := os.LookupEnv("REPO_OWNER")
 	if !ok {
@@ -104,6 +112,19 @@ func retrieveRepoConfig() (Repo, bool, error) {
 	if !ok {
 		missing = append(missing, "REPO_NAME")
 	}
+
+	if len(missing) > 0 {
+		return RepoMeta{}, fmt.Errorf("missing environment variables %v", missing)
+	}
+
+	return RepoMeta{
+		RepoOwner: repoOwner,
+		RepoName:  repoName,
+	}, nil
+}
+
+func retrieveRepoConfig() (Repo, bool, error) {
+	var missing []string
 
 	baseRef, ok := os.LookupEnv("PULL_BASE_REF")
 	if !ok {
@@ -121,7 +142,7 @@ func retrieveRepoConfig() (Repo, bool, error) {
 	}
 
 	if len(missing) > 0 {
-		if len(missing) == 5 {
+		if len(missing) == 3 {
 			// if everything is missing, we just don't have
 			// a repository configuration in this job
 			return Repo{}, false, nil
@@ -133,11 +154,9 @@ func retrieveRepoConfig() (Repo, bool, error) {
 	}
 
 	return Repo{
-		RepoOwner: repoOwner,
-		RepoName:  repoName,
-		BaseRef:   baseRef,
-		BaseSha:   baseSha,
-		PullRefs:  pullRefs,
+		BaseRef:  baseRef,
+		BaseSha:  baseSha,
+		PullRefs: pullRefs,
 	}, true, nil
 }
 
