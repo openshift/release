@@ -260,6 +260,7 @@ func (p *proxy) GetDestinationURL(r *http.Request, requestedJob string) (string,
 	masterURL := p.getMasterURL(requestedJob)
 	if len(masterURL) == 0 {
 		// Update the cache by relisting from all masters.
+		log.Printf("Cannot find job %q in the cache; relisting from all masters", requestedJob)
 		p.syncCache(false)
 
 		masterURL = p.getMasterURL(requestedJob)

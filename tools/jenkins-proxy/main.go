@@ -14,6 +14,7 @@ func handle(p Proxy, w http.ResponseWriter, r *http.Request) {
 	// Authenticate the request.
 	if err := authenticate(r, p.Auth()); err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
+		log.Printf("Unauthorized: %v, (Request: %s %s)", err, r.Method, r.URL.String())
 		return
 	}
 
@@ -47,6 +48,7 @@ func handle(p Proxy, w http.ResponseWriter, r *http.Request) {
 		}
 
 		http.Error(w, "Forbidden.", http.StatusForbidden)
+		log.Printf("Forbidden. (Request: %s %s)", r.Method, r.URL.String())
 		return
 	}
 
@@ -59,6 +61,7 @@ func handle(p Proxy, w http.ResponseWriter, r *http.Request) {
 	}
 	if len(destURL) == 0 {
 		http.NotFound(w, r)
+		log.Printf("Job %q not found. (Request: %s %s)", requestedJob, r.Method, r.URL.String())
 		return
 	}
 
