@@ -1,5 +1,7 @@
 ## prow setup
 
+# TODO: Move this at root and repurpose to use our Makefile.
+
 Register ProwJobs in the cluster with:
 ```
 oc create -f prow_crd.yaml
@@ -46,6 +48,7 @@ It needs a hmac token for decrypting Github webhooks and an oauth token for
 responding to Github events.
 ```
 oc process -f openshift/hook.yaml | oc create -f -
+oc process -f openshift/hook_rbac.yaml | oc create -f -
 ```
 
 #### webhook setup
