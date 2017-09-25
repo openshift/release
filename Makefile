@@ -4,7 +4,7 @@ all: jenkins prow mungegithub projects
 jenkins:
 .PHONY: jenkins
 
-prow: prow-crd prow-config prow-secrets prow-images hook plank jenkins-proxy jenkins-operator deck horologium splice sinker commenter
+prow: prow-crd prow-config prow-secrets prow-images prow-rbac hook plank jenkins-proxy jenkins-operator deck horologium splice sinker commenter
 .PHONY: prow
 
 prow-crd:
@@ -33,6 +33,10 @@ prow-images:
 	oc process -f cluster/ci/config/prow/prow_images.yaml | oc apply -f -
 	oc process -f tools/jenkins-proxy/openshift/build.yaml | oc apply -f -
 .PHONY: prow-images
+
+prow-rbac:
+	# TODO: Add the rest of prow roles
+	oc process -f cluster/ci/config/prow/openshift/hook_rbac.yaml | oc apply -f -
 
 hook:
 	oc process -f cluster/ci/config/prow/openshift/hook.yaml | oc apply -f -
