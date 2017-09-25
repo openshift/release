@@ -1,344 +1,341 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: config
-data:
-  config: |+
-    ---
-    plank:
-      job_url_template: '{{if eq .Spec.Refs.Repo "origin"}}https://openshift-gce-devel.appspot.com/build/origin-ci-test/{{if eq .Spec.Type "presubmit"}}pr-logs/pull{{else if eq .Spec.Type "batch"}}pr-logs/pull{{else}}logs{{end}}{{if ne .Spec.Refs.Org ""}}{{if ne .Spec.Refs.Org "openshift"}}/{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}{{else if ne .Spec.Refs.Repo "origin"}}/{{.Spec.Refs.Repo}}{{end}}{{end}}{{if eq .Spec.Type "presubmit"}}/{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}{{else if eq .Spec.Type "batch"}}/batch{{end}}/{{.Spec.Job}}/{{.Status.BuildID}}/{{else}}https://ci.openshift.redhat.com/jenkins/job/{{.Spec.Job}}/{{.Status.BuildID}}/{{end}}'
-      report_template: '[Full PR test history](https://openshift-gce-devel.appspot.com/pr/{{if eq .Spec.Refs.Org "openshift"}}{{if eq .Spec.Refs.Repo "origin"}}{{else}}{{.Spec.Refs.Repo}}/{{end}}{{else}}{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}/{{end}}{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://openshift-gce-devel.appspot.com/pr/{{with index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}). Please help us cut down on flakes by [linking to](https://github.com/kubernetes/community/blob/master/contributors/devel/flaky-tests.md#filing-issues-for-flaky-tests) an [open issue](https://github.com/{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}/issues?q=is:issue+is:open) when you hit one in your PR.'
+plank:
+  job_url_template: '{{if eq .Spec.Refs.Repo "origin"}}https://openshift-gce-devel.appspot.com/build/origin-ci-test/{{if eq .Spec.Type "presubmit"}}pr-logs/pull{{else if eq .Spec.Type "batch"}}pr-logs/pull{{else}}logs{{end}}{{if ne .Spec.Refs.Org ""}}{{if ne .Spec.Refs.Org "openshift"}}/{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}{{else if ne .Spec.Refs.Repo "origin"}}/{{.Spec.Refs.Repo}}{{end}}{{end}}{{if eq .Spec.Type "presubmit"}}/{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}{{else if eq .Spec.Type "batch"}}/batch{{end}}/{{.Spec.Job}}/{{.Status.BuildID}}/{{else}}https://ci.openshift.redhat.com/jenkins/job/{{.Spec.Job}}/{{.Status.BuildID}}/{{end}}'
+  report_template: '[Full PR test history](https://openshift-gce-devel.appspot.com/pr/{{if eq .Spec.Refs.Org "openshift"}}{{if eq .Spec.Refs.Repo "origin"}}{{else}}{{.Spec.Refs.Repo}}/{{end}}{{else}}{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}/{{end}}{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://openshift-gce-devel.appspot.com/pr/{{with index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}). Please help us cut down on flakes by [linking to](https://github.com/kubernetes/community/blob/master/contributors/devel/flaky-tests.md#filing-issues-for-flaky-tests) an [open issue](https://github.com/{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}/issues?q=is:issue+is:open) when you hit one in your PR.'
 
-    sinker:
-      resync_period: 1h
-      max_prowjob_age: 48h
-      max_pod_age: 12h
+jenkins-operator:
+  job_url_template: '{{if eq .Spec.Refs.Repo "origin"}}https://openshift-gce-devel.appspot.com/build/origin-ci-test/{{if eq .Spec.Type "presubmit"}}pr-logs/pull{{else if eq .Spec.Type "batch"}}pr-logs/pull{{else}}logs{{end}}{{if ne .Spec.Refs.Org ""}}{{if ne .Spec.Refs.Org "openshift"}}/{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}{{else if ne .Spec.Refs.Repo "origin"}}/{{.Spec.Refs.Repo}}{{end}}{{end}}{{if eq .Spec.Type "presubmit"}}/{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}{{else if eq .Spec.Type "batch"}}/batch{{end}}/{{.Spec.Job}}/{{.Status.BuildID}}/{{else}}https://ci.openshift.redhat.com/jenkins/job/{{.Spec.Job}}/{{.Status.BuildID}}/{{end}}'
+  report_template: '[Full PR test history](https://openshift-gce-devel.appspot.com/pr/{{if eq .Spec.Refs.Org "openshift"}}{{if eq .Spec.Refs.Repo "origin"}}{{else}}{{.Spec.Refs.Repo}}/{{end}}{{else}}{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}/{{end}}{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://openshift-gce-devel.appspot.com/pr/{{with index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}). Please help us cut down on flakes by [linking to](https://github.com/kubernetes/community/blob/master/contributors/devel/flaky-tests.md#filing-issues-for-flaky-tests) an [open issue](https://github.com/{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}/issues?q=is:issue+is:open) when you hit one in your PR.'
 
-    prowjob_namespace: ci
-    pod_namespace: ci
-    log_level: info
+sinker:
+  resync_period: 1h
+  max_prowjob_age: 48h
+  max_pod_age: 12h
 
-    presubmits:
-      openshift/origin:
-      - name: test_pull_request_origin_verify
-        agent: jenkins
-        always_run: true
-        context: ci/openshift-jenkins/verify
-        rerun_command: "/test verify"
-        trigger: "((?m)^/test( all| verify),?(\\s+|$))"
+prowjob_namespace: ci
+pod_namespace: ci
+log_level: info
 
-      - name: test_pull_request_origin_cmd
-        agent: jenkins
-        always_run: true
-        context: ci/openshift-jenkins/cmd
-        rerun_command: "/test cmd"
-        trigger: "((?m)^/test( all| cmd),?(\\s+|$))"
+presubmits:
+  openshift/origin:
+  - name: test_pull_request_origin_verify
+    agent: jenkins
+    always_run: true
+    context: ci/openshift-jenkins/verify
+    rerun_command: "/test verify"
+    trigger: "((?m)^/test( all| verify),?(\\s+|$))"
 
-      - name: test_pull_request_origin_unit
-        agent: jenkins
-        always_run: true
-        context: ci/openshift-jenkins/unit
-        rerun_command: "/test unit"
-        trigger: "((?m)^/test( all| unit),?(\\s+|$))"
+  - name: test_pull_request_origin_cmd
+    agent: jenkins
+    always_run: true
+    context: ci/openshift-jenkins/cmd
+    rerun_command: "/test cmd"
+    trigger: "((?m)^/test( all| cmd),?(\\s+|$))"
 
-      - name: test_pull_request_origin_integration
-        agent: jenkins
-        always_run: true
-        context: ci/openshift-jenkins/integration
-        rerun_command: "/test integration"
-        trigger: "((?m)^/test( all| integration),?(\\s+|$))"
+  - name: test_pull_request_origin_unit
+    agent: jenkins
+    always_run: true
+    context: ci/openshift-jenkins/unit
+    rerun_command: "/test unit"
+    trigger: "((?m)^/test( all| unit),?(\\s+|$))"
 
-      - name: test_pull_request_origin_end_to_end
-        agent: jenkins
-        always_run: true
-        context: ci/openshift-jenkins/end_to_end
-        rerun_command: "/test end_to_end"
-        trigger: "((?m)^/test( all| end_to_end),?(\\s+|$))"
+  - name: test_pull_request_origin_integration
+    agent: jenkins
+    always_run: true
+    context: ci/openshift-jenkins/integration
+    rerun_command: "/test integration"
+    trigger: "((?m)^/test( all| integration),?(\\s+|$))"
 
-      - name: test_pull_request_origin_extended_conformance_install_update
-        agent: jenkins
-        always_run: true
-        context: ci/openshift-jenkins/extended_conformance_install_update
-        rerun_command: "/test extended_conformance_install_update"
-        trigger: "((?m)^/test( all| extended_conformance_install_update),?(\\s+|$))"
+  - name: test_pull_request_origin_end_to_end
+    agent: jenkins
+    always_run: true
+    context: ci/openshift-jenkins/end_to_end
+    rerun_command: "/test end_to_end"
+    trigger: "((?m)^/test( all| end_to_end),?(\\s+|$))"
 
-      - name: test_pull_request_origin_extended_conformance_gce
-        agent: jenkins
-        always_run: true
-        context: ci/openshift-jenkins/extended_conformance_gce
-        rerun_command: "/test extended_conformance_gce"
-        trigger: "((?m)^/test( all| extended_conformance_gce),?(\\s+|$))"
+  - name: test_pull_request_origin_extended_conformance_install_update
+    agent: jenkins
+    always_run: true
+    context: ci/openshift-jenkins/extended_conformance_install_update
+    rerun_command: "/test extended_conformance_install_update"
+    trigger: "((?m)^/test( all| extended_conformance_install_update),?(\\s+|$))"
 
-      - name: test_pull_request_origin_extended_conformance_k8s
-        agent: jenkins
-        always_run: false
-        context: ci/openshift-jenkins/extended_conformance_k8s
-        rerun_command: "/test extended_conformance_k8s"
-        trigger: "((?m)^/test extended_conformance_k8s,?(\\s+|$))"
+  - name: test_pull_request_origin_extended_conformance_gce
+    agent: jenkins
+    always_run: true
+    context: ci/openshift-jenkins/extended_conformance_gce
+    rerun_command: "/test extended_conformance_gce"
+    trigger: "((?m)^/test( all| extended_conformance_gce),?(\\s+|$))"
 
-      - name: test_pull_request_origin_extended_networking_minimal
-        agent: jenkins
-        always_run: true
-        context: ci/openshift-jenkins/extended_networking_minimal
-        rerun_command: "/test extended_networking_minimal"
-        trigger: "((?m)^/test( all| extended_networking_minimal),?(\\s+|$))"
+  - name: test_pull_request_origin_extended_conformance_k8s
+    agent: jenkins
+    always_run: false
+    context: ci/openshift-jenkins/extended_conformance_k8s
+    rerun_command: "/test extended_conformance_k8s"
+    trigger: "((?m)^/test extended_conformance_k8s,?(\\s+|$))"
 
-      - name: test_pull_request_origin_extended_networking
-        agent: jenkins
-        always_run: false
-        context: ci/openshift-jenkins/extended_networking
-        rerun_command: "/test extended_networking"
-        trigger: "((?m)^/test extended_networking,?(\\s+|$))"
+  - name: test_pull_request_origin_extended_networking_minimal
+    agent: jenkins
+    always_run: true
+    context: ci/openshift-jenkins/extended_networking_minimal
+    rerun_command: "/test extended_networking_minimal"
+    trigger: "((?m)^/test( all| extended_networking_minimal),?(\\s+|$))"
 
-      - name: test_pull_request_origin_extended_builds
-        agent: jenkins
-        run_if_changed: '^(pkg/build)|^(pkg/cmd/infra/builder)|^(test/extended/builds)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)'
-        context: ci/openshift-jenkins/extended_builds
-        rerun_command: "/test extended_builds"
-        trigger: "((?m)^/test extended_builds,?(\\s+|$))"
+  - name: test_pull_request_origin_extended_networking
+    agent: jenkins
+    always_run: false
+    context: ci/openshift-jenkins/extended_networking
+    rerun_command: "/test extended_networking"
+    trigger: "((?m)^/test extended_networking,?(\\s+|$))"
 
-      - name: test_pull_request_origin_extended_gssapi
-        agent: jenkins
-        always_run: false
-        context: ci/openshift-jenkins/extended_gssapi
-        rerun_command: "/test extended_gssapi"
-        trigger: "((?m)^/test extended_gssapi,?(\\s+|$))"
+  - name: test_pull_request_origin_extended_builds
+    agent: jenkins
+    run_if_changed: '^(pkg/build)|^(pkg/cmd/infra/builder)|^(test/extended/builds)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)'
+    context: ci/openshift-jenkins/extended_builds
+    rerun_command: "/test extended_builds"
+    trigger: "((?m)^/test extended_builds,?(\\s+|$))"
 
-      - name: test_pull_request_origin_extended_image_ecosystem
-        agent: jenkins
-        run_if_changed: '^(test/extended/image_ecosystem)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)'
-        context: ci/openshift-jenkins/extended_image_ecosystem
-        rerun_command: "/test extended_image_ecosystem"
-        trigger: "((?m)^/test extended_image_ecosystem,?(\\s+|$))"
+  - name: test_pull_request_origin_extended_gssapi
+    agent: jenkins
+    always_run: false
+    context: ci/openshift-jenkins/extended_gssapi
+    rerun_command: "/test extended_gssapi"
+    trigger: "((?m)^/test extended_gssapi,?(\\s+|$))"
 
-      - name: test_pull_request_origin_extended_image_registry
-        agent: jenkins
-        always_run: false
-        context: ci/openshift-jenkins/extended_image_registry
-        rerun_command: "/test extended_image_registry"
-        trigger: "((?m)^/test extended_image_registry,?(\\s+|$))"
+  - name: test_pull_request_origin_extended_image_ecosystem
+    agent: jenkins
+    run_if_changed: '^(test/extended/image_ecosystem)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)'
+    context: ci/openshift-jenkins/extended_image_ecosystem
+    rerun_command: "/test extended_image_ecosystem"
+    trigger: "((?m)^/test extended_image_ecosystem,?(\\s+|$))"
 
-      - name: test_pull_request_origin_extended_ldap_groups
-        agent: jenkins
-        always_run: false
-        context: ci/openshift-jenkins/extended_ldap_groups
-        rerun_command: "/test extended_ldap_groups"
-        trigger: "((?m)^/test extended_ldap_groups,?(\\s+|$))"
+  - name: test_pull_request_origin_extended_image_registry
+    agent: jenkins
+    always_run: false
+    context: ci/openshift-jenkins/extended_image_registry
+    rerun_command: "/test extended_image_registry"
+    trigger: "((?m)^/test extended_image_registry,?(\\s+|$))"
 
-      - name: test_pull_request_origin_cross
-        agent: jenkins
-        run_if_changed: '^(hack/)|(Makefile)|(.*_(windows|linux|darwin|unsupported)(_test)?\.go)$'
-        context: ci/openshift-jenkins/cross
-        rerun_command: "/test cross"
-        trigger: "((?m)^/test cross,?(\\s+|$))"
+  - name: test_pull_request_origin_extended_ldap_groups
+    agent: jenkins
+    always_run: false
+    context: ci/openshift-jenkins/extended_ldap_groups
+    rerun_command: "/test extended_ldap_groups"
+    trigger: "((?m)^/test extended_ldap_groups,?(\\s+|$))"
 
-      - name: test_pull_request_origin_launch_gce
-        agent: jenkins
-        always_run: false
-        context: ci/openshift-jenkins/launch-gce
-        rerun_command: "/test launch-gce"
-        trigger: "((?m)^/test launch-gce,?(\\s+|$))"
+  - name: test_pull_request_origin_cross
+    agent: jenkins
+    run_if_changed: '^(hack/)|(Makefile)|(.*_(windows|linux|darwin|unsupported)(_test)?\.go)$'
+    context: ci/openshift-jenkins/cross
+    rerun_command: "/test cross"
+    trigger: "((?m)^/test cross,?(\\s+|$))"
 
-      - name: test_pull_request_origin_extended_conformance_crio
-        agent: jenkins
-        always_run: false
-        context: ci/openshift-jenkins/extended_conformance_crio
-        rerun_command: "/test crio"
-        trigger: "((?m)^/test crio,?(\\s+|$))"
+  - name: test_pull_request_origin_launch_gce
+    agent: jenkins
+    always_run: false
+    context: ci/openshift-jenkins/launch-gce
+    rerun_command: "/test launch-gce"
+    trigger: "((?m)^/test launch-gce,?(\\s+|$))"
 
-      openshift/openshift-ansible:
-      - name: test_pull_request_openshift_ansible_tox
-        agent: jenkins
-        always_run: true
-        context: ci/openshift-jenkins/tox
-        rerun_command: "/test tox"
-        trigger: "((?m)^/test( all| tox),?(\\s+|$))"
+  - name: test_pull_request_origin_extended_conformance_crio
+    agent: jenkins
+    always_run: false
+    context: ci/openshift-jenkins/extended_conformance_crio
+    rerun_command: "/test crio"
+    trigger: "((?m)^/test crio,?(\\s+|$))"
 
-      - name: test_pull_request_openshift_ansible_logging
-        agent: jenkins
-        always_run: true
-        context: ci/openshift-jenkins/logging
-        rerun_command: "/test logging"
-        trigger: "((?m)^/test( all| logging),?(\\s+|$))"
+  openshift/openshift-ansible:
+  - name: test_pull_request_openshift_ansible_tox
+    agent: jenkins
+    always_run: true
+    context: ci/openshift-jenkins/tox
+    rerun_command: "/test tox"
+    trigger: "((?m)^/test( all| tox),?(\\s+|$))"
 
-      - name: test_pull_request_openshift_ansible_extended_conformance_install
-        agent: jenkins
-        always_run: true
-        context: ci/openshift-jenkins/install
-        rerun_command: "/test install"
-        trigger: "((?m)^/test( all| install),?(\\s+|$))"
+  - name: test_pull_request_openshift_ansible_logging
+    agent: jenkins
+    always_run: true
+    context: ci/openshift-jenkins/logging
+    rerun_command: "/test logging"
+    trigger: "((?m)^/test( all| logging),?(\\s+|$))"
 
-      - name: test_pull_request_openshift_ansible_extended_conformance_install_update
-        agent: jenkins
-        always_run: true
-        context: ci/openshift-jenkins/upgrade
-        rerun_command: "/test upgrade"
-        trigger: "((?m)^/test( all| upgrade),?(\\s+|$))"
+  - name: test_pull_request_openshift_ansible_extended_conformance_install
+    agent: jenkins
+    always_run: true
+    context: ci/openshift-jenkins/install
+    rerun_command: "/test install"
+    trigger: "((?m)^/test( all| install),?(\\s+|$))"
 
-      - name: test_pull_request_openshift_ansible_extended_conformance_install_containerized
-        agent: jenkins
-        always_run: true
-        context: ci/openshift-jenkins/containerized
-        rerun_command: "/test containerized"
-        trigger: "((?m)^/test( all| containerized),?(\\s+|$))"
+  - name: test_pull_request_openshift_ansible_extended_conformance_install_update
+    agent: jenkins
+    always_run: true
+    context: ci/openshift-jenkins/upgrade
+    rerun_command: "/test upgrade"
+    trigger: "((?m)^/test( all| upgrade),?(\\s+|$))"
 
-      - name: test_pull_request_openshift_ansible_extended_conformance_install_system_containers
-        agent: jenkins
-        always_run: true
-        context: ci/openshift-jenkins/system-containers
-        rerun_command: "/test system-containers"
-        trigger: "((?m)^/test( all| system-containers),?(\\s+|$))"
+  - name: test_pull_request_openshift_ansible_extended_conformance_install_containerized
+    agent: jenkins
+    always_run: true
+    context: ci/openshift-jenkins/containerized
+    rerun_command: "/test containerized"
+    trigger: "((?m)^/test( all| containerized),?(\\s+|$))"
 
-      kubernetes-incubator/cri-o:
-      - name: test_pull_request_crio_integration_rhel
-        agent: jenkins
-        always_run: false
-        context: ci/openshift-jenkins/integration_rhel
-        rerun_command: "/test integration_rhel"
-        trigger: "((?m)^/test( all| rhel| integration| integration_rhel),?(\\s+|$))"
+  - name: test_pull_request_openshift_ansible_extended_conformance_install_system_containers
+    agent: jenkins
+    always_run: true
+    context: ci/openshift-jenkins/system-containers
+    rerun_command: "/test system-containers"
+    trigger: "((?m)^/test( all| system-containers),?(\\s+|$))"
 
-      - name: test_pull_request_crio_integration_fedora
-        agent: jenkins
-        always_run: false
-        context: ci/openshift-jenkins/integration_fedora
-        rerun_command: "/test integration_fedora"
-        trigger: "((?m)^/test( all| fedora| integration| integration_fedora),?(\\s+|$))"
+  kubernetes-incubator/cri-o:
+  - name: test_pull_request_crio_integration_rhel
+    agent: jenkins
+    always_run: false
+    context: ci/openshift-jenkins/integration_rhel
+    rerun_command: "/test integration_rhel"
+    trigger: "((?m)^/test( all| rhel| integration| integration_rhel),?(\\s+|$))"
 
-      - name: test_pull_request_crio_e2e_rhel
-        agent: jenkins
-        always_run: false
-        context: ci/openshift-jenkins/e2e_rhel
-        rerun_command: "/test e2e_rhel"
-        trigger: "((?m)^/test( all| rhel| e2e| e2e_rhel),?(\\s+|$))"
+  - name: test_pull_request_crio_integration_fedora
+    agent: jenkins
+    always_run: false
+    context: ci/openshift-jenkins/integration_fedora
+    rerun_command: "/test integration_fedora"
+    trigger: "((?m)^/test( all| fedora| integration| integration_fedora),?(\\s+|$))"
 
-      - name: test_pull_request_crio_e2e_fedora
-        agent: jenkins
-        always_run: false
-        context: ci/openshift-jenkins/e2e_fedora
-        rerun_command: "/test e2e_fedora"
-        trigger: "((?m)^/test( all| fedora| e2e| e2e_fedora),?(\\s+|$))"
+  - name: test_pull_request_crio_e2e_rhel
+    agent: jenkins
+    always_run: false
+    context: ci/openshift-jenkins/e2e_rhel
+    rerun_command: "/test e2e_rhel"
+    trigger: "((?m)^/test( all| rhel| e2e| e2e_rhel),?(\\s+|$))"
 
-    postsubmits:
-      openshift/origin:
-      - name: ami_build_origin_int_rhel_build
-        agent: jenkins
-        branches:
-        - master
-        - stage
-        - release-3.6
-        - release-1.5
-      - name: push_origin_release
-        agent: jenkins
-        branches:
-        - master
-        - stage
-        - release-3.6
-        - release-1.5
-      - name: test_branch_origin_check
-        agent: jenkins
-        branches:
-        - master
-        - stage
-        - release-3.6
-        - release-1.5
-      - name: test_branch_origin_cmd
-        agent: jenkins
-        branches:
-        - master
-        - stage
-        - release-3.6
-        - release-1.5
-      - name: test_branch_origin_cross
-        agent: jenkins
-        branches:
-        - master
-        - stage
-        - release-3.6
-        - release-1.5
-      - name: test_branch_origin_end_to_end
-        agent: jenkins
-        branches:
-        - master
-        - stage
-        - release-3.6
-        - release-1.5
-      - name: test_branch_origin_extended_conformance_gce
-        agent: jenkins
-        branches:
-        - master
-        - stage
-        - release-3.6
-        - release-1.5
-      - name: test_branch_origin_extended_conformance_install_update
-        agent: jenkins
-        branches:
-        - master
-        - stage
-        - release-3.6
-        - release-1.5
-      - name: test_branch_origin_extended_conformance_install
-        agent: jenkins
-        branches:
-        - master
-        - stage
-        - release-3.6
-        - release-1.5
-      - name: test_branch_origin_extended_networking
-        agent: jenkins
-        branches:
-        - master
-        - stage
-        - release-3.6
-        - release-1.5
-      - name: test_branch_origin_integration
-        agent: jenkins
-        branches:
-        - master
-        - stage
-        - release-3.6
-        - release-1.5
-      - name: test_branch_origin_verify
-        agent: jenkins
-        branches:
-        - master
-        - stage
-        - release-3.6
-        - release-1.5
+  - name: test_pull_request_crio_e2e_fedora
+    agent: jenkins
+    always_run: false
+    context: ci/openshift-jenkins/e2e_fedora
+    rerun_command: "/test e2e_fedora"
+    trigger: "((?m)^/test( all| fedora| e2e| e2e_fedora),?(\\s+|$))"
+
+postsubmits:
+  openshift/origin:
+  - name: ami_build_origin_int_rhel_build
+    agent: jenkins
+    branches:
+    - master
+    - stage
+    - release-3.6
+    - release-1.5
+  - name: push_origin_release
+    agent: jenkins
+    branches:
+    - master
+    - stage
+    - release-3.6
+    - release-1.5
+  - name: test_branch_origin_check
+    agent: jenkins
+    branches:
+    - master
+    - stage
+    - release-3.6
+    - release-1.5
+  - name: test_branch_origin_cmd
+    agent: jenkins
+    branches:
+    - master
+    - stage
+    - release-3.6
+    - release-1.5
+  - name: test_branch_origin_cross
+    agent: jenkins
+    branches:
+    - master
+    - stage
+    - release-3.6
+    - release-1.5
+  - name: test_branch_origin_end_to_end
+    agent: jenkins
+    branches:
+    - master
+    - stage
+    - release-3.6
+    - release-1.5
+  - name: test_branch_origin_extended_conformance_gce
+    agent: jenkins
+    branches:
+    - master
+    - stage
+    - release-3.6
+    - release-1.5
+  - name: test_branch_origin_extended_conformance_install_update
+    agent: jenkins
+    branches:
+    - master
+    - stage
+    - release-3.6
+    - release-1.5
+  - name: test_branch_origin_extended_conformance_install
+    agent: jenkins
+    branches:
+    - master
+    - stage
+    - release-3.6
+    - release-1.5
+  - name: test_branch_origin_extended_networking
+    agent: jenkins
+    branches:
+    - master
+    - stage
+    - release-3.6
+    - release-1.5
+  - name: test_branch_origin_integration
+    agent: jenkins
+    branches:
+    - master
+    - stage
+    - release-3.6
+    - release-1.5
+  - name: test_branch_origin_verify
+    agent: jenkins
+    branches:
+    - master
+    - stage
+    - release-3.6
+    - release-1.5
 
 
-    periodics:
-    - name: periodic-retester
-      agent: kubernetes
-      interval: 2h
-      spec:
-        containers:
-        - image: docker-registry.default.svc:5000/ci/commenter:latest
-          args:
-          - |-
-            --query=is:pr
-            state:open
-            label:lgtm
-            label:approved
-            status:failure
-            -label:do-not-merge
-            -label:do-not-merge/work-in-progress
-            -label:do-not-merge/hold
-            -label:needs-rebase
-            -label:needs-ok-to-test
-            repo:openshift/origin
-          - --token=/etc/oauth/oauth
-          - |-
-            --comment=/retest
+periodics:
+- name: periodic-retester
+  agent: kubernetes
+  interval: 2h
+  spec:
+    containers:
+    - image: docker-registry.default.svc:5000/ci/commenter:latest
+      args:
+      - |-
+        --query=is:pr
+        state:open
+        label:lgtm
+        label:approved
+        status:failure
+        -label:do-not-merge
+        -label:do-not-merge/work-in-progress
+        -label:do-not-merge/hold
+        -label:needs-rebase
+        -label:needs-ok-to-test
+        repo:openshift/origin
+      - --token=/etc/oauth/oauth
+      - |-
+        --comment=/retest
 
-            Please review the [full test history](https://openshift-gce-devel.appspot.com/pr/{{.Number}}) for this PR and help us cut down flakes.
+        Please review the [full test history](https://openshift-gce-devel.appspot.com/pr/{{.Number}}) for this PR and help us cut down flakes.
 
-          - --template
-          - --ceiling=1
-          - --confirm
-          volumeMounts:
-          - name: token
-            mountPath: /etc/oauth
-        volumes:
-        - name: token
-          secret:
-            secretName: retester-oauth-token
+      - --template
+      - --ceiling=1
+      - --confirm
+      volumeMounts:
+      - name: token
+        mountPath: /etc/oauth
+    volumes:
+    - name: token
+      secret:
+        secretName: retester-oauth-token
