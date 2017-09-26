@@ -10,9 +10,9 @@ oc create -f prow_crd.yaml
 Ensure the ci namespace exists and create the prow configuration files:
 ```
 oc new-project ci
-oc apply -f config.yaml
-oc apply -f plugins.yaml
-oc create cm jenkins-proxy --from-file=config=../../../../tools/jenkins-proxy/config.json -o yaml --dry-run | oc apply -f -
+oc create cm config --from-file=config=config.yaml -o yaml --dry-run | oc replace -f -
+oc create cm plugins --from-file=plugins=plugins.yaml -o yaml --dry-run | oc replace -f -
+oc create cm jenkins-proxy --from-file=config=../../../../tools/jenkins-proxy/config.json -o yaml --dry-run | oc replace -f -
 ```
 
 Create all the build configurations for prow:
@@ -47,8 +47,8 @@ that start tests.
 It needs a hmac token for decrypting Github webhooks and an oauth token for
 responding to Github events.
 ```
-oc process -f openshift/hook.yaml | oc create -f -
 oc process -f openshift/hook_rbac.yaml | oc create -f -
+oc process -f openshift/hook.yaml | oc create -f -
 ```
 
 #### webhook setup
@@ -68,6 +68,7 @@ It starts the tests for new ProwJobs, and moves them to completion accordingly.
 
 It needs an oauth token for updating comments and statuses in Github PRs.
 ```
+oc process -f openshift/plank_rbac.yaml | oc create -f -
 oc process -f openshift/plank.yaml | oc create -f -
 ```
 
@@ -85,6 +86,7 @@ oc process -f ../../../../tools/jenkins-proxy/openshift/deploy.yaml | oc create 
 order to start jobs in Jenkins and an oauth token for updating comments and statuses
 in Github PRs.
 ```
+oc process -f openshift/jenkins-operator_rbac.yaml | oc create -f -
 oc process -f openshift/jenkins-operator.yaml | oc create -f -
 ```
 
@@ -93,6 +95,7 @@ oc process -f openshift/jenkins-operator.yaml | oc create -f -
 `deck` is the prow frontend. It needs a jenkins token for authenticating with the
 jenkins-proxy in order to get Jenkins logs.
 ```
+oc process -f openshift/deck_rbac.yaml | oc create -f -
 oc process -f openshift/deck.yaml | oc create -f -
 ```
 
@@ -102,6 +105,7 @@ The rest of the components do not depend on any secrets.
 
 `horologium` is responsible for creating periodic ProwJobs.
 ```
+oc process -f openshift/horologium_rbac.yaml | oc create -f -
 oc process -f openshift/horologium.yaml | oc create -f -
 ```
 
@@ -111,6 +115,7 @@ oc process -f openshift/horologium.yaml | oc create -f -
 Make sure the options specified in the deployment manifest match your setup
 (submit queue location, Github organization, and repository).
 ```
+oc process -f openshift/splice_rbac.yaml | oc create -f -
 oc process -f openshift/splice.yaml | oc create -f -
 ```
 
@@ -118,6 +123,7 @@ oc process -f openshift/splice.yaml | oc create -f -
 
 `sinker` is used for garbage-collecting ProwJobs and Pods.
 ```
+oc process -f openshift/sinker_rbac.yaml | oc create -f -
 oc process -f openshift/sinker.yaml | oc create -f -
 ```
 

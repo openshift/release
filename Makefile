@@ -12,9 +12,9 @@ prow-crd:
 .PHONY: prow-crd
 
 prow-config:
-	oc apply -f cluster/ci/config/prow/config.yaml
-	oc apply -f cluster/ci/config/prow/plugins.yaml
-	oc create cm jenkins-proxy --from-file=config=tools/jenkins-proxy/config.json -o yaml --dry-run | oc apply -f -
+	oc create cm config --from-file=config=cluster/ci/config/prow/config.yaml -o yaml --dry-run | oc replace -f -
+	oc create cm plugins --from-file=plugins=cluster/ci/config/prow/plugins.yaml -o yaml --dry-run | oc replace -f -
+	oc create cm jenkins-proxy --from-file=config=tools/jenkins-proxy/config.json -o yaml --dry-run | oc replace -f -
 .PHONY: prow-config
 
 prow-secrets:
