@@ -337,3 +337,44 @@ objects:
           name: prow:binaries
           namespace: "${NAMESPACE}"
       type: ImageChange
+
+- kind: ImageStream
+  apiVersion: v1
+  metadata:
+    name: tide
+    namespace: "${NAMESPACE}"
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    name: tide
+    namespace: "${NAMESPACE}"
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: tide:latest
+        namespace: "${NAMESPACE}"
+    source:
+      git:
+        uri: https://github.com/openshift/test-infra.git
+      images:
+      - from:
+          kind: ImageStreamTag
+          name: prow:binaries
+          namespace: "${NAMESPACE}"
+        paths:
+        - destinationDir: .
+          sourcePath: /go/bin/tide
+    strategy:
+      dockerStrategy:
+        imageOptimizationPolicy: SkipLayers
+        dockerfilePath: prow/cmd/tide/Dockerfile
+    triggers:
+    - imageChange:
+        from:
+          kind: ImageStreamTag
+          name: prow:binaries
+          namespace: "${NAMESPACE}"
+      type: ImageChange
