@@ -1,10 +1,6 @@
 # Needs the jenkins-token secret for authenticating with the jenkins-proxy.
 apiVersion: template.openshift.io/v1
 kind: Template
-metadata:
-  name: deck-prow
-  annotations:
-    "openshift.io/display-name": deck-prow
 parameters:
 - description: The namespace to get the image from.
   name: IMAGE_NAMESPACE
@@ -96,44 +92,3 @@ objects:
           name: "${NAME}:latest"
           namespace: "${IMAGE_NAMESPACE}"
       type: ImageChange
-- apiVersion: v1
-  kind: ServiceAccount
-  metadata:
-    name: "${NAME}"
-    namespace: "${NAMESPACE}"
-- kind: ClusterRole
-  apiVersion: v1 # rbac.authorization.k8s.io/v1beta1
-  metadata:
-    name: "${NAME}"
-  rules:
-    - apiGroups:
-        - ""
-      resources:
-        - pods
-      verbs:
-        - list
-    - apiGroups:
-        - ""
-      resources:
-        - pods/log
-      verbs:
-        - get
-    - apiGroups:
-        - "prow.k8s.io"
-      resources:
-        - prowjobs
-      verbs:
-        - get
-        - list
-- kind: ClusterRoleBinding
-  apiVersion: v1 # rbac.authorization.k8s.io/v1beta1
-  metadata:
-    name: "${NAME}"
-  roleRef:
-    apiGroup: "" # rbac.authorization.k8s.io
-    kind: ClusterRole
-    name: "${NAME}"
-  subjects:
-  - kind: ServiceAccount
-    name: "${NAME}"
-    namespace: "${NAMESPACE}"
