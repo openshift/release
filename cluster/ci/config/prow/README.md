@@ -10,9 +10,9 @@ oc create -f prow_crd.yaml
 Ensure the ci namespace exists and create the prow configuration files:
 ```
 oc new-project ci
-oc apply -f config.yaml
-oc apply -f plugins.yaml
-oc create cm jenkins-proxy --from-file=config=../../../../tools/jenkins-proxy/config.json -o yaml --dry-run | oc apply -f -
+oc create cm config --from-file=config=config.yaml -o yaml --dry-run | oc replace -f -
+oc create cm plugins --from-file=plugins=plugins.yaml -o yaml --dry-run | oc replace -f -
+oc create cm jenkins-proxy --from-file=config=../../../../tools/jenkins-proxy/config.json -o yaml --dry-run | oc replace -f -
 ```
 
 Create all the build configurations for prow:
