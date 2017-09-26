@@ -35,8 +35,13 @@ prow-images:
 .PHONY: prow-images
 
 prow-rbac:
-	# TODO: Add the rest of prow roles
+	oc process -f cluster/ci/config/prow/openshift/deck_rbac.yaml | oc apply -f -
 	oc process -f cluster/ci/config/prow/openshift/hook_rbac.yaml | oc apply -f -
+	oc process -f cluster/ci/config/prow/openshift/horologium_rbac.yaml | oc apply -f -
+	oc process -f cluster/ci/config/prow/openshift/jenkins-operator_rbac.yaml | oc apply -f -
+	oc process -f cluster/ci/config/prow/openshift/plank_rbac.yaml | oc apply -f -
+	oc process -f cluster/ci/config/prow/openshift/sinker_rbac.yaml | oc apply -f -
+	oc process -f cluster/ci/config/prow/openshift/splice_rbac.yaml | oc apply -f -
 
 hook:
 	oc process -f cluster/ci/config/prow/openshift/hook.yaml | oc apply -f -
