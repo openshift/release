@@ -5,9 +5,10 @@ import (
 	"log"
 	"net/http"
 	_ "net/http/pprof"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-// TODO: Prometheus metrics
 func handle(p Proxy, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Jenkins-Proxy", "JenkinsProxy")
 
@@ -87,5 +88,6 @@ func main() {
 
 	log.Printf("Serving on :8080")
 	http.HandleFunc("/", p.handler())
+	http.Handle("/metrics", promhttp.Handler())
 	log.Fatal("Jenkins proxy ListenAndServe returned:", http.ListenAndServe(":8080", nil))
 }
