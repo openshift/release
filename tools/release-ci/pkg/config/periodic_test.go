@@ -11,9 +11,13 @@ func TestPeriodic_GcsPath(t *testing.T) {
 			JobName:     "name",
 			BuildNumber: 1,
 		},
+		RepoMeta: RepoMeta{
+			RepoOwner: "owner",
+			RepoName:  "repo",
+		},
 	}
 
-	if expected, actual := "logs/name/1/", periodic.GcsPath(); expected != actual {
+	if expected, actual := "logs/owner_repo/name/1/", periodic.GcsPath(); expected != actual {
 		t.Errorf("expected periodic job GCS path %s, got %s", expected, actual)
 	}
 }

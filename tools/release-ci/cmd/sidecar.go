@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strconv"
+	"strings"
 
 	"cloud.google.com/go/storage"
 	"github.com/spf13/cobra"
@@ -45,6 +46,11 @@ func init() {
 	sidecarCmd.Flags().StringVar(&configurationFile, "config-path", "", "The location of the configuration file")
 }
 
+func exists(file string) bool {
+	_, err := os.Stat(file)
+	return err == nil
+}
+
 func runSidecar(_ []string) error {
 	if len(configurationFile) == 0 {
 		return errors.New("no configuration file specified")
@@ -55,7 +61,7 @@ func runSidecar(_ []string) error {
 		return err
 	}
 
-	if len(config.GceCredentialsFile) == 0 {
+	if len(config.GceCredentialsFile) == 0 || !exists(config.GceCredentialsFile) {
 		// if there is no GCE configuration,
 		// we will just exit early
 		return nil
@@ -100,31 +106,37 @@ func retrieveProcessReturnCode(markerFile string) (int, error) {
 	defer watcher.Close()
 
 	group := sync.WaitGroup{}
-	group.Add(1)
-	go func() {
-		defer group.Done()
-		for {
-			select {
-			case event := <-watcher.Events:
-				if event.Name == markerFile && event.Op&fsnotify.Create == fsnotify.Create {
-					break
-				}
-			case err := <-watcher.Errors:
-				fmt.Printf("encountered an error during fsnotify watch: %v\n", err)
-			}
-		}
-	}()
 
-	dir, _ := filepath.Split(markerFile)
-	if err := watcher.Add(dir); err != nil {
-		return 1, fmt.Errorf("could not add to fsnotify watch: %v", err)
+	// Only start watching file events if the file doesn't exist
+	// If the file exists, it means the main process already completed.
+	if !exists(markerFile) {
+		group.Add(1)
+		go func() {
+			defer group.Done()
+			for {
+				select {
+				case event := <-watcher.Events:
+					if event.Name == markerFile && event.Op&fsnotify.Create == fsnotify.Create {
+						return
+					}
+				case err := <-watcher.Errors:
+					fmt.Printf("encountered an error during fsnotify watch: %v\n", err)
+				}
+			}
+		}()
+
+		dir := filepath.Dir(markerFile)
+
+		if err := watcher.Add(dir); err != nil {
+			return 1, fmt.Errorf("could not add to fsnotify watch: %v", err)
+		}
+		group.Wait()
 	}
-	group.Wait()
 
 	data, err := ioutil.ReadFile(markerFile)
 	if err != nil {
 		return 1, fmt.Errorf("could not read return code from marker file: %v", err)
 	}
 
-	return strconv.Atoi(string(data))
+	return strconv.Atoi(strings.TrimSpace(string(data)))
 }

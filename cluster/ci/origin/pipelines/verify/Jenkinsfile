@@ -33,6 +33,7 @@ pipeline {
     }
     stage("Verify") {
       steps {
+        ensureLoggingComponents(this)
         script {
           def tests = [
             "gofmt",
@@ -64,7 +65,11 @@ pipeline {
               "BUILD_NAME=${_buildName}",
               "RUN_ID=${verifyRunId}",
               "SOURCE_IMAGE_REF=${sourceImageRef}",
-              "PULL_SECRET_NAME=${pullSecretRef}"
+              "PULL_SECRET_NAME=${pullSecretRef}",
+              "JOB_NAME=${env.JOB_NAME}",
+              "BUILD_NUMBER=${env.BUILD_NUMBER}",
+              "REPO_OWNER=${env.REPO_OWNER ?: 'openshift'}",
+              "REPO_NAME=${env.REPO_NAME ?: 'origin'}"
             )
           }
           waitForPods(this, ["run": "${verifyRunId}"], 3600)

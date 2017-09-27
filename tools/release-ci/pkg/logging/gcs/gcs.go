@@ -22,12 +22,12 @@ func uploadToGCS(bucket *storage.BucketHandle, uploadTargets map[string]uploadFu
 	group.Add(len(uploadTargets))
 	for dest, upload := range uploadTargets {
 		obj := bucket.Object(dest)
-		go func(obj *storage.ObjectHandle) {
+		go func(f uploadFunc, obj *storage.ObjectHandle) {
 			defer group.Done()
-			if err := upload(obj); err != nil {
+			if err := f(obj); err != nil {
 				errCh <- err
 			}
-		}(obj)
+		}(upload, obj)
 	}
 	group.Wait()
 	close(errCh)

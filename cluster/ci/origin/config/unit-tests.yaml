@@ -19,6 +19,16 @@ parameters:
   displayName: Run ID
   name: RUN_ID
   required: true
+- name: REPO_OWNER
+  required: true
+  value: "openshift"
+- name: REPO_NAME
+  required: true
+  value: "origin"
+- name: JOB_NAME
+  required: true
+- name: BUILD_NUMBER
+  required: true
 objects:
 - apiVersion: v1
   kind: Pod
@@ -29,8 +39,34 @@ objects:
       test: unit-tests
       run: "${RUN_ID}"
   spec:
+    initContainers:
+    - name: save-config
+      env:
+      - name: JOB_NAME
+        value: ${JOB_NAME}
+      - name: BUILD_NUMBER
+        value: ${BUILD_NUMBER}
+      - name: REPO_OWNER
+        value: ${REPO_OWNER}
+      - name: REPO_NAME
+        value: ${REPO_NAME}
+      command: 
+      - release-ci
+      - save-config
+      - --config-path=/var/run/logging-config/logging-config.json
+      image: "${BINARY_IMAGE_REF}"
+      imagePullPolicy: IfNotPresent
+      volumeMounts:
+      - mountPath: /var/run/logging-config
+        name: logging-config
+      - mountPath: /var/run/logging
+        name: logging
     containers:
     - command:
+      - release-ci
+      - entrypoint
+      - --config-path=/var/run/logging-config/logging-config.json
+      - --
       - /bin/bash
       - -c
       - 'env -i TEST_KUBE=true JUNIT_REPORT=true SKIP_TEARDOWN=1 HOME=/tmp HOSTNAME=$(hostname) TERM=xterm-256color make test-unit -k'
@@ -41,8 +77,39 @@ objects:
         requests:
           cpu: "2000m"
           memory: "2Gi"
+      volumeMounts:
+      - mountPath: /var/run/logging-config
+        name: logging-config
+      - mountPath: /var/run/logging
+        name: logging
+    - command:
+      - release-ci
+      - sidecar
+      - --config-path=/var/run/logging-config/logging-config.json
+      image: "${BINARY_IMAGE_REF}"
+      imagePullPolicy: IfNotPresent
+      name: unit-tests-sidecar
+      volumeMounts:
+      - mountPath: /var/run/logging-config
+        name: logging-config
+      - mountPath: /var/run/logging
+        name: logging
+      - mountPath: /var/run/secrets/gce
+        name: gce
     dnsPolicy: ClusterFirst
     imagePullSecrets:
     - name: "${PULL_SECRET_NAME}"
     restartPolicy: Never
     terminationGracePeriodSeconds: 5
+    volumes:
+    - emptyDir:
+        sizeLimit: "0"
+      name: logging
+    - configMap:
+        defaultMode: 420
+        name: logging-config
+      name: logging-config
+    - name: gce
+      secret:
+        defaultMode: 420
+        secretName: gce
