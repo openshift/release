@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	ospath "path"
 	"path/filepath"
 	"time"
 
@@ -35,19 +36,21 @@ func UploadFinishedData(processLog, metadataFile, artifactDir string, passed boo
 
 	gcsPath := metadata.GcsPath()
 	uploadTargets := map[string]uploadFunc{
-		gcsPath + "/finished.json": dataUpload(finishedData),
+		ospath.Join(gcsPath, "finished.json"): dataUpload(finishedData),
 		// TODO(skuznets): we want to stream this log during the run
-		gcsPath + "/build-log.txt": fileUpload(processLog),
+		ospath.Join(gcsPath, "build-log.txt"): fileUpload(processLog),
 	}
 	filepath.Walk(artifactDir, func(path string, info os.FileInfo, err error) error {
-		if !info.IsDir() {
-			// we know path will be below artifactDir, but we can't
-			// communicate that to the filepath module. We can ignore
-			// this error as we can be certain it won't occur and best-
-			// effort upload is OK in any case
-			if relPath, err := filepath.Rel(artifactDir, path); err == nil {
-				uploadTargets[gcsPath+"/artifacts/"+relPath] = fileUpload(path)
-			}
+		if info == nil || info.IsDir() {
+			return nil
+		}
+
+		// we know path will be below artifactDir, but we can't
+		// communicate that to the filepath module. We can ignore
+		// this error as we can be certain it won't occur and best-
+		// effort upload is OK in any case
+		if relPath, err := filepath.Rel(artifactDir, path); err == nil {
+			uploadTargets[ospath.Join(gcsPath, "artifacts", relPath)] = fileUpload(path)
 		}
 		return nil
 	})

@@ -1,8 +1,8 @@
 package config
 
 import (
-	"testing"
 	"reflect"
+	"testing"
 )
 
 func TestBatch_GcsPath(t *testing.T) {
@@ -11,9 +11,13 @@ func TestBatch_GcsPath(t *testing.T) {
 			JobName:     "name",
 			BuildNumber: 1,
 		},
+		RepoMeta: RepoMeta{
+			RepoOwner: "owner",
+			RepoName:  "repo",
+		},
 	}
 
-	if expected, actual := "pr-logs/directory/name/1/", batch.GcsPath(); expected != actual {
+	if expected, actual := "pr-logs/directory/owner_repo/name/1/", batch.GcsPath(); expected != actual {
 		t.Errorf("expected batch job GCS path %s, got %s", expected, actual)
 	}
 }

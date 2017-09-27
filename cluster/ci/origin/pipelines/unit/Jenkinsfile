@@ -33,6 +33,7 @@ pipeline {
     }
     stage("Unit Test") {
       steps {
+        ensureLoggingComponents(this)
         script {
           def binaryImageRef = imageStreamTagRef(this, this._buildName, "binaries")
           def pullSecretRef = dockerCfgSecret(this, "default")
@@ -42,7 +43,11 @@ pipeline {
             "BUILD_NAME=${_buildName}",
             "RUN_ID=${unitRunId}",
             "BINARY_IMAGE_REF=${binaryImageRef}",
-            "PULL_SECRET_NAME=${pullSecretRef}"
+            "PULL_SECRET_NAME=${pullSecretRef}",
+            "JOB_NAME=${env.JOB_NAME}",
+            "BUILD_NUMBER=${env.BUILD_NUMBER}",
+            "REPO_OWNER=${env.REPO_OWNER ?: 'openshift'}",
+            "REPO_NAME=${env.REPO_NAME ?: 'origin'}"
           )
 
           waitForPods(this, ["run": "${unitRunId}"], 7200)
