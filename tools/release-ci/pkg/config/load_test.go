@@ -111,14 +111,12 @@ func TestLoadBatchFromReader(t *testing.T) {
 					JobName:     "name",
 					BuildNumber: 1,
 				},
-				RepoMeta: RepoMeta{
+				Repo: Repo{
 					RepoOwner: "owner",
 					RepoName:  "repo",
-				},
-				Repo: Repo{
-					BaseRef:  "ref",
-					BaseSha:  "sha",
-					PullRefs: "pullrefs",
+					BaseRef:   "ref",
+					BaseSha:   "sha",
+					PullRefs:  "pullrefs",
 				},
 			},
 			expectedErr: nil,
@@ -157,14 +155,12 @@ func TestLoadPostsubmitFromReader(t *testing.T) {
 					JobName:     "name",
 					BuildNumber: 1,
 				},
-				RepoMeta: RepoMeta{
+				Repo: Repo{
 					RepoOwner: "owner",
 					RepoName:  "repo",
-				},
-				Repo: Repo{
-					BaseRef:  "ref",
-					BaseSha:  "sha",
-					PullRefs: "pullrefs",
+					BaseRef:   "ref",
+					BaseSha:   "sha",
+					PullRefs:  "pullrefs",
 				},
 			},
 			expectedErr: nil,
@@ -203,14 +199,12 @@ func TestLoadPresubmitFromReader(t *testing.T) {
 					JobName:     "name",
 					BuildNumber: 1,
 				},
-				RepoMeta: RepoMeta{
+				Repo: Repo{
 					RepoOwner: "owner",
 					RepoName:  "repo",
-				},
-				Repo: Repo{
-					BaseRef:  "ref",
-					BaseSha:  "sha",
-					PullRefs: "pullrefs",
+					BaseRef:   "ref",
+					BaseSha:   "sha",
+					PullRefs:  "pullrefs",
 				},
 				PullRequest: PullRequest{
 					PullNumber: 1,

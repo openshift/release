@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"sync"
 
@@ -22,6 +23,7 @@ func uploadToGCS(bucket *storage.BucketHandle, uploadTargets map[string]uploadFu
 	group.Add(len(uploadTargets))
 	for dest, upload := range uploadTargets {
 		obj := bucket.Object(dest)
+		log.Printf("Queueing file for upload: %s\n", dest)
 		go func(f uploadFunc, obj *storage.ObjectHandle) {
 			defer group.Done()
 			if err := f(obj); err != nil {

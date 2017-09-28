@@ -1,15 +1,15 @@
 apiVersion: v1
 kind: Template
 labels:
-  template: unit-tests
+  template: verification-test-log
 parameters:
 - description: Name of the build to associate with the source image and artifacts
   displayName: Build Name
   name: BUILD_NAME
   required: true
-- description: The reference to the image that contains the compiled binaries to test
-  displayName: Binaries Image Reference
-  name: BINARY_IMAGE_REF
+- description: The reference to the image that contains the source to build
+  displayName: Source Image Reference
+  name: SOURCE_IMAGE_REF
   required: true
 - description: The image pull secret of the default service account
   displayName: Image Pull Secret
@@ -48,11 +48,10 @@ objects:
 - apiVersion: v1
   kind: Pod
   metadata:
-    generateName: "${BUILD_NAME}-ut-"
+    generateName: "${BUILD_NAME}-verifylog-"
     labels:
       build: "${BUILD_NAME}"
-      test: unit-tests
-      run: "${RUN_ID}"
+      log: "${RUN_ID}"
   spec:
     initContainers:
     - name: save-config
@@ -79,7 +78,7 @@ objects:
       - release-ci
       - save-config
       - --config-path=/var/run/logging-config/logging-config.json
-      image: "${BINARY_IMAGE_REF}"
+      image: "${SOURCE_IMAGE_REF}"
       imagePullPolicy: IfNotPresent
       volumeMounts:
       - mountPath: /var/run/logging-config
@@ -91,17 +90,15 @@ objects:
       - release-ci
       - entrypoint
       - --config-path=/var/run/logging-config/logging-config.json
-      - --
-      - /bin/bash
-      - -c
-      - 'env -i TEST_KUBE=true ARTIFACT_DIR=/var/run/logging/output LOG_DIR=/var/run/logging/output/logs JUNIT_REPORT=true SKIP_TEARDOWN=1 HOME=/tmp HOSTNAME=$(hostname) TERM=xterm-256color make test-unit -k'
-      image: "${BINARY_IMAGE_REF}"
+      - /usr/bin/log-pods.sh
+      - run=${RUN_ID}
+      image: "${SOURCE_IMAGE_REF}"
       imagePullPolicy: IfNotPresent
-      name: unit-tests
+      name: verify-log
       resources:
         requests:
-          cpu: "2000m"
-          memory: "2Gi"
+          memory: "512Mi"
+          cpu: "500m"
       volumeMounts:
       - mountPath: /var/run/logging-config
         name: logging-config
@@ -111,9 +108,9 @@ objects:
       - release-ci
       - sidecar
       - --config-path=/var/run/logging-config/logging-config.json
-      image: "${BINARY_IMAGE_REF}"
+      image: "${SOURCE_IMAGE_REF}"
       imagePullPolicy: IfNotPresent
-      name: unit-tests-sidecar
+      name: verify-sidecar
       volumeMounts:
       - mountPath: /var/run/logging-config
         name: logging-config
@@ -125,6 +122,7 @@ objects:
     imagePullSecrets:
     - name: "${PULL_SECRET_NAME}"
     restartPolicy: Never
+    serviceAccountName: jenkins
     terminationGracePeriodSeconds: 5
     volumes:
     - emptyDir:

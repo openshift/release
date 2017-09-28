@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	ospath "path"
 	"path/filepath"
@@ -21,6 +22,9 @@ type Finished struct {
 
 	// Passed is the result of the build
 	Passed bool `json:"passed"`
+
+	// Result is the textual representation of the result
+	Result string `json:"result"`
 }
 
 func UploadFinishedData(processLog, metadataFile, artifactDir string, passed bool, gcsBucket *storage.BucketHandle) error {
@@ -50,6 +54,7 @@ func UploadFinishedData(processLog, metadataFile, artifactDir string, passed boo
 		// this error as we can be certain it won't occur and best-
 		// effort upload is OK in any case
 		if relPath, err := filepath.Rel(artifactDir, path); err == nil {
+			log.Printf("Found %s in artifact directory. Uploading as %s\n", path, relPath)
 			uploadTargets[ospath.Join(gcsPath, "artifacts", relPath)] = fileUpload(path)
 		}
 		return nil
@@ -60,9 +65,14 @@ func UploadFinishedData(processLog, metadataFile, artifactDir string, passed boo
 
 // generateFinishedMetadata generates finishing metadata
 func generateFinishedMetadata(passed bool) (io.Reader, error) {
+	resultStr := "SUCCESS"
+	if !passed {
+		resultStr = "FAILURE"
+	}
 	finished := Finished{
 		Timestamp: time.Now().Unix(),
 		Passed:    passed,
+		Result:    resultStr,
 	}
 	data, err := json.Marshal(&finished)
 	if err != nil {
