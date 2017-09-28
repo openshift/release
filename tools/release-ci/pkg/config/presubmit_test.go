@@ -15,13 +15,13 @@ func TestPresubmit_GcsPath(t *testing.T) {
 			PullNumber: 2,
 			PullSha:    "sha",
 		},
-		RepoMeta: RepoMeta{
+		Repo: Repo{
 			RepoOwner: "owner",
 			RepoName:  "repo",
 		},
 	}
 
-	if expected, actual := "pr-logs/owner_repo/pull/2/name/1/", presubmit.GcsPath(); expected != actual {
+	if expected, actual := "pr-logs/pull/owner_repo/2/name/1/", presubmit.GcsPath(); expected != actual {
 		t.Errorf("expected presubmit job GCS path %s, got %s", expected, actual)
 	}
 }

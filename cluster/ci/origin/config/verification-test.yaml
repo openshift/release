@@ -23,16 +23,6 @@ parameters:
   displayName: Run ID
   name: RUN_ID
   required: true
-- name: REPO_OWNER
-  required: true
-  value: "openshift"
-- name: REPO_NAME
-  required: true
-  value: "origin"
-- name: JOB_NAME
-  required: true
-- name: BUILD_NUMBER
-  required: true
 objects:
 - apiVersion: v1
   kind: Pod
@@ -43,76 +33,17 @@ objects:
       test: "verify-${TEST_NAME}"
       run: "${RUN_ID}"
   spec:
-    initContainers:
-    - name: save-config
-      env:
-      - name: JOB_NAME
-        value: ${JOB_NAME}
-      - name: BUILD_NUMBER
-        value: ${BUILD_NUMBER}
-      - name: REPO_OWNER
-        value: ${REPO_OWNER}
-      - name: REPO_NAME
-        value: ${REPO_NAME}
-      - name: TEST_NAME
-        value: ${TEST_NAME}
-      command: 
-      - release-ci
-      - save-config
-      - --config-path=/var/run/logging-config/logging-config.json
-      image: "${SOURCE_IMAGE_REF}"
-      imagePullPolicy: IfNotPresent
-      volumeMounts:
-      - mountPath: /var/run/logging-config
-        name: logging-config
-      - mountPath: /var/run/logging
-        name: logging
     containers:
     - command:
-      - release-ci
-      - entrypoint
-      - --config-path=/var/run/logging-config/logging-config.json
       - hack/verify-${TEST_NAME}.sh
       image: "${SOURCE_IMAGE_REF}"
       imagePullPolicy: IfNotPresent
-      name: verify-${TEST_NAME}
+      name: verification-test
       resources:
         requests:
           memory: "512Mi"
           cpu: "500m"
-      volumeMounts:
-      - mountPath: /var/run/logging-config
-        name: logging-config
-      - mountPath: /var/run/logging
-        name: logging
-    - command:
-      - release-ci
-      - sidecar
-      - --config-path=/var/run/logging-config/logging-config.json
-      image: "${SOURCE_IMAGE_REF}"
-      imagePullPolicy: IfNotPresent
-      name: verify-${TEST_NAME}-sidecar
-      volumeMounts:
-      - mountPath: /var/run/logging-config
-        name: logging-config
-      - mountPath: /var/run/logging
-        name: logging
-      - mountPath: /var/run/secrets/gce
-        name: gce
-    dnsPolicy: ClusterFirst
     imagePullSecrets:
     - name: "${PULL_SECRET_NAME}"
     restartPolicy: Never
     terminationGracePeriodSeconds: 5
-    volumes:
-    - emptyDir:
-        sizeLimit: "0"
-      name: logging
-    - configMap:
-        defaultMode: 420
-        name: logging-config
-      name: logging-config
-    - name: gce
-      secret:
-        defaultMode: 420
-        secretName: gce

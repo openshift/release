@@ -11,7 +11,7 @@ func TestBatch_GcsPath(t *testing.T) {
 			JobName:     "name",
 			BuildNumber: 1,
 		},
-		RepoMeta: RepoMeta{
+		Repo: Repo{
 			RepoOwner: "owner",
 			RepoName:  "repo",
 		},

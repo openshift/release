@@ -24,7 +24,6 @@ type Job struct {
 
 // Periodic contains configuration for a periodic job
 type Periodic struct {
-	RepoMeta
 	Job
 }
 
@@ -32,9 +31,9 @@ type Periodic struct {
 // store their information only in the job log directory
 func (p *Periodic) GcsPath() string {
 	if len(p.TestName) > 0 {
-		return fmt.Sprintf("%s/%s_%s/%s/%d/%s/", JobLogPrefix, p.RepoOwner, p.RepoName, p.JobName, p.BuildNumber, p.TestName)
+		return fmt.Sprintf("%s/%s/%d/%s/", JobLogPrefix, p.JobName, p.BuildNumber, p.TestName)
 	}
-	return fmt.Sprintf("%s/%s_%s/%s/%d/", JobLogPrefix, p.RepoOwner, p.RepoName, p.JobName, p.BuildNumber)
+	return fmt.Sprintf("%s/%s/%d/", JobLogPrefix, p.JobName, p.BuildNumber)
 }
 
 // Aliases are the paths to symlink to the GcsPath.
