@@ -203,7 +203,7 @@ func (p *proxy) request(method, path string, body io.Reader, h *http.Header) (*h
 		resp, err = p.doRequest(method, path, body, h)
 		if err == nil && resp.StatusCode < 500 {
 			break
-		} else if err == nil {
+		} else if err == nil && retries+1 < maxRetries {
 			resp.Body.Close()
 		}
 
