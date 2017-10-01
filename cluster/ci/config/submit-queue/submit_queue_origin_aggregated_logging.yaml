@@ -1,0 +1,189 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: submit-queue-origin-aggregated-logging
+  labels:
+    app: mungegithub-origin-aggregated-logging
+    target-repo: origin-aggregated-logging
+parameters:
+- name: NAME
+  displayName: Application Name
+  description: The name to use for the objects created by this template
+  value: submit-queue-origin-aggregated-logging
+  required: true
+- name: SERVICE_NAME
+  displayName: Service Name
+  description: The name to use for the service that will report the SubmitQueue status
+  value: origin-aggregated-logging-sq-status
+  required: true
+objects:
+- apiVersion: v1
+  kind: Route
+  metadata:
+    name: "${SERVICE_NAME}"
+    labels:
+      app: mungegithub-origin-aggregated-logging
+      component: "${NAME}"
+      target-repo: origin-aggregated-logging
+  spec:
+    to:
+      kind: Service
+      name: "${SERVICE_NAME}"
+    port:
+      targetPort: status
+    tls:
+      termination: edge
+      insecureEdgeTerminationPolicy: Redirect
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: "${SERVICE_NAME}"
+    labels:
+      app: mungegithub-origin-aggregated-logging
+      component: "${NAME}"
+      target-repo: origin-aggregated-logging
+    annotations:
+      prometheus.io/path: /prometheus
+      prometheus.io/scrape: "true"
+      service.openshift.io/infrastructure: 'true'
+  spec:
+    ports:
+    - name: status
+      protocol: TCP
+      port: 80
+      targetPort: 8080
+    selector:
+      app: mungegithub-origin-aggregated-logging
+      component: "${NAME}"
+      target-repo: origin-aggregated-logging
+    type: ClusterIP
+    sessionAffinity: None
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    name: "${NAME}"
+    labels:
+      app: mungegithub-origin-aggregated-logging
+      component: "${NAME}"
+  spec:
+    replicas: 1
+    revisionHistoryLimit: 2
+    template:
+      metadata:
+        labels:
+          app: mungegithub-origin-aggregated-logging
+          component: "${NAME}"
+          target-repo: origin-aggregated-logging
+      spec:
+        containers:
+        - name: "${NAME}"
+          image: "submit-queue"
+          command:
+          - /mungegithub
+          - --dry-run=false
+          - --alsologtostderr
+          - --stderrthreshold=INFO
+          - --config-path=/etc/munge-config/config
+          ports:
+          - name: status
+            containerPort: 8080
+          resources:
+            requests:
+              cpu: 100m
+            limits:
+              cpu: 100m
+          volumeMounts:
+          - mountPath: /etc/munge-config
+            name: munge-config
+          - mountPath: /etc/hmac-token
+            name: hmac-token
+          - mountPath: /etc/oauth-token
+            name: oauth-token
+          - mountPath: /gitrepos
+            name: repo
+          - mountPath: /cache
+            name: cache-volume
+        volumes:
+        - name: munge-config
+          configMap:
+            name: "${NAME}"
+        - name: hmac-token
+          secret:
+            secretName: sq-hmac-token
+        - name: oauth-token
+          secret:
+            secretName: sq-oauth-token
+        - name: repo
+          emptyDir: {}
+        - name: cache-volume
+          persistentVolumeClaim:
+            claimName: origin-aggregated-logging-cache
+    triggers:
+    - type: ConfigChange
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - "${NAME}"
+        from:
+          kind: ImageStreamTag
+          name: "submit-queue:latest"
+      type: ImageChange
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: "${NAME}"
+  data:
+    config: |
+      fake-e2e: "true"
+      # basic config options.
+      http-cache-dir: /cache/httpcache
+      organization: openshift
+      project: origin-aggregated-logging
+      pr-mungers: lgtm-after-commit,needs-rebase,comment-deleter,submit-queue,docs-need-no-retest
+      state: open
+      token-file: /etc/oauth-token/token
+      period: 20s
+      pr-max-wait-time: 4h
+      repo-dir: /gitrepos
+      github-key-file: /etc/hmac-token/token
+
+      required-retest-contexts: "\
+        ci/openshift-jenkins/logging,\
+        ci/openshift-jenkins/json-file
+        "
+
+      protected-branches: ""
+      do-not-merge-milestones: ""
+      additional-required-labels: "kind/bug"
+
+      # chart-url: https://storage.googleapis.com/origin-test-history/k8s-queue-health.svg
+      # history-url: https://storage.googleapis.com/origin-test-history/static/index.html
+      prow-url: https://deck-ci.svc.ci.openshift.org
+      batch-enabled: true
+      context-url: https://origin-aggregated-logging-sq-status-ci.svc.ci.openshift.org
+
+      # options used by the GCS feature.
+      # gcs-bucket: origin-ci-test
+      # gcs-logs-dir: logs
+      # pull-logs-dir: pr-logs
+      # pull-key: pull
+
+      path-label-config: /path-label/path-label.txt
+
+      use-reviewers: "false"
+      gate-approved: "false"
+      gate-cla: "false"
+- kind: PersistentVolumeClaim
+  apiVersion: v1
+  metadata:
+    name: origin-aggregated-logging-cache
+    labels:
+      app: mungegithub-origin-aggregated-logging
+      component: "${NAME}"
+      target-repo: origin-aggregated-logging
+  spec:
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 10Gi
