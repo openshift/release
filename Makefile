@@ -9,6 +9,7 @@ prow: prow-crd prow-config prow-secrets prow-images prow-rbac prow-services comm
 
 prow-crd:
 	oc apply -f cluster/ci/config/prow/prow_crd.yaml
+	oc apply -f cluster/ci/config/prow/prowjob_access.yaml
 .PHONY: prow-crd
 
 prow-config:
