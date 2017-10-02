@@ -4,7 +4,7 @@ all: jenkins prow mungegithub projects
 jenkins:
 .PHONY: jenkins
 
-prow: prow-crd prow-config prow-secrets prow-images prow-rbac hook plank jenkins-proxy jenkins-operator deck horologium splice sinker commenter
+prow: prow-crd prow-config prow-secrets prow-images prow-rbac prow-services commenter
 .PHONY: prow
 
 prow-crd:
@@ -41,37 +41,16 @@ prow-rbac:
 	oc process -f cluster/ci/config/prow/openshift/sinker_rbac.yaml | oc apply -f -
 	oc process -f cluster/ci/config/prow/openshift/splice_rbac.yaml | oc apply -f -
 
-hook:
-	oc process -f cluster/ci/config/prow/openshift/hook.yaml | oc apply -f -
-.PHONY: hook
-
-deck:
+prow-services:
 	oc process -f cluster/ci/config/prow/openshift/deck.yaml | oc apply -f -
-.PHONY: deck
-
-horologium:
+	oc process -f cluster/ci/config/prow/openshift/hook.yaml | oc apply -f -
 	oc process -f cluster/ci/config/prow/openshift/horologium.yaml | oc apply -f -
-.PHONY: horologium
-
-jenkins-proxy:
-	oc process -f cluster/ci/config/prow/openshift/jenkins_proxy.yaml | oc apply -f -
-.PHONY: jenkins-proxy
-
-jenkins-operator:
 	oc process -f cluster/ci/config/prow/openshift/jenkins-operator.yaml | oc apply -f -
-.PHONY: jenkins-operator
-
-plank:
+	oc process -f cluster/ci/config/prow/openshift/jenkins_proxy.yaml | oc apply -f -
 	oc process -f cluster/ci/config/prow/openshift/plank.yaml | oc apply -f -
-.PHONY: plank
-
-sinker:
 	oc process -f cluster/ci/config/prow/openshift/sinker.yaml | oc apply -f -
-.PHONY: sinker
-
-splice:
 	oc process -f cluster/ci/config/prow/openshift/splice.yaml | oc apply -f -
-.PHONY: splice
+.PHONY: prow-services
 
 commenter:
 	# RETEST_TOKEN is the token used by the retester periodic job to rerun tests for PRs
