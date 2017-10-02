@@ -59,8 +59,27 @@ prow-jobs:
 	oc process -f cluster/ci/jobs/commenter.yaml | oc apply -f -
 .PHONY: prow-jobs
 
-mungegithub:
+mungegithub: submit-queue-secrets origin-submit-queue installer-submit-queue logging-submit-queue
 .PHONY: mungegithub
+
+submit-queue-secrets:
+	# SQ_HMAC_TOKEN is used for encrypting Github webhook payloads.
+	oc create secret generic sq-hmac-token --from-literal=token=${SQ_HMAC_TOKEN} -o yaml --dry-run | oc apply -f -
+	# SQ_OAUTH_TOKEN is used for manipulating Github PRs/issues (labels, comments, etc.).
+	oc create secret generic sq-oauth-token --from-literal=token=${SQ_OAUTH_TOKEN} -o yaml --dry-run | oc apply -f -
+.PHONY: submit-queue-secrets
+
+origin-submit-queue:
+	oc process -f cluster/ci/config/submit-queue/submit_queue.yaml | oc apply -f -
+.PHONY: origin-submit-queue
+
+installer-submit-queue:
+	oc process -f cluster/ci/config/submit-queue/submit_queue_openshift_ansible.yaml | oc apply -f -
+.PHONY: origin-submit-queue
+
+logging-submit-queue:
+	oc process -f cluster/ci/config/submit-queue/submit_queue_origin_aggregated_logging.yaml | oc apply -f -
+.PHONY: origin-submit-queue
 
 projects: gcsweb kube-state-metrics oauth-proxy origin-release prometheus
 .PHONY: projects
