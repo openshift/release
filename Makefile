@@ -18,10 +18,10 @@ prow-config:
 
 prow-secrets:
 	# This is the token used by the jenkins-operator and deck to authenticate with the jenkins-proxy.
-	oc create secret generic jenkins-token --from-literal=jenkins=${BASIC_AUTH_PASS} -o yaml --dry-run | oc apply -f -
+	oc create secret generic jenkins-token --from-literal=jenkins=${PROXY_AUTH_PASS} -o yaml --dry-run | oc apply -f -
 	# BASIC_AUTH_PASS is used by the jenkins-proxy for authenticating with https://ci.openshift.redhat.com/jenkins/
-	# BEARER_TOKEN is used by the jenkins-proxy for authenticating with FILL_ME (--from-literal=bearer=${BEARER_TOKEN})
-	oc create secret generic jenkins-tokens --from-literal=basic=${BASIC_AUTH_PASS} -o yaml --dry-run | oc apply -f -
+	# BEARER_TOKEN is used by the jenkins-proxy for authenticating with https://jenkins-origin-ci.svc.ci.openshift.org
+	oc create secret generic jenkins-tokens --from-literal=basic=${BASIC_AUTH_PASS} --from-literal=origin-bearer=${BEARER_TOKEN} -o yaml --dry-run | oc apply -f -
 	# HMAC_TOKEN is used for encrypting Github webhook payloads.
 	oc create secret generic hmac-token --from-literal=hmac=${HMAC_TOKEN} -o yaml --dry-run | oc apply -f -
 	# OAUTH_TOKEN is used for manipulating Github PRs/issues (labels, comments, etc.).
@@ -74,6 +74,8 @@ splice:
 .PHONY: splice
 
 commenter:
+	# RETEST_TOKEN is the token used by the retester periodic job to rerun tests for PRs
+	oc create secret generic retester-oauth-token --from-literal=oauth=${RETEST_TOKEN} -o yaml --dry-run | oc apply -f -
 	oc process -f cluster/ci/jobs/commenter.yaml | oc apply -f -
 .PHONY: commenter
 
