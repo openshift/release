@@ -36,7 +36,7 @@ prow-rbac:
 	oc process -f cluster/ci/config/prow/openshift/deck_rbac.yaml | oc apply -f -
 	oc process -f cluster/ci/config/prow/openshift/hook_rbac.yaml | oc apply -f -
 	oc process -f cluster/ci/config/prow/openshift/horologium_rbac.yaml | oc apply -f -
-	oc process -f cluster/ci/config/prow/openshift/jenkins-operator_rbac.yaml | oc apply -f -
+	oc process -f cluster/ci/config/prow/openshift/jenkins_operator_rbac.yaml | oc apply -f -
 	oc process -f cluster/ci/config/prow/openshift/plank_rbac.yaml | oc apply -f -
 	oc process -f cluster/ci/config/prow/openshift/sinker_rbac.yaml | oc apply -f -
 	oc process -f cluster/ci/config/prow/openshift/splice_rbac.yaml | oc apply -f -
@@ -45,7 +45,7 @@ prow-services:
 	oc process -f cluster/ci/config/prow/openshift/deck.yaml | oc apply -f -
 	oc process -f cluster/ci/config/prow/openshift/hook.yaml | oc apply -f -
 	oc process -f cluster/ci/config/prow/openshift/horologium.yaml | oc apply -f -
-	oc process -f cluster/ci/config/prow/openshift/jenkins-operator.yaml | oc apply -f -
+	oc process -f cluster/ci/config/prow/openshift/jenkins_operator.yaml | oc apply -f -
 	oc process -f cluster/ci/config/prow/openshift/jenkins_proxy.yaml | oc apply -f -
 	oc process -f cluster/ci/config/prow/openshift/plank.yaml | oc apply -f -
 	oc process -f cluster/ci/config/prow/openshift/sinker.yaml | oc apply -f -
