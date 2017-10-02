@@ -378,3 +378,45 @@ objects:
           name: prow:binaries
           namespace: "${NAMESPACE}"
       type: ImageChange
+
+- kind: ImageStream
+  apiVersion: v1
+  metadata:
+    name: jenkins-proxy
+    namespace: "${NAMESPACE}"
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    name: jenkins-proxy
+    namespace: "${NAMESPACE}"
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: jenkins-proxy:latest
+        namespace: "${NAMESPACE}"
+    source:
+      git:
+        uri: "${SOURCE_URL}"
+      images:
+      - from:
+          kind: ImageStreamTag
+          name: prow:binaries
+          namespace: "${NAMESPACE}"
+        paths:
+        - destinationDir: .
+          sourcePath: /go/bin/jenkins-proxy
+    strategy:
+      dockerStrategy:
+        dockerfilePath: prow/cmd/jenkins-proxy/Dockerfile
+        noCache: true
+        imageOptimizationPolicy: SkipLayers
+    triggers:
+    - imageChange:
+        from:
+          kind: ImageStreamTag
+          name: prow:binaries
+          namespace: "${NAMESPACE}"
+      type: ImageChange
