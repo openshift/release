@@ -14,7 +14,6 @@ prow-crd:
 prow-config:
 	oc create cm config --from-file=config=cluster/ci/config/prow/config.yaml -o yaml --dry-run | oc replace -f -
 	oc create cm plugins --from-file=plugins=cluster/ci/config/prow/plugins.yaml -o yaml --dry-run | oc replace -f -
-	oc create cm jenkins-proxy --from-file=config=tools/jenkins-proxy/config.json -o yaml --dry-run | oc replace -f -
 .PHONY: prow-config
 
 prow-secrets:
@@ -31,7 +30,6 @@ prow-secrets:
 
 prow-images:
 	oc process -f cluster/ci/config/prow/prow_images.yaml | oc apply -f -
-	oc process -f tools/jenkins-proxy/openshift/build.yaml | oc apply -f -
 .PHONY: prow-images
 
 prow-rbac:
@@ -56,7 +54,7 @@ horologium:
 .PHONY: horologium
 
 jenkins-proxy:
-	oc process -f tools/jenkins-proxy/openshift/deploy.yaml | oc apply -f -
+	oc process -f cluster/ci/config/prow/openshift/jenkins_proxy.yaml | oc apply -f -
 .PHONY: jenkins-proxy
 
 jenkins-operator:
