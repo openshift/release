@@ -4,7 +4,7 @@ all: jenkins prow mungegithub projects
 jenkins:
 .PHONY: jenkins
 
-prow: prow-crd prow-config prow-secrets prow-images prow-rbac prow-services commenter
+prow: prow-crd prow-config prow-secrets prow-images prow-rbac prow-services prow-jobs
 .PHONY: prow
 
 prow-crd:
@@ -53,11 +53,11 @@ prow-services:
 	oc process -f cluster/ci/config/prow/openshift/splice.yaml | oc apply -f -
 .PHONY: prow-services
 
-commenter:
+prow-jobs:
 	# RETEST_TOKEN is the token used by the retester periodic job to rerun tests for PRs
 	oc create secret generic retester-oauth-token --from-literal=oauth=${RETEST_TOKEN} -o yaml --dry-run | oc apply -f -
 	oc process -f cluster/ci/jobs/commenter.yaml | oc apply -f -
-.PHONY: commenter
+.PHONY: prow-jobs
 
 mungegithub:
 .PHONY: mungegithub
