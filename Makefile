@@ -13,20 +13,21 @@ prow-crd:
 .PHONY: prow-crd
 
 prow-config:
-	oc create cm config --from-file=config=cluster/ci/config/prow/config.yaml -o yaml --dry-run | oc replace -f -
-	oc create cm plugins --from-file=plugins=cluster/ci/config/prow/plugins.yaml -o yaml --dry-run | oc replace -f -
+	# TODO: Do not use apply because it will be clobbered by the config-updater plugin.
+	oc create cm config --from-file=config=cluster/ci/config/prow/config.yaml -o yaml --dry-run | oc apply -n ci -f -
+	oc create cm plugins --from-file=plugins=cluster/ci/config/prow/plugins.yaml -o yaml --dry-run | oc apply -n ci -f -
 .PHONY: prow-config
 
 prow-secrets:
 	# This is the token used by the jenkins-operator and deck to authenticate with the jenkins-proxy.
-	oc create secret generic jenkins-token --from-literal=jenkins=${PROXY_AUTH_PASS} -o yaml --dry-run | oc apply -f -
+	oc create secret generic jenkins-token --from-literal=jenkins=${PROXY_AUTH_PASS} -o yaml --dry-run | oc apply -n ci -f -
 	# BASIC_AUTH_PASS is used by the jenkins-proxy for authenticating with https://ci.openshift.redhat.com/jenkins/
 	# BEARER_TOKEN is used by the jenkins-proxy for authenticating with https://jenkins-origin-ci.svc.ci.openshift.org
-	oc create secret generic jenkins-tokens --from-literal=basic=${BASIC_AUTH_PASS} --from-literal=origin-bearer=${BEARER_TOKEN} -o yaml --dry-run | oc apply -f -
+	oc create secret generic jenkins-tokens --from-literal=basic=${BASIC_AUTH_PASS} --from-literal=origin-bearer=${BEARER_TOKEN} -o yaml --dry-run | oc apply -n ci -f -
 	# HMAC_TOKEN is used for encrypting Github webhook payloads.
-	oc create secret generic hmac-token --from-literal=hmac=${HMAC_TOKEN} -o yaml --dry-run | oc apply -f -
+	oc create secret generic hmac-token --from-literal=hmac=${HMAC_TOKEN} -o yaml --dry-run | oc apply -n ci -f -
 	# OAUTH_TOKEN is used for manipulating Github PRs/issues (labels, comments, etc.).
-	oc create secret generic oauth-token --from-literal=oauth=${OAUTH_TOKEN} -o yaml --dry-run | oc apply -f -
+	oc create secret generic oauth-token --from-literal=oauth=${OAUTH_TOKEN} -o yaml --dry-run | oc apply -n ci -f -
 .PHONY: prow-secrets
 
 prow-images:
@@ -55,7 +56,7 @@ prow-services:
 
 prow-jobs:
 	# RETEST_TOKEN is the token used by the retester periodic job to rerun tests for PRs
-	oc create secret generic retester-oauth-token --from-literal=oauth=${RETEST_TOKEN} -o yaml --dry-run | oc apply -f -
+	oc create secret generic retester-oauth-token --from-literal=oauth=${RETEST_TOKEN} -o yaml --dry-run | oc apply -n ci -f -
 	oc process -f cluster/ci/jobs/commenter.yaml | oc apply -f -
 .PHONY: prow-jobs
 
