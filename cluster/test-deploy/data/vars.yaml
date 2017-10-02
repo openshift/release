@@ -123,3 +123,47 @@ provision_custom_repositories: [
     "gpgkey": "https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-release https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-beta https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-openshifthosted"
   }
 ]
+
+##############
+# New settings
+##############
+
+openshift_gcp_prefix: "ci-{{ lookup('env', 'INSTANCE_PREFIX') | mandatory }}-"
+
+openshift_gcp_project: openshift-gce-devel-ci
+openshift_gcp_region: us-central1
+openshift_gcp_zone: us-central1-a
+
+openshift_gcp_network_name: "{{ openshift_gcp_prefix }}network"
+
+openshift_gcp_iam_service_account: jenkins-ci-provisioner@openshift-gce-devel.iam.gserviceaccount.com
+openshift_gcp_iam_service_account_keyfile: "{{ inventory_dir }}/gce.json"
+
+openshift_gcp_ssh_private_key: /home/cloud-user/.ssh/google_compute_engine
+
+openshift_gcp_infra_network_instance_group: ig-m
+
+openshift_gcp_image: 'rhel-7'
+
+openshift_gcp_registry_bucket_keyfile: "{{ inventory_dir }}/gce.json"
+openshift_gcp_registry_bucket_name: "origin-ci-test-{{ lookup('env', 'INSTANCE_PREFIX') | mandatory }}"
+
+openshift_gcp_node_group_config:
+  - name: master
+    suffix: m
+    tags: ocp-master
+    machine_type: n1-standard-2
+    boot_disk_size: 150
+    scale: 1
+  - name: node
+    suffix: n
+    tags: ocp-node
+    machine_type: n1-standard-2
+    boot_disk_size: 150
+    scale: 3
+  - name: node-flex
+    suffix: nf
+    tags: ocp-node
+    machine_type: n1-standard-2
+    boot_disk_size: 150
+    scale: 0
