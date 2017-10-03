@@ -2,12 +2,6 @@
 apiVersion: template.openshift.io/v1
 kind: Template
 parameters:
-- description: The namespace to get the image from.
-  name: IMAGE_NAMESPACE
-  value: ci
-- description: The namespace to instantiate deck under.
-  name: NAMESPACE
-  value: ci
 - description: The name of the component.
   name: NAME
   value: deck
@@ -16,7 +10,6 @@ objects:
   kind: Route
   metadata:
     name: "${NAME}"
-    namespace: "${NAMESPACE}"
   spec:
     tls:
       insecureEdgeTerminationPolicy: Redirect
@@ -24,12 +17,10 @@ objects:
     to:
       kind: Service
       name: deck
-      namespace: "${NAMESPACE}"
 - apiVersion: v1
   kind: Service
   metadata:
     name: "${NAME}"
-    namespace: "${NAMESPACE}"
   spec:
     selector:
       app: prow
@@ -42,7 +33,6 @@ objects:
   kind: DeploymentConfig
   metadata:
     name: "${NAME}"
-    namespace: "${NAMESPACE}"
     labels:
       app: prow
       component: "${NAME}"
@@ -90,5 +80,4 @@ objects:
         from:
           kind: ImageStreamTag
           name: "${NAME}:latest"
-          namespace: "${IMAGE_NAMESPACE}"
       type: ImageChange
