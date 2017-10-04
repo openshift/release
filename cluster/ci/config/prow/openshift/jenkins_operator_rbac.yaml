@@ -1,9 +1,6 @@
 apiVersion: template.openshift.io/v1
 kind: Template
 parameters:
-- description: The namespace to instantiate jenkins-operator under.
-  name: NAMESPACE
-  value: ci
 - description: The name of the component.
   name: NAME
   value: jenkins-operator
@@ -12,8 +9,7 @@ objects:
   kind: ServiceAccount
   metadata:
     name: "${NAME}"
-    namespace: "${NAMESPACE}"
-- kind: ClusterRole
+- kind: Role
   apiVersion: v1 # rbac.authorization.k8s.io/v1beta1
   metadata:
     name: "${NAME}"
@@ -26,15 +22,14 @@ objects:
         - create
         - list
         - update
-- kind: ClusterRoleBinding
+- kind: RoleBinding
   apiVersion: v1 # rbac.authorization.k8s.io/v1beta1
   metadata:
     name: "${NAME}"
   roleRef:
     apiGroup: "" # rbac.authorization.k8s.io
-    kind: ClusterRole
+    kind: Role
     name: "${NAME}"
   subjects:
   - kind: ServiceAccount
     name: "${NAME}"
-    namespace: "${NAMESPACE}"
