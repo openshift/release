@@ -9,6 +9,7 @@ ENV GIT_COMMITTER_NAME=developer \
     HOME=/tmp
 
 COPY release-ci /usr/bin/release-ci
+COPY log-pods.sh /usr/bin/log-pods.sh
 
 RUN chmod g+xw -R /go && \
     chmod g+xw -R $(go env GOROOT) && \

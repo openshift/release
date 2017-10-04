@@ -8,8 +8,10 @@ const (
 	PullRequestDirectory = PullRequestPrefix + "/directory"
 )
 
-// RepoMeta contains the owner/name of a repository
-type RepoMeta struct {
+// Repo contains configuration for a published
+// repository version involved in a job
+// See: https://github.com/kubernetes/test-infra/tree/master/prow#how-to-add-new-jobs
+type Repo struct {
 	// RepoOwner is the GitHub organization
 	// that triggered this build, provided as
 	// $REPO_OWNER by Prow.
@@ -19,12 +21,7 @@ type RepoMeta struct {
 	// that triggered this build, provided
 	// as $REPO_NAME by Prow.
 	RepoName string `json:"repo-name"`
-}
 
-// Repo contains configuration for a published
-// repository version involved in a job
-// See: https://github.com/kubernetes/test-infra/tree/master/prow#how-to-add-new-jobs
-type Repo struct {
 	// BaseRef is the name of the branch that
 	// sources for this job are merge into,
 	// provided as $PULL_BASE_REF by Prow.
@@ -44,7 +41,6 @@ type Repo struct {
 // Batch contains configuration for a batch job
 type Batch struct {
 	Job
-	RepoMeta
 	Repo
 }
 
@@ -64,4 +60,14 @@ func (b *Batch) Aliases() []string {
 // Type exposes the type of this configuration
 func (b *Batch) Type() Type {
 	return BatchType
+}
+
+const defaultRepositoryOwner = "openshift"
+const defaultRepositoryName = "origin"
+
+func repositoryPath(owner, name string) string {
+	if owner == defaultRepositoryOwner && name == defaultRepositoryName {
+		return ""
+	}
+	return fmt.Sprintf("/%s_%s", owner, name)
 }

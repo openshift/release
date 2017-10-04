@@ -1,7 +1,7 @@
 #!/usr/bin/env groovy
 
-def library_url = "${env.RELEASE_LIBRARY_URL}"
-def library_ref = "${env.RELEASE_LIBRARY_REF}"
+def library_url = "${env.RELEASE_LIBRARY_URL ?: 'github.com/openshift/release-library'}"
+def library_ref = "${env.RELEASE_LIBRARY_REF ?: 'master'}"
 
 library "${library_url}@${library_ref}"
 
@@ -11,10 +11,15 @@ pipeline {
   agent { label "release-ci.jenkins-slave" }
 
   parameters {
-    string(defaultValue: "${env.ORIGIN_TARGET_BRANCH}", name: "ORIGIN_TARGET_BRANCH", description: "The branch in the origin repository to test against.")
-    string(defaultValue: "${env.PULL_REFS}", name: "PULL_REFS", description: "Used by prow. If this is not a pull request, it should at least contain the branch:hash of the HEAD being tested.")
     string(defaultValue: "${env.BUILD_ID}", name: "buildId", description: "The ID that prow sets on a Jenkins job in order to correlate it with a ProwJob")
-    string(defaultValue: "${env.ORIGIN_URL}", name: "ORIGIN_URL", description: "The URL of the Origin repository to use")
+    string(defaultValue: "${env.ORIGIN_URL ?: 'https://github.com/openshift/origin.git' }", name: "ORIGIN_URL", description: "The URL of the Origin repository to use")
+    string(name: "REPO_OWNER", defaultValue:"${env.REPO_OWNER ?: ''}")
+    string(name: "REPO_NAME", defaultValue:"${env.REPO_NAME ?: ''}")
+    string(name: "PULL_BASE_REF", defaultValue:"${env.PULL_BASE_REF ?: ''}")
+    string(name: "PULL_BASE_SHA", defaultValue:"${env.PULL_BASE_SHA ?: ''}")
+    string(name: "PULL_REFS", defaultValue:"${env.PULL_REFS ?: 'master'}")
+    string(name: "PULL_NUMBER", defaultValue:"${env.PULL_NUMBER ?: ''}")
+    string(name: "PULL_PULL_SHA", defaultValue:"${env.PULL_PULL_SHA ?: ''}")
   }
 
   stages {
@@ -24,6 +29,25 @@ pipeline {
           this._buildName = buildName(this)
         }
         echo "Build name is ${this._buildName}"
+      }
+    }
+    stage ("Launch Build") {
+      steps {
+        script {
+          def jobName = "${env.PROJECT_NAME ?: 'origin-ci'}-build-origin"
+          def buildParams = [
+            [$class: "StringParameterValue", name: "ORIGIN_URL", value: params.ORIGIN_URL],
+            [$class: "StringParameterValue", name: "BUILD_ID", value: params.BUILD_ID],
+            [$class: "StringParameterValue", name: "REPO_OWNER", value: params.REPO_OWNER],
+            [$class: "StringParameterValue", name: "REPO_NAME", value: params.REPO_NAME],
+            [$class: "StringParameterValue", name: "PULL_BASE_REF", value: params.PULL_BASE_REF],
+            [$class: "StringParameterValue", name: "PULL_BASE_SHA", value: params.PULL_BASE_SHA],
+            [$class: "StringParameterValue", name: "PULL_REFS", value: params.PULL_REFS],
+            [$class: "StringParameterValue", name: "PULL_NUMBER", value: params.PULL_NUMBER],
+            [$class: "StringParameterValue", name: "PULL_PULL_SHA", value: params.PULL_PULL_SHA]
+          ]
+          build job: jobName, parameters: buildParams, wait: false
+        }
       }
     }
     stage("Wait for binaries") {
@@ -38,6 +62,7 @@ pipeline {
           def binaryImageRef = imageStreamTagRef(this, this._buildName, "binaries")
           def pullSecretRef = dockerCfgSecret(this, "default")
           def unitRunId = "${this._buildName}-ut-${currentBuild.number}"
+          this._unitRunId = unitRunId
 
           createTemplate(this, "${templateBase}/unit-tests.yaml", 
             "BUILD_NAME=${_buildName}",
@@ -46,11 +71,26 @@ pipeline {
             "PULL_SECRET_NAME=${pullSecretRef}",
             "JOB_NAME=${env.JOB_NAME}",
             "BUILD_NUMBER=${env.BUILD_NUMBER}",
-            "REPO_OWNER=${env.REPO_OWNER ?: 'openshift'}",
-            "REPO_NAME=${env.REPO_NAME ?: 'origin'}"
+            "REPO_OWNER=${params.REPO_OWNER}",
+            "REPO_NAME=${params.REPO_NAME}",
+            "PULL_BASE_REF=${params.PULL_BASE_REF}",
+            "PULL_BASE_SHA=${params.PULL_BASE_SHA}",
+            "PULL_REFS=${params.PULL_REFS}",
+            "PULL_NUMBER=${params.PULL_NUMBER}",
+            "PULL_PULL_SHA=${params.PULL_PULL_SHA}"
           )
-
+          
           waitForPods(this, ["run": "${unitRunId}"], 7200)
+        }
+      }
+    }
+  }
+  post {
+    // Cleanup created pods
+    always {
+      script {
+        if (this._unitRunId != "") {
+          deletePods(this, ["run": "${this._unitRunId}"])
         }
       }
     }
