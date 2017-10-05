@@ -109,3 +109,8 @@ prometheus: node-exporter
 node-exporter:
 	oc apply -f projects/prometheus/node-exporter.yaml
 .PHONY: node-exporter
+
+jenkins-setup:
+	oc new-app --template jenkins-persistent -e INSTALL_PLUGINS=groovy:2.0,pipeline-github-lib:1.0 -p MEMORY_LIMIT=4Gi
+	oc new-app -f jenkins/setup/jenkins-setup-template.yaml
+.PHONY: jenkins-setup
