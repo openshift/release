@@ -30,25 +30,6 @@ pipeline {
         echo "Build name is ${this._buildName}"
       }
     }
-    stage ("Launch Build") {
-      steps {
-        script {
-          def jobName = "${env.PROJECT_NAME ?: 'origin-ci'}-build-origin"
-          def buildParams = [
-            [$class: "StringParameterValue", name: "ORIGIN_URL", value: params.ORIGIN_URL],
-            [$class: "StringParameterValue", name: "BUILD_ID", value: params.BUILD_ID],
-            [$class: "StringParameterValue", name: "REPO_OWNER", value: params.REPO_OWNER],
-            [$class: "StringParameterValue", name: "REPO_NAME", value: params.REPO_NAME],
-            [$class: "StringParameterValue", name: "PULL_BASE_REF", value: params.PULL_BASE_REF],
-            [$class: "StringParameterValue", name: "PULL_BASE_SHA", value: params.PULL_BASE_SHA],
-            [$class: "StringParameterValue", name: "PULL_REFS", value: params.PULL_REFS],
-            [$class: "StringParameterValue", name: "PULL_NUMBER", value: params.PULL_NUMBER],
-            [$class: "StringParameterValue", name: "PULL_PULL_SHA", value: params.PULL_PULL_SHA]
-          ]
-          build job: jobName, parameters: buildParams, wait: false
-        }
-      }
-    }
     stage("Wait for source") {
       steps {
         waitForTag(this, this._buildName, "src", 7200)
