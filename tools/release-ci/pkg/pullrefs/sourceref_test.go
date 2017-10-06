@@ -72,7 +72,7 @@ func TestParsePullRefs(t *testing.T) {
 }
 
 func TestToBuildID(t *testing.T) {
-	expectRegex := regexp.MustCompile("^[0-9,a-f]{64}$")
+	expectRegex := regexp.MustCompile("^(batch-|pr-[0-9]+-|)[0-9,a-f]{24}$")
 	tests := []string{
 		"branch",
 		"branch:12345",

@@ -51,13 +51,15 @@ pipeline {
         not { expression { return imageStreamTagExists(this, "${this._buildName}", "src") } }
       }
       steps {
-        runAndWaitForBuild(this, "${this._buildName}-clone-source", {
+        runAndWaitForBuild(this, "clone-${env.BUILD_NUMBER}-${this._buildName}", {
           applyTemplate(this, "${templateBase}/clone-source.yaml",
             "RELEASE_SRC_REF=${env.RELEASE_SRC_REF ?: 'master'}",
             "RELEASE_SRC_URL=${env.RELEASE_SRC_URL ?: 'https://github.com/openshift/release.git'}", 
             "PUSH_SECRET_NAME=${this._pushSecret}",
             "BUILD_NAME=${this._buildName}",
             "PULL_REFS=${params.PULL_REFS}",
+            "PULL_NUMBER=${params.PULL_NUMBER}",
+            "BUILD_NUMBER=${env.BUILD_NUMBER}",
             "SOURCE_URL=${params.ORIGIN_URL}")
         })
       }
@@ -67,11 +69,13 @@ pipeline {
         not { expression { return imageStreamTagExists(this, "${this._buildName}", "binaries") } }
       }
       steps {
-        runAndWaitForBuild(this, "${this._buildName}-compile", {
+        runAndWaitForBuild(this, "compile-${env.BUILD_NUMBER}-${this._buildName}", {
           applyTemplate(this, "${templateBase}/compile.yaml",
             "RELEASE_SRC_REF=${env.RELEASE_SRC_REF ?: 'master'}",
             "RELEASE_SRC_URL=${env.RELEASE_SRC_URL ?: 'https://github.com/openshift/release.git'}", 
             "PUSH_SECRET_NAME=${this._pushSecret}",
+            "PULL_NUMBER=${params.PULL_NUMBER}",
+            "BUILD_NUMBER=${env.BUILD_NUMBER}",
             "BUILD_NAME=${this._buildName}")
         })
       }
