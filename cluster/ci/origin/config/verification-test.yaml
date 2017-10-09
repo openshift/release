@@ -23,16 +23,23 @@ parameters:
   displayName: Run ID
   name: RUN_ID
   required: true
+- name: BUILD_NUMBER
+  required: true
+- name: PULL_NUMBER
+  required: true
+  value: "-none"
 objects:
 - apiVersion: v1
   kind: Pod
   metadata:
-    generateName: "${BUILD_NAME}-verify-"
+    generateName: "verify-${BUILD_NUMBER}-${BUILD_NAME}-"
     labels:
       build: "${BUILD_NAME}"
       test: "verify-${TEST_NAME}"
       run: "${RUN_ID}"
       created-by-prow: "true"
+      pr: "pr${PULL_NUMBER}"
+      job: "verify-${BUILD_NUMBER}"
   spec:
     containers:
     - command:

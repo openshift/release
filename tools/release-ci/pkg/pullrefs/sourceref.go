@@ -84,6 +84,13 @@ func (s *SourceRef) ToBuildID() string {
 	sum := sha256.Sum256(desc.Bytes())
 	hash := fmt.Sprintf("%x", sum)
 
+	jobInfo := ""
+	if len(s.PullRefs) == 1 {
+		jobInfo = fmt.Sprintf("pr-%d-", s.PullRefs[0].Number)
+	} else if len(s.PullRefs) > 1 {
+		jobInfo = "batch-"
+	}
+
 	// Shorten the hash to make it usable as an origin name
-	return hash[20:]
+	return fmt.Sprintf("%s%s", jobInfo, hash[40:])
 }
