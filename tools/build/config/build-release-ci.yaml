@@ -106,3 +106,35 @@ objects:
           kind: ImageStreamTag
           name: slave-base:latest
       type: Docker
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    labels:
+      build: ci-jenkins
+    name: ci-jenkins
+  spec:
+    output:
+      to:
+        kind: ImageStreamTag
+        name: release-ci:jenkins
+    source:
+      git:
+        ref: ${RELEASE_REF}
+        uri: ${RELEASE_URL}
+      images:
+      - from:
+          name: release-ci:binary
+          kind: ImageStreamTag
+        paths:
+        - sourcePath: /usr/bin/release-ci
+          destinationDir: tools/build/ci-jenkins-image/bin
+      contextDir: tools/build/ci-jenkins-image
+      type: Git
+    strategy:
+      dockerStrategy:
+        noCache: true
+        from:
+          kind: ImageStreamTag
+          name: jenkins:latest
+          namespace: openshift
+      type: Docker
