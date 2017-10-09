@@ -35,7 +35,26 @@ pipeline {
         stage("Build Slave") {
             steps {
                 waitForTag(this, "slave-base", "latest")
-                runBuild(this, "release-ci-slave")
+                script {
+                    try { 
+                        runBuild(this, "release-ci-slave")
+                    } catch(e) {
+                        echo "Retrying slave image build"
+                        runBuild(this, "release-ci-slave")
+                    }
+                }
+            }
+        }
+        stage ("Build Jenkins") {
+            steps {
+                script {
+                    try {
+                        runBuild(this, "ci-jenkins")
+                    } catch(e) {
+                        echo "Retrying ci-jenkins image build"
+                        runBuild(this, "ci-jenkins")
+                    }
+                }
             }
         }
         stage("Annotate Slave Tag") {
