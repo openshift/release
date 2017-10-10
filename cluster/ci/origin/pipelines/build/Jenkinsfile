@@ -51,17 +51,32 @@ pipeline {
         not { expression { return imageStreamTagExists(this, "${this._buildName}", "src") } }
       }
       steps {
-        runAndWaitForBuild(this, "clone-${env.BUILD_NUMBER}-${this._buildName}", {
-          applyTemplate(this, "${templateBase}/clone-source.yaml",
-            "RELEASE_SRC_REF=${env.RELEASE_SRC_REF ?: 'master'}",
-            "RELEASE_SRC_URL=${env.RELEASE_SRC_URL ?: 'https://github.com/openshift/release.git'}", 
-            "PUSH_SECRET_NAME=${this._pushSecret}",
-            "BUILD_NAME=${this._buildName}",
-            "PULL_REFS=${params.PULL_REFS}",
-            "PULL_NUMBER=${params.PULL_NUMBER}",
-            "BUILD_NUMBER=${env.BUILD_NUMBER}",
-            "SOURCE_URL=${params.ORIGIN_URL}")
-        })
+        script {
+          jitter(this, 0,30)
+          def activeBuilds = filterObjects(this, "builds", ["build":"${this._buildName}"], { obj -> 
+            if (obj.metadata.labels != null && obj.metadata.labels["template"] == "clone-source") {
+              if (obj.status.phase == "New" || obj.status.phase == "Pending" || obj.status.phase == "Running") {
+                return true
+              }
+            }
+            return false
+          })
+          if (activeBuilds.size() == 0) {
+            runAndWaitForBuild(this, "", {
+              createTemplate(this, "${templateBase}/clone-source.yaml",
+                "RELEASE_SRC_REF=${env.RELEASE_SRC_REF ?: 'master'}",
+                "RELEASE_SRC_URL=${env.RELEASE_SRC_URL ?: 'https://github.com/openshift/release.git'}", 
+                "PUSH_SECRET_NAME=${this._pushSecret}",
+                "BUILD_NAME=${this._buildName}",
+                "PULL_REFS=${params.PULL_REFS}",
+                "PULL_NUMBER=${params.PULL_NUMBER}",
+                "BUILD_NUMBER=${env.BUILD_NUMBER}",
+                "SOURCE_URL=${params.ORIGIN_URL}")
+            })
+          } else {
+            echo "Skipping source build for ${this._buildName}. Another build is already running: ${activeBuilds[0].metadata.name}"
+          }
+        }
       }
     }
     stage("Compile") {
@@ -69,15 +84,30 @@ pipeline {
         not { expression { return imageStreamTagExists(this, "${this._buildName}", "binaries") } }
       }
       steps {
-        runAndWaitForBuild(this, "compile-${env.BUILD_NUMBER}-${this._buildName}", {
-          applyTemplate(this, "${templateBase}/compile.yaml",
-            "RELEASE_SRC_REF=${env.RELEASE_SRC_REF ?: 'master'}",
-            "RELEASE_SRC_URL=${env.RELEASE_SRC_URL ?: 'https://github.com/openshift/release.git'}", 
-            "PUSH_SECRET_NAME=${this._pushSecret}",
-            "PULL_NUMBER=${params.PULL_NUMBER}",
-            "BUILD_NUMBER=${env.BUILD_NUMBER}",
-            "BUILD_NAME=${this._buildName}")
-        })
+        script {
+          jitter(this, 0,30)
+          def activeBuilds = filterObjects(this, "builds", ["build":"${this._buildName}"], { obj -> 
+            if (obj.metadata.labels != null && obj.metadata.labels["template"] == "compile") {
+              if (obj.status.phase == "New" || obj.status.phase == "Pending" || obj.status.phase == "Running") {
+                return true
+              }
+            }
+            return false
+          })
+          if (activeBuilds.size() == 0) {
+            runAndWaitForBuild(this, "", {
+              createTemplate(this, "${templateBase}/compile.yaml",
+                "RELEASE_SRC_REF=${env.RELEASE_SRC_REF ?: 'master'}",
+                "RELEASE_SRC_URL=${env.RELEASE_SRC_URL ?: 'https://github.com/openshift/release.git'}", 
+                "PUSH_SECRET_NAME=${this._pushSecret}",
+                "PULL_NUMBER=${params.PULL_NUMBER}",
+                "BUILD_NUMBER=${env.BUILD_NUMBER}",
+                "BUILD_NAME=${this._buildName}")
+            })
+          } else {
+            echo "Skipping compile build for ${this._buildName}. Another build is already running: ${activeBuilds[0].metadata.name}"
+          }
+        }
       }
     }
   }
