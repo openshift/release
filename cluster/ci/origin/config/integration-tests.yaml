@@ -15,31 +15,127 @@ parameters:
   displayName: Image Pull Secret
   name: PULL_SECRET_NAME
   required: true
+- description: The id of the run
+  displayName: Run ID
+  name: RUN_ID
+  required: true
+- name: REPO_OWNER
+  required: true
+  value: "openshift"
+- name: REPO_NAME
+  required: true
+  value: "origin"
+- name: JOB_NAME
+  required: true
+- name: BUILD_NUMBER
+  required: true
+- name: PULL_BASE_REF
+  required: true
+  value: ""
+- name: PULL_BASE_SHA
+  required: true
+  value: ""
+- name: PULL_REFS
+  required: true
+  value: ""
+- name: PULL_NUMBER
+  value: ""
+- name: PULL_PULL_SHA
+  value: ""
 objects:
 - apiVersion: v1
   kind: Pod
   metadata:
+    generateName: "${BUILD_NAME}-int-"
     labels:
       build: "${BUILD_NAME}"
-      test: integration
+      test: integration-tests
+      run: "${RUN_ID}"
       created-by-prow: "true"
-    name: "${BUILD_NAME}-integration-tests"
   spec:
+    initContainers:
+    - name: save-config
+      env:
+      - name: JOB_NAME
+        value: ${JOB_NAME}
+      - name: BUILD_NUMBER
+        value: ${BUILD_NUMBER}
+      - name: REPO_OWNER
+        value: ${REPO_OWNER}
+      - name: REPO_NAME
+        value: ${REPO_NAME}
+      - name: PULL_BASE_REF
+        value: ${PULL_BASE_REF}
+      - name: PULL_BASE_SHA
+        value: ${PULL_BASE_SHA}
+      - name: PULL_REFS
+        value: ${PULL_REFS}
+      - name: PULL_NUMBER
+        value: ${PULL_NUMBER}
+      - name: PULL_PULL_SHA
+        value: ${PULL_PULL_SHA}
+      command:
+      - release-ci
+      - save-config
+      - --config-path=/var/run/logging-config/logging-config.json
+      image: "${BINARY_IMAGE_REF}"
+      imagePullPolicy: IfNotPresent
+      volumeMounts:
+      - mountPath: /var/run/logging-config
+        name: logging-config
+      - mountPath: /var/run/logging
+        name: logging
     containers:
     - command:
+      - release-ci
+      - entrypoint
+      - --config-path=/var/run/logging-config/logging-config.json
+      - --
       - /bin/bash
       - -c
-      - hack/test-integration.sh
+      - 'env -i ARTIFACT_DIR=/var/run/logging/output LOG_DIR=/var/run/logging/output/logs JUNIT_REPORT=true SKIP_TEARDOWN=1 HOME=/tmp HOSTNAME=$(hostname) TERM=xterm-256color make test-tools test-integration'
       image: "${BINARY_IMAGE_REF}"
-      env:
-      - name: SKIP_TEARDOWN
-        value: "1"
       imagePullPolicy: IfNotPresent
       name: integration-tests
-      resources: {}
-      securityContext: {}
+      resources:
+        limits:
+          memory: "8Gi"
+        requests:
+          cpu: "2500m"
+          memory: "6.5Gi"
+      volumeMounts:
+      - mountPath: /var/run/logging-config
+        name: logging-config
+      - mountPath: /var/run/logging
+        name: logging
+    - command:
+      - release-ci
+      - sidecar
+      - --config-path=/var/run/logging-config/logging-config.json
+      image: "${BINARY_IMAGE_REF}"
+      imagePullPolicy: IfNotPresent
+      name: integration-tests-sidecar
+      volumeMounts:
+      - mountPath: /var/run/logging-config
+        name: logging-config
+      - mountPath: /var/run/logging
+        name: logging
+      - mountPath: /var/run/secrets/gce
+        name: gce
     dnsPolicy: ClusterFirst
     imagePullSecrets:
     - name: "${PULL_SECRET_NAME}"
     restartPolicy: Never
     terminationGracePeriodSeconds: 5
+    volumes:
+    - emptyDir:
+        sizeLimit: "0"
+      name: logging
+    - configMap:
+        defaultMode: 420
+        name: logging-config
+      name: logging-config
+    - name: gce
+      secret:
+        defaultMode: 420
+        secretName: gce
