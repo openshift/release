@@ -56,6 +56,8 @@ func UploadFinishedData(processLog, metadataFile, artifactDir string, passed boo
 		if relPath, err := filepath.Rel(artifactDir, path); err == nil {
 			log.Printf("Found %s in artifact directory. Uploading as %s\n", path, relPath)
 			uploadTargets[ospath.Join(gcsPath, "artifacts", relPath)] = fileUpload(path)
+		} else {
+			log.Printf("Encountered error in relative path calculation for %s under %s: %v", path, artifactDir, err)
 		}
 		return nil
 	})
