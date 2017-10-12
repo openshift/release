@@ -21,12 +21,22 @@ ifndef WHAT
 endif
 .PHONY: check-cluster
 
-image:
+base-image:
 ifndef FROM
-	$(error Must set FROM= to the base image)
+	$(error Must set FROM= to the root image, usually centos-7)
 endif
 ifndef TO
-	$(error Must set TO= to the image name or image family name you wish to create)
+	$(error Must set TO= to the base image name or image family name you wish to create, usually rhel-7)
 endif
-	cd data/ && ../../bin/local.sh ansible-playbook -e "provision_gce_registered_image=$(TO)" -e "provision_gce_base_image=$(FROM)" playbooks/image.yaml
+	cd data/ && ../../bin/local.sh ansible-playbook -e "openshift_gcp_base_image=$(TO)" -e "openshift_gcp_root_image=$(FROM)" playbooks/build_base_image.yaml
+.PHONY: image
+
+image:
+ifndef FROM
+	$(error Must set FROM= to the base image, usually rhel-7)
+endif
+ifndef TO
+	$(error Must set TO= to the image name or image family name you wish to create, usually openshift-VERSION-node)
+endif
+	cd data/ && ../../bin/local.sh ansible-playbook -e "openshift_test_repo=$(REPO)" -e "openshift_gcp_image=$(TO)" -e "openshift_gcp_base_image=$(FROM)" playbooks/build_image.yaml
 .PHONY: image
