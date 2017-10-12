@@ -7,6 +7,18 @@ parameters:
   name: NAME
   value: jenkins-operator
 objects:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: "${NAME}"
+  spec:
+    selector:
+      app: prow
+      component: "${NAME}"
+    ports:
+    - port: 80
+      targetPort: 8080
+    type: ClusterIP
 - apiVersion: apps.openshift.io/v1
   kind: DeploymentConfig
   metadata:
@@ -34,6 +46,9 @@ objects:
           - --jenkins-user=openshift-ci-robot
           - --jenkins-token-file=/etc/jenkins/jenkins
           - --dry-run=false
+          ports:
+          - name: logs
+            containerPort: 8080
           volumeMounts:
           - mountPath: /etc/jenkins
             name: jenkins
