@@ -60,7 +60,7 @@ prow-jobs:
 	oc process -f cluster/ci/jobs/commenter.yaml | oc apply -f -
 .PHONY: prow-jobs
 
-mungegithub: submit-queue-secrets origin-submit-queue installer-submit-queue logging-submit-queue
+mungegithub: submit-queue-secrets origin-submit-queue installer-submit-queue logging-submit-queue console-submit-queue
 .PHONY: mungegithub
 
 submit-queue-secrets:
@@ -81,6 +81,10 @@ installer-submit-queue:
 logging-submit-queue:
 	oc process -f cluster/ci/config/submit-queue/submit_queue_origin_aggregated_logging.yaml | oc apply -f -
 .PHONY: origin-submit-queue
+
+console-submit-queue:
+	oc process -f cluster/ci/config/submit-queue/submit_queue_origin_web_console.yaml | oc apply -f -
+.PHONY: console-submit-queue
 
 projects: gcsweb kube-state-metrics oauth-proxy origin-release prometheus
 .PHONY: projects
