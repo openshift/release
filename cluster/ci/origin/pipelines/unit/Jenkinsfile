@@ -64,7 +64,12 @@ pipeline {
           def unitRunId = "${this._buildName}-ut-${currentBuild.number}"
           this._unitRunId = unitRunId
 
-          createTemplate(this, "${templateBase}/unit-tests.yaml", 
+          createTemplate(this, "${templateBase}/tests.yaml",
+            "JOB_NICKNAME=ut",
+            "JOB_ARGS='-i HOME=/tmp HOSTNAME=\$(hostname) TERM=xterm-256color OS_OUTPUT_SCRIPTPATH=/var/run/logging JUNIT_REPORT=true SKIP_TEARDOWN=1 TEST_KUBE=true make test-unit'",
+            "MEMORY_LIMIT=10Gi",
+            "MEMORY_REQUEST=7Gi",
+            "CPU_REQUEST=2500m",
             "BUILD_NAME=${_buildName}",
             "RUN_ID=${unitRunId}",
             "BINARY_IMAGE_REF=${binaryImageRef}",
@@ -79,7 +84,7 @@ pipeline {
             "PULL_NUMBER=${params.PULL_NUMBER}",
             "PULL_PULL_SHA=${params.PULL_PULL_SHA}"
           )
-          
+
           waitForPods(this, ["run": "${unitRunId}"], 7200)
         }
       }

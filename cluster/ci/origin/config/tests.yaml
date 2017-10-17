@@ -1,8 +1,28 @@
 apiVersion: v1
 kind: Template
 labels:
-  template: integration-tests
+  template: tests
 parameters:
+- description: Nickname of the job running this test
+  displayName: Job Nickname
+  name: JOB_NICKNAME
+  required: true
+- description: Arguments to pass to `env` to run the test
+  displayName: Job Args
+  name: JOB_ARGS
+  required: true
+- description: Memory quota limit for the job pod
+  displayName: Job Memory Limit
+  name: MEMORY_LIMIT
+  required: true
+- description: Memory quota request for the job pod
+  displayName: Job Memory Request
+  name: MEMORY_REQUEST
+  required: true
+- description: CPU quota request for the job pod
+  displayName: Job CPU Request
+  name: CPU_REQUEST
+  required: true
 - description: Name of the build to associate with the source image and artifacts
   displayName: Build Name
   name: BUILD_NAME
@@ -46,10 +66,10 @@ objects:
 - apiVersion: v1
   kind: Pod
   metadata:
-    generateName: "int-${BUILD_NUMBER}-${BUILD_NAME}-"
+    generateName: "${JOB_NICKNAME}-${BUILD_NUMBER}-${BUILD_NAME}-"
     labels:
       build: "${BUILD_NAME}"
-      test: integration-tests
+      test: "${JOB_NAME}"
       run: "${RUN_ID}"
       created-by-prow: "true"
   spec:
@@ -93,16 +113,16 @@ objects:
       - --
       - /bin/bash
       - -c
-      - 'env -i OS_OUTPUT_SCRIPTPATH=/var/run/logging JUNIT_REPORT=true SKIP_TEARDOWN=1 HOME=/tmp HOSTNAME=$(hostname) TERM=xterm-256color make test-tools test-integration'
+      - 'env ${JOB_ARGS}'
       image: "${BINARY_IMAGE_REF}"
       imagePullPolicy: IfNotPresent
-      name: integration-tests
+      name: test
       resources:
         limits:
-          memory: "8Gi"
+          memory: "${MEMORY_LIMIT}"
         requests:
-          cpu: "2500m"
-          memory: "6.5Gi"
+          cpu: "${CPU_REQUEST}"
+          memory: "${MEMORY_REQUEST}"
       volumeMounts:
       - mountPath: /var/run/logging-config
         name: logging-config
@@ -114,7 +134,7 @@ objects:
       - --config-path=/var/run/logging-config/logging-config.json
       image: "${BINARY_IMAGE_REF}"
       imagePullPolicy: IfNotPresent
-      name: integration-tests-sidecar
+      name: logging
       volumeMounts:
       - mountPath: /var/run/logging-config
         name: logging-config
