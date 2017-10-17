@@ -373,3 +373,40 @@ objects:
           kind: ImageStreamTag
           name: prow:binaries
       type: ImageChange
+
+- kind: ImageStream
+  apiVersion: v1
+  metadata:
+    name: cherrypick
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    name: cherrypick
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: cherrypick:latest
+    source:
+      git:
+        uri: "${SOURCE_URL}"
+      images:
+      - from:
+          kind: ImageStreamTag
+          name: prow:binaries
+        paths:
+        - destinationDir: .
+          sourcePath: /go/bin/cherrypick
+    strategy:
+      dockerStrategy:
+        dockerfilePath: experiment/cherrypicker/Dockerfile
+        noCache: true
+        imageOptimizationPolicy: SkipLayers
+    triggers:
+    - imageChange:
+        from:
+          kind: ImageStreamTag
+          name: prow:binaries
+      type: ImageChange
