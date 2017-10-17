@@ -20,17 +20,41 @@ parameters:
   name: RELEASE_SRC_REF
   value: master
   required: true
+- description: The job's nickname
+  displayName: Nickname
+  name: JOB_NICKNAME
+  required: true
+- description: The job's arguments
+  displayName: Arguments
+  name: JOB_ARGS
+  required: true
+- description: The job's memory quota limit
+  displayName: Memory Limit
+  name: MEMORY_LIMIT
+  required: true
+- description: The job's memory quota request
+  displayName: Memory Request
+  name: MEMORY_REQUEST
+  required: true
+- description: The job's CPU quota request
+  displayName: CPU Request
+  name: CPU_REQUEST
+  required: true
+- description: The image tag tests run off of
+  displayName: Test Image Tag
+  name: IMAGE_TAG
+  required: true
 objects:
 - apiVersion: v1
   kind: ConfigMap
   metadata:
-    name: cmd-origin-job
+    name: "${JOB_NICKNAME}-origin-job"
     annotations:
       ci.openshift.io/jenkins-job: "true"
   data:
     job.yml: |-
       - job:
-          name: ${JOB_PREFIX}-cmd-origin
+          name: ${JOB_PREFIX}-${JOB_NICKNAME}-origin
           project-type: pipeline
           concurrent: true
           parameters:
@@ -70,8 +94,32 @@ objects:
                 name: PULL_PULL_SHA
                 default: ""
                 description: PR commit
+            - string:
+                name: JOB_NICKNAME
+                default: "${JOB_NICKNAME}"
+                description: Job nickname
+            - string:
+                name: JOB_ARGS
+                default: "${JOB_ARGS}"
+                description: Job test args
+            - string:
+                name: MEMORY_LIMIT
+                default: "${MEMORY_LIMIT}"
+                description: Memory Limit
+            - string:
+                name: MEMORY_REQUEST
+                default: "${MEMORY_REQUEST}"
+                description: Memory Request
+            - string:
+                name: CPU_REQUEST
+                default: "${CPU_REQUEST}"
+                description: CPU Request
+            - string:
+                name: IMAGE_TAG
+                default: "${IMAGE_TAG}"
+                description: Test image tag
           pipeline-scm:
-            script-path: cluster/ci/origin/pipelines/command/Jenkinsfile
+            script-path: cluster/ci/origin/pipelines/build-then-test/Jenkinsfile
             scm:
                - git:
                    url: ${RELEASE_SRC_URL}
