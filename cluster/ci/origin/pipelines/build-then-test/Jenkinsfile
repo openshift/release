@@ -20,6 +20,12 @@ pipeline {
     string(name: "PULL_REFS", defaultValue:"${env.PULL_REFS ?: 'master'}")
     string(name: "PULL_NUMBER", defaultValue:"${env.PULL_NUMBER ?: ''}")
     string(name: "PULL_PULL_SHA", defaultValue:"${env.PULL_PULL_SHA ?: ''}")
+    string(name: "JOB_NICKNAME", defaultValue:"${env.JOB_NICKNAME ?: ''}")
+    string(name: "JOB_ARGS", defaultValue:"${env.JOB_ARGS ?: ''}")
+    string(name: "MEMORY_LIMIT", defaultValue:"${env.MEMORY_LIMIT ?: ''}")
+    string(name: "MEMORY_REQUEST", defaultValue:"${env.MEMORY_REQUEST ?: ''}")
+    string(name: "CPU_REQUEST", defaultValue:"${env.CPU_REQUEST ?: ''}")
+    string(name: "IMAGE_TAG", defaultValue:"${env.IMAGE_TAG ?: ''}")
   }
 
   stages {
@@ -50,28 +56,28 @@ pipeline {
         }
       }
     }
-    stage("Wait for binaries") {
+    stage("Wait For Image") {
       steps {
-        waitForTag(this, this._buildName, "binaries", 7200)
+        waitForTag(this, this._buildName, "${params.IMAGE_TAG}", 7200)
       }
     }
-    stage("Command Test") {
+    stage("Run Test") {
       steps {
         ensureLoggingComponents(this)
         script {
-          def binaryImageRef = imageStreamTagRef(this, this._buildName, "binaries")
+          def binaryImageRef = imageStreamTagRef(this, this._buildName, "${params.IMAGE_TAG}")
           def pullSecretRef = dockerCfgSecret(this, "default")
-          def commandRunId = "${this._buildName}-cmd-${currentBuild.number}"
-          this._commandRunId = commandRunId
+          def runId = "${this._buildName}-${params.JOB_NICKNAME}-${currentBuild.number}"
+          this._runId = runId
 
           createTemplate(this, "${templateBase}/tests.yaml",
-            "JOB_NICKNAME=cmd",
-            "JOB_ARGS=HOME='/tmp HOSTNAME=\$(hostname) TERM=xterm-256color OS_OUTPUT_SCRIPTPATH=/var/run/logging JUNIT_REPORT=true SKIP_TEARDOWN=1 make test-cmd'",
-            "MEMORY_LIMIT=8Gi",
-            "MEMORY_REQUEST=6.5Gi",
-            "CPU_REQUEST=2500m",
+            "JOB_NICKNAME=${params.JOB_NICKNAME}",
+            "JOB_ARGS=${params.JOB_ARGS}",
+            "MEMORY_LIMIT=${params.MEMORY_LIMIT}",
+            "MEMORY_REQUEST=${params.MEMORY_REQUEST}",
+            "CPU_REQUEST=${params.CPU_REQUEST}",
             "BUILD_NAME=${_buildName}",
-            "RUN_ID=${commandRunId}",
+            "RUN_ID=${runId}",
             "BINARY_IMAGE_REF=${binaryImageRef}",
             "PULL_SECRET_NAME=${pullSecretRef}",
             "JOB_NAME=${env.JOB_NAME}",
@@ -85,7 +91,7 @@ pipeline {
             "PULL_PULL_SHA=${params.PULL_PULL_SHA}"
           )
 
-          waitForPods(this, ["run": "${commandRunId}"], 7200)
+          waitForPods(this, ["run": "${runId}"], 7200)
         }
       }
     }
