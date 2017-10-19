@@ -2,24 +2,21 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
-
-	"cloud.google.com/go/storage"
-	"github.com/spf13/cobra"
-
 	"sync"
 
-	"path/filepath"
-
-	"errors"
-
+	"cloud.google.com/go/storage"
 	"github.com/fsnotify/fsnotify"
-	"github.com/openshift/release/tools/release-ci/pkg/logging/gcs"
+	"github.com/spf13/cobra"
 	"google.golang.org/api/option"
+
+	"github.com/openshift/release/tools/release-ci/pkg/logging/gcs"
 )
 
 // sidecarCmd should run alongside a test pod and uploads files to GCS
@@ -41,9 +38,12 @@ this entrypoint to upload to GCS.`,
 	},
 }
 
+var testName string
+
 func init() {
 	RootCmd.AddCommand(sidecarCmd)
 	sidecarCmd.Flags().StringVar(&configurationFile, "config-path", "", "The location of the configuration file")
+	sidecarCmd.Flags().StringVar(&testName, "test-name", "", "The name of the test in the job. If present, artifacts are uploaded to a subdirectory of the job's path")
 }
 
 func exists(file string) bool {
@@ -72,8 +72,11 @@ func runSidecar(_ []string) error {
 		return err
 	}
 
-	if err := gcs.UploadStartingData(config.ConfigurationFile, gcsBucket); err != nil {
-		return err
+	// Only upload job start data if not capturing data for a specific test
+	if len(testName) == 0 {
+		if err = gcs.UploadStartingData(config.ConfigurationFile, gcsBucket); err != nil {
+			return err
+		}
 	}
 
 	returnCode, err := retrieveProcessReturnCode(config.MarkerFile)
@@ -84,7 +87,7 @@ func runSidecar(_ []string) error {
 	}
 	passed := returnCode == 0 && err == nil
 
-	return gcs.UploadFinishedData(config.ProcessLog, config.ConfigurationFile, config.ArtifactDir, passed, gcsBucket)
+	return gcs.UploadFinishedData(config.ProcessLog, config.ConfigurationFile, config.ArtifactDir, testName, passed, gcsBucket)
 }
 
 func createGcsClient(bucket, credentialsFile string) (*storage.BucketHandle, error) {

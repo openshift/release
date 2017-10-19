@@ -6,6 +6,7 @@
 set -e
 
 selector="${1}"
+container_name="${2:-}"
 
 
 function usage {
@@ -48,7 +49,11 @@ while [[ "${finished}" == "no" ]]; do
 		fi
 		totalCount=$(( totalCount + 1 ))
 		completed_pods+=("${podname}")
-		oc log "${podname}"
+		if [[ -n "${container_name}" ]]; then
+			oc log "${podname}" -c "${container_name}"
+		else
+			oc log "${podname}"
+		fi
 	done
 	if [[ "${finished}" == "yes" ]]; then 
 		break

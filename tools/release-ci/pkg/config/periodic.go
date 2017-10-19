@@ -16,10 +16,6 @@ type Job struct {
 	// BuildNumber is the identifier for this build
 	// of the job, provided as $BUILD_NUMBER by Prow.
 	BuildNumber int `json:"build-number"`
-
-	// TestName is the optional name of a test that was run
-	// as part of the job. Specified as $TEST_NAME.
-	TestName string `json:"test-name,omitempty"`
 }
 
 // Periodic contains configuration for a periodic job
@@ -30,9 +26,6 @@ type Periodic struct {
 // GcsPath is the base path for job data. Periodic jobs
 // store their information only in the job log directory
 func (p *Periodic) GcsPath() string {
-	if len(p.TestName) > 0 {
-		return fmt.Sprintf("%s/%s/%d/%s/", JobLogPrefix, p.JobName, p.BuildNumber, p.TestName)
-	}
 	return fmt.Sprintf("%s/%s/%d/", JobLogPrefix, p.JobName, p.BuildNumber)
 }
 
