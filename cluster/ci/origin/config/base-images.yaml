@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: Template
+labels:
+  template: base-images
+parameters:
+- description: Origin Release Image
+  displayName: Origin Release Image
+  name: ORIGIN_RELEASE_IMAGE
+  value: openshift/origin-release
+  required: true
+- description: Origin Release Image Tag
+  displayName: Origin Release Tag
+  name: ORIGIN_RELEASE_TAG
+  value: golang-1.8
+  required: true
+objects:
+- apiVersion: v1
+  kind: ImageStream
+  metadata:
+    name: origin-release
+  spec:
+    lookupPolicy:
+      local: false
+    tags:
+    - name: "${ORIGIN_RELEASE_TAG}"
+      from:
+        kind: DockerImage
+        name: "${ORIGIN_RELEASE_IMAGE}:${ORIGIN_RELEASE_TAG}"
+      referencePolicy:
+        type: Source
+    - name: latest
+      from:
+        kind: ImageStreamTag
+        name: "origin-release:${ORIGIN_RELEASE_TAG}"
+      referencePolicy:
+        type: Source
+- apiVersion: v1
+  kind: ImageStream
+  metadata:
+    name: build-base
+  spec:
+    lookupPolicy:
+      local: false
+- apiVersion: v1
+  kind: ImageStream
+  metadata:
+    name: test-base
+  spec:
+    lookupPolicy:
+      local: false
