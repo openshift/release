@@ -9,7 +9,7 @@ ENV GIT_COMMITTER_NAME=developer \
     HOME=/tmp \
     UMASK=0002
 
-COPY log-pods.sh run.sh /usr/bin/
+COPY run.sh /usr/bin/
 
 RUN chmod g+xw -R /go && \
     chmod g+xw -R $(go env GOROOT) && \
