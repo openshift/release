@@ -12,9 +12,6 @@ openshift_additional_repos: [
 
 # URLs and certs
 
-provision_prefix: ci-{{ lookup('env', 'INSTANCE_PREFIX') | mandatory }}-
-gce_network_name: "ci-{{ lookup('env', 'INSTANCE_PREFIX') | mandatory }}-ocp-network"
-
 openshift_master_cluster_public_hostname: api.{{ lookup('env', 'INSTANCE_PREFIX') | mandatory }}.origin-ci-int-gce.dev.rhcloud.com
 openshift_master_cluster_hostname: internal-api.{{ lookup('env', 'INSTANCE_PREFIX') | mandatory }}.origin-ci-int-gce.dev.rhcloud.com
 wildcard_zone: apps.{{ lookup('env', 'INSTANCE_PREFIX') | mandatory }}.origin-ci-int-gce.dev.rhcloud.com
@@ -35,7 +32,6 @@ openshift_node_open_ports: [{"service":"Router stats port","port":"1936/tcp"},{"
 # Authentication and authorization
 
 openshift_master_identity_providers: [{"name": "allow_all", "login": "true", "challenge": "true", "kind": "AllowAllPasswordIdentityProvider"}]
-# provision_role_mappings: [{"user": "admin", "role": "cluster-admin"}]
 
 # Post config setting sizes
 
@@ -43,54 +39,12 @@ openshift_hosted_router_replicas: 1
 openshift_hosted_registry_replicas: 1
 openshift_schedulable: True
 
-# GCE provisioning info
-
-# Project ID and zone settings for Google Cloud
-gce_project_id: openshift-gce-devel-ci
-gce_region_name: us-east1
-gce_zone_name: us-east1-c
-gce_service_account: jenkins-ci-provisioner@openshift-gce-devel.iam.gserviceaccount.com
-gce_service_account_keyfile: "{{ inventory_dir }}/gce.json"
-gce_ssh_private_key: /home/cloud-user/.ssh/google_compute_engine
-
-openshift_hosted_registry_storage_gcs_keyfile: "{{ inventory_dir }}/gce.json"
+openshift_hosted_registry_storage_gcs_keyfile: "{{ files_dir }}/gce.json"
 openshift_hosted_registry_storage_kind: object
 openshift_hosted_registry_storage_provider: gcs
 openshift_hosted_registry_storage_gcs_bucket: origin-ci-test-{{ lookup('env', 'INSTANCE_PREFIX') | mandatory }}
-
-# Control which node group router traffic is targeted at.
-provision_gce_router_network_instance_group: ig-m # default: ig-i
-provision_gce_node_groups:
-- name: master
-  suffix: m
-  tags: ocp-master
-  machine_type: n1-standard-2
-  boot_disk_size: 150
-  scale: 1
-- name: node
-  suffix: n
-  tags: ocp-node
-  machine_type: n1-standard-2
-  boot_disk_size: 150
-  scale: 3
-- name: node-flex
-  suffix: nf
-  tags: ocp-node
-  machine_type: n1-standard-2
-  boot_disk_size: 150
-  scale: 0
-
-# An image or image family to pull from
-provision_gce_registered_image: rhel-7
-
 provision_gce_docker_storage_driver: overlay2
 
-# Provide a startup script file to the GCE instances
-provision_gce_startup_script_file: # "startup.sh"
-# Provide userdata to the gce instances
-provision_gce_user_data_file:
-
-rhsub_skip: true
 provision_custom_repositories: [
   {
     "name": "oso-rhui-rhel-server-releases",
@@ -124,10 +78,6 @@ provision_custom_repositories: [
   }
 ]
 
-##############
-# New settings
-##############
-
 openshift_gcp_prefix: "ci-{{ lookup('env', 'INSTANCE_PREFIX') | mandatory }}-"
 
 openshift_gcp_project: openshift-gce-devel-ci
@@ -137,34 +87,57 @@ openshift_gcp_zone: us-east1-c
 openshift_gcp_network_name: "{{ openshift_gcp_prefix }}network"
 
 openshift_gcp_iam_service_account: jenkins-ci-provisioner@openshift-gce-devel.iam.gserviceaccount.com
-openshift_gcp_iam_service_account_keyfile: "{{ inventory_dir }}/gce.json"
+openshift_gcp_iam_service_account_keyfile: "{{ files_dir }}/gce.json"
 
 openshift_gcp_ssh_private_key: /home/cloud-user/.ssh/google_compute_engine
 
 openshift_gcp_infra_network_instance_group: ig-m
 
-openshift_gcp_image: 'rhel-7'
-openshift_gcp_base_image: 'centos-7'
+# Instructs the launch job to build an AMI prior to cluster provisioning and then use that image
+openshift_gcp_build_image: true
+openshift_gcp_image: '{{ openshift_gcp_prefix }}images'
+openshift_gcp_base_image: 'rhel-7'
+openshift_gcp_root_image: 'centos-7'
 
-openshift_gcp_registry_bucket_keyfile: "{{ inventory_dir }}/gce.json"
+openshift_gcp_registry_bucket_keyfile: "{{ files_dir }}/gce.json"
 openshift_gcp_registry_bucket_name: "origin-ci-test-{{ lookup('env', 'INSTANCE_PREFIX') | mandatory }}"
 
+openshift_gcp_startup_script_file: "{{ files_dir }}/bootstrap-script.sh"
 openshift_gcp_node_group_config:
   - name: master
     suffix: m
-    tags: ocp-master
+    tags: ocp-master,ocp-infra-node,ocp-node
     machine_type: n1-standard-2
     boot_disk_size: 150
     scale: 1
+    bootstrap: true
+    wait_for_stable: true
   - name: node
     suffix: n
     tags: ocp-node
     machine_type: n1-standard-2
     boot_disk_size: 150
     scale: 3
+    bootstrap: true
   - name: node-flex
     suffix: nf
     tags: ocp-node
     machine_type: n1-standard-2
     boot_disk_size: 150
     scale: 0
+    bootstrap: true
+
+openshift_master_node_configs:
+- type: master
+  edits:
+  - key: kubeletArguments.node-labels
+    value: ['role=infra']
+- type: node
+  edits:
+  - key: kubeletArguments.node-labels
+    value: ['role=app']
+
+osm_controller_args: {"experimental-cluster-signing-duration": ["20m"]}
+openshift_master_bootstrap_enabled: true
+openshift_master_bootstrap_auto_approve: true
+openshift_master_bootstrap_auto_approver_node_selector: {"role": "infra"}
