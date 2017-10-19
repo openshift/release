@@ -1,7 +1,7 @@
 #!/usr/bin/env groovy
 
-def library_url = "${env.RELEASE_LIBRARY_URL ?: 'github.com/openshift/release-library'}"
-def library_ref = "${env.RELEASE_LIBRARY_REF ?: 'master'}"
+def library_url = "${env.RELEASE_LIBRARY_URL ?: (params.RELEASE_LIBRARY_URL ?: 'github.com/openshift/release-library') }"
+def library_ref = "${env.RELEASE_LIBRARY_REF ?: (params.RELEASE_LIBRARY_REF ?: 'master') }"
 
 library "${library_url}@${library_ref}"
 
@@ -20,6 +20,8 @@ pipeline {
     string(name: "PULL_REFS", defaultValue:"${env.PULL_REFS ?: 'master'}")
     string(name: "PULL_NUMBER", defaultValue:"${env.PULL_NUMBER ?: ''}")
     string(name: "PULL_PULL_SHA", defaultValue:"${env.PULL_PULL_SHA ?: ''}")
+    string(name: "RELEASE_LIBRARY_URL", defaultValue: "${library_url}")
+    string(name: "RELEASE_LIBRARY_REF", defaultValue: "${library_ref}")
   }
   stages {
     stage ("Configure Variables") {
@@ -28,6 +30,25 @@ pipeline {
           this._buildName = buildName(this)
         }
         echo "Build name is ${this._buildName}"
+      }
+    }
+    stage ("Launch Build") {
+      steps {
+        script {
+          def jobName = "${env.PROJECT_NAME ?: 'origin-ci'}-build-origin"
+          def buildParams = [
+            [$class: "StringParameterValue", name: "ORIGIN_URL", value: params.ORIGIN_URL],
+            [$class: "StringParameterValue", name: "BUILD_ID", value: params.BUILD_ID],
+            [$class: "StringParameterValue", name: "REPO_OWNER", value: params.REPO_OWNER],
+            [$class: "StringParameterValue", name: "REPO_NAME", value: params.REPO_NAME],
+            [$class: "StringParameterValue", name: "PULL_BASE_REF", value: params.PULL_BASE_REF],
+            [$class: "StringParameterValue", name: "PULL_BASE_SHA", value: params.PULL_BASE_SHA],
+            [$class: "StringParameterValue", name: "PULL_REFS", value: params.PULL_REFS],
+            [$class: "StringParameterValue", name: "PULL_NUMBER", value: params.PULL_NUMBER],
+            [$class: "StringParameterValue", name: "PULL_PULL_SHA", value: params.PULL_PULL_SHA]
+          ]
+          build job: jobName, parameters: buildParams, wait: false
+        }
       }
     }
     stage("Wait for source") {
@@ -63,16 +84,26 @@ pipeline {
           this._verifyRunId = verifyRunId
           def sourceImageRef = imageStreamTagRef(this, this._buildName, "src")
           def pullSecretRef = dockerCfgSecret(this, "default")
+          def toolsImageRef = imageStreamTagRef(this, "release-ci", "binary")
 
           for (test in tests) {
+            echo "Launching verification pod for verify-${test}"
             createTemplate(this, "${templateBase}/verification-test.yaml", 
               "TEST_NAME=${test}",
               "BUILD_NAME=${_buildName}",
               "RUN_ID=${verifyRunId}",
-              "BUILD_NUMBER=${env.BUILD_NUMBER}",
-              "PULL_NUMBER=${params.PULL_NUMBER}",
               "SOURCE_IMAGE_REF=${sourceImageRef}",
-              "PULL_SECRET_NAME=${pullSecretRef}"
+              "PULL_SECRET_NAME=${pullSecretRef}",
+              "TOOLS_IMAGE_REF=${toolsImageRef}",
+              "JOB_NAME=${env.JOB_NAME}",
+              "BUILD_NUMBER=${env.BUILD_NUMBER}",
+              "REPO_OWNER=${params.REPO_OWNER}",
+              "REPO_NAME=${params.REPO_NAME}",
+              "PULL_BASE_REF=${params.PULL_BASE_REF}",
+              "PULL_BASE_SHA=${params.PULL_BASE_SHA}",
+              "PULL_REFS=${params.PULL_REFS}",
+              "PULL_NUMBER=${params.PULL_NUMBER}",
+              "PULL_PULL_SHA=${params.PULL_PULL_SHA}"
             )
           }
           createTemplate(this, "${templateBase}/verification-test-log.yaml",
@@ -80,6 +111,7 @@ pipeline {
               "RUN_ID=${verifyRunId}",
               "SOURCE_IMAGE_REF=${sourceImageRef}",
               "PULL_SECRET_NAME=${pullSecretRef}",
+              "TOOLS_IMAGE_REF=${toolsImageRef}",
               "JOB_NAME=${env.JOB_NAME}",
               "BUILD_NUMBER=${env.BUILD_NUMBER}",
               "REPO_OWNER=${params.REPO_OWNER}",
@@ -103,9 +135,15 @@ pipeline {
           def artifactDir = "${workingDir}/artifacts"
           def testPods = openshift.selector("pods", ["run":"${this._verifyRunId}"])
           def logPod = openshift.selector("pods", ["log":"${this._verifyRunId}"])
-          saveArtifacts(this, artifactDir, testPods)
-          saveArtifacts(this, artifactDir, logPod)
+          try {
+            saveArtifacts(this, artifactDir, testPods)
+            saveArtifacts(this, artifactDir, logPod)
+          } catch (e) {
+            echo "Error saving artifacts: ${e}"
+          }
+          echo "Uploading artifacts"
           uploadArtifacts(this, artifactDir)
+          echo "About to delete created pods"
           try {
             testPods.delete()
           } catch (e) {

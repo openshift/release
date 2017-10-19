@@ -64,6 +64,7 @@ func UploadFinishedData(processLog, metadataFile, artifactDir string, testName s
 }
 
 func gatherArtifacts(artifactDir, gcsPath string, uploadTargets map[string]uploadFunc) {
+	log.Printf("Gathering artifacts from artifact directory: %s", artifactDir)
 	filepath.Walk(artifactDir, func(path string, info os.FileInfo, err error) error {
 		if info == nil || info.IsDir() {
 			return nil
