@@ -1,9 +1,6 @@
 all: jenkins prow mungegithub projects
 .PHONY: all
 
-jenkins:
-.PHONY: jenkins
-
 prow: prow-crd prow-config prow-secrets prow-images prow-rbac prow-services prow-jobs
 .PHONY: prow
 
@@ -114,7 +111,14 @@ node-exporter:
 	oc apply -f projects/prometheus/node-exporter.yaml
 .PHONY: node-exporter
 
-jenkins-setup:
-	oc new-app --template jenkins-persistent -e INSTALL_PLUGINS=groovy:2.0,pipeline-github-lib:1.0 -p MEMORY_LIMIT=4Gi
+jenkins:
+	oc new-app --template jenkins-persistent -e INSTALL_PLUGINS=groovy:2.0,pipeline-github-lib:1.0 -p MEMORY_LIMIT=10Gi -p VOLUME_CAPACITY=20Gi -e OPENSHIFT_JENKINS_JVM_ARCH=x86_64 -e JAVA_GC_OPTS="-XX:+UseParallelGC -XX:MinHeapFreeRatio=20 -XX:MaxHeapFreeRatio=40 -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90"
+.PHONY: jenkins
+
+jenkins-setup: jenkins
 	oc new-app -f jenkins/setup/jenkins-setup-template.yaml
 .PHONY: jenkins-setup
+
+jenkins-setup-dev: jenkins
+	oc new-app -f jenkins/setup/jenkins-setup-template.yaml -p SKIP_PERMISSIONS_JOB=1 -p SOURCE_URL="${RELEASE_URL}" -p SOURCE_REF="${RELEASE_REF}"
+.PHONY: jenkins-setup-dev
