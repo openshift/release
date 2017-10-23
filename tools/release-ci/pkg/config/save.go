@@ -150,7 +150,7 @@ func retrievePullConfig() (PullRequest, bool, error) {
 	var missing []string
 	var pullNumber int
 	rawPullNumber, ok := os.LookupEnv("PULL_NUMBER")
-	if !ok {
+	if !ok || len(rawPullNumber) == 0 {
 		missing = append(missing, "PULL_NUMBER")
 	} else {
 		if number, err := strconv.Atoi(rawPullNumber); err != nil {
@@ -161,7 +161,7 @@ func retrievePullConfig() (PullRequest, bool, error) {
 	}
 
 	pullSha, ok := os.LookupEnv("PULL_PULL_SHA")
-	if !ok {
+	if !ok || len(pullSha) == 0 {
 		missing = append(missing, "PULL_PULL_SHA")
 	}
 
