@@ -30,6 +30,8 @@ parameters:
   value: "1"
 - name: PULL_NUMBER
   value: "-none"
+- name: JOB_ID
+  value: "none"
 objects:
 - apiVersion: v1
   kind: Build
@@ -38,6 +40,7 @@ objects:
       build: "${BUILD_NAME}"
       pr: "pr${PULL_NUMBER}"
       job: "clone-source-${BUILD_NUMBER}"
+      job-id: "${JOB_ID}"
     generateName: "clone-${BUILD_NUMBER}-${BUILD_NAME}-"
   spec:
     output:
@@ -51,12 +54,12 @@ objects:
     source:
       dockerfile: |
         FROM test-base:latest
-
+        ENV UMASK 0200
         ARG REPO_OWNER
         ARG REPO_NAME
         ARG PULL_REFS
 
-        RUN umask 0002 && release-ci cloneref --src-root=/data
+        RUN run.sh release-ci cloneref --src-root=/data
     strategy:
       dockerStrategy:
         pullSecret:

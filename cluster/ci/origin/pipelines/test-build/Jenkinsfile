@@ -1,0 +1,127 @@
+#!/usr/bin/env groovy
+
+def library_url = "${env.RELEASE_LIBRARY_URL ?: (params.RELEASE_LIBRARY_URL ?: 'github.com/openshift/release-library') }"
+def library_ref = "${env.RELEASE_LIBRARY_REF ?: (params.RELEASE_LIBRARY_REF ?: 'master') }"
+
+library "${library_url}@${library_ref}"
+
+def templateBase = "cluster/ci/origin/config"
+
+pipeline {
+  agent any
+
+  parameters {
+    booleanParam(defaultValue: (env.BUILD_IMAGES == "true" || env.BUILD_IMAGES == "yes"), name: "BUILD_IMAGES", description: "Set to 'true' if you wish to build images")
+    string(defaultValue: "${env.BUILD_ID}", name: "buildId", description: "The ID that prow sets on a Jenkins job in order to correlate it with a ProwJob")
+
+    // Only PULL_REFS is currently used, but other parameters are here for completeness
+    // and future logging
+    string(name: "REPO_OWNER", defaultValue:"${env.REPO_OWNER ?: 'openshift'}")
+    string(name: "REPO_NAME", defaultValue:"${env.REPO_NAME ?: 'origin'}")
+    string(name: "PULL_BASE_REF", defaultValue:"${env.PULL_BASE_REF ?: ''}")
+    string(name: "PULL_BASE_SHA", defaultValue:"${env.PULL_BASE_SHA ?: ''}")
+    string(name: "PULL_REFS", defaultValue:"${env.PULL_REFS ?: 'master'}")
+    string(name: "PULL_NUMBER", defaultValue:"${env.PULL_NUMBER ?: ''}")
+    string(name: "PULL_PULL_SHA", defaultValue:"${env.PULL_PULL_SHA ?: ''}")
+    string(name: "RELEASE_SRC_URL", defaultValue: "${env.RELEASE_SRC_URL ?: 'https://github.com/openshift/release.git'}")
+    string(name: "RELEASE_SRC_REF", defaultValue: "${env.RELEASE_SRC_REF ?: 'master'}")
+    string(name: "RELEASE_LIBRARY_URL", defaultValue: "${library_url}")
+    string(name: "RELEASE_LIBRARY_REF", defaultValue: "${library_ref}")
+  }
+
+  stages {
+    stage ("Configure Variables") {
+      steps {
+        script {
+          this._buildName = buildName(this)
+          this._pushSecret = dockerCfgSecret(this, "builder")
+          this._jobId = "test-build-${this._buildName}-${env.BUILD_NUMBER}"
+        }
+        echo "Build name is ${this._buildName}"
+      }
+    }
+    stage ("Create ImageStream") {
+      when {
+        not { expression { return imageStreamExists(this, "${this._buildName}") } }
+      }
+      steps {
+        echo "Creating image stream ${this._buildName}"
+        applyTemplate(this, "${templateBase}/output-imagestream.yaml", 
+          "BUILD_NAME=${this._buildName}")
+      }
+    }
+    stage("Clone") {
+      when {
+        not { expression { return imageStreamTagExists(this, "${this._buildName}", "src") } }
+      }
+      steps {
+        script {
+          jitter(this, 0,30)
+          def activeBuilds = filterObjects(this, "builds", ["build":"${this._buildName}"], { obj -> 
+            if (obj.metadata.labels != null && obj.metadata.labels["template"] == "clone-source") {
+              if (obj.status.phase == "New" || obj.status.phase == "Pending" || obj.status.phase == "Running") {
+                return true
+              }
+            }
+            return false
+          })
+          if (activeBuilds.size() == 0) {
+            runAndWaitForBuild(this, "", {
+              return createTemplate(this, "${templateBase}/clone-source.yaml",
+                "RELEASE_SRC_REF=${params.RELEASE_SRC_REF}",
+                "RELEASE_SRC_URL=${params.RELEASE_SRC_URL}", 
+                "PUSH_SECRET_NAME=${this._pushSecret}",
+                "BUILD_NAME=${this._buildName}",
+                "PULL_REFS=${params.PULL_REFS}",
+                "PULL_NUMBER=${params.PULL_NUMBER}",
+                "BUILD_NUMBER=${env.BUILD_NUMBER}",
+                "REPO_OWNER=${params.REPO_OWNER}",
+                "REPO_NAME=${params.REPO_NAME}",
+                "JOB_ID=${this._jobId}")
+            })
+          } else {
+            echo "Skipping source build for ${this._buildName}. Another build is already running: ${activeBuilds[0].metadata.name}"
+          }
+        }
+      }
+    }
+    stage("Compile") {
+      when {
+        not { expression { return imageStreamTagExists(this, "${this._buildName}", "test-binaries") } }
+      }
+      steps {
+        script {
+          jitter(this, 0,30)
+          def activeBuilds = filterObjects(this, "builds", ["build":"${this._buildName}"], { obj -> 
+            if (obj.metadata.labels != null && obj.metadata.labels["template"] == "test-compile") {
+              if (obj.status.phase == "New" || obj.status.phase == "Pending" || obj.status.phase == "Running") {
+                return true
+              }
+            }
+            return false
+          })
+          if (activeBuilds.size() == 0) {
+            runAndWaitForBuild(this, "", {
+              return createTemplate(this, "${templateBase}/test-compile.yaml",
+                "RELEASE_SRC_REF=${params.RELEASE_SRC_REF}",
+                "RELEASE_SRC_URL=${params.RELEASE_SRC_URL}", 
+                "PUSH_SECRET_NAME=${this._pushSecret}",
+                "PULL_NUMBER=${params.PULL_NUMBER}",
+                "BUILD_NUMBER=${env.BUILD_NUMBER}",
+                "BUILD_NAME=${this._buildName}",
+                "JOB_ID=${this._jobId}")
+            })
+          } else {
+            echo "Skipping compile build for ${this._buildName}. Another build is already running: ${activeBuilds[0].metadata.name}"
+          }
+        }
+      }
+    }
+  }
+  post {
+    always {
+      cleanupArtifacts(this, ["job-id": "${this._jobId}"])
+      deleteWorkspace(this)
+    }
+  }
+}
