@@ -16,9 +16,22 @@ pipeline {
   }
 
   stages {
-    stage("Create Objects") {
+    stage("Create release-ci image stream") {
+      when {
+        not { expression { return imageStreamExists(this, "release-ci") } }
+      }
       steps {
-        applyTemplate(this, "${contextDir}/build-release-ci.yaml", 
+        sh "oc create imagestream release-ci"
+      }
+    }
+    stage("Import origin-release image stream") {
+      steps {
+        sh "oc import-image origin-release:golang-1.8 --from openshift/origin-release:golang-1.8 --confirm"
+      }
+    }
+    stage("Create release-ci-binary build") {
+      steps {
+        applyTemplate(this, "${contextDir}/build-release-ci.yaml",
           "RELEASE_URL=${params.RELEASE_URL}",
           "RELEASE_REF=${params.RELEASE_REF}")
       }
