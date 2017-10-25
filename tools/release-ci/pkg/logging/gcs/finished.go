@@ -27,6 +27,17 @@ type Finished struct {
 	Result string `json:"result"`
 }
 
+func UploadArtifacts(metadataFile, artifactDir string, gcsBucket *storage.BucketHandle) error {
+	metadata, err := config.LoadGcs(metadataFile)
+	if err != nil {
+		return err
+	}
+	gcsPath := metadata.GcsPath()
+	uploadTargets := map[string]uploadFunc{}
+	gatherArtifacts(artifactDir, gcsPath, uploadTargets)
+	return uploadToGCS(gcsBucket, uploadTargets)
+}
+
 func UploadFinishedData(processLog, metadataFile, artifactDir string, passed bool, gcsBucket *storage.BucketHandle) error {
 	metadata, err := config.LoadGcs(metadataFile)
 	if err != nil {
@@ -44,6 +55,11 @@ func UploadFinishedData(processLog, metadataFile, artifactDir string, passed boo
 		// TODO(skuznets): we want to stream this log during the run
 		ospath.Join(gcsPath, "build-log.txt"): fileUpload(processLog),
 	}
+	gatherArtifacts(artifactDir, gcsPath, uploadTargets)
+	return uploadToGCS(gcsBucket, uploadTargets)
+}
+
+func gatherArtifacts(artifactDir, gcsPath string, uploadTargets map[string]uploadFunc) {
 	filepath.Walk(artifactDir, func(path string, info os.FileInfo, err error) error {
 		if info == nil || info.IsDir() {
 			return nil
@@ -61,8 +77,6 @@ func UploadFinishedData(processLog, metadataFile, artifactDir string, passed boo
 		}
 		return nil
 	})
-
-	return uploadToGCS(gcsBucket, uploadTargets)
 }
 
 // generateFinishedMetadata generates finishing metadata
