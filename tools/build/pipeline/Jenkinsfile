@@ -8,63 +8,46 @@ library "${library_url}@${library_ref}"
 def contextDir="tools/build/config"
 
 pipeline {
-    agent any
+  agent any
 
-    parameters {
-        string(defaultValue: "${env.RELEASE_URL ?: 'https://github.com/openshift/release.git' }", name: "RELEASE_URL", description: "URL of the release repository to build")
-        string(defaultValue: "${env.RELEASE_REF ?: 'master' }", name: "RELEASE_REF", description: "Git reference of release repository")
-    }
+  parameters {
+    string(defaultValue: "${env.RELEASE_URL ?: 'https://github.com/openshift/release.git' }", name: "RELEASE_URL", description: "URL of the release repository to build")
+    string(defaultValue: "${env.RELEASE_REF ?: 'master' }", name: "RELEASE_REF", description: "Git reference of release repository")
+  }
 
-    stages {
-        stage("Create Objects") {
-            when {
-                not { expression { return imageStreamExists(this, "release-ci") } }
-            }
-            steps {
-                applyTemplate(this, "${contextDir}/build-release-ci.yaml", 
-                    "RELEASE_URL=${params.RELEASE_URL}",
-                    "RELEASE_REF=${params.RELEASE_REF}")
-            }
-        }
-        stage("Build Binary") {
-            steps {
-                waitForTag(this, "origin-release", "golang-1.8")
-                runBuild(this, "release-ci-binary")
-            }
-        }
-        stage("Build Slave") {
-            steps {
-                waitForTag(this, "slave-base", "latest")
-                script {
-                    try { 
-                        runBuild(this, "release-ci-slave")
-                    } catch(e) {
-                        echo "Retrying slave image build"
-                        runBuild(this, "release-ci-slave")
-                    }
-                }
-            }
-        }
-        stage ("Build Jenkins") {
-            steps {
-                script {
-                    try {
-                        runBuild(this, "ci-jenkins")
-                    } catch(e) {
-                        echo "Retrying ci-jenkins image build"
-                        runBuild(this, "ci-jenkins")
-                    }
-                }
-            }
-        }
-        stage("Annotate Slave Tag") {
-            when {
-                not { expression { return imageStreamTagExists(this, "release-ci", "jenkins-slave") } }
-            }
-            steps {
-                createTag(this, "release-ci:slave", "release-ci:jenkins-slave")
-                annotateTag(this, "release-ci", "jenkins-slave", "role", "jenkins-slave")
-            }
-        }
+  stages {
+    stage("Create Objects") {
+      steps {
+        applyTemplate(this, "${contextDir}/build-release-ci.yaml", 
+          "RELEASE_URL=${params.RELEASE_URL}",
+          "RELEASE_REF=${params.RELEASE_REF}")
+      }
     }
+    stage("Build Binary") {
+      steps {
+        waitForTag(this, "origin-release", "golang-1.8")
+        runBuild(this, "release-ci-binary")
+      }
+    }
+    stage("Provision binary to Jenkins") {
+      steps {
+        waitForTag(this, "release-ci", "binary")
+        script {
+          openshift.withCluster() {
+            def releaseCI = openshift.selector("is/release-ci")
+            def imageName = releaseCI.object().status.dockerImageRepository
+            deploymentName = "${env.JOB_NAME}-${env.BUILD_NUMBER}"
+            sh "oc run --quiet ${deploymentName} --image ${imageName}:binary --command -- /bin/bash -c 'while(true); do date; sleep 60; done'"
+            def extractDC = openshift.selector("dc/${deploymentName}")
+            extractDC.rollout().status("-w")
+            def podName = extractDC.related("pods").name()
+            def podObjectName = podName.tokenize("/")[1]
+            sh "oc rsync ${podObjectName}:/usr/bin/release-ci ."
+            sh "mkdir -p /var/lib/jenkins/tools"
+            sh "cp ./release-ci /var/lib/jenkins/tools"
+          }
+        }
+      }
+    }
+  }
 }
