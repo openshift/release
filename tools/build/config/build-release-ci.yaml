@@ -35,18 +35,6 @@ objects:
       referencePolicy:
         type: Source
 - apiVersion: v1
-  kind: ImageStream
-  metadata:
-    name: slave-base
-  spec:
-    tags:
-    - from:
-        kind: DockerImage
-        name: openshift/jenkins-slave-base-centos7:latest
-      name: latest
-      referencePolicy:
-        type: Source
-- apiVersion: v1
   kind: BuildConfig
   metadata:
     labels:
@@ -74,67 +62,4 @@ objects:
         from:
           kind: ImageStreamTag
           name: origin-release:golang-1.8
-      type: Docker
-- apiVersion: v1
-  kind: BuildConfig
-  metadata:
-    labels:
-      build: release-ci-slave
-    name: release-ci-slave
-  spec:
-    output:
-      to:
-        kind: ImageStreamTag
-        name: release-ci:slave
-    source:
-      git:
-        ref: ${RELEASE_REF}
-        uri: ${RELEASE_URL}
-      images:
-      - from:
-          name: release-ci:binary
-          kind: ImageStreamTag
-        paths:
-        - sourcePath: /usr/bin/release-ci
-          destinationDir: tools/build/release-ci-slave-image/bin
-      contextDir: tools/build/release-ci-slave-image
-      type: Git
-    strategy:
-      dockerStrategy:
-        noCache: true
-        from:
-          kind: ImageStreamTag
-          name: slave-base:latest
-      type: Docker
-- apiVersion: v1
-  kind: BuildConfig
-  metadata:
-    labels:
-      build: ci-jenkins
-    name: ci-jenkins
-  spec:
-    output:
-      to:
-        kind: ImageStreamTag
-        name: release-ci:jenkins-staging
-    source:
-      git:
-        ref: ${RELEASE_REF}
-        uri: ${RELEASE_URL}
-      images:
-      - from:
-          name: release-ci:binary
-          kind: ImageStreamTag
-        paths:
-        - sourcePath: /usr/bin/release-ci
-          destinationDir: tools/build/ci-jenkins-image/bin
-      contextDir: tools/build/ci-jenkins-image
-      type: Git
-    strategy:
-      dockerStrategy:
-        noCache: true
-        from:
-          kind: ImageStreamTag
-          name: jenkins:latest
-          namespace: openshift
       type: Docker
