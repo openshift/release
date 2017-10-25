@@ -6,6 +6,7 @@ def library_ref = "${env.RELEASE_LIBRARY_REF ?: 'master'}"
 library "${library_url}@${library_ref}"
 
 def templateBase = "cluster/ci/origin/config"
+def launchedBuilds = [:]
 
 pipeline {
   agent any
@@ -63,7 +64,7 @@ pipeline {
           })
           if (activeBuilds.size() == 0) {
             runAndWaitForBuild(this, "", {
-              createTemplate(this, "${templateBase}/clone-source.yaml",
+              launchedBuilds["clone-source"] = createTemplate(this, "${templateBase}/clone-source.yaml",
                 "RELEASE_SRC_REF=${env.RELEASE_SRC_REF ?: 'master'}",
                 "RELEASE_SRC_URL=${env.RELEASE_SRC_URL ?: 'https://github.com/openshift/release.git'}", 
                 "PUSH_SECRET_NAME=${this._pushSecret}",
@@ -72,6 +73,7 @@ pipeline {
                 "PULL_NUMBER=${params.PULL_NUMBER}",
                 "BUILD_NUMBER=${env.BUILD_NUMBER}",
                 "SOURCE_URL=${params.ORIGIN_URL}")
+              return launchedBuilds["clone-source"]
             })
           } else {
             echo "Skipping source build for ${this._buildName}. Another build is already running: ${activeBuilds[0].metadata.name}"
@@ -96,16 +98,48 @@ pipeline {
           })
           if (activeBuilds.size() == 0) {
             runAndWaitForBuild(this, "", {
-              createTemplate(this, "${templateBase}/compile.yaml",
+              launchedBuilds["compile"] = createTemplate(this, "${templateBase}/compile.yaml",
                 "RELEASE_SRC_REF=${env.RELEASE_SRC_REF ?: 'master'}",
                 "RELEASE_SRC_URL=${env.RELEASE_SRC_URL ?: 'https://github.com/openshift/release.git'}", 
                 "PUSH_SECRET_NAME=${this._pushSecret}",
                 "PULL_NUMBER=${params.PULL_NUMBER}",
                 "BUILD_NUMBER=${env.BUILD_NUMBER}",
                 "BUILD_NAME=${this._buildName}")
+              return launchedBuilds["compile"]
             })
           } else {
             echo "Skipping compile build for ${this._buildName}. Another build is already running: ${activeBuilds[0].metadata.name}"
+          }
+        }
+      }
+    }
+  }
+  post {
+    always {
+      script {
+        openshift.withCluster() {
+          def cloneSourceBuild = launchedBuilds["clone-source"]
+          def compileBuild = launchedBuilds["compile"]
+          def workingDir = pwd()
+          def artifactDir = "${workingDir}/artifacts"
+          if (cloneSourceBuild != null) {
+            saveArtifacts(this, artifactDir, cloneSourceBuild)
+            try {
+              cloneSourceBuild.delete()
+            } catch (e) {
+              echo "Error cleaning up clone build: ${e}"
+            }
+          }
+          if (compileBuild != null) {
+            saveArtifacts(this, artifactDir, compileBuild)
+            try {
+              compileBuild.delete()
+            } catch (e) {
+              echo "Error cleaning up compile build: ${e}"
+            }
+          }
+          if (cloneSourceBuild != null || compileBuild != null) {
+            uploadArtifacts(this, artifactDir)
           }
         }
       }
