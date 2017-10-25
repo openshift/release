@@ -1,17 +1,16 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
 
-	"errors"
-
 	"github.com/openshift/release/tools/release-ci/pkg/logging/gcs"
 )
 
-// sidecarCmd should run alongside a test pod and uploads files to GCS
+// uploadCmd uploads a set of artifacts to GCS
 var uploadCmd = &cobra.Command{
 	Use:   "upload",
 	Short: "Uploads artifacts to GCS",
