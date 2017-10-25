@@ -65,7 +65,8 @@ pipeline {
       steps {
         ensureLoggingComponents(this)
         script {
-          def binaryImageRef = imageStreamTagRef(this, this._buildName, "${params.IMAGE_TAG}")
+          def toolsImageRef = imageStreamTagRef(this, "release-ci", "binary")
+          def baseImageRef = imageStreamTagRef(this, this._buildName, "${params.IMAGE_TAG}")
           def pullSecretRef = dockerCfgSecret(this, "default")
           def runId = "${this._buildName}-${params.JOB_NICKNAME}-${currentBuild.number}"
           this._runId = runId
@@ -78,7 +79,8 @@ pipeline {
             "CPU_REQUEST=${params.CPU_REQUEST}",
             "BUILD_NAME=${_buildName}",
             "RUN_ID=${runId}",
-            "BINARY_IMAGE_REF=${binaryImageRef}",
+            "BASE_IMAGE_REF=${baseImageRef}",
+            "TOOLS_IMAGE_REF=${toolsImageRef}",
             "PULL_SECRET_NAME=${pullSecretRef}",
             "JOB_NAME=${env.JOB_NAME}",
             "BUILD_NUMBER=${env.BUILD_NUMBER}",

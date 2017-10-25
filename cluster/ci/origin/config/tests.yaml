@@ -27,9 +27,13 @@ parameters:
   displayName: Build Name
   name: BUILD_NAME
   required: true
-- description: The reference to the image that contains the compiled binaries to test
-  displayName: Binaries Image Reference
-  name: BINARY_IMAGE_REF
+- description: The reference to the image that we base our test off of
+  displayName: Base Image Reference
+  name: BASE_IMAGE_REF
+  required: true
+- description: The reference to the image that contains the compiled tool binaries
+  displayName: Tools Image Reference
+  name: TOOLS_IMAGE_REF
   required: true
 - description: The image pull secret of the default service account
   displayName: Image Pull Secret
@@ -74,6 +78,16 @@ objects:
       created-by-prow: "true"
   spec:
     initContainers:
+    - name: place-tooling
+      command:
+      - cp
+      - /usr/bin/release-ci
+      - /var/run/tools/release-ci
+      image: "${TOOLS_IMAGE_REF}"
+      imagePullPolicy: IfNotPresent
+      volumeMounts:
+      - mountPath: /var/run/tools
+        name: tools
     - name: save-config
       env:
       - name: JOB_NAME
@@ -95,26 +109,29 @@ objects:
       - name: PULL_PULL_SHA
         value: ${PULL_PULL_SHA}
       command:
-      - release-ci
+      - /var/run/tools/release-ci
       - save-config
       - --config-path=/var/run/logging-config/logging-config.json
-      image: "${BINARY_IMAGE_REF}"
+      image: "${BASE_IMAGE_REF}"
       imagePullPolicy: IfNotPresent
       volumeMounts:
       - mountPath: /var/run/logging-config
         name: logging-config
       - mountPath: /var/run/logging
         name: logging
+      - mountPath: /var/run/tools
+        name: tools
     containers:
     - command:
-      - release-ci
+      - /var/run/tools/release-ci
       - entrypoint
       - --config-path=/var/run/logging-config/logging-config.json
       - --
+    - args:
       - /bin/bash
       - -c
       - 'function o() { e="$?"; echo -n "memory.max_usage_in_bytes="; cat /sys/fs/cgroup/memory/memory.max_usage_in_bytes; exit "$e"; }; trap o EXIT; env ${JOB_ARGS}'
-      image: "${BINARY_IMAGE_REF}"
+      image: "${BASE_IMAGE_REF}"
       imagePullPolicy: IfNotPresent
       name: test
       resources:
@@ -128,11 +145,13 @@ objects:
         name: logging-config
       - mountPath: /var/run/logging
         name: logging
+      - mountPath: /var/run/tools
+        name: tools
     - command:
-      - release-ci
+      - /var/run/tools/release-ci
       - sidecar
       - --config-path=/var/run/logging-config/logging-config.json
-      image: "${BINARY_IMAGE_REF}"
+      image: "${BASE_IMAGE_REF}"
       imagePullPolicy: IfNotPresent
       name: logging
       volumeMounts:
@@ -142,6 +161,8 @@ objects:
         name: logging
       - mountPath: /var/run/secrets/gce
         name: gce
+      - mountPath: /var/run/tools
+        name: tools
     dnsPolicy: ClusterFirst
     imagePullSecrets:
     - name: "${PULL_SECRET_NAME}"
@@ -151,6 +172,9 @@ objects:
     - emptyDir:
         sizeLimit: "0"
       name: logging
+    - emptyDir:
+        sizeLimit: "0"
+      name: tools
     - configMap:
         defaultMode: 420
         name: logging-config
