@@ -1,7 +1,7 @@
 all: jenkins prow mungegithub projects
 .PHONY: all
 
-prow: prow-crd prow-config prow-secrets prow-images prow-rbac prow-services prow-jobs
+prow: prow-crd prow-config prow-secrets prow-images prow-rbac prow-plugins prow-services prow-jobs
 .PHONY: prow
 
 prow-crd:
@@ -39,6 +39,11 @@ prow-rbac:
 	oc process -f cluster/ci/config/prow/openshift/plank_rbac.yaml | oc apply -f -
 	oc process -f cluster/ci/config/prow/openshift/sinker_rbac.yaml | oc apply -f -
 	oc process -f cluster/ci/config/prow/openshift/splice_rbac.yaml | oc apply -f -
+
+prow-plugins:
+	# Uses the same credentials used by hook.
+	oc process -f cluster/ci/config/prow/openshift/cherrypick.yaml | oc apply -f -
+.PHONY: prow-plugins
 
 prow-services:
 	oc process -f cluster/ci/config/prow/openshift/deck.yaml | oc apply -f -

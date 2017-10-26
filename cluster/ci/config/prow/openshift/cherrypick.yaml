@@ -1,0 +1,79 @@
+# Needs the hmac-token secret for decrypting webhook payloads.
+# Needs the oauth-token secret for creating PRs.
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: cherrypicker-prow
+  annotations:
+    "openshift.io/display-name": cherrypicker-prow
+  description: |
+    cherrypicker manifests for prow
+parameters:
+- description: The name of the component.
+  name: NAME
+  value: cherrypick
+objects:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: "${NAME}"
+  spec:
+    selector:
+      app: prow
+      component: "${NAME}"
+    ports:
+    - port: 80
+      targetPort:: 8888
+    type: ClusterIP
+- apiVersion: apps.openshift.io/v1
+  kind: DeploymentConfig
+  metadata:
+    name: "${NAME}"
+    labels:
+      app: prow
+      component: "${NAME}"
+  spec:
+    replicas: 1
+    revisionHistoryLimit: 2
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: "${NAME}"
+      spec:
+        containers:
+        - name: "${NAME}"
+          image: "${NAME}"
+          args:
+          - --dry-run=false
+          ports:
+            - name: http
+              containerPort: 8888
+          volumeMounts:
+          - name: hmac
+            mountPath: /etc/webhook
+            readOnly: true
+          - name: oauth
+            mountPath: /etc/github
+            readOnly: true
+          - name: tmp
+            mountPath: /tmp
+        volumes:
+        - name: hmac
+          secret:
+            secretName: hmac-token
+        - name: oauth
+          secret:
+            secretName: oauth-token
+        - name: tmp
+          emptyDir: {}
+    triggers:
+    - type: ConfigChange
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - "${NAME}"
+        from:
+          kind: ImageStreamTag
+          name: "${NAME}:latest"
+      type: ImageChange
