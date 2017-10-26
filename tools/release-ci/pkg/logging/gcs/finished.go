@@ -38,7 +38,7 @@ func UploadArtifacts(metadataFile, artifactDir string, gcsBucket *storage.Bucket
 	return uploadToGCS(gcsBucket, uploadTargets)
 }
 
-func UploadFinishedData(processLog, metadataFile, artifactDir string, passed bool, gcsBucket *storage.BucketHandle) error {
+func UploadFinishedData(processLog, metadataFile, artifactDir string, testName string, passed bool, gcsBucket *storage.BucketHandle) error {
 	metadata, err := config.LoadGcs(metadataFile)
 	if err != nil {
 		return err
@@ -50,6 +50,10 @@ func UploadFinishedData(processLog, metadataFile, artifactDir string, passed boo
 	}
 
 	gcsPath := metadata.GcsPath()
+	if len(testName) > 0 {
+		gcsPath = ospath.Join(gcsPath, testName)
+	}
+
 	uploadTargets := map[string]uploadFunc{
 		ospath.Join(gcsPath, "finished.json"): dataUpload(finishedData),
 		// TODO(skuznets): we want to stream this log during the run
