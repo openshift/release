@@ -1,0 +1,52 @@
+#!/usr/bin/env groovy
+
+def library_url = "${env.RELEASE_LIBRARY_URL ?: "github.com/openshift/release-library"}"
+def library_ref = "${env.RELEASE_LIBRARY_REF ?: "master"}"
+
+library "${library_url}@${library_ref}"
+
+def templateBase = "cluster/ci/origin/config"
+
+pipeline {
+  agent any
+
+  parameters {
+    string(name: "ORIGIN_URL", defaultValue: "${env.ORIGIN_URL ?: 'https://github.com/openshift/origin.git' }", description: "The URL of the Origin repository to use")
+    string(name: "RELEASE_IMAGE", defaultValue: "${env.RELEASE_IMAGE ?: 'openshift/origin-release' }", description: "Release image to use as base")
+    string(name: "RELEASE_TAG", defaultValue: "${env.RELEASE_TAG ?: 'golang-1.8' }", description: "Release image tag")
+    string(name: "RELEASE_SRC_URL", defaultValue: "${env.RELEASE_SRC_URL ?: 'https://github.com/openshift/release.git' }", description: "The URL of the release repository")
+    string(name: "RELEASE_SRC_REF", defaultValue: "${env.RELEASE_SRC_REF ?: 'master' }", description: "The branch of the release repository to use")
+  }
+
+  stages {
+    stage("Define Images") {
+      steps {
+        applyTemplate(this, "${templateBase}/base-images.yaml",
+          "ORIGIN_RELEASE_IMAGE=${params.RELEASE_IMAGE}",
+          "ORIGIN_RELEASE_TAG=${params.RELEASE_TAG}")
+        waitForTag(this, "origin-release", "${params.RELEASE_TAG}")
+      }
+    }
+    stage("Run Builds") {
+      steps {
+        script {
+          def imageSecret=dockerCfgSecret(this, "builder")
+          def buildBaseBuild = createTemplate(this, "${templateBase}/build-base-build.yaml",
+            "RELEASE_SRC_URL=${params.RELEASE_SRC_URL}",
+            "RELEASE_SRC_REF=${params.RELEASE_SRC_REF}",
+            "ORIGIN_SRC_URL=${params.ORIGIN_URL}",
+            "IMAGE_SECRET=${imageSecret}")
+          def testBaseBuild = createTemplate(this, "${templateBase}/test-base-build.yaml",
+            "RELEASE_SRC_URL=${params.RELEASE_SRC_URL}",
+            "RELEASE_SRC_REF=${params.RELEASE_SRC_REF}",
+            "ORIGIN_SRC_URL=${params.ORIGIN_URL}",
+            "IMAGE_SECRET=${imageSecret}")
+          // For now wait for builds serially. Parallel blocks 
+          // are buggy in Jenkinsfiles
+          waitForBuild(this, testBaseBuild.name(), 7200)
+          waitForBuild(this, buildBaseBuild.name(), 7200)
+        }
+      }
+    }
+  }
+}

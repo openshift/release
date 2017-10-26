@@ -1,0 +1,65 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: build-base-images
+labels:
+  template: build-base-images
+parameters:
+- description: Prefix for job names, typically the namespace
+  displayName: Job Prefix
+  name: JOB_PREFIX
+  value: origin-ci
+  required: true
+- description: The URL of the origin release source repository
+  displayName: Source URL
+  name: RELEASE_SRC_URL
+  value: https://github.com/openshift/release.git
+  required: true
+- description: The Reference of the origin release source repository
+  displayName: Source Ref
+  name: RELEASE_SRC_REF
+  value: master
+  required: true
+objects:
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: build-base-images
+    annotations:
+      ci.openshift.io/jenkins-job: "true"
+  data:
+    job.yml: |-
+      - job:
+          name: ${JOB_PREFIX}-build-base-images
+          project-type: pipeline
+          concurrent: false
+          triggers:
+            - timed: 'H H * * *'
+          parameters:
+            - string:
+                name: ORIGIN_URL
+                default: https://github.com/openshift/origin
+                description: The URL of the Origin repository to use
+            - string:
+                name: RELEASE_IMAGE
+                default: openshift/origin-release
+                description: Release image to use as base
+            - string:
+                name: RELEASE_TAG
+                default: golang-1.8
+                description: Release image tag
+            - string:
+                name: RELEASE_SRC_URL
+                default: ${RELEASE_SRC_URL}
+                description: The URL of the release repository to use
+            - string:
+                name: RELEASE_SRC_REF
+                default: ${RELEASE_SRC_REF}
+                description: The branch of the release repository to use
+          pipeline-scm:
+            script-path: cluster/ci/origin/pipelines/base-images/Jenkinsfile
+            scm:
+               - git:
+                   url: ${RELEASE_SRC_URL}
+                   branches:
+                     - ${RELEASE_SRC_REF}
