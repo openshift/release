@@ -98,4 +98,22 @@ pipeline {
       }
     }
   }
+  post {
+    always {
+      script {
+        openshift.withCluster() {
+          def workingDir = pwd()
+          def artifactDir = "${workingDir}/artifacts"
+          def testPods = openshift.selector("pods", ["run":"${this._runId}"])
+          saveArtifacts(this, artifactDir, testPods)
+          uploadArtifacts(this, artifactDir)
+          try {
+            testPods.delete()
+          } catch (e) {
+            echo "Error cleaning up test pods: ${e}"
+          }
+        }
+      }
+    }
+  }
 }
