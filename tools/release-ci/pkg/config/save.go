@@ -84,8 +84,6 @@ func retrieveJobConfig() (Job, error) {
 		}
 	}
 
-	testName, _ := os.LookupEnv("TEST_NAME")
-
 	if len(missing) > 0 {
 		return Job{}, fmt.Errorf("missing environment variables %v", missing)
 	}
@@ -93,7 +91,6 @@ func retrieveJobConfig() (Job, error) {
 	return Job{
 		JobName:     jobName,
 		BuildNumber: buildNumber,
-		TestName:    testName,
 	}, nil
 }
 
