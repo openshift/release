@@ -12,12 +12,9 @@ pipeline {
   agent any
 
   parameters {
-    string(defaultValue: "${env.ORIGIN_URL ?: 'https://github.com/openshift/origin.git' }", name: "ORIGIN_URL", description: "The URL of the Origin repository to use")
     booleanParam(defaultValue: (env.BUILD_IMAGES == "true" || env.BUILD_IMAGES == "yes"), name: "BUILD_IMAGES", description: "Set to 'true' if you wish to build images")
     string(defaultValue: "${env.BUILD_ID}", name: "buildId", description: "The ID that prow sets on a Jenkins job in order to correlate it with a ProwJob")
 
-    // Only PULL_REFS is currently used, but other parameters are here for completeness
-    // and future logging
     string(name: "REPO_OWNER", defaultValue:"${env.REPO_OWNER ?: ''}")
     string(name: "REPO_NAME", defaultValue:"${env.REPO_NAME ?: ''}")
     string(name: "PULL_BASE_REF", defaultValue:"${env.PULL_BASE_REF ?: ''}")
@@ -45,7 +42,7 @@ pipeline {
       }
       steps {
         echo "Creating image stream ${this._buildName}"
-        applyTemplate(this, "${templateBase}/output-imagestream.yaml", 
+        applyTemplate(this, "${templateBase}/output-imagestream.yaml",
           "BUILD_NAME=${this._buildName}")
       }
     }
@@ -56,7 +53,7 @@ pipeline {
       steps {
         script {
           jitter(this, 0,30)
-          def activeBuilds = filterObjects(this, "builds", ["build":"${this._buildName}"], { obj -> 
+          def activeBuilds = filterObjects(this, "builds", ["build":"${this._buildName}"], { obj ->
             if (obj.metadata.labels != null && obj.metadata.labels["template"] == "clone-source") {
               if (obj.status.phase == "New" || obj.status.phase == "Pending" || obj.status.phase == "Running") {
                 return true
@@ -68,13 +65,14 @@ pipeline {
             runAndWaitForBuild(this, "", {
               launchedBuilds["clone-source"] = createTemplate(this, "${templateBase}/clone-source.yaml",
                 "RELEASE_SRC_REF=${env.RELEASE_SRC_REF ?: 'master'}",
-                "RELEASE_SRC_URL=${env.RELEASE_SRC_URL ?: 'https://github.com/openshift/release.git'}", 
+                "RELEASE_SRC_URL=${env.RELEASE_SRC_URL ?: 'https://github.com/openshift/release.git'}",
                 "PUSH_SECRET_NAME=${this._pushSecret}",
                 "BUILD_NAME=${this._buildName}",
+                "REPO_OWNER=${params.REPO_OWNER}",
+                "REPO_NAME=${params.REPO_NAME}",
                 "PULL_REFS=${params.PULL_REFS}",
                 "PULL_NUMBER=${params.PULL_NUMBER}",
-                "BUILD_NUMBER=${env.BUILD_NUMBER}",
-                "SOURCE_URL=${params.ORIGIN_URL}")
+                "BUILD_NUMBER=${env.BUILD_NUMBER}")
               return launchedBuilds["clone-source"]
             })
           } else {
@@ -90,7 +88,7 @@ pipeline {
       steps {
         script {
           jitter(this, 0,30)
-          def activeBuilds = filterObjects(this, "builds", ["build":"${this._buildName}"], { obj -> 
+          def activeBuilds = filterObjects(this, "builds", ["build":"${this._buildName}"], { obj ->
             if (obj.metadata.labels != null && obj.metadata.labels["template"] == "compile") {
               if (obj.status.phase == "New" || obj.status.phase == "Pending" || obj.status.phase == "Running") {
                 return true
@@ -102,7 +100,7 @@ pipeline {
             runAndWaitForBuild(this, "", {
               launchedBuilds["compile"] = createTemplate(this, "${templateBase}/compile.yaml",
                 "RELEASE_SRC_REF=${env.RELEASE_SRC_REF ?: 'master'}",
-                "RELEASE_SRC_URL=${env.RELEASE_SRC_URL ?: 'https://github.com/openshift/release.git'}", 
+                "RELEASE_SRC_URL=${env.RELEASE_SRC_URL ?: 'https://github.com/openshift/release.git'}",
                 "PUSH_SECRET_NAME=${this._pushSecret}",
                 "PULL_NUMBER=${params.PULL_NUMBER}",
                 "BUILD_NUMBER=${env.BUILD_NUMBER}",
