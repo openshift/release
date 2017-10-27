@@ -45,6 +45,7 @@ prow-builds:
 	done
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/metrics_server.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/cherrypick.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/refresh.yaml
 .PHONY: prow-builds
 
 prow-update:
@@ -80,6 +81,7 @@ prow-services:
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tide.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/metrics_server.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/cherrypick.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/refresh.yaml
 .PHONY: prow-services
 
 prow-jobs:
