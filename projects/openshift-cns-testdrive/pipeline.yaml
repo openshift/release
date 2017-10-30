@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: List
+items:
+- kind: ImageStream
+  apiVersion: v1
+  metadata:
+    name: ocp-ops-cns-ci
+- kind: BuildConfig
+  apiVersion: v1
+  metadata:
+    name: ocp-ops-cns-ci
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: ocp-ops-cns-ci:latest
+    source:
+      git:
+        uri: https://github.com/thoraxe/openshift-cns-testdrive.git
+        ref: ci-container-tweak
+      contextDir: ci-test-container
+      type: Git
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: centos:7
+        imageOptimizationPolicy: SkipLayers
+    triggers:
+    - type: ConfigChange
