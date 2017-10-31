@@ -1,6 +1,7 @@
 FROM release-base
 
-ARG SOURCE_URL=https://github.com/openshift/origin.git
-ARG PULL_REFS=""
+ARG REPO_OWNER
+ARG REPO_NAME
+ARG PULL_REFS
 
-RUN umask 0002 && release-ci cloneref "$SOURCE_URL"
+RUN umask 0002 && release-ci cloneref --src-root=/data
