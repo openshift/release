@@ -8,5 +8,5 @@ RUN mkdir -p /go/src/github.com/openshift && \
     cd release && \
     git checkout ${RELEASE_REF} && \
     cd tools/release-ci && \
-    go build . && \
+    CGO_ENABLED=0 GOOS=linux go build -a --ldflags '-extldflags "-static"' . && \
     cp release-ci /usr/bin/release-ci
