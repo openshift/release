@@ -29,6 +29,7 @@ prow-secrets:
 
 prow-images:
 	oc process -f cluster/ci/config/prow/prow_images.yaml | oc apply -f -
+	oc process -f cluster/ci/config/prow/plugin_images.yaml | oc apply -f -
 .PHONY: prow-images
 
 prow-rbac:
