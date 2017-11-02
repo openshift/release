@@ -130,30 +130,34 @@ pipeline {
   post {
     always {
       script {
-        openshift.withCluster() {
-          def workingDir = pwd()
-          def artifactDir = "${workingDir}/artifacts"
-          def testPods = openshift.selector("pods", ["run":"${this._verifyRunId}"])
-          def logPod = openshift.selector("pods", ["log":"${this._verifyRunId}"])
-          try {
-            saveArtifacts(this, artifactDir, testPods)
-            saveArtifacts(this, artifactDir, logPod)
-          } catch (e) {
-            echo "Error saving artifacts: ${e}"
+        try {
+          openshift.withCluster() {
+            def workingDir = pwd()
+            def artifactDir = "${workingDir}/artifacts"
+            def testPods = openshift.selector("pods", ["run":"${this._verifyRunId}"])
+            def logPod = openshift.selector("pods", ["log":"${this._verifyRunId}"])
+            try {
+              saveArtifacts(this, artifactDir, testPods)
+              saveArtifacts(this, artifactDir, logPod)
+            } catch (e) {
+              echo "Error saving artifacts: ${e}"
+            }
+            echo "Uploading artifacts"
+            uploadArtifacts(this, artifactDir)
+            echo "About to delete created pods"
+            try {
+              testPods.delete()
+            } catch (e) {
+              echo "Error cleaning up test pods: ${e}"
+            }
+            try {
+              logPod.delete()
+            } catch (e) {
+              echo "Error cleaning up verification log pod: ${e}"
+            }
           }
-          echo "Uploading artifacts"
-          uploadArtifacts(this, artifactDir)
-          echo "About to delete created pods"
-          try {
-            testPods.delete()
-          } catch (e) {
-            echo "Error cleaning up test pods: ${e}"
-          }
-          try {
-            logPod.delete()
-          } catch (e) {
-            echo "Error cleaning up verification log pod: ${e}"
-          }
+        } finally {
+          deleteDir()
         }
       }
     }
