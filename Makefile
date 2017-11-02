@@ -25,6 +25,8 @@ prow-secrets:
 	oc create secret generic hmac-token --from-literal=hmac=${HMAC_TOKEN} -o yaml --dry-run | oc apply -f -
 	# OAUTH_TOKEN is used for manipulating Github PRs/issues (labels, comments, etc.).
 	oc create secret generic oauth-token --from-literal=oauth=${OAUTH_TOKEN} -o yaml --dry-run | oc apply -f -
+	# CHERRYPICK_TOKEN is used by the cherrypick bot for cherrypicking changes into new PRs.
+	oc create secret generic cherrypick-token --from-literal=oauth=${CHERRYPICK_TOKEN} -o yaml --dry-run | oc apply -f -
 .PHONY: prow-secrets
 
 prow-images:
