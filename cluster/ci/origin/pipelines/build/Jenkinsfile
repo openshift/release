@@ -117,31 +117,35 @@ pipeline {
   post {
     always {
       script {
-        openshift.withCluster() {
-          def cloneSourceBuild = launchedBuilds["clone-source"]
-          def compileBuild = launchedBuilds["compile"]
-          def workingDir = pwd()
-          def artifactDir = "${workingDir}/artifacts"
-          if (cloneSourceBuild != null) {
-            saveArtifacts(this, artifactDir, cloneSourceBuild)
-            try {
-              cloneSourceBuild.delete()
-            } catch (e) {
-              echo "Error cleaning up clone build: ${e}"
+        try {
+          openshift.withCluster() {
+            def cloneSourceBuild = launchedBuilds["clone-source"]
+            def compileBuild = launchedBuilds["compile"]
+            def workingDir = pwd()
+            def artifactDir = "${workingDir}/artifacts"
+            if (cloneSourceBuild != null) {
+              saveArtifacts(this, artifactDir, cloneSourceBuild)
+              try {
+                cloneSourceBuild.delete()
+              } catch (e) {
+                echo "Error cleaning up clone build: ${e}"
+              }
             }
-          }
-          if (compileBuild != null) {
-            saveArtifacts(this, artifactDir, compileBuild)
-            try {
-              compileBuild.delete()
-            } catch (e) {
-              echo "Error cleaning up compile build: ${e}"
+            if (compileBuild != null) {
+              saveArtifacts(this, artifactDir, compileBuild)
+              try {
+                compileBuild.delete()
+              } catch (e) {
+                echo "Error cleaning up compile build: ${e}"
+              }
             }
-          }
-          if (cloneSourceBuild != null || compileBuild != null) {
-            uploadArtifacts(this, artifactDir)
+            if (cloneSourceBuild != null || compileBuild != null) {
+              uploadArtifacts(this, artifactDir)
+            }
           }
         }
+      } finally {
+        deleteDir()
       }
     }
   }
