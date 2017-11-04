@@ -26,11 +26,12 @@ objects:
         uri: "${SOURCE_URL}"
       type: Git
       dockerfile: |
-        FROM openshift/origin-release:golang-1.8
+        FROM golang:1.9.2
 
         COPY . /go/src/k8s.io/test-infra
         RUN cd /go/src/k8s.io/test-infra && \
-            godep restore && \
+            go get -u github.com/golang/dep/cmd/dep && \
+            dep ensure && \
             cd prow && \
             mkdir -p /static && \
             cp -r cmd/deck/static/* /static && \
@@ -40,7 +41,7 @@ objects:
       dockerStrategy:
         from:
           kind: DockerImage
-          name: openshift/origin-release:golang-1.8
+          name: golang:1.9.2
         imageOptimizationPolicy: SkipLayers
     triggers:
     - type: ConfigChange
