@@ -3,25 +3,10 @@ plank:
   report_template: '[Full PR test history](https://openshift-gce-devel.appspot.com/pr/{{if ne .Spec.Refs.Repo "origin"}}{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}/{{end}}{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://openshift-gce-devel.appspot.com/pr/{{with index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}). Please help us cut down on flakes by [linking to](https://github.com/kubernetes/community/blob/master/contributors/devel/flaky-tests.md#filing-issues-for-flaky-tests) an [open issue](https://github.com/{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}/issues?q=is:issue+is:open) when you hit one in your PR.'
 
 jenkins_operator:
-  max_concurrency: 145
+  max_concurrency: 125
   allow_cancellations: true
   job_url_template: 'https://openshift-gce-devel.appspot.com/build/origin-ci-test/{{if eq .Spec.Type "presubmit"}}pr-logs/pull{{else if eq .Spec.Type "batch"}}pr-logs/pull{{else}}logs{{end}}{{if ne .Spec.Refs.Repo "origin"}}/{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}{{end}}{{if eq .Spec.Type "presubmit"}}/{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}{{else if eq .Spec.Type "batch"}}/batch{{end}}/{{.Spec.Job}}/{{.Status.BuildID}}/'
   report_template: '[Full PR test history](https://openshift-gce-devel.appspot.com/pr/{{if ne .Spec.Refs.Repo "origin"}}{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}/{{end}}{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://openshift-gce-devel.appspot.com/pr/{{with index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}). Please help us cut down on flakes by [linking to](https://github.com/kubernetes/community/blob/master/contributors/devel/flaky-tests.md#filing-issues-for-flaky-tests) an [open issue](https://github.com/{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}/issues?q=is:issue+is:open) when you hit one in your PR.'
-
-jenkins_proxy:
-  proxy_auth:
-    user: "openshift-ci-robot"
-    token_file: "/etc/jenkins/basic"
-  masters:
-  - url: "https://ci.openshift.redhat.com/jenkins"
-    auth:
-      basic_auth:
-        user: "openshift-ci-robot"
-        token_file: "/etc/jenkins/basic"
-  - url: "https://jenkins-origin-ci.svc.ci.openshift.org"
-    auth:
-      bearer_token:
-        token_file: "/etc/jenkins/origin-bearer"
 
 sinker:
   resync_period: 1h
@@ -31,7 +16,11 @@ sinker:
 deck:
   external_agent_logs:
   - agent: jenkins
+    selector: master=ci.openshift.redhat.com
     url_template: 'http://jenkins-operator/job/{{.Spec.Job}}/{{.Status.BuildID}}/consoleText'
+  - agent: jenkins
+    selector: master=jenkins-origin-ci
+    url_template: 'http://jenkins-origin-operator/job/{{.Spec.Job}}/{{.Status.BuildID}}/consoleText'
 
 prowjob_namespace: ci
 pod_namespace: ci
