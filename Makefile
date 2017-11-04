@@ -16,11 +16,9 @@ prow-config:
 .PHONY: prow-config
 
 prow-secrets:
-	# This is the token used by the jenkins-operator and deck to authenticate with the jenkins-proxy.
-	oc create secret generic jenkins-token --from-literal=jenkins=${PROXY_AUTH_PASS} -o yaml --dry-run | oc apply -f -
-	# BASIC_AUTH_PASS is used by the jenkins-proxy for authenticating with https://ci.openshift.redhat.com/jenkins/
-	# BEARER_TOKEN is used by the jenkins-proxy for authenticating with https://jenkins-origin-ci.svc.ci.openshift.org
-	oc create secret generic jenkins-tokens --from-literal=basic=${BASIC_AUTH_PASS} --from-literal=origin-bearer=${BEARER_TOKEN} -o yaml --dry-run | oc apply -f -
+	# BASIC_AUTH_PASS is used by prow for authenticating with https://ci.openshift.redhat.com/jenkins/
+	# BEARER_TOKEN is used by prow for authenticating with https://jenkins-origin-ci.svc.ci.openshift.org
+	oc create secret generic jenkins-tokens --from-literal=basic=${BASIC_AUTH_PASS} --from-literal=bearer=${BEARER_TOKEN} -o yaml --dry-run | oc apply -f -
 	# HMAC_TOKEN is used for encrypting Github webhook payloads.
 	oc create secret generic hmac-token --from-literal=hmac=${HMAC_TOKEN} -o yaml --dry-run | oc apply -f -
 	# OAUTH_TOKEN is used for manipulating Github PRs/issues (labels, comments, etc.).
@@ -53,7 +51,6 @@ prow-services:
 	oc process -f cluster/ci/config/prow/openshift/hook.yaml | oc apply -f -
 	oc process -f cluster/ci/config/prow/openshift/horologium.yaml | oc apply -f -
 	oc process -f cluster/ci/config/prow/openshift/jenkins_operator.yaml | oc apply -f -
-	oc process -f cluster/ci/config/prow/openshift/jenkins_proxy.yaml | oc apply -f -
 	oc process -f cluster/ci/config/prow/openshift/plank.yaml | oc apply -f -
 	oc process -f cluster/ci/config/prow/openshift/sinker.yaml | oc apply -f -
 	oc process -f cluster/ci/config/prow/openshift/splice.yaml | oc apply -f -
