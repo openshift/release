@@ -1,0 +1,87 @@
+# Needs the hmac-token secret for decrypting webhook payloads.
+# Needs the oauth-token secret for creating PRs.
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: jenkins-config-updater-prow
+  annotations:
+    "openshift.io/display-name": jenkins-config-updater-prow
+  description: |
+    jenkins-config-updater manifests for prow
+parameters: []
+objects:
+- apiVersion: v1
+  kind: Route
+  metadata:
+    name: jenkins-config-updater-prow
+  spec:
+    path: /
+    tls:
+      insecureEdgeTerminationPolicy: Redirect
+      termination: edge
+    to:
+      kind: Service
+      name: jenkins-config-updater-prow
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: jenkins-config-updater-prow
+  spec:
+    selector:
+      app: prow
+      component: jenkins-config-updater-prow
+    ports:
+    - port: 8888
+    type: NodePort
+- apiVersion: apps.openshift.io/v1
+  kind: DeploymentConfig
+  metadata:
+    name: jenkins-config-updater-prow
+    labels:
+      app: prow
+      component: jenkins-config-updater-prow
+  spec:
+    replicas: 1
+    revisionHistoryLimit: 2
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: jenkins-config-updater-prow
+      spec:
+        containers:
+        - name: jenkins-config-updater-prow
+          image: jenkins-config-updater-prow
+          args:
+          - --dry-run=false
+          ports:
+            - name: http
+              containerPort: 8888
+          volumeMounts:
+          - name: hmac
+            mountPath: /etc/webhook
+            readOnly: true
+          - name: oauth
+            mountPath: /etc/github
+            readOnly: true
+          - name: tmp
+            mountPath: /tmp
+        volumes:
+        - name: hmac
+          secret:
+            secretName: hmac-token
+        - name: oauth
+          secret:
+            secretName: oauth-token
+        - name: tmp
+          emptyDir: {}
+    triggers:
+    - type: ConfigChange
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - jenkins-config-updater-prow
+        from:
+          kind: ImageStreamTag
+          name: jenkins-config-updater:latest
+      type: ImageChange
