@@ -1,0 +1,81 @@
+apiVersion: v1
+kind: Template
+parameters:
+- name: SOURCE_URL
+  displayName: Source URL
+  description: Git source URL to use for building the image
+  value: https://github.com/openshift/test-infra.git
+- name: SOURCE_REF
+  displayName: Source ref
+  description: Git source ref to use for building the image
+  value: master
+objects:
+- kind: ImageStream
+  apiVersion: v1
+  metadata:
+    name: jenkins-config-updater
+- kind: BuildConfig
+  apiVersion: v1
+  metadata:
+    name: jenkins-config-updater-binaries
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: jenkins-config-updater:binaries
+    source:
+      git:
+        uri: "${SOURCE_URL}"
+        ref: "${SOURCE_REF}"
+      type: Git
+      dockerfile: |
+        FROM openshift/origin-release:golang-1.8
+
+        COPY . /go/src/k8s.io/test-infra
+        RUN cd /go/src/k8s.io/test-infra && \
+            godep restore && \
+            CGO_ENABLED=0 GOOS=linux go install -a --ldflags '-extldflags "-static"' ./experiment/jenkins-config-updater && \
+            rm -rf /go/src /go/pkg
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: openshift/origin-release:golang-1.8
+        imageOptimizationPolicy: SkipLayers
+    triggers:
+    - type: ConfigChange
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    name: jenkins-config-updater
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: jenkins-config-updater:latest
+    source:
+      git:
+        uri: "${SOURCE_URL}"
+        ref: "${SOURCE_REF}"
+      images:
+      - from:
+          kind: ImageStreamTag
+          name: jenkins-config-updater:binaries
+        paths:
+        - destinationDir: .
+          sourcePath: /go/bin/jenkins-config-updater
+    strategy:
+      dockerStrategy:
+        dockerfilePath: experiment/jenkins-config-updater/Dockerfile
+        noCache: true
+        imageOptimizationPolicy: SkipLayers
+    triggers:
+    - imageChange:
+        from:
+          kind: ImageStreamTag
+          name: jenkins-config-updater:binaries
+      type: ImageChange
