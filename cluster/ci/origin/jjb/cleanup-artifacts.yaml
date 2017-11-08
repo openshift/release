@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: Template
 metadata:
-  name: cleanup-image-streams
+  name: cleanup-artifacts
 labels:
-  template: cleanup-image-streams
+  template: cleanup-artifacts
 parameters:
 - description: Prefix for job names, typically the namespace
   displayName: Job Prefix
@@ -24,19 +24,19 @@ objects:
 - apiVersion: v1
   kind: ConfigMap
   metadata:
-    name: cleanup-image-streams
+    name: cleanup-artifacts
     annotations:
       ci.openshift.io/jenkins-job: "true"
   data:
     job.yml: |-
       - job:
-          name: ${JOB_PREFIX}-cleanup-image-streams
+          name: ${JOB_PREFIX}-cleanup-artifacts
           project-type: pipeline
           concurrent: false
           triggers:
             - timed: 'H * * * *'
           pipeline-scm:
-            script-path: cluster/ci/origin/pipelines/cleanup-image-streams/Jenkinsfile
+            script-path: cluster/ci/origin/pipelines/cleanup-artifacts/Jenkinsfile
             scm:
                - git:
                    url: ${RELEASE_SRC_URL}
