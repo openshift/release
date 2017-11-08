@@ -169,6 +169,8 @@ pipeline {
               openshift.newProject("images-${this._buildName}")
               openshift.withProject("images-${this._buildName}") {
                 openshift.raw("policy", "add-role-to-group", "admin", "system:serviceaccounts:${currentProject}")
+                openshift.raw("policy", "add-role-to-user", "view", "system:anonymous")
+                openshift.raw("policy", "add-role-to-user", "system:image-puller", "system:anonymous")
               }
             }
           }
@@ -212,6 +214,7 @@ pipeline {
               "--from-literal", "image-base=${this._imageBase}",
               "--from-literal", "rpm-repo=http://${routeHost}",
               "--from-literal", "namespace=images-${this._buildName}")
+            openshift.raw("label", "configmap", "${this._buildName}", "created-by-ci=true")
           }
         }
       }
