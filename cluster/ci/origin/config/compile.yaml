@@ -7,24 +7,10 @@ parameters:
   displayName: Build Name
   name: BUILD_NAME
   required: true
-- description: The URL of the origin release source repository
-  displayName: Source URL
-  name: RELEASE_SRC_URL
-  value: https://github.com/openshift/release.git
-  required: true
-- description: The Reference of the origin release source repository
-  displayName: Source Ref
-  name: RELEASE_SRC_REF
-  value: master
-  required: true
-- description: The Context inside the origin release source repository
-  displayName: Source Context
-  name: RELEASE_SRC_CONTEXT
-  value: cluster/ci/origin/images/binaries
 - description: The name of the push secret for the builder service account
   displayName: Push Secret
   name: PUSH_SECRET_NAME
-  required: true 
+  required: true
 - description: The number of the Jenkins job that launched this build
   displayName: Build Number
   name: BUILD_NUMBER
@@ -50,14 +36,13 @@ objects:
     runPolicy: Serial
     serviceAccount: builder
     source:
-      contextDir: "${RELEASE_SRC_CONTEXT}"
-      git:
-        ref: "${RELEASE_SRC_REF}"
-        uri: "${RELEASE_SRC_URL}"
-      type: Git
+      dockerfile: |
+        FROM source
+
+        RUN umask 0002 && OS_GOFLAGS="-race" hack/build-go.sh
     strategy:
       dockerStrategy:
-        pullSecret: 
+        pullSecret:
           name: "${PUSH_SECRET_NAME}"
         from:
           kind: ImageStreamTag
