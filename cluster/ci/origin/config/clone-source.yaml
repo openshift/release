@@ -7,20 +7,6 @@ parameters:
   displayName: Build Name
   name: BUILD_NAME
   required: true
-- description: The URL of the origin release source repository
-  displayName: Source URL
-  name: RELEASE_SRC_URL
-  value: https://github.com/openshift/release.git
-  required: true
-- description: The Reference of the origin release source repository
-  displayName: Source Ref
-  name: RELEASE_SRC_REF
-  value: master
-  required: true
-- description: The Context inside the origin release source repository
-  displayName: Source Context
-  name: RELEASE_SRC_CONTEXT
-  value: cluster/ci/origin/images/src
 - description: The reference to the base image to use to fetch the source
   displayName: Base Image Reference
   name: BASE_IMAGE_REF
@@ -63,11 +49,14 @@ objects:
     runPolicy: Serial
     serviceAccount: builder
     source:
-      contextDir: "${RELEASE_SRC_CONTEXT}"
-      git:
-        ref: "${RELEASE_SRC_REF}"
-        uri: "${RELEASE_SRC_URL}"
-      type: Git
+      dockerfile: |
+        FROM test-base:latest
+
+        ARG REPO_OWNER
+        ARG REPO_NAME
+        ARG PULL_REFS
+
+        RUN umask 0002 && release-ci cloneref --src-root=/data
     strategy:
       dockerStrategy:
         pullSecret:
