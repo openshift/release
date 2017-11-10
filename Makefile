@@ -32,6 +32,22 @@ prow-images:
 	oc process -f cluster/ci/config/prow/openshift/build/plugin_images.yaml | oc apply -f -
 .PHONY: prow-images
 
+prow-builds:
+	for name in deck hook horologium jenkins-operator plank sinker splice tide; do \
+		oc process -f cluster/ci/config/prow/openshift/build/prow_component.yaml -p NAME=$$name | oc apply -f - ; \
+	done
+.PHONY: prow-builds
+
+prow-update:
+ifeq ($(WHAT),all)
+	for name in deck hook horologium jenkins-operator plank sinker splice tide; do \
+		oc start-build bc/$$name ; \
+	done
+else
+	oc start-build bc/$(WHAT)
+endif
+.PHONY: prow-update
+
 prow-rbac:
 	oc process -f cluster/ci/config/prow/openshift/deck_rbac.yaml | oc apply -f -
 	oc process -f cluster/ci/config/prow/openshift/hook_rbac.yaml | oc apply -f -
