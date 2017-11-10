@@ -88,7 +88,7 @@ console-submit-queue:
 	oc process -f cluster/ci/config/submit-queue/submit_queue_origin_web_console.yaml | oc apply -f -
 .PHONY: console-submit-queue
 
-projects: gcsweb kube-state-metrics oauth-proxy origin-release prometheus
+projects: gcsweb kube-state-metrics oauth-proxy origin-release prometheus test-bases
 .PHONY: projects
 
 gcsweb:
@@ -115,6 +115,10 @@ prometheus: node-exporter
 node-exporter:
 	oc apply -f projects/prometheus/node-exporter.yaml
 .PHONY: node-exporter
+
+test-bases:
+	oc apply -f projects/test-bases/openshift/openshift-ansible.yaml
+.PHONY test-bases
 
 jenkins:
 	oc new-app --template jenkins-persistent -e INSTALL_PLUGINS=groovy:2.0,pipeline-github-lib:1.0 -p MEMORY_LIMIT=10Gi -p VOLUME_CAPACITY=20Gi -e OPENSHIFT_JENKINS_JVM_ARCH=x86_64 -e JAVA_GC_OPTS="-XX:+UseParallelGC -XX:MinHeapFreeRatio=20 -XX:MaxHeapFreeRatio=40 -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90"
