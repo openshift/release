@@ -41,13 +41,8 @@ pipeline {
       }
     }
     stage ("Create ImageStream") {
-      when {
-        not { expression { return imageStreamExists(this, "${this._buildName}") } }
-      }
       steps {
-        echo "Creating image stream ${this._buildName}"
-        applyTemplate(this, "${templateBase}/output-imagestream.yaml", 
-          "BUILD_NAME=${this._buildName}")
+        ensureImageStream(this, "${this._buildName}")
       }
     }
     stage("Clone") {
@@ -57,7 +52,7 @@ pipeline {
       steps {
         script {
           jitter(this, 0,30)
-          def activeBuilds = filterObjects(this, "builds", ["build":"${this._buildName}"], { obj -> 
+          def activeBuilds = filterObjects(this, "builds", ["build":"${this._buildName}"], { obj ->
             if (obj.metadata.labels != null && obj.metadata.labels["template"] == "clone-source") {
               if (obj.status.phase == "New" || obj.status.phase == "Pending" || obj.status.phase == "Running") {
                 return true
@@ -69,7 +64,7 @@ pipeline {
             runAndWaitForBuild(this, "", {
               return createTemplate(this, "${templateBase}/clone-source.yaml",
                 "RELEASE_SRC_REF=${params.RELEASE_SRC_REF}",
-                "RELEASE_SRC_URL=${params.RELEASE_SRC_URL}", 
+                "RELEASE_SRC_URL=${params.RELEASE_SRC_URL}",
                 "PUSH_SECRET_NAME=${this._pushSecret}",
                 "BUILD_NAME=${this._buildName}",
                 "PULL_REFS=${params.PULL_REFS}",
@@ -92,7 +87,7 @@ pipeline {
       steps {
         script {
           jitter(this, 0,30)
-          def activeBuilds = filterObjects(this, "builds", ["build":"${this._buildName}"], { obj -> 
+          def activeBuilds = filterObjects(this, "builds", ["build":"${this._buildName}"], { obj ->
             if (obj.metadata.labels != null && obj.metadata.labels["template"] == "test-compile") {
               if (obj.status.phase == "New" || obj.status.phase == "Pending" || obj.status.phase == "Running") {
                 return true
@@ -104,7 +99,7 @@ pipeline {
             runAndWaitForBuild(this, "", {
               return createTemplate(this, "${templateBase}/test-compile.yaml",
                 "RELEASE_SRC_REF=${params.RELEASE_SRC_REF}",
-                "RELEASE_SRC_URL=${params.RELEASE_SRC_URL}", 
+                "RELEASE_SRC_URL=${params.RELEASE_SRC_URL}",
                 "PUSH_SECRET_NAME=${this._pushSecret}",
                 "PULL_NUMBER=${params.PULL_NUMBER}",
                 "BUILD_NUMBER=${env.BUILD_NUMBER}",
