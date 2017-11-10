@@ -4,9 +4,12 @@ set -e
 
 base=$( dirname "${BASH_SOURCE[0]}")
 
-jenkins_host="$(oc get route jenkins -o jsonpath='{ .spec.host }')"
 token="$(oc whoami -t)"
-jenkins_url="https://${jenkins_host}"
+namespace="${NAMESPACE:-}"
+namespace_arg=""
+if [[ -n "${namespace}" ]]; then
+	namespace_arg="-n ${namespace}"
+fi
 
 cd ~/Code/release/go/src/github.com/openshift/release
 release_url="${RELEASE_SRC_URL:-https://github.com/openshift/release.git}"
@@ -19,17 +22,17 @@ echo "Using job prefix ${job_prefix}, release URL ${release_url}, and release_re
 for template in $(find "${base}/../cluster/ci/origin/jjb" -name \*.yaml); do
 	if [[ "$(basename $template)" != "test-origin-configmap.yaml" ]]; then
 		echo "Updating ${template}"
-		oc process -f ${template} \
+		oc process ${namespace_arg} -f ${template} \
 			-p "JOB_PREFIX=${job_prefix}" \
 			-p "RELEASE_SRC_URL=${release_url}" \
-			-p "RELEASE_SRC_REF=${release_ref}" | oc apply -f -
+			-p "RELEASE_SRC_REF=${release_ref}" | oc apply ${namespace_arg} -f -
 	fi
 done
 
 for environment in $( find "${base}/../cluster/ci/origin/jjb/env" -name \*.env ); do
 	echo "Updating test-origin-configmap with ${environment}"
-	oc process --param-file="${environment}" --filename="${base}/../cluster/ci/origin/jjb/test-origin-configmap.yaml" \
+	oc process ${namespace_arg} --param-file="${environment}" --filename="${base}/../cluster/ci/origin/jjb/test-origin-configmap.yaml" \
 		-p "JOB_PREFIX=${job_prefix}" \
 		-p "RELEASE_SRC_URL=${release_url}" \
-		-p "RELEASE_SRC_REF=${release_ref}" | oc apply -f -
+		-p "RELEASE_SRC_REF=${release_ref}" | oc apply ${namespace_arg} -f -
 done
