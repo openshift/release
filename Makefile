@@ -104,7 +104,9 @@ oauth-proxy:
 .PHONY: oauth-proxy
 
 origin-release:
+	# $DOCKERCONFIGJSON is the path to the json file
 	oc secrets new dockerhub ${DOCKERCONFIGJSON}
+	oc secrets link builder dockerhub
 	oc process -f projects/origin-release/pipeline.yaml | oc apply -f -
 .PHONY: origin-release
 
