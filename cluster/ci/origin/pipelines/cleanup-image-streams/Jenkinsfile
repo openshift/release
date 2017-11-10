@@ -13,7 +13,7 @@ pipeline {
             imageStreams.withEach() {
               def imageStream = it.object()
               // Only process image streams that are part of a build
-              if (imageStream.metadata.labels != null && imageStream.metadata.labels.template == "output-imagestream") {
+              if (imageStream.metadata.labels != null && imageStream.metadata.labels["created-by-ci"] == "true") {
                 def creationTimestamp = imageStream.metadata.creationTimestamp
                 def imageStreamCreationSecsStr = sh(script: "date --date=${creationTimestamp} +%s", returnStdout: true)
                 def imageStreamCreationSecs = imageStreamCreationSecsStr as Integer
@@ -30,6 +30,6 @@ pipeline {
           }
         }
       }
-    }   
+    }
   }
 }
