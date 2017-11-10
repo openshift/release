@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: Template
 metadata:
-  name: standalone-jobs
+  name: test-build-origin-job
 labels:
-  template: standalone-jobs
+  template: test-build-origin-job
 parameters:
 - description: Prefix for job names, typically the namespace
   displayName: Job Prefix
@@ -24,13 +24,13 @@ objects:
 - apiVersion: v1
   kind: ConfigMap
   metadata:
-    name: build-origin-job
+    name: test-build-origin-job
     annotations:
       ci.openshift.io/jenkins-job: "true"
   data:
     job.yml: |-
       - job:
-          name: ${JOB_PREFIX}-build-origin
+          name: ${JOB_PREFIX}-test-build-origin
           project-type: pipeline
           concurrent: true
           properties:
@@ -85,16 +85,8 @@ objects:
                 name: RELEASE_LIBRARY_REF
                 default: "master"
                 description: Release Library Ref
-            - bool:
-                name: CLEAN_BUILD
-                default: false
-                description: Perform a clean RPM build
-            - string:
-                name: PROVISIONER_TOKEN
-                default: ""
-                description: Token to use when creating a new project for images
           pipeline-scm:
-            script-path: cluster/ci/origin/pipelines/build/Jenkinsfile
+            script-path: cluster/ci/origin/pipelines/test-build/Jenkinsfile
             scm:
                - git:
                    url: ${RELEASE_SRC_URL}

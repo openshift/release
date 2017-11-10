@@ -12,7 +12,6 @@ pipeline {
 
   parameters {
     string(defaultValue: "${env.BUILD_ID}", name: "buildId", description: "The ID that prow sets on a Jenkins job in order to correlate it with a ProwJob")
-    string(defaultValue: "${env.ORIGIN_URL ?: 'https://github.com/openshift/origin.git' }", name: "ORIGIN_URL", description: "The URL of the Origin repository to use")
     string(name: "REPO_OWNER", defaultValue:"${env.REPO_OWNER ?: ''}")
     string(name: "REPO_NAME", defaultValue:"${env.REPO_NAME ?: ''}")
     string(name: "PULL_BASE_REF", defaultValue:"${env.PULL_BASE_REF ?: ''}")
@@ -26,6 +25,8 @@ pipeline {
     string(name: "MEMORY_REQUEST", defaultValue:"${env.MEMORY_REQUEST ?: ''}")
     string(name: "CPU_REQUEST", defaultValue:"${env.CPU_REQUEST ?: ''}")
     string(name: "IMAGE_TAG", defaultValue:"${env.IMAGE_TAG ?: ''}")
+    string(name: "RELEASE_SRC_URL", defaultValue: "${env.RELEASE_SRC_URL ?: 'https://github.com/openshift/release.git'}")
+    string(name: "RELEASE_SRC_REF", defaultValue: "${env.RELEASE_SRC_REF ?: 'master'}")
     string(name: "RELEASE_LIBRARY_URL", defaultValue: "${library_url}")
     string(name: "RELEASE_LIBRARY_REF", defaultValue: "${library_ref}")
   }
@@ -42,9 +43,8 @@ pipeline {
     stage ("Launch Build") {
       steps {
         script {
-          def jobName = "${env.PROJECT_NAME ?: 'origin-ci'}-build-origin"
+          def jobName = "${env.PROJECT_NAME ?: 'origin-ci'}-test-build-origin"
           def buildParams = [
-            [$class: "StringParameterValue", name: "ORIGIN_URL", value: params.ORIGIN_URL],
             [$class: "StringParameterValue", name: "BUILD_ID", value: params.BUILD_ID],
             [$class: "StringParameterValue", name: "REPO_OWNER", value: params.REPO_OWNER],
             [$class: "StringParameterValue", name: "REPO_NAME", value: params.REPO_NAME],
@@ -52,7 +52,11 @@ pipeline {
             [$class: "StringParameterValue", name: "PULL_BASE_SHA", value: params.PULL_BASE_SHA],
             [$class: "StringParameterValue", name: "PULL_REFS", value: params.PULL_REFS],
             [$class: "StringParameterValue", name: "PULL_NUMBER", value: params.PULL_NUMBER],
-            [$class: "StringParameterValue", name: "PULL_PULL_SHA", value: params.PULL_PULL_SHA]
+            [$class: "StringParameterValue", name: "PULL_PULL_SHA", value: params.PULL_PULL_SHA],
+            [$class: "StringParameterValue", name: "RELEASE_SRC_URL", value: params.RELEASE_SRC_URL],
+            [$class: "StringParameterValue", name: "RELEASE_SRC_REF", value: params.RELEASE_SRC_REF],
+            [$class: "StringParameterValue", name: "RELEASE_LIBRARY_URL", value: params.RELEASE_LIBRARY_URL],
+            [$class: "StringParameterValue", name: "RELEASE_LIBRARY_REF", value: params.RELEASE_LIBRARY_REF]
           ]
           build job: jobName, parameters: buildParams, wait: false
         }
@@ -102,24 +106,8 @@ pipeline {
   }
   post {
     always {
-      script {
-        try {
-          openshift.withCluster() {
-            def workingDir = pwd()
-            def artifactDir = "${workingDir}/artifacts"
-            def testPods = openshift.selector("pods", ["run":"${this._runId}"])
-            saveArtifacts(this, artifactDir, testPods)
-            uploadArtifacts(this, artifactDir)
-            try {
-              testPods.delete()
-            } catch (e) {
-              echo "Error cleaning up test pods: ${e}"
-            }
-          }
-        } finally {
-          deleteDir()
-        }
-      }
+      cleanupArtifacts(this, ["run":"${this._runId}"])
+      deleteWorkspace(this)
     }
   }
 }

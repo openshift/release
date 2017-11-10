@@ -9,19 +9,32 @@ parameters:
   required: true
 - description: The name of the push secret for the builder service account
   displayName: Push Secret
-  name: PUSH_SECRET_NAME
+  name: IMAGE_SECRET_NAME
   required: true
+- description: The number of the Jenkins job that launched this build
+  displayName: Build Number
+  name: BUILD_NUMBER
+  value: "1"
+- name: PULL_NUMBER
+  value: "-none"
+- name: RUN_ID
+  value: "run-id"
+  required: true
+- name: JOB_ID
+  value: "none"
 objects:
 - apiVersion: v1
   kind: Build
   metadata:
     labels:
       build: "${BUILD_NAME}"
-    name: "${BUILD_NAME}-origin-base"
+      runid: "${RUN_ID}"
+      job-id: "${JOB_ID}"
+    generateName: "origin-base-${BUILD_NUMBER}-${BUILD_NAME}-"
   spec:
     output:
       pushSecret:
-        name: "${PUSH_SECRET_NAME}"
+        name: "${IMAGE_SECRET_NAME}"
       to:
         kind: ImageStreamTag
         name: "${BUILD_NAME}:origin-base"
@@ -31,29 +44,35 @@ objects:
       contextDir: "base"
       images:
       - from:
-          kind: DockerImage
-          name: "${BUILD_NAME}:src"
+          kind: ImageStreamTag
+          name: "${BUILD_NAME}:binaries"
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         paths:
         - destinationDir: "."
           sourcePath: "/go/src/github.com/openshift/origin/images/base"
       type: Image
     strategy:
       dockerStrategy:
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         dockerfilePath: Dockerfile.centos7
         from:
-          kind: DockerImage
-          name: "${BUILD_NAME}:origin-source"
+          kind: ImageStreamTag
+          name: "${BUILD_NAME}:repo-base"
       type: Docker
 - apiVersion: v1
   kind: Build
   metadata:
     labels:
       build: "${BUILD_NAME}"
-    name: "${BUILD_NAME}-cluster-capacity"
+      runid: "${RUN_ID}"
+      job-id: "${JOB_ID}"
+    generateName: "cluster-capacity-${BUILD_NUMBER}-${BUILD_NAME}-"
   spec:
     output:
       pushSecret:
-        name: "${PUSH_SECRET_NAME}"
+        name: "${IMAGE_SECRET_NAME}"
       to:
         kind: ImageStreamTag
         name: "${BUILD_NAME}:origin-cluster-capacity"
@@ -63,28 +82,34 @@ objects:
       contextDir: "cluster-capacity"
       images:
       - from:
-          kind: DockerImage
-          name: "${BUILD_NAME}:src"
+          kind: ImageStreamTag
+          name: "${BUILD_NAME}:binaries"
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         paths:
         - destinationDir: "."
           sourcePath: "/go/src/github.com/openshift/origin/images/cluster-capacity"
       type: Image
     strategy:
       dockerStrategy:
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         from:
-          kind: DockerImage
-          name: "${BUILD_NAME}:origin-source"
+          kind: ImageStreamTag
+          name: "${BUILD_NAME}:origin-base"
       type: Docker
 - apiVersion: v1
   kind: Build
   metadata:
     labels:
       build: "${BUILD_NAME}"
-    name: "${BUILD_NAME}-service-catalog"
+      runid: "${RUN_ID}"
+      job-id: "${JOB_ID}"
+    generateName: "service-catalog-${BUILD_NUMBER}-${BUILD_NAME}-"
   spec:
     output:
       pushSecret:
-        name: "${PUSH_SECRET_NAME}"
+        name: "${IMAGE_SECRET_NAME}"
       to:
         kind: ImageStreamTag
         name: "${BUILD_NAME}:origin-service-catalog"
@@ -94,28 +119,34 @@ objects:
       contextDir: "service-catalog"
       images:
       - from:
-          kind: DockerImage
-          name: "${BUILD_NAME}:src"
+          kind: ImageStreamTag
+          name: "${BUILD_NAME}:binaries"
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         paths:
         - destinationDir: "."
           sourcePath: "/go/src/github.com/openshift/origin/images/service-catalog"
       type: Image
     strategy:
       dockerStrategy:
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         from:
-          kind: DockerImage
-          name: "${BUILD_NAME}:origin-source"
+          kind: ImageStreamTag
+          name: "${BUILD_NAME}:origin-base"
       type: Docker
 - apiVersion: v1
   kind: Build
   metadata:
     labels:
       build: "${BUILD_NAME}"
-    name: "${BUILD_NAME}-origin"
+      runid: "${RUN_ID}"
+      job-id: "${JOB_ID}"
+    generateName: "origin-${BUILD_NUMBER}-${BUILD_NAME}-"
   spec:
     output:
       pushSecret:
-        name: "${PUSH_SECRET_NAME}"
+        name: "${IMAGE_SECRET_NAME}"
       to:
         kind: ImageStreamTag
         name: "${BUILD_NAME}:origin"
@@ -125,17 +156,21 @@ objects:
       contextDir: "origin"
       images:
       - from:
-          kind: DockerImage
-          name: "${BUILD_NAME}:src"
+          kind: ImageStreamTag
+          name: "${BUILD_NAME}:binaries"
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         paths:
         - destinationDir: "."
           sourcePath: "/go/src/github.com/openshift/origin/images/origin"
       type: Image
     strategy:
       dockerStrategy:
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         dockerfilePath: Dockerfile.centos7
         from:
-          kind: DockerImage
+          kind: ImageStreamTag
           name: "${BUILD_NAME}:origin-base"
       type: Docker
 - apiVersion: v1
@@ -143,11 +178,13 @@ objects:
   metadata:
     labels:
       build: "${BUILD_NAME}"
-    name: "${BUILD_NAME}-haproxy-router"
+      runid: "${RUN_ID}"
+      job-id: "${JOB_ID}"
+    generateName: "haproxy-router-${BUILD_NUMBER}-${BUILD_NAME}-"
   spec:
     output:
       pushSecret:
-        name: "${PUSH_SECRET_NAME}"
+        name: "${IMAGE_SECRET_NAME}"
       to:
         kind: ImageStreamTag
         name: "${BUILD_NAME}:origin-haproxy-router"
@@ -157,16 +194,20 @@ objects:
       contextDir: "haproxy"
       images:
       - from:
-          kind: DockerImage
-          name: "${BUILD_NAME}:src"
+          kind: ImageStreamTag
+          name: "${BUILD_NAME}:binaries"
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         paths:
         - destinationDir: "."
           sourcePath: "/go/src/github.com/openshift/origin/images/router/haproxy"
       type: Image
     strategy:
       dockerStrategy:
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         from:
-          kind: DockerImage
+          kind: ImageStreamTag
           name: "${BUILD_NAME}:origin"
       type: Docker
 - apiVersion: v1
@@ -174,11 +215,13 @@ objects:
   metadata:
     labels:
       build: "${BUILD_NAME}"
-    name: "${BUILD_NAME}-keepalived-ipfailover"
+      runid: "${RUN_ID}"
+      job-id: "${JOB_ID}"
+    generateName: "keepalived-ipfailover-${BUILD_NUMBER}-${BUILD_NAME}-"
   spec:
     output:
       pushSecret:
-        name: "${PUSH_SECRET_NAME}"
+        name: "${IMAGE_SECRET_NAME}"
       to:
         kind: ImageStreamTag
         name: "${BUILD_NAME}:origin-keepalived-ipfailover"
@@ -188,16 +231,20 @@ objects:
       contextDir: "keepalived"
       images:
       - from:
-          kind: DockerImage
-          name: "${BUILD_NAME}:src"
+          kind: ImageStreamTag
+          name: "${BUILD_NAME}:binaries"
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         paths:
         - destinationDir: "."
           sourcePath: "/go/src/github.com/openshift/origin/images/ipfailover/keepalived"
       type: Image
     strategy:
       dockerStrategy:
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         from:
-          kind: DockerImage
+          kind: ImageStreamTag
           name: "${BUILD_NAME}:origin"
       type: Docker
 - apiVersion: v1
@@ -205,11 +252,13 @@ objects:
   metadata:
     labels:
       build: "${BUILD_NAME}"
-    name: "${BUILD_NAME}-docker-registry"
+      runid: "${RUN_ID}"
+      job-id: "${JOB_ID}"
+    generateName: "docker-registry-${BUILD_NUMBER}-${BUILD_NAME}-"
   spec:
     output:
       pushSecret:
-        name: "${PUSH_SECRET_NAME}"
+        name: "${IMAGE_SECRET_NAME}"
       to:
         kind: ImageStreamTag
         name: "${BUILD_NAME}:origin-docker-registry"
@@ -219,16 +268,20 @@ objects:
       contextDir: "dockerregistry"
       images:
       - from:
-          kind: DockerImage
-          name: "${BUILD_NAME}:src"
+          kind: ImageStreamTag
+          name: "${BUILD_NAME}:binaries"
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         paths:
         - destinationDir: "."
           sourcePath: "/go/src/github.com/openshift/origin/images/dockerregistry"
       type: Image
     strategy:
       dockerStrategy:
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         from:
-          kind: DockerImage
+          kind: ImageStreamTag
           name: "${BUILD_NAME}:origin-base"
       type: Docker
 - apiVersion: v1
@@ -236,11 +289,13 @@ objects:
   metadata:
     labels:
       build: "${BUILD_NAME}"
-    name: "${BUILD_NAME}-egress-router"
+      runid: "${RUN_ID}"
+      job-id: "${JOB_ID}"
+    generateName: "egress-router-${BUILD_NUMBER}-${BUILD_NAME}-"
   spec:
     output:
       pushSecret:
-        name: "${PUSH_SECRET_NAME}"
+        name: "${IMAGE_SECRET_NAME}"
       to:
         kind: ImageStreamTag
         name: "${BUILD_NAME}:origin-egress-router"
@@ -250,16 +305,20 @@ objects:
       contextDir: "router"
       images:
       - from:
-          kind: DockerImage
-          name: "${BUILD_NAME}:src"
+          kind: ImageStreamTag
+          name: "${BUILD_NAME}:binaries"
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         paths:
         - destinationDir: "."
           sourcePath: "/go/src/github.com/openshift/origin/images/egress/router"
       type: Image
     strategy:
       dockerStrategy:
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         from:
-          kind: DockerImage
+          kind: ImageStreamTag
           name: "${BUILD_NAME}:origin-base"
       type: Docker
 - apiVersion: v1
@@ -267,11 +326,13 @@ objects:
   metadata:
     labels:
       build: "${BUILD_NAME}"
-    name: "${BUILD_NAME}-egress-http-proxy"
+      runid: "${RUN_ID}"
+      job-id: "${JOB_ID}"
+    generateName: "egress-http-proxy-${BUILD_NUMBER}-${BUILD_NAME}-"
   spec:
     output:
       pushSecret:
-        name: "${PUSH_SECRET_NAME}"
+        name: "${IMAGE_SECRET_NAME}"
       to:
         kind: ImageStreamTag
         name: "${BUILD_NAME}:origin-egress-http-proxy"
@@ -281,16 +342,20 @@ objects:
       contextDir: "http-proxy"
       images:
       - from:
-          kind: DockerImage
-          name: "${BUILD_NAME}:src"
+          kind: ImageStreamTag
+          name: "${BUILD_NAME}:binaries"
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         paths:
         - destinationDir: "."
           sourcePath: "/go/src/github.com/openshift/origin/images/egress/http-proxy"
       type: Image
     strategy:
       dockerStrategy:
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         from:
-          kind: DockerImage
+          kind: ImageStreamTag
           name: "${BUILD_NAME}:origin-base"
       type: Docker
 - apiVersion: v1
@@ -298,11 +363,13 @@ objects:
   metadata:
     labels:
       build: "${BUILD_NAME}"
-    name: "${BUILD_NAME}-federation"
+      runid: "${RUN_ID}"
+      job-id: "${JOB_ID}"
+    generateName: "federation-${BUILD_NUMBER}-${BUILD_NAME}-"
   spec:
     output:
       pushSecret:
-        name: "${PUSH_SECRET_NAME}"
+        name: "${IMAGE_SECRET_NAME}"
       to:
         kind: ImageStreamTag
         name: "${BUILD_NAME}:origin-federation"
@@ -312,16 +379,20 @@ objects:
       contextDir: "federation"
       images:
       - from:
-          kind: DockerImage
+          kind: ImageStreamTag
           name: "${BUILD_NAME}:rpms"
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         paths:
         - destinationDir: "."
           sourcePath: "/go/src/github.com/openshift/origin/images/federation"
       type: Image
     strategy:
       dockerStrategy:
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         from:
-          kind: DockerImage
+          kind: ImageStreamTag
           name: "${BUILD_NAME}:origin-base"
       type: Docker
 - apiVersion: v1
@@ -329,11 +400,13 @@ objects:
   metadata:
     labels:
       build: "${BUILD_NAME}"
-    name: "${BUILD_NAME}-gitserver"
+      runid: "${RUN_ID}"
+      job-id: "${JOB_ID}"
+    generateName: "gitserver-${BUILD_NUMBER}-${BUILD_NAME}-"
   spec:
     output:
       pushSecret:
-        name: "${PUSH_SECRET_NAME}"
+        name: "${IMAGE_SECRET_NAME}"
       to:
         kind: ImageStreamTag
         name: "${BUILD_NAME}:origin-gitserver"
@@ -343,8 +416,10 @@ objects:
       contextDir: "gitserver"
       images:
       - from:
-          kind: DockerImage
+          kind: ImageStreamTag
           name: "${BUILD_NAME}:rpms"
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         paths:
         - destinationDir: "."
           sourcePath: "/go/src/github.com/openshift/origin/examples/gitserver"
@@ -353,8 +428,10 @@ objects:
       type: Image
     strategy:
       dockerStrategy:
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         from:
-          kind: DockerImage
+          kind: ImageStreamTag
           name: "${BUILD_NAME}:origin"
       type: Docker
 - apiVersion: v1
@@ -362,11 +439,13 @@ objects:
   metadata:
     labels:
       build: "${BUILD_NAME}"
-    name: "${BUILD_NAME}-deployer"
+      runid: "${RUN_ID}"
+      job-id: "${JOB_ID}"
+    generateName: "deployer-${BUILD_NUMBER}-${BUILD_NAME}-"
   spec:
     output:
       pushSecret:
-        name: "${PUSH_SECRET_NAME}"
+        name: "${IMAGE_SECRET_NAME}"
       to:
         kind: ImageStreamTag
         name: "${BUILD_NAME}:origin-deployer"
@@ -376,16 +455,20 @@ objects:
       contextDir: "deployer"
       images:
       - from:
-          kind: DockerImage
-          name: "${BUILD_NAME}:src"
+          kind: ImageStreamTag
+          name: "${BUILD_NAME}:binaries"
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         paths:
         - destinationDir: "."
           sourcePath: "/go/src/github.com/openshift/origin/images/deployer"
       type: Image
     strategy:
       dockerStrategy:
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         from:
-          kind: DockerImage
+          kind: ImageStreamTag
           name: "${BUILD_NAME}:origin"
       type: Docker
 - apiVersion: v1
@@ -393,11 +476,13 @@ objects:
   metadata:
     labels:
       build: "${BUILD_NAME}"
-    name: "${BUILD_NAME}-recycler"
+      runid: "${RUN_ID}"
+      job-id: "${JOB_ID}"
+    generateName: "recycler-${BUILD_NUMBER}-${BUILD_NAME}-"
   spec:
     output:
       pushSecret:
-        name: "${PUSH_SECRET_NAME}"
+        name: "${IMAGE_SECRET_NAME}"
       to:
         kind: ImageStreamTag
         name: "${BUILD_NAME}:origin-recycler"
@@ -407,16 +492,20 @@ objects:
       contextDir: "recycler"
       images:
       - from:
-          kind: DockerImage
-          name: "${BUILD_NAME}:src"
+          kind: ImageStreamTag
+          name: "${BUILD_NAME}:binaries"
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         paths:
         - destinationDir: "."
           sourcePath: "/go/src/github.com/openshift/origin/images/recycler"
       type: Image
     strategy:
       dockerStrategy:
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         from:
-          kind: DockerImage
+          kind: ImageStreamTag
           name: "${BUILD_NAME}:origin"
       type: Docker
 - apiVersion: v1
@@ -424,11 +513,13 @@ objects:
   metadata:
     labels:
       build: "${BUILD_NAME}"
-    name: "${BUILD_NAME}-docker-builder"
+      runid: "${RUN_ID}"
+      job-id: "${JOB_ID}"
+    generateName: "docker-builder-${BUILD_NUMBER}-${BUILD_NAME}-"
   spec:
     output:
       pushSecret:
-        name: "${PUSH_SECRET_NAME}"
+        name: "${IMAGE_SECRET_NAME}"
       to:
         kind: ImageStreamTag
         name: "${BUILD_NAME}:origin-docker-builder"
@@ -438,16 +529,20 @@ objects:
       contextDir: "docker-builder"
       images:
       - from:
-          kind: DockerImage
-          name: "${BUILD_NAME}:src"
+          kind: ImageStreamTag
+          name: "${BUILD_NAME}:binaries"
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         paths:
         - destinationDir: "."
           sourcePath: "/go/src/github.com/openshift/origin/images/builder/docker/docker-builder"
       type: Image
     strategy:
       dockerStrategy:
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         from:
-          kind: DockerImage
+          kind: ImageStreamTag
           name: "${BUILD_NAME}:origin"
       type: Docker
 - apiVersion: v1
@@ -455,11 +550,13 @@ objects:
   metadata:
     labels:
       build: "${BUILD_NAME}"
-    name: "${BUILD_NAME}-sti-builder"
+      runid: "${RUN_ID}"
+      job-id: "${JOB_ID}"
+    generateName: "sti-builder-${BUILD_NUMBER}-${BUILD_NAME}-"
   spec:
     output:
       pushSecret:
-        name: "${PUSH_SECRET_NAME}"
+        name: "${IMAGE_SECRET_NAME}"
       to:
         kind: ImageStreamTag
         name: "${BUILD_NAME}:origin-sti-builder"
@@ -469,16 +566,20 @@ objects:
       contextDir: "sti-builder"
       images:
       - from:
-          kind: DockerImage
-          name: "${BUILD_NAME}:src"
+          kind: ImageStreamTag
+          name: "${BUILD_NAME}:binaries"
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         paths:
         - destinationDir: "."
           sourcePath: "/go/src/github.com/openshift/origin/images/builder/docker/sti-builder"
       type: Image
     strategy:
       dockerStrategy:
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         from:
-          kind: DockerImage
+          kind: ImageStreamTag
           name: "${BUILD_NAME}:origin"
       type: Docker
 - apiVersion: v1
@@ -486,11 +587,13 @@ objects:
   metadata:
     labels:
       build: "${BUILD_NAME}"
-    name: "${BUILD_NAME}-f5-router"
+      runid: "${RUN_ID}"
+      job-id: "${JOB_ID}"
+    generateName: "f5-router-${BUILD_NUMBER}-${BUILD_NAME}-"
   spec:
     output:
       pushSecret:
-        name: "${PUSH_SECRET_NAME}"
+        name: "${IMAGE_SECRET_NAME}"
       to:
         kind: ImageStreamTag
         name: "${BUILD_NAME}:origin-f5-router"
@@ -500,16 +603,20 @@ objects:
       contextDir: "f5"
       images:
       - from:
-          kind: DockerImage
-          name: "${BUILD_NAME}:src"
+          kind: ImageStreamTag
+          name: "${BUILD_NAME}:binaries"
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         paths:
         - destinationDir: "."
           sourcePath: "/go/src/github.com/openshift/origin/images/router/f5"
       type: Image
     strategy:
       dockerStrategy:
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         from:
-          kind: DockerImage
+          kind: ImageStreamTag
           name: "${BUILD_NAME}:origin"
       type: Docker
 - apiVersion: v1
@@ -517,11 +624,13 @@ objects:
   metadata:
     labels:
       build: "${BUILD_NAME}"
-    name: "${BUILD_NAME}-node"
+      runid: "${RUN_ID}"
+      job-id: "${JOB_ID}"
+    generateName: "node-${BUILD_NUMBER}-${BUILD_NAME}-"
   spec:
     output:
       pushSecret:
-        name: "${PUSH_SECRET_NAME}"
+        name: "${IMAGE_SECRET_NAME}"
       to:
         kind: ImageStreamTag
         name: "${BUILD_NAME}:node"
@@ -531,16 +640,20 @@ objects:
       contextDir: "node"
       images:
       - from:
-          kind: DockerImage
-          name: "${BUILD_NAME}:src"
+          kind: ImageStreamTag
+          name: "${BUILD_NAME}:binaries"
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         paths:
         - destinationDir: "."
           sourcePath: "/go/src/github.com/openshift/origin/images/node"
       type: Image
     strategy:
       dockerStrategy:
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         from:
-          kind: DockerImage
+          kind: ImageStreamTag
           name: "${BUILD_NAME}:origin"
       type: Docker
 - apiVersion: v1
@@ -548,11 +661,13 @@ objects:
   metadata:
     labels:
       build: "${BUILD_NAME}"
-    name: "${BUILD_NAME}-openvswitch"
+      runid: "${RUN_ID}"
+      job-id: "${JOB_ID}"
+    generateName: "openvswitch-${BUILD_NUMBER}-${BUILD_NAME}-"
   spec:
     output:
       pushSecret:
-        name: "${PUSH_SECRET_NAME}"
+        name: "${IMAGE_SECRET_NAME}"
       to:
         kind: ImageStreamTag
         name: "${BUILD_NAME}:openvswitch"
@@ -562,16 +677,20 @@ objects:
       contextDir: "openvswitch"
       images:
       - from:
-          kind: DockerImage
-          name: "${BUILD_NAME}:src"
+          kind: ImageStreamTag
+          name: "${BUILD_NAME}:binaries"
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         paths:
         - destinationDir: "."
           sourcePath: "/go/src/github.com/openshift/origin/images/openvswitch"
       type: Image
     strategy:
       dockerStrategy:
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         from:
-          kind: DockerImage
+          kind: ImageStreamTag
           name: "${BUILD_NAME}:node"
       type: Docker
 - apiVersion: v1
@@ -579,11 +698,13 @@ objects:
   metadata:
     labels:
       build: "${BUILD_NAME}"
-    name: "${BUILD_NAME}-hello-openshift"
+      runid: "${RUN_ID}"
+      job-id: "${JOB_ID}"
+    generateName: "hello-openshift-${BUILD_NUMBER}-${BUILD_NAME}-"
   spec:
     output:
       pushSecret:
-        name: "${PUSH_SECRET_NAME}"
+        name: "${IMAGE_SECRET_NAME}"
       to:
         kind: ImageStreamTag
         name: "${BUILD_NAME}:hello-openshift"
@@ -593,8 +714,10 @@ objects:
       contextDir: "hello-openshift"
       images:
       - from:
-          kind: DockerImage
+          kind: ImageStreamTag
           name: "${BUILD_NAME}:rpms"
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         paths:
         - destinationDir: "."
           sourcePath: "/go/src/github.com/openshift/origin/examples/hello-openshift"
@@ -603,7 +726,9 @@ objects:
       type: Image
     strategy:
       dockerStrategy:
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
         from:
-          kind: DockerImage
+          kind: ImageStreamTag
           name: "${BUILD_NAME}:origin"
       type: Docker

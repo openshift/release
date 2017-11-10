@@ -50,6 +50,14 @@ func printRefHash(args []string) error {
 	if err != nil {
 		return err
 	}
+	if len(sourceURL) == 0 {
+		owner := os.Getenv("REPO_OWNER")
+		name := os.Getenv("REPO_NAME")
+
+		if len(owner) > 0 && len(name) > 0 {
+			sourceURL = fmt.Sprintf("https://github.com/%s/%s.git", owner, name)
+		}
+	}
 	sourceRef.RepositoryURL = sourceURL
 	fmt.Printf("%s\n", sourceRef.ToBuildID())
 	return nil
