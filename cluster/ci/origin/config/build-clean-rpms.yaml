@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Template
 labels:
-  template: build-rpms
+  template: build-clean-rpms
 parameters:
 - description: Name of the build to associate with the source image and artifacts
   displayName: Build Name
@@ -20,7 +20,7 @@ parameters:
 - description: The Context inside the origin release source repository
   displayName: Source Context
   name: RELEASE_SRC_CONTEXT
-  value: cluster/ci/origin/images/rpms
+  value: cluster/ci/origin/images/clean-rpms
 - description: The name of the image pull/push secret for the builder service account
   displayName: Image Secret Name
   name: IMAGE_SECRET_NAME
@@ -31,6 +31,14 @@ parameters:
   value: "1"
 - name: PULL_NUMBER
   value: "-none"
+- description: The references to build
+  displayName: Pull References
+  name: PULL_REFS
+  required: true
+- name: REPO_OWNER
+  required: true
+- name: REPO_NAME
+  required: true
 - name: BASE_IMAGE_REF
   required: true
 - name: JOB_ID
@@ -42,9 +50,9 @@ objects:
     labels:
       build: "${BUILD_NAME}"
       pr: "pr${PULL_NUMBER}"
-      job: "rpms-${BUILD_NUMBER}"
+      job: "clean-rpms-${BUILD_NUMBER}"
       job-id: "${JOB_ID}"
-    generateName: "rpms-${BUILD_NUMBER}-${BUILD_NAME}-"
+    generateName: "clean-rpms-${BUILD_NUMBER}-${BUILD_NAME}-"
   spec:
     output:
       pushSecret:
@@ -65,6 +73,13 @@ objects:
         from:
           kind: ImageStreamTag
           name: "${BASE_IMAGE_REF}"
+        buildArgs:
+        - name: REPO_OWNER
+          value: "${REPO_OWNER}"
+        - name: REPO_NAME
+          value: "${REPO_NAME}"
+        - name: PULL_REFS
+          value: "${PULL_REFS}"
         pullSecret:
           name: "${IMAGE_SECRET_NAME}"
       type: Docker

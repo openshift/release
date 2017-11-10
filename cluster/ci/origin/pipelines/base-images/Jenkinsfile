@@ -18,6 +18,13 @@ pipeline {
     string(name: "RELEASE_SRC_REF", defaultValue: "${env.RELEASE_SRC_REF ?: 'master' }", description: "The branch of the release repository to use")
     string(name: "RELEASE_LIBRARY_URL", defaultValue: "${library_url}")
     string(name: "RELEASE_LIBRARY_REF", defaultValue: "${library_ref}")
+    string(name: "REPO_OWNER", defaultValue: "openshift")
+    string(name: "REPO_NAME", defaultValue: "origin")
+    string(name: "PULL_BASE_REF", defaultValue: "master")
+    string(name: "PULL_BASE_SHA", defaultValue: "master")
+    string(name: "PULL_REFS", defaultValue: "master")
+    string(name: "PULL_NUMBER", defaultValue: "")
+    string(name: "PULL_PULL_SHA", defaultValue: "")
   }
 
   stages {
@@ -32,17 +39,20 @@ pipeline {
     stage("Run Builds") {
       steps {
         script {
+          this._jobId = "build-base-${env.BUILD_NUMBER}"
           def imageSecret=dockerCfgSecret(this, "builder")
           def buildBaseBuild = createTemplate(this, "${templateBase}/build-base-build.yaml",
             "RELEASE_SRC_URL=${params.RELEASE_SRC_URL}",
             "RELEASE_SRC_REF=${params.RELEASE_SRC_REF}",
             "ORIGIN_SRC_URL=${params.ORIGIN_URL}",
-            "IMAGE_SECRET=${imageSecret}")
+            "IMAGE_SECRET=${imageSecret}",
+            "JOB_ID=${this._jobId}")
           def testBaseBuild = createTemplate(this, "${templateBase}/test-base-build.yaml",
             "RELEASE_SRC_URL=${params.RELEASE_SRC_URL}",
             "RELEASE_SRC_REF=${params.RELEASE_SRC_REF}",
             "ORIGIN_SRC_URL=${params.ORIGIN_URL}",
-            "IMAGE_SECRET=${imageSecret}")
+            "IMAGE_SECRET=${imageSecret}", 
+            "JOB_ID=${this._jobId}")
           // For now wait for builds serially. Parallel blocks 
           // are buggy in Jenkinsfiles
           waitForBuild(this, testBaseBuild.name(), 7200)
@@ -53,7 +63,8 @@ pipeline {
   }
   post {
     always {
-      deleteDir()
+      cleanupArtifacts(this, ["job-id": "${this._jobId}"])
+      deleteWorkspace(this)
     }
   }
 }
