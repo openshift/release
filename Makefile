@@ -120,7 +120,7 @@ node-exporter:
 
 test-bases:
 	oc apply -f projects/test-bases/openshift/openshift-ansible.yaml
-.PHONY test-bases
+.PHONY: test-bases
 
 jenkins:
 	oc new-app --template jenkins-persistent -e INSTALL_PLUGINS=groovy:2.0,pipeline-github-lib:1.0 -p MEMORY_LIMIT=10Gi -p VOLUME_CAPACITY=20Gi -e OPENSHIFT_JENKINS_JVM_ARCH=x86_64 -e JAVA_GC_OPTS="-XX:+UseParallelGC -XX:MinHeapFreeRatio=20 -XX:MaxHeapFreeRatio=40 -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90"
