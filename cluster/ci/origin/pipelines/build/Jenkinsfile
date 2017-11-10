@@ -40,13 +40,8 @@ pipeline {
       }
     }
     stage ("Create ImageStream") {
-      when {
-        not { expression { return imageStreamExists(this, "${this._buildName}") } }
-      }
       steps {
-        echo "Creating image stream ${this._buildName}"
-        applyTemplate(this, "${templateBase}/output-imagestream.yaml",
-          "BUILD_NAME=${this._buildName}")
+        ensureImageStream(this, "${this._buildName}")
       }
     }
     stage("Compile") {
@@ -58,7 +53,7 @@ pipeline {
           runAndWaitForBuild(this, "", {
             return createTemplate(this, "${templateBase}/compile.yaml",
               "RELEASE_SRC_REF=${params.RELEASE_SRC_REF}",
-              "RELEASE_SRC_URL=${params.RELEASE_SRC_URL}", 
+              "RELEASE_SRC_URL=${params.RELEASE_SRC_URL}",
               "PUSH_SECRET_NAME=${this._pushSecret}",
               "PULL_NUMBER=${params.PULL_NUMBER}",
               "PULL_REFS=${params.PULL_REFS}",
@@ -81,7 +76,7 @@ pipeline {
             runAndWaitForBuild(this, "", {
               return createTemplate(this, "${templateBase}/build-clean-rpms.yaml",
                 "RELEASE_SRC_REF=${params.RELEASE_SRC_REF}",
-                "RELEASE_SRC_URL=${params.RELEASE_SRC_URL}", 
+                "RELEASE_SRC_URL=${params.RELEASE_SRC_URL}",
                 "IMAGE_SECRET_NAME=${this._pushSecret}",
                 "BASE_IMAGE_REF=build-base:latest",
                 "PULL_NUMBER=${params.PULL_NUMBER}",
@@ -96,7 +91,7 @@ pipeline {
             runAndWaitForBuild(this, "", {
               return createTemplate(this, "${templateBase}/build-rpms.yaml",
                 "RELEASE_SRC_REF=${params.RELEASE_SRC_REF}",
-                "RELEASE_SRC_URL=${params.RELEASE_SRC_URL}", 
+                "RELEASE_SRC_URL=${params.RELEASE_SRC_URL}",
                 "IMAGE_SECRET_NAME=${this._pushSecret}",
                 "BASE_IMAGE_REF=${this._buildName}:binaries",
                 "PULL_NUMBER=${params.PULL_NUMBER}",
@@ -118,7 +113,7 @@ pipeline {
           openshift.withCluster() {
             imageStreamRepo = openshift.selector("is/${this._buildName}").object().status.dockerImageRepository
           }
-          applyTemplate(this, "${templateBase}/serve-rpms.yaml", 
+          applyTemplate(this, "${templateBase}/serve-rpms.yaml",
             "RPM_IMAGE_REF=${imageStreamRepo}:rpms",
             "BUILD_NAME=${this._buildName}")
           waitForDeployment(this, "rpm-repo-${this._buildName}")
@@ -138,7 +133,7 @@ pipeline {
           runAndWaitForBuild(this, "", {
             return createTemplate(this, "${templateBase}/repo-base.yaml",
               "RELEASE_SRC_REF=${env.RELEASE_SRC_REF ?: 'master'}",
-              "RELEASE_SRC_URL=${env.RELEASE_SRC_URL ?: 'https://github.com/openshift/release.git'}", 
+              "RELEASE_SRC_URL=${env.RELEASE_SRC_URL ?: 'https://github.com/openshift/release.git'}",
               "PUSH_SECRET_NAME=${this._pushSecret}",
               "PULL_NUMBER=${params.PULL_NUMBER}",
               "BUILD_NUMBER=${env.BUILD_NUMBER}",
@@ -159,7 +154,7 @@ pipeline {
           "BUILD_NAME=${this._buildName}",
           "JOB_ID=${this._jobId}")
         waitForBuilds(this, ["runid": "${this._runId}"], true)
-      } 
+      }
     }
     stage("Create Image Namespace") {
       when {
@@ -215,7 +210,7 @@ pipeline {
               configmap.delete()
             }
             routeHost = openshift.selector("route/rpm-repo-${this._buildName}").object().spec.host
-            openshift.raw("create", "configmap", "${this._buildName}", 
+            openshift.raw("create", "configmap", "${this._buildName}",
               "--from-literal", "image-base=${this._imageBase}",
               "--from-literal", "rpm-repo=http://${routeHost}",
               "--from-literal", "namespace=images-${this._buildName}")
