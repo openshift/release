@@ -18,15 +18,23 @@ items:
         name: openshift-ansible:test-base
     source:
       git:
-        uri: https://github.com/kubernetes/openshift-ansible.git
+        uri: https://github.com/openshift/openshift-ansible.git
       type: Git
       dockerfile: |
         FROM openshift/origin-release:base
         COPY . /data/src/github.com/openshift/openshift-ansible
+        COPY release-ci /usr/bin
+      images:
+      - from:
+          kind: ImageStreamTag
+          name: release-ci:binary
+        paths:
+        - destinationDir: .
+          sourcePath: /usr/bin/release-ci
     strategy:
       dockerStrategy:
         from:
-          kind: DockerImage
+          kind: ImageStreamTag
           name: origin-release:base
         imageOptimizationPolicy: SkipLayers
     triggers:
