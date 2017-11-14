@@ -68,6 +68,44 @@ objects:
       build: "${BUILD_NAME}"
       runid: "${RUN_ID}"
       job-id: "${JOB_ID}"
+    generateName: "origin-pod-${BUILD_NUMBER}-${BUILD_NAME}-"
+  spec:
+    output:
+      pushSecret:
+        name: "${IMAGE_SECRET_NAME}"
+      to:
+        kind: ImageStreamTag
+        name: "${BUILD_NAME}:origin-pod"
+    runPolicy: Serial
+    serviceAccount: builder
+    source:
+      contextDir: "pod"
+      images:
+      - from:
+          kind: ImageStreamTag
+          name: "${BUILD_NAME}:binaries"
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
+        paths:
+        - destinationDir: "."
+          sourcePath: "/go/src/github.com/openshift/origin/images/pod"
+      type: Image
+    strategy:
+      dockerStrategy:
+        pullSecret:
+          name: "${IMAGE_SECRET_NAME}"
+        dockerfilePath: Dockerfile.centos7
+        from:
+          kind: ImageStreamTag
+          name: "${BUILD_NAME}:repo-base"
+      type: Docker
+- apiVersion: v1
+  kind: Build
+  metadata:
+    labels:
+      build: "${BUILD_NAME}"
+      runid: "${RUN_ID}"
+      job-id: "${JOB_ID}"
     generateName: "cluster-capacity-${BUILD_NUMBER}-${BUILD_NAME}-"
   spec:
     output:

@@ -7,20 +7,6 @@ parameters:
   displayName: Build Name
   name: BUILD_NAME
   required: true
-- description: The URL of the origin release source repository
-  displayName: Source URL
-  name: RELEASE_SRC_URL
-  value: https://github.com/openshift/release.git
-  required: true
-- description: The Reference of the origin release source repository
-  displayName: Source Ref
-  name: RELEASE_SRC_REF
-  value: master
-  required: true
-- description: The Context inside the origin release source repository
-  displayName: Source Context
-  name: RELEASE_SRC_CONTEXT
-  value: cluster/ci/origin/images/rpms
 - description: The name of the image pull/push secret for the builder service account
   displayName: Image Secret Name
   name: IMAGE_SECRET_NAME
@@ -55,11 +41,11 @@ objects:
     runPolicy: Serial
     serviceAccount: builder
     source:
-      contextDir: "${RELEASE_SRC_CONTEXT}"
-      git:
-        ref: "${RELEASE_SRC_REF}"
-        uri: "${RELEASE_SRC_URL}"
-      type: Git
+      dockerfile: |-
+        FROM binaries
+
+        RUN touch .local && run.sh make build-rpms
+
     strategy:
       dockerStrategy:
         from:
