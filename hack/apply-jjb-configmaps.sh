@@ -8,7 +8,6 @@ jenkins_host="$(oc get route jenkins -o jsonpath='{ .spec.host }')"
 token="$(oc whoami -t)"
 jenkins_url="https://${jenkins_host}"
 
-cd ~/Code/release/go/src/github.com/openshift/release
 release_url="${RELEASE_SRC_URL:-https://github.com/openshift/release.git}"
 release_ref="${RELEASE_SRC_REF:-master}"
 job_prefix="${JOB_PREFIX:-origin-ci}"
