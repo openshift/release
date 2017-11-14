@@ -1,0 +1,58 @@
+apiVersion: v1
+kind: List
+items:
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: build-job
+    annotations:
+      ci.openshift.io/jenkins-job: "true"
+  data:
+    job.yml: |-
+      - job:
+          name: ci-openshift-ansible-build
+          project-type: pipeline
+          concurrent: true
+          properties:
+            - build-discarder:
+                days-to-keep: 1
+          parameters:
+            - string:
+                name: buildId
+                default: ""
+                description: The ID that prow sets on a Jenkins job in order to correlate it with a ProwJob
+            - string:
+                name: REPO_OWNER
+                default: ""
+                description: Repository organization
+            - string:
+                name: REPO_NAME
+                default: ""
+                description: Repository name
+            - string:
+                name: PULL_BASE_REF
+                default: ""
+                description: Base branch
+            - string:
+                name: PULL_BASE_SHA
+                default: ""
+                description: Base branch commit
+            - string:
+                name: PULL_REFS
+                default: ""
+                description: Reference to build or test
+            - string:
+                name: PULL_NUMBER
+                default: ""
+                description: PR number
+            - string:
+                name: PULL_PULL_SHA
+                default: ""
+                description: PR commit
+          pipeline-scm:
+            script-path: jobs/openshift/openshift-ansible/build.groovy
+            scm:
+               - git:
+                   url: https://github.com/stevekuznetsov/release.git
+                   branches:
+                     - skuznets/openshift-ansible-build-pipeline
