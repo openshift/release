@@ -52,8 +52,6 @@ pipeline {
         script {
           runAndWaitForBuild(this, "", {
             return createTemplate(this, "${templateBase}/compile.yaml",
-              "RELEASE_SRC_REF=${params.RELEASE_SRC_REF}",
-              "RELEASE_SRC_URL=${params.RELEASE_SRC_URL}",
               "PUSH_SECRET_NAME=${this._pushSecret}",
               "PULL_NUMBER=${params.PULL_NUMBER}",
               "PULL_REFS=${params.PULL_REFS}",
@@ -75,8 +73,6 @@ pipeline {
           if (params.CLEAN_BUILD) {
             runAndWaitForBuild(this, "", {
               return createTemplate(this, "${templateBase}/build-clean-rpms.yaml",
-                "RELEASE_SRC_REF=${params.RELEASE_SRC_REF}",
-                "RELEASE_SRC_URL=${params.RELEASE_SRC_URL}",
                 "IMAGE_SECRET_NAME=${this._pushSecret}",
                 "BASE_IMAGE_REF=build-base:latest",
                 "PULL_NUMBER=${params.PULL_NUMBER}",
@@ -90,8 +86,6 @@ pipeline {
           } else {
             runAndWaitForBuild(this, "", {
               return createTemplate(this, "${templateBase}/build-rpms.yaml",
-                "RELEASE_SRC_REF=${params.RELEASE_SRC_REF}",
-                "RELEASE_SRC_URL=${params.RELEASE_SRC_URL}",
                 "IMAGE_SECRET_NAME=${this._pushSecret}",
                 "BASE_IMAGE_REF=${this._buildName}:binaries",
                 "PULL_NUMBER=${params.PULL_NUMBER}",
@@ -132,8 +126,8 @@ pipeline {
           }
           runAndWaitForBuild(this, "", {
             return createTemplate(this, "${templateBase}/repo-base.yaml",
-              "RELEASE_SRC_REF=${env.RELEASE_SRC_REF ?: 'master'}",
-              "RELEASE_SRC_URL=${env.RELEASE_SRC_URL ?: 'https://github.com/openshift/release.git'}",
+              "RELEASE_SRC_REF=${params.RELEASE_SRC_REF}",
+              "RELEASE_SRC_URL=${params.RELEASE_SRC_URL}",
               "PUSH_SECRET_NAME=${this._pushSecret}",
               "PULL_NUMBER=${params.PULL_NUMBER}",
               "BUILD_NUMBER=${env.BUILD_NUMBER}",
@@ -194,8 +188,12 @@ pipeline {
               }
             }
             openshift.withProject("images-${this._buildName}") {
-              def originImageStream = openshift.selector("is", "origin")
-              this._imageBase = openshift.selector("is", "origin").object().status.dockerImageRepository
+              def originImageStream = openshift.selector("is", "origin").object()
+              if (originImageStream.status.publicDockerImageRepository) {
+                this._imageBase = originImageStream.status.publicDockerImageRepository
+              } else {
+                this._imageBase = originImageStream.status.dockerImageRepository
+              }
             }
           }
         }
