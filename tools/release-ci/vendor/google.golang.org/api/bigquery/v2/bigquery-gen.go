@@ -660,6 +660,36 @@ func (s *DatasetReference) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+type EncryptionConfiguration struct {
+	// KmsKeyName: [Optional] Describes the Cloud KMS encryption key that
+	// will be used to protect destination BigQuery table. The BigQuery
+	// Service Account associated with your project requires access to this
+	// encryption key.
+	KmsKeyName string `json:"kmsKeyName,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "KmsKeyName") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "KmsKeyName") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *EncryptionConfiguration) MarshalJSON() ([]byte, error) {
+	type noMethod EncryptionConfiguration
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 type ErrorProto struct {
 	// DebugInfo: Debugging information. This property is internal to Google
 	// and should not be used.
@@ -1038,6 +1068,40 @@ func (s *GetQueryResultsResponse) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+type GetServiceAccountResponse struct {
+	// Email: The service account email address.
+	Email string `json:"email,omitempty"`
+
+	// Kind: The resource type of the response.
+	Kind string `json:"kind,omitempty"`
+
+	// ServerResponse contains the HTTP response code and headers from the
+	// server.
+	googleapi.ServerResponse `json:"-"`
+
+	// ForceSendFields is a list of field names (e.g. "Email") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Email") to include in API
+	// requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *GetServiceAccountResponse) MarshalJSON() ([]byte, error) {
+	type noMethod GetServiceAccountResponse
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 type GoogleSheetsOptions struct {
 	// SkipLeadingRows: [Optional] The number of rows at the top of a sheet
 	// that BigQuery will skip when reading the data. The default value is
@@ -1305,6 +1369,10 @@ type JobConfigurationLoad struct {
 	// one atomic update upon job completion.
 	CreateDisposition string `json:"createDisposition,omitempty"`
 
+	// DestinationEncryptionConfiguration: [Experimental] Custom encryption
+	// configuration (e.g., Cloud KMS keys).
+	DestinationEncryptionConfiguration *EncryptionConfiguration `json:"destinationEncryptionConfiguration,omitempty"`
+
 	// DestinationTable: [Required] The destination table to load the data
 	// into.
 	DestinationTable *TableReference `json:"destinationTable,omitempty"`
@@ -1383,17 +1451,16 @@ type JobConfigurationLoad struct {
 	// property.
 	SchemaInlineFormat string `json:"schemaInlineFormat,omitempty"`
 
-	// SchemaUpdateOptions: [Experimental] Allows the schema of the
-	// desitination table to be updated as a side effect of the load job if
-	// a schema is autodetected or supplied in the job configuration. Schema
-	// update options are supported in two cases: when writeDisposition is
-	// WRITE_APPEND; when writeDisposition is WRITE_TRUNCATE and the
-	// destination table is a partition of a table, specified by partition
-	// decorators. For normal tables, WRITE_TRUNCATE will always overwrite
-	// the schema. One or more of the following values are specified:
-	// ALLOW_FIELD_ADDITION: allow adding a nullable field to the schema.
-	// ALLOW_FIELD_RELAXATION: allow relaxing a required field in the
-	// original schema to nullable.
+	// SchemaUpdateOptions: Allows the schema of the destination table to be
+	// updated as a side effect of the load job if a schema is autodetected
+	// or supplied in the job configuration. Schema update options are
+	// supported in two cases: when writeDisposition is WRITE_APPEND; when
+	// writeDisposition is WRITE_TRUNCATE and the destination table is a
+	// partition of a table, specified by partition decorators. For normal
+	// tables, WRITE_TRUNCATE will always overwrite the schema. One or more
+	// of the following values are specified: ALLOW_FIELD_ADDITION: allow
+	// adding a nullable field to the schema. ALLOW_FIELD_RELAXATION: allow
+	// relaxing a required field in the original schema to nullable.
 	SchemaUpdateOptions []string `json:"schemaUpdateOptions,omitempty"`
 
 	// SkipLeadingRows: [Optional] The number of rows at the top of a CSV
@@ -1419,8 +1486,8 @@ type JobConfigurationLoad struct {
 	// not allowed.
 	SourceUris []string `json:"sourceUris,omitempty"`
 
-	// TimePartitioning: [Experimental] If specified, configures time-based
-	// partitioning for the destination table.
+	// TimePartitioning: If specified, configures time-based partitioning
+	// for the destination table.
 	TimePartitioning *TimePartitioning `json:"timePartitioning,omitempty"`
 
 	// WriteDisposition: [Optional] Specifies the action that occurs if the
@@ -1481,6 +1548,10 @@ type JobConfigurationQuery struct {
 	// unqualified table names in the query.
 	DefaultDataset *DatasetReference `json:"defaultDataset,omitempty"`
 
+	// DestinationEncryptionConfiguration: [Experimental] Custom encryption
+	// configuration (e.g., Cloud KMS keys).
+	DestinationEncryptionConfiguration *EncryptionConfiguration `json:"destinationEncryptionConfiguration,omitempty"`
+
 	// DestinationTable: [Optional] Describes the table where the query
 	// results should be stored. If not present, a new table will be created
 	// to store the results. This property must be set for large results
@@ -1530,16 +1601,15 @@ type JobConfigurationQuery struct {
 	// QueryParameters: Query parameters for standard SQL queries.
 	QueryParameters []*QueryParameter `json:"queryParameters,omitempty"`
 
-	// SchemaUpdateOptions: [Experimental] Allows the schema of the
-	// destination table to be updated as a side effect of the query job.
-	// Schema update options are supported in two cases: when
-	// writeDisposition is WRITE_APPEND; when writeDisposition is
-	// WRITE_TRUNCATE and the destination table is a partition of a table,
-	// specified by partition decorators. For normal tables, WRITE_TRUNCATE
-	// will always overwrite the schema. One or more of the following values
-	// are specified: ALLOW_FIELD_ADDITION: allow adding a nullable field to
-	// the schema. ALLOW_FIELD_RELAXATION: allow relaxing a required field
-	// in the original schema to nullable.
+	// SchemaUpdateOptions: Allows the schema of the destination table to be
+	// updated as a side effect of the query job. Schema update options are
+	// supported in two cases: when writeDisposition is WRITE_APPEND; when
+	// writeDisposition is WRITE_TRUNCATE and the destination table is a
+	// partition of a table, specified by partition decorators. For normal
+	// tables, WRITE_TRUNCATE will always overwrite the schema. One or more
+	// of the following values are specified: ALLOW_FIELD_ADDITION: allow
+	// adding a nullable field to the schema. ALLOW_FIELD_RELAXATION: allow
+	// relaxing a required field in the original schema to nullable.
 	SchemaUpdateOptions []string `json:"schemaUpdateOptions,omitempty"`
 
 	// TableDefinitions: [Optional] If querying an external data source
@@ -1548,8 +1618,8 @@ type JobConfigurationQuery struct {
 	// source can then be queried as if it were a standard BigQuery table.
 	TableDefinitions map[string]ExternalDataConfiguration `json:"tableDefinitions,omitempty"`
 
-	// TimePartitioning: [Experimental] If specified, configures time-based
-	// partitioning for the destination table.
+	// TimePartitioning: If specified, configures time-based partitioning
+	// for the destination table.
 	TimePartitioning *TimePartitioning `json:"timePartitioning,omitempty"`
 
 	// UseLegacySql: Specifies whether to use BigQuery's legacy SQL dialect
@@ -1618,6 +1688,10 @@ type JobConfigurationTableCopy struct {
 	// CREATE_IF_NEEDED. Creation, truncation and append actions occur as
 	// one atomic update upon job completion.
 	CreateDisposition string `json:"createDisposition,omitempty"`
+
+	// DestinationEncryptionConfiguration: [Experimental] Custom encryption
+	// configuration (e.g., Cloud KMS keys).
+	DestinationEncryptionConfiguration *EncryptionConfiguration `json:"destinationEncryptionConfiguration,omitempty"`
 
 	// DestinationTable: [Required] The destination table
 	DestinationTable *TableReference `json:"destinationTable,omitempty"`
@@ -1851,6 +1925,21 @@ type JobStatistics2 struct {
 	// query cache.
 	CacheHit bool `json:"cacheHit,omitempty"`
 
+	// DdlOperationPerformed: [Output-only, Experimental] The DDL operation
+	// performed, possibly dependent on the pre-existence of the DDL target.
+	// Possible values (new values might be added in the future): "CREATE":
+	// The query created the DDL target. "SKIP": No-op. Example cases: the
+	// query is CREATE TABLE IF NOT EXISTS while the table already exists,
+	// or the query is DROP TABLE IF EXISTS while the table does not exist.
+	// "REPLACE": The query replaced the DDL target. Example case: the query
+	// is CREATE OR REPLACE TABLE, and the table already exists. "DROP": The
+	// query deleted the DDL target.
+	DdlOperationPerformed string `json:"ddlOperationPerformed,omitempty"`
+
+	// DdlTargetTable: [Output-only, Experimental] The DDL target table.
+	// Present only for CREATE/DROP TABLE/VIEW queries.
+	DdlTargetTable *TableReference `json:"ddlTargetTable,omitempty"`
+
 	// NumDmlAffectedRows: [Output-only] The number of rows affected by a
 	// DML statement. Present only for DML statements INSERT, UPDATE or
 	// DELETE.
@@ -1877,6 +1966,9 @@ type JobStatistics2 struct {
 
 	// TotalBytesProcessed: [Output-only] Total bytes processed for the job.
 	TotalBytesProcessed int64 `json:"totalBytesProcessed,omitempty,string"`
+
+	// TotalSlotMs: [Output-only] Slot-milliseconds for the job.
+	TotalSlotMs int64 `json:"totalSlotMs,omitempty,string"`
 
 	// UndeclaredQueryParameters: [Output-only, Experimental] Standard SQL
 	// only: list of undeclared query parameters detected during a dry run
@@ -2486,6 +2578,10 @@ type Table struct {
 	// Description: [Optional] A user-friendly description of this table.
 	Description string `json:"description,omitempty"`
 
+	// EncryptionConfiguration: [Experimental] Custom encryption
+	// configuration (e.g., Cloud KMS keys).
+	EncryptionConfiguration *EncryptionConfiguration `json:"encryptionConfiguration,omitempty"`
+
 	// Etag: [Output-only] A hash of this resource.
 	Etag string `json:"etag,omitempty"`
 
@@ -2555,8 +2651,8 @@ type Table struct {
 	// TableReference: [Required] Reference describing the ID of this table.
 	TableReference *TableReference `json:"tableReference,omitempty"`
 
-	// TimePartitioning: [Experimental] If specified, configures time-based
-	// partitioning for this table.
+	// TimePartitioning: If specified, configures time-based partitioning
+	// for this table.
 	TimePartitioning *TimePartitioning `json:"timePartitioning,omitempty"`
 
 	// Type: [Output-only] Describes the table type. The following values
@@ -2908,6 +3004,16 @@ func (s *TableList) MarshalJSON() ([]byte, error) {
 }
 
 type TableListTables struct {
+	// CreationTime: The time when this table was created, in milliseconds
+	// since the epoch.
+	CreationTime int64 `json:"creationTime,omitempty,string"`
+
+	// ExpirationTime: [Optional] The time when this table expires, in
+	// milliseconds since the epoch. If not present, the table will persist
+	// indefinitely. Expired tables will be deleted and their storage
+	// reclaimed.
+	ExpirationTime int64 `json:"expirationTime,omitempty,string"`
+
 	// FriendlyName: The user-friendly name for this table.
 	FriendlyName string `json:"friendlyName,omitempty"`
 
@@ -2924,8 +3030,7 @@ type TableListTables struct {
 	// TableReference: A reference uniquely identifying the table.
 	TableReference *TableReference `json:"tableReference,omitempty"`
 
-	// TimePartitioning: [Experimental] The time-based partitioning for this
-	// table.
+	// TimePartitioning: The time-based partitioning for this table.
 	TimePartitioning *TimePartitioning `json:"timePartitioning,omitempty"`
 
 	// Type: The type of table. Possible values are: TABLE, VIEW.
@@ -2934,7 +3039,7 @@ type TableListTables struct {
 	// View: Additional details for a view.
 	View *TableListTablesView `json:"view,omitempty"`
 
-	// ForceSendFields is a list of field names (e.g. "FriendlyName") to
+	// ForceSendFields is a list of field names (e.g. "CreationTime") to
 	// unconditionally include in API requests. By default, fields with
 	// empty values are omitted from API requests. However, any non-pointer,
 	// non-interface field appearing in ForceSendFields will be sent to the
@@ -2942,7 +3047,7 @@ type TableListTables struct {
 	// used to include empty fields in Patch requests.
 	ForceSendFields []string `json:"-"`
 
-	// NullFields is a list of field names (e.g. "FriendlyName") to include
+	// NullFields is a list of field names (e.g. "CreationTime") to include
 	// in API requests with the JSON null value. By default, fields with
 	// empty values are omitted from API requests. However, any field with
 	// an empty value appearing in NullFields will be sent to the server as
@@ -3081,8 +3186,14 @@ type TimePartitioning struct {
 	// storage for a partition.
 	ExpirationMs int64 `json:"expirationMs,omitempty,string"`
 
+	// Field: [Experimental] [Optional] If not set, the table is partitioned
+	// by pseudo column '_PARTITIONTIME'; if set, the table is partitioned
+	// by this field. The field must be a top-level TIMESTAMP or DATE field.
+	// Its mode must be NULLABLE or REQUIRED.
+	Field string `json:"field,omitempty"`
+
 	// Type: [Required] The only type supported is DAY, which will generate
-	// one partition per day based on data loading time.
+	// one partition per day.
 	Type string `json:"type,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "ExpirationMs") to
@@ -4605,17 +4716,13 @@ func (c *JobsGetQueryResultsCall) Pages(ctx context.Context, f func(*GetQueryRes
 // method id "bigquery.jobs.insert":
 
 type JobsInsertCall struct {
-	s                *Service
-	projectId        string
-	job              *Job
-	urlParams_       gensupport.URLParams
-	media_           io.Reader
-	mediaBuffer_     *gensupport.MediaBuffer
-	mediaType_       string
-	mediaSize_       int64 // mediaSize, if known.  Used only for calls to progressUpdater_.
-	progressUpdater_ googleapi.ProgressUpdater
-	ctx_             context.Context
-	header_          http.Header
+	s          *Service
+	projectId  string
+	job        *Job
+	urlParams_ gensupport.URLParams
+	mediaInfo_ *gensupport.MediaInfo
+	ctx_       context.Context
+	header_    http.Header
 }
 
 // Insert: Starts a new asynchronous job. Requires the Can View project
@@ -4636,12 +4743,7 @@ func (r *JobsService) Insert(projectId string, job *Job) *JobsInsertCall {
 // supplied.
 // At most one of Media and ResumableMedia may be set.
 func (c *JobsInsertCall) Media(r io.Reader, options ...googleapi.MediaOption) *JobsInsertCall {
-	opts := googleapi.ProcessMediaOptions(options)
-	chunkSize := opts.ChunkSize
-	if !opts.ForceEmptyContentType {
-		r, c.mediaType_ = gensupport.DetermineContentType(r, opts.ContentType)
-	}
-	c.media_, c.mediaBuffer_ = gensupport.PrepareUpload(r, chunkSize)
+	c.mediaInfo_ = gensupport.NewInfoFromMedia(r, options)
 	return c
 }
 
@@ -4656,11 +4758,7 @@ func (c *JobsInsertCall) Media(r io.Reader, options ...googleapi.MediaOption) *J
 // supersede any context previously provided to the Context method.
 func (c *JobsInsertCall) ResumableMedia(ctx context.Context, r io.ReaderAt, size int64, mediaType string) *JobsInsertCall {
 	c.ctx_ = ctx
-	rdr := gensupport.ReaderAtToReader(r, size)
-	rdr, c.mediaType_ = gensupport.DetermineContentType(rdr, mediaType)
-	c.mediaBuffer_ = gensupport.NewMediaBuffer(rdr, googleapi.DefaultUploadChunkSize)
-	c.media_ = nil
-	c.mediaSize_ = size
+	c.mediaInfo_ = gensupport.NewInfoFromResumableMedia(r, size, mediaType)
 	return c
 }
 
@@ -4669,7 +4767,7 @@ func (c *JobsInsertCall) ResumableMedia(ctx context.Context, r io.ReaderAt, size
 // not slow down the upload operation. This should only be called when
 // using ResumableMedia (as opposed to Media).
 func (c *JobsInsertCall) ProgressUpdater(pu googleapi.ProgressUpdater) *JobsInsertCall {
-	c.progressUpdater_ = pu
+	c.mediaInfo_.SetProgressUpdater(pu)
 	return c
 }
 
@@ -4714,27 +4812,16 @@ func (c *JobsInsertCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders.Set("Content-Type", "application/json")
 	c.urlParams_.Set("alt", alt)
 	urls := googleapi.ResolveRelative(c.s.BasePath, "projects/{projectId}/jobs")
-	if c.media_ != nil || c.mediaBuffer_ != nil {
+	if c.mediaInfo_ != nil {
 		urls = strings.Replace(urls, "https://www.googleapis.com/", "https://www.googleapis.com/upload/", 1)
-		protocol := "multipart"
-		if c.mediaBuffer_ != nil {
-			protocol = "resumable"
-		}
-		c.urlParams_.Set("uploadType", protocol)
+		c.urlParams_.Set("uploadType", c.mediaInfo_.UploadType())
 	}
 	if body == nil {
 		body = new(bytes.Buffer)
 		reqHeaders.Set("Content-Type", "application/json")
 	}
-	if c.media_ != nil {
-		combined, ctype := gensupport.CombineBodyMedia(body, "application/json", c.media_, c.mediaType_)
-		defer combined.Close()
-		reqHeaders.Set("Content-Type", ctype)
-		body = combined
-	}
-	if c.mediaBuffer_ != nil && c.mediaType_ != "" {
-		reqHeaders.Set("X-Upload-Content-Type", c.mediaType_)
-	}
+	body, cleanup := c.mediaInfo_.UploadRequest(reqHeaders, body)
+	defer cleanup()
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("POST", urls, body)
 	req.Header = reqHeaders
@@ -4770,20 +4857,10 @@ func (c *JobsInsertCall) Do(opts ...googleapi.CallOption) (*Job, error) {
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	if c.mediaBuffer_ != nil {
-		loc := res.Header.Get("Location")
-		rx := &gensupport.ResumableUpload{
-			Client:    c.s.client,
-			UserAgent: c.s.userAgent(),
-			URI:       loc,
-			Media:     c.mediaBuffer_,
-			MediaType: c.mediaType_,
-			Callback: func(curr int64) {
-				if c.progressUpdater_ != nil {
-					c.progressUpdater_(curr, c.mediaSize_)
-				}
-			},
-		}
+	rx := c.mediaInfo_.ResumableUpload(res.Header.Get("Location"))
+	if rx != nil {
+		rx.Client = c.s.client
+		rx.UserAgent = c.s.userAgent()
 		ctx := c.ctx_
 		if ctx == nil {
 			ctx = context.TODO()
@@ -5236,6 +5313,146 @@ func (c *JobsQueryCall) Do(opts ...googleapi.CallOption) (*QueryResponse, error)
 	//   },
 	//   "response": {
 	//     "$ref": "QueryResponse"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/bigquery",
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/cloud-platform.read-only"
+	//   ]
+	// }
+
+}
+
+// method id "bigquery.projects.getServiceAccount":
+
+type ProjectsGetServiceAccountCall struct {
+	s            *Service
+	projectId    string
+	urlParams_   gensupport.URLParams
+	ifNoneMatch_ string
+	ctx_         context.Context
+	header_      http.Header
+}
+
+// GetServiceAccount: Returns the email address of the service account
+// for your project used for interactions with Google Cloud KMS.
+func (r *ProjectsService) GetServiceAccount(projectId string) *ProjectsGetServiceAccountCall {
+	c := &ProjectsGetServiceAccountCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.projectId = projectId
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *ProjectsGetServiceAccountCall) Fields(s ...googleapi.Field) *ProjectsGetServiceAccountCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// IfNoneMatch sets the optional parameter which makes the operation
+// fail if the object's ETag matches the given value. This is useful for
+// getting updates only after the object has changed since the last
+// request. Use googleapi.IsNotModified to check whether the response
+// error from Do is the result of In-None-Match.
+func (c *ProjectsGetServiceAccountCall) IfNoneMatch(entityTag string) *ProjectsGetServiceAccountCall {
+	c.ifNoneMatch_ = entityTag
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *ProjectsGetServiceAccountCall) Context(ctx context.Context) *ProjectsGetServiceAccountCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *ProjectsGetServiceAccountCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *ProjectsGetServiceAccountCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	if c.ifNoneMatch_ != "" {
+		reqHeaders.Set("If-None-Match", c.ifNoneMatch_)
+	}
+	var body io.Reader = nil
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "projects/{projectId}/serviceAccount")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("GET", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"projectId": c.projectId,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "bigquery.projects.getServiceAccount" call.
+// Exactly one of *GetServiceAccountResponse or error will be non-nil.
+// Any non-2xx status code is an error. Response headers are in either
+// *GetServiceAccountResponse.ServerResponse.Header or (if a response
+// was returned at all) in error.(*googleapi.Error).Header. Use
+// googleapi.IsNotModified to check whether the returned error was
+// because http.StatusNotModified was returned.
+func (c *ProjectsGetServiceAccountCall) Do(opts ...googleapi.CallOption) (*GetServiceAccountResponse, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &GetServiceAccountResponse{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Returns the email address of the service account for your project used for interactions with Google Cloud KMS.",
+	//   "httpMethod": "GET",
+	//   "id": "bigquery.projects.getServiceAccount",
+	//   "parameterOrder": [
+	//     "projectId"
+	//   ],
+	//   "parameters": {
+	//     "projectId": {
+	//       "description": "Project ID for which the service account is requested.",
+	//       "location": "path",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "projects/{projectId}/serviceAccount",
+	//   "response": {
+	//     "$ref": "GetServiceAccountResponse"
 	//   },
 	//   "scopes": [
 	//     "https://www.googleapis.com/auth/bigquery",

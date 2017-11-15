@@ -446,8 +446,8 @@ func (s *ListWaitersResponse) MarshalJSON() ([]byte, error) {
 type Operation struct {
 	// Done: If the value is `false`, it means the operation is still in
 	// progress.
-	// If true, the operation is completed, and either `error` or `response`
-	// is
+	// If `true`, the operation is completed, and either `error` or
+	// `response` is
 	// available.
 	Done bool `json:"done,omitempty"`
 
@@ -622,9 +622,11 @@ type RuntimeConfig struct {
 	//
 	// The `[PROJECT_ID]` must be a valid project ID, and `[CONFIG_NAME]` is
 	// an
-	// arbitrary name that matches RFC 1035 segment specification. The
-	// length of
-	// `[CONFIG_NAME]` must be less than 64 bytes.
+	// arbitrary name that
+	// matches
+	// [0-9A-Za-z](?:[_.A-Za-z0-9-]{0,62}[_.A-Za-z0-9])? regular
+	// expression.
+	// The length of `[CONFIG_NAME]` must be less than 64 characters.
 	//
 	// You pick the RuntimeConfig resource name, but the server will
 	// validate that
@@ -912,9 +914,12 @@ type Variable struct {
 	// one
 	// non-slash character. Multiple slashes are coalesced into single
 	// slash
-	// character. Each path segment should follow RFC 1035 segment
-	// specification.
-	// The length of a `[VARIABLE_NAME]` must be less than 256 bytes.
+	// character. Each path segment should
+	// match
+	// [0-9A-Za-z](?:[_.A-Za-z0-9-]{0,62}[_.A-Za-z0-9])? regular
+	// expression.
+	// The length of a `[VARIABLE_NAME]` must be less than 256
+	// characters.
 	//
 	// Once you create a variable, you cannot change the variable name.
 	Name string `json:"name,omitempty"`
@@ -2740,7 +2745,7 @@ func (c *ProjectsConfigsVariablesCreateCall) Do(opts ...googleapi.CallOption) (*
 	//   ],
 	//   "parameters": {
 	//     "parent": {
-	//       "description": "The path to the RutimeConfig resource that this variable should belong to.\nThe configuration must exist beforehand; the path must by in the format:\n\n`projects/[PROJECT_ID]/configs/[CONFIG_NAME]`",
+	//       "description": "The path to the RutimeConfig resource that this variable should belong to.\nThe configuration must exist beforehand; the path must be in the format:\n\n`projects/[PROJECT_ID]/configs/[CONFIG_NAME]`",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+/configs/[^/]+$",
 	//       "required": true,
@@ -3234,7 +3239,7 @@ func (c *ProjectsConfigsVariablesListCall) Do(opts ...googleapi.CallOption) (*Li
 	//       "type": "string"
 	//     },
 	//     "parent": {
-	//       "description": "The path to the RuntimeConfig resource for which you want to list variables.\nThe configuration must exist beforehand; the path must by in the format:\n\n`projects/[PROJECT_ID]/configs/[CONFIG_NAME]`",
+	//       "description": "The path to the RuntimeConfig resource for which you want to list variables.\nThe configuration must exist beforehand; the path must be in the format:\n\n`projects/[PROJECT_ID]/configs/[CONFIG_NAME]`",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+/configs/[^/]+$",
 	//       "required": true,
@@ -3857,7 +3862,7 @@ func (c *ProjectsConfigsWaitersCreateCall) Do(opts ...googleapi.CallOption) (*Op
 	//   ],
 	//   "parameters": {
 	//     "parent": {
-	//       "description": "The path to the configuration that will own the waiter.\nThe configuration must exist beforehand; the path must by in the format:\n\n`projects/[PROJECT_ID]/configs/[CONFIG_NAME]`.",
+	//       "description": "The path to the configuration that will own the waiter.\nThe configuration must exist beforehand; the path must be in the format:\n\n`projects/[PROJECT_ID]/configs/[CONFIG_NAME]`.",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+/configs/[^/]+$",
 	//       "required": true,
@@ -4298,7 +4303,7 @@ func (c *ProjectsConfigsWaitersListCall) Do(opts ...googleapi.CallOption) (*List
 	//       "type": "string"
 	//     },
 	//     "parent": {
-	//       "description": "The path to the configuration for which you want to get a list of waiters.\nThe configuration must exist beforehand; the path must by in the format:\n\n`projects/[PROJECT_ID]/configs/[CONFIG_NAME]`",
+	//       "description": "The path to the configuration for which you want to get a list of waiters.\nThe configuration must exist beforehand; the path must be in the format:\n\n`projects/[PROJECT_ID]/configs/[CONFIG_NAME]`",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+/configs/[^/]+$",
 	//       "required": true,

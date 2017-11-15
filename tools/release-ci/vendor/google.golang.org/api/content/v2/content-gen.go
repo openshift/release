@@ -230,6 +230,14 @@ type Account struct {
 	// WebsiteUrl: The merchant's website.
 	WebsiteUrl string `json:"websiteUrl,omitempty"`
 
+	// YoutubeChannelLinks: List of linked YouTube channels that are active
+	// or pending approval. To create a new link request, add a new link
+	// with status active to the list. It will remain in a pending state
+	// until approved or rejected in the YT Creator Studio interface. To
+	// delete an active link, or to cancel a link request, remove it from
+	// the list.
+	YoutubeChannelLinks []*AccountYouTubeChannelLink `json:"youtubeChannelLinks,omitempty"`
+
 	// ServerResponse contains the HTTP response code and headers from the
 	// server.
 	googleapi.ServerResponse `json:"-"`
@@ -627,6 +635,45 @@ func (s *AccountUser) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+type AccountYouTubeChannelLink struct {
+	// ChannelId: Channel ID.
+	ChannelId string `json:"channelId,omitempty"`
+
+	// Status: Status of the link between this Merchant Center account and
+	// the YouTube channel. Upon retrieval, it represents the actual status
+	// of the link and can be either active if it was approved in YT Creator
+	// Studio or pending if it's pending approval. Upon insertion, it
+	// represents the intended status of the link. Re-uploading a link with
+	// status active when it's still pending or with status pending when
+	// it's already active will have no effect: the status will remain
+	// unchanged. Re-uploading a link with deprecated status inactive is
+	// equivalent to not submitting the link at all and will delete the link
+	// if it was active or cancel the link request if it was pending.
+	Status string `json:"status,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "ChannelId") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "ChannelId") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *AccountYouTubeChannelLink) MarshalJSON() ([]byte, error) {
+	type noMethod AccountYouTubeChannelLink
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 type AccountsAuthInfoResponse struct {
 	// AccountIdentifiers: The account identifiers corresponding to the
 	// authenticated user.
@@ -740,6 +787,10 @@ type AccountsCustomBatchRequestEntry struct {
 
 	// BatchId: An entry ID, unique within the batch request.
 	BatchId int64 `json:"batchId,omitempty"`
+
+	// Force: Whether the account should be deleted if the account has
+	// offers. Only applicable if the method is delete.
+	Force bool `json:"force,omitempty"`
 
 	// MerchantId: The ID of the managing account.
 	MerchantId uint64 `json:"merchantId,omitempty,string"`
@@ -1335,8 +1386,9 @@ type Datafeed struct {
 	// attributes are defined in the data feed.
 	AttributeLanguage string `json:"attributeLanguage,omitempty"`
 
-	// ContentLanguage: The two-letter ISO 639-1 language of the items in
-	// the feed. Must be a valid language for targetCountry.
+	// ContentLanguage: [DEPRECATED] Please use targets[].language instead.
+	// The two-letter ISO 639-1 language of the items in the feed. Must be a
+	// valid language for targetCountry.
 	ContentLanguage string `json:"contentLanguage,omitempty"`
 
 	// ContentType: The type of data feed. For product inventory feeds, only
@@ -1356,8 +1408,9 @@ type Datafeed struct {
 	// Id: The ID of the data feed.
 	Id int64 `json:"id,omitempty,string"`
 
-	// IntendedDestinations: The list of intended destinations (corresponds
-	// to checked check boxes in Merchant Center).
+	// IntendedDestinations: [DEPRECATED] Please use
+	// targets[].includedDestinations instead. The list of intended
+	// destinations (corresponds to checked check boxes in Merchant Center).
 	IntendedDestinations []string `json:"intendedDestinations,omitempty"`
 
 	// Kind: Identifies what kind of resource this is. Value: the fixed
@@ -1367,9 +1420,14 @@ type Datafeed struct {
 	// Name: A descriptive name of the data feed.
 	Name string `json:"name,omitempty"`
 
-	// TargetCountry: The country where the items in the feed will be
-	// included in the search index, represented as a CLDR territory code.
+	// TargetCountry: [DEPRECATED] Please use targets[].country instead. The
+	// country where the items in the feed will be included in the search
+	// index, represented as a CLDR territory code.
 	TargetCountry string `json:"targetCountry,omitempty"`
+
+	// Targets: The targets this feed should apply to (country, language,
+	// destinations).
+	Targets []*DatafeedTarget `json:"targets,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
 	// server.
@@ -1503,6 +1561,10 @@ func (s *DatafeedFormat) MarshalJSON() ([]byte, error) {
 // last retrieval of the datafeed computed asynchronously when the feed
 // processing is finished.
 type DatafeedStatus struct {
+	// Country: The country for which the status is reported, represented as
+	// a  CLDR territory code.
+	Country string `json:"country,omitempty"`
+
 	// DatafeedId: The ID of the feed for which the status is reported.
 	DatafeedId uint64 `json:"datafeedId,omitempty,string"`
 
@@ -1519,6 +1581,10 @@ type DatafeedStatus struct {
 	// string "content#datafeedStatus".
 	Kind string `json:"kind,omitempty"`
 
+	// Language: The two-letter ISO 639-1 language for which the status is
+	// reported.
+	Language string `json:"language,omitempty"`
+
 	// LastUploadDate: The last date at which the feed was uploaded.
 	LastUploadDate string `json:"lastUploadDate,omitempty"`
 
@@ -1532,7 +1598,7 @@ type DatafeedStatus struct {
 	// server.
 	googleapi.ServerResponse `json:"-"`
 
-	// ForceSendFields is a list of field names (e.g. "DatafeedId") to
+	// ForceSendFields is a list of field names (e.g. "Country") to
 	// unconditionally include in API requests. By default, fields with
 	// empty values are omitted from API requests. However, any non-pointer,
 	// non-interface field appearing in ForceSendFields will be sent to the
@@ -1540,7 +1606,7 @@ type DatafeedStatus struct {
 	// used to include empty fields in Patch requests.
 	ForceSendFields []string `json:"-"`
 
-	// NullFields is a list of field names (e.g. "DatafeedId") to include in
+	// NullFields is a list of field names (e.g. "Country") to include in
 	// API requests with the JSON null value. By default, fields with empty
 	// values are omitted from API requests. However, any field with an
 	// empty value appearing in NullFields will be sent to the server as
@@ -1624,6 +1690,48 @@ type DatafeedStatusExample struct {
 
 func (s *DatafeedStatusExample) MarshalJSON() ([]byte, error) {
 	type noMethod DatafeedStatusExample
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+type DatafeedTarget struct {
+	// Country: The country where the items in the feed will be included in
+	// the search index, represented as a  CLDR territory code.
+	Country string `json:"country,omitempty"`
+
+	// ExcludedDestinations: The list of destinations to exclude for this
+	// target (corresponds to unchecked check boxes in Merchant Center).
+	ExcludedDestinations []string `json:"excludedDestinations,omitempty"`
+
+	// IncludedDestinations: The list of destinations to include for this
+	// target (corresponds to checked check boxes in Merchant Center).
+	// Default destinations are always included unless provided in the
+	// excluded_destination field.
+	IncludedDestinations []string `json:"includedDestinations,omitempty"`
+
+	// Language: The two-letter ISO 639-1 language of the items in the feed.
+	// Must be a valid language for targets[].country.
+	Language string `json:"language,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Country") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Country") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *DatafeedTarget) MarshalJSON() ([]byte, error) {
+	type noMethod DatafeedTarget
 	raw := noMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
@@ -1837,8 +1945,18 @@ type DatafeedstatusesCustomBatchRequestEntry struct {
 	// BatchId: An entry ID, unique within the batch request.
 	BatchId int64 `json:"batchId,omitempty"`
 
-	// DatafeedId: The ID of the data feed to get or delete.
+	// Country: The country for which to get the datafeed status. If this
+	// parameter is provided then language must also be provided. Note that
+	// for multi-target datafeeds this parameter is required.
+	Country string `json:"country,omitempty"`
+
+	// DatafeedId: The ID of the data feed to get.
 	DatafeedId uint64 `json:"datafeedId,omitempty,string"`
+
+	// Language: The language for which to get the datafeed status. If this
+	// parameter is provided then country must also be provided. Note that
+	// for multi-target datafeeds this parameter is required.
+	Language string `json:"language,omitempty"`
 
 	// MerchantId: The ID of the managing account.
 	MerchantId uint64 `json:"merchantId,omitempty,string"`
@@ -2102,18 +2220,20 @@ type Headers struct {
 	// if all other fields are not set.
 	PostalCodeGroupNames []string `json:"postalCodeGroupNames,omitempty"`
 
-	// Prices: be "infinity". For example [{"value": "10", "currency":
-	// "USD"}, {"value": "500", "currency": "USD"}, {"value": "infinity",
-	// "currency": "USD"}] represents the headers "<= $10", " $500". All
-	// prices within a service must have the same currency. Must be
-	// non-empty. Can only be set if all other fields are not set.
+	// Prices: A list of inclusive order price upper bounds. The last
+	// price's value can be "infinity". For example [{"value": "10",
+	// "currency": "USD"}, {"value": "500", "currency": "USD"}, {"value":
+	// "infinity", "currency": "USD"}] represents the headers "<= $10", "
+	// $500". All prices within a service must have the same currency. Must
+	// be non-empty. Can only be set if all other fields are not set.
 	Prices []*Price `json:"prices,omitempty"`
 
-	// Weights: be "infinity". For example [{"value": "10", "unit": "kg"},
-	// {"value": "50", "unit": "kg"}, {"value": "infinity", "unit": "kg"}]
-	// represents the headers "<= 10kg", " 50kg". All weights within a
-	// service must have the same unit. Must be non-empty. Can only be set
-	// if all other fields are not set.
+	// Weights: A list of inclusive order weight upper bounds. The last
+	// weight's value can be "infinity". For example [{"value": "10",
+	// "unit": "kg"}, {"value": "50", "unit": "kg"}, {"value": "infinity",
+	// "unit": "kg"}] represents the headers "<= 10kg", " 50kg". All weights
+	// within a service must have the same unit. Must be non-empty. Can only
+	// be set if all other fields are not set.
 	Weights []*Weight `json:"weights,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "Locations") to
@@ -3081,7 +3201,8 @@ func (s *OrderLineItemShippingDetails) MarshalJSON() ([]byte, error) {
 }
 
 type OrderLineItemShippingDetailsMethod struct {
-	// Carrier: The carrier for the shipping. Optional.
+	// Carrier: The carrier for the shipping. Optional. See
+	// shipments[].carrier for a list of acceptable values.
 	Carrier string `json:"carrier,omitempty"`
 
 	// MaxDaysInTransit: Maximum transit time.
@@ -3133,7 +3254,16 @@ type OrderPaymentMethod struct {
 	// PhoneNumber: The billing phone number.
 	PhoneNumber string `json:"phoneNumber,omitempty"`
 
-	// Type: The type of instrument (VISA, Mastercard, etc).
+	// Type: The type of instrument.
+	//
+	// Acceptable values are:
+	// - "AMEX"
+	// - "DISCOVER"
+	// - "JCB"
+	// - "MASTERCARD"
+	// - "UNIONPAY"
+	// - "VISA"
+	// - ""
 	Type string `json:"type,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "BillingAddress") to
@@ -3339,6 +3469,30 @@ func (s *OrderReturn) MarshalJSON() ([]byte, error) {
 
 type OrderShipment struct {
 	// Carrier: The carrier handling the shipment.
+	//
+	// Acceptable values are:
+	// - "gsx"
+	// - "ups"
+	// - "united parcel service"
+	// - "usps"
+	// - "united states postal service"
+	// - "fedex"
+	// - "dhl"
+	// - "ecourier"
+	// - "cxt"
+	// - "google"
+	// - "on trac"
+	// - "ontrac"
+	// - "on-trac"
+	// - "on_trac"
+	// - "delvic"
+	// - "dynamex"
+	// - "lasership"
+	// - "smartpost"
+	// - "fedex smartpost"
+	// - "mpx"
+	// - "uds"
+	// - "united delivery service"
 	Carrier string `json:"carrier,omitempty"`
 
 	// CreationDate: Date on which the shipment has been created, in ISO
@@ -3385,7 +3539,8 @@ func (s *OrderShipment) MarshalJSON() ([]byte, error) {
 }
 
 type OrderShipmentLineItemShipment struct {
-	// LineItemId: The id of the line item that is shipped.
+	// LineItemId: The id of the line item that is shipped. Either
+	// lineItemId or productId is required.
 	LineItemId string `json:"lineItemId,omitempty"`
 
 	// Quantity: The quantity that is shipped.
@@ -3517,7 +3672,8 @@ type OrdersCancelLineItemRequest struct {
 	// left on the order.
 	Amount *Price `json:"amount,omitempty"`
 
-	// LineItemId: The ID of the line item to cancel.
+	// LineItemId: The ID of the line item to cancel. Either lineItemId or
+	// productId is required.
 	LineItemId string `json:"lineItemId,omitempty"`
 
 	// OperationId: The ID of the operation. Unique across all operations
@@ -3857,7 +4013,8 @@ type OrdersCustomBatchRequestEntryCancelLineItem struct {
 	// left on the order.
 	Amount *Price `json:"amount,omitempty"`
 
-	// LineItemId: The ID of the line item to cancel.
+	// LineItemId: The ID of the line item to cancel. Either lineItemId or
+	// productId is required.
 	LineItemId string `json:"lineItemId,omitempty"`
 
 	// Quantity: The quantity to cancel.
@@ -3926,7 +4083,8 @@ func (s *OrdersCustomBatchRequestEntryRefund) MarshalJSON() ([]byte, error) {
 }
 
 type OrdersCustomBatchRequestEntryReturnLineItem struct {
-	// LineItemId: The ID of the line item to return.
+	// LineItemId: The ID of the line item to return. Either lineItemId or
+	// productId is required.
 	LineItemId string `json:"lineItemId,omitempty"`
 
 	// Quantity: The quantity to return.
@@ -3962,16 +4120,25 @@ func (s *OrdersCustomBatchRequestEntryReturnLineItem) MarshalJSON() ([]byte, err
 }
 
 type OrdersCustomBatchRequestEntryShipLineItems struct {
-	// Carrier: The carrier handling the shipment.
+	// Carrier: Deprecated. Please use shipmentInfo instead. The carrier
+	// handling the shipment. See shipments[].carrier in the  Orders
+	// resource representation for a list of acceptable values.
 	Carrier string `json:"carrier,omitempty"`
 
 	// LineItems: Line items to ship.
 	LineItems []*OrderShipmentLineItemShipment `json:"lineItems,omitempty"`
 
-	// ShipmentId: The ID of the shipment.
+	// ShipmentId: Deprecated. Please use shipmentInfo instead. The ID of
+	// the shipment.
 	ShipmentId string `json:"shipmentId,omitempty"`
 
-	// TrackingId: The tracking id for the shipment.
+	// ShipmentInfos: Shipment information. This field is repeated because a
+	// single line item can be shipped in several packages (and have several
+	// tracking IDs).
+	ShipmentInfos []*OrdersCustomBatchRequestEntryShipLineItemsShipmentInfo `json:"shipmentInfos,omitempty"`
+
+	// TrackingId: Deprecated. Please use shipmentInfo instead. The tracking
+	// id for the shipment.
 	TrackingId string `json:"trackingId,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "Carrier") to
@@ -3997,8 +4164,45 @@ func (s *OrdersCustomBatchRequestEntryShipLineItems) MarshalJSON() ([]byte, erro
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+type OrdersCustomBatchRequestEntryShipLineItemsShipmentInfo struct {
+	// Carrier: The carrier handling the shipment. See shipments[].carrier
+	// in the  Orders resource representation for a list of acceptable
+	// values.
+	Carrier string `json:"carrier,omitempty"`
+
+	// ShipmentId: The ID of the shipment.
+	ShipmentId string `json:"shipmentId,omitempty"`
+
+	// TrackingId: The tracking id for the shipment.
+	TrackingId string `json:"trackingId,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Carrier") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Carrier") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *OrdersCustomBatchRequestEntryShipLineItemsShipmentInfo) MarshalJSON() ([]byte, error) {
+	type noMethod OrdersCustomBatchRequestEntryShipLineItemsShipmentInfo
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 type OrdersCustomBatchRequestEntryUpdateShipment struct {
 	// Carrier: The carrier handling the shipment. Not updated if missing.
+	// See shipments[].carrier in the  Orders resource representation for a
+	// list of acceptable values.
 	Carrier string `json:"carrier,omitempty"`
 
 	// ShipmentId: The ID of the shipment.
@@ -4293,7 +4497,8 @@ func (s *OrdersRefundResponse) MarshalJSON() ([]byte, error) {
 }
 
 type OrdersReturnLineItemRequest struct {
-	// LineItemId: The ID of the line item to return.
+	// LineItemId: The ID of the line item to return. Either lineItemId or
+	// productId is required.
 	LineItemId string `json:"lineItemId,omitempty"`
 
 	// OperationId: The ID of the operation. Unique across all operations
@@ -4369,7 +4574,9 @@ func (s *OrdersReturnLineItemResponse) MarshalJSON() ([]byte, error) {
 }
 
 type OrdersShipLineItemsRequest struct {
-	// Carrier: The carrier handling the shipment.
+	// Carrier: Deprecated. Please use shipmentInfo instead. The carrier
+	// handling the shipment. See shipments[].carrier in the  Orders
+	// resource representation for a list of acceptable values.
 	Carrier string `json:"carrier,omitempty"`
 
 	// LineItems: Line items to ship.
@@ -4379,10 +4586,17 @@ type OrdersShipLineItemsRequest struct {
 	// for a given order.
 	OperationId string `json:"operationId,omitempty"`
 
-	// ShipmentId: The ID of the shipment.
+	// ShipmentId: Deprecated. Please use shipmentInfo instead. The ID of
+	// the shipment.
 	ShipmentId string `json:"shipmentId,omitempty"`
 
-	// TrackingId: The tracking id for the shipment.
+	// ShipmentInfos: Shipment information. This field is repeated because a
+	// single line item can be shipped in several packages (and have several
+	// tracking IDs).
+	ShipmentInfos []*OrdersCustomBatchRequestEntryShipLineItemsShipmentInfo `json:"shipmentInfos,omitempty"`
+
+	// TrackingId: Deprecated. Please use shipmentInfo instead. The tracking
+	// id for the shipment.
 	TrackingId string `json:"trackingId,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "Carrier") to
@@ -4515,6 +4729,8 @@ func (s *OrdersUpdateMerchantOrderIdResponse) MarshalJSON() ([]byte, error) {
 
 type OrdersUpdateShipmentRequest struct {
 	// Carrier: The carrier handling the shipment. Not updated if missing.
+	// See shipments[].carrier in the  Orders resource representation for a
+	// list of acceptable values.
 	Carrier string `json:"carrier,omitempty"`
 
 	// OperationId: The ID of the operation. Unique across all operations
@@ -4820,7 +5036,10 @@ type Product struct {
 	// Gtin: Global Trade Item Number (GTIN) of the item.
 	Gtin string `json:"gtin,omitempty"`
 
-	// Id: The REST id of the product.
+	// Id: The REST id of the product. Content API methods that operate on
+	// products take this as their productId parameter.
+	// The REST id for a product is of the form
+	// channel:contentLanguage:targetCountry:offerId.
 	Id string `json:"id,omitempty"`
 
 	// IdentifierExists: False when the item does not have unique product
@@ -4874,10 +5093,12 @@ type Product struct {
 	// multipack.
 	Multipack int64 `json:"multipack,omitempty,string"`
 
-	// OfferId: An identifier of the item. Leading and trailing whitespaces
-	// are stripped and multiple whitespaces are replaced by a single
-	// whitespace upon submission. Only valid unicode characters are
+	// OfferId: A unique identifier for the item. Leading and trailing
+	// whitespaces are stripped and multiple whitespaces are replaced by a
+	// single whitespace upon submission. Only valid unicode characters are
 	// accepted. See the products feed specification for details.
+	// Note: Content API methods that operate on products take the REST id
+	// of the product, not this identifier.
 	OfferId string `json:"offerId,omitempty"`
 
 	// OnlineOnly: Whether an item is available for purchase only online.
@@ -6023,6 +6244,11 @@ type Service struct {
 	// delivery of the product. Required.
 	DeliveryTime *DeliveryTime `json:"deliveryTime,omitempty"`
 
+	// MinimumOrderValue: Minimum order value for this service. If set,
+	// indicates that customers will have to spend at least this amount. All
+	// prices within a service must have the same currency.
+	MinimumOrderValue *Price `json:"minimumOrderValue,omitempty"`
+
 	// Name: Free-form name of the service. Must be unique within target
 	// account. Required.
 	Name string `json:"name,omitempty"`
@@ -6804,10 +7030,6 @@ type AccountsClaimwebsiteCall struct {
 }
 
 // Claimwebsite: Claims the website of a Merchant Center sub-account.
-// This method can only be called for accounts to which the managing
-// account has access: either the managing account itself for any
-// Merchant Center account, or any sub-account when the managing account
-// is a multi-client account.
 func (r *AccountsService) Claimwebsite(merchantId uint64, accountId uint64) *AccountsClaimwebsiteCall {
 	c := &AccountsClaimwebsiteCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -6815,9 +7037,10 @@ func (r *AccountsService) Claimwebsite(merchantId uint64, accountId uint64) *Acc
 	return c
 }
 
-// Overwrite sets the optional parameter "overwrite": Flag to remove any
-// existing claim on the requested website by another account and
-// replace it with a claim from this account.
+// Overwrite sets the optional parameter "overwrite": Only available to
+// selected merchants. When set to True, this flag removes any existing
+// claim on the requested website by another account and replaces it
+// with a claim from this account.
 func (c *AccountsClaimwebsiteCall) Overwrite(overwrite bool) *AccountsClaimwebsiteCall {
 	c.urlParams_.Set("overwrite", fmt.Sprint(overwrite))
 	return c
@@ -6905,7 +7128,7 @@ func (c *AccountsClaimwebsiteCall) Do(opts ...googleapi.CallOption) (*AccountsCl
 	}
 	return ret, nil
 	// {
-	//   "description": "Claims the website of a Merchant Center sub-account. This method can only be called for accounts to which the managing account has access: either the managing account itself for any Merchant Center account, or any sub-account when the managing account is a multi-client account.",
+	//   "description": "Claims the website of a Merchant Center sub-account.",
 	//   "httpMethod": "POST",
 	//   "id": "content.accounts.claimwebsite",
 	//   "parameterOrder": [
@@ -6921,14 +7144,14 @@ func (c *AccountsClaimwebsiteCall) Do(opts ...googleapi.CallOption) (*AccountsCl
 	//       "type": "string"
 	//     },
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the managing account. If this account is not a multi-client account, then this parameter must be the same as accountId.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
 	//       "type": "string"
 	//     },
 	//     "overwrite": {
-	//       "description": "Flag to remove any existing claim on the requested website by another account and replace it with a claim from this account.",
+	//       "description": "Only available to selected merchants. When set to True, this flag removes any existing claim on the requested website by another account and replaces it with a claim from this account.",
 	//       "location": "query",
 	//       "type": "boolean"
 	//     }
@@ -7087,8 +7310,7 @@ type AccountsDeleteCall struct {
 	header_    http.Header
 }
 
-// Delete: Deletes a Merchant Center sub-account. This method can only
-// be called for multi-client accounts.
+// Delete: Deletes a Merchant Center sub-account.
 func (r *AccountsService) Delete(merchantId uint64, accountId uint64) *AccountsDeleteCall {
 	c := &AccountsDeleteCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -7100,6 +7322,13 @@ func (r *AccountsService) Delete(merchantId uint64, accountId uint64) *AccountsD
 // in dry-run mode.
 func (c *AccountsDeleteCall) DryRun(dryRun bool) *AccountsDeleteCall {
 	c.urlParams_.Set("dryRun", fmt.Sprint(dryRun))
+	return c
+}
+
+// Force sets the optional parameter "force": Flag to delete
+// sub-accounts with products. The default value is false.
+func (c *AccountsDeleteCall) Force(force bool) *AccountsDeleteCall {
+	c.urlParams_.Set("force", fmt.Sprint(force))
 	return c
 }
 
@@ -7160,7 +7389,7 @@ func (c *AccountsDeleteCall) Do(opts ...googleapi.CallOption) error {
 	}
 	return nil
 	// {
-	//   "description": "Deletes a Merchant Center sub-account. This method can only be called for multi-client accounts.",
+	//   "description": "Deletes a Merchant Center sub-account.",
 	//   "httpMethod": "DELETE",
 	//   "id": "content.accounts.delete",
 	//   "parameterOrder": [
@@ -7180,8 +7409,14 @@ func (c *AccountsDeleteCall) Do(opts ...googleapi.CallOption) error {
 	//       "location": "query",
 	//       "type": "boolean"
 	//     },
+	//     "force": {
+	//       "default": "false",
+	//       "description": "Flag to delete sub-accounts with products. The default value is false.",
+	//       "location": "query",
+	//       "type": "boolean"
+	//     },
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the managing account. This must be a multi-client account.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -7208,10 +7443,7 @@ type AccountsGetCall struct {
 	header_      http.Header
 }
 
-// Get: Retrieves a Merchant Center account. This method can only be
-// called for accounts to which the managing account has access: either
-// the managing account itself for any Merchant Center account, or any
-// sub-account when the managing account is a multi-client account.
+// Get: Retrieves a Merchant Center account.
 func (r *AccountsService) Get(merchantId uint64, accountId uint64) *AccountsGetCall {
 	c := &AccountsGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -7314,7 +7546,7 @@ func (c *AccountsGetCall) Do(opts ...googleapi.CallOption) (*Account, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves a Merchant Center account. This method can only be called for accounts to which the managing account has access: either the managing account itself for any Merchant Center account, or any sub-account when the managing account is a multi-client account.",
+	//   "description": "Retrieves a Merchant Center account.",
 	//   "httpMethod": "GET",
 	//   "id": "content.accounts.get",
 	//   "parameterOrder": [
@@ -7330,7 +7562,7 @@ func (c *AccountsGetCall) Do(opts ...googleapi.CallOption) (*Account, error) {
 	//       "type": "string"
 	//     },
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the managing account. If this account is not a multi-client account, then this parameter must be the same as accountId.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -7359,8 +7591,7 @@ type AccountsInsertCall struct {
 	header_    http.Header
 }
 
-// Insert: Creates a Merchant Center sub-account. This method can only
-// be called for multi-client accounts.
+// Insert: Creates a Merchant Center sub-account.
 func (r *AccountsService) Insert(merchantId uint64, account *Account) *AccountsInsertCall {
 	c := &AccountsInsertCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -7461,7 +7692,7 @@ func (c *AccountsInsertCall) Do(opts ...googleapi.CallOption) (*Account, error) 
 	}
 	return ret, nil
 	// {
-	//   "description": "Creates a Merchant Center sub-account. This method can only be called for multi-client accounts.",
+	//   "description": "Creates a Merchant Center sub-account.",
 	//   "httpMethod": "POST",
 	//   "id": "content.accounts.insert",
 	//   "parameterOrder": [
@@ -7474,7 +7705,7 @@ func (c *AccountsInsertCall) Do(opts ...googleapi.CallOption) (*Account, error) 
 	//       "type": "boolean"
 	//     },
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the managing account. This must be a multi-client account.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -7506,8 +7737,7 @@ type AccountsListCall struct {
 	header_      http.Header
 }
 
-// List: Lists the sub-accounts in your Merchant Center account. This
-// method can only be called for multi-client accounts.
+// List: Lists the sub-accounts in your Merchant Center account.
 func (r *AccountsService) List(merchantId uint64) *AccountsListCall {
 	c := &AccountsListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -7622,7 +7852,7 @@ func (c *AccountsListCall) Do(opts ...googleapi.CallOption) (*AccountsListRespon
 	}
 	return ret, nil
 	// {
-	//   "description": "Lists the sub-accounts in your Merchant Center account. This method can only be called for multi-client accounts.",
+	//   "description": "Lists the sub-accounts in your Merchant Center account.",
 	//   "httpMethod": "GET",
 	//   "id": "content.accounts.list",
 	//   "parameterOrder": [
@@ -7636,7 +7866,7 @@ func (c *AccountsListCall) Do(opts ...googleapi.CallOption) (*AccountsListRespon
 	//       "type": "integer"
 	//     },
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the managing account. This must be a multi-client account.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -7692,11 +7922,8 @@ type AccountsPatchCall struct {
 	header_    http.Header
 }
 
-// Patch: Updates a Merchant Center account. This method can only be
-// called for accounts to which the managing account has access: either
-// the managing account itself for any Merchant Center account, or any
-// sub-account when the managing account is a multi-client account. This
-// method supports patch semantics.
+// Patch: Updates a Merchant Center account. This method supports patch
+// semantics.
 func (r *AccountsService) Patch(merchantId uint64, accountId uint64, account *Account) *AccountsPatchCall {
 	c := &AccountsPatchCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -7799,7 +8026,7 @@ func (c *AccountsPatchCall) Do(opts ...googleapi.CallOption) (*Account, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Updates a Merchant Center account. This method can only be called for accounts to which the managing account has access: either the managing account itself for any Merchant Center account, or any sub-account when the managing account is a multi-client account. This method supports patch semantics.",
+	//   "description": "Updates a Merchant Center account. This method supports patch semantics.",
 	//   "httpMethod": "PATCH",
 	//   "id": "content.accounts.patch",
 	//   "parameterOrder": [
@@ -7820,7 +8047,7 @@ func (c *AccountsPatchCall) Do(opts ...googleapi.CallOption) (*Account, error) {
 	//       "type": "boolean"
 	//     },
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the managing account. If this account is not a multi-client account, then this parameter must be the same as accountId.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -7853,10 +8080,7 @@ type AccountsUpdateCall struct {
 	header_    http.Header
 }
 
-// Update: Updates a Merchant Center account. This method can only be
-// called for accounts to which the managing account has access: either
-// the managing account itself for any Merchant Center account, or any
-// sub-account when the managing account is a multi-client account.
+// Update: Updates a Merchant Center account.
 func (r *AccountsService) Update(merchantId uint64, accountId uint64, account *Account) *AccountsUpdateCall {
 	c := &AccountsUpdateCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -7959,7 +8183,7 @@ func (c *AccountsUpdateCall) Do(opts ...googleapi.CallOption) (*Account, error) 
 	}
 	return ret, nil
 	// {
-	//   "description": "Updates a Merchant Center account. This method can only be called for accounts to which the managing account has access: either the managing account itself for any Merchant Center account, or any sub-account when the managing account is a multi-client account.",
+	//   "description": "Updates a Merchant Center account.",
 	//   "httpMethod": "PUT",
 	//   "id": "content.accounts.update",
 	//   "parameterOrder": [
@@ -7980,7 +8204,7 @@ func (c *AccountsUpdateCall) Do(opts ...googleapi.CallOption) (*Account, error) 
 	//       "type": "boolean"
 	//     },
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the managing account. If this account is not a multi-client account, then this parameter must be the same as accountId.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -8130,11 +8354,7 @@ type AccountstatusesGetCall struct {
 	header_      http.Header
 }
 
-// Get: Retrieves the status of a Merchant Center account. This method
-// can only be called for accounts to which the managing account has
-// access: either the managing account itself for any Merchant Center
-// account, or any sub-account when the managing account is a
-// multi-client account.
+// Get: Retrieves the status of a Merchant Center account.
 func (r *AccountstatusesService) Get(merchantId uint64, accountId uint64) *AccountstatusesGetCall {
 	c := &AccountstatusesGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -8237,7 +8457,7 @@ func (c *AccountstatusesGetCall) Do(opts ...googleapi.CallOption) (*AccountStatu
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves the status of a Merchant Center account. This method can only be called for accounts to which the managing account has access: either the managing account itself for any Merchant Center account, or any sub-account when the managing account is a multi-client account.",
+	//   "description": "Retrieves the status of a Merchant Center account.",
 	//   "httpMethod": "GET",
 	//   "id": "content.accountstatuses.get",
 	//   "parameterOrder": [
@@ -8253,7 +8473,7 @@ func (c *AccountstatusesGetCall) Do(opts ...googleapi.CallOption) (*AccountStatu
 	//       "type": "string"
 	//     },
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the managing account. If this account is not a multi-client account, then this parameter must be the same as accountId.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -8283,7 +8503,7 @@ type AccountstatusesListCall struct {
 }
 
 // List: Lists the statuses of the sub-accounts in your Merchant Center
-// account. This method can only be called for multi-client accounts.
+// account.
 func (r *AccountstatusesService) List(merchantId uint64) *AccountstatusesListCall {
 	c := &AccountstatusesListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -8399,7 +8619,7 @@ func (c *AccountstatusesListCall) Do(opts ...googleapi.CallOption) (*Accountstat
 	}
 	return ret, nil
 	// {
-	//   "description": "Lists the statuses of the sub-accounts in your Merchant Center account. This method can only be called for multi-client accounts.",
+	//   "description": "Lists the statuses of the sub-accounts in your Merchant Center account.",
 	//   "httpMethod": "GET",
 	//   "id": "content.accountstatuses.list",
 	//   "parameterOrder": [
@@ -8413,7 +8633,7 @@ func (c *AccountstatusesListCall) Do(opts ...googleapi.CallOption) (*Accountstat
 	//       "type": "integer"
 	//     },
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the managing account. This must be a multi-client account.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -8601,11 +8821,7 @@ type AccounttaxGetCall struct {
 	header_      http.Header
 }
 
-// Get: Retrieves the tax settings of the account. This method can only
-// be called for accounts to which the managing account has access:
-// either the managing account itself for any Merchant Center account,
-// or any sub-account when the managing account is a multi-client
-// account.
+// Get: Retrieves the tax settings of the account.
 func (r *AccounttaxService) Get(merchantId uint64, accountId uint64) *AccounttaxGetCall {
 	c := &AccounttaxGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -8708,7 +8924,7 @@ func (c *AccounttaxGetCall) Do(opts ...googleapi.CallOption) (*AccountTax, error
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves the tax settings of the account. This method can only be called for accounts to which the managing account has access: either the managing account itself for any Merchant Center account, or any sub-account when the managing account is a multi-client account.",
+	//   "description": "Retrieves the tax settings of the account.",
 	//   "httpMethod": "GET",
 	//   "id": "content.accounttax.get",
 	//   "parameterOrder": [
@@ -8724,7 +8940,7 @@ func (c *AccounttaxGetCall) Do(opts ...googleapi.CallOption) (*AccountTax, error
 	//       "type": "string"
 	//     },
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the managing account. If this account is not a multi-client account, then this parameter must be the same as accountId.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -8754,8 +8970,7 @@ type AccounttaxListCall struct {
 }
 
 // List: Lists the tax settings of the sub-accounts in your Merchant
-// Center account. This method can only be called for multi-client
-// accounts.
+// Center account.
 func (r *AccounttaxService) List(merchantId uint64) *AccounttaxListCall {
 	c := &AccounttaxListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -8870,7 +9085,7 @@ func (c *AccounttaxListCall) Do(opts ...googleapi.CallOption) (*AccounttaxListRe
 	}
 	return ret, nil
 	// {
-	//   "description": "Lists the tax settings of the sub-accounts in your Merchant Center account. This method can only be called for multi-client accounts.",
+	//   "description": "Lists the tax settings of the sub-accounts in your Merchant Center account.",
 	//   "httpMethod": "GET",
 	//   "id": "content.accounttax.list",
 	//   "parameterOrder": [
@@ -8884,7 +9099,7 @@ func (c *AccounttaxListCall) Do(opts ...googleapi.CallOption) (*AccounttaxListRe
 	//       "type": "integer"
 	//     },
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the managing account. This must be a multi-client account.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -8940,11 +9155,8 @@ type AccounttaxPatchCall struct {
 	header_    http.Header
 }
 
-// Patch: Updates the tax settings of the account. This method can only
-// be called for accounts to which the managing account has access:
-// either the managing account itself for any Merchant Center account,
-// or any sub-account when the managing account is a multi-client
-// account. This method supports patch semantics.
+// Patch: Updates the tax settings of the account. This method supports
+// patch semantics.
 func (r *AccounttaxService) Patch(merchantId uint64, accountId uint64, accounttax *AccountTax) *AccounttaxPatchCall {
 	c := &AccounttaxPatchCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -9047,7 +9259,7 @@ func (c *AccounttaxPatchCall) Do(opts ...googleapi.CallOption) (*AccountTax, err
 	}
 	return ret, nil
 	// {
-	//   "description": "Updates the tax settings of the account. This method can only be called for accounts to which the managing account has access: either the managing account itself for any Merchant Center account, or any sub-account when the managing account is a multi-client account. This method supports patch semantics.",
+	//   "description": "Updates the tax settings of the account. This method supports patch semantics.",
 	//   "httpMethod": "PATCH",
 	//   "id": "content.accounttax.patch",
 	//   "parameterOrder": [
@@ -9068,7 +9280,7 @@ func (c *AccounttaxPatchCall) Do(opts ...googleapi.CallOption) (*AccountTax, err
 	//       "type": "boolean"
 	//     },
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the managing account. If this account is not a multi-client account, then this parameter must be the same as accountId.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -9101,11 +9313,7 @@ type AccounttaxUpdateCall struct {
 	header_    http.Header
 }
 
-// Update: Updates the tax settings of the account. This method can only
-// be called for accounts to which the managing account has access:
-// either the managing account itself for any Merchant Center account,
-// or any sub-account when the managing account is a multi-client
-// account.
+// Update: Updates the tax settings of the account.
 func (r *AccounttaxService) Update(merchantId uint64, accountId uint64, accounttax *AccountTax) *AccounttaxUpdateCall {
 	c := &AccounttaxUpdateCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -9208,7 +9416,7 @@ func (c *AccounttaxUpdateCall) Do(opts ...googleapi.CallOption) (*AccountTax, er
 	}
 	return ret, nil
 	// {
-	//   "description": "Updates the tax settings of the account. This method can only be called for accounts to which the managing account has access: either the managing account itself for any Merchant Center account, or any sub-account when the managing account is a multi-client account.",
+	//   "description": "Updates the tax settings of the account.",
 	//   "httpMethod": "PUT",
 	//   "id": "content.accounttax.update",
 	//   "parameterOrder": [
@@ -9229,7 +9437,7 @@ func (c *AccounttaxUpdateCall) Do(opts ...googleapi.CallOption) (*AccountTax, er
 	//       "type": "boolean"
 	//     },
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the managing account. If this account is not a multi-client account, then this parameter must be the same as accountId.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -9392,8 +9600,7 @@ type DatafeedsDeleteCall struct {
 }
 
 // Delete: Deletes a datafeed configuration from your Merchant Center
-// account. This method can only be called for non-multi-client
-// accounts.
+// account.
 func (r *DatafeedsService) Delete(merchantId uint64, datafeedId uint64) *DatafeedsDeleteCall {
 	c := &DatafeedsDeleteCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -9465,7 +9672,7 @@ func (c *DatafeedsDeleteCall) Do(opts ...googleapi.CallOption) error {
 	}
 	return nil
 	// {
-	//   "description": "Deletes a datafeed configuration from your Merchant Center account. This method can only be called for non-multi-client accounts.",
+	//   "description": "Deletes a datafeed configuration from your Merchant Center account.",
 	//   "httpMethod": "DELETE",
 	//   "id": "content.datafeeds.delete",
 	//   "parameterOrder": [
@@ -9474,6 +9681,7 @@ func (c *DatafeedsDeleteCall) Do(opts ...googleapi.CallOption) error {
 	//   ],
 	//   "parameters": {
 	//     "datafeedId": {
+	//       "description": "The ID of the datafeed.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -9485,6 +9693,7 @@ func (c *DatafeedsDeleteCall) Do(opts ...googleapi.CallOption) error {
 	//       "type": "boolean"
 	//     },
 	//     "merchantId": {
+	//       "description": "The ID of the account that manages the datafeed. This account cannot be a multi-client account.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -9512,8 +9721,7 @@ type DatafeedsGetCall struct {
 }
 
 // Get: Retrieves a datafeed configuration from your Merchant Center
-// account. This method can only be called for non-multi-client
-// accounts.
+// account.
 func (r *DatafeedsService) Get(merchantId uint64, datafeedId uint64) *DatafeedsGetCall {
 	c := &DatafeedsGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -9616,7 +9824,7 @@ func (c *DatafeedsGetCall) Do(opts ...googleapi.CallOption) (*Datafeed, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves a datafeed configuration from your Merchant Center account. This method can only be called for non-multi-client accounts.",
+	//   "description": "Retrieves a datafeed configuration from your Merchant Center account.",
 	//   "httpMethod": "GET",
 	//   "id": "content.datafeeds.get",
 	//   "parameterOrder": [
@@ -9625,12 +9833,14 @@ func (c *DatafeedsGetCall) Do(opts ...googleapi.CallOption) (*Datafeed, error) {
 	//   ],
 	//   "parameters": {
 	//     "datafeedId": {
+	//       "description": "The ID of the datafeed.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
 	//       "type": "string"
 	//     },
 	//     "merchantId": {
+	//       "description": "The ID of the account that manages the datafeed. This account cannot be a multi-client account.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -9660,8 +9870,7 @@ type DatafeedsInsertCall struct {
 }
 
 // Insert: Registers a datafeed configuration with your Merchant Center
-// account. This method can only be called for non-multi-client
-// accounts.
+// account.
 func (r *DatafeedsService) Insert(merchantId uint64, datafeed *Datafeed) *DatafeedsInsertCall {
 	c := &DatafeedsInsertCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -9762,7 +9971,7 @@ func (c *DatafeedsInsertCall) Do(opts ...googleapi.CallOption) (*Datafeed, error
 	}
 	return ret, nil
 	// {
-	//   "description": "Registers a datafeed configuration with your Merchant Center account. This method can only be called for non-multi-client accounts.",
+	//   "description": "Registers a datafeed configuration with your Merchant Center account.",
 	//   "httpMethod": "POST",
 	//   "id": "content.datafeeds.insert",
 	//   "parameterOrder": [
@@ -9775,6 +9984,7 @@ func (c *DatafeedsInsertCall) Do(opts ...googleapi.CallOption) (*Datafeed, error
 	//       "type": "boolean"
 	//     },
 	//     "merchantId": {
+	//       "description": "The ID of the account that manages the datafeed. This account cannot be a multi-client account.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -9806,8 +10016,7 @@ type DatafeedsListCall struct {
 	header_      http.Header
 }
 
-// List: Lists the datafeeds in your Merchant Center account. This
-// method can only be called for non-multi-client accounts.
+// List: Lists the datafeeds in your Merchant Center account.
 func (r *DatafeedsService) List(merchantId uint64) *DatafeedsListCall {
 	c := &DatafeedsListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -9922,7 +10131,7 @@ func (c *DatafeedsListCall) Do(opts ...googleapi.CallOption) (*DatafeedsListResp
 	}
 	return ret, nil
 	// {
-	//   "description": "Lists the datafeeds in your Merchant Center account. This method can only be called for non-multi-client accounts.",
+	//   "description": "Lists the datafeeds in your Merchant Center account.",
 	//   "httpMethod": "GET",
 	//   "id": "content.datafeeds.list",
 	//   "parameterOrder": [
@@ -9936,7 +10145,7 @@ func (c *DatafeedsListCall) Do(opts ...googleapi.CallOption) (*DatafeedsListResp
 	//       "type": "integer"
 	//     },
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the account that manages the datafeeds. This account cannot be a multi-client account.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -9993,8 +10202,7 @@ type DatafeedsPatchCall struct {
 }
 
 // Patch: Updates a datafeed configuration of your Merchant Center
-// account. This method can only be called for non-multi-client
-// accounts. This method supports patch semantics.
+// account. This method supports patch semantics.
 func (r *DatafeedsService) Patch(merchantId uint64, datafeedId uint64, datafeed *Datafeed) *DatafeedsPatchCall {
 	c := &DatafeedsPatchCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -10097,7 +10305,7 @@ func (c *DatafeedsPatchCall) Do(opts ...googleapi.CallOption) (*Datafeed, error)
 	}
 	return ret, nil
 	// {
-	//   "description": "Updates a datafeed configuration of your Merchant Center account. This method can only be called for non-multi-client accounts. This method supports patch semantics.",
+	//   "description": "Updates a datafeed configuration of your Merchant Center account. This method supports patch semantics.",
 	//   "httpMethod": "PATCH",
 	//   "id": "content.datafeeds.patch",
 	//   "parameterOrder": [
@@ -10106,6 +10314,7 @@ func (c *DatafeedsPatchCall) Do(opts ...googleapi.CallOption) (*Datafeed, error)
 	//   ],
 	//   "parameters": {
 	//     "datafeedId": {
+	//       "description": "The ID of the datafeed.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -10117,6 +10326,7 @@ func (c *DatafeedsPatchCall) Do(opts ...googleapi.CallOption) (*Datafeed, error)
 	//       "type": "boolean"
 	//     },
 	//     "merchantId": {
+	//       "description": "The ID of the account that manages the datafeed. This account cannot be a multi-client account.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -10150,8 +10360,7 @@ type DatafeedsUpdateCall struct {
 }
 
 // Update: Updates a datafeed configuration of your Merchant Center
-// account. This method can only be called for non-multi-client
-// accounts.
+// account.
 func (r *DatafeedsService) Update(merchantId uint64, datafeedId uint64, datafeed *Datafeed) *DatafeedsUpdateCall {
 	c := &DatafeedsUpdateCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -10254,7 +10463,7 @@ func (c *DatafeedsUpdateCall) Do(opts ...googleapi.CallOption) (*Datafeed, error
 	}
 	return ret, nil
 	// {
-	//   "description": "Updates a datafeed configuration of your Merchant Center account. This method can only be called for non-multi-client accounts.",
+	//   "description": "Updates a datafeed configuration of your Merchant Center account.",
 	//   "httpMethod": "PUT",
 	//   "id": "content.datafeeds.update",
 	//   "parameterOrder": [
@@ -10263,6 +10472,7 @@ func (c *DatafeedsUpdateCall) Do(opts ...googleapi.CallOption) (*Datafeed, error
 	//   ],
 	//   "parameters": {
 	//     "datafeedId": {
+	//       "description": "The ID of the datafeed.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -10274,6 +10484,7 @@ func (c *DatafeedsUpdateCall) Do(opts ...googleapi.CallOption) (*Datafeed, error
 	//       "type": "boolean"
 	//     },
 	//     "merchantId": {
+	//       "description": "The ID of the account that manages the datafeed. This account cannot be a multi-client account.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -10424,12 +10635,31 @@ type DatafeedstatusesGetCall struct {
 }
 
 // Get: Retrieves the status of a datafeed from your Merchant Center
-// account. This method can only be called for non-multi-client
-// accounts.
+// account.
 func (r *DatafeedstatusesService) Get(merchantId uint64, datafeedId uint64) *DatafeedstatusesGetCall {
 	c := &DatafeedstatusesGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
 	c.datafeedId = datafeedId
+	return c
+}
+
+// Country sets the optional parameter "country": The country for which
+// to get the datafeed status. If this parameter is provided then
+// language must also be provided. Note that this parameter is required
+// for feeds targeting multiple countries and languages, since a feed
+// may have a different status for each target.
+func (c *DatafeedstatusesGetCall) Country(country string) *DatafeedstatusesGetCall {
+	c.urlParams_.Set("country", country)
+	return c
+}
+
+// Language sets the optional parameter "language": The language for
+// which to get the datafeed status. If this parameter is provided then
+// country must also be provided. Note that this parameter is required
+// for feeds targeting multiple countries and languages, since a feed
+// may have a different status for each target.
+func (c *DatafeedstatusesGetCall) Language(language string) *DatafeedstatusesGetCall {
+	c.urlParams_.Set("language", language)
 	return c
 }
 
@@ -10528,7 +10758,7 @@ func (c *DatafeedstatusesGetCall) Do(opts ...googleapi.CallOption) (*DatafeedSta
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves the status of a datafeed from your Merchant Center account. This method can only be called for non-multi-client accounts.",
+	//   "description": "Retrieves the status of a datafeed from your Merchant Center account.",
 	//   "httpMethod": "GET",
 	//   "id": "content.datafeedstatuses.get",
 	//   "parameterOrder": [
@@ -10536,13 +10766,25 @@ func (c *DatafeedstatusesGetCall) Do(opts ...googleapi.CallOption) (*DatafeedSta
 	//     "datafeedId"
 	//   ],
 	//   "parameters": {
+	//     "country": {
+	//       "description": "The country for which to get the datafeed status. If this parameter is provided then language must also be provided. Note that this parameter is required for feeds targeting multiple countries and languages, since a feed may have a different status for each target.",
+	//       "location": "query",
+	//       "type": "string"
+	//     },
 	//     "datafeedId": {
+	//       "description": "The ID of the datafeed.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
 	//       "type": "string"
 	//     },
+	//     "language": {
+	//       "description": "The language for which to get the datafeed status. If this parameter is provided then country must also be provided. Note that this parameter is required for feeds targeting multiple countries and languages, since a feed may have a different status for each target.",
+	//       "location": "query",
+	//       "type": "string"
+	//     },
 	//     "merchantId": {
+	//       "description": "The ID of the account that manages the datafeed. This account cannot be a multi-client account.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -10572,8 +10814,7 @@ type DatafeedstatusesListCall struct {
 }
 
 // List: Lists the statuses of the datafeeds in your Merchant Center
-// account. This method can only be called for non-multi-client
-// accounts.
+// account.
 func (r *DatafeedstatusesService) List(merchantId uint64) *DatafeedstatusesListCall {
 	c := &DatafeedstatusesListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -10688,7 +10929,7 @@ func (c *DatafeedstatusesListCall) Do(opts ...googleapi.CallOption) (*Datafeedst
 	}
 	return ret, nil
 	// {
-	//   "description": "Lists the statuses of the datafeeds in your Merchant Center account. This method can only be called for non-multi-client accounts.",
+	//   "description": "Lists the statuses of the datafeeds in your Merchant Center account.",
 	//   "httpMethod": "GET",
 	//   "id": "content.datafeedstatuses.list",
 	//   "parameterOrder": [
@@ -10702,7 +10943,7 @@ func (c *DatafeedstatusesListCall) Do(opts ...googleapi.CallOption) (*Datafeedst
 	//       "type": "integer"
 	//     },
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the account that manages the datafeeds. This account cannot be a multi-client account.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -10758,8 +10999,7 @@ type InventoryCustombatchCall struct {
 
 // Custombatch: Updates price and availability for multiple products or
 // stores in a single request. This operation does not update the
-// expiration date of the products. This method can only be called for
-// non-multi-client accounts.
+// expiration date of the products.
 func (r *InventoryService) Custombatch(inventorycustombatchrequest *InventoryCustomBatchRequest) *InventoryCustombatchCall {
 	c := &InventoryCustombatchCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.inventorycustombatchrequest = inventorycustombatchrequest
@@ -10856,7 +11096,7 @@ func (c *InventoryCustombatchCall) Do(opts ...googleapi.CallOption) (*InventoryC
 	}
 	return ret, nil
 	// {
-	//   "description": "Updates price and availability for multiple products or stores in a single request. This operation does not update the expiration date of the products. This method can only be called for non-multi-client accounts.",
+	//   "description": "Updates price and availability for multiple products or stores in a single request. This operation does not update the expiration date of the products.",
 	//   "httpMethod": "POST",
 	//   "id": "content.inventory.custombatch",
 	//   "parameters": {
@@ -10894,9 +11134,7 @@ type InventorySetCall struct {
 }
 
 // Set: Updates price and availability of a product in your Merchant
-// Center account. This operation does not update the expiration date of
-// the product. This method can only be called for non-multi-client
-// accounts.
+// Center account.
 func (r *InventoryService) Set(merchantId uint64, storeCode string, productId string, inventorysetrequest *InventorySetRequest) *InventorySetCall {
 	c := &InventorySetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -11001,7 +11239,7 @@ func (c *InventorySetCall) Do(opts ...googleapi.CallOption) (*InventorySetRespon
 	}
 	return ret, nil
 	// {
-	//   "description": "Updates price and availability of a product in your Merchant Center account. This operation does not update the expiration date of the product. This method can only be called for non-multi-client accounts.",
+	//   "description": "Updates price and availability of a product in your Merchant Center account.",
 	//   "httpMethod": "POST",
 	//   "id": "content.inventory.set",
 	//   "parameterOrder": [
@@ -11016,14 +11254,14 @@ func (c *InventorySetCall) Do(opts ...googleapi.CallOption) (*InventorySetRespon
 	//       "type": "boolean"
 	//     },
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the account that contains the product. This account cannot be a multi-client account.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
 	//       "type": "string"
 	//     },
 	//     "productId": {
-	//       "description": "The ID of the product for which to update price and availability.",
+	//       "description": "The REST id of the product for which to update price and availability.",
 	//       "location": "path",
 	//       "required": true,
 	//       "type": "string"
@@ -11061,8 +11299,7 @@ type OrdersAcknowledgeCall struct {
 	header_                  http.Header
 }
 
-// Acknowledge: Marks an order as acknowledged. This method can only be
-// called for non-multi-client accounts.
+// Acknowledge: Marks an order as acknowledged.
 func (r *OrdersService) Acknowledge(merchantId uint64, orderId string, ordersacknowledgerequest *OrdersAcknowledgeRequest) *OrdersAcknowledgeCall {
 	c := &OrdersAcknowledgeCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -11158,7 +11395,7 @@ func (c *OrdersAcknowledgeCall) Do(opts ...googleapi.CallOption) (*OrdersAcknowl
 	}
 	return ret, nil
 	// {
-	//   "description": "Marks an order as acknowledged. This method can only be called for non-multi-client accounts.",
+	//   "description": "Marks an order as acknowledged.",
 	//   "httpMethod": "POST",
 	//   "id": "content.orders.acknowledge",
 	//   "parameterOrder": [
@@ -11167,7 +11404,7 @@ func (c *OrdersAcknowledgeCall) Do(opts ...googleapi.CallOption) (*OrdersAcknowl
 	//   ],
 	//   "parameters": {
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the account that manages the order. This cannot be a multi-client account.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -11206,8 +11443,7 @@ type OrdersAdvancetestorderCall struct {
 }
 
 // Advancetestorder: Sandbox only. Moves a test order from state
-// "inProgress" to state "pendingShipment". This method can only be
-// called for non-multi-client accounts.
+// "inProgress" to state "pendingShipment".
 func (r *OrdersService) Advancetestorder(merchantId uint64, orderId string) *OrdersAdvancetestorderCall {
 	c := &OrdersAdvancetestorderCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -11297,7 +11533,7 @@ func (c *OrdersAdvancetestorderCall) Do(opts ...googleapi.CallOption) (*OrdersAd
 	}
 	return ret, nil
 	// {
-	//   "description": "Sandbox only. Moves a test order from state \"inProgress\" to state \"pendingShipment\". This method can only be called for non-multi-client accounts.",
+	//   "description": "Sandbox only. Moves a test order from state \"inProgress\" to state \"pendingShipment\".",
 	//   "httpMethod": "POST",
 	//   "id": "content.orders.advancetestorder",
 	//   "parameterOrder": [
@@ -11306,7 +11542,7 @@ func (c *OrdersAdvancetestorderCall) Do(opts ...googleapi.CallOption) (*OrdersAd
 	//   ],
 	//   "parameters": {
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the account that manages the order. This cannot be a multi-client account.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -11343,7 +11579,6 @@ type OrdersCancelCall struct {
 }
 
 // Cancel: Cancels all line items in an order, making a full refund.
-// This method can only be called for non-multi-client accounts.
 func (r *OrdersService) Cancel(merchantId uint64, orderId string, orderscancelrequest *OrdersCancelRequest) *OrdersCancelCall {
 	c := &OrdersCancelCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -11439,7 +11674,7 @@ func (c *OrdersCancelCall) Do(opts ...googleapi.CallOption) (*OrdersCancelRespon
 	}
 	return ret, nil
 	// {
-	//   "description": "Cancels all line items in an order, making a full refund. This method can only be called for non-multi-client accounts.",
+	//   "description": "Cancels all line items in an order, making a full refund.",
 	//   "httpMethod": "POST",
 	//   "id": "content.orders.cancel",
 	//   "parameterOrder": [
@@ -11448,7 +11683,7 @@ func (c *OrdersCancelCall) Do(opts ...googleapi.CallOption) (*OrdersCancelRespon
 	//   ],
 	//   "parameters": {
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the account that manages the order. This cannot be a multi-client account.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -11487,8 +11722,7 @@ type OrdersCancellineitemCall struct {
 	header_                     http.Header
 }
 
-// Cancellineitem: Cancels a line item, making a full refund. This
-// method can only be called for non-multi-client accounts.
+// Cancellineitem: Cancels a line item, making a full refund.
 func (r *OrdersService) Cancellineitem(merchantId uint64, orderId string, orderscancellineitemrequest *OrdersCancelLineItemRequest) *OrdersCancellineitemCall {
 	c := &OrdersCancellineitemCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -11584,7 +11818,7 @@ func (c *OrdersCancellineitemCall) Do(opts ...googleapi.CallOption) (*OrdersCanc
 	}
 	return ret, nil
 	// {
-	//   "description": "Cancels a line item, making a full refund. This method can only be called for non-multi-client accounts.",
+	//   "description": "Cancels a line item, making a full refund.",
 	//   "httpMethod": "POST",
 	//   "id": "content.orders.cancellineitem",
 	//   "parameterOrder": [
@@ -11593,7 +11827,7 @@ func (c *OrdersCancellineitemCall) Do(opts ...googleapi.CallOption) (*OrdersCanc
 	//   ],
 	//   "parameters": {
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the account that manages the order. This cannot be a multi-client account.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -11631,8 +11865,7 @@ type OrdersCreatetestorderCall struct {
 	header_                      http.Header
 }
 
-// Createtestorder: Sandbox only. Creates a test order. This method can
-// only be called for non-multi-client accounts.
+// Createtestorder: Sandbox only. Creates a test order.
 func (r *OrdersService) Createtestorder(merchantId uint64, orderscreatetestorderrequest *OrdersCreateTestOrderRequest) *OrdersCreatetestorderCall {
 	c := &OrdersCreatetestorderCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -11726,7 +11959,7 @@ func (c *OrdersCreatetestorderCall) Do(opts ...googleapi.CallOption) (*OrdersCre
 	}
 	return ret, nil
 	// {
-	//   "description": "Sandbox only. Creates a test order. This method can only be called for non-multi-client accounts.",
+	//   "description": "Sandbox only. Creates a test order.",
 	//   "httpMethod": "POST",
 	//   "id": "content.orders.createtestorder",
 	//   "parameterOrder": [
@@ -11734,7 +11967,7 @@ func (c *OrdersCreatetestorderCall) Do(opts ...googleapi.CallOption) (*OrdersCre
 	//   ],
 	//   "parameters": {
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the account that should manage the order. This cannot be a multi-client account.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -11766,8 +11999,7 @@ type OrdersCustombatchCall struct {
 }
 
 // Custombatch: Retrieves or modifies multiple orders in a single
-// request. This method can only be called for non-multi-client
-// accounts.
+// request.
 func (r *OrdersService) Custombatch(orderscustombatchrequest *OrdersCustomBatchRequest) *OrdersCustombatchCall {
 	c := &OrdersCustombatchCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.orderscustombatchrequest = orderscustombatchrequest
@@ -11857,7 +12089,7 @@ func (c *OrdersCustombatchCall) Do(opts ...googleapi.CallOption) (*OrdersCustomB
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves or modifies multiple orders in a single request. This method can only be called for non-multi-client accounts.",
+	//   "description": "Retrieves or modifies multiple orders in a single request.",
 	//   "httpMethod": "POST",
 	//   "id": "content.orders.custombatch",
 	//   "path": "orders/batch",
@@ -11886,8 +12118,7 @@ type OrdersGetCall struct {
 	header_      http.Header
 }
 
-// Get: Retrieves an order from your Merchant Center account. This
-// method can only be called for non-multi-client accounts.
+// Get: Retrieves an order from your Merchant Center account.
 func (r *OrdersService) Get(merchantId uint64, orderId string) *OrdersGetCall {
 	c := &OrdersGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -11990,7 +12221,7 @@ func (c *OrdersGetCall) Do(opts ...googleapi.CallOption) (*Order, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves an order from your Merchant Center account. This method can only be called for non-multi-client accounts.",
+	//   "description": "Retrieves an order from your Merchant Center account.",
 	//   "httpMethod": "GET",
 	//   "id": "content.orders.get",
 	//   "parameterOrder": [
@@ -11999,7 +12230,7 @@ func (c *OrdersGetCall) Do(opts ...googleapi.CallOption) (*Order, error) {
 	//   ],
 	//   "parameters": {
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the account that manages the order. This cannot be a multi-client account.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -12036,7 +12267,6 @@ type OrdersGetbymerchantorderidCall struct {
 }
 
 // Getbymerchantorderid: Retrieves an order using merchant order id.
-// This method can only be called for non-multi-client accounts.
 func (r *OrdersService) Getbymerchantorderid(merchantId uint64, merchantOrderId string) *OrdersGetbymerchantorderidCall {
 	c := &OrdersGetbymerchantorderidCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -12140,7 +12370,7 @@ func (c *OrdersGetbymerchantorderidCall) Do(opts ...googleapi.CallOption) (*Orde
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves an order using merchant order id. This method can only be called for non-multi-client accounts.",
+	//   "description": "Retrieves an order using merchant order id.",
 	//   "httpMethod": "GET",
 	//   "id": "content.orders.getbymerchantorderid",
 	//   "parameterOrder": [
@@ -12149,7 +12379,7 @@ func (c *OrdersGetbymerchantorderidCall) Do(opts ...googleapi.CallOption) (*Orde
 	//   ],
 	//   "parameters": {
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the account that manages the order. This cannot be a multi-client account.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -12186,8 +12416,7 @@ type OrdersGettestordertemplateCall struct {
 }
 
 // Gettestordertemplate: Sandbox only. Retrieves an order template that
-// can be used to quickly create a new order in sandbox. This method can
-// only be called for non-multi-client accounts.
+// can be used to quickly create a new order in sandbox.
 func (r *OrdersService) Gettestordertemplate(merchantId uint64, templateName string) *OrdersGettestordertemplateCall {
 	c := &OrdersGettestordertemplateCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -12291,7 +12520,7 @@ func (c *OrdersGettestordertemplateCall) Do(opts ...googleapi.CallOption) (*Orde
 	}
 	return ret, nil
 	// {
-	//   "description": "Sandbox only. Retrieves an order template that can be used to quickly create a new order in sandbox. This method can only be called for non-multi-client accounts.",
+	//   "description": "Sandbox only. Retrieves an order template that can be used to quickly create a new order in sandbox.",
 	//   "httpMethod": "GET",
 	//   "id": "content.orders.gettestordertemplate",
 	//   "parameterOrder": [
@@ -12300,7 +12529,7 @@ func (c *OrdersGettestordertemplateCall) Do(opts ...googleapi.CallOption) (*Orde
 	//   ],
 	//   "parameters": {
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the account that should manage the order. This cannot be a multi-client account.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -12347,8 +12576,7 @@ type OrdersListCall struct {
 	header_      http.Header
 }
 
-// List: Lists the orders in your Merchant Center account. This method
-// can only be called for non-multi-client accounts.
+// List: Lists the orders in your Merchant Center account.
 func (r *OrdersService) List(merchantId uint64) *OrdersListCall {
 	c := &OrdersListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -12533,7 +12761,7 @@ func (c *OrdersListCall) Do(opts ...googleapi.CallOption) (*OrdersListResponse, 
 	}
 	return ret, nil
 	// {
-	//   "description": "Lists the orders in your Merchant Center account. This method can only be called for non-multi-client accounts.",
+	//   "description": "Lists the orders in your Merchant Center account.",
 	//   "httpMethod": "GET",
 	//   "id": "content.orders.list",
 	//   "parameterOrder": [
@@ -12552,7 +12780,7 @@ func (c *OrdersListCall) Do(opts ...googleapi.CallOption) (*OrdersListResponse, 
 	//       "type": "integer"
 	//     },
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the account that manages the order. This cannot be a multi-client account.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -12664,7 +12892,6 @@ type OrdersRefundCall struct {
 }
 
 // Refund: Refund a portion of the order, up to the full amount paid.
-// This method can only be called for non-multi-client accounts.
 func (r *OrdersService) Refund(merchantId uint64, orderId string, ordersrefundrequest *OrdersRefundRequest) *OrdersRefundCall {
 	c := &OrdersRefundCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -12760,7 +12987,7 @@ func (c *OrdersRefundCall) Do(opts ...googleapi.CallOption) (*OrdersRefundRespon
 	}
 	return ret, nil
 	// {
-	//   "description": "Refund a portion of the order, up to the full amount paid. This method can only be called for non-multi-client accounts.",
+	//   "description": "Refund a portion of the order, up to the full amount paid.",
 	//   "httpMethod": "POST",
 	//   "id": "content.orders.refund",
 	//   "parameterOrder": [
@@ -12769,7 +12996,7 @@ func (c *OrdersRefundCall) Do(opts ...googleapi.CallOption) (*OrdersRefundRespon
 	//   ],
 	//   "parameters": {
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the account that manages the order. This cannot be a multi-client account.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -12808,8 +13035,7 @@ type OrdersReturnlineitemCall struct {
 	header_                     http.Header
 }
 
-// Returnlineitem: Returns a line item. This method can only be called
-// for non-multi-client accounts.
+// Returnlineitem: Returns a line item.
 func (r *OrdersService) Returnlineitem(merchantId uint64, orderId string, ordersreturnlineitemrequest *OrdersReturnLineItemRequest) *OrdersReturnlineitemCall {
 	c := &OrdersReturnlineitemCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -12905,7 +13131,7 @@ func (c *OrdersReturnlineitemCall) Do(opts ...googleapi.CallOption) (*OrdersRetu
 	}
 	return ret, nil
 	// {
-	//   "description": "Returns a line item. This method can only be called for non-multi-client accounts.",
+	//   "description": "Returns a line item.",
 	//   "httpMethod": "POST",
 	//   "id": "content.orders.returnlineitem",
 	//   "parameterOrder": [
@@ -12914,7 +13140,7 @@ func (c *OrdersReturnlineitemCall) Do(opts ...googleapi.CallOption) (*OrdersRetu
 	//   ],
 	//   "parameters": {
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the account that manages the order. This cannot be a multi-client account.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -12953,8 +13179,7 @@ type OrdersShiplineitemsCall struct {
 	header_                    http.Header
 }
 
-// Shiplineitems: Marks line item(s) as shipped. This method can only be
-// called for non-multi-client accounts.
+// Shiplineitems: Marks line item(s) as shipped.
 func (r *OrdersService) Shiplineitems(merchantId uint64, orderId string, ordersshiplineitemsrequest *OrdersShipLineItemsRequest) *OrdersShiplineitemsCall {
 	c := &OrdersShiplineitemsCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -13050,7 +13275,7 @@ func (c *OrdersShiplineitemsCall) Do(opts ...googleapi.CallOption) (*OrdersShipL
 	}
 	return ret, nil
 	// {
-	//   "description": "Marks line item(s) as shipped. This method can only be called for non-multi-client accounts.",
+	//   "description": "Marks line item(s) as shipped.",
 	//   "httpMethod": "POST",
 	//   "id": "content.orders.shiplineitems",
 	//   "parameterOrder": [
@@ -13059,7 +13284,7 @@ func (c *OrdersShiplineitemsCall) Do(opts ...googleapi.CallOption) (*OrdersShipL
 	//   ],
 	//   "parameters": {
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the account that manages the order. This cannot be a multi-client account.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -13099,7 +13324,7 @@ type OrdersUpdatemerchantorderidCall struct {
 }
 
 // Updatemerchantorderid: Updates the merchant order ID for a given
-// order. This method can only be called for non-multi-client accounts.
+// order.
 func (r *OrdersService) Updatemerchantorderid(merchantId uint64, orderId string, ordersupdatemerchantorderidrequest *OrdersUpdateMerchantOrderIdRequest) *OrdersUpdatemerchantorderidCall {
 	c := &OrdersUpdatemerchantorderidCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -13196,7 +13421,7 @@ func (c *OrdersUpdatemerchantorderidCall) Do(opts ...googleapi.CallOption) (*Ord
 	}
 	return ret, nil
 	// {
-	//   "description": "Updates the merchant order ID for a given order. This method can only be called for non-multi-client accounts.",
+	//   "description": "Updates the merchant order ID for a given order.",
 	//   "httpMethod": "POST",
 	//   "id": "content.orders.updatemerchantorderid",
 	//   "parameterOrder": [
@@ -13205,7 +13430,7 @@ func (c *OrdersUpdatemerchantorderidCall) Do(opts ...googleapi.CallOption) (*Ord
 	//   ],
 	//   "parameters": {
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the account that manages the order. This cannot be a multi-client account.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -13245,7 +13470,7 @@ type OrdersUpdateshipmentCall struct {
 }
 
 // Updateshipment: Updates a shipment's status, carrier, and/or tracking
-// ID. This method can only be called for non-multi-client accounts.
+// ID.
 func (r *OrdersService) Updateshipment(merchantId uint64, orderId string, ordersupdateshipmentrequest *OrdersUpdateShipmentRequest) *OrdersUpdateshipmentCall {
 	c := &OrdersUpdateshipmentCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -13341,7 +13566,7 @@ func (c *OrdersUpdateshipmentCall) Do(opts ...googleapi.CallOption) (*OrdersUpda
 	}
 	return ret, nil
 	// {
-	//   "description": "Updates a shipment's status, carrier, and/or tracking ID. This method can only be called for non-multi-client accounts.",
+	//   "description": "Updates a shipment's status, carrier, and/or tracking ID.",
 	//   "httpMethod": "POST",
 	//   "id": "content.orders.updateshipment",
 	//   "parameterOrder": [
@@ -13350,7 +13575,7 @@ func (c *OrdersUpdateshipmentCall) Do(opts ...googleapi.CallOption) (*OrdersUpda
 	//   ],
 	//   "parameters": {
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the account that manages the order. This cannot be a multi-client account.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -13388,8 +13613,7 @@ type ProductsCustombatchCall struct {
 }
 
 // Custombatch: Retrieves, inserts, and deletes multiple products in a
-// single request. This method can only be called for non-multi-client
-// accounts.
+// single request.
 func (r *ProductsService) Custombatch(productscustombatchrequest *ProductsCustomBatchRequest) *ProductsCustombatchCall {
 	c := &ProductsCustombatchCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.productscustombatchrequest = productscustombatchrequest
@@ -13486,7 +13710,7 @@ func (c *ProductsCustombatchCall) Do(opts ...googleapi.CallOption) (*ProductsCus
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves, inserts, and deletes multiple products in a single request. This method can only be called for non-multi-client accounts.",
+	//   "description": "Retrieves, inserts, and deletes multiple products in a single request.",
 	//   "httpMethod": "POST",
 	//   "id": "content.products.custombatch",
 	//   "parameters": {
@@ -13521,8 +13745,7 @@ type ProductsDeleteCall struct {
 	header_    http.Header
 }
 
-// Delete: Deletes a product from your Merchant Center account. This
-// method can only be called for non-multi-client accounts.
+// Delete: Deletes a product from your Merchant Center account.
 func (r *ProductsService) Delete(merchantId uint64, productId string) *ProductsDeleteCall {
 	c := &ProductsDeleteCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -13594,7 +13817,7 @@ func (c *ProductsDeleteCall) Do(opts ...googleapi.CallOption) error {
 	}
 	return nil
 	// {
-	//   "description": "Deletes a product from your Merchant Center account. This method can only be called for non-multi-client accounts.",
+	//   "description": "Deletes a product from your Merchant Center account.",
 	//   "httpMethod": "DELETE",
 	//   "id": "content.products.delete",
 	//   "parameterOrder": [
@@ -13608,14 +13831,14 @@ func (c *ProductsDeleteCall) Do(opts ...googleapi.CallOption) error {
 	//       "type": "boolean"
 	//     },
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the account that contains the product. This account cannot be a multi-client account.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
 	//       "type": "string"
 	//     },
 	//     "productId": {
-	//       "description": "The ID of the product.",
+	//       "description": "The REST id of the product.",
 	//       "location": "path",
 	//       "required": true,
 	//       "type": "string"
@@ -13641,8 +13864,7 @@ type ProductsGetCall struct {
 	header_      http.Header
 }
 
-// Get: Retrieves a product from your Merchant Center account. This
-// method can only be called for non-multi-client accounts.
+// Get: Retrieves a product from your Merchant Center account.
 func (r *ProductsService) Get(merchantId uint64, productId string) *ProductsGetCall {
 	c := &ProductsGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -13745,7 +13967,7 @@ func (c *ProductsGetCall) Do(opts ...googleapi.CallOption) (*Product, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves a product from your Merchant Center account. This method can only be called for non-multi-client accounts.",
+	//   "description": "Retrieves a product from your Merchant Center account.",
 	//   "httpMethod": "GET",
 	//   "id": "content.products.get",
 	//   "parameterOrder": [
@@ -13754,14 +13976,14 @@ func (c *ProductsGetCall) Do(opts ...googleapi.CallOption) (*Product, error) {
 	//   ],
 	//   "parameters": {
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the account that contains the product. This account cannot be a multi-client account.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
 	//       "type": "string"
 	//     },
 	//     "productId": {
-	//       "description": "The ID of the product.",
+	//       "description": "The REST id of the product.",
 	//       "location": "path",
 	//       "required": true,
 	//       "type": "string"
@@ -13791,8 +14013,7 @@ type ProductsInsertCall struct {
 
 // Insert: Uploads a product to your Merchant Center account. If an item
 // with the same channel, contentLanguage, offerId, and targetCountry
-// already exists, this method updates that entry. This method can only
-// be called for non-multi-client accounts.
+// already exists, this method updates that entry.
 func (r *ProductsService) Insert(merchantId uint64, product *Product) *ProductsInsertCall {
 	c := &ProductsInsertCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -13893,7 +14114,7 @@ func (c *ProductsInsertCall) Do(opts ...googleapi.CallOption) (*Product, error) 
 	}
 	return ret, nil
 	// {
-	//   "description": "Uploads a product to your Merchant Center account. If an item with the same channel, contentLanguage, offerId, and targetCountry already exists, this method updates that entry. This method can only be called for non-multi-client accounts.",
+	//   "description": "Uploads a product to your Merchant Center account. If an item with the same channel, contentLanguage, offerId, and targetCountry already exists, this method updates that entry.",
 	//   "httpMethod": "POST",
 	//   "id": "content.products.insert",
 	//   "parameterOrder": [
@@ -13906,7 +14127,7 @@ func (c *ProductsInsertCall) Do(opts ...googleapi.CallOption) (*Product, error) 
 	//       "type": "boolean"
 	//     },
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the account that contains the product. This account cannot be a multi-client account.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -13938,8 +14159,7 @@ type ProductsListCall struct {
 	header_      http.Header
 }
 
-// List: Lists the products in your Merchant Center account. This method
-// can only be called for non-multi-client accounts.
+// List: Lists the products in your Merchant Center account.
 func (r *ProductsService) List(merchantId uint64) *ProductsListCall {
 	c := &ProductsListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -14063,7 +14283,7 @@ func (c *ProductsListCall) Do(opts ...googleapi.CallOption) (*ProductsListRespon
 	}
 	return ret, nil
 	// {
-	//   "description": "Lists the products in your Merchant Center account. This method can only be called for non-multi-client accounts.",
+	//   "description": "Lists the products in your Merchant Center account.",
 	//   "httpMethod": "GET",
 	//   "id": "content.products.list",
 	//   "parameterOrder": [
@@ -14082,7 +14302,7 @@ func (c *ProductsListCall) Do(opts ...googleapi.CallOption) (*ProductsListRespon
 	//       "type": "integer"
 	//     },
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the account that contains the products. This account cannot be a multi-client account.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -14137,8 +14357,7 @@ type ProductstatusesCustombatchCall struct {
 }
 
 // Custombatch: Gets the statuses of multiple products in a single
-// request. This method can only be called for non-multi-client
-// accounts.
+// request.
 func (r *ProductstatusesService) Custombatch(productstatusescustombatchrequest *ProductstatusesCustomBatchRequest) *ProductstatusesCustombatchCall {
 	c := &ProductstatusesCustombatchCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.productstatusescustombatchrequest = productstatusescustombatchrequest
@@ -14237,7 +14456,7 @@ func (c *ProductstatusesCustombatchCall) Do(opts ...googleapi.CallOption) (*Prod
 	}
 	return ret, nil
 	// {
-	//   "description": "Gets the statuses of multiple products in a single request. This method can only be called for non-multi-client accounts.",
+	//   "description": "Gets the statuses of multiple products in a single request.",
 	//   "httpMethod": "POST",
 	//   "id": "content.productstatuses.custombatch",
 	//   "parameters": {
@@ -14274,7 +14493,6 @@ type ProductstatusesGetCall struct {
 }
 
 // Get: Gets the status of a product from your Merchant Center account.
-// This method can only be called for non-multi-client accounts.
 func (r *ProductstatusesService) Get(merchantId uint64, productId string) *ProductstatusesGetCall {
 	c := &ProductstatusesGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -14385,7 +14603,7 @@ func (c *ProductstatusesGetCall) Do(opts ...googleapi.CallOption) (*ProductStatu
 	}
 	return ret, nil
 	// {
-	//   "description": "Gets the status of a product from your Merchant Center account. This method can only be called for non-multi-client accounts.",
+	//   "description": "Gets the status of a product from your Merchant Center account.",
 	//   "httpMethod": "GET",
 	//   "id": "content.productstatuses.get",
 	//   "parameterOrder": [
@@ -14399,14 +14617,14 @@ func (c *ProductstatusesGetCall) Do(opts ...googleapi.CallOption) (*ProductStatu
 	//       "type": "boolean"
 	//     },
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the account that contains the product. This account cannot be a multi-client account.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
 	//       "type": "string"
 	//     },
 	//     "productId": {
-	//       "description": "The ID of the product.",
+	//       "description": "The REST id of the product.",
 	//       "location": "path",
 	//       "required": true,
 	//       "type": "string"
@@ -14435,8 +14653,7 @@ type ProductstatusesListCall struct {
 }
 
 // List: Lists the statuses of the products in your Merchant Center
-// account. This method can only be called for non-multi-client
-// accounts.
+// account.
 func (r *ProductstatusesService) List(merchantId uint64) *ProductstatusesListCall {
 	c := &ProductstatusesListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -14569,7 +14786,7 @@ func (c *ProductstatusesListCall) Do(opts ...googleapi.CallOption) (*Productstat
 	}
 	return ret, nil
 	// {
-	//   "description": "Lists the statuses of the products in your Merchant Center account. This method can only be called for non-multi-client accounts.",
+	//   "description": "Lists the statuses of the products in your Merchant Center account.",
 	//   "httpMethod": "GET",
 	//   "id": "content.productstatuses.list",
 	//   "parameterOrder": [
@@ -14593,7 +14810,7 @@ func (c *ProductstatusesListCall) Do(opts ...googleapi.CallOption) (*Productstat
 	//       "type": "integer"
 	//     },
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the account that contains the products. This account cannot be a multi-client account.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -14782,11 +14999,7 @@ type ShippingsettingsGetCall struct {
 	header_      http.Header
 }
 
-// Get: Retrieves the shipping settings of the account. This method can
-// only be called for accounts to which the managing account has access:
-// either the managing account itself for any Merchant Center account,
-// or any sub-account when the managing account is a multi-client
-// account.
+// Get: Retrieves the shipping settings of the account.
 func (r *ShippingsettingsService) Get(merchantId uint64, accountId uint64) *ShippingsettingsGetCall {
 	c := &ShippingsettingsGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -14889,7 +15102,7 @@ func (c *ShippingsettingsGetCall) Do(opts ...googleapi.CallOption) (*ShippingSet
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves the shipping settings of the account. This method can only be called for accounts to which the managing account has access: either the managing account itself for any Merchant Center account, or any sub-account when the managing account is a multi-client account.",
+	//   "description": "Retrieves the shipping settings of the account.",
 	//   "httpMethod": "GET",
 	//   "id": "content.shippingsettings.get",
 	//   "parameterOrder": [
@@ -14905,7 +15118,7 @@ func (c *ShippingsettingsGetCall) Do(opts ...googleapi.CallOption) (*ShippingSet
 	//       "type": "string"
 	//     },
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the managing account. If this account is not a multi-client account, then this parameter must be the same as accountId.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -15076,8 +15289,7 @@ type ShippingsettingsListCall struct {
 }
 
 // List: Lists the shipping settings of the sub-accounts in your
-// Merchant Center account. This method can only be called for
-// multi-client accounts.
+// Merchant Center account.
 func (r *ShippingsettingsService) List(merchantId uint64) *ShippingsettingsListCall {
 	c := &ShippingsettingsListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -15193,7 +15405,7 @@ func (c *ShippingsettingsListCall) Do(opts ...googleapi.CallOption) (*Shippingse
 	}
 	return ret, nil
 	// {
-	//   "description": "Lists the shipping settings of the sub-accounts in your Merchant Center account. This method can only be called for multi-client accounts.",
+	//   "description": "Lists the shipping settings of the sub-accounts in your Merchant Center account.",
 	//   "httpMethod": "GET",
 	//   "id": "content.shippingsettings.list",
 	//   "parameterOrder": [
@@ -15207,7 +15419,7 @@ func (c *ShippingsettingsListCall) Do(opts ...googleapi.CallOption) (*Shippingse
 	//       "type": "integer"
 	//     },
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the managing account. This must be a multi-client account.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -15263,11 +15475,8 @@ type ShippingsettingsPatchCall struct {
 	header_          http.Header
 }
 
-// Patch: Updates the shipping settings of the account. This method can
-// only be called for accounts to which the managing account has access:
-// either the managing account itself for any Merchant Center account,
-// or any sub-account when the managing account is a multi-client
-// account. This method supports patch semantics.
+// Patch: Updates the shipping settings of the account. This method
+// supports patch semantics.
 func (r *ShippingsettingsService) Patch(merchantId uint64, accountId uint64, shippingsettings *ShippingSettings) *ShippingsettingsPatchCall {
 	c := &ShippingsettingsPatchCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -15370,7 +15579,7 @@ func (c *ShippingsettingsPatchCall) Do(opts ...googleapi.CallOption) (*ShippingS
 	}
 	return ret, nil
 	// {
-	//   "description": "Updates the shipping settings of the account. This method can only be called for accounts to which the managing account has access: either the managing account itself for any Merchant Center account, or any sub-account when the managing account is a multi-client account. This method supports patch semantics.",
+	//   "description": "Updates the shipping settings of the account. This method supports patch semantics.",
 	//   "httpMethod": "PATCH",
 	//   "id": "content.shippingsettings.patch",
 	//   "parameterOrder": [
@@ -15391,7 +15600,7 @@ func (c *ShippingsettingsPatchCall) Do(opts ...googleapi.CallOption) (*ShippingS
 	//       "type": "boolean"
 	//     },
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the managing account. If this account is not a multi-client account, then this parameter must be the same as accountId.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
@@ -15424,11 +15633,7 @@ type ShippingsettingsUpdateCall struct {
 	header_          http.Header
 }
 
-// Update: Updates the shipping settings of the account. This method can
-// only be called for accounts to which the managing account has access:
-// either the managing account itself for any Merchant Center account,
-// or any sub-account when the managing account is a multi-client
-// account.
+// Update: Updates the shipping settings of the account.
 func (r *ShippingsettingsService) Update(merchantId uint64, accountId uint64, shippingsettings *ShippingSettings) *ShippingsettingsUpdateCall {
 	c := &ShippingsettingsUpdateCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.merchantId = merchantId
@@ -15531,7 +15736,7 @@ func (c *ShippingsettingsUpdateCall) Do(opts ...googleapi.CallOption) (*Shipping
 	}
 	return ret, nil
 	// {
-	//   "description": "Updates the shipping settings of the account. This method can only be called for accounts to which the managing account has access: either the managing account itself for any Merchant Center account, or any sub-account when the managing account is a multi-client account.",
+	//   "description": "Updates the shipping settings of the account.",
 	//   "httpMethod": "PUT",
 	//   "id": "content.shippingsettings.update",
 	//   "parameterOrder": [
@@ -15552,7 +15757,7 @@ func (c *ShippingsettingsUpdateCall) Do(opts ...googleapi.CallOption) (*Shipping
 	//       "type": "boolean"
 	//     },
 	//     "merchantId": {
-	//       "description": "The ID of the managing account.",
+	//       "description": "The ID of the managing account. If this account is not a multi-client account, then this parameter must be the same as accountId.",
 	//       "format": "uint64",
 	//       "location": "path",
 	//       "required": true,
