@@ -18,6 +18,7 @@ items:
         name: oauth-proxy:binaries
     source:
       git:
+        ref: master
         uri: https://github.com/openshift/oauth-proxy.git
       type: Git
       dockerfile: |
@@ -29,7 +30,7 @@ items:
       dockerStrategy:
         from:
           kind: DockerImage
-          name: openshift/origin-release:golang-1.7
+          name: openshift/origin-release:golang-1.8
         imageOptimizationPolicy: SkipLayers
     triggers:
     - type: ConfigChange
@@ -44,9 +45,11 @@ items:
     successfulBuildsHistoryLimit: 1
     failedBuildsHistoryLimit: 2
     output:
+      pushSecret:
+        name: registry-push
       to:
-        kind: ImageStreamTag
-        name: oauth-proxy:latest
+        kind: DockerImage
+        name: docker.io/openshift/oauth-proxy:v1.1.0
     source:
       dockerfile: |
         FROM        centos:7
