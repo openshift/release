@@ -520,10 +520,10 @@ type GoogleDatastoreAdminV1beta1CommonMetadata struct {
 
 	// Labels: The client-assigned labels which were provided when the
 	// operation was
-	// created.  May also include additional labels.
+	// created. May also include additional labels.
 	Labels map[string]string `json:"labels,omitempty"`
 
-	// OperationType: The type of the operation.  Can be used as a filter
+	// OperationType: The type of the operation. Can be used as a filter
 	// in
 	// ListOperationsRequest.
 	//
@@ -531,8 +531,6 @@ type GoogleDatastoreAdminV1beta1CommonMetadata struct {
 	//   "OPERATION_TYPE_UNSPECIFIED" - Unspecified.
 	//   "EXPORT_ENTITIES" - ExportEntities.
 	//   "IMPORT_ENTITIES" - ImportEntities.
-	//   "BUILD_INDEX" - Build an index.
-	//   "CLEAR_INDEX" - Clear an index.
 	OperationType string `json:"operationType,omitempty"`
 
 	// StartTime: The time that work began on the operation.
@@ -546,7 +544,7 @@ type GoogleDatastoreAdminV1beta1CommonMetadata struct {
 	//   "PROCESSING" - Request is actively being processed.
 	//   "CANCELLING" - Request is in the process of being cancelled after
 	// user called
-	// longrunning.Operations.CancelOperation on the operation.
+	// google.longrunning.Operations.CancelOperation on the operation.
 	//   "FINALIZING" - Request has been processed and is in its
 	// finalization stage.
 	//   "SUCCESSFUL" - Request has completed successfully.
@@ -554,7 +552,7 @@ type GoogleDatastoreAdminV1beta1CommonMetadata struct {
 	// error.
 	//   "CANCELLED" - Request has finished being cancelled after user
 	// called
-	// longrunning.Operations.CancelOperation.
+	// google.longrunning.Operations.CancelOperation.
 	State string `json:"state,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "EndTime") to
@@ -581,9 +579,9 @@ func (s *GoogleDatastoreAdminV1beta1CommonMetadata) MarshalJSON() ([]byte, error
 }
 
 // GoogleDatastoreAdminV1beta1EntityFilter: Identifies a subset of
-// entities in a project.  This is specified as
-// combinations of kind + namespace (either or both of which may be all,
-// as
+// entities in a project. This is specified as
+// combinations of kinds and namespaces (either or both of which may be
+// all, as
 // described in the following examples).
 // Example usage:
 //
@@ -605,12 +603,12 @@ type GoogleDatastoreAdminV1beta1EntityFilter struct {
 	// Kinds: If empty, then this represents all kinds.
 	Kinds []string `json:"kinds,omitempty"`
 
-	// NamespaceIds: An empty list represents all namespaces.  This is the
+	// NamespaceIds: An empty list represents all namespaces. This is the
 	// preferred
 	// usage for projects that don't use namespaces.
 	//
-	// An empty string element represents the default namespace.  This
-	// should be
+	// An empty string element represents the default namespace. This should
+	// be
 	// used if the project has data in non-default namespaces, but doesn't
 	// want to
 	// include them.
@@ -774,7 +772,9 @@ func (s *GoogleDatastoreAdminV1beta1ImportEntitiesMetadata) MarshalJSON() ([]byt
 // GoogleDatastoreAdminV1beta1Progress: Measures the progress of a
 // particular metric.
 type GoogleDatastoreAdminV1beta1Progress struct {
-	// WorkCompleted: Note that this may be greater than work_estimated.
+	// WorkCompleted: The amount of work that has been completed. Note that
+	// this may be greater
+	// than work_estimated.
 	WorkCompleted int64 `json:"workCompleted,omitempty,string"`
 
 	// WorkEstimated: An estimate of how much work needs to be performed.
@@ -995,40 +995,6 @@ func (s *KindExpression) MarshalJSON() ([]byte, error) {
 // href="http://www.unoosa.org/pdf/icg/2012/template/WGS_84.pdf">WGS84
 // st
 // andard</a>. Values must be within normalized ranges.
-//
-// Example of normalization code in Python:
-//
-//     def NormalizeLongitude(longitude):
-//       """Wraps decimal degrees longitude to [-180.0, 180.0]."""
-//       q, r = divmod(longitude, 360.0)
-//       if r > 180.0 or (r == 180.0 and q <= -1.0):
-//         return r - 360.0
-//       return r
-//
-//     def NormalizeLatLng(latitude, longitude):
-//       """Wraps decimal degrees latitude and longitude to
-//       [-90.0, 90.0] and [-180.0, 180.0], respectively."""
-//       r = latitude % 360.0
-//       if r <= 90.0:
-//         return r, NormalizeLongitude(longitude)
-//       elif r >= 270.0:
-//         return r - 360, NormalizeLongitude(longitude)
-//       else:
-//         return 180 - r, NormalizeLongitude(longitude + 180.0)
-//
-//     assert 180.0 == NormalizeLongitude(180.0)
-//     assert -180.0 == NormalizeLongitude(-180.0)
-//     assert -179.0 == NormalizeLongitude(181.0)
-//     assert (0.0, 0.0) == NormalizeLatLng(360.0, 0.0)
-//     assert (0.0, 0.0) == NormalizeLatLng(-360.0, 0.0)
-//     assert (85.0, 180.0) == NormalizeLatLng(95.0, 0.0)
-//     assert (-85.0, -170.0) == NormalizeLatLng(-95.0, 10.0)
-//     assert (90.0, 10.0) == NormalizeLatLng(90.0, 10.0)
-//     assert (-90.0, -10.0) == NormalizeLatLng(-90.0, -10.0)
-//     assert (0.0, -170.0) == NormalizeLatLng(-180.0, 10.0)
-//     assert (0.0, -170.0) == NormalizeLatLng(180.0, 10.0)
-//     assert (-90.0, 10.0) == NormalizeLatLng(270.0, 10.0)
-//     assert (90.0, 10.0) == NormalizeLatLng(-270.0, 10.0)
 type LatLng struct {
 	// Latitude: The latitude in degrees. It must be in the range [-90.0,
 	// +90.0].
@@ -1727,6 +1693,47 @@ func (s *ReadWrite) MarshalJSON() ([]byte, error) {
 	type noMethod ReadWrite
 	raw := noMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// ReserveIdsRequest: The request for Datastore.ReserveIds.
+type ReserveIdsRequest struct {
+	// DatabaseId: If not empty, the ID of the database against which to
+	// make the request.
+	DatabaseId string `json:"databaseId,omitempty"`
+
+	// Keys: A list of keys with complete key paths whose numeric IDs should
+	// not be
+	// auto-allocated.
+	Keys []*Key `json:"keys,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "DatabaseId") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "DatabaseId") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *ReserveIdsRequest) MarshalJSON() ([]byte, error) {
+	type noMethod ReserveIdsRequest
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// ReserveIdsResponse: The response for Datastore.ReserveIds.
+type ReserveIdsResponse struct {
+	// ServerResponse contains the HTTP response code and headers from the
+	// server.
+	googleapi.ServerResponse `json:"-"`
 }
 
 // RollbackRequest: The request for Datastore.Rollback.
@@ -2523,6 +2530,143 @@ func (c *ProjectsLookupCall) Do(opts ...googleapi.CallOption) (*LookupResponse, 
 	//   },
 	//   "response": {
 	//     "$ref": "LookupResponse"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/datastore"
+	//   ]
+	// }
+
+}
+
+// method id "datastore.projects.reserveIds":
+
+type ProjectsReserveIdsCall struct {
+	s                 *Service
+	projectId         string
+	reserveidsrequest *ReserveIdsRequest
+	urlParams_        gensupport.URLParams
+	ctx_              context.Context
+	header_           http.Header
+}
+
+// ReserveIds: Prevents the supplied keys' IDs from being auto-allocated
+// by Cloud
+// Datastore.
+func (r *ProjectsService) ReserveIds(projectId string, reserveidsrequest *ReserveIdsRequest) *ProjectsReserveIdsCall {
+	c := &ProjectsReserveIdsCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.projectId = projectId
+	c.reserveidsrequest = reserveidsrequest
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *ProjectsReserveIdsCall) Fields(s ...googleapi.Field) *ProjectsReserveIdsCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *ProjectsReserveIdsCall) Context(ctx context.Context) *ProjectsReserveIdsCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *ProjectsReserveIdsCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *ProjectsReserveIdsCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	var body io.Reader = nil
+	body, err := googleapi.WithoutDataWrapper.JSONReader(c.reserveidsrequest)
+	if err != nil {
+		return nil, err
+	}
+	reqHeaders.Set("Content-Type", "application/json")
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v1beta3/projects/{projectId}:reserveIds")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("POST", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"projectId": c.projectId,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "datastore.projects.reserveIds" call.
+// Exactly one of *ReserveIdsResponse or error will be non-nil. Any
+// non-2xx status code is an error. Response headers are in either
+// *ReserveIdsResponse.ServerResponse.Header or (if a response was
+// returned at all) in error.(*googleapi.Error).Header. Use
+// googleapi.IsNotModified to check whether the returned error was
+// because http.StatusNotModified was returned.
+func (c *ProjectsReserveIdsCall) Do(opts ...googleapi.CallOption) (*ReserveIdsResponse, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &ReserveIdsResponse{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Prevents the supplied keys' IDs from being auto-allocated by Cloud\nDatastore.",
+	//   "flatPath": "v1beta3/projects/{projectId}:reserveIds",
+	//   "httpMethod": "POST",
+	//   "id": "datastore.projects.reserveIds",
+	//   "parameterOrder": [
+	//     "projectId"
+	//   ],
+	//   "parameters": {
+	//     "projectId": {
+	//       "description": "The ID of the project against which to make the request.",
+	//       "location": "path",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "v1beta3/projects/{projectId}:reserveIds",
+	//   "request": {
+	//     "$ref": "ReserveIdsRequest"
+	//   },
+	//   "response": {
+	//     "$ref": "ReserveIdsResponse"
 	//   },
 	//   "scopes": [
 	//     "https://www.googleapis.com/auth/cloud-platform",

@@ -561,8 +561,8 @@ func (s *LoggingOptions) MarshalJSON() ([]byte, error) {
 type Operation struct {
 	// Done: If the value is `false`, it means the operation is still in
 	// progress.
-	// If true, the operation is completed, and either `error` or `response`
-	// is
+	// If `true`, the operation is completed, and either `error` or
+	// `response` is
 	// available.
 	Done bool `json:"done,omitempty"`
 
@@ -581,7 +581,7 @@ type Operation struct {
 
 	// Response: If importing ReadGroupSets, an ImportReadGroupSetsResponse
 	// is returned. If importing Variants, an ImportVariantsResponse is
-	// returned. For pipelines and exports, an empty response is returned.
+	// returned. For pipelines and exports, an Empty response is returned.
 	Response googleapi.RawMessage `json:"response,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
@@ -959,6 +959,23 @@ func (s *PipelineParameter) MarshalJSON() ([]byte, error) {
 
 // PipelineResources: The system resources for the pipeline run.
 type PipelineResources struct {
+	// AcceleratorCount: Optional. The number of accelerators of the
+	// specified type to attach.
+	// By specifying this parameter, you will download and install the
+	// following
+	// third-party software onto your managed GCE instances: NVIDIA®
+	// Tesla®
+	// drivers and NVIDIA® CUDA toolkit.
+	AcceleratorCount int64 `json:"acceleratorCount,omitempty,string"`
+
+	// AcceleratorType: Optional. The GCE defined accelerator type.
+	// By specifying this parameter, you will download and install the
+	// following
+	// third-party software onto your managed GCE instances: NVIDIA®
+	// Tesla®
+	// drivers and NVIDIA® CUDA toolkit.
+	AcceleratorType string `json:"acceleratorType,omitempty"`
+
 	// BootDiskSizeGb: The size of the boot disk. Defaults to 10 (GB).
 	BootDiskSizeGb int64 `json:"bootDiskSizeGb,omitempty"`
 
@@ -1006,7 +1023,7 @@ type PipelineResources struct {
 	// creation will restricted. If empty, any zone may be chosen.
 	Zones []string `json:"zones,omitempty"`
 
-	// ForceSendFields is a list of field names (e.g. "BootDiskSizeGb") to
+	// ForceSendFields is a list of field names (e.g. "AcceleratorCount") to
 	// unconditionally include in API requests. By default, fields with
 	// empty values are omitted from API requests. However, any non-pointer,
 	// non-interface field appearing in ForceSendFields will be sent to the
@@ -1014,7 +1031,7 @@ type PipelineResources struct {
 	// used to include empty fields in Patch requests.
 	ForceSendFields []string `json:"-"`
 
-	// NullFields is a list of field names (e.g. "BootDiskSizeGb") to
+	// NullFields is a list of field names (e.g. "AcceleratorCount") to
 	// include in API requests with the JSON null value. By default, fields
 	// with empty values are omitted from API requests. However, any field
 	// with an empty value appearing in NullFields will be sent to the

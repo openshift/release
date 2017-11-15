@@ -84,6 +84,18 @@ func (s *mockLanguageServer) AnalyzeEntities(ctx context.Context, req *languagep
 	return s.resps[0].(*languagepb.AnalyzeEntitiesResponse), nil
 }
 
+func (s *mockLanguageServer) AnalyzeEntitySentiment(ctx context.Context, req *languagepb.AnalyzeEntitySentimentRequest) (*languagepb.AnalyzeEntitySentimentResponse, error) {
+	md, _ := metadata.FromIncomingContext(ctx)
+	if xg := md["x-goog-api-client"]; len(xg) == 0 || !strings.Contains(xg[0], "gl-go/") {
+		return nil, fmt.Errorf("x-goog-api-client = %v, expected gl-go key", xg)
+	}
+	s.reqs = append(s.reqs, req)
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.resps[0].(*languagepb.AnalyzeEntitySentimentResponse), nil
+}
+
 func (s *mockLanguageServer) AnalyzeSyntax(ctx context.Context, req *languagepb.AnalyzeSyntaxRequest) (*languagepb.AnalyzeSyntaxResponse, error) {
 	md, _ := metadata.FromIncomingContext(ctx)
 	if xg := md["x-goog-api-client"]; len(xg) == 0 || !strings.Contains(xg[0], "gl-go/") {
@@ -94,6 +106,18 @@ func (s *mockLanguageServer) AnalyzeSyntax(ctx context.Context, req *languagepb.
 		return nil, s.err
 	}
 	return s.resps[0].(*languagepb.AnalyzeSyntaxResponse), nil
+}
+
+func (s *mockLanguageServer) ClassifyText(ctx context.Context, req *languagepb.ClassifyTextRequest) (*languagepb.ClassifyTextResponse, error) {
+	md, _ := metadata.FromIncomingContext(ctx)
+	if xg := md["x-goog-api-client"]; len(xg) == 0 || !strings.Contains(xg[0], "gl-go/") {
+		return nil, fmt.Errorf("x-goog-api-client = %v, expected gl-go key", xg)
+	}
+	s.reqs = append(s.reqs, req)
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.resps[0].(*languagepb.ClassifyTextResponse), nil
 }
 
 func (s *mockLanguageServer) AnnotateText(ctx context.Context, req *languagepb.AnnotateTextRequest) (*languagepb.AnnotateTextResponse, error) {
@@ -255,6 +279,65 @@ func TestLanguageServiceAnalyzeEntitiesError(t *testing.T) {
 	}
 	_ = resp
 }
+func TestLanguageServiceAnalyzeEntitySentiment(t *testing.T) {
+	var language string = "language-1613589672"
+	var expectedResponse = &languagepb.AnalyzeEntitySentimentResponse{
+		Language: language,
+	}
+
+	mockLanguage.err = nil
+	mockLanguage.reqs = nil
+
+	mockLanguage.resps = append(mockLanguage.resps[:0], expectedResponse)
+
+	var document *languagepb.Document = &languagepb.Document{}
+	var request = &languagepb.AnalyzeEntitySentimentRequest{
+		Document: document,
+	}
+
+	c, err := NewClient(context.Background(), clientOpt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := c.AnalyzeEntitySentiment(context.Background(), request)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if want, got := request, mockLanguage.reqs[0]; !proto.Equal(want, got) {
+		t.Errorf("wrong request %q, want %q", got, want)
+	}
+
+	if want, got := expectedResponse, resp; !proto.Equal(want, got) {
+		t.Errorf("wrong response %q, want %q)", got, want)
+	}
+}
+
+func TestLanguageServiceAnalyzeEntitySentimentError(t *testing.T) {
+	errCode := codes.PermissionDenied
+	mockLanguage.err = gstatus.Error(errCode, "test error")
+
+	var document *languagepb.Document = &languagepb.Document{}
+	var request = &languagepb.AnalyzeEntitySentimentRequest{
+		Document: document,
+	}
+
+	c, err := NewClient(context.Background(), clientOpt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := c.AnalyzeEntitySentiment(context.Background(), request)
+
+	if st, ok := gstatus.FromError(err); !ok {
+		t.Errorf("got error %v, expected grpc error", err)
+	} else if c := st.Code(); c != errCode {
+		t.Errorf("got error code %q, want %q", c, errCode)
+	}
+	_ = resp
+}
 func TestLanguageServiceAnalyzeSyntax(t *testing.T) {
 	var language string = "language-1613589672"
 	var expectedResponse = &languagepb.AnalyzeSyntaxResponse{
@@ -306,6 +389,62 @@ func TestLanguageServiceAnalyzeSyntaxError(t *testing.T) {
 	}
 
 	resp, err := c.AnalyzeSyntax(context.Background(), request)
+
+	if st, ok := gstatus.FromError(err); !ok {
+		t.Errorf("got error %v, expected grpc error", err)
+	} else if c := st.Code(); c != errCode {
+		t.Errorf("got error code %q, want %q", c, errCode)
+	}
+	_ = resp
+}
+func TestLanguageServiceClassifyText(t *testing.T) {
+	var expectedResponse *languagepb.ClassifyTextResponse = &languagepb.ClassifyTextResponse{}
+
+	mockLanguage.err = nil
+	mockLanguage.reqs = nil
+
+	mockLanguage.resps = append(mockLanguage.resps[:0], expectedResponse)
+
+	var document *languagepb.Document = &languagepb.Document{}
+	var request = &languagepb.ClassifyTextRequest{
+		Document: document,
+	}
+
+	c, err := NewClient(context.Background(), clientOpt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := c.ClassifyText(context.Background(), request)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if want, got := request, mockLanguage.reqs[0]; !proto.Equal(want, got) {
+		t.Errorf("wrong request %q, want %q", got, want)
+	}
+
+	if want, got := expectedResponse, resp; !proto.Equal(want, got) {
+		t.Errorf("wrong response %q, want %q)", got, want)
+	}
+}
+
+func TestLanguageServiceClassifyTextError(t *testing.T) {
+	errCode := codes.PermissionDenied
+	mockLanguage.err = gstatus.Error(errCode, "test error")
+
+	var document *languagepb.Document = &languagepb.Document{}
+	var request = &languagepb.ClassifyTextRequest{
+		Document: document,
+	}
+
+	c, err := NewClient(context.Background(), clientOpt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := c.ClassifyText(context.Background(), request)
 
 	if st, ok := gstatus.FromError(err); !ok {
 		t.Errorf("got error %v, expected grpc error", err)
