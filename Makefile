@@ -1,3 +1,8 @@
+export RELEASE_URL=https://github.com/openshift/release.git
+export RELEASE_REF=master
+export SKIP_PERMISSIONS_JOB=0
+
+
 all: jenkins prow mungegithub projects
 .PHONY: all
 
@@ -139,13 +144,14 @@ test-bases:
 .PHONY: test-bases
 
 jenkins:
-	oc new-app --template jenkins-persistent -e INSTALL_PLUGINS=groovy:2.0,pipeline-github-lib:1.0 -p MEMORY_LIMIT=10Gi -p VOLUME_CAPACITY=20Gi -e OPENSHIFT_JENKINS_JVM_ARCH=x86_64 -e JAVA_GC_OPTS="-XX:+UseParallelGC -XX:MinHeapFreeRatio=20 -XX:MaxHeapFreeRatio=40 -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90"
+	oc new-app --template jenkins-persistent -e INSTALL_PLUGINS=groovy:2.0,pipeline-github-lib:1.0,,permissive-script-security:0.1 -p MEMORY_LIMIT=10Gi -p VOLUME_CAPACITY=20Gi -e OPENSHIFT_JENKINS_JVM_ARCH=x86_64 -e JAVA_GC_OPTS="-XX:+UseParallelGC -XX:MinHeapFreeRatio=20 -XX:MaxHeapFreeRatio=40 -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90" -e JAVA_OPTS="-Dhudson.slaves.NodeProvisioner.MARGIN=50 -Dhudson.slaves.NodeProvisioner.MARGIN0=0.85 -Dpermissive-script-security.enabled=true"
 .PHONY: jenkins
 
 jenkins-setup: jenkins
-	oc new-app -f jenkins/setup/jenkins-setup-template.yaml
+	oc new-app -f jenkins/setup/jenkins-setup-template.yaml -p SKIP_PERMISSIONS_JOB=$(SKIP_PERMISSIONS_JOB) -p SOURCE_URL=$(RELEASE_URL) -p SOURCE_REF=$(RELEASE_REF)
 .PHONY: jenkins-setup
 
-jenkins-setup-dev: jenkins
-	oc new-app -f jenkins/setup/jenkins-setup-template.yaml -p SKIP_PERMISSIONS_JOB=1 -p SOURCE_URL="${RELEASE_URL}" -p SOURCE_REF="${RELEASE_REF}"
+jenkins-setup-dev: export SKIP_PERMISSIONS_JOB=1
+jenkins-setup-dev: jenkins-setup
 .PHONY: jenkins-setup-dev
+
