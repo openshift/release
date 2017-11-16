@@ -68,6 +68,24 @@ func ExampleClient_AnalyzeEntities() {
 	_ = resp
 }
 
+func ExampleClient_AnalyzeEntitySentiment() {
+	ctx := context.Background()
+	c, err := language.NewClient(ctx)
+	if err != nil {
+		// TODO: Handle error.
+	}
+
+	req := &languagepb.AnalyzeEntitySentimentRequest{
+	// TODO: Fill request struct fields.
+	}
+	resp, err := c.AnalyzeEntitySentiment(ctx, req)
+	if err != nil {
+		// TODO: Handle error.
+	}
+	// TODO: Use resp.
+	_ = resp
+}
+
 func ExampleClient_AnalyzeSyntax() {
 	ctx := context.Background()
 	c, err := language.NewClient(ctx)
@@ -79,6 +97,24 @@ func ExampleClient_AnalyzeSyntax() {
 	// TODO: Fill request struct fields.
 	}
 	resp, err := c.AnalyzeSyntax(ctx, req)
+	if err != nil {
+		// TODO: Handle error.
+	}
+	// TODO: Use resp.
+	_ = resp
+}
+
+func ExampleClient_ClassifyText() {
+	ctx := context.Background()
+	c, err := language.NewClient(ctx)
+	if err != nil {
+		// TODO: Handle error.
+	}
+
+	req := &languagepb.ClassifyTextRequest{
+	// TODO: Fill request struct fields.
+	}
+	resp, err := c.ClassifyText(ctx, req)
 	if err != nil {
 		// TODO: Handle error.
 	}

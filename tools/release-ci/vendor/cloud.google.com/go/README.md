@@ -33,6 +33,94 @@ make backwards-incompatible changes.
 
 ## News
 
+_October 30, 2017_
+
+*v0.16.0*
+
+- Other bigquery changes:
+  - `JobIterator.Next` returns `*Job`; removed `JobInfo` (BREAKING CHANGE).
+  - UseStandardSQL is deprecated; set UseLegacySQL to true if you need
+    Legacy SQL.
+  - Uploader.Put will generate a random insert ID if you do not provide one.
+  - Support time partitioning for load jobs.
+  - Support dry-run queries.
+  - A `Job` remembers its last retrieved status.
+  - Support retrieving job configuration.
+  - Support labels for jobs and tables.
+  - Support dataset access lists.
+  - Improve support for external data sources, including data from Bigtable and
+    Google Sheets, and tables with external data.
+  - Support updating a table's view configuration.
+  - Fix uploading civil times with nanoseconds.
+
+- storage: 
+  - Support PubSub notifications.
+  - Support Requester Pays buckets.
+
+- profiler: Support goroutine and mutex profile types.
+
+
+_October 3, 2017_
+
+*v0.15.0*
+
+- firestore: beta release. See the
+  [announcement](https://firebase.googleblog.com/2017/10/introducing-cloud-firestore.html).
+
+- errorreporting: The existing package has been redesigned.
+
+- errors: This package has been removed. Use errorreporting.
+
+
+_September 28, 2017_
+
+*v0.14.0*
+
+- bigquery BREAKING CHANGES:
+  - Standard SQL is the default for queries and views.
+  - `Table.Create` takes `TableMetadata` as a second argument, instead of
+    options.
+  - `Dataset.Create` takes `DatasetMetadata` as a second argument.
+  - `DatasetMetadata` field `ID` renamed to `FullID`
+  - `TableMetadata` field `ID` renamed to `FullID`
+
+- Other bigquery changes:
+  - The client will append a random suffix to a provided job ID if you set
+    `AddJobIDSuffix` to true in a job config.
+  - Listing jobs is supported.
+  - Better retry logic.
+
+- vision, language, speech: clients are now stable
+
+- monitoring: client is now beta
+
+- profiler:
+  - Rename InstanceName to Instance, ZoneName to Zone
+  - Auto-detect service name and version on AppEngine.
+
+_September 8, 2017_
+
+*v0.13.0*
+
+- bigquery: UseLegacySQL options for CreateTable and QueryConfig. Use these
+  options to continue using Legacy SQL after the client switches its default
+  to Standard SQL.
+
+- bigquery: Support for updating dataset labels.
+
+- bigquery: Set DatasetIterator.ProjectID to list datasets in a project other
+  than the client's. DatasetsInProject is no longer needed and is deprecated.
+
+- bigtable: Fail ListInstances when any zones fail.
+
+- spanner: support decoding of slices of basic types (e.g. []string, []int64,
+  etc.)
+
+- logging/logadmin: UpdateSink no longer creates a sink if it is missing
+  (actually a change to the underlying service, not the client)
+
+- profiler: Service and ServiceVersion replace Target in Config.
+
 _August 22, 2017_
 
 *v0.12.0*
@@ -55,41 +143,6 @@ _August 22, 2017_
 - storage: support bucket lifecycle configurations.
 
 
-_July 31, 2017_
-
-*v0.11.0*
-
-- Clients for spanner, pubsub and video are now in beta.
-
-- New client for DLP.
-
-- spanner: performance and testing improvements.
-
-- storage: requester-pays buckets are supported.
-
-- storage, profiler, bigtable, bigquery: bug fixes and other minor improvements.
-
-- pubsub: bug fixes and other minor improvements
-
-_June 17, 2017_
-
-
-*v0.10.0*
-
-- pubsub: Subscription.ModifyPushConfig replaced with Subscription.Update.
-
-- pubsub: Subscription.Receive now runs concurrently for higher throughput.
-
-- vision: cloud.google.com/go/vision is deprecated. Use
-cloud.google.com/go/vision/apiv1 instead.
-
-- translation: now stable.
-
-- trace: several changes to the surface. See the link below.
-
-[Code changes required from v0.9.0.](https://github.com/GoogleCloudPlatform/google-cloud-go/blob/master/MIGRATION.md)
-
-
 [Older news](https://github.com/GoogleCloudPlatform/google-cloud-go/blob/master/old-news.md)
 
 ## Supported APIs
@@ -97,15 +150,16 @@ cloud.google.com/go/vision/apiv1 instead.
 Google API                       | Status       | Package
 ---------------------------------|--------------|-----------------------------------------------------------
 [Datastore][cloud-datastore]     | stable       | [`cloud.google.com/go/datastore`][cloud-datastore-ref]
+[Firestore][cloud-firestore]     | beta         | [`cloud.google.com/go/firestore`][cloud-firestore-ref]
 [Storage][cloud-storage]         | stable       | [`cloud.google.com/go/storage`][cloud-storage-ref]
 [Bigtable][cloud-bigtable]       | beta         | [`cloud.google.com/go/bigtable`][cloud-bigtable-ref]
 [BigQuery][cloud-bigquery]       | beta         | [`cloud.google.com/go/bigquery`][cloud-bigquery-ref]
 [Logging][cloud-logging]         | stable       | [`cloud.google.com/go/logging`][cloud-logging-ref]
-[Monitoring][cloud-monitoring]   | alpha        | [`cloud.google.com/go/monitoring/apiv3`][cloud-monitoring-ref]
+[Monitoring][cloud-monitoring]   | beta         | [`cloud.google.com/go/monitoring/apiv3`][cloud-monitoring-ref]
 [Pub/Sub][cloud-pubsub]          | beta         | [`cloud.google.com/go/pubsub`][cloud-pubsub-ref]
-[Vision][cloud-vision]           | beta         | [`cloud.google.com/go/vision/apiv1`][cloud-vision-ref]
-[Language][cloud-language]       | beta         | [`cloud.google.com/go/language/apiv1`][cloud-language-ref]
-[Speech][cloud-speech]           | beta         | [`cloud.google.com/go/speech/apiv1`][cloud-speech-ref]
+[Vision][cloud-vision]           | stable       | [`cloud.google.com/go/vision/apiv1`][cloud-vision-ref]
+[Language][cloud-language]       | stable       | [`cloud.google.com/go/language/apiv1`][cloud-language-ref]
+[Speech][cloud-speech]           | stable       | [`cloud.google.com/go/speech/apiv1`][cloud-speech-ref]
 [Spanner][cloud-spanner]         | beta         | [`cloud.google.com/go/spanner`][cloud-spanner-ref]
 [Translation][cloud-translation] | stable       | [`cloud.google.com/go/translate`][cloud-translation-ref]
 [Trace][cloud-trace]             | alpha        | [`cloud.google.com/go/trace`][cloud-trace-ref]
@@ -430,6 +484,11 @@ for more information.
 [cloud-datastore-ref]: https://godoc.org/cloud.google.com/go/datastore
 [cloud-datastore-docs]: https://cloud.google.com/datastore/docs
 [cloud-datastore-activation]: https://cloud.google.com/datastore/docs/activate
+
+[cloud-firestore]: https://cloud.google.com/firestore/
+[cloud-firestore-ref]: https://godoc.org/cloud.google.com/go/firestore
+[cloud-firestore-docs]: https://cloud.google.com/firestore/docs
+[cloud-firestore-activation]: https://cloud.google.com/firestore/docs/activate
 
 [cloud-pubsub]: https://cloud.google.com/pubsub/
 [cloud-pubsub-ref]: https://godoc.org/cloud.google.com/go/pubsub

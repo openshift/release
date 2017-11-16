@@ -795,6 +795,10 @@ type File struct {
 	// addParents and removeParents parameters to modify the values.
 	Parents []string `json:"parents,omitempty"`
 
+	// PermissionIds: List of permission IDs for users with access to this
+	// file.
+	PermissionIds []string `json:"permissionIds,omitempty"`
+
 	// Permissions: The full list of permissions for the file. This is only
 	// available if the requesting user can share the file. Not populated
 	// for Team Drive files.
@@ -1847,6 +1851,10 @@ type TeamDrive struct {
 	// only be set on a drive.teamdrives.update request that does not set
 	// themeId.
 	ColorRgb string `json:"colorRgb,omitempty"`
+
+	// CreatedTime: The time at which the Team Drive was created (RFC 3339
+	// date-time).
+	CreatedTime string `json:"createdTime,omitempty"`
 
 	// Id: The ID of this Team Drive which is also the ID of the top level
 	// folder for this Team Drive.
@@ -3990,16 +3998,12 @@ func (c *FilesCopyCall) Do(opts ...googleapi.CallOption) (*File, error) {
 // method id "drive.files.create":
 
 type FilesCreateCall struct {
-	s                *Service
-	file             *File
-	urlParams_       gensupport.URLParams
-	media_           io.Reader
-	mediaBuffer_     *gensupport.MediaBuffer
-	mediaType_       string
-	mediaSize_       int64 // mediaSize, if known.  Used only for calls to progressUpdater_.
-	progressUpdater_ googleapi.ProgressUpdater
-	ctx_             context.Context
-	header_          http.Header
+	s          *Service
+	file       *File
+	urlParams_ gensupport.URLParams
+	mediaInfo_ *gensupport.MediaInfo
+	ctx_       context.Context
+	header_    http.Header
 }
 
 // Create: Creates a new file.
@@ -4060,12 +4064,7 @@ func (c *FilesCreateCall) UseContentAsIndexableText(useContentAsIndexableText bo
 // supplied.
 // At most one of Media and ResumableMedia may be set.
 func (c *FilesCreateCall) Media(r io.Reader, options ...googleapi.MediaOption) *FilesCreateCall {
-	opts := googleapi.ProcessMediaOptions(options)
-	chunkSize := opts.ChunkSize
-	if !opts.ForceEmptyContentType {
-		r, c.mediaType_ = gensupport.DetermineContentType(r, opts.ContentType)
-	}
-	c.media_, c.mediaBuffer_ = gensupport.PrepareUpload(r, chunkSize)
+	c.mediaInfo_ = gensupport.NewInfoFromMedia(r, options)
 	return c
 }
 
@@ -4080,11 +4079,7 @@ func (c *FilesCreateCall) Media(r io.Reader, options ...googleapi.MediaOption) *
 // supersede any context previously provided to the Context method.
 func (c *FilesCreateCall) ResumableMedia(ctx context.Context, r io.ReaderAt, size int64, mediaType string) *FilesCreateCall {
 	c.ctx_ = ctx
-	rdr := gensupport.ReaderAtToReader(r, size)
-	rdr, c.mediaType_ = gensupport.DetermineContentType(rdr, mediaType)
-	c.mediaBuffer_ = gensupport.NewMediaBuffer(rdr, googleapi.DefaultUploadChunkSize)
-	c.media_ = nil
-	c.mediaSize_ = size
+	c.mediaInfo_ = gensupport.NewInfoFromResumableMedia(r, size, mediaType)
 	return c
 }
 
@@ -4093,7 +4088,7 @@ func (c *FilesCreateCall) ResumableMedia(ctx context.Context, r io.ReaderAt, siz
 // not slow down the upload operation. This should only be called when
 // using ResumableMedia (as opposed to Media).
 func (c *FilesCreateCall) ProgressUpdater(pu googleapi.ProgressUpdater) *FilesCreateCall {
-	c.progressUpdater_ = pu
+	c.mediaInfo_.SetProgressUpdater(pu)
 	return c
 }
 
@@ -4138,27 +4133,16 @@ func (c *FilesCreateCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders.Set("Content-Type", "application/json")
 	c.urlParams_.Set("alt", alt)
 	urls := googleapi.ResolveRelative(c.s.BasePath, "files")
-	if c.media_ != nil || c.mediaBuffer_ != nil {
+	if c.mediaInfo_ != nil {
 		urls = strings.Replace(urls, "https://www.googleapis.com/", "https://www.googleapis.com/upload/", 1)
-		protocol := "multipart"
-		if c.mediaBuffer_ != nil {
-			protocol = "resumable"
-		}
-		c.urlParams_.Set("uploadType", protocol)
+		c.urlParams_.Set("uploadType", c.mediaInfo_.UploadType())
 	}
 	if body == nil {
 		body = new(bytes.Buffer)
 		reqHeaders.Set("Content-Type", "application/json")
 	}
-	if c.media_ != nil {
-		combined, ctype := gensupport.CombineBodyMedia(body, "application/json", c.media_, c.mediaType_)
-		defer combined.Close()
-		reqHeaders.Set("Content-Type", ctype)
-		body = combined
-	}
-	if c.mediaBuffer_ != nil && c.mediaType_ != "" {
-		reqHeaders.Set("X-Upload-Content-Type", c.mediaType_)
-	}
+	body, cleanup := c.mediaInfo_.UploadRequest(reqHeaders, body)
+	defer cleanup()
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("POST", urls, body)
 	req.Header = reqHeaders
@@ -4191,20 +4175,10 @@ func (c *FilesCreateCall) Do(opts ...googleapi.CallOption) (*File, error) {
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	if c.mediaBuffer_ != nil {
-		loc := res.Header.Get("Location")
-		rx := &gensupport.ResumableUpload{
-			Client:    c.s.client,
-			UserAgent: c.s.userAgent(),
-			URI:       loc,
-			Media:     c.mediaBuffer_,
-			MediaType: c.mediaType_,
-			Callback: func(curr int64) {
-				if c.progressUpdater_ != nil {
-					c.progressUpdater_(curr, c.mediaSize_)
-				}
-			},
-		}
+	rx := c.mediaInfo_.ResumableUpload(res.Header.Get("Location"))
+	if rx != nil {
+		rx.Client = c.s.client
+		rx.UserAgent = c.s.userAgent()
 		ctx := c.ctx_
 		if ctx == nil {
 			ctx = context.TODO()
@@ -5022,13 +4996,13 @@ func (c *FilesListCall) IncludeTeamDriveItems(includeTeamDriveItems bool) *Files
 
 // OrderBy sets the optional parameter "orderBy": A comma-separated list
 // of sort keys. Valid keys are 'createdTime', 'folder',
-// 'modifiedByMeTime', 'modifiedTime', 'name', 'quotaBytesUsed',
-// 'recency', 'sharedWithMeTime', 'starred', and 'viewedByMeTime'. Each
-// key sorts ascending by default, but may be reversed with the 'desc'
-// modifier. Example usage: ?orderBy=folder,modifiedTime desc,name.
-// Please note that there is a current limitation for users with
-// approximately one million files in which the requested sort order is
-// ignored.
+// 'modifiedByMeTime', 'modifiedTime', 'name', 'name_natural',
+// 'quotaBytesUsed', 'recency', 'sharedWithMeTime', 'starred', and
+// 'viewedByMeTime'. Each key sorts ascending by default, but may be
+// reversed with the 'desc' modifier. Example usage:
+// ?orderBy=folder,modifiedTime desc,name. Please note that there is a
+// current limitation for users with approximately one million files in
+// which the requested sort order is ignored.
 func (c *FilesListCall) OrderBy(orderBy string) *FilesListCall {
 	c.urlParams_.Set("orderBy", orderBy)
 	return c
@@ -5199,7 +5173,7 @@ func (c *FilesListCall) Do(opts ...googleapi.CallOption) (*FileList, error) {
 	//       "type": "boolean"
 	//     },
 	//     "orderBy": {
-	//       "description": "A comma-separated list of sort keys. Valid keys are 'createdTime', 'folder', 'modifiedByMeTime', 'modifiedTime', 'name', 'quotaBytesUsed', 'recency', 'sharedWithMeTime', 'starred', and 'viewedByMeTime'. Each key sorts ascending by default, but may be reversed with the 'desc' modifier. Example usage: ?orderBy=folder,modifiedTime desc,name. Please note that there is a current limitation for users with approximately one million files in which the requested sort order is ignored.",
+	//       "description": "A comma-separated list of sort keys. Valid keys are 'createdTime', 'folder', 'modifiedByMeTime', 'modifiedTime', 'name', 'name_natural', 'quotaBytesUsed', 'recency', 'sharedWithMeTime', 'starred', and 'viewedByMeTime'. Each key sorts ascending by default, but may be reversed with the 'desc' modifier. Example usage: ?orderBy=folder,modifiedTime desc,name. Please note that there is a current limitation for users with approximately one million files in which the requested sort order is ignored.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
@@ -5281,17 +5255,13 @@ func (c *FilesListCall) Pages(ctx context.Context, f func(*FileList) error) erro
 // method id "drive.files.update":
 
 type FilesUpdateCall struct {
-	s                *Service
-	fileId           string
-	file             *File
-	urlParams_       gensupport.URLParams
-	media_           io.Reader
-	mediaBuffer_     *gensupport.MediaBuffer
-	mediaType_       string
-	mediaSize_       int64 // mediaSize, if known.  Used only for calls to progressUpdater_.
-	progressUpdater_ googleapi.ProgressUpdater
-	ctx_             context.Context
-	header_          http.Header
+	s          *Service
+	fileId     string
+	file       *File
+	urlParams_ gensupport.URLParams
+	mediaInfo_ *gensupport.MediaInfo
+	ctx_       context.Context
+	header_    http.Header
 }
 
 // Update: Updates a file's metadata and/or content with patch
@@ -5357,12 +5327,7 @@ func (c *FilesUpdateCall) UseContentAsIndexableText(useContentAsIndexableText bo
 // supplied.
 // At most one of Media and ResumableMedia may be set.
 func (c *FilesUpdateCall) Media(r io.Reader, options ...googleapi.MediaOption) *FilesUpdateCall {
-	opts := googleapi.ProcessMediaOptions(options)
-	chunkSize := opts.ChunkSize
-	if !opts.ForceEmptyContentType {
-		r, c.mediaType_ = gensupport.DetermineContentType(r, opts.ContentType)
-	}
-	c.media_, c.mediaBuffer_ = gensupport.PrepareUpload(r, chunkSize)
+	c.mediaInfo_ = gensupport.NewInfoFromMedia(r, options)
 	return c
 }
 
@@ -5377,11 +5342,7 @@ func (c *FilesUpdateCall) Media(r io.Reader, options ...googleapi.MediaOption) *
 // supersede any context previously provided to the Context method.
 func (c *FilesUpdateCall) ResumableMedia(ctx context.Context, r io.ReaderAt, size int64, mediaType string) *FilesUpdateCall {
 	c.ctx_ = ctx
-	rdr := gensupport.ReaderAtToReader(r, size)
-	rdr, c.mediaType_ = gensupport.DetermineContentType(rdr, mediaType)
-	c.mediaBuffer_ = gensupport.NewMediaBuffer(rdr, googleapi.DefaultUploadChunkSize)
-	c.media_ = nil
-	c.mediaSize_ = size
+	c.mediaInfo_ = gensupport.NewInfoFromResumableMedia(r, size, mediaType)
 	return c
 }
 
@@ -5390,7 +5351,7 @@ func (c *FilesUpdateCall) ResumableMedia(ctx context.Context, r io.ReaderAt, siz
 // not slow down the upload operation. This should only be called when
 // using ResumableMedia (as opposed to Media).
 func (c *FilesUpdateCall) ProgressUpdater(pu googleapi.ProgressUpdater) *FilesUpdateCall {
-	c.progressUpdater_ = pu
+	c.mediaInfo_.SetProgressUpdater(pu)
 	return c
 }
 
@@ -5435,27 +5396,16 @@ func (c *FilesUpdateCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders.Set("Content-Type", "application/json")
 	c.urlParams_.Set("alt", alt)
 	urls := googleapi.ResolveRelative(c.s.BasePath, "files/{fileId}")
-	if c.media_ != nil || c.mediaBuffer_ != nil {
+	if c.mediaInfo_ != nil {
 		urls = strings.Replace(urls, "https://www.googleapis.com/", "https://www.googleapis.com/upload/", 1)
-		protocol := "multipart"
-		if c.mediaBuffer_ != nil {
-			protocol = "resumable"
-		}
-		c.urlParams_.Set("uploadType", protocol)
+		c.urlParams_.Set("uploadType", c.mediaInfo_.UploadType())
 	}
 	if body == nil {
 		body = new(bytes.Buffer)
 		reqHeaders.Set("Content-Type", "application/json")
 	}
-	if c.media_ != nil {
-		combined, ctype := gensupport.CombineBodyMedia(body, "application/json", c.media_, c.mediaType_)
-		defer combined.Close()
-		reqHeaders.Set("Content-Type", ctype)
-		body = combined
-	}
-	if c.mediaBuffer_ != nil && c.mediaType_ != "" {
-		reqHeaders.Set("X-Upload-Content-Type", c.mediaType_)
-	}
+	body, cleanup := c.mediaInfo_.UploadRequest(reqHeaders, body)
+	defer cleanup()
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("PATCH", urls, body)
 	req.Header = reqHeaders
@@ -5491,20 +5441,10 @@ func (c *FilesUpdateCall) Do(opts ...googleapi.CallOption) (*File, error) {
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	if c.mediaBuffer_ != nil {
-		loc := res.Header.Get("Location")
-		rx := &gensupport.ResumableUpload{
-			Client:    c.s.client,
-			UserAgent: c.s.userAgent(),
-			URI:       loc,
-			Media:     c.mediaBuffer_,
-			MediaType: c.mediaType_,
-			Callback: func(curr int64) {
-				if c.progressUpdater_ != nil {
-					c.progressUpdater_(curr, c.mediaSize_)
-				}
-			},
-		}
+	rx := c.mediaInfo_.ResumableUpload(res.Header.Get("Location"))
+	if rx != nil {
+		rx.Client = c.s.client
+		rx.UserAgent = c.s.userAgent()
 		ctx := c.ctx_
 		if ctx == nil {
 			ctx = context.TODO()
@@ -5851,6 +5791,16 @@ func (c *PermissionsCreateCall) TransferOwnership(transferOwnership bool) *Permi
 	return c
 }
 
+// UseDomainAdminAccess sets the optional parameter
+// "useDomainAdminAccess": Whether the request should be treated as if
+// it was issued by a domain administrator; if set to true, then the
+// requester will be granted access if they are an administrator of the
+// domain to which the item belongs.
+func (c *PermissionsCreateCall) UseDomainAdminAccess(useDomainAdminAccess bool) *PermissionsCreateCall {
+	c.urlParams_.Set("useDomainAdminAccess", fmt.Sprint(useDomainAdminAccess))
+	return c
+}
+
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -5971,6 +5921,12 @@ func (c *PermissionsCreateCall) Do(opts ...googleapi.CallOption) (*Permission, e
 	//       "description": "Whether to transfer ownership to the specified user and downgrade the current owner to a writer. This parameter is required as an acknowledgement of the side effect.",
 	//       "location": "query",
 	//       "type": "boolean"
+	//     },
+	//     "useDomainAdminAccess": {
+	//       "default": "false",
+	//       "description": "Whether the request should be treated as if it was issued by a domain administrator; if set to true, then the requester will be granted access if they are an administrator of the domain to which the item belongs.",
+	//       "location": "query",
+	//       "type": "boolean"
 	//     }
 	//   },
 	//   "path": "files/{fileId}/permissions",
@@ -6011,6 +5967,16 @@ func (r *PermissionsService) Delete(fileId string, permissionId string) *Permiss
 // Whether the requesting application supports Team Drives.
 func (c *PermissionsDeleteCall) SupportsTeamDrives(supportsTeamDrives bool) *PermissionsDeleteCall {
 	c.urlParams_.Set("supportsTeamDrives", fmt.Sprint(supportsTeamDrives))
+	return c
+}
+
+// UseDomainAdminAccess sets the optional parameter
+// "useDomainAdminAccess": Whether the request should be treated as if
+// it was issued by a domain administrator; if set to true, then the
+// requester will be granted access if they are an administrator of the
+// domain to which the item belongs.
+func (c *PermissionsDeleteCall) UseDomainAdminAccess(useDomainAdminAccess bool) *PermissionsDeleteCall {
+	c.urlParams_.Set("useDomainAdminAccess", fmt.Sprint(useDomainAdminAccess))
 	return c
 }
 
@@ -6096,6 +6062,12 @@ func (c *PermissionsDeleteCall) Do(opts ...googleapi.CallOption) error {
 	//       "description": "Whether the requesting application supports Team Drives.",
 	//       "location": "query",
 	//       "type": "boolean"
+	//     },
+	//     "useDomainAdminAccess": {
+	//       "default": "false",
+	//       "description": "Whether the request should be treated as if it was issued by a domain administrator; if set to true, then the requester will be granted access if they are an administrator of the domain to which the item belongs.",
+	//       "location": "query",
+	//       "type": "boolean"
 	//     }
 	//   },
 	//   "path": "files/{fileId}/permissions/{permissionId}",
@@ -6131,6 +6103,16 @@ func (r *PermissionsService) Get(fileId string, permissionId string) *Permission
 // Whether the requesting application supports Team Drives.
 func (c *PermissionsGetCall) SupportsTeamDrives(supportsTeamDrives bool) *PermissionsGetCall {
 	c.urlParams_.Set("supportsTeamDrives", fmt.Sprint(supportsTeamDrives))
+	return c
+}
+
+// UseDomainAdminAccess sets the optional parameter
+// "useDomainAdminAccess": Whether the request should be treated as if
+// it was issued by a domain administrator; if set to true, then the
+// requester will be granted access if they are an administrator of the
+// domain to which the item belongs.
+func (c *PermissionsGetCall) UseDomainAdminAccess(useDomainAdminAccess bool) *PermissionsGetCall {
+	c.urlParams_.Set("useDomainAdminAccess", fmt.Sprint(useDomainAdminAccess))
 	return c
 }
 
@@ -6254,6 +6236,12 @@ func (c *PermissionsGetCall) Do(opts ...googleapi.CallOption) (*Permission, erro
 	//       "description": "Whether the requesting application supports Team Drives.",
 	//       "location": "query",
 	//       "type": "boolean"
+	//     },
+	//     "useDomainAdminAccess": {
+	//       "default": "false",
+	//       "description": "Whether the request should be treated as if it was issued by a domain administrator; if set to true, then the requester will be granted access if they are an administrator of the domain to which the item belongs.",
+	//       "location": "query",
+	//       "type": "boolean"
 	//     }
 	//   },
 	//   "path": "files/{fileId}/permissions/{permissionId}",
@@ -6311,6 +6299,16 @@ func (c *PermissionsListCall) PageToken(pageToken string) *PermissionsListCall {
 // Whether the requesting application supports Team Drives.
 func (c *PermissionsListCall) SupportsTeamDrives(supportsTeamDrives bool) *PermissionsListCall {
 	c.urlParams_.Set("supportsTeamDrives", fmt.Sprint(supportsTeamDrives))
+	return c
+}
+
+// UseDomainAdminAccess sets the optional parameter
+// "useDomainAdminAccess": Whether the request should be treated as if
+// it was issued by a domain administrator; if set to true, then the
+// requester will be granted access if they are an administrator of the
+// domain to which the item belongs.
+func (c *PermissionsListCall) UseDomainAdminAccess(useDomainAdminAccess bool) *PermissionsListCall {
+	c.urlParams_.Set("useDomainAdminAccess", fmt.Sprint(useDomainAdminAccess))
 	return c
 }
 
@@ -6439,6 +6437,12 @@ func (c *PermissionsListCall) Do(opts ...googleapi.CallOption) (*PermissionList,
 	//       "description": "Whether the requesting application supports Team Drives.",
 	//       "location": "query",
 	//       "type": "boolean"
+	//     },
+	//     "useDomainAdminAccess": {
+	//       "default": "false",
+	//       "description": "Whether the request should be treated as if it was issued by a domain administrator; if set to true, then the requester will be granted access if they are an administrator of the domain to which the item belongs.",
+	//       "location": "query",
+	//       "type": "boolean"
 	//     }
 	//   },
 	//   "path": "files/{fileId}/permissions",
@@ -6519,6 +6523,16 @@ func (c *PermissionsUpdateCall) SupportsTeamDrives(supportsTeamDrives bool) *Per
 // acknowledgement of the side effect.
 func (c *PermissionsUpdateCall) TransferOwnership(transferOwnership bool) *PermissionsUpdateCall {
 	c.urlParams_.Set("transferOwnership", fmt.Sprint(transferOwnership))
+	return c
+}
+
+// UseDomainAdminAccess sets the optional parameter
+// "useDomainAdminAccess": Whether the request should be treated as if
+// it was issued by a domain administrator; if set to true, then the
+// requester will be granted access if they are an administrator of the
+// domain to which the item belongs.
+func (c *PermissionsUpdateCall) UseDomainAdminAccess(useDomainAdminAccess bool) *PermissionsUpdateCall {
+	c.urlParams_.Set("useDomainAdminAccess", fmt.Sprint(useDomainAdminAccess))
 	return c
 }
 
@@ -6644,6 +6658,12 @@ func (c *PermissionsUpdateCall) Do(opts ...googleapi.CallOption) (*Permission, e
 	//     "transferOwnership": {
 	//       "default": "false",
 	//       "description": "Whether to transfer ownership to the specified user and downgrade the current owner to a writer. This parameter is required as an acknowledgement of the side effect.",
+	//       "location": "query",
+	//       "type": "boolean"
+	//     },
+	//     "useDomainAdminAccess": {
+	//       "default": "false",
+	//       "description": "Whether the request should be treated as if it was issued by a domain administrator; if set to true, then the requester will be granted access if they are an administrator of the domain to which the item belongs.",
 	//       "location": "query",
 	//       "type": "boolean"
 	//     }
@@ -8338,6 +8358,16 @@ func (r *TeamdrivesService) Get(teamDriveId string) *TeamdrivesGetCall {
 	return c
 }
 
+// UseDomainAdminAccess sets the optional parameter
+// "useDomainAdminAccess": Whether the request should be treated as if
+// it was issued by a domain administrator; if set to true, then the
+// requester will be granted access if they are an administrator of the
+// domain to which the Team Drive belongs.
+func (c *TeamdrivesGetCall) UseDomainAdminAccess(useDomainAdminAccess bool) *TeamdrivesGetCall {
+	c.urlParams_.Set("useDomainAdminAccess", fmt.Sprint(useDomainAdminAccess))
+	return c
+}
+
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -8444,6 +8474,12 @@ func (c *TeamdrivesGetCall) Do(opts ...googleapi.CallOption) (*TeamDrive, error)
 	//       "location": "path",
 	//       "required": true,
 	//       "type": "string"
+	//     },
+	//     "useDomainAdminAccess": {
+	//       "default": "false",
+	//       "description": "Whether the request should be treated as if it was issued by a domain administrator; if set to true, then the requester will be granted access if they are an administrator of the domain to which the Team Drive belongs.",
+	//       "location": "query",
+	//       "type": "boolean"
 	//     }
 	//   },
 	//   "path": "teamdrives/{teamDriveId}",
@@ -8485,6 +8521,23 @@ func (c *TeamdrivesListCall) PageSize(pageSize int64) *TeamdrivesListCall {
 // Team Drives.
 func (c *TeamdrivesListCall) PageToken(pageToken string) *TeamdrivesListCall {
 	c.urlParams_.Set("pageToken", pageToken)
+	return c
+}
+
+// Q sets the optional parameter "q": Query string for searching Team
+// Drives.
+func (c *TeamdrivesListCall) Q(q string) *TeamdrivesListCall {
+	c.urlParams_.Set("q", q)
+	return c
+}
+
+// UseDomainAdminAccess sets the optional parameter
+// "useDomainAdminAccess": Whether the request should be treated as if
+// it was issued by a domain administrator; if set to true, then all
+// Team Drives of the domain in which the requester is an administrator
+// are returned.
+func (c *TeamdrivesListCall) UseDomainAdminAccess(useDomainAdminAccess bool) *TeamdrivesListCall {
+	c.urlParams_.Set("useDomainAdminAccess", fmt.Sprint(useDomainAdminAccess))
 	return c
 }
 
@@ -8596,6 +8649,17 @@ func (c *TeamdrivesListCall) Do(opts ...googleapi.CallOption) (*TeamDriveList, e
 	//       "description": "Page token for Team Drives.",
 	//       "location": "query",
 	//       "type": "string"
+	//     },
+	//     "q": {
+	//       "description": "Query string for searching Team Drives.",
+	//       "location": "query",
+	//       "type": "string"
+	//     },
+	//     "useDomainAdminAccess": {
+	//       "default": "false",
+	//       "description": "Whether the request should be treated as if it was issued by a domain administrator; if set to true, then all Team Drives of the domain in which the requester is an administrator are returned.",
+	//       "location": "query",
+	//       "type": "boolean"
 	//     }
 	//   },
 	//   "path": "teamdrives",

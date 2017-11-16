@@ -1457,40 +1457,6 @@ func (s *HistoricalOffer) MarshalJSON() ([]byte, error) {
 // href="http://www.unoosa.org/pdf/icg/2012/template/WGS_84.pdf">WGS84
 // st
 // andard</a>. Values must be within normalized ranges.
-//
-// Example of normalization code in Python:
-//
-//     def NormalizeLongitude(longitude):
-//       """Wraps decimal degrees longitude to [-180.0, 180.0]."""
-//       q, r = divmod(longitude, 360.0)
-//       if r > 180.0 or (r == 180.0 and q <= -1.0):
-//         return r - 360.0
-//       return r
-//
-//     def NormalizeLatLng(latitude, longitude):
-//       """Wraps decimal degrees latitude and longitude to
-//       [-90.0, 90.0] and [-180.0, 180.0], respectively."""
-//       r = latitude % 360.0
-//       if r <= 90.0:
-//         return r, NormalizeLongitude(longitude)
-//       elif r >= 270.0:
-//         return r - 360, NormalizeLongitude(longitude)
-//       else:
-//         return 180 - r, NormalizeLongitude(longitude + 180.0)
-//
-//     assert 180.0 == NormalizeLongitude(180.0)
-//     assert -180.0 == NormalizeLongitude(-180.0)
-//     assert -179.0 == NormalizeLongitude(181.0)
-//     assert (0.0, 0.0) == NormalizeLatLng(360.0, 0.0)
-//     assert (0.0, 0.0) == NormalizeLatLng(-360.0, 0.0)
-//     assert (85.0, 180.0) == NormalizeLatLng(95.0, 0.0)
-//     assert (-85.0, -170.0) == NormalizeLatLng(-95.0, 10.0)
-//     assert (90.0, 10.0) == NormalizeLatLng(90.0, 10.0)
-//     assert (-90.0, -10.0) == NormalizeLatLng(-90.0, -10.0)
-//     assert (0.0, -170.0) == NormalizeLatLng(-180.0, 10.0)
-//     assert (0.0, -170.0) == NormalizeLatLng(180.0, 10.0)
-//     assert (-90.0, 10.0) == NormalizeLatLng(270.0, 10.0)
-//     assert (90.0, 10.0) == NormalizeLatLng(-270.0, 10.0)
 type LatLng struct {
 	// Latitude: The latitude in degrees. It must be in the range [-90.0,
 	// +90.0].
@@ -2419,6 +2385,10 @@ type LogUserEventRequest struct {
 	// Terms Of Service` button.
 	//   "SMB_ENTERED_WEBSITE_IN_CONTACT_PARTNER_FORM" - Advertiser entered
 	// website in contact form.
+	//   "AGENCY_SELECTED_OPT_IN_AFA_MIGRATION" - Agency opted in for
+	// migrating their exams to Academy for Ads.
+	//   "AGENCY_SELECTED_OPT_OUT_AFA_MIGRATION" - Agency opted out for
+	// migrating their exams to Academy for Ads.
 	EventAction string `json:"eventAction,omitempty"`
 
 	// EventCategory: The category the action belongs to.
@@ -3128,6 +3098,10 @@ type UserProfile struct {
 	// Markets: A list of ids representing which markets the user was
 	// interested in.
 	Markets []string `json:"markets,omitempty"`
+
+	// MigrateToAfa: Whether or not to migrate the user's exam data to
+	// Academy for Ads.
+	MigrateToAfa bool `json:"migrateToAfa,omitempty"`
 
 	// PhoneNumber: The user's phone number.
 	PhoneNumber string `json:"phoneNumber,omitempty"`
