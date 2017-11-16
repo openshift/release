@@ -36,7 +36,7 @@ var buildFile string
 
 func init() {
 	RootCmd.AddCommand(runBuildCmd)
-	configCmd.Flags().StringVarP(&buildFile, "file", "f", "", "The file containing the build definition")
+	runBuildCmd.Flags().StringVarP(&buildFile, "file", "f", "", "The file containing the build definition")
 }
 
 func runBuild() error {
