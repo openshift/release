@@ -3,9 +3,9 @@
 apiVersion: template.openshift.io/v1
 kind: Template
 metadata:
-  name: jenkins-config-updater-prow
+  name: jenkins-config-updater
   annotations:
-    "openshift.io/display-name": jenkins-config-updater-prow
+    "openshift.io/display-name": jenkins-config-updater
   description: |
     jenkins-config-updater manifests for prow
 parameters: []
@@ -13,21 +13,21 @@ objects:
 - apiVersion: v1
   kind: Service
   metadata:
-    name: jenkins-config-updater-prow
+    name: jenkins-config-updater
   spec:
     selector:
       app: prow
-      component: jenkins-config-updater-prow
+      component: jenkins-config-updater
     ports:
     - port: 8888
     type: ClusterIP
 - apiVersion: apps.openshift.io/v1
   kind: DeploymentConfig
   metadata:
-    name: jenkins-config-updater-prow
+    name: jenkins-config-updater
     labels:
       app: prow
-      component: jenkins-config-updater-prow
+      component: jenkins-config-updater
   spec:
     replicas: 1
     revisionHistoryLimit: 2
@@ -35,11 +35,11 @@ objects:
       metadata:
         labels:
           app: prow
-          component: jenkins-config-updater-prow
+          component: jenkins-config-updater
       spec:
         containers:
-        - name: jenkins-config-updater-prow
-          image: jenkins-config-updater-prow
+        - name: jenkins-config-updater
+          image: jenkins-config-updater
           args:
           - --dry-run=false
           ports:
@@ -69,7 +69,7 @@ objects:
     - imageChangeParams:
         automatic: true
         containerNames:
-        - jenkins-config-updater-prow
+        - jenkins-config-updater
         from:
           kind: ImageStreamTag
           name: jenkins-config-updater:latest
