@@ -385,6 +385,7 @@ type Command struct {
 	// again until the user has entered it.
 	//   "DO_NOT_ASK_CREDENTIALS_ON_BOOT" - Don't ask for user credentials
 	// on device boot.
+	//   "LOCK_NOW" - Lock the device after password reset.
 	ResetPasswordFlags []string `json:"resetPasswordFlags,omitempty"`
 
 	// Type: The type of the command.
@@ -561,12 +562,13 @@ type Device struct {
 	PolicyCompliant bool `json:"policyCompliant,omitempty"`
 
 	// PolicyName: The name of the policy that is intended to be applied to
-	// the device. If empty, the policy with id default is applied. This
-	// field may be modified by an update request. The name of the policy is
-	// in the form enterprises/{enterpriseId}/policies/{policyId}. It is
-	// also permissible to only specify the policyId when updating this
-	// field as long as the policyId contains no slashes since the rest of
-	// the policy name can be inferred from context.
+	// the device. If empty, the policy_name for the user that owns this
+	// device is applied. This field may be modified by an update request.
+	// The name of the policy is in the form
+	// enterprises/{enterpriseId}/policies/{policyId}. It is also
+	// permissible to only specify the policyId when updating this field as
+	// long as the policyId contains no slashes since the rest of the policy
+	// name can be inferred from context.
 	PolicyName string `json:"policyName,omitempty"`
 
 	// PowerManagementEvents: Power management events on the device in
@@ -603,9 +605,8 @@ type Device struct {
 	// devices will be in this state until they have applied policy.
 	State string `json:"state,omitempty"`
 
-	// UserName: The resource name of the user of the device in the form
-	// enterprises/{enterpriseId}/users/{userId}. This is the name of the
-	// device account automatically created for this device.
+	// UserName: The resource name of the user that owns this device in the
+	// form enterprises/{enterpriseId}/users/{userId}.
 	UserName string `json:"userName,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
@@ -729,10 +730,12 @@ type EnrollmentToken struct {
 	// PolicyName: The name of the policy that will be initially applied to
 	// the enrolled device in the form
 	// enterprises/{enterpriseId}/policies/{policyId}. If not specified, the
-	// policy with id default is applied. It is permissible to only specify
-	// the policyId when updating this field as long as the policyId
-	// contains no slashes since the rest of the policy name can be inferred
-	// from context.
+	// policy_name for the user that owns the device is applied. If
+	// user_name also isn't specified, the policy defaults to
+	// enterprises/{enterpriseId}/policies/default. It is permissible to
+	// only specify the policyId when updating this field as long as the
+	// policyId contains no slashes since the rest of the policy name can be
+	// inferred from context.
 	PolicyName string `json:"policyName,omitempty"`
 
 	// QrCode: A JSON string whose UTF-8 representation can be used to
@@ -1370,8 +1373,8 @@ type NonComplianceDetail struct {
 	FieldPath string `json:"fieldPath,omitempty"`
 
 	// InstallationFailureReason: If package_name is set and the
-	// non-compliance reason is APP_NOT_INSTALLED, the detailed reason the
-	// app cannot be installed.
+	// non-compliance reason is APP_NOT_INSTALLED or APP_NOT_UPDATED, the
+	// detailed reason the app cannot be installed or updated.
 	//
 	// Possible values:
 	//   "INSTALLATION_FAILURE_REASON_UNSPECIFIED" - This value is
@@ -1418,7 +1421,10 @@ type NonComplianceDetail struct {
 	//   "PENDING" - The setting was not applied yet at the time of the
 	// report, but is expected to be applied shortly.
 	//   "APP_INCOMPATIBLE" - The setting cannot be applied to the
-	// application because its target SDK version is not high enough.
+	// application because the application doesn't support it, for example
+	// because its target SDK version is not high enough.
+	//   "APP_NOT_UPDATED" - The application is installed but not updated to
+	// the minimum version code specified by policy
 	NonComplianceReason string `json:"nonComplianceReason,omitempty"`
 
 	// PackageName: The package name indicating which application is out of
@@ -1479,13 +1485,14 @@ type NonComplianceDetailCondition struct {
 	//   "PENDING" - The setting was not applied yet at the time of the
 	// report, but is expected to be applied shortly.
 	//   "APP_INCOMPATIBLE" - The setting cannot be applied to the
-	// application because its target SDK version is not high enough.
+	// application because the application doesn't support it, for example
+	// because its target SDK version is not high enough.
+	//   "APP_NOT_UPDATED" - The application is installed but not updated to
+	// the minimum version code specified by policy
 	NonComplianceReason string `json:"nonComplianceReason,omitempty"`
 
 	// PackageName: The package name indicating which application is out of
 	// compliance. If not set, then this condition matches any package name.
-	// If this field is set, then setting_name must be unset or set to
-	// applications; otherwise, the condition would never be satisfied.
 	PackageName string `json:"packageName,omitempty"`
 
 	// SettingName: The name of the policy setting. This is the JSON field
@@ -1633,6 +1640,10 @@ type PasswordRequirements struct {
 	// Possible values:
 	//   "PASSWORD_QUALITY_UNSPECIFIED" - There are no requirements for the
 	// password.
+	//   "BIOMETRIC_WEAK" - There must be at least low-security biometric
+	// recognition technology to secure the device. This includes
+	// technologies that can recognize the identity of an individual to
+	// about a 3 digit PIN (false detection is less than 1 in 1,000).
 	//   "SOMETHING" - There must be a password, but there are no
 	// restrictions on its characters.
 	//   "NUMERIC" - The password must contain numeric characters.
@@ -1771,6 +1782,10 @@ type Policy struct {
 	// Applications: Policy applied to apps.
 	Applications []*ApplicationPolicy `json:"applications,omitempty"`
 
+	// AutoTimeRequired: Whether auto time is required, which prevents the
+	// user from manually setting the date and time.
+	AutoTimeRequired bool `json:"autoTimeRequired,omitempty"`
+
 	// BlockApplicationsEnabled: Whether applications other than the ones
 	// configured in applications are blocked from being installed. When
 	// set, applications that were installed under a previous policy but no
@@ -1838,13 +1853,15 @@ type Policy struct {
 	// enterprises/{enterpriseId}/policies/{policyId}
 	Name string `json:"name,omitempty"`
 
-	// NetworkEscapeHatchEnabled: Flag to specify if network escape hatch is
-	// enabled. If this flag has been enabled then upon device boot if
-	// device has no network connection, then an activity will be shown that
-	// allows the user to temporarily connect to a network to fetch the
-	// latest policy. The launched activity will time out if no network has
-	// been connected for a given while and will return to the previous
-	// activity that was shown.
+	// NetworkEscapeHatchEnabled: Whether the network escape hatch is
+	// enabled. If a network connection can't be made at boot time, the
+	// escape hatch prompts the user to temporarily connect to a network in
+	// order to refresh the device policy. After applying policy, the
+	// temporary network will be forgotten and the device will continue
+	// booting. This prevents being unable to connect to a network if there
+	// is no suitable network in the last policy and the device boots into
+	// an app in lock task mode, or the user is otherwise unable to reach
+	// device settings.
 	NetworkEscapeHatchEnabled bool `json:"networkEscapeHatchEnabled,omitempty"`
 
 	// OpenNetworkConfiguration: Network configuration for the device. See
@@ -1888,9 +1905,8 @@ type Policy struct {
 	StayOnPluggedModes []string `json:"stayOnPluggedModes,omitempty"`
 
 	// SystemUpdate: The system update policy, which controls how OS updates
-	// are applied. If the update type is WINDOWED and the device has a
-	// device account, the update window will automatically apply to Play
-	// app updates as well.
+	// are applied. If the update type is WINDOWED, the update window will
+	// automatically apply to Play app updates as well.
 	SystemUpdate *SystemUpdate `json:"systemUpdate,omitempty"`
 
 	// UnmuteMicrophoneDisabled: Whether the microphone is muted and
@@ -1900,6 +1916,15 @@ type Policy struct {
 	// Version: The version of the policy. This is a read-only field. The
 	// version is incremented each time the policy is updated.
 	Version int64 `json:"version,omitempty,string"`
+
+	// WifiConfigDisabled: Whether configuring WiFi access points is
+	// disabled.
+	WifiConfigDisabled bool `json:"wifiConfigDisabled,omitempty"`
+
+	// WifiConfigsLockdownEnabled: Whether WiFi networks defined in Open
+	// Network Configuration are locked so they cannot be edited by the
+	// user.
+	WifiConfigsLockdownEnabled bool `json:"wifiConfigsLockdownEnabled,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
 	// server.
@@ -2218,10 +2243,10 @@ type SystemUpdate struct {
 	//   "AUTOMATIC" - Install automatically as soon as an update is
 	// available.
 	//   "WINDOWED" - Install automatically within a daily maintenance
-	// window. If the device has a device account, this also configures Play
-	// apps to be updated within the window. This is strongly recommended
-	// for kiosk devices because this is the only way apps persistently
-	// pinned to the foreground can be updated by Play.
+	// window. This also configures Play apps to be updated within the
+	// window. This is strongly recommended for kiosk devices because this
+	// is the only way apps persistently pinned to the foreground can be
+	// updated by Play.
 	//   "POSTPONE" - Postpone automatic install up to a maximum of 30 days.
 	Type string `json:"type,omitempty"`
 

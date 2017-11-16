@@ -17,16 +17,16 @@ package bigquery
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp/cmpopts"
+
 	"cloud.google.com/go/internal/testutil"
 
-	"github.com/google/go-cmp/cmp/cmpopts"
-	"golang.org/x/net/context"
 	bq "google.golang.org/api/bigquery/v2"
 )
 
 func defaultCopyJob() *bq.Job {
 	return &bq.Job{
-		JobReference: &bq.JobReference{ProjectId: "client-project-id"},
+		JobReference: &bq.JobReference{JobId: "RANDOM", ProjectId: "client-project-id"},
 		Configuration: &bq.JobConfiguration{
 			Copy: &bq.JobConfigurationTableCopy{
 				DestinationTable: &bq.TableReference{
@@ -47,9 +47,11 @@ func defaultCopyJob() *bq.Job {
 }
 
 func TestCopy(t *testing.T) {
+	defer fixRandomID("RANDOM")()
 	testCases := []struct {
 		dst    *Table
 		srcs   []*Table
+		jobID  string
 		config CopyConfig
 		want   *bq.Job
 	}{
@@ -84,9 +86,11 @@ func TestCopy(t *testing.T) {
 			config: CopyConfig{
 				CreateDisposition: CreateNever,
 				WriteDisposition:  WriteTruncate,
+				Labels:            map[string]string{"a": "b"},
 			},
 			want: func() *bq.Job {
 				j := defaultCopyJob()
+				j.Configuration.Labels = map[string]string{"a": "b"}
 				j.Configuration.Copy.CreateDisposition = "CREATE_NEVER"
 				j.Configuration.Copy.WriteDisposition = "WRITE_TRUNCATE"
 				return j
@@ -105,7 +109,7 @@ func TestCopy(t *testing.T) {
 					TableID:   "s-table-id",
 				},
 			},
-			config: CopyConfig{JobID: "job-id"},
+			jobID: "job-id",
 			want: func() *bq.Job {
 				j := defaultCopyJob()
 				j.JobReference.JobId = "job-id"
@@ -113,37 +117,25 @@ func TestCopy(t *testing.T) {
 			}(),
 		},
 	}
-
+	c := &Client{projectID: "client-project-id"}
 	for i, tc := range testCases {
-		s := &testService{}
-		c := &Client{
-			service:   s,
-			projectID: "client-project-id",
-		}
 		tc.dst.c = c
 		copier := tc.dst.CopierFrom(tc.srcs...)
+		copier.JobID = tc.jobID
 		tc.config.Srcs = tc.srcs
 		tc.config.Dst = tc.dst
 		copier.CopyConfig = tc.config
-		if _, err := copier.Run(context.Background()); err != nil {
-			t.Errorf("#%d: err calling Run: %v", i, err)
-			continue
-		}
-		checkJob(t, i, s.Job, tc.want)
-	}
-}
+		got := copier.newJob()
+		checkJob(t, i, got, tc.want)
 
-func checkJob(t *testing.T, i int, got, want *bq.Job) {
-	if got.JobReference == nil {
-		t.Errorf("#%d: empty job  reference", i)
-		return
-	}
-	if got.JobReference.JobId == "" {
-		t.Errorf("#%d: empty job ID", i)
-		return
-	}
-	d := testutil.Diff(got, want, cmpopts.IgnoreFields(bq.JobReference{}, "JobId"))
-	if d != "" {
-		t.Errorf("#%d: (got=-, want=+) %s", i, d)
+		jc, err := bqToJobConfig(got.Configuration, c)
+		if err != nil {
+			t.Fatalf("#%d: %v", i, err)
+		}
+		diff := testutil.Diff(jc.(*CopyConfig), &copier.CopyConfig,
+			cmpopts.IgnoreUnexported(Table{}))
+		if diff != "" {
+			t.Errorf("#%d: (got=-, want=+:\n%s", i, diff)
+		}
 	}
 }

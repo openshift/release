@@ -238,11 +238,7 @@ type AndroidInstrumentationTest struct {
 	TestTargets []string `json:"testTargets,omitempty"`
 
 	// UseOrchestrator: The flag indicates whether Android Test Orchestrator
-	// will be used to run test or not. Test orchestrator is used if either:
-	// - orchestrator_option field is USE_ORCHESTRATOR, and test runner is
-	// compatible with orchestrator. Or - orchestrator_option field is
-	// unspecified or ORCHESTRATOR_OPTION_UNSPECIFIED, and test runner is
-	// compatible with orchestrator.
+	// will be used to run test or not.
 	UseOrchestrator bool `json:"useOrchestrator,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "TestPackageId") to
@@ -409,22 +405,29 @@ func (s *AndroidTest) MarshalJSON() ([]byte, error) {
 // { "@type": "type.googleapis.com/google.protobuf.Duration", "value":
 // "1.212s" }
 type Any struct {
-	// TypeUrl: A URL/resource name whose content describes the type of the
-	// serialized protocol buffer message.
+	// TypeUrl: A URL/resource name that uniquely identifies the type of the
+	// serialized protocol buffer message. The last segment of the URL's
+	// path must represent the fully qualified name of the type (as in
+	// `path/google.protobuf.Duration`). The name should be in a canonical
+	// form (e.g., leading "." is not accepted).
 	//
-	// For URLs which use the scheme `http`, `https`, or no scheme, the
-	// following restrictions and interpretations apply:
+	// In practice, teams usually precompile into the binary all types that
+	// they expect it to use in the context of Any. However, for URLs which
+	// use the scheme `http`, `https`, or no scheme, one can optionally set
+	// up a type server that maps type URLs to message definitions as
+	// follows:
 	//
-	// * If no scheme is provided, `https` is assumed. * The last segment of
-	// the URL's path must represent the fully qualified name of the type
-	// (as in `path/google.protobuf.Duration`). The name should be in a
-	// canonical form (e.g., leading "." is not accepted). * An HTTP GET on
-	// the URL must yield a [google.protobuf.Type][] value in binary format,
-	// or produce an error. * Applications are allowed to cache lookup
-	// results based on the URL, or have them precompiled into a binary to
-	// avoid any lookup. Therefore, binary compatibility needs to be
-	// preserved on changes to types. (Use versioned type names to manage
-	// breaking changes.)
+	// * If no scheme is provided, `https` is assumed. * An HTTP GET on the
+	// URL must yield a [google.protobuf.Type][] value in binary format, or
+	// produce an error. * Applications are allowed to cache lookup results
+	// based on the URL, or have them precompiled into a binary to avoid any
+	// lookup. Therefore, binary compatibility needs to be preserved on
+	// changes to types. (Use versioned type names to manage breaking
+	// changes.)
+	//
+	// Note: this functionality is not currently available in the official
+	// protobuf release, and it is not used for type URLs beginning with
+	// type.googleapis.com.
 	//
 	// Schemes other than `http`, `https` (or the empty scheme) might be
 	// used with implementation specific semantics.
@@ -858,8 +861,8 @@ func (s *Execution) MarshalJSON() ([]byte, error) {
 }
 
 type FailureDetail struct {
-	// Crashed: If the failure was severe because the system under test
-	// crashed.
+	// Crashed: If the failure was severe because the system (app) under
+	// test crashed.
 	Crashed bool `json:"crashed,omitempty"`
 
 	// NotInstalled: If an app is not installed and thus no test can be run
@@ -867,7 +870,8 @@ type FailureDetail struct {
 	// unsupported platform.
 	NotInstalled bool `json:"notInstalled,omitempty"`
 
-	// OtherNativeCrash: If a native process other than the app crashed.
+	// OtherNativeCrash: If a native process (including any other than the
+	// app) crashed.
 	OtherNativeCrash bool `json:"otherNativeCrash,omitempty"`
 
 	// TimedOut: If the test overran some time limit, and that is why it
@@ -935,6 +939,102 @@ type FileReference struct {
 
 func (s *FileReference) MarshalJSON() ([]byte, error) {
 	type noMethod FileReference
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// GraphicsStats: Graphics statistics for the App. The information is
+// collected from 'adb shell dumpsys graphicsstats'. For more info see:
+// https://developer.android.com/training/testing/performance.html
+// Statistics will only be present for API 23+.
+type GraphicsStats struct {
+	// Buckets: Histogram of frame render times. There should be 154 buckets
+	// ranging from [5ms, 6ms) to [4950ms, infinity)
+	Buckets []*GraphicsStatsBucket `json:"buckets,omitempty"`
+
+	// HighInputLatencyCount: Total "high input latency" events.
+	HighInputLatencyCount int64 `json:"highInputLatencyCount,omitempty,string"`
+
+	// JankyFrames: Total frames with slow render time. Should be <=
+	// total_frames.
+	JankyFrames int64 `json:"jankyFrames,omitempty,string"`
+
+	// MissedVsyncCount: Total "missed vsync" events.
+	MissedVsyncCount int64 `json:"missedVsyncCount,omitempty,string"`
+
+	// P50Millis: 50th percentile frame render time in milliseconds.
+	P50Millis int64 `json:"p50Millis,omitempty,string"`
+
+	// P90Millis: 90th percentile frame render time in milliseconds.
+	P90Millis int64 `json:"p90Millis,omitempty,string"`
+
+	// P95Millis: 95th percentile frame render time in milliseconds.
+	P95Millis int64 `json:"p95Millis,omitempty,string"`
+
+	// P99Millis: 99th percentile frame render time in milliseconds.
+	P99Millis int64 `json:"p99Millis,omitempty,string"`
+
+	// SlowBitmapUploadCount: Total "slow bitmap upload" events.
+	SlowBitmapUploadCount int64 `json:"slowBitmapUploadCount,omitempty,string"`
+
+	// SlowDrawCount: Total "slow draw" events.
+	SlowDrawCount int64 `json:"slowDrawCount,omitempty,string"`
+
+	// SlowUiThreadCount: Total "slow UI thread" events.
+	SlowUiThreadCount int64 `json:"slowUiThreadCount,omitempty,string"`
+
+	// TotalFrames: Total frames rendered by package.
+	TotalFrames int64 `json:"totalFrames,omitempty,string"`
+
+	// ForceSendFields is a list of field names (e.g. "Buckets") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Buckets") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *GraphicsStats) MarshalJSON() ([]byte, error) {
+	type noMethod GraphicsStats
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+type GraphicsStatsBucket struct {
+	// FrameCount: Number of frames in the bucket.
+	FrameCount int64 `json:"frameCount,omitempty,string"`
+
+	// RenderMillis: Lower bound of render time in milliseconds.
+	RenderMillis int64 `json:"renderMillis,omitempty,string"`
+
+	// ForceSendFields is a list of field names (e.g. "FrameCount") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "FrameCount") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *GraphicsStatsBucket) MarshalJSON() ([]byte, error) {
+	type noMethod GraphicsStatsBucket
 	raw := noMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
@@ -1488,6 +1588,11 @@ type PerfMetricsSummary struct {
 	// ExecutionId: A tool results execution ID.
 	ExecutionId string `json:"executionId,omitempty"`
 
+	// GraphicsStats: Graphics statistics for the entire run. Statistics are
+	// reset at the beginning of the run and collected at the end of the
+	// run.
+	GraphicsStats *GraphicsStats `json:"graphicsStats,omitempty"`
+
 	// HistoryId: A tool results history ID.
 	HistoryId string `json:"historyId,omitempty"`
 
@@ -1768,6 +1873,10 @@ type ScreenshotCluster struct {
 
 	// Screens: Full list of screens.
 	Screens []*Screen `json:"screens,omitempty"`
+
+	// ServerResponse contains the HTTP response code and headers from the
+	// server.
+	googleapi.ServerResponse `json:"-"`
 
 	// ForceSendFields is a list of field names (e.g. "Activity") to
 	// unconditionally include in API requests. By default, fields with
@@ -2417,14 +2526,15 @@ type TestIssue struct {
 	//
 	// Possible values:
 	//   "anr"
+	//   "compatibleWithOrchestrator"
 	//   "fatalException"
 	//   "nativeCrash"
 	//   "unspecifiedType"
+	//   "unusedRoboDirective"
 	Type string `json:"type,omitempty"`
 
 	// Warning: Warning message with additional details of the issue. Should
 	// always be a message from com.google.devtools.toolresults.v1.warnings
-	// Required.
 	Warning *Any `json:"warning,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "ErrorMessage") to
@@ -4410,6 +4520,170 @@ func (c *ProjectsHistoriesExecutionsPatchCall) Do(opts ...googleapi.CallOption) 
 
 }
 
+// method id "toolresults.projects.histories.executions.clusters.get":
+
+type ProjectsHistoriesExecutionsClustersGetCall struct {
+	s            *Service
+	projectId    string
+	historyId    string
+	executionId  string
+	clusterId    string
+	urlParams_   gensupport.URLParams
+	ifNoneMatch_ string
+	ctx_         context.Context
+	header_      http.Header
+}
+
+// Get: Retrieves a single screenshot cluster by its ID
+func (r *ProjectsHistoriesExecutionsClustersService) Get(projectId string, historyId string, executionId string, clusterId string) *ProjectsHistoriesExecutionsClustersGetCall {
+	c := &ProjectsHistoriesExecutionsClustersGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.projectId = projectId
+	c.historyId = historyId
+	c.executionId = executionId
+	c.clusterId = clusterId
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *ProjectsHistoriesExecutionsClustersGetCall) Fields(s ...googleapi.Field) *ProjectsHistoriesExecutionsClustersGetCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// IfNoneMatch sets the optional parameter which makes the operation
+// fail if the object's ETag matches the given value. This is useful for
+// getting updates only after the object has changed since the last
+// request. Use googleapi.IsNotModified to check whether the response
+// error from Do is the result of In-None-Match.
+func (c *ProjectsHistoriesExecutionsClustersGetCall) IfNoneMatch(entityTag string) *ProjectsHistoriesExecutionsClustersGetCall {
+	c.ifNoneMatch_ = entityTag
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *ProjectsHistoriesExecutionsClustersGetCall) Context(ctx context.Context) *ProjectsHistoriesExecutionsClustersGetCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *ProjectsHistoriesExecutionsClustersGetCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *ProjectsHistoriesExecutionsClustersGetCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	if c.ifNoneMatch_ != "" {
+		reqHeaders.Set("If-None-Match", c.ifNoneMatch_)
+	}
+	var body io.Reader = nil
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "{projectId}/histories/{historyId}/executions/{executionId}/clusters/{clusterId}")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("GET", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"projectId":   c.projectId,
+		"historyId":   c.historyId,
+		"executionId": c.executionId,
+		"clusterId":   c.clusterId,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "toolresults.projects.histories.executions.clusters.get" call.
+// Exactly one of *ScreenshotCluster or error will be non-nil. Any
+// non-2xx status code is an error. Response headers are in either
+// *ScreenshotCluster.ServerResponse.Header or (if a response was
+// returned at all) in error.(*googleapi.Error).Header. Use
+// googleapi.IsNotModified to check whether the returned error was
+// because http.StatusNotModified was returned.
+func (c *ProjectsHistoriesExecutionsClustersGetCall) Do(opts ...googleapi.CallOption) (*ScreenshotCluster, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &ScreenshotCluster{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Retrieves a single screenshot cluster by its ID",
+	//   "httpMethod": "GET",
+	//   "id": "toolresults.projects.histories.executions.clusters.get",
+	//   "parameterOrder": [
+	//     "projectId",
+	//     "historyId",
+	//     "executionId",
+	//     "clusterId"
+	//   ],
+	//   "parameters": {
+	//     "clusterId": {
+	//       "description": "A Cluster id\n\nRequired.",
+	//       "location": "path",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "executionId": {
+	//       "description": "An Execution id.\n\nRequired.",
+	//       "location": "path",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "historyId": {
+	//       "description": "A History id.\n\nRequired.",
+	//       "location": "path",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "projectId": {
+	//       "description": "A Project id.\n\nRequired.",
+	//       "location": "path",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "{projectId}/histories/{historyId}/executions/{executionId}/clusters/{clusterId}",
+	//   "response": {
+	//     "$ref": "ScreenshotCluster"
+	//   }
+	// }
+
+}
+
 // method id "toolresults.projects.histories.executions.clusters.list":
 
 type ProjectsHistoriesExecutionsClustersListCall struct {
@@ -5683,10 +5957,10 @@ type ProjectsHistoriesExecutionsStepsPerfMetricsSummaryCreateCall struct {
 	header_            http.Header
 }
 
-// Create: Creates a PerfMetricsSummary resource.
+// Create: Creates a PerfMetricsSummary resource. Returns the existing
+// one if it has already been created.
 //
-// May return any of the following error code(s): - ALREADY_EXISTS - A
-// PerfMetricSummary already exists for the given Step - NOT_FOUND - The
+// May return any of the following error code(s): - NOT_FOUND - The
 // containing Step does not exist
 func (r *ProjectsHistoriesExecutionsStepsPerfMetricsSummaryService) Create(projectId string, historyId string, executionId string, stepId string, perfmetricssummary *PerfMetricsSummary) *ProjectsHistoriesExecutionsStepsPerfMetricsSummaryCreateCall {
 	c := &ProjectsHistoriesExecutionsStepsPerfMetricsSummaryCreateCall{s: r.s, urlParams_: make(gensupport.URLParams)}
@@ -5787,7 +6061,7 @@ func (c *ProjectsHistoriesExecutionsStepsPerfMetricsSummaryCreateCall) Do(opts .
 	}
 	return ret, nil
 	// {
-	//   "description": "Creates a PerfMetricsSummary resource.\n\nMay return any of the following error code(s): - ALREADY_EXISTS - A PerfMetricSummary already exists for the given Step - NOT_FOUND - The containing Step does not exist",
+	//   "description": "Creates a PerfMetricsSummary resource. Returns the existing one if it has already been created.\n\nMay return any of the following error code(s): - NOT_FOUND - The containing Step does not exist",
 	//   "httpMethod": "POST",
 	//   "id": "toolresults.projects.histories.executions.steps.perfMetricsSummary.create",
 	//   "parameterOrder": [
