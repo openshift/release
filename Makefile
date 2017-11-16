@@ -162,5 +162,5 @@ jenkins-config-updater-build:
 jenkins-config-updater:
 	oc create serviceaccount jenkins-config-updater -o yaml --dry-run | oc apply -f -
 	oc adm policy add-role-to-user edit -z jenkins-config-updater
-	oc process -f cluster/ci/config/prow/openshift/jenkins-config-updater.yaml | oc apply -f -
+	oc apply -f cluster/ci/config/prow/openshift/jenkins-config-updater.yaml
 .PHONY: jenkins-config-updater
