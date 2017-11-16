@@ -155,11 +155,11 @@ jenkins-setup-dev: export SKIP_PERMISSIONS_JOB=1
 jenkins-setup-dev: jenkins-setup
 .PHONY: jenkins-setup-dev
 
-jekins-config-updater-build:
-	oc process -f cluster/ci/config/prow/jenkins-config-updater.yaml | oc apply -f -
+jenkins-config-updater-build:
+	oc process -f cluster/ci/config/prow/openshift/build/jenkins-config-updater.yaml | oc apply -f -
 .PHONY: jenkins-config-updater-build
 
-jekins-config-updater:
+jenkins-config-updater:
 	oc create serviceaccount jenkins-config-updater -o yaml --dry-run | oc apply -f -
 	oc adm policy add-role-to-user edit -z jenkins-config-updater
 	oc process -f cluster/ci/config/prow/openshift/jenkins-config-updater.yaml | oc apply -f -
