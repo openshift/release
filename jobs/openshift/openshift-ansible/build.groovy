@@ -1,6 +1,6 @@
 #!/usr/bin/env groovy
 
-library "github.com/stevekuznetsov/release-library@skuznets/build-pipeline"
+library "github.com/openshift/release-library@master"
 
 buildPipeline(
   "build",
