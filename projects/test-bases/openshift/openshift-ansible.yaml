@@ -17,13 +17,12 @@ items:
         kind: ImageStreamTag
         name: openshift-ansible:test-base
     source:
-      git:
-        uri: https://github.com/openshift/openshift-ansible.git
-      type: Git
+      type: Dockerfile
       dockerfile: |
         FROM openshift/origin-release:base
-        COPY . /data/src/github.com/openshift/openshift-ansible
-        COPY release-ci /usr/bin
+        ENV GIT_COMMITTER_NAME=developer GIT_COMMITTER_EMAIL=developer@redhat.com
+        RUN git clone https://github.com/openshift/openshift-ansible.git /data/src/github.com/openshift/openshift-ansible/
+        COPY release-ci /usr/bin/
       images:
       - from:
           kind: ImageStreamTag
