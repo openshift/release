@@ -2,6 +2,13 @@ export RELEASE_URL=https://github.com/openshift/release.git
 export RELEASE_REF=master
 export SKIP_PERMISSIONS_JOB=0
 
+apply:
+	oc apply -f $(WHAT)
+.PHONY: apply
+
+applyTemplate:
+	oc process -f $(WHAT) | oc apply -f -
+.PHONY: applyTemplate
 
 all: jenkins prow mungegithub projects
 .PHONY: all
@@ -10,8 +17,8 @@ prow: prow-crd prow-config prow-secrets prow-images prow-rbac prow-plugins prow-
 .PHONY: prow
 
 prow-crd:
-	oc apply -f cluster/ci/config/prow/prow_crd.yaml
-	oc apply -f cluster/ci/config/prow/prowjob_access.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/prow_crd.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/prowjob_access.yaml
 .PHONY: prow-crd
 
 prow-config:
@@ -33,13 +40,13 @@ prow-secrets:
 .PHONY: prow-secrets
 
 prow-images:
-	oc process -f cluster/ci/config/prow/openshift/build/prow_images.yaml | oc apply -f -
-	oc process -f cluster/ci/config/prow/openshift/build/plugin_images.yaml | oc apply -f -
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/prow_images.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/plugin_images.yaml
 .PHONY: prow-images
 
 prow-builds:
 	for name in deck hook horologium jenkins-operator plank sinker splice tide; do \
-		oc process -f cluster/ci/config/prow/openshift/build/prow_component.yaml -p NAME=$$name | oc apply -f - ; \
+		$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/prow_component.yaml -p NAME=$$name; \
 	done
 .PHONY: prow-builds
 
@@ -54,33 +61,33 @@ endif
 .PHONY: prow-update
 
 prow-rbac:
-	oc process -f cluster/ci/config/prow/openshift/deck_rbac.yaml | oc apply -f -
-	oc process -f cluster/ci/config/prow/openshift/hook_rbac.yaml | oc apply -f -
-	oc process -f cluster/ci/config/prow/openshift/horologium_rbac.yaml | oc apply -f -
-	oc process -f cluster/ci/config/prow/openshift/jenkins_operator_rbac.yaml | oc apply -f -
-	oc process -f cluster/ci/config/prow/openshift/plank_rbac.yaml | oc apply -f -
-	oc process -f cluster/ci/config/prow/openshift/sinker_rbac.yaml | oc apply -f -
-	oc process -f cluster/ci/config/prow/openshift/splice_rbac.yaml | oc apply -f -
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/deck_rbac.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/hook_rbac.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/horologium_rbac.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/jenkins_operator_rbac.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/plank_rbac.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/sinker_rbac.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/splice_rbac.yaml
 
 prow-plugins:
 	# Uses the same credentials used by hook.
-	oc process -f cluster/ci/config/prow/openshift/cherrypick.yaml | oc apply -f -
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/cherrypick.yaml
 .PHONY: prow-plugins
 
 prow-services:
-	oc process -f cluster/ci/config/prow/openshift/deck.yaml | oc apply -f -
-	oc process -f cluster/ci/config/prow/openshift/hook.yaml | oc apply -f -
-	oc process -f cluster/ci/config/prow/openshift/horologium.yaml | oc apply -f -
-	oc process -f cluster/ci/config/prow/openshift/jenkins_operator.yaml | oc apply -f -
-	oc process -f cluster/ci/config/prow/openshift/plank.yaml | oc apply -f -
-	oc process -f cluster/ci/config/prow/openshift/sinker.yaml | oc apply -f -
-	oc process -f cluster/ci/config/prow/openshift/splice.yaml | oc apply -f -
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/deck.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/hook.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/horologium.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/jenkins_operator.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/plank.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/sinker.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/splice.yaml
 .PHONY: prow-services
 
 prow-jobs:
 	# RETEST_TOKEN is the token used by the retester periodic job to rerun tests for PRs
 	oc create secret generic retester-oauth-token --from-literal=oauth=${RETEST_TOKEN} -o yaml --dry-run | oc apply -f -
-	oc process -f cluster/ci/jobs/commenter.yaml | oc apply -f -
+	$(MAKE) applyTemplate WHAT=cluster/ci/jobs/commenter.yaml
 .PHONY: prow-jobs
 
 mungegithub: submit-queue-secrets origin-submit-queue installer-submit-queue logging-submit-queue console-submit-queue
@@ -94,53 +101,53 @@ submit-queue-secrets:
 .PHONY: submit-queue-secrets
 
 origin-submit-queue:
-	oc process -f cluster/ci/config/submit-queue/submit_queue.yaml | oc apply -f -
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/submit-queue/submit_queue.yaml
 .PHONY: origin-submit-queue
 
 installer-submit-queue:
-	oc process -f cluster/ci/config/submit-queue/submit_queue_openshift_ansible.yaml | oc apply -f -
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/submit-queue/submit_queue_openshift_ansible.yaml
 .PHONY: origin-submit-queue
 
 logging-submit-queue:
-	oc process -f cluster/ci/config/submit-queue/submit_queue_origin_aggregated_logging.yaml | oc apply -f -
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/submit-queue/submit_queue_origin_aggregated_logging.yaml
 .PHONY: origin-submit-queue
 
 console-submit-queue:
-	oc process -f cluster/ci/config/submit-queue/submit_queue_origin_web_console.yaml | oc apply -f -
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/submit-queue/submit_queue_origin_web_console.yaml
 .PHONY: console-submit-queue
 
 projects: gcsweb kube-state-metrics oauth-proxy origin-release prometheus test-bases
 .PHONY: projects
 
 gcsweb:
-	oc process -f projects/gcsweb/pipeline.yaml | oc apply -f -
+	$(MAKE) applyTemplate WHAT=projects/gcsweb/pipeline.yaml
 .PHONY: gcsweb
 
 kube-state-metrics:
-	oc apply -f projects/kube-state-metrics/pipeline.yaml
+	$(MAKE) apply WHAT=projects/kube-state-metrics/pipeline.yaml
 .PHONY: kube-state-metrics
 
 oauth-proxy:
-	oc apply -f projects/oauth-proxy/pipeline.yaml
+	$(MAKE) apply WHAT=projects/oauth-proxy/pipeline.yaml
 .PHONY: oauth-proxy
 
 origin-release:
 	# $DOCKERCONFIGJSON is the path to the json file
 	oc secrets new dockerhub ${DOCKERCONFIGJSON}
 	oc secrets link builder dockerhub
-	oc process -f projects/origin-release/pipeline.yaml | oc apply -f -
+	$(MAKE) applyTemplate WHAT=projects/origin-release/pipeline.yaml
 .PHONY: origin-release
 
 prometheus: node-exporter
-	oc apply -f projects/prometheus/prometheus.yaml
+	$(MAKE) apply WHAT=projects/prometheus/prometheus.yaml
 .PHONY: prometheus
 
 node-exporter:
-	oc apply -f projects/prometheus/node-exporter.yaml
+	$(MAKE) apply WHAT=projects/prometheus/node-exporter.yaml
 .PHONY: node-exporter
 
 test-bases:
-	oc apply -f projects/test-bases/openshift/openshift-ansible.yaml
+	$(MAKE) apply WHAT=projects/test-bases/openshift/openshift-ansible.yaml
 .PHONY: test-bases
 
 jenkins:
@@ -156,11 +163,11 @@ jenkins-setup-dev: jenkins-setup
 .PHONY: jenkins-setup-dev
 
 jenkins-config-updater-build:
-	oc process -f cluster/ci/config/prow/openshift/build/jenkins-config-updater.yaml | oc apply -f -
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/jenkins-config-updater/build.yaml
 .PHONY: jenkins-config-updater-build
 
 jenkins-config-updater:
 	oc create serviceaccount jenkins-config-updater -o yaml --dry-run | oc apply -f -
 	oc adm policy add-role-to-user edit -z jenkins-config-updater
-	oc apply -f cluster/ci/config/prow/openshift/jenkins-config-updater.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/jenkins-config-updater/deployment.yaml
 .PHONY: jenkins-config-updater
