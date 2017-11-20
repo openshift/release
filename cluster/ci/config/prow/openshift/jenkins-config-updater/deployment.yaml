@@ -1,5 +1,5 @@
 # Needs the hmac-token secret for decrypting webhook payloads.
-# Needs the oauth-token secret for creating PRs.
+# Needs the oauth-token secret for querying GitHub.
 apiVersion: v1
 kind: List
 items:
@@ -46,6 +46,9 @@ items:
           - name: oauth
             mountPath: /etc/github
             readOnly: true
+          - name: config
+            mountPath: /etc/config
+            readOnly: true
           - name: tmp
             mountPath: /tmp
         volumes:
@@ -55,6 +58,9 @@ items:
         - name: oauth
           secret:
             secretName: oauth-token
+        - name: config
+          configMap:
+            name: jenkins-config-updater
         - name: tmp
           emptyDir: {}
         serviceAccountName: jenkins-config-updater
