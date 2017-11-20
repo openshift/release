@@ -13,7 +13,7 @@ applyTemplate:
 all: jenkins prow mungegithub projects
 .PHONY: all
 
-prow: prow-crd prow-config prow-secrets prow-images prow-rbac prow-plugins prow-services prow-jobs
+prow: prow-crd prow-config prow-secrets prow-images prow-builds prow-rbac prow-plugins prow-services prow-jobs
 .PHONY: prow
 
 prow-crd:
@@ -40,7 +40,7 @@ prow-secrets:
 .PHONY: prow-secrets
 
 prow-images:
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/prow_images.yaml
+	# TODO: Migrate plugins builds to targets similar to prow-builds and prow-update.
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/plugin_images.yaml
 .PHONY: prow-images
 
