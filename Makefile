@@ -46,10 +46,10 @@ prow-builds:
 prow-update:
 ifeq ($(WHAT),all)
 	for name in deck hook horologium jenkins-operator plank sinker splice tide; do \
-		oc start-build bc/$$name ; \
+		oc start-build bc/$$name-binaries ; \
 	done
 else
-	oc start-build bc/$(WHAT)
+	oc start-build bc/$(WHAT)-binaries
 endif
 .PHONY: prow-update
 
