@@ -20,13 +20,14 @@ items:
       type: Dockerfile
       dockerfile: |
         FROM openshift/origin-release:base
-        RUN INSTALL_PKGS="gcc libffi-devel python-devel openssl-devel python2-pip" && \
+        RUN INSTALL_PKGS="ansible gcc libffi-devel python-devel openssl-devel python2-pip" && \
             yum install -y $INSTALL_PKGS && \
             rpm -V $INSTALL_PKGS && \
             yum clean all && \
             pip install tox
         ENV GIT_COMMITTER_NAME=developer GIT_COMMITTER_EMAIL=developer@redhat.com
         RUN umask 0002 && mkdir -p /data/src/github.com/openshift/ && git clone https://github.com/openshift/openshift-ansible.git /data/src/github.com/openshift/openshift-ansible/
+        RUN umask 0002 && cd /data/src/github.com/openshift/openshift-ansible/ && /usr/bin/tox --notest
         COPY release-ci /usr/bin/
       images:
       - from:
