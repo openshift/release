@@ -68,6 +68,7 @@ prow-rbac:
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/plank_rbac.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/sinker_rbac.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/splice_rbac.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tide_rbac.yaml
 
 prow-plugins:
 	# Uses the same credentials used by hook.
@@ -82,6 +83,7 @@ prow-services:
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/plank.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/sinker.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/splice.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tide.yaml
 .PHONY: prow-services
 
 prow-jobs:
