@@ -20,6 +20,11 @@ items:
       type: Dockerfile
       dockerfile: |
         FROM openshift/origin-release:base
+        RUN INSTALL_PKGS="gcc libffi-devel python-devel openssl-devel python-pip" && \
+            yum install -y $INSTALL_PKGS && \
+            rpm -V $INSTALL_PKGS && \
+            yum clean all && \
+            pip install tox
         ENV GIT_COMMITTER_NAME=developer GIT_COMMITTER_EMAIL=developer@redhat.com
         RUN git clone https://github.com/openshift/openshift-ansible.git /data/src/github.com/openshift/openshift-ansible/
         COPY release-ci /usr/bin/
