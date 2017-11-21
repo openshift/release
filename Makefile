@@ -48,6 +48,7 @@ prow-builds:
 	for name in deck hook horologium jenkins-operator plank sinker splice tide; do \
 		$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/prow_component.yaml -p NAME=$$name; \
 	done
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/metrics_server.yaml
 .PHONY: prow-builds
 
 prow-update:
@@ -69,6 +70,7 @@ prow-rbac:
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/sinker_rbac.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/splice_rbac.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tide_rbac.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/metrics_server_rbac.yaml
 
 prow-plugins:
 	# Uses the same credentials used by hook.
@@ -84,6 +86,7 @@ prow-services:
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/sinker.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/splice.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tide.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/metrics_server.yaml
 .PHONY: prow-services
 
 prow-jobs:
