@@ -34,7 +34,7 @@ objects:
         ref: "${SOURCE_REF}"
       type: Git
       dockerfile: |
-        FROM golang:1.9.2
+        FROM docker.io/golang:1.9.2
 
         COPY . /go/src/k8s.io/test-infra
         RUN cd /go/src/k8s.io/test-infra && \
@@ -43,13 +43,13 @@ objects:
             cd prow && \
             mkdir -p /static && \
             cp -r cmd/deck/static/* /static && \
-            CGO_ENABLED=0 go install -a -installsuffix cgo -ldflags '-w' ./cmd/... && \
+            CGO_ENABLED=0 go install ./cmd/... && \
             rm -rf /go/src /go/pkg
     strategy:
       dockerStrategy:
         from:
           kind: DockerImage
-          name: golang:1.9.2
+          name: docker.io/golang:1.9.2
         imageOptimizationPolicy: SkipLayers
     triggers:
     - type: ConfigChange

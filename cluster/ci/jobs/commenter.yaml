@@ -23,19 +23,19 @@ objects:
         uri: https://github.com/openshift/test-infra.git
       type: Git
       dockerfile: |
-        FROM openshift/origin-release:golang-1.8
+        FROM docker.io/golang:1.9.2
 
         COPY . /go/src/k8s.io/test-infra
         RUN cd /go/src/k8s.io/test-infra && \
-            godep restore && \
-            cd experiment/commenter && \
-            CGO_ENABLED=0 go install -a -installsuffix cgo -ldflags '-w' && \
+            go get -u github.com/golang/dep/cmd/dep && \
+            dep ensure && \
+            CGO_ENABLED=0 go install ./experiment/commenter && \
             rm -rf /go/src /go/pkg
     strategy:
       dockerStrategy:
         from:
           kind: DockerImage
-          name: openshift/origin-release:golang-1.8
+          name: docker.io/golang:1.9.2
         imageOptimizationPolicy: SkipLayers
     triggers:
     - type: ConfigChange
