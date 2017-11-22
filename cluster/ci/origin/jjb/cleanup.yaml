@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: cleanup
+labels:
+  template: cleanup
+parameters:
+- description: Prefix for job names, typically the namespace
+  displayName: Job Prefix
+  name: JOB_PREFIX
+  value: origin-ci
+  required: true
+- description: The URL of the origin release source repository
+  displayName: Source URL
+  name: RELEASE_SRC_URL
+  value: https://github.com/openshift/release.git
+  required: true
+- description: The Reference of the origin release source repository
+  displayName: Source Ref
+  name: RELEASE_SRC_REF
+  value: master
+  required: true
+objects:
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: cleanup
+    annotations:
+      ci.openshift.io/jenkins-job: "true"
+  data:
+    job.yml: |-
+      - job:
+          name: ${JOB_PREFIX}-cleanup
+          project-type: pipeline
+          concurrent: true
+          parameters:
+            - string:
+                name: RESOURCE
+                default: ""
+                description: The name of the resource to cleanup in type/name format
+          pipeline-scm:
+            script-path: cluster/ci/origin/pipelines/cleanup/Jenkinsfile
+            scm:
+               - git:
+                   url: ${RELEASE_SRC_URL}
+                   branches:
+                     - ${RELEASE_SRC_REF}
+
+

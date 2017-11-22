@@ -1,0 +1,122 @@
+#!/usr/bin/env groovy
+
+def library_url = "${env.RELEASE_LIBRARY_URL ?: (params.RELEASE_LIBRARY_URL ?: 'github.com/openshift/release-library') }"
+def library_ref = "${env.RELEASE_LIBRARY_REF ?: (params.RELEASE_LIBRARY_REF ?: 'master') }"
+
+library "${library_url}@${library_ref}"
+
+
+pipeline {
+  agent any
+
+  parameters {
+    string(name: "RESOURCE", defaultValue: "")
+  }
+
+  stages {
+    stage("Configure variables") {
+      steps {
+        script {
+          def parts = params.RESOURCE.tokenize("/")
+          this._resourceType = parts[0]
+          this._name = parts[1]
+        }
+      }
+    }
+    stage("Stash data directory") {
+      steps {
+        script {
+          dir ("cluster/test-deploy/data") {
+            stash "data-files"
+          }
+        }
+      }
+    }
+    stage("Deprovision Cluster") {
+      when { expression { return this._resourceType == "configmaps" } }
+      steps {
+        script {
+          podTemplate(
+            cloud: "openshift",
+            label: "origin-gce",
+            containers: [
+              containerTemplate(name: "origin-gce", image: "openshift/origin-gce:latest", ttyEnabled: true, command: "cat")
+            ],
+            volumes: [
+              secretVolume (
+                secretName: 'gce-provisioner',
+                mountPath: '/var/secrets/gce-provisioner'
+              ),
+              secretVolume (
+                secretName: 'gce-ssh',
+                mountPath: '/var/secrets/gce-ssh'
+              )
+            ]
+          ) {
+            node("origin-gce") {
+              container("origin-gce") {
+                sh "mkdir data-files"
+                dir("data-files") {
+                  unstash "data-files"
+                  sh "cp * /usr/share/ansible/openshift-ansible-gce/playbooks/files"
+                }
+                sh "cp -L /var/secrets/gce-provisioner/*.json /var/secrets/gce-ssh/ssh* /usr/share/ansible/openshift-ansible-gce/playbooks/files"
+                def instancePrefix = "${this._name}".take(25)
+                def script = $/cd $${WORK} && HOME=/home/cloud-user \
+$${WORK}/entrypoint.sh env INSTANCE_PREFIX=${instancePrefix} ansible-playbook \
+playbooks/terminate.yaml || true/$
+                sh script
+              }
+            }
+	  }
+	}
+      }
+    }
+    stage("Remove Related Artifacts") {
+      when { expression { return this._resourceType == "configmaps" } }
+      steps {
+        script {
+          openshift.withCluster() {
+            if (openshift.selector("cm/${this._name}").exists()) {
+              def cm = openshift.selector("cm/${this._name}").object()
+              def namespace = cm.data["namespace"]
+              def secret = cm.data["kubeconfig"]
+              // Remove tagged images namespace
+              if (namespace) {
+                try {
+                  openshift.selector("project/${namespace}").delete("--ignore-not-found")
+                } catch (e) {
+                  echo "WARNING: unable to delete project ${namespace}. It may not exist"
+                }
+              }
+              if (secret) {
+                openshift.selector("secret/${secret}").delete("--ignore-not-found")
+              }
+            }
+
+            // Remove rpm repo
+            openshift.selector("dc", ["app": "rpm-repo-${this._name}"]).delete("--ignore-not-found")
+            openshift.selector("svc", ["app": "rpm-repo-${this._name}"]).delete("--ignore-not-found")
+            openshift.selector("route", ["app": "rpm-repo-${this._name}"]).delete("--ignore-not-found")
+
+            // Remove imagestream
+            openshift.selector("is", ["build": "${this._name}"]).delete("--ignore-not-found")
+
+            // Remove configmap
+            openshift.selector("cm/${this._name}").delete("--ignore-not-found")
+          }
+        }
+      }
+    }
+    stage("Remove ImageStream") {
+      when { expression { return this._resourceType == "imagestreams" } }
+      steps {
+        script {
+          openshift.withCluster() {
+            openshift.selector("is", ["build":"${this._name}"]).delete("--ignore-not-found")
+          }
+        }
+      }
+    }
+  }
+}
