@@ -292,43 +292,6 @@ objects:
       build: "${BUILD_NAME}"
       runid: "${RUN_ID}"
       job-id: "${JOB_ID}"
-    generateName: "docker-registry-${BUILD_NUMBER}-${BUILD_NAME}-"
-  spec:
-    output:
-      pushSecret:
-        name: "${IMAGE_SECRET_NAME}"
-      to:
-        kind: ImageStreamTag
-        name: "${BUILD_NAME}:origin-docker-registry"
-    runPolicy: Serial
-    serviceAccount: builder
-    source:
-      contextDir: "dockerregistry"
-      images:
-      - from:
-          kind: ImageStreamTag
-          name: "${BUILD_NAME}:binaries"
-        pullSecret:
-          name: "${IMAGE_SECRET_NAME}"
-        paths:
-        - destinationDir: "."
-          sourcePath: "/go/src/github.com/openshift/origin/images/dockerregistry"
-      type: Image
-    strategy:
-      dockerStrategy:
-        pullSecret:
-          name: "${IMAGE_SECRET_NAME}"
-        from:
-          kind: ImageStreamTag
-          name: "${BUILD_NAME}:origin-base"
-      type: Docker
-- apiVersion: v1
-  kind: Build
-  metadata:
-    labels:
-      build: "${BUILD_NAME}"
-      runid: "${RUN_ID}"
-      job-id: "${JOB_ID}"
     generateName: "egress-router-${BUILD_NUMBER}-${BUILD_NAME}-"
   spec:
     output:
@@ -432,45 +395,6 @@ objects:
         from:
           kind: ImageStreamTag
           name: "${BUILD_NAME}:origin-base"
-      type: Docker
-- apiVersion: v1
-  kind: Build
-  metadata:
-    labels:
-      build: "${BUILD_NAME}"
-      runid: "${RUN_ID}"
-      job-id: "${JOB_ID}"
-    generateName: "gitserver-${BUILD_NUMBER}-${BUILD_NAME}-"
-  spec:
-    output:
-      pushSecret:
-        name: "${IMAGE_SECRET_NAME}"
-      to:
-        kind: ImageStreamTag
-        name: "${BUILD_NAME}:origin-gitserver"
-    runPolicy: Serial
-    serviceAccount: builder
-    source:
-      contextDir: "gitserver"
-      images:
-      - from:
-          kind: ImageStreamTag
-          name: "${BUILD_NAME}:rpms"
-        pullSecret:
-          name: "${IMAGE_SECRET_NAME}"
-        paths:
-        - destinationDir: "."
-          sourcePath: "/go/src/github.com/openshift/origin/examples/gitserver"
-        - destinationDir: "gitserver/bin"
-          sourcePath: "/go/src/github.com/openshift/origin/_output/local/bin/linux/amd64/gitserver"
-      type: Image
-    strategy:
-      dockerStrategy:
-        pullSecret:
-          name: "${IMAGE_SECRET_NAME}"
-        from:
-          kind: ImageStreamTag
-          name: "${BUILD_NAME}:origin"
       type: Docker
 - apiVersion: v1
   kind: Build
