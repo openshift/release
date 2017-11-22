@@ -18,7 +18,7 @@ type Runner interface {
 
 // CloneRef clones a SourceRef in the specified directory
 func CloneRef(ref SourceRef, cloneDest string, runner Runner) error {
-	runner.Add(func() error { return os.MkdirAll(cloneDest, 0755) })
+	runner.Add(func() error { return os.MkdirAll(cloneDest, 0775) })
 	runner.AddCmd(cloneDest, "git", "init")
 	runner.AddCmd(cloneDest, "git", "fetch", ref.RepositoryURL, ref.Branch)
 	runner.AddCmd(cloneDest, "git", "checkout", ref.BranchCommit)
