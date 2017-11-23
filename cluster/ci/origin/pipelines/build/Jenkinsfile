@@ -157,21 +157,22 @@ pipeline {
       steps {
         script {
           def currentProject = "${env.PROJECT_NAME}"
+          def setPermissions = {
+            openshift.withProject("images-${this._buildName}") {
+              openshift.raw("policy", "add-role-to-group", "admin", "system:serviceaccounts:${currentProject}")
+              openshift.raw("policy", "add-role-to-user", "view", "system:anonymous")
+              openshift.raw("policy", "add-role-to-user", "system:image-puller", "system:anonymous")
+            }
+          }
           openshift.withCluster() {
             if ("${params.PROVISIONER_TOKEN}".length() > 0) {
               openshift.doAs("${params.PROVISIONER_TOKEN}") {
                 openshift.newProject("images-${this._buildName}")
-                openshift.withProject("images-${this._buildName}") {
-                  openshift.raw("policy", "add-role-to-group", "admin", "system:serviceaccounts:${currentProject}")
-                }
+                setPermissions()
               }
             } else {
               openshift.newProject("images-${this._buildName}")
-              openshift.withProject("images-${this._buildName}") {
-                openshift.raw("policy", "add-role-to-group", "admin", "system:serviceaccounts:${currentProject}")
-                openshift.raw("policy", "add-role-to-user", "view", "system:anonymous")
-                openshift.raw("policy", "add-role-to-user", "system:image-puller", "system:anonymous")
-              }
+              setPermissions()
             }
           }
         }
@@ -186,8 +187,13 @@ pipeline {
             for (i = 0; i < tags.size(); i++) {
               def tag = tags[i].tag
               openshift.withProject("images-${this._buildName}") {
-                openshift.tag("${currentProject}/${this._buildName}:${tag}", "${tag}:latest")
+                openshift.tag("${currentProject}/${this._buildName}:${tag}", "${tag}:ci")
               }
+            }
+            // Tag registry separately -- use latest from docker.io for now, but will 
+            // need to use last good known image in the future.
+            openshift.withProject("images-${this._buildName}") {
+              openshift.tag("--source=docker", "openshift/origin-docker-registry:latest", "origin-docker-registry:ci")
             }
             openshift.withProject("images-${this._buildName}") {
               def originImageStream = openshift.selector("is", "origin").object()
