@@ -105,21 +105,23 @@ submit-queue-secrets:
 	oc create secret generic sq-oauth-token --from-literal=token=${SQ_OAUTH_TOKEN} -o yaml --dry-run | oc apply -f -
 .PHONY: submit-queue-secrets
 
-origin-submit-queue:
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/submit-queue/submit_queue.yaml
-.PHONY: origin-submit-queue
+submit-queue-build:
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/submit-queue/submit_queue_build.yaml
+.PHONY: submit-queue-build
 
-installer-submit-queue:
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/submit-queue/submit_queue_openshift_ansible.yaml
-.PHONY: origin-submit-queue
+submit-queue-deployments:
+	$(MAKE) apply WHAT=cluster/ci/config/submit-queue/submit_queue.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/submit-queue/submit_queue_openshift_ansible.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/submit-queue/submit_queue_origin_web_console.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/submit-queue/submit_queue_origin_aggregated_logging.yaml
+.PHONY: submit-queue-deployments
 
-logging-submit-queue:
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/submit-queue/submit_queue_origin_aggregated_logging.yaml
-.PHONY: origin-submit-queue
-
-console-submit-queue:
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/submit-queue/submit_queue_origin_web_console.yaml
-.PHONY: console-submit-queue
+submit-queue-configs:
+	$(MAKE) apply WHAT=cluster/ci/config/submit-queue/submit_queue_config.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/submit-queue/submit_queue_openshift_ansible_config.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/submit-queue/submit_queue_origin_web_console_config.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/submit-queue/submit_queue_origin_aggregated_logging_config.yaml
+.PHONY: submit-queue-configs
 
 projects: gcsweb kube-state-metrics oauth-proxy origin-release prometheus test-bases
 .PHONY: projects

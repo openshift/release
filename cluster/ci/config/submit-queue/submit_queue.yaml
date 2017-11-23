@@ -1,133 +1,23 @@
 apiVersion: v1
-kind: Template
+kind: List
 metadata:
   name: submit-queue
   labels:
     app: mungegithub
     target-repo: origin
-parameters:
-- name: NAME
-  displayName: Application Name
-  description: The name to use for the objects created by this template
-  value: submit-queue
-  required: true
-- name: SERVICE_NAME
-  displayName: Service Name
-  description: The name to use for the service that will report the SubmitQueue status
-  value: origin-sq-status
-  required: true
-- name: SOURCE_URL
-  displayName: Source URL
-  description: Git source URL to use for building the Submit Queue image
-  value: https://github.com/openshift/test-infra.git
-  required: true
-objects:
-- kind: ImageStream
-  apiVersion: v1
-  metadata:
-    name: submit-queue
-    labels:
-      app: mungegithub
-      component: "${NAME}"
-      target-repo: origin
-- kind: BuildConfig
-  apiVersion: v1
-  metadata:
-    name: "${NAME}-binary"
-    labels:
-      app: mungegithub
-      component: "${NAME}-binary"
-      target-repo: origin
-  spec:
-    successfulBuildsHistoryLimit: 1
-    failedBuildsHistoryLimit: 2
-    output:
-      to:
-        kind: ImageStreamTag
-        name: "${NAME}:binaries"
-    source:
-      git:
-        uri: "${SOURCE_URL}"
-      type: Git
-      dockerfile: |
-        FROM openshift/origin-release:golang-1.8
-
-        COPY . /go/src/k8s.io/test-infra
-        RUN cd /go/src/k8s.io/test-infra && \
-            go get -u github.com/golang/dep/cmd/dep && \
-            dep ensure && \
-            cd mungegithub && \
-            CGO_ENABLED=0 GOOS=linux go install -a -installsuffix cgo -ldflags '-w' && \
-            # 'godep clean' would be nice
-            mkdir -p /tmp/src/k8s.io/test-infra && \
-            mv /go/src/k8s.io/test-infra/* /tmp/src/k8s.io/test-infra && \
-            rm -rf /go/src && \
-            mkdir -p /go/src/k8s.io/test-infra && \
-            mv /tmp/src/k8s.io/test-infra/* /go/src/k8s.io/test-infra
-    strategy:
-      dockerStrategy:
-        from:
-          kind: DockerImage
-          name: openshift/origin-release:golang-1.8
-        imageOptimizationPolicy: SkipLayers
-    triggers:
-    - type: ConfigChange
-- apiVersion: v1
-  kind: BuildConfig
-  metadata:
-    name: "${NAME}"
-    labels:
-      app: mungegithub
-      component: "${NAME}"
-      target-repo: origin
-  spec:
-    successfulBuildsHistoryLimit: 1
-    failedBuildsHistoryLimit: 2
-    output:
-      to:
-        kind: ImageStreamTag
-        name: "${NAME}:latest"
-    source:
-      git:
-        uri: "${SOURCE_URL}"
-      contextDir: mungegithub
-      images:
-      - from:
-          kind: ImageStreamTag
-          name: "${NAME}:binaries"
-        paths:
-        - destinationDir: mungegithub/
-          sourcePath: /go/bin/mungegithub
-      dockerfile: |
-        FROM        alpine:3.6
-        MAINTAINER  Michail Kargakis <mkargaki@redhat.com>
-        RUN apk update --no-cache && \
-            apk add ca-certificates git --no-cache
-        EXPOSE 8080
-        ADD mungegithub /mungegithub
-        ADD submit-queue/www-rh /www
-        ENTRYPOINT [ "/mungegithub" ]
-    strategy:
-      dockerStrategy:
-        imageOptimizationPolicy: SkipLayers
-    triggers:
-    - imageChange:
-        from:
-          kind: ImageStreamTag
-          name: "${NAME}:binaries"
-      type: ImageChange
+items:
 - apiVersion: v1
   kind: Route
   metadata:
-    name: "${SERVICE_NAME}"
+    name: "origin-sq-status"
     labels:
       app: mungegithub
-      component: "${NAME}"
+      component: "submit-queue"
       target-repo: origin
   spec:
     to:
       kind: Service
-      name: "${SERVICE_NAME}"
+      name: "origin-sq-status"
     port:
       targetPort: status
     tls:
@@ -136,10 +26,10 @@ objects:
 - apiVersion: v1
   kind: Service
   metadata:
-    name: "${SERVICE_NAME}"
+    name: "origin-sq-status"
     labels:
       app: mungegithub
-      component: "${NAME}"
+      component: "submit-queue"
       target-repo: origin
     annotations:
       prometheus.io/path: /prometheus
@@ -153,17 +43,17 @@ objects:
       targetPort: 8080
     selector:
       app: mungegithub
-      component: "${NAME}"
+      component: "submit-queue"
       target-repo: origin
     type: ClusterIP
     sessionAffinity: None
 - apiVersion: v1
   kind: DeploymentConfig
   metadata:
-    name: "${NAME}"
+    name: "submit-queue"
     labels:
       app: mungegithub
-      component: "${NAME}"
+      component: "submit-queue"
   spec:
     replicas: 1
     revisionHistoryLimit: 2
@@ -173,12 +63,12 @@ objects:
       metadata:
         labels:
           app: mungegithub
-          component: "${NAME}"
+          component: "submit-queue"
           target-repo: origin
       spec:
         containers:
-        - name: "${NAME}"
-          image: "${NAME}"
+        - name: "submit-queue"
+          image: "submit-queue"
           command:
           - /mungegithub
           - --dry-run=false
@@ -209,7 +99,7 @@ objects:
         volumes:
         - name: munge-config
           configMap:
-            name: "${NAME}"
+            name: "submit-queue"
         - name: path-label
           configMap:
             name: path-label
@@ -229,86 +119,18 @@ objects:
     - imageChangeParams:
         automatic: true
         containerNames:
-        - "${NAME}"
+        - "submit-queue"
         from:
           kind: ImageStreamTag
-          name: "${NAME}:latest"
+          name: "submit-queue:latest"
       type: ImageChange
-- apiVersion: v1
-  kind: ConfigMap
-  metadata:
-    name: "${NAME}"
-  data:
-    config: |
-      # https://trello.com/c/eJrRpm7S/230-ci-mungegithub-evaluate-using-a-gcs-bucket-for-the-submitqueue-or-querying-jenkins-directly
-      fake-e2e: "true"
-      # basic config options.
-      http-cache-dir: /cache/httpcache
-      organization: openshift
-      project: origin
-      # Make sure approval-handler and blunderbuss run before submit-queue.
-      # Otherwise it's going to take an extra-cycle to detect the label change.
-      # Run blunderbuss before approval-handler, so that we can suggest approvers
-      # based on assigned reviewer.
-      pr-mungers: lgtm-after-commit,needs-rebase,comment-deleter,blunderbuss,approval-handler,submit-queue,path-label
-      state: open
-      token-file: /etc/oauth-token/token
-      period: 20s
-      pr-max-wait-time: 4h
-      repo-dir: /gitrepos
-      github-key-file: /etc/hmac-token/token
-
-      required-retest-contexts: "\
-        ci/openshift-jenkins/verify,\
-        ci/openshift-jenkins/unit,\
-        ci/openshift-jenkins/cmd,\
-        ci/openshift-jenkins/integration,\
-        ci/openshift-jenkins/end_to_end,\
-        ci/openshift-jenkins/extended_conformance_install,\
-        ci/openshift-jenkins/extended_networking_minimal,\
-        "
-
-      protected-branches: ""
-      do-not-merge-milestones: ""
-      additional-required-labels: ""
-      blocking-labels: ""
-
-      # chart-url: https://storage.googleapis.com/origin-test-history/k8s-queue-health.svg
-      # history-url: https://storage.googleapis.com/origin-test-history/static/index.html
-      prow-url: https://deck-ci.svc.ci.openshift.org
-      batch-enabled: true
-      context-url: https://origin-sq-status-ci.svc.ci.openshift.org
-
-      # options used by the GCS feature.
-      # gcs-bucket: origin-ci-test
-      # gcs-logs-dir: logs
-      # pull-logs-dir: pr-logs
-      # pull-key: pull
-
-      path-label-config: /path-label/path-label.txt
-
-      use-reviewers: "true"
-      gate-approved: "true"
-      implicit-self-approval: true
-      gate-cla: "false"
-- apiVersion: v1
-  kind: ConfigMap
-  metadata:
-    name: path-label
-  data:
-    path-label.txt: |-
-      # This file is used by the path-label munger and is of the form:
-      # PATH REGEXP     LABEL
-      .*/api/([^/]+/)*types.go$   needs-api-review
-      .*/apis/([^/]+/)*types.go$   needs-api-review
-      .*vendor/.* vendor-update
 - kind: PersistentVolumeClaim
   apiVersion: v1
   metadata:
     name: origin-cache
     labels:
       app: mungegithub
-      component: "${NAME}"
+      component: "submit-queue"
       target-repo: origin
   spec:
     accessModes:

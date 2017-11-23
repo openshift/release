@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: List
+metadata:
+  name: submit-queue-openshift-ansible
+  labels:
+    app: mungegithub-openshift-ansible
+    target-repo: openshift-ansible
+items:
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: "submit-queue-openshift-ansible"
+  data:
+    config: |
+      fake-e2e: "true"
+      # basic config options.
+      http-cache-dir: /cache/httpcache
+      organization: openshift
+      project: openshift-ansible
+      pr-mungers: lgtm-after-commit,needs-rebase,comment-deleter,submit-queue
+      state: open
+      token-file: /etc/oauth-token/token
+      period: 20s
+      pr-max-wait-time: 4h
+      repo-dir: /gitrepos
+      github-key-file: /etc/hmac-token/token
+
+      required-retest-contexts: "\
+        ci/openshift-jenkins/tox,\
+        ci/openshift-jenkins/logging,\
+        ci/openshift-jenkins/install,\
+        ci/openshift-jenkins/containerized,\
+        ci/openshift-jenkins/system-containers,\
+        continuous-integration/travis-ci/pr
+        "
+
+      protected-branches: ""
+      do-not-merge-milestones: ""
+      additional-required-labels: ""
+
+      # chart-url: https://storage.googleapis.com/origin-test-history/k8s-queue-health.svg
+      # history-url: https://storage.googleapis.com/origin-test-history/static/index.html
+      prow-url: https://deck-ci.svc.ci.openshift.org
+      batch-enabled: true
+      context-url: https://openshift-ansible-sq-status-ci.svc.ci.openshift.org
+
+      # options used by the GCS feature.
+      # gcs-bucket: origin-ci-test
+      # gcs-logs-dir: logs
+      # pull-logs-dir: pr-logs
+      # pull-key: pull
+
+      path-label-config: /path-label/path-label.txt
+
+      use-reviewers: "false"
+      gate-approved: "false"
+      gate-cla: "false"
