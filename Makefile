@@ -48,7 +48,7 @@ prow-builds:
 .PHONY: prow-builds
 
 prow-update:
-ifeq ($(WHAT),all)
+ifeq ($(WHAT),)
 	for name in deck hook horologium jenkins-operator plank sinker splice tide; do \
 		oc start-build bc/$$name-binaries ; \
 	done
