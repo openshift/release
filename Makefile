@@ -13,7 +13,7 @@ applyTemplate:
 all: jenkins prow mungegithub projects
 .PHONY: all
 
-prow: prow-crd prow-config prow-secrets prow-images prow-builds prow-rbac prow-plugins prow-services prow-jobs
+prow: prow-crd prow-config prow-secrets prow-builds prow-rbac prow-plugins prow-services prow-jobs
 .PHONY: prow
 
 prow-crd:
@@ -39,16 +39,12 @@ prow-secrets:
 	oc create secret generic cherrypick-token --from-literal=oauth=${CHERRYPICK_TOKEN} -o yaml --dry-run | oc apply -f -
 .PHONY: prow-secrets
 
-prow-images:
-	# TODO: Migrate plugins builds to targets similar to prow-builds and prow-update.
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/plugin_images.yaml
-.PHONY: prow-images
-
 prow-builds:
 	for name in deck hook horologium jenkins-operator plank sinker splice tide; do \
 		$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/prow_component.yaml -p NAME=$$name; \
 	done
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/metrics_server.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/plugin_images.yaml
 .PHONY: prow-builds
 
 prow-update:
