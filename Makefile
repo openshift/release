@@ -67,6 +67,7 @@ prow-rbac:
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/splice_rbac.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tide_rbac.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/metrics_server_rbac.yaml
+.PHONY: prow-rbac
 
 prow-plugins:
 	# Uses the same credentials used by hook.
