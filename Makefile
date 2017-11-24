@@ -13,7 +13,7 @@ applyTemplate:
 all: jenkins prow mungegithub projects
 .PHONY: all
 
-prow: prow-crd prow-config prow-secrets prow-builds prow-rbac prow-plugins prow-services prow-jobs
+prow: prow-crd prow-config prow-secrets prow-builds prow-rbac prow-services prow-jobs
 .PHONY: prow
 
 prow-crd:
@@ -44,7 +44,7 @@ prow-builds:
 		$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/prow_component.yaml -p NAME=$$name; \
 	done
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/metrics_server.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/plugin_images.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/cherrypick.yaml
 .PHONY: prow-builds
 
 prow-update:
@@ -69,11 +69,6 @@ prow-rbac:
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/metrics_server_rbac.yaml
 .PHONY: prow-rbac
 
-prow-plugins:
-	# Uses the same credentials used by hook.
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/cherrypick.yaml
-.PHONY: prow-plugins
-
 prow-services:
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/deck.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/hook.yaml
@@ -84,6 +79,7 @@ prow-services:
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/splice.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tide.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/metrics_server.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/cherrypick.yaml
 .PHONY: prow-services
 
 prow-jobs:
