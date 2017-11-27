@@ -140,9 +140,13 @@ origin-release:
 	$(MAKE) applyTemplate WHAT=projects/origin-release/pipeline.yaml
 .PHONY: origin-release
 
-prometheus: node-exporter
+prometheus: node-exporter prometheus-config
 	$(MAKE) apply WHAT=projects/prometheus/prometheus.yaml
 .PHONY: prometheus
+
+prometheus-config:
+	oc create cm prometheus -n kube-system --from-file=projects/prometheus/prometheus.yml --from-file=projects/prometheus/prometheus.rules -o yaml --dry-run | oc apply -f -
+.PHONY: prometheus-config
 
 node-exporter:
 	$(MAKE) apply WHAT=projects/prometheus/node-exporter.yaml
