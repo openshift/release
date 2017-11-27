@@ -146,6 +146,7 @@ prometheus: node-exporter prometheus-config
 
 prometheus-config:
 	oc create cm prometheus -n kube-system --from-file=projects/prometheus/prometheus.yml --from-file=projects/prometheus/prometheus.rules -o yaml --dry-run | oc apply -f -
+	oc create cm prometheus-alerts -n kube-system --from-file=projects/prometheus/alertmanager.yml -o yaml --dry-run | oc apply -f -
 .PHONY: prometheus-config
 
 node-exporter:
