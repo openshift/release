@@ -43,7 +43,6 @@ prow-builds:
 	for name in deck hook horologium jenkins-operator plank sinker splice tide; do \
 		$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/prow_component.yaml -p NAME=$$name; \
 	done
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/metrics_server.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/cherrypick.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/refresh.yaml
 .PHONY: prow-builds
@@ -67,7 +66,6 @@ prow-rbac:
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/sinker_rbac.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/splice_rbac.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tide_rbac.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/metrics_server_rbac.yaml
 .PHONY: prow-rbac
 
 prow-services:
@@ -79,7 +77,6 @@ prow-services:
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/sinker.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/splice.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tide.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/metrics_server.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/cherrypick.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/refresh.yaml
 .PHONY: prow-services
