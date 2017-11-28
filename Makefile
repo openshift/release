@@ -89,6 +89,7 @@ prow-jobs:
 	# RETEST_TOKEN is the token used by the retester periodic job to rerun tests for PRs
 	oc create secret generic retester-oauth-token --from-literal=oauth=${RETEST_TOKEN} -o yaml --dry-run | oc apply -f -
 	$(MAKE) applyTemplate WHAT=cluster/ci/jobs/commenter.yaml
+	$(MAKE) apply WHAT=projects/prometheus/test/build.yaml
 .PHONY: prow-jobs
 
 mungegithub: submit-queue-secrets origin-submit-queue installer-submit-queue logging-submit-queue console-submit-queue
