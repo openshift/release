@@ -139,6 +139,10 @@ pipeline {
       }
     }
     stage("Build Images") {
+      when {
+        // If the project exists, images have already been built and tagged
+        not { expression { return projectExists(this, "images-${this._buildName}", "${params.PROVISIONER_TOKEN}") } }
+      }
       steps {
         createTemplate(this, "${templateBase}/build-images.yaml",
           "IMAGE_SECRET_NAME=${this._pushSecret}",
@@ -179,6 +183,15 @@ pipeline {
       }
     }
     stage("Tag Images") {
+      when {
+        expression { 
+          this._cmExists = false
+          openshift.withCluster() {
+            this._cmExists = openshift.selector("cm/${this._buildName}").exists()
+          }
+          return !this._cmExists
+        }
+      }
       steps {
         script {
           def currentProject = "${env.PROJECT_NAME}"
@@ -208,6 +221,7 @@ pipeline {
       }
     }
     stage("Create Build Result ConfigMap") {
+      when { expression { return !this._cmExists } }
       steps {
         script {
           openshift.withCluster() {
