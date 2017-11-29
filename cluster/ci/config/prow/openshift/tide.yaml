@@ -5,6 +5,18 @@ parameters:
   name: NAME
   value: tide
 objects:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: "${NAME}"
+  spec:
+    selector:
+      app: prow
+      component: "${NAME}"
+    ports:
+    - port: 80
+      targetPort: 8888
+    type: ClusterIP
 - apiVersion: apps.openshift.io/v1
   kind: DeploymentConfig
   metadata:
@@ -27,6 +39,9 @@ objects:
           args:
           - --dry-run=false
           - --github-token-file=/etc/github/token
+          ports:
+          - name: http
+            containerPort: 8888
           volumeMounts:
           - name: oauth
             mountPath: /etc/github
