@@ -1,35 +1,55 @@
-#!/bin/sh
+#!/bin/bash
 
-DS_NAME=$1
-DASH_FILE="./openshift-cluster-monitoring.json"
+datasource_name=$1
+prometheus_namespace=$2
 
-oc create namespace grafana
-# deploy the grafana pod
-oc new-app -f grafana-ocp.yaml
+usage() {
+echo "
+USAGE
+    setup-grafana.sh pro-ocp openshift-metrics true
 
-pod_state=""
-while [ "$pod_state" != "Running" ]
-do
-        pod_state=`oc get pod |grep grafana |awk '{print $3}'`
-        sleep 1
-done
+    args:
+      datasource_name: grafana datasource name
+      prometheus_namespace: existing prometheus name e.g openshift-metrics
 
-TOKEN=`./oc sa get-token default`
-#TODO:// replace those hardcoded values, the clinet which runs it must have permissions.
-ROUTE=`oc get route |grep grafana |awk '{print $2}'`
-PRO_SERVER=`oc get route --all-namespaces |grep prometheus |awk '{print $3}'`
-JSON="{\"name\":\""$DS_NAME"\",\"type\":\"prometheus\",\"typeLogoUrl\":\"\",\"access\":\"proxy\",\"url\":\"https://"$PRO_SERVER"\",\"basicAuth\":false,\"withCredentials\":false,\"jsonData\":{\"tlsSkipVerify\":true,\"token\":\"$TOKEN\"}}"
+    note:
+      the project must have view permissions for kube-system
+"
+exit 1
+}
 
-# Add DS.
-curl -H "Content-Type: application/json" -u admin:admin $ROUTE/api/datasources -X POST -d $JSON
+[[ -n ${datasource_name} ]] || usage
 
-# Replace values for DS.
-sed -i 's/${DS_PR}/'$DS_NAME'/' $DASH_FILE
+oc new-project grafana
+oc process -f grafana-ocp.yaml |oc create -f -
+oc rollout status deployment/grafana-ocp
+oc adm policy add-role-to-user view -z grafana-ocp -n kube-system
 
-# Create new dashboard.
-curl -H "Content-Type: application/json" -u admin:admin $ROUTE/api/dashboards/db -X POST -d @$DASH_FILE
+payload="$( mktemp )"
+cat <<EOF >"${payload}"
+{
+	"name": "${datasource_name}",
+	"type": "prometheus",
+	"typeLogoUrl": "",
+	"access": "proxy",
+	"url": "https://$( oc get route prometheus -n "${prometheus_namespace}" -o jsonpath='{.spec.host}' )",
+	"basicAuth": false,
+	"withCredentials": false,
+	"jsonData": {
+		"tlsSkipVerify":true,
+		"token":"$( oc sa get-token grafana-ocp )"
+	}
+}
+EOF
 
-# Tear down.
-sed -i 's/'$DS_NAME'/${DS_PR}/' $DASH_FILE
+grafana_host="https://$( oc get route grafana-ocp -o jsonpath='{.spec.host}' )"
+curl -H "Content-Type: application/json" -u admin:admin "${grafana_host}/api/datasources" -X POST -d "@${payload}"
+
+# TODO:// use the origin file, one the PR will merge openshift/origin#17114?.
+dashboard_file="./openshift-cluster-monitoring.json"
+sed -i.bak "s/\${DS_PR}/${datasource_name}/" "${dashboard_file}"
+curl -H "Content-Type: application/json" -u admin:admin "${grafana_host}/api/dashboards/db" -X POST -d "@${dashboard_file}"
+mv "${dashboard_file}.bak" "${dashboard_file}"
+
 
 exit 0
