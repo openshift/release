@@ -141,6 +141,11 @@ prometheus: node-exporter
 	$(MAKE) apply WHAT=projects/prometheus/prometheus.yaml
 .PHONY: prometheus
 
+prometheus-rules:
+	oc create cm prometheus-rules -n kube-system --from-file=prometheus.rules=projects/prometheus/prometheus.rules.yaml -o yaml --dry-run | oc apply -f -
+	oc set volume sts/prometheus  -n kube-system -c prometheus --add -t configmap --configmap-name=prometheus-rules -m /etc/prometheus/prometheus.rules --sub-path=..data/prometheus.rules || true
+.PHONY: prometheus-rules
+
 node-exporter:
 	$(MAKE) apply WHAT=projects/prometheus/node-exporter.yaml
 .PHONY: node-exporter
