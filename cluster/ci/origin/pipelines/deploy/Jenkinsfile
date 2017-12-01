@@ -39,11 +39,13 @@ pipeline {
             def cm = openshift.selector("cm/${this._buildName}").object()
             this._imageBase = cm.data["image-base"]
             this._rpmRepo = cm.data["rpm-repo"]
+            this._kubeconfig = cm.data["kubeconfig"]
           }
         }
       }
     }
     stage("Stash data directory") {
+      when { expression { return this._kubeconfig ? false : true } }
       steps {
         script {
           dir ("cluster/test-deploy/data") {
@@ -53,6 +55,7 @@ pipeline {
       }
     }
     stage("Run Deployment") {
+      when { expression { return this._kubeconfig ? false : true } }
       steps {
         script {
           podTemplate(
@@ -98,16 +101,16 @@ $${WORK}/entrypoint.sh env INSTANCE_PREFIX=${instancePrefix} ansible-playbook -v
       }
     }
     stage("Save Kubeconfig") {
+      when { expression { return this._kubeconfig ? false : true } }
       steps {
         script {
-          sh "mkdir kubeconfig"
+          sh "mkdir -p kubeconfig"
           dir("kubeconfig") {
             unstash "kubeconfig"
             openshift.withCluster() {
+              openshift.selector("secret", "${this._buildName}").delete("--ignore-not-found")
               openshift.raw("create", "secret", "generic", "${this._buildName}", "--from-file", "admin.kubeconfig=./admin.kubeconfig")
-              def cm = openshift.selector("cm/${this._buildName}").object()
-              cm.data["kubeconfig"] = "${this._buildName}"
-              openshift.apply(cm)
+              sh "oc patch cm/${this._buildName} --patch '{ \"data\": { \"kubeconfig\": \"${this._buildName}\" } }'"
             }
           }
         }
