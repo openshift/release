@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: List
+items:
+- kind: BuildConfig
+  apiVersion: v1
+  metadata:
+    name: common-test-base-golang-1.9
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: common-test-base:golang-1.9
+    source:
+      type: Git
+      git:
+        ref: skuznets/image-registry-build
+        uri: https://github.com/stevekuznetsov/release.git
+      contextDir: projects/test-bases/common/golang-1.9/
+    strategy:
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: common-test-base:base
+        imageOptimizationPolicy: SkipLayers
+    triggers:
+    - type: ConfigChange
+    - type: ImageChange
+      imageChange:
+        from:
+          kind: ImageStreamTag
+          name: common-test-base:base
