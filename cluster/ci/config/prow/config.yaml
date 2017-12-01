@@ -25,6 +25,7 @@ deck:
 tide:
   queries:
   - "type:pr state:open repo:openshift/image-registry label:lgtm label:approved -label:needs-ok-to-test -label:do-not-merge/work-in-progress -label:do-not-merge/hold -label:needs-rebase"
+  - "type:pr state:open repo:openshift/origin-web-console-server label:lgtm -label:needs-ok-to-test -label:do-not-merge/work-in-progress -label:do-not-merge/hold -label:needs-rebase"
 
 prowjob_namespace: ci
 pod_namespace: ci
@@ -432,6 +433,24 @@ presubmits:
     context: ci/openshift-jenkins
     rerun_command: "/test"
     trigger: "((?m)^/test,?(\\s+|$))"
+
+  openshift/origin-web-console-server:
+  - name: test_pull_request_origin_web_console_server_check
+    agent: jenkins
+    labels:
+      master: ci.openshift.redhat.com
+    always_run: true
+    context: ci/openshift-jenkins/check
+    rerun_command: "/test check"
+    trigger: "((?m)^/test( all| check),?(\\s+|$))"
+  - name: test_pull_request_origin_web_console_server_e2e
+    agent: jenkins
+    labels:
+      master: ci.openshift.redhat.com
+    always_run: true
+    context: ci/openshift-jenkins/e2e
+    rerun_command: "/test e2e"
+    trigger: "((?m)^/test( all| e2e),?(\\s+|$))"    
 
   openshift/openshift-cns-testdrive:
   - name: origin-ci-openshift-cns-testdrive-origin
