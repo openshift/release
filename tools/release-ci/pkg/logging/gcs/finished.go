@@ -59,7 +59,7 @@ func UploadFinishedData(processLog, metadataFile, artifactDir string, testName s
 		// TODO(skuznets): we want to stream this log during the run
 		ospath.Join(gcsPath, "build-log.txt"): fileUpload(processLog),
 	}
-	gatherArtifacts(artifactDir, gcsPath, uploadTargets)
+	gatherArtifacts(artifactDir, ospath.Join(gcsPath, "artifacts"), uploadTargets)
 	return uploadToGCS(gcsBucket, uploadTargets)
 }
 
@@ -76,7 +76,7 @@ func gatherArtifacts(artifactDir, gcsPath string, uploadTargets map[string]uploa
 		// effort upload is OK in any case
 		if relPath, err := filepath.Rel(artifactDir, path); err == nil {
 			log.Printf("Found %s in artifact directory. Uploading as %s\n", path, relPath)
-			uploadTargets[ospath.Join(gcsPath, "artifacts", relPath)] = fileUpload(path)
+			uploadTargets[ospath.Join(gcsPath, relPath)] = fileUpload(path)
 		} else {
 			log.Printf("Encountered error in relative path calculation for %s under %s: %v", path, artifactDir, err)
 		}

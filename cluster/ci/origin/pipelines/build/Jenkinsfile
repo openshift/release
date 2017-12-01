@@ -183,15 +183,7 @@ pipeline {
       }
     }
     stage("Tag Images") {
-      when {
-        expression { 
-          this._cmExists = false
-          openshift.withCluster() {
-            this._cmExists = openshift.selector("cm/${this._buildName}").exists()
-          }
-          return !this._cmExists
-        }
-      }
+      when { expression { return !configMapExists(this) } }
       steps {
         script {
           def currentProject = "${env.PROJECT_NAME}"
@@ -203,7 +195,7 @@ pipeline {
                 openshift.tag("${currentProject}/${this._buildName}:${tag}", "${tag}:ci")
               }
             }
-            // Tag registry separately -- use latest from docker.io for now, but will 
+            // Tag registry separately -- use latest from docker.io for now, but will
             // need to use last good known image in the future.
             openshift.withProject("images-${this._buildName}") {
               openshift.tag("--source=docker", "openshift/origin-docker-registry:latest", "origin-docker-registry:ci")
@@ -221,7 +213,7 @@ pipeline {
       }
     }
     stage("Create Build Result ConfigMap") {
-      when { expression { return !this._cmExists } }
+      when { expression { return !configMapExists(this) } }
       steps {
         script {
           openshift.withCluster() {

@@ -1,11 +1,10 @@
 #!/usr/bin/env groovy
+@Library("release-library@master")
+import com.redhat.openshift.PipelineImageTestStep
 
-library "github.com/openshift/release-library@master"
+import static com.redhat.openshift.BuildPipelineConfiguration.TEST_BINARIES_TAG
 
-testPipeline(
-  /* name      */ "py35-unit",
-  /* build job */ "ci-openshift-ansible-build",
-  /* base tag  */ "tox",
-  /* test cmd  */ "./.tox/py35-unit/bin/pytest",
-  /* limits    */ "1Gi", "1000m"
-)
+testPipeline([new PipelineImageTestStep(
+  tag: TEST_BINARIES_TAG,
+  commands: ["./.tox/py35-unit/bin/pytest"]
+)])

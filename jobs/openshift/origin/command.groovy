@@ -6,5 +6,13 @@ import static com.redhat.openshift.BuildPipelineConfiguration.TEST_BINARIES_TAG
 
 testPipeline([new PipelineImageTestStep(
   tag: TEST_BINARIES_TAG,
-  commands: ["./.tox/py27-unit/bin/pytest"]
+  ram: "7.1Gi",
+  cpu: "2500m",
+  env: [
+    JUNIT_REPORT : "true",
+    SKIP_TEARDOWN: "1"
+  ],
+  commands: [
+    "make test-cmd"
+  ]
 )])
