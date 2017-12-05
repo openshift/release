@@ -1,6 +1,5 @@
 plank:
-  job_url_template: 'https://openshift-gce-devel.appspot.com/build/origin-ci-test/{{if eq .Spec.Type "presubmit"}}pr-logs/pull{{else if eq .Spec.Type "batch"}}pr-logs/pull{{else}}logs{{end}}{{if ne .Spec.Refs.Repo "origin"}}/{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}{{end}}{{if eq .Spec.Type "presubmit"}}/{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}{{else if eq .Spec.Type "batch"}}/batch{{end}}/{{.Spec.Job}}/{{.Status.BuildID}}/'
-  report_template: '[Full PR test history](https://openshift-gce-devel.appspot.com/pr/{{if ne .Spec.Refs.Repo "origin"}}{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}/{{end}}{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://openshift-gce-devel.appspot.com/pr/{{with index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}). Please help us cut down on flakes by [linking to](https://github.com/kubernetes/community/blob/master/contributors/devel/flaky-tests.md#filing-issues-for-flaky-tests) an [open issue](https://github.com/{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}/issues?q=is:issue+is:open) when you hit one in your PR.'
+  job_url_template: 'https://deck-ci.svc.ci.openshift.org/log?job={{.Spec.Job}}&id={{.Status.BuildID}}'
 
 jenkins_operator:
   max_concurrency: 125
@@ -520,6 +519,17 @@ presubmits:
     context: ci/openshift-jenkins/unit
     rerun_command: "/test unit"
     trigger: "((?m)^/test( all| unit),?(\\s+|$))"
+
+  openshift/release:
+  - name: check_prometheus_rules
+    agent: kubernetes
+    run_if_changed: '^(projects/prometheus/prometheus.rules.yaml)$'
+    context: ci/openshift/promrules
+    rerun_command: "/test promrules"
+    trigger: "((?m)^/test promrules,?(\\s+|$))"
+    spec:
+      containers:
+      - image: registry.svc.ci.openshift.org/ci/promrules:latest
 
 postsubmits:
   openshift/origin:
