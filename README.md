@@ -19,3 +19,11 @@ make prow
 ```
 
 For more information on prow, see the upstream [documentation](https://github.com/kubernetes/test-infra/tree/master/prow#prow).
+
+### Prow alerts
+
+A Prometheus server runs in the CI cluster and is configured to create [alerts](https://prometheus-kube-system.svc.ci.openshift.org/alerts) on top of prow metrics. By clicking on the `expr` field of every alert, you can view the query that is setup for alerting. For more information on alerts, see [the Prometheus docs](https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/).
+
+TODO: Forward alerts via e-mail.
+
+TODO: Dcoument common actions on firing alerts, wherever it's possible to act
