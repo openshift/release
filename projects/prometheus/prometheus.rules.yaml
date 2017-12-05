@@ -86,3 +86,19 @@ groups:
       miqTarget: "BatchFailures"
       severity: "WARN"
       message: "jenkins-origin-operator has increased rate of failed batch tests"
+- name: test
+  rules:
+  - alert: Failures in batch tests managed by jenkins-operator
+    expr: sum(prowjobs{type="batch",state="failure",kubernetes_name="jenkins-operator"}) sum(prowjobs{type="batch",kubernetes_name="jenkins-operator"}) > 0.3
+    for: 2h
+    annotations:
+      miqTarget: "BatchFailures"
+      severity: "WARN"
+      message: "jenkins-operator has increased rate of failed batch tests"
+  - alert: Failures in batch tests managed by jenkins-origin-operator
+    expr: sum(prowjobs{type="batch",state="failure",kubernetes_name="jenkins-origin-operator"}) / sum(prowjobs{type="batch",kubernetes_name="jenkins-origin-operator"}) > 0.3
+    for: 2h
+    annotations:
+      miqTarget: "BatchFailures"
+      severity: "WARN"
+      message: "jenkins-origin-operator has increased rate of failed batch tests"
