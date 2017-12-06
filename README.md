@@ -24,6 +24,39 @@ For more information on prow, see the upstream [documentation](https://github.co
 
 A Prometheus server runs in the CI cluster and is configured to create [alerts](https://prometheus-kube-system.svc.ci.openshift.org/alerts) on top of prow metrics. By clicking on the `expr` field of every alert, you can view the query that is setup for alerting. For more information on alerts, see [the Prometheus docs](https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/).
 
+Possible reactions to some of these alerts:
+
+* Slow Jenkins operator sync
+* Slow Jenkins pipeline operator sync
+
+These should not be a problem in general but if any of them persists for more than a couple of hours, [`max_goroutines`](https://github.com/openshift/release/blob/ff18182aa0eb849b89e7abd1bc7765ad6d27142f/cluster/ci/config/prow/config.yaml#L7) can be incremented to allow more parallelism in the operators (note that the same option dictates both operators).
+
+Another possible mitigation for slow syncs is to shard the operators further by spinning up a new deployment of [`jenkins_operator`](https://github.com/openshift/release/blob/ff18182aa0eb849b89e7abd1bc7765ad6d27142f/cluster/ci/config/prow/openshift/jenkins_operator.yaml) and tweak its [label selector](https://github.com/openshift/release/blob/ff18182aa0eb849b89e7abd1bc7765ad6d27142f/cluster/ci/config/prow/openshift/jenkins_operator.yaml#L54) to handle some of the load of the operator that experiences slow syncs. You will also need to change the label selector of the slow operator and add [labels in some of the jobs](https://github.com/openshift/release/blob/ff18182aa0eb849b89e7abd1bc7765ad6d27142f/cluster/ci/config/prow/config.yaml#L67-L68) it is handling appropriately.
+
+* Errors in tests managed by jenkins-origin-operator
+* Errors in tests managed by jenkins-operator
+* Failed Jenkins requests from jenkins-operator
+* Failed Jenkins requests from jenkins-origin-operator
+
+Errors in tests means that there is an underlying infrastructure failure that blocks tests from executing correctly or the tests are executing correctly but a problem in the infrastructure disallows the operators to pick up the correct results. Most often than not, this is an issue with Jenkins.
+
+Failed requests to Jenkins is usually a problem with Jenkins and less often a misconfiguration in prow (eg. wrong Jenkins credentials). It may be possible that Jenkins is overwhelmed by the number of jobs it is running. In that case [`max_concurrency`](https://github.com/openshift/release/blob/ff18182aa0eb849b89e7abd1bc7765ad6d27142f/cluster/ci/config/prow/config.yaml#L6) can be decremented to force more free space in Jenkins.
+
+TODO: How to debug our Jenkins instances.
+
+* Failures in postsubmit tests managed by jenkins-operator
+* Failures in postsubmit tests managed by jenkins-origin-operator
+* Failures in batch tests managed by jenkins-operator
+* Failures in batch tests managed by jenkins-origin-operator
+
+These alerts are usually triggered because of [flaky tests](https://hackernoon.com/flaky-tests-a-war-that-never-ends-9aa32fdef359). The only thing that can be done in this case is to triage these failures, open issues in their respective repositories, and nag people to fix them. We need to be especially cautious about failures in batch tests. Consecutive failures in batch tests means we are not merging with a satisfying rate.
+
+Use the following links to triage these alerts:
+
+https://deck-ci.svc.ci.openshift.org/?type=postsubmit
+
+https://deck-ci.svc.ci.openshift.org/?type=batch
+
 TODO: Forward alerts via e-mail.
 
-TODO: Dcoument common actions on firing alerts, wherever it's possible to act
+
