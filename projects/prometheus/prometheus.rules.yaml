@@ -15,6 +15,8 @@ groups:
       miqTarget: "SlowSync"
       severity: "WARN"
       message: "jenkins-operator has slow resyncs"
+    labels:
+      app: prow
   - alert: Slow Jenkins pipeline operator sync
     expr: (sum(rate(resync_period_seconds_bucket{kubernetes_name="jenkins-origin-operator",le="9"}[1h]))
      + sum(rate(resync_period_seconds_bucket{kubernetes_name="jenkins-origin-operator",le="27"}[1h])))
@@ -24,6 +26,8 @@ groups:
       miqTarget: "SlowSync"
       severity: "WARN"
       message: "jenkins-origin-operator has slow resyncs"
+    labels:
+      app: prow
 - name: failed-jenkins-requests
   rules:
   - alert: Failed Jenkins requests from jenkins-operator
@@ -33,6 +37,8 @@ groups:
       miqTarget: "FailedJenkinsRequests"
       severity: "WARN"
       message: "jenkins-operator has increased rate of failed Jenkins requests during the past hour"
+    labels:
+      app: prow
   - alert: Failed Jenkins requests from jenkins-origin-operator
     expr: sum(jenkins_requests{code!~"^2..$",kubernetes_name="jenkins-origin-operator"}) / sum(jenkins_requests{kubernetes_name="jenkins-origin-operator"}) > 0.1
     for: 30m
@@ -40,6 +46,8 @@ groups:
       miqTarget: "FailedJenkinsRequests"
       severity: "WARN"
       message: "jenkins-origin-operator has increased rate of failed Jenkins requests during the past hour"
+    labels:
+      app: prow
 - name: errored-tests
   rules:
   - alert: Errors in tests managed by jenkins-operator
@@ -48,12 +56,16 @@ groups:
       miqTarget: "ErroredTests"
       severity: "WARN"
       message: "jenkins-operator has increased error test rate"
+    labels:
+      app: prow
   - alert: Errors in tests managed by jenkins-origin-operator
     expr: sum(prowjobs{state="error",kubernetes_name="jenkins-origin-operator"}) / sum(prowjobs{kubernetes_name="jenkins-origin-operator"}) > 0.05
     annotations:
       miqTarget: "ErroredTests"
       severity: "WARN"
       message: "jenkins-origin-operator has increased error test rate"
+    labels:
+      app: prow
 - name: postsubmit-failures
   rules:
   - alert: Failures in postsubmit tests managed by jenkins-operator
@@ -63,6 +75,8 @@ groups:
       miqTarget: "PostsubmitFailures"
       severity: "WARN"
       message: "jenkins-operator has increased rate of failed postsubmit tests"
+    labels:
+      app: prow
   - alert: Failures in postsubmit tests managed by jenkins-origin-operator
     expr: sum(prowjobs{type="postsubmit",state="failure",kubernetes_name="jenkins-origin-operator"}) / sum(prowjobs{type="postsubmit",kubernetes_name="jenkins-origin-operator"}) > 0.3
     for: 2h
@@ -70,6 +84,8 @@ groups:
       miqTarget: "PostsubmitFailures"
       severity: "WARN"
       message: "jenkins-origin-operator has increased rate of failed postsubmit tests"
+    labels:
+      app: prow
 - name: batch-failures
   rules:
   - alert: Failures in batch tests managed by jenkins-operator
@@ -79,6 +95,8 @@ groups:
       miqTarget: "BatchFailures"
       severity: "WARN"
       message: "jenkins-operator has increased rate of failed batch tests"
+    labels:
+      app: prow
   - alert: Failures in batch tests managed by jenkins-origin-operator
     expr: sum(prowjobs{type="batch",state="failure",kubernetes_name="jenkins-origin-operator"}) / sum(prowjobs{type="batch",kubernetes_name="jenkins-origin-operator"}) > 0.3
     for: 2h
@@ -86,3 +104,5 @@ groups:
       miqTarget: "BatchFailures"
       severity: "WARN"
       message: "jenkins-origin-operator has increased rate of failed batch tests"
+    labels:
+      app: prow
