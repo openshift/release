@@ -102,8 +102,13 @@ pipeline {
         script {
           openshift.withCluster() {
             // Create the build and run it
-            def builderObjects = openshift.process("--filename=jenkins/setup/resources/config-generator-build.yaml")
-            openshift.apply(builderObjects)
+            if (!openshift.selector("imagestream", "configmap-job").exists()) {
+              openshift.create("imagestream", "configmap-job")
+            }
+            if (!openshift.selector("buildconfig", "configmap-job").exists()) {
+              def builderObjects = openshift.process("--filename=jenkins/setup/resources/config-generator-build.yaml")
+              openshift.create(builderObjects)
+            }
             def jobBuilder = openshift.selector("buildconfig/configmap-job-builder")
             sh "cp -R jenkins/library/src jenkins/setup/images/config-job-image"
             openshift.startBuild("configmap-job", "--from-dir=./jenkins/setup/images/config-job-image", "--follow")
