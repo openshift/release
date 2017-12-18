@@ -1,9 +1,14 @@
 #!/bin/bash
 
+set -o nounset
+set -o errexit
+set -o pipefail
+
 if [[ ! -f ~/.config/jenkins_jobs/jenkins_jobs.ini ]]; then
-	export TOKEN="$(oc whoami -t)"
+	TOKEN="$(oc whoami -t)"
+	export TOKEN
 	mkdir -p ~/.config/jenkins_jobs
-	cat ~/jenkins_jobs.ini.template | envsubst > ~/.config/jenkins_jobs/jenkins_jobs.ini
+	sed "s/TOKEN/${TOKEN}/" ~/jenkins_jobs.ini.template > ~/.config/jenkins_jobs/jenkins_jobs.ini
 fi
 
 # If Jenkins service not present, instantiate it
