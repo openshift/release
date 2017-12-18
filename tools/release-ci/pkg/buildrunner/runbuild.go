@@ -18,7 +18,7 @@ var (
 	MaximumBuildDuration  = 4 * time.Hour
 )
 
-func RunBuild(resourceFile string) error {
+func RunBuild(resourceFile string, followBuild bool) error {
 
 	if len(resourceFile) == 0 {
 		return errors.New("no build file specified")
@@ -45,7 +45,12 @@ func RunBuild(resourceFile string) error {
 			return err
 		}
 	}
-	return followBuild(buildName)
+	if followBuild {
+		return followBuild(buildName)
+	} else {
+		fmt.Println(buildName)
+		return nil
+	}
 }
 
 func isAlreadyExistsError(msg string) bool {
