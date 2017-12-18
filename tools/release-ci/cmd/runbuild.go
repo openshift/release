@@ -19,9 +19,9 @@ var runBuildCmd = &cobra.Command{
 	Short: "Runs a build, logs its output and returns exit code based on build result",
 	Long: `Runs a build
 
-Takes the build definition in a file (either json or yaml). 
+Takes the build definition in a file (either json or yaml).
 If '-' is specified as the filename, the build is read from stdin.
-The log of the build is output and the command will succeed or fail 
+The log of the build is output and the command will succeed or fail
 based on the result of the build`,
 	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -33,15 +33,17 @@ based on the result of the build`,
 }
 
 var buildFile string
+var followBuild bool
 
 func init() {
 	RootCmd.AddCommand(runBuildCmd)
 	runBuildCmd.Flags().StringVarP(&buildFile, "file", "f", "", "The file containing the build definition")
+	runBuildCmd.Flags().BoolVarP(&followBuild, "follow", "", false, "Follow the build's logs")
 }
 
 func runBuild() error {
 	if len(buildFile) == 0 {
 		return errors.New("no build file specified")
 	}
-	return buildrunner.RunBuild(buildFile)
+	return buildrunner.RunBuild(buildFile, followBuild)
 }
