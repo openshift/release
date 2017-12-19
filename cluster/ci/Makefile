@@ -1,7 +1,9 @@
 LATEST = $(shell curl -q "https://storage.googleapis.com/origin-ci-test/branch-logs/origin/master/builds/.latest" 2>/dev/null)/artifacts/rpms
 REPO ?= $(LATEST)
-INSTANCE_PREFIX ?= $(WHAT)
-export INSTANCE_PREFIX
+ifdef WHAT
+	INSTANCE_PREFIX = $(WHAT)
+	export INSTANCE_PREFIX
+endif
 
 up: check-cluster
 	cd data/ && ../../bin/local.sh ansible-playbook -e "openshift_test_repo=$(REPO)" playbooks/launch.yaml

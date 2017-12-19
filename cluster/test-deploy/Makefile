@@ -1,7 +1,9 @@
 PROFILE ?= "gcp-dev"
 TYPE ?= $(shell cat $(PROFILE)/.type)
-INSTANCE_PREFIX ?= $(WHAT)
-export INSTANCE_PREFIX
+ifdef WHAT
+	INSTANCE_PREFIX = $(WHAT)
+	export INSTANCE_PREFIX
+endif
 export TYPE
 
 # Select RPMs based on branch or tag
