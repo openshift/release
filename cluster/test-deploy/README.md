@@ -40,5 +40,5 @@ The following ansible variables are commonly used:
 
 The following environment variables can be provided
 
-* `OPENSHIFT_ANSIBLE_IMAGE` (defaults to `openshift/origin-gce:latest`) the image to deploy from
+* `OPENSHIFT_ANSIBLE_IMAGE` (defaults to `openshift/origin-ansible:latest`) the image to deploy from
 
