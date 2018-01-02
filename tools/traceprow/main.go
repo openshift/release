@@ -11,17 +11,28 @@ import (
 )
 
 var (
-	prowURL = flag.String("prow-url", "https://deck-ci.svc.ci.openshift.org/", "URL to the prow frontend.")
+	prowURL = flag.String("prow-url", "https://deck-ci.svc.ci.openshift.org/trace", "URL to the prow frontend.")
 )
 
 func main() {
 	flag.Parse()
+	args := flag.Args()
 
-	if len(os.Args) != 2 {
+	// Note that this will not work:
+	//
+	// traceprow URL --prow-url=different-url
+	//
+	// whereas the following will work:
+	//
+	// traceprow --prow-url=different-url URL
+	//
+	// ..because of how the stdlib flag package is doing the argument pasing.
+	if len(args) != 1 {
+		fmt.Fprintf(os.Stderr, "Invalid arguments: %v\n", args)
 		fmt.Fprintln(os.Stderr, "One argument required: Link to a Github pull request or pull request comment")
 		os.Exit(1)
 	}
-	link, err := url.Parse(os.Args[1])
+	link, err := url.Parse(args[0])
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
@@ -47,7 +58,7 @@ func main() {
 		params.Add("issuecomment", strings.TrimPrefix(link.Fragment, "issuecomment-"))
 	}
 
-	target, err := url.Parse(*prowURL + "/trace")
+	target, err := url.Parse(*prowURL)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
