@@ -9,7 +9,11 @@ parameters:
 - description: The name of the component.
   name: NAME_ORIGIN
   value: jenkins-origin-operator
+- description: The name of the component.
+  name: NAME_OPENSHIFT_ANSIBLE
+  value: jenkins-openshift-ansible-operator
 objects:
+# Service used solely for collecting Prometheus metrics
 - apiVersion: v1
   kind: Service
   metadata:
@@ -88,6 +92,7 @@ objects:
           name: "${NAME}:latest"
       type: ImageChange
 
+# Service used solely for collecting Prometheus metrics
 - apiVersion: v1
   kind: Service
   metadata:
@@ -160,6 +165,84 @@ objects:
         automatic: true
         containerNames:
         - "${NAME_ORIGIN}"
+        from:
+          kind: ImageStreamTag
+          name: "${NAME}:latest"
+      type: ImageChange
+
+# Service used solely for collecting Prometheus metrics
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: "${NAME_OPENSHIFT_ANSIBLE}"
+    annotations:
+      prometheus.io/scrape: "true"
+  spec:
+    selector:
+      app: prow
+      component: "${NAME_OPENSHIFT_ANSIBLE}"
+    ports:
+    - port: 80
+      targetPort: 8080
+    type: ClusterIP
+- apiVersion: apps.openshift.io/v1
+  kind: DeploymentConfig
+  metadata:
+    name: "${NAME_OPENSHIFT_ANSIBLE}"
+    labels:
+      app: prow
+      component: "${NAME_OPENSHIFT_ANSIBLE}"
+  spec:
+    # Do not scale up.
+    replicas: 1
+    revisionHistoryLimit: 2
+    strategy:
+      type: Recreate
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: "${NAME_OPENSHIFT_ANSIBLE}"
+      spec:
+        serviceAccountName: "${NAME}"
+        containers:
+        - name: "${NAME_OPENSHIFT_ANSIBLE}"
+          image: "${NAME}"
+          args:
+          - --jenkins-url=https://jenkins-ci-openshift-ansible.svc.ci.openshift.org
+          - --jenkins-bearer-token-file=/etc/jenkins/bearer
+          - --label-selector=master=jenkins-openshift-ansible-ci
+          - --dry-run=false
+          ports:
+          - name: logs
+            containerPort: 8080
+          volumeMounts:
+          - mountPath: /etc/jenkins
+            name: jenkins
+            readOnly: true
+          - name: oauth
+            mountPath: /etc/github
+            readOnly: true
+          - name: config
+            mountPath: /etc/config
+            readOnly: true
+        volumes:
+        - name: jenkins
+          secret:
+            defaultMode: 420
+            secretName: jenkins-ansible-token
+        - name: oauth
+          secret:
+            secretName: oauth-token
+        - name: config
+          configMap:
+            name: config
+    triggers:
+    - type: ConfigChange
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - "${NAME_OPENSHIFT_ANSIBLE}"
         from:
           kind: ImageStreamTag
           name: "${NAME}:latest"
