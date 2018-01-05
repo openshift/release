@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	prowURL = flag.String("prow-url", "https://deck-ci.svc.ci.openshift.org/trace", "URL to the prow frontend.")
+	traceURL = flag.String("trace-url", "https://tracer-ci.svc.ci.openshift.org", "URL to the prow log tracer.")
 )
 
 func main() {
@@ -58,7 +58,7 @@ func main() {
 		params.Add("issuecomment", strings.TrimPrefix(link.Fragment, "issuecomment-"))
 	}
 
-	target, err := url.Parse(*prowURL)
+	target, err := url.Parse(*traceURL)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
