@@ -35,6 +35,7 @@ prow-secrets:
 	# BASIC_AUTH_PASS is used by prow for authenticating with https://ci.openshift.redhat.com/jenkins/
 	# BEARER_TOKEN is used by prow for authenticating with https://jenkins-origin-ci.svc.ci.openshift.org
 	oc create secret generic jenkins-tokens --from-literal=basic=${BASIC_AUTH_PASS} --from-literal=bearer=${BEARER_TOKEN} -o yaml --dry-run | oc apply -f -
+	oc create secret generic jenkins-ansible-token --from-literal=bearer=${BEARER_ANSIBLE_TOKEN} -o yaml --dry-run | oc apply -f -
 	# HMAC_TOKEN is used for encrypting Github webhook payloads.
 	oc create secret generic hmac-token --from-literal=hmac=${HMAC_TOKEN} -o yaml --dry-run | oc apply -f -
 	# OAUTH_TOKEN is used for manipulating Github PRs/issues (labels, comments, etc.).
