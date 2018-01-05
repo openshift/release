@@ -49,6 +49,7 @@ prow-builds:
 	done
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/cherrypick.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/refresh.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/tracer.yaml
 .PHONY: prow-builds
 
 prow-update:
@@ -70,6 +71,7 @@ prow-rbac:
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/sinker_rbac.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/splice_rbac.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tide_rbac.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tracer_rbac.yaml
 .PHONY: prow-rbac
 
 prow-services:
@@ -83,6 +85,7 @@ prow-services:
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tide.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/cherrypick.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/refresh.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tracer.yaml
 .PHONY: prow-services
 
 prow-jobs:
