@@ -11,6 +11,6 @@ testPipeline([new PipelineImageTestStep(
     SKIP_TEARDOWN: "1"
   ],
   commands: [
-    "make verify verify-commits -jk"
+    "make -j -k verify verify-commits"
   ]
 )])
