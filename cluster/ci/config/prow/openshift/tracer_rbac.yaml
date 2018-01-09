@@ -8,6 +8,8 @@ objects:
 - apiVersion: v1
   kind: ServiceAccount
   metadata:
+    annotations:
+      serviceaccounts.openshift.io/oauth-redirectreference.tracer: '{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"tracer"}}'
     name: "${NAME}"
 - kind: Role
   apiVersion: rbac.authorization.k8s.io/v1beta1
@@ -37,3 +39,32 @@ objects:
   subjects:
   - kind: ServiceAccount
     name: "${NAME}"
+- kind: ClusterRole
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: "${NAME}-oauth"
+  rules:
+    - apiGroups:
+      - authentication.k8s.io
+      resources:
+      - tokenreviews
+      verbs:
+      - create
+    - apiGroups:
+      - authorization.k8s.io
+      resources:
+      - subjectaccessreviews
+      verbs:
+      - create
+- kind: ClusterRoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: "${NAME}-oauth"
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: "${NAME}-oauth"
+  subjects:
+  - kind: ServiceAccount
+    name: "${NAME}"
+    namespace: ci
