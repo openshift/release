@@ -12,6 +12,7 @@ import (
 
 var (
 	traceURL = flag.String("trace-url", "https://tracer-ci.svc.ci.openshift.org", "URL to the prow log tracer.")
+	token    = flag.String("token", "", "Token for bearer token auth.")
 )
 
 func main() {
@@ -63,9 +64,17 @@ func main() {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}
-
 	target.RawQuery = params.Encode()
-	resp, err := http.Get(target.String())
+	req, err := http.NewRequest(http.MethodGet, target.String(), nil)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, fmt.Sprintf("Cannot create new request: %v", err))
+		os.Exit(1)
+	}
+	if *token != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", *token))
+	}
+	client := http.Client{}
+	resp, err := client.Do(req)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
