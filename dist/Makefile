@@ -24,7 +24,7 @@ tag:
 ifndef WHAT
 	$(error Must set WHAT= to the name of the tag to create)
 endif
-	git submodule foreach git tag -s -a -m "$(WHAT)" $(WHAT)
+	git submodule foreach git tag -f -s -a -m "$(WHAT)" $(WHAT)
 	git submodule foreach git push origin --tags "$(WHAT)"
 
 # Replace the 'origin' remote in each submodule with a Git private remote to allow push operations.
