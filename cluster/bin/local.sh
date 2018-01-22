@@ -21,9 +21,9 @@ fi
 
 if [[ $# -eq 0 ]]; then
   args+="-it "
-  docker create --name "$ctr" -v /var/tmp -e "INSTANCE_PREFIX=${INSTANCE_PREFIX}" -e "OPENSHIFT_ANSIBLE_COMMIT=${OPENSHIFT_ANSIBLE_COMMIT-}" $args "${OPENSHIFT_ANSIBLE_IMAGE:-openshift/origin-gce:latest}" /bin/bash >/dev/null
+  docker create --name "$ctr" -v /var/tmp -e "INSTANCE_PREFIX=${INSTANCE_PREFIX}" -e "OPENSHIFT_ANSIBLE_COMMIT=${OPENSHIFT_ANSIBLE_COMMIT-}" $args "${OPENSHIFT_ANSIBLE_GCE_IMAGE:-openshift/origin-gce:latest}" /bin/bash >/dev/null
 else
-  docker create --name "$ctr" -v /var/tmp -e "INSTANCE_PREFIX=${INSTANCE_PREFIX}" -e "OPENSHIFT_ANSIBLE_COMMIT=${OPENSHIFT_ANSIBLE_COMMIT-}" $args "${OPENSHIFT_ANSIBLE_IMAGE:-openshift/origin-gce:latest}" "$@" >/dev/null
+  docker create --name "$ctr" -v /var/tmp -e "INSTANCE_PREFIX=${INSTANCE_PREFIX}" -e "OPENSHIFT_ANSIBLE_COMMIT=${OPENSHIFT_ANSIBLE_COMMIT-}" $args "${OPENSHIFT_ANSIBLE_GCE_IMAGE:-openshift/origin-gce:latest}" "$@" >/dev/null
 fi
 
 tar ${opts} -c . | docker cp - $ctr:/usr/share/ansible/openshift-ansible-gce/playbooks/files
