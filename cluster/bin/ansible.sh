@@ -20,7 +20,7 @@ else
 fi
 
 opts="--mode=ug+rwX --owner=0 --group=0"
-tar ${opts} -c . | docker cp - $ctr:/usr/share/ansible/openshift-ansible/playbooks/files
+tar ${opts} -c . | docker cp - $ctr:/usr/share/ansible/openshift-ansible/inventory/dynamic/injected
 
 if [[ $# -eq 0 ]]; then
   docker start -ai "${ctr}"
