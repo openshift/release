@@ -35,6 +35,7 @@ tide:
     - openshift/image-registry
     - openshift/online-hibernation
     - openshift/kubernetes-metrics-server
+    - openshift/online-console-extensions
     labels:
     - lgtm
     - approved
@@ -550,6 +551,16 @@ presubmits:
     rerun_command: "/test unit"
     trigger: "((?m)^/test( all| unit),?(\\s+|$))"
 
+  openshift/online-console-extensions:
+  - name: test_pull_request_online_console_extensions
+    agent: jenkins
+    labels:
+      master: ci.openshift.redhat.com
+    always_run: true
+    context: ci/openshift-jenkins
+    rerun_command: "/test"
+    trigger: "((?m)^/test,?(\\s+|$))"
+
   openshift/release:
   - name: check_prometheus_rules
     agent: kubernetes
@@ -717,7 +728,13 @@ postsubmits:
     - master
     - prod
     - stage
-
+  openshift/online-console-extensions:
+  - name: test_branch_online_console_extensions
+    agent: jenkins
+    labels:
+      master: ci.openshift.redhat.com
+    branches:
+    - master
 
 periodics:
 - name: test_branch_origin_extended_conformance_k8s
