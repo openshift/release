@@ -4,15 +4,15 @@ INSTANCE_PREFIX ?= $(WHAT)
 export INSTANCE_PREFIX
 
 up: check-cluster
-	cd data/ && ../../bin/local.sh ansible-playbook -e "openshift_test_repo=$(REPO)" playbooks/launch.yaml
+	cd data/ && ../../bin/ansible.sh ansible-playbook -e "openshift_test_repo=$(REPO)" playbooks/gcp/openshift-cluster/launch.yml
 .PHONY: up
 
 down: check-cluster
-	cd data/ && ../../bin/local.sh ansible-playbook playbooks/terminate.yaml
+	cd data/ && ../../bin/ansible.sh ansible-playbook playbooks/gcp/openshift-cluster/deprovision.yml
 .PHONY: down
 
 sh: check-cluster
-	cd data/ && ../../bin/local.sh
+	cd data/ && ../../bin/ansible.sh
 .PHONY: sh
 
 check-cluster:
@@ -28,7 +28,7 @@ endif
 ifndef TO
 	$(error Must set TO= to the base image name or image family name you wish to create, usually rhel-7)
 endif
-	cd data/ && ../../bin/local.sh ansible-playbook -e "openshift_gcp_base_image=$(TO)" -e "openshift_gcp_root_image=$(FROM)" playbooks/build_base_image.yaml
+	cd data/ && ../../bin/ansible.sh ansible-playbook -e "openshift_gcp_base_image=$(TO)" -e "openshift_gcp_root_image=$(FROM)" playbooks/gcp/openshift-cluster/build_base_image.yml
 .PHONY: image
 
 image:
@@ -38,5 +38,5 @@ endif
 ifndef TO
 	$(error Must set TO= to the image name or image family name you wish to create, usually openshift-VERSION-node)
 endif
-	cd data/ && ../../bin/local.sh ansible-playbook -e "openshift_test_repo=$(REPO)" -e "openshift_gcp_image=$(TO)" -e "openshift_gcp_base_image=$(FROM)" playbooks/build_image.yaml
+	cd data/ && ../../bin/ansible.sh ansible-playbook -e "openshift_test_repo=$(REPO)" -e "openshift_gcp_image=$(TO)" -e "openshift_gcp_base_image=$(FROM)" playbooks/gcp/openshift-cluster/build_image.yml
 .PHONY: image
