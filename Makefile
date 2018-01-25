@@ -125,7 +125,7 @@ submit-queue-configs:
 	$(MAKE) apply WHAT=cluster/ci/config/submit-queue/submit_queue_origin_aggregated_logging_config.yaml
 .PHONY: submit-queue-configs
 
-projects: gcsweb kube-state-metrics oauth-proxy origin-release prometheus test-bases
+projects: gcsweb kube-state-metrics oauth-proxy origin-release prometheus test-bases image-pruner-setup
 .PHONY: projects
 
 gcsweb:
@@ -189,3 +189,9 @@ jenkins-config-updater:
 	oc adm policy add-role-to-user edit -z jenkins-config-updater
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/jenkins-config-updater/deployment.yaml
 .PHONY: jenkins-config-updater
+
+image-pruner-setup:
+	oc create serviceaccount image-pruner -o yaml --dry-run | oc apply -f -
+	oc adm policy --as=system:admin add-cluster-role-to-user system:image-pruner -z image-pruner
+	$(MAKE) apply WHAT=cluster/ci/jobs/image-pruner.yaml
+.PHONY: image-pruner-setup
