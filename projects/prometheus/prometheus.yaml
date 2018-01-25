@@ -21,7 +21,7 @@ items:
         uri: https://github.com/openshift/prometheus.git
       type: Git
       dockerfile: |
-        FROM openshift/origin-release:golang-1.8
+        FROM openshift/origin-release:golang-1.9
         COPY . /go/src/github.com/prometheus/prometheus
         RUN cd /go/src/github.com/prometheus/prometheus && \
             CGO_ENABLED=0 make build
@@ -29,7 +29,7 @@ items:
       dockerStrategy:
         from:
           kind: DockerImage
-          name: openshift/origin-release:golang-1.8
+          name: openshift/origin-release:golang-1.9
         imageOptimizationPolicy: SkipLayers
     triggers:
     - type: ConfigChange
@@ -59,7 +59,10 @@ items:
         COPY consoles/                              /usr/share/prometheus/consoles/
 
         RUN ln -s /usr/share/prometheus/console_libraries /usr/share/prometheus/consoles/ /etc/prometheus/
+        RUN mkdir -p /prometheus && \
+            chown -R nobody:nobody etc/prometheus /prometheus
 
+        USER       nobody
         EXPOSE     9090
         VOLUME     [ "/prometheus" ]
         WORKDIR    /prometheus
@@ -107,7 +110,7 @@ items:
         uri: https://github.com/openshift/prometheus-alertmanager.git
       type: Git
       dockerfile: |
-        FROM openshift/origin-release:golang-1.8
+        FROM openshift/origin-release:golang-1.9
         COPY . /go/src/github.com/prometheus/alertmanager
         RUN cd /go/src/github.com/prometheus/alertmanager && \
             CGO_ENABLED=0 make build
@@ -115,7 +118,7 @@ items:
       dockerStrategy:
         from:
           kind: DockerImage
-          name: openshift/origin-release:golang-1.8
+          name: openshift/origin-release:golang-1.9
         imageOptimizationPolicy: SkipLayers
     triggers:
     - type: ConfigChange
@@ -146,8 +149,8 @@ items:
         VOLUME     [ "/alertmanager" ]
         WORKDIR    /alertmanager
         ENTRYPOINT [ "/bin/alertmanager" ]
-        CMD        [ "-config.file=/etc/alertmanager/config.yml", \
-                    "-storage.path=/alertmanager" ]
+        CMD        [ "--config.file=/etc/alertmanager/config.yml", \
+                    "--storage.path=/alertmanager" ]
       images:
       - from:
           kind: ImageStreamTag
