@@ -10,6 +10,7 @@ Configurations:
 For GCP, the data directory should have:
 
 * `gce.json` containing the GCP service account credentials to use that have permission to create instances, networks, and a bucket in project `openshift-gce-devel-ci`
+  * If you don't have access to credentials that create into this project, you can change the vars-origin.yaml file to set a different project. Recommended if you are not a CI bot.
 * `ops-mirror.pem` containing the client certificate for the OpenShift ops mirror
 * `ssh-privatekey` (optional) with the private key to use for the GCP instances
 * `ssh-publickey` (optional) a key to use with the above private key
@@ -18,9 +19,8 @@ See `gcp/vars-origin.yaml` for the default settings (which is common across all 
 
 Other prerequisites:
 
-* Docker 1.12+ installed and available
-* Your system time must be up to date in order for gcloud to
-  authenticate to GCE (run `sudo ntpd -gq` in your VM if necessary)
+* Docker 1.12+ installed and available on your local machine
+* Your system time must be up to date in order for gcloud to authenticate to GCE (run `sudo ntpd -gq` in your VM if necessary)
 
 The default cluster type is `gcp`. You can set an alternate configuration by passing `TYPE=gcp-ha` on the `make` arguments.
 

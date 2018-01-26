@@ -1,1 +1,0 @@
-This directory has been moved to gcp/ and will be deleted in the future.
