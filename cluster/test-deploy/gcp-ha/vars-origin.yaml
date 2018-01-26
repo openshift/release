@@ -112,46 +112,6 @@ openshift_gcp_root_image: 'centos-7'
 openshift_gcp_registry_bucket_keyfile: "{{ files_dir }}/gce.json"
 openshift_gcp_registry_bucket_name: "origin-ci-test-{{ lookup('env', 'INSTANCE_PREFIX') | mandatory }}"
 
-openshift_gcp_startup_script_file: "{{ files_dir }}/bootstrap-script.sh"
-openshift_gcp_node_group_config:
-  - name: master
-    suffix: m
-    tags: ocp-master,ocp-infra-node,ocp-node
-    machine_type: n1-standard-2
-    boot_disk_size: 150
-    scale: 1
-    bootstrap: true
-    wait_for_stable: true
-  - name: node
-    suffix: n
-    tags: ocp-node
-    machine_type: n1-standard-2
-    boot_disk_size: 150
-    scale: 3
-    bootstrap: true
-  - name: node-flex
-    suffix: nf
-    tags: ocp-node
-    machine_type: n1-standard-2
-    boot_disk_size: 150
-    scale: 0
-    bootstrap: true
-
-openshift_node_groups:
-- name: node-config-master
-  labels:
-  - 'node-role.kubernetes.io/master=true'
-  - 'node-role.kubernetes.io/infra=true'
-  - 'node-role.kubernetes.io/node=true'
-  - 'role=infra'
-- name: node-config-node
-  labels:
-  - 'node-role.kubernetes.io/node=true'
-  - 'role=app'
-  edits:
-  - key: kubeletArguments.pods-per-core
-    value: ['20']
-
 osm_controller_args: {"experimental-cluster-signing-duration": ["20m"]}
 openshift_master_bootstrap_enabled: true
 openshift_master_bootstrap_auto_approve: true
