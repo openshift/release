@@ -1,22 +1,28 @@
-# Deploy OpenShift for e2e testing on GCE
+# Deploy OpenShift for e2e testing
 
-Standard setup for an e2e test environment on GCE is provided in this directory. The data directory
-should have:
+Standard setup for an e2e test environment on supported clusters is provided in this directory. Subdirectories contain the default configurations. The deployment uses the `openshift/origin-ansible:latest` image to launch clusters.
 
-* `gce.json` containing the GCE service account credentials to use that have permission to create instances, networks, and a bucket in project `openshift-gce-devel-ci`
+Configurations:
+
+* `gcp` - 1 master, 3 node cluster with bootstrapping
+* `gcp-ha` - 3 master, 3 node cluster with bootstrapping
+
+For GCP, the data directory should have:
+
+* `gce.json` containing the GCP service account credentials to use that have permission to create instances, networks, and a bucket in project `openshift-gce-devel-ci`
 * `ops-mirror.pem` containing the client certificate for the OpenShift ops mirror
-* `ssh-privatekey` (optional) with the private key to use for the GCE instances
+* `ssh-privatekey` (optional) with the private key to use for the GCP instances
 * `ssh-publickey` (optional) a key to use with the above private key
 
-See `data/vars.yaml` for the default settings.  This depends on the `openshift/origin-gce:latest` image
-which is a pre-built version of the GCE reference architecture and the openshift-ansible playbooks for the
-appropriate release. That image is built from https://github.com/openshift/origin-gce.
+See `gcp/vars-origin.yaml` for the default settings (which is common across all GCP setups) and `gcp/vars.yaml` and `gcp-ha/vars.yaml` for the variables that differ.
 
 Other prerequisites:
 
 * Docker 1.12+ installed and available
 * Your system time must be up to date in order for gcloud to
   authenticate to GCE (run `sudo ntpd -gq` in your VM if necessary)
+
+The default cluster type is `gcp`. You can set an alternate configuration by passing `TYPE=gcp-ha` on the `make` arguments.
 
 ```
 # launch cluster using the latest RPMs
@@ -30,6 +36,9 @@ $ make WHAT=mycluster down
 
 # get a shell in the ansible environment
 $ make WHAT=mycluster sh
+
+# launch a different profile
+$ make WHAT=mycluster TYPE=gcp-ha
 ```
 
 The following ansible variables are commonly used:
