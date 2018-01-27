@@ -48,11 +48,7 @@ openshift_hosted_registry_storage_kind: object
 openshift_hosted_registry_storage_provider: gcs
 openshift_hosted_registry_storage_gcs_bucket: origin-ci-test-{{ lookup('env', 'INSTANCE_PREFIX') | mandatory }}
 
-# Use overlay2, directly on the main instance disk, with no quota
-# TODO: look at quota configuration and determine why it fails
 container_runtime_docker_storage_type: overlay2
-container_runtime_docker_storage_setup_device: /dev/sda
-docker_storage_size: 0
 
 provision_custom_repositories: [
   {
@@ -84,6 +80,21 @@ provision_custom_repositories: [
     "failovermethod": "priority",
     "gpgcheck": 1,
     "gpgkey": "https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-release https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-beta https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-openshifthosted"
+  },
+  {
+    "name": "dockertested",
+    "baseurl": "https://mirror.ops.rhcloud.com/enterprise/rhel/dockertested/x86_64/os/
+        https://use-mirror1.ops.rhcloud.com/enterprise/rhel/dockertested/x86_64/os/
+        https://use-mirror2.ops.rhcloud.com/enterprise/rhel/dockertested/x86_64/os/
+        https://euw-mirror1.ops.rhcloud.com/enterprise/rhel/dockertested/x86_64/os/
+        https://gce-mirror1.ops.rhcloud.com/enterprise/rhel/dockertested/x86_64/os/
+        https://gce-mirror2.ops.rhcloud.com/enterprise/rhel/dockertested/x86_64/os/",
+    "sslverify": "false",
+    "sslclientkey": "ops-mirror.pem",
+    "sslclientcert": "ops-mirror.pem",
+    "failovermethod": "priority",
+    "gpgcheck": 1,
+    "gpgkey": "https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-release https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-beta https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-openshifthosted"
   }
 ]
 
@@ -98,8 +109,7 @@ openshift_gcp_network_name: "{{ openshift_gcp_prefix }}network"
 openshift_gcp_iam_service_account: jenkins-ci-provisioner@openshift-gce-devel.iam.gserviceaccount.com
 openshift_gcp_iam_service_account_keyfile: "{{ files_dir }}/gce.json"
 
-# TODO: revert to files_dir + "/ssh-privatekey" when openshift/origin-ansible:latest image is published
-openshift_gcp_ssh_private_key: "{{ '/home/cloud-user/.ssh/google_compute_engine' | is_file | ternary( '/home/cloud-user/.ssh/google_compute_engine', files_dir + '/ssh-privatekey' ) }}"
+openshift_gcp_ssh_private_key: "{{ files_dir + '/ssh-privatekey' }}"
 
 openshift_gcp_infra_network_instance_group: ig-m
 
