@@ -32,15 +32,18 @@ prow-config-update:
 .PHONY: prow-config
 
 prow-secrets:
-	# BASIC_AUTH_PASS is used by prow for authenticating with https://ci.openshift.redhat.com/jenkins/
-	# BEARER_TOKEN is used by prow for authenticating with https://jenkins-origin-ci.svc.ci.openshift.org
-	oc create secret generic jenkins-tokens --from-literal=basic=${BASIC_AUTH_PASS} --from-literal=bearer=${BEARER_TOKEN} -o yaml --dry-run | oc apply -f -
+	# CI_PASS is a token for openshift-ci-robot to authenticate in https://ci.openshift.redhat.com/jenkins/
+	oc create secret generic jenkins-tokens --from-literal=basic=${CI_PASS} -o yaml --dry-run | oc apply -f -
 	# HMAC_TOKEN is used for encrypting Github webhook payloads.
 	oc create secret generic hmac-token --from-literal=hmac=${HMAC_TOKEN} -o yaml --dry-run | oc apply -f -
 	# OAUTH_TOKEN is used for manipulating Github PRs/issues (labels, comments, etc.).
 	oc create secret generic oauth-token --from-literal=oauth=${OAUTH_TOKEN} -o yaml --dry-run | oc apply -f -
 	# CHERRYPICK_TOKEN is used by the cherrypick bot for cherrypicking changes into new PRs.
 	oc create secret generic cherrypick-token --from-literal=oauth=${CHERRYPICK_TOKEN} -o yaml --dry-run | oc apply -f -
+	# CIDEV_PASS is a token for openshift-ci-robot to authenticate in https://ci.dev.openshift.redhat.com/jenkins/
+	oc create secret generic cidev-token --from-literal=basic=${CIDEV_PASS} -o yaml --dry-run | oc apply -f -
+	# cert.pem, key.pem, and ca_cert.pem are used for authenticating with https://ci.dev.openshift.redhat.com/jenkins/
+	oc create secret generic certificates --from-file=cert.pem --from-file=key.pem --from-file=ca_cert.pem -o yaml --dry-run | oc apply -f -
 .PHONY: prow-secrets
 
 prow-builds:
