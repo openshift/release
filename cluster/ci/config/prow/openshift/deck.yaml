@@ -5,6 +5,13 @@ parameters:
 - description: The name of the component.
   name: NAME
   value: deck
+- description: The name of the internal component.
+  name: INTERNAL_NAME
+  value: deck-internal
+- description: The session secret for the component.
+  name: SESSION_SECRET
+  generate: expression
+  from: "[a-zA-Z0-9]{43}"
 objects:
 - apiVersion: v1
   kind: Route
@@ -16,7 +23,7 @@ objects:
       termination: edge
     to:
       kind: Service
-      name: deck
+      name: "${NAME}"
 - apiVersion: v1
   kind: Service
   metadata:
@@ -73,3 +80,111 @@ objects:
           kind: ImageStreamTag
           name: "${NAME}:latest"
       type: ImageChange
+- apiVersion: v1
+  kind: Route
+  metadata:
+    name: "${INTERNAL_NAME}"
+  spec:
+    tls:
+      insecureEdgeTerminationPolicy: Redirect
+      termination: Reencrypt
+    to:
+      kind: Service
+      name: "${INTERNAL_NAME}"
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: "${INTERNAL_NAME}"
+    annotations:
+      service.alpha.openshift.io/serving-cert-secret-name: "${INTERNAL_NAME}-tls"
+  spec:
+    selector:
+      app: prow
+      component: "${INTERNAL_NAME}"
+    ports:
+    - port: 443
+      targetPort: 8443
+    type: ClusterIP
+- apiVersion: apps.openshift.io/v1
+  kind: DeploymentConfig
+  metadata:
+    name: "${INTERNAL_NAME}"
+    labels:
+      app: prow
+      component: "${INTERNAL_NAME}"
+  spec:
+    replicas: 1
+    revisionHistoryLimit: 2
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: "${INTERNAL_NAME}"
+      spec:
+        serviceAccountName: "${NAME}"
+        containers:
+        - name: oauth-proxy
+          image: openshift/oauth-proxy:v1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+          - containerPort: 8443
+            name: web
+          args:
+          - -provider=openshift
+          - -https-address=:8443
+          - -http-address=
+          - -email-domain=*
+          - -upstream=http://localhost:8080
+          - -client-id=system:serviceaccount:ci:${NAME}
+          - -openshift-ca=/etc/pki/tls/cert.pem
+          - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          - '-openshift-sar={"resource": "namespaces", "verb": "get", "resourceName": "kube-system", "namespace": "kube-system"}'
+          - '-openshift-delegate-urls={"/": {"resource": "namespaces", "verb": "get", "resourceName": "kube-system", "namespace": "kube-system"}}'
+          - -client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
+          - -cookie-secret-file=/etc/proxy/secrets/session_secret
+          - -tls-cert=/etc/tls/private/tls.crt
+          - -tls-key=/etc/tls/private/tls.key
+          volumeMounts:
+          - mountPath: /etc/tls/private
+            name: "${INTERNAL_NAME}-tls"
+          - mountPath: /etc/proxy/secrets
+            name: session-secret
+        - name: "${NAME}"
+          image: "${NAME}"
+          args:
+          - --tide-url=http://tide/
+          - --hook-url=http://hook:8888/plugin-help
+          - --hidden-only=true
+          ports:
+            - name: http
+              containerPort: 8080
+          volumeMounts:
+          - name: config
+            mountPath: /etc/config
+            readOnly: true
+        volumes:
+        - name: config
+          configMap:
+            name: config
+        - name: session-secret
+          secret:
+            secretName: "${INTERNAL_NAME}-session-secret"
+        - name: "${INTERNAL_NAME}-tls"
+          secret:
+            secretName: "${INTERNAL_NAME}-tls"
+    triggers:
+    - type: ConfigChange
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - "${NAME}"
+        from:
+          kind: ImageStreamTag
+          name: "${NAME}:latest"
+      type: ImageChange
+- apiVersion: v1
+  kind: Secret
+  metadata:
+    name: "${INTERNAL_NAME}-session-secret"
+  stringData:
+    session_secret: "${SESSION_SECRET}="
