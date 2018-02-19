@@ -4,18 +4,27 @@ BRANCH = master
 status:
 	@git submodule
 
+# Creates a new release branch for FROM, then creates a new commit into master and
+# tags it as TO, then pushes both to upstream.
 .PHONY: branch
 branch:
-ifndef WHAT
-	$(error Must set WHAT= to the name of the branch to create)
+ifndef FROM
+	$(error Must set FROM= to the major/minor version of the current release, e.g. 3.9)
 endif
-	git submodule foreach git checkout -b $(WHAT) $(BRANCH)
-	git submodule foreach echo git push origin $(WHAT)
+ifndef TO
+	$(error Must set TO= to the major/minor version of the next release, e.g. 3.10)
+endif
+	git submodule foreach git checkout -b release-$(FROM) $(BRANCH)
+	git submodule foreach git checkout $(BRANCH)
+	git submodule foreach 'echo $(TO) > .release; git add .release; echo git commit -Sm "Branch for v$(TO)"'
+	git submodule foreach echo git tag -f -s -a -m "v$(TO).0-alpha.0" v$(TO).0-alpha.0
+	git submodule foreach echo git push origin "release-$(FROM)" "v$(TO).0-alpha.0"
 
 # Ensures the latest BRANCH commit is reflected in this repository.
 .PHONY: sync
 sync:
 	git submodule foreach git fetch origin
+	git submodule foreach git checkout $(BRANCH)
 	git submodule foreach git reset origin/$(BRANCH) --hard
 
 # Tag the current status of the repository as WHAT, and push those tags.
