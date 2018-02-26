@@ -1,6 +1,19 @@
 #!/bin/bash
 set -euo pipefail
 
+platform="$(uname)"
+
+tar_cmd="tar"
+tar_opts="--mode=ug+rwX --owner=0 --group=0"
+if [ "$platform" == "Darwin" ]; then
+    if [ "$(command -v gtar)" != "" ]; then
+        tar_cmd="gtar"
+    else
+        echo "Detected OS as Mac OS, please install gnu-tar (gtar)"
+        exit 1
+    fi
+fi
+
 ctr=gce-build-"$( date +%Y%m%d-%H%M%S )"
 
 function cleanup() {
@@ -19,8 +32,7 @@ else
   docker create --name "$ctr" -v /var/tmp --entrypoint /usr/local/bin/entrypoint-gcp -e "INSTANCE_PREFIX=${INSTANCE_PREFIX}" $args "${OPENSHIFT_ANSIBLE_IMAGE:-openshift/origin-ansible:latest}" "$@" >/dev/null
 fi
 
-opts="--mode=ug+rwX --owner=0 --group=0"
-tar ${opts} -c . | docker cp - $ctr:/usr/share/ansible/openshift-ansible/inventory/dynamic/injected
+"${tar_cmd}" ${tar_opts} -c . | docker cp - $ctr:/usr/share/ansible/openshift-ansible/inventory/dynamic/injected
 
 if [[ $# -eq 0 ]]; then
   docker start -ai "${ctr}"
