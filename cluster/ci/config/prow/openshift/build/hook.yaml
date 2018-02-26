@@ -1,9 +1,6 @@
 apiVersion: v1
 kind: Template
 parameters:
-- name: NAME
-  displayName: Name of the prow component to build
-  required: true
 - name: SOURCE_URL
   displayName: Source URL
   description: Git source URL to use for building the image
@@ -16,18 +13,18 @@ objects:
 - kind: ImageStream
   apiVersion: v1
   metadata:
-    name: "${NAME}"
+    name: "hook"
 - kind: BuildConfig
   apiVersion: v1
   metadata:
-    name: "${NAME}-binaries"
+    name: "hook-binaries"
   spec:
     successfulBuildsHistoryLimit: 1
     failedBuildsHistoryLimit: 2
     output:
       to:
         kind: ImageStreamTag
-        name: "${NAME}:binaries"
+        name: "hook:binaries"
     source:
       git:
         uri: "${SOURCE_URL}"
@@ -39,8 +36,6 @@ objects:
         COPY . /go/src/k8s.io/test-infra
         RUN cd /go/src/k8s.io/test-infra && \
             cd prow && \
-            mkdir -p /static && \
-            cp -r cmd/deck/static/* /static && \
             CGO_ENABLED=0 go install ./cmd/... && \
             rm -rf /go/src /go/pkg
     strategy:
@@ -55,14 +50,14 @@ objects:
 - apiVersion: v1
   kind: BuildConfig
   metadata:
-    name: "${NAME}"
+    name: "hook"
   spec:
     successfulBuildsHistoryLimit: 1
     failedBuildsHistoryLimit: 2
     output:
       to:
         kind: ImageStreamTag
-        name: "${NAME}:latest"
+        name: "hook:latest"
     source:
       git:
         uri: "${SOURCE_URL}"
@@ -70,19 +65,19 @@ objects:
       images:
       - from:
           kind: ImageStreamTag
-          name: "${NAME}:binaries"
+          name: "hook:binaries"
         paths:
         - destinationDir: .
-          sourcePath: "/go/bin/${NAME}"
+          sourcePath: "/go/bin/hook"
         - destinationDir: .
           sourcePath: /static
     strategy:
       dockerStrategy:
         imageOptimizationPolicy: SkipLayers
-        dockerfilePath: "prow/cmd/${NAME}/Dockerfile"
+        dockerfilePath: "prow/cmd/hook/Dockerfile"
     triggers:
     - imageChange:
         from:
           kind: ImageStreamTag
-          name: "${NAME}:binaries"
+          name: "hook:binaries"
       type: ImageChange
