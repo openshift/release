@@ -47,13 +47,18 @@ prow-secrets:
 .PHONY: prow-secrets
 
 prow-builds:
-	for name in deck hook horologium jenkins-operator plank sinker splice tide; do \
-		$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/prow_component.yaml -p NAME=$$name; \
-	done
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/cherrypick.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/refresh.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/tracer.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/deck.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/hook.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/horologium.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/jenkins_operator.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/needs_rebase.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/plank.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/refresh.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/sinker.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/splice.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/tide.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/tracer.yaml
 .PHONY: prow-builds
 
 prow-update:
@@ -79,18 +84,18 @@ prow-rbac:
 .PHONY: prow-rbac
 
 prow-services:
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/cherrypick.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/deck.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/hook.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/horologium.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/jenkins_operator.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/needs_rebase.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/plank.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/refresh.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/sinker.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/splice.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tide.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/cherrypick.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/refresh.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tracer.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/needs_rebase.yaml
 .PHONY: prow-services
 
 prow-jobs:
