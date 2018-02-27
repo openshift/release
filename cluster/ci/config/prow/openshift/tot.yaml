@@ -1,0 +1,66 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+objects:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: tot
+  spec:
+    selector:
+      app: prow
+      component: tot
+    ports:
+    - port: 80
+      targetPort: 8888
+    type: ClusterIP
+- apiVersion: apps/v1beta1
+  kind: StatefulSet
+  metadata:
+    name: tot
+    annotations:
+      image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"tot:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"tot\")].image"}]'
+    labels:
+      app: prow
+      component: tot
+  spec:
+    serviceName: tot
+    replicas: 1
+    revisionHistoryLimit: 2
+    updateStrategy:
+      type: RollingUpdate
+    selector:
+      matchLabels:
+        app: prow
+        component: tot
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: tot
+      spec:
+        containers:
+        - name: tot
+          image: tot
+          args:
+          # - --fallback=true
+          # - --fallback-url-template=TODO
+          - --storage=/storage/tot.json
+          ports:
+            - name: http
+              containerPort: 8888
+          volumeMounts:
+          - name: datadir
+            mountPath: /storage
+        volumes:
+        - name: datadir
+          persistentVolumeClaim:
+            claimName: datadir
+    volumeClaimTemplates:
+    - metadata:
+        name: datadir
+      spec:
+        accessModes:
+          - "ReadWriteOnce"
+        resources:
+          requests:
+            storage: 1Gi
