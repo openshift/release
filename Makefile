@@ -58,12 +58,13 @@ prow-builds:
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/sinker.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/splice.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/tide.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/tot.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/tracer.yaml
 .PHONY: prow-builds
 
 prow-update:
 ifeq ($(WHAT),)
-	for name in deck hook horologium jenkins-operator plank sinker splice tide; do \
+	for name in deck hook horologium jenkins-operator plank sinker splice tide tot; do \
 		oc start-build bc/$$name-binaries ; \
 	done
 else
@@ -95,6 +96,7 @@ prow-services:
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/sinker.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/splice.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tide.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tot.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tracer.yaml
 .PHONY: prow-services
 
