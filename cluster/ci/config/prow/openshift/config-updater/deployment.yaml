@@ -6,11 +6,11 @@ items:
 - apiVersion: v1
   kind: Service
   metadata:
-    name: jenkins-config-updater
+    name: config-updater
   spec:
     selector:
       app: prow
-      component: jenkins-config-updater
+      component: config-updater
     ports:
     - port: 80
       targetPort: 8888
@@ -18,10 +18,10 @@ items:
 - apiVersion: apps.openshift.io/v1
   kind: DeploymentConfig
   metadata:
-    name: jenkins-config-updater
+    name: config-updater
     labels:
       app: prow
-      component: jenkins-config-updater
+      component: config-updater
   spec:
     replicas: 1
     revisionHistoryLimit: 2
@@ -29,11 +29,11 @@ items:
       metadata:
         labels:
           app: prow
-          component: jenkins-config-updater
+          component: config-updater
       spec:
         containers:
-        - name: jenkins-config-updater
-          image: jenkins-config-updater
+        - name: config-updater
+          image: config-updater
           args:
           - --dry-run=false
           ports:
@@ -60,17 +60,17 @@ items:
             secretName: oauth-token
         - name: config
           configMap:
-            name: jenkins-config-updater
+            name: config-updater
         - name: tmp
           emptyDir: {}
-        serviceAccountName: jenkins-config-updater
+        serviceAccountName: config-updater
     triggers:
     - type: ConfigChange
     - imageChangeParams:
         automatic: true
         containerNames:
-        - jenkins-config-updater
+        - config-updater
         from:
           kind: ImageStreamTag
-          name: jenkins-config-updater:latest
+          name: config-updater:latest
       type: ImageChange
