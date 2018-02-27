@@ -14,11 +14,13 @@ endif
 ifndef TO
 	$(error Must set TO= to the major/minor version of the next release, e.g. 3.10)
 endif
+	git submodule foreach '! git rev-parse release-$(FROM) &>/dev/null'
+	git submodule foreach '! git rev-parse v$(TO).0-alpha.0 &>/dev/null'
 	git submodule foreach git checkout -b release-$(FROM) $(BRANCH)
 	git submodule foreach git checkout $(BRANCH)
-	git submodule foreach 'echo $(TO) > .release; git add .release; echo git commit -Sm "Branch for v$(TO)"'
-	git submodule foreach echo git tag -f -s -a -m "v$(TO).0-alpha.0" v$(TO).0-alpha.0
-	git submodule foreach echo git push origin "release-$(FROM)" "v$(TO).0-alpha.0"
+	git submodule foreach 'echo $(TO) > .release; git add .release; git commit -S -m "Branch for v$(TO)"'
+	git submodule foreach git tag -f -s -a -m "v$(TO).0-alpha.0" v$(TO).0-alpha.0
+	git submodule foreach git push origin "release-$(FROM)" "v$(TO).0-alpha.0"
 
 # Ensures the latest BRANCH commit is reflected in this repository.
 .PHONY: sync
