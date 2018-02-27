@@ -21,6 +21,9 @@ endif
 	git submodule foreach 'echo $(TO) > .release; git add .release; git commit -S -m "Branch for v$(TO)"'
 	git submodule foreach git tag -f -s -a -m "v$(TO).0-alpha.0" v$(TO).0-alpha.0
 	git submodule foreach git push origin "release-$(FROM)" "v$(TO).0-alpha.0"
+	@echo -n CLONE_ARGS
+	@git submodule -q foreach 'a="$$(basename $$(dirname $$path))/$$(basename $$path)"; printf " --repo=$${a/\//,}=v$(TO).0-alpha.0"'
+	@echo
 
 # Ensures the latest BRANCH commit is reflected in this repository.
 .PHONY: sync
