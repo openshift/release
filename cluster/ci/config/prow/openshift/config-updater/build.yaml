@@ -57,9 +57,13 @@ objects:
         kind: ImageStreamTag
         name: config-updater:latest
     source:
-      git:
-        uri: "${SOURCE_URL}"
-        ref: "${SOURCE_REF}"
+      dockerfile: |
+        FROM        openshift/origin:latest
+
+        RUN yum install -y make
+
+        COPY config-updater /bin/config-updater
+        ENTRYPOINT [ "/bin/config-updater" ]
       images:
       - from:
           kind: ImageStreamTag
@@ -71,8 +75,7 @@ objects:
       dockerStrategy:
          from:
             kind: DockerImage
-            name: openshift/origin:latest
-         dockerfilePath: experiment/config-updater/Dockerfile
+            name: docker.io/openshift/origin:latest
          noCache: true
          imageOptimizationPolicy: SkipLayers
     triggers:
