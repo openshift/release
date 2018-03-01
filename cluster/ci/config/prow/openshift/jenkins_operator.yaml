@@ -7,9 +7,6 @@ parameters:
   name: NAME
   value: jenkins-operator
 - description: The name of the component.
-  name: NAME_ORIGIN
-  value: jenkins-origin-operator
-- description: The name of the component.
   name: INTERNAL_NAME
   value: jenkins-dev-operator
 objects:
@@ -86,83 +83,6 @@ objects:
         automatic: true
         containerNames:
         - "${NAME}"
-        from:
-          kind: ImageStreamTag
-          name: "${NAME}:latest"
-      type: ImageChange
-
-- apiVersion: v1
-  kind: Service
-  metadata:
-    name: "${NAME_ORIGIN}"
-    annotations:
-      prometheus.io/scrape: "true"
-  spec:
-    selector:
-      app: prow
-      component: "${NAME_ORIGIN}"
-    ports:
-    - port: 80
-      targetPort: 8080
-    type: ClusterIP
-- apiVersion: apps.openshift.io/v1
-  kind: DeploymentConfig
-  metadata:
-    name: "${NAME_ORIGIN}"
-    labels:
-      app: prow
-      component: "${NAME_ORIGIN}"
-  spec:
-    # Do not scale up.
-    replicas: 1
-    revisionHistoryLimit: 2
-    strategy:
-      type: Recreate
-    template:
-      metadata:
-        labels:
-          app: prow
-          component: "${NAME_ORIGIN}"
-      spec:
-        serviceAccountName: "${NAME}"
-        containers:
-        - name: "${NAME_ORIGIN}"
-          image: "${NAME}"
-          args:
-          - --jenkins-url=https://jenkins-origin-ci.svc.ci.openshift.org
-          - --jenkins-bearer-token-file=/etc/jenkins/bearer
-          - --label-selector=master=jenkins-origin-ci
-          - --dry-run=false
-          ports:
-          - name: logs
-            containerPort: 8080
-          volumeMounts:
-          - mountPath: /etc/jenkins
-            name: jenkins
-            readOnly: true
-          - name: oauth
-            mountPath: /etc/github
-            readOnly: true
-          - name: config
-            mountPath: /etc/config
-            readOnly: true
-        volumes:
-        - name: jenkins
-          secret:
-            defaultMode: 420
-            secretName: jenkins-tokens
-        - name: oauth
-          secret:
-            secretName: oauth-token
-        - name: config
-          configMap:
-            name: config
-    triggers:
-    - type: ConfigChange
-    - imageChangeParams:
-        automatic: true
-        containerNames:
-        - "${NAME_ORIGIN}"
         from:
           kind: ImageStreamTag
           name: "${NAME}:latest"
