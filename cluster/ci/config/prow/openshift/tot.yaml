@@ -42,8 +42,9 @@ objects:
         - name: tot
           image: tot
           args:
+          - --config-path=/etc/config/config
           - --fallback=true
-          - --fallback-url-template=http://gcsweb/gcs/origin-ci-test/pr-logs/directory/%s/latest-build.txt
+          - --fallback-bucket=http://gcsweb/gcs/origin-ci-test
           - --storage=/storage/tot.json
           ports:
             - name: http
@@ -51,10 +52,15 @@ objects:
           volumeMounts:
           - name: datadir
             mountPath: /storage
+          - name: config
+            mountPath: /etc/config
         volumes:
         - name: datadir
           persistentVolumeClaim:
             claimName: datadir
+        - name: config
+          configMap:
+            name: config
     volumeClaimTemplates:
     - metadata:
         name: datadir
