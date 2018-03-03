@@ -10,7 +10,7 @@ applyTemplate:
 	oc process -f $(WHAT) | oc apply -f -
 .PHONY: applyTemplate
 
-all: jenkins prow mungegithub projects
+all: prow mungegithub projects
 .PHONY: all
 
 prow: prow-crd prow-config prow-secrets prow-builds prow-rbac prow-services prow-jobs
@@ -60,6 +60,7 @@ prow-builds:
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/tide.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/tot.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/tracer.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/config-updater/build.yaml
 .PHONY: prow-builds
 
 prow-update:
@@ -98,6 +99,9 @@ prow-services:
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tide.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tot.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tracer.yaml
+	oc create serviceaccount config-updater -o yaml --dry-run | oc apply -f -
+	oc adm policy add-role-to-user edit -z config-updater
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/config-updater/deployment.yaml
 .PHONY: prow-services
 
 prow-jobs:
@@ -177,28 +181,6 @@ node-exporter:
 test-bases:
 	$(MAKE) apply WHAT=projects/test-bases/openshift/openshift-ansible.yaml
 .PHONY: test-bases
-
-jenkins:
-	oc new-app --template jenkins-persistent -e INSTALL_PLUGINS=groovy:2.0,pipeline-github-lib:1.0,,permissive-script-security:0.1 -p MEMORY_LIMIT=10Gi -p VOLUME_CAPACITY=20Gi -e OPENSHIFT_JENKINS_JVM_ARCH=x86_64 -e JAVA_GC_OPTS="-XX:+UseParallelGC -XX:MinHeapFreeRatio=20 -XX:MaxHeapFreeRatio=40 -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90" -e JAVA_OPTS="-Dhudson.slaves.NodeProvisioner.MARGIN=50 -Dhudson.slaves.NodeProvisioner.MARGIN0=0.85 -Dpermissive-script-security.enabled=true"
-.PHONY: jenkins
-
-jenkins-setup: jenkins
-	oc new-app -f jenkins/setup/jenkins-setup-template.yaml -p SKIP_PERMISSIONS_JOB=$(SKIP_PERMISSIONS_JOB) -p SOURCE_URL=$(RELEASE_URL) -p SOURCE_REF=$(RELEASE_REF)
-.PHONY: jenkins-setup
-
-jenkins-setup-dev: export SKIP_PERMISSIONS_JOB=1
-jenkins-setup-dev: jenkins-setup
-.PHONY: jenkins-setup-dev
-
-jenkins-config-updater-build:
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/jenkins-config-updater/build.yaml
-.PHONY: jenkins-config-updater-build
-
-jenkins-config-updater:
-	oc create serviceaccount jenkins-config-updater -o yaml --dry-run | oc apply -f -
-	oc adm policy add-role-to-user edit -z jenkins-config-updater
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/jenkins-config-updater/deployment.yaml
-.PHONY: jenkins-config-updater
 
 image-pruner-setup:
 	oc create serviceaccount image-pruner -o yaml --dry-run | oc apply -f -
