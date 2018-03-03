@@ -43,12 +43,12 @@ openshift_schedulable: True
 
 # GCE provisioning info
 
-openshift_hosted_registry_storage_gcs_keyfile: "{{ files_dir }}/gcs-registry.json"
+openshift_hosted_registry_storage_gcs_keyfile: "{{ files_dir }}/gce.json"
 openshift_hosted_registry_storage_kind: object
 openshift_hosted_registry_storage_provider: gcs
 openshift_hosted_registry_storage_gcs_bucket: openshift-gce-devel-origin-ci-registry-bucket
-provision_gce_emptydir_quota: 10Gi
-provision_gce_docker_storage_driver: overlay2
+
+container_runtime_docker_storage_type: overlay2
 
 provision_custom_repositories: [
   {
@@ -80,46 +80,85 @@ provision_custom_repositories: [
     "failovermethod": "priority",
     "gpgcheck": 1,
     "gpgkey": "https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-release https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-beta https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-openshifthosted"
+  },
+  {
+    "name": "dockertested",
+    "baseurl": "https://mirror.ops.rhcloud.com/enterprise/rhel/dockertested/x86_64/os/
+        https://use-mirror1.ops.rhcloud.com/enterprise/rhel/dockertested/x86_64/os/
+        https://use-mirror2.ops.rhcloud.com/enterprise/rhel/dockertested/x86_64/os/
+        https://euw-mirror1.ops.rhcloud.com/enterprise/rhel/dockertested/x86_64/os/
+        https://gce-mirror1.ops.rhcloud.com/enterprise/rhel/dockertested/x86_64/os/
+        https://gce-mirror2.ops.rhcloud.com/enterprise/rhel/dockertested/x86_64/os/",
+    "sslverify": "false",
+    "sslclientkey": "ops-mirror.pem",
+    "sslclientcert": "ops-mirror.pem",
+    "failovermethod": "priority",
+    "gpgcheck": 1,
+    "gpgkey": "https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-release https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-beta https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-openshifthosted"
   }
 ]
 
 openshift_gcp_prefix: origin-ci-
 
-openshift_gcp_project: openshift-gce-devel
-openshift_gcp_region: us-central1
-openshift_gcp_zone: us-central1-a
+openshift_gcp_project: openshift-ci-infra
+openshift_gcp_region: us-east1
+openshift_gcp_zone: us-east1-c
 
 openshift_gcp_network_name: "{{ openshift_gcp_prefix }}network"
 
-openshift_gcp_iam_service_account: ci-provisioner@openshift-gce-devel.iam.gserviceaccount.com
 openshift_gcp_iam_service_account_keyfile: "{{ files_dir }}/gce.json"
 
-openshift_gcp_ssh_private_key: "{{ files_dir }}/ssh-privatekey"
+openshift_gcp_ssh_private_key: "{{ files_dir + '/ssh-privatekey' }}"
 
 openshift_gcp_infra_network_instance_group: ig-m
 
-openshift_gcp_image: 'rhel-7'
-openshift_gcp_base_image: 'centos-7'
+openshift_gcp_build_image: true
+openshift_gcp_image: '{{ openshift_gcp_prefix }}images'
+openshift_gcp_base_image: 'origin-node-centos-7'
+openshift_gcp_root_image: 'centos-7'
 
-openshift_gcp_registry_bucket_keyfile: "{{ files_dir }}/gcs-registry.json"
+openshift_gcp_registry_bucket_keyfile: "{{ files_dir }}/gce.json"
 openshift_gcp_registry_bucket_name: openshift-gce-devel-origin-ci-registry-bucket
+
+osm_controller_args: {"experimental-cluster-signing-duration": ["1h"]}
+openshift_master_bootstrap_enabled: true
+openshift_master_bootstrap_auto_approve: true
+openshift_master_bootstrap_auto_approver_node_selector: {"role": "infra"}
 
 openshift_gcp_node_group_config:
   - name: master
     suffix: m
-    tags: ocp-master,preserve
+    tags: ocp-master,ocp-infra-node,ocp-node,preserve
     machine_type: n1-standard-2
     boot_disk_size: 150
     scale: 1
+    bootstrap: true
+    wait_for_stable: true
   - name: node
     suffix: n
     tags: ocp-node,preserve
     machine_type: n1-standard-8
     boot_disk_size: 150
-    scale: 10
+    scale: 1
+    bootstrap: true
   - name: node-flex
     suffix: nf
     tags: ocp-node,preserve
     machine_type: n1-standard-4
     boot_disk_size: 150
     scale: 0
+    bootstrap: true
+
+openshift_node_groups:
+- name: node-config-master
+  labels:
+  - 'node-role.kubernetes.io/master=true'
+  - 'node-role.kubernetes.io/infra=true'
+  - 'role=infra'
+- name: node-config-node
+  labels:
+  - 'node-role.kubernetes.io/compute=true'
+  - 'role=app'
+  edits:
+  - key: kubeletArguments.pods-per-core
+    value: ['20']
