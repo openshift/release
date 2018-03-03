@@ -1,19 +1,20 @@
 LATEST = $(shell curl -q "https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/master/.latest-rpms" 2>/dev/null)
 REPO ?= $(LATEST)
-TYPE ?= "gcp"
+PROFILE ?= "gcp"
+TYPE ?= $(shell cat $(PROFILE)/.type)
 INSTANCE_PREFIX ?= $(WHAT)
 export INSTANCE_PREFIX
 
 up: check-cluster
-	cd $(TYPE)/ && ../../bin/ansible.sh ansible-playbook -e "openshift_test_repo=$(REPO)" playbooks/gcp/openshift-cluster/launch.yml
+	cd $(PROFILE)/ && ../../bin/ansible.sh ansible-playbook -e "openshift_test_repo=$(REPO)" playbooks/$(TYPE)/openshift-cluster/launch.yml
 .PHONY: up
 
 down: check-cluster
-	cd $(TYPE)/ && ../../bin/ansible.sh ansible-playbook playbooks/gcp/openshift-cluster/deprovision.yml
+	cd $(PROFILE)/ && ../../bin/ansible.sh ansible-playbook playbooks/$(TYPE)/openshift-cluster/deprovision.yml
 .PHONY: down
 
 sh: check-cluster
-	cd $(TYPE)/ && ../../bin/ansible.sh
+	cd $(PROFILE)/ && ../../bin/ansible.sh
 .PHONY: sh
 
 check-cluster:
@@ -29,7 +30,7 @@ endif
 ifndef TO
 	$(error Must set TO= to the base image name or image family name you wish to create, usually rhel-7)
 endif
-	cd $(TYPE)/ && ../../bin/ansible.sh ansible-playbook -e "openshift_gcp_base_image=$(TO)" -e "openshift_gcp_root_image=$(FROM)" playbooks/gcp/openshift-cluster/build_base_image.yml
+	cd $(PROFILE)/ && ../../bin/ansible.sh ansible-playbook -e "openshift_$(TYPE)_base_image=$(TO)" -e "openshift_$(TYPE)_root_image=$(FROM)" playbooks/$(TYPE)/openshift-cluster/build_base_image.yml
 .PHONY: image
 
 image:
@@ -39,5 +40,5 @@ endif
 ifndef TO
 	$(error Must set TO= to the image name or image family name you wish to create, usually openshift-VERSION-node)
 endif
-	cd $(TYPE)/ && ../../bin/ansible.sh ansible-playbook -e "openshift_test_repo=$(REPO)" -e "openshift_gcp_image=$(TO)" -e "openshift_gcp_base_image=$(FROM)" playbooks/gcp/openshift-cluster/build_image.yml
+	cd $(PROFILE)/ && ../../bin/ansible.sh ansible-playbook -e "openshift_test_repo=$(REPO)" -e "openshift_$(TYPE)_image=$(TO)" -e "openshift_$(TYPE)_base_image=$(FROM)" playbooks/$(TYPE)/openshift-cluster/build_image.yml
 .PHONY: image
