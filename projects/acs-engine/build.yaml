@@ -1,0 +1,32 @@
+kind: List
+apiVersion: v1
+items:
+- kind: ImageStream
+  apiVersion: v1
+  metadata:
+    name: acs-engine-tests
+- kind: BuildConfig
+  apiVersion: v1
+  metadata:
+    name: acs-engine-tests
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: acs-engine-tests:latest
+    source:
+      contextDir: "projects/acs-engine"
+      git:
+        uri: "https://github.com/openshift/release"
+        ref: "master"
+      type: Git
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: quay.io/deis/go-dev:v1.8.1
+        imageOptimizationPolicy: SkipLayers
+    triggers:
+    - type: ConfigChange
