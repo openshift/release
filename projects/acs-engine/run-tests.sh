@@ -7,6 +7,7 @@ set -eux
 # Clone PR
 mkdir -p /tmp/go
 export GOPATH=/tmp/go
+export PATH=$PATH:$GOPATH/bin
 # Unfortunately go get is broken for acs-engine
 # See https://github.com/Azure/acs-engine/issues/1160
 go get github.com/Azure/acs-engine || true
