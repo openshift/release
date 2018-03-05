@@ -16,6 +16,7 @@ git fetch origin pull/${PULL_NUMBER}/head
 git checkout FETCH_HEAD
 
 # Test
+make bootstrap
 make test-style
 make build-binary
 make test
