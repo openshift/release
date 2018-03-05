@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	traceURL = flag.String("trace-url", "https://tracer-ci.svc.ci.openshift.org", "URL to the prow log tracer.")
+	traceURL = flag.String("trace-url", "https://tracer-ci.svc.ci.openshift.org/trace", "URL to the prow log tracer.")
 	token    = flag.String("token", "", "Token for bearer token auth.")
 )
 
