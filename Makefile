@@ -10,11 +10,19 @@ applyTemplate:
 	oc process -f $(WHAT) | oc apply -f -
 .PHONY: applyTemplate
 
-all: prow mungegithub projects
+all: roles prow mungegithub projects
 .PHONY: all
 
-prow: prow-crd prow-config prow-secrets prow-builds prow-rbac prow-services prow-jobs
+roles:
+	$(MAKE) apply WHAT=cluster/ci/config/roles.yaml
+.PHONY: roles
+
+prow: ci-ns prow-crd prow-config prow-secrets prow-builds prow-rbac prow-services prow-jobs
 .PHONY: prow
+
+ci-ns:
+	oc project ci
+.PHONY: ci-ns
 
 prow-crd:
 	$(MAKE) apply WHAT=cluster/ci/config/prow/prow_crd.yaml
