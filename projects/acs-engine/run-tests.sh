@@ -13,8 +13,10 @@ export PATH=$PATH:$GOPATH/bin
 go get github.com/Azure/acs-engine || true
 cd /tmp/go/src/github.com/Azure/acs-engine
 git remote set-url origin https://github.com/kargakis/acs-engine
+git fetch origin
+git checkout origin/master
 git fetch origin pull/${PULL_NUMBER}/head
-git checkout FETCH_HEAD
+git merge FETCH_HEAD
 
 # Test
 make bootstrap
