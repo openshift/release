@@ -12,8 +12,8 @@ export PATH=$PATH:$GOPATH/bin
 # See https://github.com/Azure/acs-engine/issues/1160
 go get github.com/Azure/acs-engine || true
 cd /tmp/go/src/github.com/Azure/acs-engine
-git config --global user.email "openshift-ci-robot@ci.openshift.org"
-git config --global user.name "openshift-ci-robot"
+git config user.email "openshift-ci-robot@ci.openshift.org"
+git config user.name "openshift-ci-robot"
 git remote set-url origin https://github.com/kargakis/acs-engine
 git fetch origin
 git checkout origin/master
