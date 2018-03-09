@@ -131,3 +131,37 @@ objects:
           kind: ImageStreamTag
           name: common-test-base:golang-1.9
       type: ImageChange
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    labels:
+      app: "${NAME}"
+    name: "${NAME}-golang-1.10"
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: DockerImage
+        name: "docker.io/openshift/${NAME}:golang-1.10"
+      pushSecret:
+        name: "dockerhub"
+    source:
+      git:
+        ref: "${SOURCE_REF}"
+        uri: "${SOURCE_URL}"
+      contextDir: "${SOURCE_CONTEXT_BASE}/golang-1.10/"
+      type: Git
+    strategy:
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: common-test-base:golang-1.10
+        imageOptimizationPolicy: SkipLayers
+    triggers:
+    - imageChange:
+        from:
+          kind: ImageStreamTag
+          name: common-test-base:golang-1.10
+      type: ImageChange
+
