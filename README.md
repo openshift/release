@@ -2,20 +2,15 @@
 
 This repository contains the process tooling for OpenShift releases.
 
-## Prow
+## Openshift CI infra
 
 Prerequisites:
-* `ci` namespace exists
-* `BASIC_AUTH_PASS` is the password for authenticating with https://ci.openshift.redhat.com/jenkins/
-* `BEARER_TOKEN` is the token for authenticating with https://jenkins-origin-ci.svc.ci.openshift.org
-* `HMAC_TOKEN` is used for decrypting Github webhook payloads
-* `OAUTH_TOKEN` is used for adding labels and comments in Github
-* `RETEST_TOKEN` is used by the retester periodic job to rerun tests for PRs
-* `CHERRYPICK_TOKEN` is used by the cherrypick plugin to cherry-pick PRs in release branches
+* various credentials need to be present in your environment
+  - required prow credentials can be found in the [prow-secrets](https://github.com/openshift/release/blob/17fb58ec3c10a407f8b895b5fdba6a0796bc2677/Makefile#L42-L55) target
+* ensure you run as `system:admin`
 
-Ensure the aforementioned requirements are met and stand up a prow cluster:
-```
-make prow
-```
+`make all` then will deploy all the necessary CI components.
 
 For more information on prow, see the upstream [documentation](https://github.com/kubernetes/test-infra/tree/master/prow#prow).
+
+TODO: Cross-link to CI overview doc.
