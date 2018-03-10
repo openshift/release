@@ -37,7 +37,7 @@ prow-config:
 prow-config-update:
 	oc create cm config --from-file=config=cluster/ci/config/prow/config.yaml -o yaml --dry-run | oc replace -f -
 	oc create cm plugins --from-file=plugins=cluster/ci/config/prow/plugins.yaml -o yaml --dry-run | oc replace -f -
-.PHONY: prow-config
+.PHONY: prow-config-update
 
 prow-secrets:
 	# CI_PASS is a token for openshift-ci-robot to authenticate in https://ci.openshift.redhat.com/jenkins/
