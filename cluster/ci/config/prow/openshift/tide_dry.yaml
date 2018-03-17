@@ -1,0 +1,69 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+parameters:
+- description: The name of the component.
+  name: NAME
+  value: tide
+objects:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: "${NAME}"
+  spec:
+    selector:
+      app: prow
+      component: "${NAME}"
+    ports:
+    - port: 80
+      targetPort: 8888
+    type: ClusterIP
+- apiVersion: apps.openshift.io/v1
+  kind: DeploymentConfig
+  metadata:
+    name: "${NAME}"
+  spec:
+    # Do not scale up.
+    replicas: 1
+    strategy:
+      type: Recreate
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: "${NAME}"
+      spec:
+        serviceAccountName: "${NAME}"
+        containers:
+        - name: "${NAME}"
+          image: "${NAME}"
+          args:
+          - --deck-url=https://deck-ci.svc.ci.openshift.org
+          - --dry-run=true
+          - --github-token-file=/etc/github/token
+          ports:
+          - name: http
+            containerPort: 8888
+          volumeMounts:
+          - name: oauth
+            mountPath: /etc/github
+            readOnly: true
+          - name: config
+            mountPath: /etc/config
+            readOnly: true
+        volumes:
+        - name: oauth
+          secret:
+            secretName: sq-oauth-token
+        - name: config
+          configMap:
+            name: config
+    triggers:
+    - type: ConfigChange
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - "${NAME}"
+        from:
+          kind: ImageStreamTag
+          name: "${NAME}:latest"
+      type: ImageChange
