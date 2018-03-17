@@ -52,7 +52,20 @@ prow-secrets:
 	oc create secret generic cidev-token --from-literal=basic=${CIDEV_PASS} -o yaml --dry-run | oc apply -f -
 	# cert.pem, key.pem, and ca_cert.pem are used for authenticating with https://ci.dev.openshift.redhat.com/jenkins/
 	oc create secret generic certificates --from-file=cert.pem --from-file=key.pem --from-file=ca_cert.pem -o yaml --dry-run | oc apply -f -
+	# OPENSHIFT_BOT_TOKEN is the token used by the retester periodic job to rerun tests for PRs
+	oc create secret generic openshift-bot-token --from-literal=oauth=${OPENSHIFT_BOT_TOKEN} -o yaml --dry-run | oc apply -f -
 .PHONY: prow-secrets
+
+export PROJECT=openshift-ci-infra
+export ZONE=us-east1-c
+export HOST=origin-ci-ig-m-px8t
+
+export-secrets:
+	oc get secrets/jenkins-tokens secrets/hmac-token secrets/oauth-token secrets/cherrypick-token secrets/cidev-token secrets/certificates secrets/openshift-bot-token --export -o yaml > prow_secrets.yaml
+	# Can't connect as root directly in GCE. If it's ok to copy these files in the regural user dir, then do:
+	# gcloud compute --project $(PROJECT) scp --zone $(ZONE) prow_secrets.yaml $(HOST):~/
+	# rm prow_secrets.yaml
+.PHONY: export-secrets
 
 prow-builds:
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/cherrypick.yaml
@@ -113,8 +126,6 @@ prow-services:
 .PHONY: prow-services
 
 prow-jobs:
-	# OPENSHIFT_BOT_TOKEN is the token used by the retester periodic job to rerun tests for PRs
-	oc create secret generic openshift-bot-token --from-literal=oauth=${OPENSHIFT_BOT_TOKEN} -o yaml --dry-run | oc apply -f -
 	$(MAKE) applyTemplate WHAT=cluster/ci/jobs/commenter.yaml
 	$(MAKE) apply WHAT=projects/prometheus/test/build.yaml
 .PHONY: prow-jobs
