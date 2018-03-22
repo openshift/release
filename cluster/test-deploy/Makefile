@@ -1,6 +1,6 @@
 LATEST = $(shell curl -q "https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/master/.latest-rpms" 2>/dev/null)
 REPO ?= $(LATEST)
-PROFILE ?= "gcp"
+PROFILE ?= "gcp-dev"
 TYPE ?= $(shell cat $(PROFILE)/.type)
 INSTANCE_PREFIX ?= $(WHAT)
 export INSTANCE_PREFIX
