@@ -56,6 +56,8 @@ prow-secrets:
 	oc create secret generic cidev-token --from-literal=basic=${CIDEV_PASS} -o yaml --dry-run | oc apply -f -
 	# cert.pem, key.pem, and ca_cert.pem are used for authenticating with https://ci.dev.openshift.redhat.com/jenkins/
 	oc create secret generic certificates --from-file=cert.pem --from-file=key.pem --from-file=ca_cert.pem -o yaml --dry-run | oc apply -f -
+	# OPENSHIFT_BOT_TOKEN is the token used by the retester periodic job to rerun tests for PRs
+	oc create secret generic openshift-bot-token --from-literal=oauth=${OPENSHIFT_BOT_TOKEN} -o yaml --dry-run | oc apply -f -
 .PHONY: prow-secrets
 
 prow-builds:
@@ -117,8 +119,6 @@ prow-services:
 .PHONY: prow-services
 
 prow-jobs:
-	# OPENSHIFT_BOT_TOKEN is the token used by the retester periodic job to rerun tests for PRs
-	oc create secret generic openshift-bot-token --from-literal=oauth=${OPENSHIFT_BOT_TOKEN} -o yaml --dry-run | oc apply -f -
 	$(MAKE) applyTemplate WHAT=cluster/ci/jobs/commenter.yaml
 	$(MAKE) apply WHAT=projects/prometheus/test/build.yaml
 .PHONY: prow-jobs
