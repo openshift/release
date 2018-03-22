@@ -40,6 +40,10 @@ prow-config-update:
 .PHONY: prow-config-update
 
 prow-secrets:
+	# DECK_COOKIE_FILE is used for encrypting payloads between deck frontend and backend
+	oc create secret generic cookie --from-file=secret="${DECK_COOKIE_FILE}"
+	# DECK_OAUTH_APP_FILE is used for serving the PR info page on deck
+	oc create secret generic github-oauth-config --from-file=secret="${DECK_OAUTH_APP_FILE}"
 	# CI_PASS is a token for openshift-ci-robot to authenticate in https://ci.openshift.redhat.com/jenkins/
 	oc create secret generic jenkins-tokens --from-literal=basic=${CI_PASS} -o yaml --dry-run | oc apply -f -
 	# HMAC_TOKEN is used for encrypting Github webhook payloads.
