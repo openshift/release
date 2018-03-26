@@ -174,7 +174,7 @@ origin-release:
 	$(MAKE) applyTemplate WHAT=projects/origin-release/pipeline.yaml
 .PHONY: origin-release
 
-prometheus: node-exporter
+prometheus: node-exporter alert-buffer
 	$(MAKE) apply WHAT=projects/prometheus/prometheus.yaml
 .PHONY: prometheus
 
@@ -190,6 +190,10 @@ prometheus-alerts:
 node-exporter:
 	$(MAKE) apply WHAT=projects/prometheus/node_exporter.yaml
 .PHONY: node-exporter
+
+alert-buffer:
+	$(MAKE) apply WHAT=projects/prometheus/alert-buffer.yaml
+.PHONY: alert-buffer
 
 test-bases:
 	$(MAKE) apply WHAT=projects/test-bases/openshift/openshift-ansible.yaml
