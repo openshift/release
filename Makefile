@@ -188,7 +188,7 @@ prometheus-alerts:
 .PHONY: prometheus-alerts
 
 node-exporter:
-	$(MAKE) apply WHAT=projects/prometheus/node-exporter.yaml
+	$(MAKE) apply WHAT=projects/prometheus/node_exporter.yaml
 .PHONY: node-exporter
 
 test-bases:
