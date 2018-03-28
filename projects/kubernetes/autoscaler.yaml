@@ -3,17 +3,17 @@ items:
 - apiVersion: v1
   kind: ImageStream
   metadata:
-    name: kubernetes-autoscaler
+    name: origin-cluster-autoscaler
 - apiVersion: v1
   kind: BuildConfig
   metadata:
-    name: kubernetes-autoscaler-binary
+    name: origin-cluster-autoscaler-binary
   spec:
     failedBuildsHistoryLimit: 2
     output:
       to:
         kind: ImageStreamTag
-        name: kubernetes-autoscaler:binaries
+        name: origin-cluster-autoscaler:binaries
     source:
       dockerfile: |
         FROM scratch
@@ -21,7 +21,7 @@ items:
         RUN cd /go/src/k8s.io/autoscaler/cluster-autoscaler && \
             make build-binary
       git:
-        uri: https://github.com/openshift/kubernetes-autoscaler.git
+        uri: https://github.com/openshift/autoscaler.git
       type: Git
     strategy:
       dockerStrategy:
@@ -35,13 +35,13 @@ items:
 - apiVersion: v1
   kind: BuildConfig
   metadata:
-    name: kubernetes-autoscaler
+    name: origin-cluster-autoscaler
   spec:
     failedBuildsHistoryLimit: 2
     output:
       to:
         kind: ImageStreamTag
-        name: kubernetes-autoscaler:latest
+        name: origin-cluster-autoscaler:latest
     source:
       dockerfile: |
         FROM        centos:7
@@ -53,7 +53,7 @@ items:
       images:
       - from:
           kind: ImageStreamTag
-          name: kubernetes-autoscaler:binaries
+          name: origin-cluster-autoscaler:binaries
         paths:
         - destinationDir: .
           sourcePath: /go/src/k8s.io/autoscaler/cluster-autoscaler/.
@@ -68,7 +68,7 @@ items:
     - imageChange:
         from:
           kind: ImageStreamTag
-          name: kubernetes-autoscaler:binaries
+          name: origin-cluster-autoscaler:binaries
       type: ImageChange
 kind: List
 metadata: {}
