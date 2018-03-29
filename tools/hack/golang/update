@@ -5,6 +5,7 @@ set -o nounset
 set -o pipefail
 
 src="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TMPDIR=$(mktemp -d "${TMPDIR:-/tmp/}openshift-release.XXXXXXXXX")
 
 # Tools are tools that most projects will reuse and are therefore vendored
 tools=( import-verifier junitreport changelog )
@@ -54,3 +55,5 @@ if [[ ! -f "${spec}" ]]; then
 
   sed -e "s|package_name TODO|package_name ${package_name}|" "${src}/package.spec" > "${dst}/${package_name}.spec"
 fi
+
+rm -rf $TMPDIR
