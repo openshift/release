@@ -32,6 +32,10 @@ items:
     successfulBuildsHistoryLimit: 1
     triggers:
     - type: ConfigChange
+    - type: GitHub
+      github:
+        secretReference:
+          name: github-deploymentconfig-trigger
 - apiVersion: v1
   kind: BuildConfig
   metadata:
@@ -39,9 +43,11 @@ items:
   spec:
     failedBuildsHistoryLimit: 2
     output:
+      pushSecret:
+        name: registry-push
       to:
-        kind: ImageStreamTag
-        name: origin-cluster-autoscaler:latest
+        kind: DockerImage
+        name: docker.io/openshift/kubernetes-autoscaler:v1.2.0-dev
     source:
       dockerfile: |
         FROM        centos:7
