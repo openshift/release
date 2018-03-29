@@ -1,0 +1,34 @@
+---
+openshift_azure_clusterid: magentaci
+openshift_azure_resource_location: eastus
+
+openshift_deployment_type: openshift-enterprise
+
+openshift_azure_vm_admin_username: openshift
+ansible_ssh_user: "{{ openshift_azure_vm_admin_username }}"
+ansible_ssh_private_key_file: '~/.ssh/id_rsa'
+become: true
+
+openshift_master_bootstrap_enabled: true
+openshift_master_fire_handlers: false
+openshift_master_systemd_enable: no
+openshift_is_containerized: false
+
+openshift_azure_vm_ssh_public_keys:
+- path: "/home/{{ openshift_azure_vm_admin_username }}/.ssh/authorized_keys"
+  key_data: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+
+openshift_azure_vm_data_disks:
+- lun: 0
+  managed_disk_type: Premium_LRS
+  disk_size_gb: 200
+  storage_container_name: "{{ openshift_azure_storage_account_name }}"
+  storage_account_name: "{{ openshift_azure_storage_account_name }}"
+
+openshift_azure_use_cloud_init: false
+openshift_cloudprovider_kind: azure
+
+openshift_docker_additional_registries: registry.access.redhat.com,registry.reg-aws.openshift.com:443
+
+container_runtime_docker_storage_type: overlay2
+container_runtime_docker_storage_setup_device: /dev/sdc

@@ -1,7 +1,11 @@
 PROFILE ?= "gcp-dev"
 TYPE ?= $(shell cat $(PROFILE)/.type)
+# Namespaces of images, azure requires to specify resource group
+TO_NS ?= ""
+FROM_NS ?= ""
 INSTANCE_PREFIX ?= $(WHAT)
 export INSTANCE_PREFIX
+export TYPE
 
 # Select RPMs based on branch or tag
 REF ?= "master"
@@ -37,7 +41,7 @@ endif
 ifndef TO
 	$(error Must set TO= to the base image name or image family name you wish to create, usually rhel-7)
 endif
-	cd $(PROFILE)/ && ../../bin/ansible.sh ansible-playbook -e "openshift_$(TYPE)_base_image=$(TO)" -e "openshift_$(TYPE)_root_image=$(FROM)" playbooks/$(TYPE)/openshift-cluster/build_base_image.yml
+	cd $(PROFILE)/ && ../../bin/ansible.sh ansible-playbook -e "openshift_$(TYPE)_base_image_ns=$(TO_NS)" -e "openshift_$(TYPE)_base_image=$(TO)" -e "openshift_$(TYPE)_root_image_ns=$(FROM_NS)" -e "openshift_$(TYPE)_root_image=$(FROM)" playbooks/$(TYPE)/openshift-cluster/build_base_image.yml
 .PHONY: image
 
 image:
@@ -47,5 +51,5 @@ endif
 ifndef TO
 	$(error Must set TO= to the image name or image family name you wish to create, usually openshift-VERSION-node)
 endif
-	cd $(PROFILE)/ && ../../bin/ansible.sh ansible-playbook -e "openshift_test_repo=$(REPO)" -e "openshift_$(TYPE)_image=$(TO)" -e "openshift_$(TYPE)_base_image=$(FROM)" playbooks/$(TYPE)/openshift-cluster/build_image.yml
+	cd $(PROFILE)/ && ../../bin/ansible.sh ansible-playbook -e "openshift_test_repo=$(REPO)" -e "openshift_$(TYPE)_image_ns=$(TO_NS)" -e "openshift_$(TYPE)_image=$(TO)" -e "openshift_$(TYPE)_base_image_ns=$(FROM_NS)" -e "openshift_$(TYPE)_base_image=$(FROM)" playbooks/$(TYPE)/openshift-cluster/build_image.yml
 .PHONY: image
