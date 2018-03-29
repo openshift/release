@@ -10,7 +10,7 @@ applyTemplate:
 	oc process -f $(WHAT) | oc apply -f -
 .PHONY: applyTemplate
 
-all: roles prow mungegithub projects
+all: roles prow projects
 .PHONY: all
 
 roles:
@@ -48,6 +48,9 @@ prow-secrets:
 	oc create secret generic jenkins-tokens --from-literal=basic=${CI_PASS} -o yaml --dry-run | oc apply -f -
 	# HMAC_TOKEN is used for encrypting Github webhook payloads.
 	oc create secret generic hmac-token --from-literal=hmac=${HMAC_TOKEN} -o yaml --dry-run | oc apply -f -
+	# SQ_OAUTH_TOKEN is used for merging PRs
+	# TODO: Rename to something not related to SQ
+	oc create secret generic sq-oauth-token --from-literal=token=${SQ_OAUTH_TOKEN} -o yaml --dry-run | oc apply -f -
 	# OAUTH_TOKEN is used for manipulating Github PRs/issues (labels, comments, etc.).
 	oc create secret generic oauth-token --from-literal=oauth=${OAUTH_TOKEN} -o yaml --dry-run | oc apply -f -
 	# CHERRYPICK_TOKEN is used by the cherrypick bot for cherrypicking changes into new PRs.
@@ -70,7 +73,6 @@ prow-builds:
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/plank.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/refresh.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/sinker.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/splice.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/tide.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/tot.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/tracer.yaml
@@ -79,7 +81,7 @@ prow-builds:
 
 prow-update:
 ifeq ($(WHAT),)
-	for name in deck hook horologium jenkins-operator plank sinker splice tide tot; do \
+	for name in deck hook horologium jenkins-operator plank sinker tide tot; do \
 		oc start-build bc/$$name-binaries ; \
 	done
 else
@@ -94,7 +96,6 @@ prow-rbac:
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/jenkins_operator_rbac.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/plank_rbac.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/sinker_rbac.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/splice_rbac.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tide_rbac.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tracer_rbac.yaml
 .PHONY: prow-rbac
@@ -109,7 +110,6 @@ prow-services:
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/plank.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/refresh.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/sinker.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/splice.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tide.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tot.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tracer.yaml
@@ -123,34 +123,6 @@ prow-jobs:
 	$(MAKE) apply WHAT=projects/prometheus/test/build.yaml
 	$(MAKE) apply WHAT=projects/acs-engine/build.yaml
 .PHONY: prow-jobs
-
-mungegithub: submit-queue-secrets origin-submit-queue installer-submit-queue logging-submit-queue console-submit-queue
-.PHONY: mungegithub
-
-submit-queue-secrets:
-	# SQ_HMAC_TOKEN is used for encrypting Github webhook payloads.
-	oc create secret generic sq-hmac-token --from-literal=token=${SQ_HMAC_TOKEN} -o yaml --dry-run | oc apply -f -
-	# SQ_OAUTH_TOKEN is used for manipulating Github PRs/issues (labels, comments, etc.).
-	oc create secret generic sq-oauth-token --from-literal=token=${SQ_OAUTH_TOKEN} -o yaml --dry-run | oc apply -f -
-.PHONY: submit-queue-secrets
-
-submit-queue-build:
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/submit-queue/submit_queue_build.yaml
-.PHONY: submit-queue-build
-
-submit-queue-deployments:
-	$(MAKE) apply WHAT=cluster/ci/config/submit-queue/submit_queue.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/submit-queue/submit_queue_openshift_ansible.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/submit-queue/submit_queue_origin_web_console.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/submit-queue/submit_queue_origin_aggregated_logging.yaml
-.PHONY: submit-queue-deployments
-
-submit-queue-configs:
-	$(MAKE) apply WHAT=cluster/ci/config/submit-queue/submit_queue_config.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/submit-queue/submit_queue_openshift_ansible_config.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/submit-queue/submit_queue_origin_web_console_config.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/submit-queue/submit_queue_origin_aggregated_logging_config.yaml
-.PHONY: submit-queue-configs
 
 projects: gcsweb kube-state-metrics oauth-proxy origin-release prometheus test-bases image-pruner-setup
 .PHONY: projects
