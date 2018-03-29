@@ -38,9 +38,9 @@ args=""
 
 if [[ $# -eq 0 ]]; then
   args+="-it "
-  docker create --name "$ctr" -v /var/tmp --entrypoint "/usr/local/bin/entrypoint-${TYPE}" -e "INSTANCE_PREFIX=${INSTANCE_PREFIX}" $args "${image}" /bin/bash >/dev/null
+  docker create --name "$ctr" -v /var/tmp --entrypoint /usr/local/bin/entrypoint-provider -e "TYPE=${TYPE}" -e "INSTANCE_PREFIX=${INSTANCE_PREFIX}" $args "${image}" /bin/bash >/dev/null
 else
-  docker create --name "$ctr" -v /var/tmp --entrypoint "/usr/local/bin/entrypoint-${TYPE}" -e "INSTANCE_PREFIX=${INSTANCE_PREFIX}" $args "${image}" "$@" >/dev/null
+  docker create --name "$ctr" -v /var/tmp --entrypoint /usr/local/bin/entrypoint-provider -e "TYPE=${TYPE}" -e "INSTANCE_PREFIX=${INSTANCE_PREFIX}" $args "${image}" "$@" >/dev/null
 fi
 
 "${tar_cmd}" ${tar_opts} -c . | docker cp - $ctr:/usr/share/ansible/openshift-ansible/inventory/dynamic/injected
