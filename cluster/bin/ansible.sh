@@ -14,6 +14,17 @@ if [ "$platform" == "Darwin" ]; then
     fi
 fi
 
+image="${OPENSHIFT_ANSIBLE_IMAGE-}"
+if [[ -z "${image}" ]]; then
+  if [[ "${REF-}" =~ ^release-([0-9]+\.[0-9]+)$ ]]; then
+    image="openshift/origin-ansible:v${BASH_REMATCH[1]}"
+  elif [[ "${REF-}" =~ ^v([0-9]+\.[0-9]+) ]]; then
+    image="openshift/origin-ansible:v${BASH_REMATCH[1]}"
+  else
+    image="openshift/origin-ansible:latest"
+  fi
+fi
+
 ctr=gce-build-"$( date +%Y%m%d-%H%M%S )"
 
 function cleanup() {
@@ -27,9 +38,9 @@ args=""
 
 if [[ $# -eq 0 ]]; then
   args+="-it "
-  docker create --name "$ctr" -v /var/tmp --entrypoint /usr/local/bin/entrypoint-gcp -e "INSTANCE_PREFIX=${INSTANCE_PREFIX}" $args "${OPENSHIFT_ANSIBLE_IMAGE:-openshift/origin-ansible:latest}" /bin/bash >/dev/null
+  docker create --name "$ctr" -v /var/tmp --entrypoint /usr/local/bin/entrypoint-gcp -e "INSTANCE_PREFIX=${INSTANCE_PREFIX}" $args "${image}" /bin/bash >/dev/null
 else
-  docker create --name "$ctr" -v /var/tmp --entrypoint /usr/local/bin/entrypoint-gcp -e "INSTANCE_PREFIX=${INSTANCE_PREFIX}" $args "${OPENSHIFT_ANSIBLE_IMAGE:-openshift/origin-ansible:latest}" "$@" >/dev/null
+  docker create --name "$ctr" -v /var/tmp --entrypoint /usr/local/bin/entrypoint-gcp -e "INSTANCE_PREFIX=${INSTANCE_PREFIX}" $args "${image}" "$@" >/dev/null
 fi
 
 "${tar_cmd}" ${tar_opts} -c . | docker cp - $ctr:/usr/share/ansible/openshift-ansible/inventory/dynamic/injected
