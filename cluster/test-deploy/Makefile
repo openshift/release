@@ -1,9 +1,12 @@
-LATEST = $(shell curl -q "https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/master/.latest-rpms" 2>/dev/null)
-REPO ?= $(LATEST)
 PROFILE ?= "gcp-dev"
 TYPE ?= $(shell cat $(PROFILE)/.type)
 INSTANCE_PREFIX ?= $(WHAT)
 export INSTANCE_PREFIX
+
+# Select RPMs based on branch or tag
+REF ?= "master"
+LATEST = $(shell curl -q "https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/$(REF)/.latest-rpms" 2>/dev/null)
+REPO ?= $(LATEST)
 
 up: check-cluster
 	cd $(PROFILE)/ && ../../bin/ansible.sh ansible-playbook -e "openshift_test_repo=$(REPO)" playbooks/$(TYPE)/openshift-cluster/launch.yml
