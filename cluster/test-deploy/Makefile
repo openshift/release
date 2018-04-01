@@ -20,6 +20,10 @@ sh: check-cluster
 	cd $(PROFILE)/ && ../../bin/ansible.sh
 .PHONY: sh
 
+upgrade: check-cluster
+	cd $(PROFILE)/ && ../../bin/ansible.sh ansible-playbook -e "openshift_test_repo=$(REPO)" playbooks/$(TYPE)/openshift-cluster/upgrade.yml
+.PHONY: upgrade
+
 check-cluster:
 ifndef WHAT
 	$(error Must set WHAT= to a unique cluster name)
