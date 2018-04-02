@@ -1,0 +1,80 @@
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: ImageStream
+  metadata:
+    name: descheduler
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    name: descheduler-binary
+  spec:
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: descheduler:binaries
+    source:
+      dockerfile: |
+        FROM scratch
+        COPY . /go/src/github.com/kubernetes-incubator/descheduler
+        RUN cd /go/src/github.com/kubernetes-incubator/descheduler && \
+            make
+      git:
+        uri: https://github.com/openshift/descheduler.git
+      type: Git
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: openshift/origin-release:golang-1.9
+        imageOptimizationPolicy: SkipLayers
+    successfulBuildsHistoryLimit: 1
+    triggers:
+    - type: ConfigChange
+    - type: GitHub
+      github:
+        secretReference:
+          name: github-deploymentconfig-trigger
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    name: descheduler
+  spec:
+    failedBuildsHistoryLimit: 2
+    output:
+      pushSecret:
+        name: registry-push
+      to:
+        kind: DockerImage
+        name: docker.io/openshift/descheduler:v1.2.4
+    source:
+      dockerfile: |
+        FROM        centos:7
+        MAINTAINER  Seth Jennings <sjenning@redhat.com>
+
+        COPY _output/bin/descheduler /bin/descheduler
+
+        ENTRYPOINT [ "/bin/descheduler" ]
+      images:
+      - from:
+          kind: ImageStreamTag
+          name: descheduler:binaries
+        paths:
+        - destinationDir: .
+          sourcePath: /go/src/github.com/kubernetes-incubator/descheduler/.
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: centos:7
+        imageOptimizationPolicy: SkipLayers
+    successfulBuildsHistoryLimit: 1
+    triggers:
+    - imageChange:
+        from:
+          kind: ImageStreamTag
+          name: descheduler:binaries
+      type: ImageChange
+kind: List
+metadata: {}
