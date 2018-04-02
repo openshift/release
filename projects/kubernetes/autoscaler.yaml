@@ -3,17 +3,17 @@ items:
 - apiVersion: v1
   kind: ImageStream
   metadata:
-    name: origin-cluster-autoscaler
+    name: cluster-autoscaler
 - apiVersion: v1
   kind: BuildConfig
   metadata:
-    name: origin-cluster-autoscaler-binary
+    name: cluster-autoscaler-binary
   spec:
     failedBuildsHistoryLimit: 2
     output:
       to:
         kind: ImageStreamTag
-        name: origin-cluster-autoscaler:binaries
+        name: cluster-autoscaler:binaries
     source:
       dockerfile: |
         FROM scratch
@@ -27,7 +27,7 @@ items:
       dockerStrategy:
         from:
           kind: DockerImage
-          name: openshift/origin-release:golang-1.8
+          name: openshift/origin-release:golang-1.9
         imageOptimizationPolicy: SkipLayers
     successfulBuildsHistoryLimit: 1
     triggers:
@@ -39,7 +39,7 @@ items:
 - apiVersion: v1
   kind: BuildConfig
   metadata:
-    name: origin-cluster-autoscaler
+    name: cluster-autoscaler
   spec:
     failedBuildsHistoryLimit: 2
     output:
@@ -47,11 +47,11 @@ items:
         name: registry-push
       to:
         kind: DockerImage
-        name: docker.io/openshift/kubernetes-autoscaler:v1.2.0-dev
+        name: docker.io/openshift/cluster-autoscaler:v1.2.0
     source:
       dockerfile: |
         FROM        centos:7
-        MAINTAINER  Clayton Coleman <ccoleman@redhat.com>
+        MAINTAINER  Seth Jennings <sjenning@redhat.com>
 
         COPY cluster-autoscaler /bin/cluster-autoscaler
 
@@ -59,7 +59,7 @@ items:
       images:
       - from:
           kind: ImageStreamTag
-          name: origin-cluster-autoscaler:binaries
+          name: cluster-autoscaler:binaries
         paths:
         - destinationDir: .
           sourcePath: /go/src/k8s.io/autoscaler/cluster-autoscaler/.
@@ -74,7 +74,7 @@ items:
     - imageChange:
         from:
           kind: ImageStreamTag
-          name: origin-cluster-autoscaler:binaries
+          name: cluster-autoscaler:binaries
       type: ImageChange
 kind: List
 metadata: {}
