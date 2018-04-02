@@ -124,7 +124,7 @@ prow-jobs:
 	$(MAKE) apply WHAT=projects/acs-engine/build.yaml
 .PHONY: prow-jobs
 
-projects: gcsweb kube-state-metrics oauth-proxy origin-release prometheus test-bases image-pruner-setup autoscaler descheduler
+projects: gcsweb kube-state-metrics oauth-proxy origin-release prometheus test-bases image-pruner-setup autoscaler descheduler node-problem-detector
 .PHONY: projects
 
 autoscaler:
@@ -134,6 +134,10 @@ autoscaler:
 descheduler:
 	$(MAKE) apply WHAT=projects/kubernetes/descheduler.yaml
 .PHONY: descheduler
+
+node-problem-detector:
+	$(MAKE) apply WHAT=projects/kubernetes/node-problem-detector.yaml
+.PHONY: node-problem-detector
 
 projects-secrets:
 	# GITHUB_DEPLOYMENTCONFIG_TRIGGER is used to route github webhook deliveries
