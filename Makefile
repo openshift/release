@@ -124,8 +124,17 @@ prow-jobs:
 	$(MAKE) apply WHAT=projects/acs-engine/build.yaml
 .PHONY: prow-jobs
 
-projects: gcsweb kube-state-metrics oauth-proxy origin-release prometheus test-bases image-pruner-setup
+projects: gcsweb kube-state-metrics oauth-proxy origin-release prometheus test-bases image-pruner-setup autoscaler
 .PHONY: projects
+
+autoscaler:
+	$(MAKE) apply WHAT=projects/kubernetes/autoscaler.yaml
+.PHONY: autoscaler
+
+projects-secrets:
+	# GITHUB_DEPLOYMENTCONFIG_TRIGGER is used to route github webhook deliveries
+	oc create secret generic github-deploymentconfig-trigger --from-literal=WebHookSecretKey="${GITHUB_DEPLOYMENTCONFIG_TRIGGER}"
+.PHONY: projects-secrets
 
 gcsweb:
 	$(MAKE) applyTemplate WHAT=projects/gcsweb/pipeline.yaml
