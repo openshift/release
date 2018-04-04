@@ -13,7 +13,7 @@ applyTemplate:
 all: roles prow projects
 .PHONY: all
 
-roles:
+roles: ci-ns
 	$(MAKE) apply WHAT=cluster/ci/config/roles.yaml
 .PHONY: roles
 
