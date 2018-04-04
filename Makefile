@@ -124,7 +124,7 @@ prow-jobs:
 	$(MAKE) apply WHAT=projects/acs-engine/build.yaml
 .PHONY: prow-jobs
 
-projects: gcsweb kube-state-metrics oauth-proxy origin-release prometheus test-bases image-pruner-setup autoscaler descheduler node-problem-detector
+projects: gcsweb kube-state-metrics oauth-proxy origin-release prometheus test-bases image-pruner-setup autoscaler descheduler node-problem-detector publishing-bot
 .PHONY: projects
 
 autoscaler:
@@ -155,6 +155,10 @@ kube-state-metrics:
 oauth-proxy:
 	$(MAKE) apply WHAT=projects/oauth-proxy/pipeline.yaml
 .PHONY: oauth-proxy
+
+publishing-bot:
+	$(MAKE) apply WHAT=projects/publishing-bot/storage-class.yaml
+.PHONY: publishing-bot
 
 origin-release:
 	# $DOCKERCONFIGJSON is the path to the json file
