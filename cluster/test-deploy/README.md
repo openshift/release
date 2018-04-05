@@ -16,6 +16,8 @@ Prerequisites:
 
 In each profile, see `vars-origin.yaml` for the default settings (which is common across all profiles) and `vars.yaml` for the variables that differ.
 
+If you need to customize things like the number of nodes, the type of instances or size of the root disk, vars.yaml is for you.
+
 ### Configure a profile manually
 
 Add the following files to the profile directory:
@@ -95,3 +97,10 @@ The following environment variables can be provided
     ```shell
     docker push docker-registry-default.apps.$WHAT.origin-gce.dev.openshift.com/openshift/origin:b42d282
     ```
+
+## ssh'ing to the nodes
+```
+# KUBECONFIG=gcp-dev/admin.kubeconfig oc get nodes -o wide
+# chmod 0600 gcp-dev/ssh-privatekey
+# ssh -i gcp-dev/ssh-privatekey cloud-user@$node
+```
