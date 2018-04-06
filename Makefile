@@ -172,12 +172,12 @@ prometheus: node-exporter alert-buffer
 .PHONY: prometheus
 
 prometheus-rules:
-	oc create cm prometheus-rules -n kube-system --from-file=prometheus.rules=projects/prometheus/prometheus.rules.yaml -o yaml --dry-run | oc apply -f -
-	oc set volume sts/prometheus  -n kube-system -c prometheus --add -t configmap --configmap-name=prometheus-rules -m /etc/prometheus/prometheus.rules --sub-path=..data/prometheus.rules || true
+	oc create cm prometheus-rules -n openshift-monitoring --from-file=prometheus.rules=projects/prometheus/prometheus.rules.yaml -o yaml --dry-run | oc apply -f -
+	oc set volume sts/prometheus  -n openshift-monitoring -c prometheus --add -t configmap --configmap-name=prometheus-rules -m /etc/prometheus/prometheus.rules --sub-path=..data/prometheus.rules || true
 .PHONY: prometheus-rules
 
 prometheus-alerts:
-	oc create cm prometheus-alerts -n kube-system --from-file=projects/prometheus/alertmanager.yml -o yaml --dry-run | oc apply -f -
+	oc create cm prometheus-alerts -n openshift-monitoring --from-file=projects/prometheus/alertmanager.yml -o yaml --dry-run | oc apply -f -
 .PHONY: prometheus-alerts
 
 node-exporter:
