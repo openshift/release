@@ -25,6 +25,8 @@ if [[ -z "${image}" ]]; then
   fi
 fi
 
+TYPE=${TYPE:-gcp}
+
 ctr="$TYPE"-build-"$( date +%Y%m%d-%H%M%S )"
 
 function cleanup() {
