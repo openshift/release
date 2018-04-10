@@ -124,8 +124,12 @@ prow-jobs:
 	$(MAKE) apply WHAT=projects/acs-engine/build.yaml
 .PHONY: prow-jobs
 
-projects: gcsweb kube-state-metrics oauth-proxy origin-release prometheus test-bases image-pruner-setup autoscaler descheduler node-problem-detector publishing-bot
+projects: gcsweb kube-state-metrics oauth-proxy origin-release prometheus test-bases image-pruner-setup autoscaler descheduler node-problem-detector publishing-bot cluster-capacity
 .PHONY: projects
+
+cluster-capacity:
+	$(MAKE) apply WHAT=projects/kubernetes/cluster-capacity.yaml
+.PHONY: cluster-capacity
 
 autoscaler:
 	$(MAKE) apply WHAT=projects/kubernetes/autoscaler.yaml
