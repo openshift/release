@@ -1,0 +1,82 @@
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: ImageStream
+  metadata:
+    name: cluster-capacity
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    name: cluster-capacity-binary
+  spec:
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: cluster-capacity:binaries
+    source:
+      dockerfile: |
+        FROM scratch
+        COPY . /go/src/github.com/kubernetes-incubator/cluster-capacity
+        RUN cd /go/src/github.com/kubernetes-incubator/cluster-capacity && \
+            make build
+      git:
+        uri: https://github.com/openshift/cluster-capacity.git
+      type: Git
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: openshift/origin-release:golang-1.10
+        imageOptimizationPolicy: SkipLayers
+    successfulBuildsHistoryLimit: 1
+    triggers:
+    - type: ConfigChange
+    - type: GitHub
+      github:
+        secretReference:
+          name: github-deploymentconfig-trigger
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    name: cluster-capacity
+  spec:
+    failedBuildsHistoryLimit: 2
+    output:
+      pushSecret:
+        name: registry-push
+      to:
+        kind: DockerImage
+        name: docker.io/openshift/cluster-capacity:v0.4.0
+    source:
+      dockerfile: |
+        FROM        centos:7
+        MAINTAINER  Avesh Agarwal <avagarwa@redhat.com>
+
+        COPY hypercc /bin/hypercc
+        RUN ln -s /bin/hypercc /bin/cluster-capacity && \
+            ln -s /bin/hypercc /bin/genpod
+
+        ENTRYPOINT [ "/bin/cluster-capacity" ]
+      images:
+      - from:
+          kind: ImageStreamTag
+          name: cluster-capacity:binaries
+        paths:
+        - destinationDir: .
+          sourcePath: /go/src/github.com/kubernetes-incubator/cluster-capacity/.
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: centos:7
+        imageOptimizationPolicy: SkipLayers
+    successfulBuildsHistoryLimit: 1
+    triggers:
+    - imageChange:
+        from:
+          kind: ImageStreamTag
+          name: cluster-capacity:binaries
+      type: ImageChange
+kind: List
+metadata: {}
