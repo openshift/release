@@ -4,8 +4,34 @@
 #
 # The standard name for this image is openshift/origin-release
 #
-FROM common-test-base:golang-1.8
-MAINTAINER  Steve Kuznetsov <skuznets@redhat.com>
+FROM centos:7
+
+ENV VERSION=1.8.3 \
+    GOPATH=/go
+ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
+
+COPY cbs-paas7-openshift-multiarch-el7-build.repo /etc/yum.repos.d/
+RUN yum install -y epel-release && \
+    rpm -V epel-release && \
+    INSTALL_PKGS="bc bind-utils bsdtar ceph-common createrepo device-mapper device-mapper-persistent-data e2fsprogs ethtool file findutils gcc git glibc-static gpgme gpgme-devel hostname iptables jq krb5-devel libassuan libassuan-devel lsof make mercurial nmap-ncat openssl protobuf-compiler rsync socat sysvinit-tools tar tito tree util-linux wget which xfsprogs zip goversioninfo" && \
+    yum install -y $INSTALL_PKGS && \
+    rpm -V $INSTALL_PKGS && \
+    yum clean all && \
+    touch /os-build-image && \
+    git config --system user.name origin-release-container && \
+    git config --system user.email origin-release@redhat.com
+
+RUN INSTALL_PKGS="golang-${VERSION}" && \
+    yum install -y $INSTALL_PKGS && \
+    rpm -V $INSTALL_PKGS && \
+    yum clean all && \
+    go get golang.org/x/tools/cmd/cover \
+        golang.org/x/tools/cmd/goimports \
+        github.com/tools/godep \
+        github.com/golang/lint/golint \
+        github.com/openshift/imagebuilder/cmd/imagebuilder && \
+    mv $GOPATH/bin/* /usr/bin/ && \
+    rm -rf $GOPATH/*
 
 ENV OS_VERSION_FILE=/go/src/github.com/openshift/origin/os-version-defs
 
