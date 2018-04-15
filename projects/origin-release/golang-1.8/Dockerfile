@@ -31,7 +31,10 @@ RUN INSTALL_PKGS="golang-${VERSION}" && \
         github.com/golang/lint/golint \
         github.com/openshift/imagebuilder/cmd/imagebuilder && \
     mv $GOPATH/bin/* /usr/bin/ && \
-    rm -rf $GOPATH/*
+    rm -rf $GOPATH/* && \
+    mkdir $GOPATH/bin && \
+    ln -s /usr/bin/imagebuilder $GOPATH/bin/imagebuilder
+    # TODO: symlink for backwards compatibility with hack/build-images.sh only, remove
 
 ENV OS_VERSION_FILE=/go/src/github.com/openshift/origin/os-version-defs
 
