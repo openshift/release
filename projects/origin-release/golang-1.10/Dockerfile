@@ -34,7 +34,10 @@ RUN yum install -y /tmp/origin-rpm/*.rpm && \
         github.com/openshift/imagebuilder/cmd/imagebuilder \
         k8s.io/test-infra/prow/cmd/clonerefs && \
     mv $GOPATH/bin/* /usr/bin/ && \
-    rm -rf $GOPATH/*
+    rm -rf $GOPATH/* && \
+    mkdir $GOPATH/bin && \
+    ln -s /usr/bin/imagebuilder $GOPATH/bin/imagebuilder
+    # TODO: symlink for backwards compatibility with hack/build-images.sh only, remove
 
 RUN chmod g+xw -R $GOPATH && \
     chmod g+xw -R $(go env GOROOT)
