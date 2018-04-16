@@ -121,7 +121,7 @@ prow-services:
 prow-jobs:
 	$(MAKE) applyTemplate WHAT=cluster/ci/jobs/commenter.yaml
 	$(MAKE) apply WHAT=projects/prometheus/test/build.yaml
-	$(MAKE) apply WHAT=projects/acs-engine/build.yaml
+	$(MAKE) applyTemplate WHAT=projects/acs-engine/build.yaml
 .PHONY: prow-jobs
 
 projects: gcsweb kube-state-metrics oauth-proxy origin-release prometheus test-bases image-pruner-setup autoscaler descheduler node-problem-detector publishing-bot cluster-capacity
