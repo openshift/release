@@ -355,15 +355,27 @@ presubmits:
     rerun_command: "/test crio"
     trigger: "((?m)^/test crio,?(\\s+|$))"
 
-    # this job along with test_branch_origin_service_catalog will be deleted once the new catalog job is stable
+  - name: test_pull_request_origin_service_catalog_39
+    agent: jenkins
+    labels:
+      master: ci.openshift.redhat.com
+    always_run: false
+    branches:
+    - release-3.9
+    skip_report: true
+    run_if_changed: '^(pkg/cmd/server/bootstrappolicy)|^(pkg/oc/bootstrap/docker/openshift)|^(cmd/service-catalog)|^(examples/service-catalog)'
+    context: ci/openshift-jenkins/service-catalog
+    rerun_command: "/test service-catalog"
+    trigger: "((?m)^/test service-catalog,?(\\s+|$))"
+
   - name: test_pull_request_origin_service_catalog
     agent: jenkins
     labels:
       master: ci.openshift.redhat.com
     always_run: false
-    # TEMPORARY until this job is fixed to work
-    skip_report: true
-    run_if_changed: '^(pkg/cmd/server/bootstrappolicy)|^(pkg/oc/bootstrap/docker/openshift)|^(cmd/service-catalog)'
+    branches:
+    - master
+    run_if_changed: '^(pkg/cmd/server/bootstrappolicy)|^(pkg/oc/bootstrap/docker/openshift)|^(examples/service-catalog)'
     context: ci/openshift-jenkins/service-catalog
     rerun_command: "/test service-catalog"
     trigger: "((?m)^/test service-catalog,?(\\s+|$))"
@@ -1312,7 +1324,6 @@ postsubmits:
       master: ci.openshift.redhat.com
     branches:
     - master
-    - release-3.9
   - name: test_branch_origin_extended_conformance_azure_39
     agent: jenkins
     labels:
