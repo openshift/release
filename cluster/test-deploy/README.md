@@ -43,6 +43,8 @@ cp $SHARED_SECRETS/mirror/client.p12 $RELEASE_TOOLS/$PROFILE/ops-mirror.pem
 
 ## Usage
 
+Set `WHAT` below to a name that will identify your cluster (it gets the domain `$WHAT.origin-gce.dev.openshift.com`).  Please include your LDAP username to avoid collisions with others.
+
 You can set an alternate profile by passing `PROFILE=gcp` on the `make` arguments.
 
 ```
