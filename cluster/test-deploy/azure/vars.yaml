@@ -86,3 +86,104 @@ openshift_azure_acsengine_template_edits:
   value: "{{ openshift_azure_client_id }}"
 - key: properties.servicePrincipalProfile.secret
   value: "{{ openshift_azure_service_secret }}"
+
+
+openshift_additional_repos_rhel_default:
+  baseurl: 'https://mirror.openshift.com/enterprise/enterprise-3.9/latest/x86_64/os/'
+  enabled: yes
+  gpgcheck: no
+  gpgkey: 'https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-release https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-beta https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-openshifthosted'
+  id: openshift-repo
+  name: openshift-repo
+  sslclientcert: /var/lib/yum/client-cert.pem
+  sslclientkey: /var/lib/yum/client-key.pem
+  sslverify: no
+
+openshift_additional_repos_rhel_test:
+  baseurl: '{{ openshift_test_repo | default("") }}'
+  enabled: yes
+  gpgcheck: no
+  id: openshift-test-repo
+  name: openshift-test-repo
+
+openshift_additional_repos_rhel:
+- '{{ openshift_additional_repos_rhel_test if openshift_test_repo is defined else openshift_additional_repos_rhel_default }}'
+
+- baseurl: 'https://mirror.ops.rhcloud.com/enterprise/rhel/rhel-7-fast-datapath-rpms/'
+  description: 'Fastdata provides the official builds of OVS OpenShift supports'
+  enabled: True
+  gpgcheck: False
+  gpgkey: 'https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-release https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-beta https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-openshifthosted'
+  name: fastdata-ovs
+  sslclientcert: /var/lib/yum/client-cert.pem
+  sslclientkey: /var/lib/yum/client-key.pem
+  sslverify: False
+
+- name: rhel-server-ansible
+  id: rhel-server-ansible
+  description: "Red Hat Enterprise Linux 7 - ansible"
+  baseurl: 'https://mirror.openshift.com/enterprise/rhel/rhel-7-server-ansible-2.4-rpms/'
+  enabled: yes
+  gpgcheck: yes
+  sslverify: no
+  sslclientcert: "/var/lib/yum/client-cert.pem"
+  sslclientkey: "/var/lib/yum/client-key.pem"
+  gpgkey: "https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-release https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-beta https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-openshifthosted"
+
+- name: rhel-server-extras
+  id: rhel-server-extras
+  description: "Red Hat Enterprise Linux 7 - Extras"
+  baseurl: 'https://mirror.ops.rhcloud.com/libra/rhui-rhel-server-7-extras/'
+  enabled: yes
+  gpgcheck: yes
+  sslverify: no
+  sslclientcert: "/var/lib/yum/client-cert.pem"
+  sslclientkey: "/var/lib/yum/client-key.pem"
+  gpgkey: "https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-release https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-beta https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-openshifthosted"
+
+- name: rhel-server-releases
+  id: rhel-server-releases
+  description: "Red Hat Enterprise Linux 7"
+  baseurl: 'https://mirror.ops.rhcloud.com/libra/rhui-rhel-server-7-releases/'
+  enabled: yes
+  gpgcheck: yes
+  sslverify: no
+  sslclientcert: "/var/lib/yum/client-cert.pem"
+  sslclientkey: "/var/lib/yum/client-key.pem"
+  gpgkey: "https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-release https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-beta https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-openshifthosted"
+
+- name: rhel-server-releases-optional
+  id: rhel-server-releases
+  description: "Red Hat Enterprise Linux 7 - Optional"
+  baseurl: 'https://mirror.ops.rhcloud.com/libra/rhui-rhel-server-7-releases-optional/'
+  enabled: yes
+  gpgcheck: yes
+  sslverify: no
+  sslclientcert: "/var/lib/yum/client-cert.pem"
+  sslclientkey: "/var/lib/yum/client-key.pem"
+  gpgkey: "https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-release https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-beta https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-openshifthosted"
+
+
+openshift_additional_repos_centos_default:
+  name: origin-pr
+  baseurl: 'https://storage.googleapis.com/origin-ci-test/logs/test_branch_origin_extended_conformance_gce_39/23/artifacts/rpms'
+  enabled: 1
+  gpgcheck: 0
+
+openshift_additional_repos_centos_test:
+  baseurl: '{{ openshift_test_repo | default("") }}'
+  enabled: 1
+  gpgcheck: 0
+  id: openshift-test-repo
+  name: openshift-test-repo
+
+openshift_additional_repos_centos:
+- '{{ openshift_additional_repos_centos_test if openshift_test_repo is defined else openshift_additional_repos_centos_default }}'
+
+- name: origin-pr-dependencies
+  baseurl: 'http://mirror.centos.org/centos/7/paas/x86_64/openshift-origin/'
+  enabled: 1
+  gpgcheck: 0
+
+
+openshift_additional_repos: '{{ openshift_additional_repos_rhel if openshift_deployment_type == "openshift-enterprise" else openshift_additional_repos_centos }}'
