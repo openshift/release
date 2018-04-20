@@ -14,6 +14,11 @@ jenkins_operators:
   max_goroutines: 20
   allow_cancellations: true
   job_url_template: 'https://ci.dev.openshift.redhat.com/jenkins/job/{{.Spec.Job}}/{{.Status.JenkinsBuildID}}'
+- label_selector: master=kata-jenkins-ci.westus2.cloudapp.azure.com
+  max_concurrency: 10
+  max_goroutines: 20
+  allow_cancellations: true
+  job_url_template: 'http://kata-jenkins-ci.westus2.cloudapp.azure.com/job/{{.Spec.Job}}/{{.Status.JenkinsBuildID}}'
 
 sinker:
   resync_period: 1h
@@ -823,6 +828,15 @@ presubmits:
     context: ci/openshift-jenkins/ami_fedora
     rerun_command: "/test ami_fedora"
     trigger: "((?m)^/test( ami| ami_fedora),?(\\s+|$))"
+
+  - name: kata-containers-crio-PR
+    agent: jenkins
+    labels:
+      master: kata-jenkins-ci.westus2.cloudapp.azure.com
+    always_run: false
+    context: ci/kata-jenkins
+    rerun_command: "/test kata-containers"
+    trigger: "((?m)^/test( all| kata-containers),?(\\s+|$))"
 
   openshift/origin-aggregated-logging:
   - name: test_pull_request_origin_aggregated_logging_journald
