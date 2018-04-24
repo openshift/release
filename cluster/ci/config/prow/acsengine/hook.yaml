@@ -1,0 +1,128 @@
+# Needs the hmac-token secret for decrypting webhook payloads.
+# Needs the oauth-token secret for manipulating Github PRs/issues.
+apiVersion: template.openshift.io/v1
+kind: Template
+parameters:
+- description: The name of the component.
+  name: NAME
+  value: hook
+objects:
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    name: "${NAME}"
+- kind: Role
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: "${NAME}"
+  rules:
+    - apiGroups:
+        - ""
+      resources:
+        - configmaps
+      verbs:
+        - update
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: "${NAME}"
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: Role
+    name: "${NAME}"
+  subjects:
+  - kind: ServiceAccount
+    name: "${NAME}"
+
+- apiVersion: v1
+  kind: Route
+  metadata:
+    name: "${NAME}"
+  spec:
+    path: /hook
+    tls:
+      insecureEdgeTerminationPolicy: Redirect
+      termination: edge
+    to:
+      kind: Service
+      name: "${NAME}"
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: "${NAME}"
+    annotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "8888"
+  spec:
+    selector:
+      app: prow
+      component: "${NAME}"
+    ports:
+    - port: 8888
+    type: ClusterIP
+- apiVersion: apps.openshift.io/v1
+  kind: DeploymentConfig
+  metadata:
+    name: "${NAME}"
+    labels:
+      app: prow
+      component: "${NAME}"
+  spec:
+    replicas: 1
+    revisionHistoryLimit: 2
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: "${NAME}"
+      spec:
+        serviceAccountName: "${NAME}"
+        containers:
+        - name: "${NAME}"
+          image: " "
+          args:
+          - --dry-run=false
+          ports:
+            - name: http
+              containerPort: 8888
+          volumeMounts:
+          - name: hmac
+            mountPath: /etc/webhook
+            readOnly: true
+          - name: oauth
+            mountPath: /etc/github
+            readOnly: true
+          - name: config
+            mountPath: /etc/config
+            readOnly: true
+          - name: plugins
+            mountPath: /etc/plugins
+            readOnly: true
+          - name: tmp
+            mountPath: /tmp
+        volumes:
+        - name: hmac
+          secret:
+            secretName: hmac-token
+        - name: oauth
+          secret:
+            secretName: oauth-token
+        - name: config
+          configMap:
+            name: config
+        - name: plugins
+          configMap:
+            name: plugins
+        - name: tmp
+          emptyDir: {}
+    triggers:
+    - type: ConfigChange
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - "${NAME}"
+        from:
+          kind: ImageStreamTag
+          name: "${NAME}:latest"
+          namespace: ci
+      type: ImageChange

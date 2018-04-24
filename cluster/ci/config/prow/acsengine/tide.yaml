@@ -1,0 +1,109 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+parameters:
+- description: The name of the component.
+  name: NAME
+  value: tide
+- description: The namespace of the component.
+  name: NAMESPACE
+  value: acs-engine-ci
+objects:
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    name: "${NAME}"
+    namespace: "${NAMESPACE}"
+- kind: Role
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: "${NAME}"
+    namespace: "${NAMESPACE}"
+  rules:
+    - apiGroups:
+        - "prow.k8s.io"
+      resources:
+        - prowjobs
+      verbs:
+        - create
+        - list
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: "${NAME}"
+    namespace: "${NAMESPACE}"
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: Role
+    name: "${NAME}"
+    namespace: "${NAMESPACE}"
+  subjects:
+  - kind: ServiceAccount
+    name: "${NAME}"
+    namespace: "${NAMESPACE}"
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: "${NAME}"
+    namespace: "${NAMESPACE}"
+  spec:
+    selector:
+      app: prow
+      component: "${NAME}"
+    ports:
+    - port: 80
+      targetPort: 8888
+    type: ClusterIP
+- apiVersion: apps.openshift.io/v1
+  kind: DeploymentConfig
+  metadata:
+    name: "${NAME}"
+    namespace: "${NAMESPACE}"
+    labels:
+      app: prow
+      component: "${NAME}"
+  spec:
+    # Do not scale up.
+    replicas: 1
+    strategy:
+      type: Recreate
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: "${NAME}"
+      spec:
+        serviceAccountName: "${NAME}"
+        containers:
+        - name: "${NAME}"
+          image: " "
+          args:
+          - --dry-run=false
+          - --github-token-file=/etc/github/token
+          ports:
+          - name: http
+            containerPort: 8888
+          volumeMounts:
+          - name: oauth
+            mountPath: /etc/github
+            readOnly: true
+          - name: config
+            mountPath: /etc/config
+            readOnly: true
+        volumes:
+        - name: oauth
+          secret:
+            secretName: tide-oauth-token
+        - name: config
+          configMap:
+            name: config
+    triggers:
+    - type: ConfigChange
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - "${NAME}"
+        from:
+          kind: ImageStreamTag
+          name: "${NAME}:latest"
+          namespace: ci
+      type: ImageChange
