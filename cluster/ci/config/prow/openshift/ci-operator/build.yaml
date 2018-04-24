@@ -1,0 +1,43 @@
+kind: List
+apiVersion: v1
+items:
+- apiVersion: build.openshift.io/v1
+  kind: BuildConfig
+  metadata:
+    name: ci-operator
+    namespace: ci
+  spec:
+    output:
+      to:
+        kind: ImageStreamTag
+        name: ci-operator:latest
+    runPolicy: Serial
+    source:
+      dockerfile: |-
+        FROM openshift/origin-release:golang-1.9
+        WORKDIR /go/src/github.com/openshift/ci-operator
+        COPY . .
+        RUN go install ./cmd/ci-operator
+        FROM centos:7
+        COPY --from=0 /go/bin/ci-operator /usr/bin/ci-operator
+      git:
+        uri: https://github.com/openshift/ci-operator.git
+      type: Git
+    strategy:
+      dockerStrategy:
+        forcePull: true
+        from:
+          kind: DockerImage
+          name: centos:7
+      type: Docker
+    triggers:
+    - github:
+        secretReference:
+          name: github-deploymentconfig-trigger
+      type: GitHub
+    - type: ConfigChange
+- apiVersion: image.openshift.io/v1
+  kind: ImageStream
+  metadata:
+    name: ci-operator
+    namespace: ci
