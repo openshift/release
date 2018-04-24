@@ -79,6 +79,7 @@ prow-builds:
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/tot.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/tracer.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/config-updater/build.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/ci-operator/build.yaml
 .PHONY: prow-builds
 
 prow-update:
