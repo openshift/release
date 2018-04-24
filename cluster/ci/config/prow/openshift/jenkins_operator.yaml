@@ -212,12 +212,13 @@ objects:
         serviceAccountName: jenkins-operator
         containers:
         - name: kata-jenkins-operator
-          image: quay.io/kargakis/jenkins-operator:pretot # TODO " "
+          image: "${NAME}"
           args:
           - --jenkins-url=http://kata-jenkins-ci.westus2.cloudapp.azure.com/
           - --jenkins-user=katabuilder
           - --jenkins-token-file=/etc/jenkins/basic
           - --label-selector=master=kata-jenkins-ci.westus2.cloudapp.azure.com
+          - --csrf-protect=true
           - --dry-run=false
           ports:
           - name: logs
@@ -245,3 +246,11 @@ objects:
             name: config
     triggers:
     - type: ConfigChange
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - kata-jenkins-operator
+        from:
+          kind: ImageStreamTag
+          name: "${NAME}:latest"
+      type: ImageChange
