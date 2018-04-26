@@ -16,30 +16,29 @@ Prerequisites:
 
 In each profile, see `vars-origin.yaml` for the default settings (which is common across all profiles) and `vars.yaml` for the variables that differ.
 
-### Configure a profile manually
+### Configure a profile
 
-Add the following files to the profile directory:
-
-* `gce.json` containing the GCP service account credentials to use that have permission to create instances, networks, and a bucket in the project used by the profile
-* `ops-mirror.pem` containing the client certificate for the OpenShift ops mirror
-* `ssh-privatekey` (optional) with the private key to use for the GCP instances
-* `ssh-publickey` (optional) a key to use with the above private key
-
-### Configure a profile using shared secrets
+This is the typical workflow to configure the development profile `gcp-dev` (but would apply to any other profile).
 
 Clone the shared secrets repo to `$SHARED_SECRETS`:
 
 ```shell
-git clone git@github.com:openshift/shared-secrets.git
+git clone git@github.com:openshift/shared-secrets.git $SHARED_SECRETS
 ```
 
-Copy secrets to a given `$PROFILE` in the in the release tools directory:
+Copy secrets to their well-known locations in the profile directory:
 
 ```shell
-cp $SHARED_SECRETS/gce/aos-serviceaccount.json $RELEASE_TOOLS/$PROFILE/gce.json
-cp $SHARED_SECRETS/gce/cloud-user@gce.pem $RELEASE_TOOLS/$PROFILE/ssh-privatekey
-cp $SHARED_SECRETS/mirror/client.p12 $RELEASE_TOOLS/$PROFILE/ops-mirror.pem
+cp $SHARED_SECRETS/gce/aos-serviceaccount.json $RELEASE_TOOLS/gcp-dev/gce.json
+
+cp $SHARED_SECRETS/gce/cloud-user@gce.pem $RELEASE_TOOLS/gcp-dev/ssh-privatekey
+
+cp $SHARED_SECRETS/mirror/client.p12 $RELEASE_TOOLS/gcp-dev/ops-mirror.pem
 ```
+
+### Configure installer variables
+
+**Add new installer variables** to a file such as `gcp-dev/myvars.yaml` (any YAML file in the profile directory will be treated as a variables file). Keep in mind that the precedence order of the variable files in the profile is unspecified: to override variables in `vars.yaml` or `vars-origin.yaml` just modify those files directly for now.
 
 ## Usage
 
@@ -70,9 +69,17 @@ The following ansible variables are commonly used:
 * `openshift_image_tag` (optional) is the suffix of the image to run with
 * `openshift_pkg_version` (optional) is the exact package value to use `-0.0.1` if installing RPMs that don't match the desired version
 
-The following environment variables can be provided
+The following environment variables can be provided:
 
 * `OPENSHIFT_ANSIBLE_IMAGE` (defaults to `openshift/origin-ansible:latest`) the image to deploy from
+
+The following files can be added to a profile:
+
+* `gce.json` containing the GCP service account credentials to use that have permission to create instances, networks, and a bucket in the project used by the profile
+* `ops-mirror.pem` containing the client certificate for the OpenShift ops mirror
+* `ssh-privatekey` (optional) with the private key to use for the GCP instances
+* `ssh-privatekey.pub` (optional) a key to use with the above private key
+
 
 ## Pushing images to the cluster registry
 
