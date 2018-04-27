@@ -17,7 +17,7 @@ roles:
 	$(MAKE) apply WHAT=cluster/ci/config/roles.yaml
 .PHONY: roles
 
-prow: ci-ns prow-crd prow-config prow-secrets prow-builds prow-rbac prow-services prow-jobs
+prow: ci-ns prow-crd prow-config prow-secrets prow-builds prow-rbac prow-services prow-jobs acs-engine-setup
 .PHONY: prow
 
 ci-ns:
@@ -200,3 +200,19 @@ image-pruner-setup:
 	oc adm policy --as=system:admin add-cluster-role-to-user system:image-pruner -z image-pruner
 	$(MAKE) apply WHAT=cluster/ci/jobs/image-pruner.yaml
 .PHONY: image-pruner-setup
+
+acs-engine-setup:
+	oc new-project acs-engine-ci
+	# TODO: Secrets
+	# ACS_HMAC_TOKEN is used for encrypting Github webhook payloads.
+	oc create secret generic hmac-token --from-literal=hmac=${ACS_HMAC_TOKEN}
+	# ACS_MERGE_TOKEN is used for merging PRs
+	oc create secret generic tide-oauth-token --from-literal=token=${ACS_MERGE_TOKEN}
+	# ACS_CI_TOKEN is used for manipulating Github PRs/issues (labels, comments, etc.).
+	oc create secret generic oauth-token --from-literal=oauth=${ACS_CI_TOKEN}
+	oc create cm config --from-file=config=cluster/ci/config/prow/acsengine/config.yaml
+	oc create cm plugins --from-file=plugins=cluster/ci/config/prow/acsengine/plugins.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/acsengine/deck.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/acsengine/hook.yaml
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/acsengine/tide.yaml
+.PHONY: acs-engine-setup

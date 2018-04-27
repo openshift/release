@@ -1,0 +1,62 @@
+apiVersion: v1
+kind: List
+items:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: tide
+  spec:
+    selector:
+      app: prow
+      component: tide
+    ports:
+    - port: 80
+      targetPort: 8888
+    type: ClusterIP
+- apiVersion: apps/v1beta2
+  kind: Deployment
+  metadata:
+    name: tide
+    labels:
+      app: prow
+      component: tide
+  spec:
+    # Do not scale up.
+    replicas: 1
+    serviceAccountName: tide
+    selector:
+      matchLabels:
+        app: prow
+        component: tide
+    strategy:
+      type: Recreate
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: tide
+      spec:
+        containers:
+        - name: tide
+          image: gcr.io/k8s-prow/tide:v20180411-68d5d28e8
+          args:
+          - --dry-run=false
+          # defaults to --github-token-file=/etc/github/oauth
+          # defaults to --config-path=/etc/config/config
+          ports:
+          - name: http
+            containerPort: 8888
+          volumeMounts:
+          - name: oauth
+            mountPath: /etc/github
+            readOnly: true
+          - name: config
+            mountPath: /etc/config
+            readOnly: true
+        volumes:
+        - name: oauth
+          secret:
+            secretName: tide-oauth-token
+        - name: config
+          configMap:
+            name: config
