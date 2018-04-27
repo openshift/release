@@ -392,6 +392,19 @@ presubmits:
     rerun_command: "/test service-catalog"
     trigger: "((?m)^/test service-catalog,?(\\s+|$))"
 
+  - name: test_pull_request_origin_extended_conformance_azure_39
+    agent: jenkins
+    labels:
+      master: ci.openshift.redhat.com
+    always_run: true
+    # TODO: Remove once the job is stable
+    skip_report: true
+    branches:
+    - release-3.9
+    context: ci/openshift-jenkins/azure
+    rerun_command: "/test azure"
+    trigger: "((?m)^/test( all| azure),?(\\s+|$))"
+
   openshift/ci-operator:
   - name: pull-ci-operator-unit
     agent: kubernetes
@@ -1341,6 +1354,12 @@ postsubmits:
       master: ci.openshift.redhat.com
     branches:
     - master
+  - name: test_branch_origin_extended_conformance_azure_39
+    agent: jenkins
+    labels:
+      master: ci.openshift.redhat.com
+    branches:
+    - release-3.9
 
   openshift/openshift-ansible:
   - name: test_branch_openshift_ansible_extended_conformance_gce_37
@@ -1775,23 +1794,23 @@ periodics:
   labels:
       master: ci.openshift.redhat.com
   interval: 2h
-- name: azure_build_base_image_rhel
-  agent: jenkins
-  labels:
-      master: ci.openshift.redhat.com
-  interval: 168h
-- name: azure_build_node_image_rhel
-  agent: jenkins
-  labels:
-      master: ci.openshift.redhat.com
-  interval: 168h
 - name: azure_build_base_image_centos
   agent: jenkins
   labels:
       master: ci.openshift.redhat.com
-  interval: 168h
-- name: azure_build_node_image_centos
+  interval: 24h
+  run_after_success:
+  - name: azure_build_node_image_centos_39
+    agent: jenkins
+    labels:
+        master: ci.openshift.redhat.com
+- name: azure_build_base_image_rhel
   agent: jenkins
   labels:
       master: ci.openshift.redhat.com
-  interval: 168h
+  interval: 24h
+  run_after_success:
+  - name: azure_build_node_image_rhel_39
+    agent: jenkins
+    labels:
+        master: ci.openshift.redhat.com
