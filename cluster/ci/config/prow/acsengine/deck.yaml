@@ -1,58 +1,48 @@
-apiVersion: template.openshift.io/v1
-kind: Template
-parameters:
-- description: The name of the component.
-  name: NAME
-  value: deck
-objects:
-- apiVersion: v1
-  kind: Route
-  metadata:
-    name: "${NAME}"
-  spec:
-    tls:
-      insecureEdgeTerminationPolicy: Redirect
-      termination: edge
-    to:
-      kind: Service
-      name: "${NAME}"
+apiVersion: v1
+kind: List
+items:
 - apiVersion: v1
   kind: Service
   metadata:
-    name: "${NAME}"
+    name: deck
   spec:
     selector:
       app: prow
-      component: "${NAME}"
+      component: deck
     ports:
     - port: 80
       targetPort: 8080
     type: ClusterIP
-- apiVersion: apps.openshift.io/v1
-  kind: DeploymentConfig
+- apiVersion: apps/v1beta2
+  kind: Deployment
   metadata:
-    name: "${NAME}"
+    name: deck
     labels:
       app: prow
-      component: "${NAME}"
+      component: deck
   spec:
     replicas: 1
+    selector:
+      matchLabels:
+        app: prow
+        component: deck
     revisionHistoryLimit: 2
     template:
       metadata:
         labels:
           app: prow
-          component: "${NAME}"
+          component: deck
       spec:
-        serviceAccountName: "${NAME}"
         containers:
-        - name: "${NAME}"
-          image: " "
+        - name: deck
+          image: gcr.io/k8s-prow/deck:v20180411-68d5d28e8
           args:
           - --tide-url=http://tide/
           - --hook-url=http://hook:8888/plugin-help
+          # defaults to --config-path=/etc/config/config
           ports:
             - name: http
+              # not configurable today, deck serves in 8080 
               containerPort: 8080
           volumeMounts:
           - name: config
@@ -62,18 +52,3 @@ objects:
         - name: config
           configMap:
             name: config
-    triggers:
-    - type: ConfigChange
-    - imageChangeParams:
-        automatic: true
-        containerNames:
-        - "${NAME}"
-        from:
-          kind: ImageStreamTag
-          name: "${NAME}:latest"
-          namespace: ci
-      type: ImageChange
-- apiVersion: v1
-  kind: ServiceAccount
-  metadata:
-    name: "${NAME}"

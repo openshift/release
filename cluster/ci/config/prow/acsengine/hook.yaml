@@ -1,87 +1,52 @@
 # Needs the hmac-token secret for decrypting webhook payloads.
 # Needs the oauth-token secret for manipulating Github PRs/issues.
-apiVersion: template.openshift.io/v1
-kind: Template
-parameters:
-- description: The name of the component.
-  name: NAME
-  value: hook
-objects:
-- apiVersion: v1
-  kind: ServiceAccount
-  metadata:
-    name: "${NAME}"
-- kind: Role
-  apiVersion: rbac.authorization.k8s.io/v1beta1
-  metadata:
-    name: "${NAME}"
-  rules:
-    - apiGroups:
-        - ""
-      resources:
-        - configmaps
-      verbs:
-        - update
-- kind: RoleBinding
-  apiVersion: rbac.authorization.k8s.io/v1beta1
-  metadata:
-    name: "${NAME}"
-  roleRef:
-    apiGroup: rbac.authorization.k8s.io
-    kind: Role
-    name: "${NAME}"
-  subjects:
-  - kind: ServiceAccount
-    name: "${NAME}"
-
-- apiVersion: v1
-  kind: Route
-  metadata:
-    name: "${NAME}"
-  spec:
-    path: /hook
-    tls:
-      insecureEdgeTerminationPolicy: Redirect
-      termination: edge
-    to:
-      kind: Service
-      name: "${NAME}"
+apiVersion: v1
+kind: List
+items:
 - apiVersion: v1
   kind: Service
   metadata:
-    name: "${NAME}"
+    name: hook
     annotations:
       prometheus.io/scrape: "true"
       prometheus.io/port: "8888"
   spec:
     selector:
       app: prow
-      component: "${NAME}"
+      component: hook
     ports:
     - port: 8888
     type: ClusterIP
-- apiVersion: apps.openshift.io/v1
-  kind: DeploymentConfig
+- apiVersion: apps/v1beta2
+  kind: Deployment
   metadata:
-    name: "${NAME}"
+    name: hook
     labels:
       app: prow
-      component: "${NAME}"
+      component: hook
   spec:
     replicas: 1
+    selector:
+      matchLabels:
+        app: prow
+        component: hook
     revisionHistoryLimit: 2
     template:
       metadata:
         labels:
           app: prow
-          component: "${NAME}"
+          component: hook
       spec:
-        serviceAccountName: "${NAME}"
         containers:
-        - name: "${NAME}"
-          image: " "
+        - name: hook
+          image: gcr.io/k8s-prow/hook:v20180411-68d5d28e8
           args:
           - --dry-run=false
+          # defaults to --port=8888
+          # defaults to --github-token-file=/etc/github/oauth
+          # defaults to --hmac-secret-file=/etc/webhook/hmac
+          # defaults to --config-path=/etc/config/config
+          # defaults to --plugin-config=/etc/plugins/plugins
           ports:
             - name: http
               containerPort: 8888
@@ -115,14 +80,3 @@ objects:
             name: plugins
         - name: tmp
           emptyDir: {}
-    triggers:
-    - type: ConfigChange
-    - imageChangeParams:
-        automatic: true
-        containerNames:
-        - "${NAME}"
-        from:
-          kind: ImageStreamTag
-          name: "${NAME}:latest"
-          namespace: ci
-      type: ImageChange
