@@ -1,0 +1,114 @@
+kind: Template
+apiVersion: template.openshift.io/v1
+parameters:
+- name: NAMESPACE
+  required: true
+- name: IMAGE_FORMAT
+  required: true
+- name: ANSIBLE_IMAGE
+  required: true
+- name: INSTANCE_PREFIX
+  required: true
+- name: RPM_REPO
+  required: true
+- name: CLUSTER_TYPE
+  required: true
+objects:
+
+# We want the cluster to be able to access these images
+- kind: RoleBinding
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: e2e-image-puller
+    namespace: ${NAMESPACE}
+  roleRef:
+    name: system:image-puller
+  subjects:
+  - kind: SystemGroup
+    name: system:unauthenticated
+
+# The e2e pod spins up a cluster, runs e2e tests, and then cleans up the cluster.
+- kind: Pod
+  apiVersion: v1
+  metadata:
+    name: e2e
+    namespace: ${NAMESPACE}
+  spec:
+    restartPolicy: Never
+    activeDeadlineSeconds: 7200
+    terminationGracePeriodSeconds: 600
+    volumes:
+    - name: shared-tmp
+      emptyDir: {}
+    - name: cluster-profile
+      secret:
+        secretName: cluster-profile
+
+    containers:
+    
+    # Runs an install
+    - name: ansible
+      image: ${ANSIBLE_IMAGE}
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp
+      - name: cluster-profile
+        mountPath: /usr/share/ansible/openshift-ansible/inventory/dynamic/injected
+      env:
+      - name: INSTANCE_PREFIX
+        value: ${INSTANCE_PREFIX}
+      command:
+      - /usr/local/bin/entrypoint-gcp
+      args:
+      - ansible-playbook
+      - -vv
+      - -e 
+      - openshift_test_repo=${RPM_REPO}
+      - -e
+      - oreg_url=${IMAGE_FORMAT}
+      - playbooks/${CLUSTER_TYPE}/openshift-cluster/launch.yml
+    
+    # Once admin.kubeconfig exists, executes shared tests
+    - name: e2e
+      image: ${ANSIBLE_IMAGE}
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -euo pipefail
+
+        trap 'kill $(jobs -p); exit 0' TERM
+
+        while true; do
+          if [[ ! -f /tmp/shared/admin.kubeconfig ]]; then
+            sleep 15 & wait
+            continue
+          fi
+          break
+        done
+
+        echo "Found shared kubeconfig"
+
+    # Performs cleanup of all created resources
+    - name: cleanup
+      image: ${ANSIBLE_IMAGE}
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      - name: cluster-profile
+        mountPath: /usr/share/ansible/openshift-ansible/inventory/dynamic/injected
+      env:
+      - name: INSTANCE_PREFIX
+        value: ${INSTANCE_PREFIX}
+      command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        trap '/usr/local/bin/entrypoint-${CLUSTER_TYPE} ansible-playbook -vv playbooks/${CLUSTER_TYPE}/openshift-cluster/deprovision.yml' EXIT
+        trap 'kill $(jobs -p); exit 0' TERM
+        sleep 7200 & wait
