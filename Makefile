@@ -13,7 +13,7 @@ applyTemplate:
 all: roles prow projects
 .PHONY: all
 
-roles:
+roles: cluster-operator-roles
 	$(MAKE) apply WHAT=cluster/ci/config/roles.yaml
 .PHONY: roles
 
@@ -209,3 +209,6 @@ image-pruner-setup:
 	oc adm policy --as=system:admin add-cluster-role-to-user system:image-pruner -z image-pruner
 	$(MAKE) apply WHAT=cluster/ci/jobs/image-pruner.yaml
 .PHONY: image-pruner-setup
+
+cluster-operator-roles:
+	$(MAKE) applyTemplate WHAT=projects/cluster-operator/cluster-operator-roles-template.yaml
