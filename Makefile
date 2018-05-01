@@ -82,6 +82,12 @@ prow-builds:
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/tracer.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/config-updater/build.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/ci-operator/build.yaml
+	$(MAKE) apply WHAT=tools/pod-utils/artifact-uploader.yaml
+	$(MAKE) apply WHAT=tools/pod-utils/clonerefs.yaml
+	$(MAKE) apply WHAT=tools/pod-utils/entrypoint.yaml
+	$(MAKE) apply WHAT=tools/pod-utils/gcsupload.yaml
+	$(MAKE) apply WHAT=tools/pod-utils/initupload.yaml
+	$(MAKE) apply WHAT=tools/pod-utils/sidecar.yaml
 .PHONY: prow-builds
 
 prow-update:
@@ -95,6 +101,7 @@ endif
 .PHONY: prow-update
 
 prow-rbac:
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/artifact-operator_rbac.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/deck_rbac.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/hook_rbac.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/horologium_rbac.yaml
@@ -106,6 +113,7 @@ prow-rbac:
 .PHONY: prow-rbac
 
 prow-services:
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/artifact-operator.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/cherrypick.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/deck.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/hook.yaml

@@ -1,0 +1,50 @@
+kind: List
+apiVersion: v1
+items:
+- apiVersion: apps.openshift.io/v1
+  kind: DeploymentConfig
+  metadata:
+    name: artifact-uploader
+    labels:
+      app: prow
+      component: artifact-uploader
+  spec:
+    replicas: 1
+    revisionHistoryLimit: 2
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: artifact-uploader
+      spec:
+        serviceAccountName: artifact-uploader
+        containers:
+        - name: artifact-uploader
+          image: " "
+          args:
+          - --num-workers=20
+          - --prow-job-ns=ci
+          - --path-strategy=single
+          - --default-org=openshift
+          - --default-repo=origin
+          - --gcs-path=gs://origin-ci-test/
+          - --gcs-credentials-file=/secrets/gcs/service-account.json
+          - --dry-run=false
+          volumeMounts:
+          - name: gcs-credentials
+            mountPath: /secrets/gcs
+            readOnly: true
+        volumes:
+        - name: gcs-credentials
+          secret:
+            secretName: gcs-publisher-credentials
+    triggers:
+    - type: ConfigChange
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - artifact-uploader
+        from:
+          kind: ImageStreamTag
+          name: artifact-uploader:latest
+      type: ImageChange
