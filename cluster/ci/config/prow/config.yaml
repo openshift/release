@@ -406,6 +406,38 @@ presubmits:
     rerun_command: "/test azure"
     trigger: "((?m)^/test( all| azure),?(\\s+|$))"
 
+  openshift/os:
+  - name: pull-ci-os-container-build
+    agent: kubernetes
+    context: pull-ci-os-container-build
+    branches:
+    - master
+    rerun_command: "/test build"
+    trigger: "/test build"
+    decorate: true
+    utility_images:
+      clonerefs: "registry.svc.ci.openshift.org/ci/clonerefs:latest-json"
+      initupload: "registry.svc.ci.openshift.org/ci/initupload:latest-json"
+      entrypoint: "registry.svc.ci.openshift.org/ci/entrypoint:latest-json"
+      sidecar: "registry.svc.ci.openshift.org/ci/sidecar:latest-json"
+    gcs_configuration:
+      bucket: "origin-ci-test"
+      path_strategy: "single"
+      default_org: "openshift"
+      default_repo: "origin"
+    gcs_credentials_secret: "gcs-publisher-credentials"
+    spec:
+      containers:
+      - name: build
+        image: registry.svc.ci.openshift.org/ci/origin-release:golang-1.9
+        command:
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          env
+          pwd
+
   openshift/ci-operator:
   - name: pull-ci-operator-unit
     agent: kubernetes
