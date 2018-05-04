@@ -219,4 +219,5 @@ image-pruner-setup:
 .PHONY: image-pruner-setup
 
 cluster-operator-roles:
+	$(MAKE) apply WHAT=projects/cluster-operator/cluster-operator-team-roles.yaml
 	$(MAKE) applyTemplate WHAT=projects/cluster-operator/cluster-operator-roles-template.yaml
