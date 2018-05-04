@@ -2,6 +2,7 @@ PROFILE ?= "gcp-dev"
 TYPE ?= $(shell cat $(PROFILE)/.type)
 INSTANCE_PREFIX ?= $(WHAT)
 export INSTANCE_PREFIX
+export TYPE
 
 # Select RPMs based on branch or tag
 REF ?= "master"
