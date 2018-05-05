@@ -428,6 +428,10 @@ presubmits:
       default_repo: "origin"
     gcs_credentials_secret: "gcs-publisher-credentials"
     spec:
+      serviceAccountName: privileged-builder
+      privileged: true
+      securityContext:
+        runAsUser: 0
       containers:
       - name: build
         image: registry.svc.ci.openshift.org/ci/origin-release:golang-1.9
@@ -436,8 +440,7 @@ presubmits:
         - -c
         - |
           #!/bin/bash
-          env
-          pwd
+          imagebuilder -privileged .
 
   openshift/ci-operator:
   - name: pull-ci-operator-unit

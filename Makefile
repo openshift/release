@@ -141,6 +141,7 @@ prow-cluster-jobs:
 prow-jobs: prow-cluster-jobs
 	$(MAKE) applyTemplate WHAT=cluster/ci/jobs/commenter.yaml
 	$(MAKE) apply WHAT=projects/prometheus/test/build.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/jobs/os.yaml
 	$(MAKE) applyTemplate WHAT=projects/acs-engine/build.yaml
 .PHONY: prow-jobs
 
