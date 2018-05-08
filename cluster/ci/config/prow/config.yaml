@@ -1841,6 +1841,31 @@ periodics:
     - name: token
       secret:
         secretName: openshift-bot-token
+- name: periodic-label-sync
+  interval: 24h
+  agent: kubernetes
+  spec:
+    containers:
+    - image: gcr.io/k8s-testimages/label_sync:v20180227-377685119
+      args:
+      - --config=/etc/config/labels.yaml
+      - --confirm=true
+      - --orgs=origin
+      - --token=/etc/github/oauth
+      volumeMounts:
+      - name: token
+        mountPath: /etc/github
+        readOnly: true
+      - name: config
+        mountPath: /etc/config
+        readOnly: true
+    volumes:
+    - name: token
+      secret:
+        secretName: openshift-bot-token
+    - name: config
+      configMap:
+        name: labels
 - name: ci-kubernetes-conformance-node-e2e-rhel
   agent: jenkins
   labels:
