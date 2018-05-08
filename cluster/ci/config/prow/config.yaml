@@ -1,6 +1,20 @@
 plank:
   allow_cancellations: true
   job_url_template: 'https://openshift-gce-devel.appspot.com/build/origin-ci-test/{{if eq .Spec.Type "presubmit"}}pr-logs/pull{{else if eq .Spec.Type "batch"}}pr-logs/pull{{else}}logs{{end}}{{if ne .Spec.Refs.Repo "origin"}}/{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}{{end}}{{if eq .Spec.Type "presubmit"}}/{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}{{else if eq .Spec.Type "batch"}}/batch{{end}}/{{.Spec.Job}}/{{.Status.BuildID}}/'
+  default_decoration_config:
+    timeout: 7200000000000 # 2h
+    grace_period: 15000000000 # 15s
+    utility_images:
+      clonerefs: "registry.svc.ci.openshift.org/ci/clonerefs:latest-json"
+      initupload: "registry.svc.ci.openshift.org/ci/initupload:latest-json"
+      entrypoint: "registry.svc.ci.openshift.org/ci/entrypoint:latest-json"
+      sidecar: "registry.svc.ci.openshift.org/ci/sidecar:latest-json"
+    gcs_configuration:
+      bucket: "origin-ci-test"
+      path_strategy: "single"
+      default_org: "openshift"
+      default_repo: "origin"
+    gcs_credentials_secret: "gcs-publisher-credentials"
 
 jenkins_operators:
 - label_selector: master=ci.openshift.redhat.com
@@ -414,17 +428,6 @@ presubmits:
     rerun_command: "/test build"
     trigger: "/test build"
     decorate: true
-    utility_images:
-      clonerefs: "registry.svc.ci.openshift.org/ci/clonerefs:latest-json"
-      initupload: "registry.svc.ci.openshift.org/ci/initupload:latest-json"
-      entrypoint: "registry.svc.ci.openshift.org/ci/entrypoint:latest-json"
-      sidecar: "registry.svc.ci.openshift.org/ci/sidecar:latest-json"
-    gcs_configuration:
-      bucket: "origin-ci-test"
-      path_strategy: "single"
-      default_org: "openshift"
-      default_repo: "origin"
-    gcs_credentials_secret: "gcs-publisher-credentials"
     spec:
       volumes:
       - name: docker-socket
@@ -452,17 +455,6 @@ presubmits:
     rerun_command: "/test pull-ci-operator-unit"
     trigger: "/test pull-ci-operator-unit"
     decorate: true
-    utility_images:
-      clonerefs: "registry.svc.ci.openshift.org/ci/clonerefs:latest-json"
-      initupload: "registry.svc.ci.openshift.org/ci/initupload:latest-json"
-      entrypoint: "registry.svc.ci.openshift.org/ci/entrypoint:latest-json"
-      sidecar: "registry.svc.ci.openshift.org/ci/sidecar:latest-json"
-    gcs_configuration:
-      bucket: "origin-ci-test"
-      path_strategy: "single"
-      default_org: "openshift"
-      default_repo: "origin"
-    gcs_credentials_secret: "gcs-publisher-credentials"
     spec:
       containers:
       - name: test
@@ -472,9 +464,6 @@ presubmits:
         - test
         - ./...
         image: docker.io/golang:latest
-        env:
-        - name: GOPATH
-          value: /home/prow/go
 
   openshift/ose:
   - name: test_pull_request_ose_check_and_verify_tasks
