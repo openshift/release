@@ -63,6 +63,8 @@ prow-secrets:
 	oc create secret generic certificates --from-file=cert.pem --from-file=key.pem --from-file=ca_cert.pem -o yaml --dry-run | oc apply -f -
 	# OPENSHIFT_BOT_TOKEN is the token used by the retester periodic job to rerun tests for PRs
 	oc create secret generic openshift-bot-token --from-literal=oauth=${OPENSHIFT_BOT_TOKEN} -o yaml --dry-run | oc apply -f -
+	# REPO_MANAGEMENT_TOKEN is the token used by the mangement periodic job to manage repo configs
+	oc create secret generic repo-management-token --from-literal=oauth=${REPO_MANAGEMENT_TOKEN} -o yaml --dry-run | oc apply -f -
 	# gce.json is used by jobs operating against GCE
 	oc create secret generic cluster-secrets-gcp --from-file=cluster/test-deploy/gcp/gce.json --from-file=cluster/test-deploy/gcp/ssh-privatekey --from-file=cluster/test-deploy/gcp/ssh-publickey --from-file=cluster/test-deploy/gcp/ops-mirror.pem -o yaml --dry-run | oc apply -f -
 .PHONY: prow-secrets
