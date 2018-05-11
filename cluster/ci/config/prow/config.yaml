@@ -1011,6 +1011,69 @@ presubmits:
     context: ci/openshift-jenkins/unit
     rerun_command: "/test unit"
     trigger: "((?m)^/test( all| unit),?(\\s+|$))"
+  - name: pull-ci-image-registry-e2e
+    agent: kubernetes
+    context: ci/prow/e2e
+    branches:
+    - master
+    rerun_command: "/test e2e"
+    trigger: "/test e2e"
+    decorate: true
+    utility_images:
+      clonerefs: "registry.svc.ci.openshift.org/ci/clonerefs:latest-json"
+      initupload: "registry.svc.ci.openshift.org/ci/initupload:latest-json"
+      entrypoint: "registry.svc.ci.openshift.org/ci/entrypoint:latest-json"
+      sidecar: "registry.svc.ci.openshift.org/ci/sidecar:latest-json"
+    gcs_configuration:
+      bucket: "origin-ci-test"
+      path_strategy: "single"
+      default_org: "openshift"
+      default_repo: "origin"
+    gcs_credentials_secret: "gcs-publisher-credentials"
+    spec:
+      volumes:
+      - name: job-definition
+        configMap: 
+          name: prow-job-cluster-launch-e2e
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      containers:
+      - name: test
+        image: docker-registry.default.svc:5000/ci/ci-operator:latest
+        volumeMounts:
+        - name: job-definition
+          mountPath: /usr/local/e2e-gcp
+          subPath: cluster-launch-e2e.yaml
+        - name: cluster-profile
+          mountPath: /usr/local/e2e-gcp-cluster-profile
+        env:
+        - name: JOB_NAME_SAFE
+          value: e2e-gcp
+        - name: CLUSTER_TYPE
+          value: gcp
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-image-registry
+              key: config.json
+        - name: RPM_REPO_BASEURL_REF
+          value: https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/master/.latest-rpms
+        command:
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -e
+          export RPM_REPO="$( curl -q "${RPM_REPO_BASEURL_REF}" 2>/dev/null)"
+          ci-operator \
+            --delete-when-idle=10m --dry-run=false \
+            --secret-dir=/usr/local/e2e-gcp-cluster-profile --template=/usr/local/e2e-gcp \
+            --target=e2e-gcp
 
   openshift/kubernetes-metrics-server:
   - name: test_pull_request_kubernetes_metrics_server_unit
