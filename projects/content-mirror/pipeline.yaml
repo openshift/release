@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: List
+items:
+- kind: ImageStream
+  apiVersion: v1
+  metadata:
+    name: content-mirror
+- kind: BuildConfig
+  apiVersion: v1
+  metadata:
+    name: content-mirror
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: content-mirror:latest
+    source:
+      git:
+        ref: master
+        uri: https://github.com/openshift/content-mirror.git
+      type: Git
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: centos:7
+        imageOptimizationPolicy: SkipLayers
+    triggers:
+    - type: ConfigChange
+    - type: GitHub
+      github:
+        secretReference:
+          name: github-deploymentconfig-trigger
