@@ -147,7 +147,7 @@ prow-jobs: prow-cluster-jobs
 	$(MAKE) applyTemplate WHAT=projects/acs-engine/build.yaml
 .PHONY: prow-jobs
 
-projects: gcsweb kube-state-metrics oauth-proxy origin-stable origin-release prometheus test-bases image-pruner-setup autoscaler descheduler node-problem-detector publishing-bot cluster-capacity
+projects: gcsweb kube-state-metrics oauth-proxy origin-stable origin-release prometheus test-bases image-pruner-setup autoscaler descheduler node-problem-detector publishing-bot cluster-capacity content-mirror
 .PHONY: projects
 
 cluster-capacity:
@@ -161,6 +161,10 @@ autoscaler:
 descheduler:
 	$(MAKE) apply WHAT=projects/kubernetes/descheduler.yaml
 .PHONY: descheduler
+
+content-mirror:
+	$(MAKE) apply WHAT=projects/content-mirror/pipeline.yaml
+.PHONY: content-mirror
 
 node-problem-detector:
 	$(MAKE) apply WHAT=projects/kubernetes/node-problem-detector.yaml
