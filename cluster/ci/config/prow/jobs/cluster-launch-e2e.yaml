@@ -12,10 +12,15 @@ parameters:
   required: true
 - name: IMAGE_ANSIBLE
   required: true
+- name: IMAGE_TESTS
+  required: true
 - name: RPM_REPO
   required: true
 - name: CLUSTER_TYPE
   required: true
+- name: TEST_SUITE
+- name: TEST_FOCUS
+- name: TEST_SKIP
 objects:
 
 # We want the cluster to be able to access these images
@@ -59,9 +64,9 @@ objects:
         mountPath: /usr/share/ansible/openshift-ansible/inventory/dynamic/injected
       env:
       - name: INSTANCE_PREFIX
-        value: ${JOB_NAME_SAFE}-${JOB_NAME_HASH}
+        value: ${NAMESPACE}-${JOB_NAME_HASH}
       command:
-      - /usr/local/bin/entrypoint-gcp
+      - /usr/local/bin/entrypoint-${CLUSTER_TYPE}
       args:
       - ansible-playbook
       - -vv
@@ -84,17 +89,23 @@ objects:
         #!/bin/bash
         set -euo pipefail
 
+        trap 'touch /tmp/shared/exit' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
 
+        export KUBECONFIG=/tmp/shared/admin.kubeconfig
+
         while true; do
-          if [[ ! -f /tmp/shared/admin.kubeconfig ]]; then
+          if [[ ! -f $KUBECONFIG ]]; then
             sleep 15 & wait
             continue
           fi
           break
         done
-
         echo "Found shared kubeconfig"
+
+        PATH=/usr/libexec/origin:$PATH
+
+        ginkgo -v -noColor -nodes=40 $( which extended.test ) -- -suite "${TEST_SUITE}" -ginkgo.focus="${TEST_FOCUS}" -ginkgo.focus="${TEST_SKIP}"
 
     # Performs cleanup of all created resources
     - name: cleanup
@@ -106,7 +117,7 @@ objects:
         mountPath: /usr/share/ansible/openshift-ansible/inventory/dynamic/injected
       env:
       - name: INSTANCE_PREFIX
-        value: ${JOB_NAME_SAFE}-${JOB_NAME_HASH}
+        value: ${NAMESPACE}-${JOB_NAME_HASH}
       command:
       - /bin/bash
       - -c
@@ -114,4 +125,10 @@ objects:
         #!/bin/bash
         trap '/usr/local/bin/entrypoint-${CLUSTER_TYPE} ansible-playbook -vv playbooks/${CLUSTER_TYPE}/openshift-cluster/deprovision.yml' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
-        sleep 7200 & wait
+
+        for i in `seq 1 120`; do
+          if [[ -f /tmp/shared/exit ]]; then
+            exit 0
+          fi
+          sleep 60 & wait
+        done
