@@ -2,11 +2,11 @@
 
 # This script provides constants for the Golang binary build process
 
-readonly OS_GO_PACKAGE=github.com/openshift/image-registry
+readonly OS_GO_PACKAGE=github.com/openshift/TODO-YOUR-PACKAGE-HERE
 
-readonly OS_BUILD_ENV_GOLANG="${OS_BUILD_ENV_GOLANG:-1.8}"
+readonly OS_BUILD_ENV_GOLANG="${OS_BUILD_ENV_GOLANG:-1.9}"
 readonly OS_BUILD_ENV_IMAGE="${OS_BUILD_ENV_IMAGE:-openshift/origin-release:golang-${OS_BUILD_ENV_GOLANG}}"
-readonly OS_REQUIRED_GO_VERSION="go1.8"
+readonly OS_REQUIRED_GO_VERSION="go1.9"
 readonly OS_BUILD_ENV_WORKINGDIR="/go/${OS_GO_PACKAGE}"
 
 readonly OS_OUTPUT_BASEPATH="${OS_OUTPUT_BASEPATH:-_output}"
@@ -25,7 +25,7 @@ readonly OS_GOFLAGS_TAGS="include_gcs include_oss containers_image_openpgp"
 readonly OS_IMAGE_COMPILE_BINARIES=( )
 
 readonly OS_CROSS_COMPILE_TARGETS=(
-  cmd/dockerregistry
+  cmd/TODO-YOUR-COMMAND-HERE
 )
 readonly OS_CROSS_COMPILE_BINARIES=("${OS_CROSS_COMPILE_TARGETS[@]##*/}")
 
@@ -54,8 +54,6 @@ function os::build::ldflags() {
 
   declare -a ldflags=()
 
-  ldflags+=($(os::build::ldflag "${OS_GO_PACKAGE}/pkg/oc/bootstrap/docker.defaultImageStreams" "${OS_BUILD_LDFLAGS_DEFAULT_IMAGE_STREAMS}"))
-  ldflags+=($(os::build::ldflag "${OS_GO_PACKAGE}/pkg/cmd/util/variable.DefaultImagePrefix" "${OS_BUILD_LDFLAGS_IMAGE_PREFIX}"))
   ldflags+=($(os::build::ldflag "${OS_GO_PACKAGE}/pkg/version.majorFromGit" "${OS_GIT_MAJOR}"))
   ldflags+=($(os::build::ldflag "${OS_GO_PACKAGE}/pkg/version.minorFromGit" "${OS_GIT_MINOR}"))
   ldflags+=($(os::build::ldflag "${OS_GO_PACKAGE}/pkg/version.versionFromGit" "${OS_GIT_VERSION}"))
