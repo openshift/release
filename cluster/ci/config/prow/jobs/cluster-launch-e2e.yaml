@@ -82,6 +82,8 @@ objects:
       volumeMounts:
       - name: shared-tmp
         mountPath: /tmp/shared
+      - name: cluster-profile
+        mountPath: /tmp/cluster
       command:
       - /bin/bash
       - -c
@@ -105,7 +107,16 @@ objects:
 
         PATH=/usr/libexec/origin:$PATH
 
-        ginkgo -v -noColor -nodes=40 $( which extended.test ) -- -suite "${TEST_SUITE}" -ginkgo.focus="${TEST_FOCUS}" -ginkgo.focus="${TEST_SKIP}"
+        if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
+          export GOOGLE_APPLICATION_CREDENTIALS="/tmp/cluster/gce.json"
+          export KUBE_SSH_USER=cloud-user
+          cp /tmp/cluster/ssh-privatekey ~/.ssh/google_compute_engine || true
+          export PROVIDER_ARGS='-provider=gce -gce-zone=us-east1-c -gce-project=openshift-gce-devel-ci'
+        fi
+        set -x
+        ginkgo -v -noColor -nodes=40 $( which extended.test ) -- \
+          -suite "${TEST_SUITE}" -ginkgo.focus="${TEST_FOCUS}" -ginkgo.focus="${TEST_SKIP}" \
+          -test.timeout=2h ${PROVIDER_ARGS-}
 
     # Performs cleanup of all created resources
     - name: cleanup
