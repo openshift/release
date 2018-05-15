@@ -147,7 +147,7 @@ prow-jobs: prow-cluster-jobs
 	$(MAKE) applyTemplate WHAT=projects/acs-engine/build.yaml
 .PHONY: prow-jobs
 
-projects: gcsweb kube-state-metrics oauth-proxy origin-stable origin-release prometheus test-bases image-pruner-setup autoscaler descheduler node-problem-detector publishing-bot cluster-capacity content-mirror image-registry
+projects: gcsweb kube-state-metrics oauth-proxy origin-stable origin-release prometheus test-bases image-pruner-setup autoscaler descheduler node-problem-detector publishing-bot cluster-capacity content-mirror image-registry service-idler
 .PHONY: projects
 
 image-registry:
@@ -214,6 +214,10 @@ prometheus: node-exporter alert-buffer
 node-exporter:
 	$(MAKE) apply WHAT=projects/prometheus/node_exporter.yaml
 .PHONY: node-exporter
+
+service-idler:
+	$(MAKE) apply WHAT=projects/service-idler/pipeline.yaml
+.PHONY: service-idler
 
 alert-buffer:
 	$(MAKE) apply WHAT=projects/prometheus/alert-buffer.yaml
