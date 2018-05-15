@@ -147,8 +147,12 @@ prow-jobs: prow-cluster-jobs
 	$(MAKE) applyTemplate WHAT=projects/acs-engine/build.yaml
 .PHONY: prow-jobs
 
-projects: gcsweb kube-state-metrics oauth-proxy origin-stable origin-release prometheus test-bases image-pruner-setup autoscaler descheduler node-problem-detector publishing-bot cluster-capacity content-mirror
+projects: gcsweb kube-state-metrics oauth-proxy origin-stable origin-release prometheus test-bases image-pruner-setup autoscaler descheduler node-problem-detector publishing-bot cluster-capacity content-mirror image-registry
 .PHONY: projects
+
+image-registry:
+	oc create configmap ci-operator-image-registry --from-file=projects/image-registry/config.json -o yaml --dry-run | oc apply -f -
+.PHONY: image-registry
 
 cluster-capacity:
 	$(MAKE) apply WHAT=projects/kubernetes/cluster-capacity.yaml

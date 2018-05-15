@@ -4,6 +4,7 @@ plank:
   default_decoration_config:
     timeout: 7200000000000 # 2h
     grace_period: 15000000000 # 15s
+    artifact_dir: /tmp/artifacts
     utility_images:
       clonerefs: "registry.svc.ci.openshift.org/ci/clonerefs:latest-json"
       initupload: "registry.svc.ci.openshift.org/ci/initupload:latest-json"
@@ -1009,25 +1010,42 @@ presubmits:
     context: ci/openshift-jenkins/unit
     rerun_command: "/test unit"
     trigger: "((?m)^/test( all| unit),?(\\s+|$))"
+  - name: pull-ci-image-registry-unit
+    agent: kubernetes
+    context: ci/prow/unit
+    branches:
+    - master
+    rerun_command: "/test unit"
+    always_run: false
+    trigger: "((?m)^/test( unit),?(\\s+|$))"
+    decorate: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: docker-registry.default.svc:5000/ci/ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-image-registry
+              key: config.json
+        command:
+        - ci-operator
+        args:
+        - --delete-when-idle=10m
+        - --artifact-dir=/tmp/artifacts
+        - --dry-run=false
+        - --target=unit
   - name: pull-ci-image-registry-e2e
     agent: kubernetes
     context: ci/prow/e2e
     branches:
     - master
     rerun_command: "/test e2e"
-    trigger: "/test e2e"
+    always_run: false
+    trigger: "((?m)^/test( e2e),?(\\s+|$))"
     decorate: true
-    utility_images:
-      clonerefs: "registry.svc.ci.openshift.org/ci/clonerefs:latest-json"
-      initupload: "registry.svc.ci.openshift.org/ci/initupload:latest-json"
-      entrypoint: "registry.svc.ci.openshift.org/ci/entrypoint:latest-json"
-      sidecar: "registry.svc.ci.openshift.org/ci/sidecar:latest-json"
-    gcs_configuration:
-      bucket: "origin-ci-test"
-      path_strategy: "single"
-      default_org: "openshift"
-      default_repo: "origin"
-    gcs_credentials_secret: "gcs-publisher-credentials"
     spec:
       serviceAccountName: ci-operator
       volumes:
@@ -1073,6 +1091,7 @@ presubmits:
           export RPM_REPO="$( curl -q "${RPM_REPO_BASEURL_REF}" 2>/dev/null)"
           ci-operator \
             --delete-when-idle=10m --dry-run=false \
+            --artifact-dir=/tmp/artifacts \
             --secret-dir=/usr/local/e2e-gcp-cluster-profile --template=/usr/local/e2e-gcp \
             --target=e2e-gcp
 
