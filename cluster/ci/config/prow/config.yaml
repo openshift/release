@@ -408,7 +408,8 @@ presubmits:
     branches:
     - master
     rerun_command: "/test build"
-    trigger: "/test build"
+    always_run: true
+    trigger: "((?m)^/test( all| build),?(\\s+|$))"
     decorate: true
     spec:
       volumes:
@@ -423,6 +424,7 @@ presubmits:
         - name: docker-socket
           mountPath: /var/run/docker.sock
         securityContext:
+          # TODO: the team has promised me they will be able to remove this soon
           privileged: true
           runAsUser: 0
         command:
@@ -1017,17 +1019,6 @@ presubmits:
     rerun_command: "/test e2e"
     trigger: "/test e2e"
     decorate: true
-    utility_images:
-      clonerefs: "registry.svc.ci.openshift.org/ci/clonerefs:latest-json"
-      initupload: "registry.svc.ci.openshift.org/ci/initupload:latest-json"
-      entrypoint: "registry.svc.ci.openshift.org/ci/entrypoint:latest-json"
-      sidecar: "registry.svc.ci.openshift.org/ci/sidecar:latest-json"
-    gcs_configuration:
-      bucket: "origin-ci-test"
-      path_strategy: "single"
-      default_org: "openshift"
-      default_repo: "origin"
-    gcs_credentials_secret: "gcs-publisher-credentials"
     spec:
       serviceAccountName: ci-operator
       volumes:
