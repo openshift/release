@@ -64,6 +64,29 @@ items:
     kind: ClusterRole
     apiGroup: rbac.authorization.k8s.io
     name: cluster-reader
+
+- kind: ClusterRole
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: ci-image-stream-view
+  rules:
+  - apiGroups: ["image.openshift.io"]
+    resources: ["imagestreams", "imagestreamtags", "imagestreamimages"]
+    verbs: ["get", "list"]
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: anonymous-users-to-get-images
+    namespace: openshift
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:unauthenticated
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: ci-image-stream-view
+
 - kind: RoleBinding
   apiVersion: rbac.authorization.k8s.io/v1beta1
   metadata:
