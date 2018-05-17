@@ -4,7 +4,6 @@ plank:
   default_decoration_config:
     timeout: 7200000000000 # 2h
     grace_period: 15000000000 # 15s
-    artifact_dir: /tmp/artifacts
     utility_images:
       clonerefs: "registry.svc.ci.openshift.org/ci/clonerefs:latest-json"
       initupload: "registry.svc.ci.openshift.org/ci/initupload:latest-json"
@@ -1025,7 +1024,7 @@ presubmits:
       serviceAccountName: ci-operator
       containers:
       - name: test
-        image: docker-registry.default.svc:5000/ci/ci-operator:latest
+        image: ci-operator:latest
         env:
         - name: CONFIG_SPEC
           valueFrom:
@@ -1036,7 +1035,7 @@ presubmits:
         - ci-operator
         args:
         - --delete-when-idle=10m
-        - --artifact-dir=/tmp/artifacts
+        - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=unit
   - name: pull-ci-image-registry-e2e
@@ -1063,7 +1062,7 @@ presubmits:
               name: cluster-profile-gcp
       containers:
       - name: test
-        image: docker-registry.default.svc:5000/ci/ci-operator:latest
+        image: ci-operator:latest
         volumeMounts:
         - name: job-definition
           mountPath: /usr/local/e2e-gcp
@@ -1093,7 +1092,7 @@ presubmits:
           export RPM_REPO="$( curl -q "${RPM_REPO_BASEURL_REF}" 2>/dev/null)"
           ci-operator \
             --delete-when-idle=10m --dry-run=false \
-            --artifact-dir=/tmp/artifacts \
+            --artifact-dir=$(ARTIFACTS) \
             --secret-dir=/usr/local/e2e-gcp-cluster-profile --template=/usr/local/e2e-gcp \
             --target=e2e-gcp
 
