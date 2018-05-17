@@ -54,8 +54,59 @@ objects:
 
     containers:
 
+    # Once admin.kubeconfig exists, executes shared tests
+    - name: test
+      image: ${IMAGE_TESTS}
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      - name: cluster-profile
+        mountPath: /tmp/cluster
+      env:
+      - name: HOME
+        value: /tmp/home
+      command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -euo pipefail
+
+        trap 'touch /tmp/shared/exit' EXIT
+        trap 'kill $(jobs -p); exit 0' TERM
+
+        mkdir -p "${HOME}"
+        export KUBECONFIG=/tmp/shared/admin.kubeconfig
+
+        while true; do
+          if [[ ! -f $KUBECONFIG ]]; then
+            sleep 15 & wait
+            continue
+          fi
+          break
+        done
+        echo "Found shared kubeconfig"
+
+        PATH=/usr/libexec/origin:$PATH
+
+        if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
+          export GOOGLE_APPLICATION_CREDENTIALS="/tmp/cluster/gce.json"
+          export KUBE_SSH_USER=cloud-user
+          cp /tmp/cluster/ssh-privatekey ~/.ssh/google_compute_engine || true
+          export PROVIDER_ARGS='-provider=gce -gce-zone=us-east1-c -gce-project=openshift-gce-devel-ci'
+        fi
+
+        mkdir -p /tmp/output
+        cd /tmp/output
+
+        set -x
+        ginkgo -v -noColor -nodes=40 $( which extended.test ) -- \
+          -suite "${TEST_SUITE}" -ginkgo.focus="${TEST_FOCUS}" -ginkgo.focus="${TEST_SKIP}" \
+          -e2e-output-dir /tmp/output -report-dir /tmp/output/junit \
+          -test.timeout=2h ${PROVIDER_ARGS-}
+
     # Runs an install
-    - name: ansible
+    - name: setup
       image: ${IMAGE_ANSIBLE}
       volumeMounts:
       - name: shared-tmp
@@ -76,50 +127,8 @@ objects:
       - oreg_url=${IMAGE_FORMAT}
       - playbooks/${CLUSTER_TYPE}/openshift-cluster/launch.yml
 
-    # Once admin.kubeconfig exists, executes shared tests
-    - name: e2e
-      image: ${IMAGE_TESTS}
-      volumeMounts:
-      - name: shared-tmp
-        mountPath: /tmp/shared
-      - name: cluster-profile
-        mountPath: /tmp/cluster
-      command:
-      - /bin/bash
-      - -c
-      - |
-        #!/bin/bash
-        set -euo pipefail
-
-        trap 'touch /tmp/shared/exit' EXIT
-        trap 'kill $(jobs -p); exit 0' TERM
-
-        export KUBECONFIG=/tmp/shared/admin.kubeconfig
-
-        while true; do
-          if [[ ! -f $KUBECONFIG ]]; then
-            sleep 15 & wait
-            continue
-          fi
-          break
-        done
-        echo "Found shared kubeconfig"
-
-        PATH=/usr/libexec/origin:$PATH
-
-        if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
-          export GOOGLE_APPLICATION_CREDENTIALS="/tmp/cluster/gce.json"
-          export KUBE_SSH_USER=cloud-user
-          cp /tmp/cluster/ssh-privatekey ~/.ssh/google_compute_engine || true
-          export PROVIDER_ARGS='-provider=gce -gce-zone=us-east1-c -gce-project=openshift-gce-devel-ci'
-        fi
-        set -x
-        ginkgo -v -noColor -nodes=40 $( which extended.test ) -- \
-          -suite "${TEST_SUITE}" -ginkgo.focus="${TEST_FOCUS}" -ginkgo.focus="${TEST_SKIP}" \
-          -test.timeout=2h ${PROVIDER_ARGS-}
-
     # Performs cleanup of all created resources
-    - name: cleanup
+    - name: teardown
       image: ${IMAGE_ANSIBLE}
       volumeMounts:
       - name: shared-tmp
