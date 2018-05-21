@@ -991,10 +991,10 @@ presubmits:
     agent: jenkins
     labels:
       master: ci.openshift.redhat.com
-    always_run: true
+    always_run: false
     context: ci/openshift-jenkins/extended
     rerun_command: "/test extended"
-    trigger: "((?m)^/test( all| extended),?(\\s+|$))"
+    trigger: "((?m)^/test( extended),?(\\s+|$))"
   - name: test_pull_request_image_registry_integration
     agent: jenkins
     labels:
@@ -1007,17 +1007,17 @@ presubmits:
     agent: jenkins
     labels:
       master: ci.openshift.redhat.com
-    always_run: true
+    always_run: false
     context: ci/openshift-jenkins/unit
-    rerun_command: "/test unit"
-    trigger: "((?m)^/test( all| unit),?(\\s+|$))"
+    rerun_command: "/test old-unit"
+    trigger: "((?m)^/test( old-unit),?(\\s+|$))"
   - name: pull-ci-image-registry-unit
     agent: kubernetes
     context: ci/prow/unit
     branches:
     - master
     rerun_command: "/test unit"
-    always_run: false
+    always_run: true
     trigger: "((?m)^/test( unit),?(\\s+|$))"
     decorate: true
     spec:
@@ -1044,7 +1044,7 @@ presubmits:
     branches:
     - master
     rerun_command: "/test e2e"
-    always_run: false
+    always_run: true
     trigger: "((?m)^/test( e2e),?(\\s+|$))"
     decorate: true
     spec:
@@ -1070,8 +1070,8 @@ presubmits:
         - name: cluster-profile
           mountPath: /usr/local/e2e-gcp-cluster-profile
         env:
-        - name: TEST_SUITE
-          value: parallel.conformance.openshift.io
+        - name: TEST_FOCUS
+          value: openshift/conformance/parallel|\[registry\]
         - name: JOB_NAME_SAFE
           value: e2e-gcp
         - name: CLUSTER_TYPE
