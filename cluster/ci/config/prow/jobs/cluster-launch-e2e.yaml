@@ -83,6 +83,7 @@ objects:
 
         mkdir -p "${HOME}"
 
+        # wait until the setup job creates admin.kubeconfig
         while true; do
           if [[ ! -f /tmp/shared/admin.kubeconfig ]]; then
             sleep 15 & wait
@@ -98,6 +99,7 @@ objects:
 
         PATH=/usr/libexec/origin:$PATH
 
+        # set up cloud provider specific env vars
         if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
           export GOOGLE_APPLICATION_CREDENTIALS="/tmp/cluster/gce.json"
           export KUBE_SSH_USER=cloud-user
@@ -109,8 +111,9 @@ objects:
         mkdir -p /tmp/output
         cd /tmp/output
 
+        # TODO: bump nodes up to 40 again
         set -x
-        ginkgo -v -noColor -nodes=40 $( which extended.test ) -- \
+        ginkgo -v -noColor -nodes=30 $( which extended.test ) -- \
           -suite "${TEST_SUITE}" -ginkgo.focus="${TEST_FOCUS}" -ginkgo.focus="${TEST_SKIP}" \
           -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit \
           -test.timeout=2h ${PROVIDER_ARGS-}
