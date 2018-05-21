@@ -166,7 +166,7 @@ prow-jobs: prow-cluster-jobs prow-rpm-mirrors
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/ci-operator/roles.yaml
 .PHONY: prow-jobs
 
-projects: gcsweb kube-state-metrics oauth-proxy origin origin-stable origin-release prometheus test-bases image-mirror-setup image-pruner-setup node-problem-detector publishing-bot content-mirror service-idler acs-engine
+projects: gcsweb kube-state-metrics oauth-proxy origin origin-stable origin-release prometheus test-bases image-mirror-setup image-pruner-setup node-problem-detector publishing-bot image-registry-publishing-bot content-mirror service-idler acs-engine
 .PHONY: projects
 
 ci-operator-config:
@@ -185,6 +185,8 @@ node-problem-detector:
 projects-secrets:
 	# GITHUB_DEPLOYMENTCONFIG_TRIGGER is used to route github webhook deliveries
 	oc create secret generic github-deploymentconfig-trigger --from-literal=WebHookSecretKey="${GITHUB_DEPLOYMENTCONFIG_TRIGGER}"
+	# IMAGE_REGISTRY_PUBLISHER_BOT_GITHUB_TOKEN is used to push changes from github.com/openshift/image-registry/vendor to our forked repositories.
+	oc create secret generic -n image-registry-publishing-bot github-token --from-literal=token=$${IMAGE_REGISTRY_PUBLISHER_BOT_GITHUB_TOKEN?} --dry-run -o yaml | oc apply -f -
 .PHONY: projects-secrets
 
 gcsweb:
@@ -202,6 +204,11 @@ oauth-proxy:
 publishing-bot:
 	$(MAKE) apply WHAT=projects/publishing-bot/storage-class.yaml
 .PHONY: publishing-bot
+
+image-registry-publishing-bot:
+	oc create configmap -n image-registry-publishing-bot publisher-config --from-file=config=cluster/ci/config/publishingbots/image-registry/config.yaml -o yaml --dry-run | oc apply -f -
+	oc create configmap -n image-registry-publishing-bot publisher-rules --from-file=config=cluster/ci/config/publishingbots/image-registry/rules.yaml -o yaml --dry-run | oc apply -f -
+	$(MAKE) apply WHAT=cluster/ci/config/publishingbots/image-registry/statefulset.yaml
 
 origin-stable:
 	$(MAKE) apply WHAT=projects/origin-stable/release.yaml
