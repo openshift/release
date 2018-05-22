@@ -1,6 +1,7 @@
 PROFILE ?= "gcp-dev"
 TYPE ?= $(shell cat $(PROFILE)/.type)
 INSTANCE_PREFIX ?= $(WHAT)
+CMD =
 export INSTANCE_PREFIX
 export TYPE
 
@@ -19,7 +20,7 @@ down: check-cluster
 
 sh: check-cluster
 	@echo ansible-playbook -e "openshift_test_repo=$(REPO)" playbooks/$(TYPE)/openshift-cluster/launch.yml
-	cd $(PROFILE)/ && ../../bin/ansible.sh
+	cd $(PROFILE)/ && ../../bin/ansible.sh $(CMD)
 .PHONY: sh
 
 upgrade: check-cluster
@@ -49,5 +50,5 @@ endif
 ifndef TO
 	$(error Must set TO= to the image name or image family name you wish to create, usually openshift-VERSION-node)
 endif
-	cd $(PROFILE)/ && ../../bin/ansible.sh ansible-playbook -e "openshift_test_repo=$(REPO)" -e "openshift_$(TYPE)_image=$(TO)" -e "openshift_$(TYPE)_base_image=$(FROM)" playbooks/$(TYPE)/openshift-cluster/build_image.yml
+	cd $(PROFILE)/ && ../../bin/ansible.sh ansible-playbook -e "openshift_test_repo=$(REPO)" -e "openshift_$(TYPE)_image=$(TO)" -e "openshift_$(TYPE)_base_image=$(FROM)" playbooks/$(TYPE)/openshift-cluster/build_image.yml $(EXTRA_ARGS)
 .PHONY: image

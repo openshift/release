@@ -36,14 +36,21 @@ function cleanup() {
 trap cleanup EXIT
 cleanup
 
-args=""
 
+DOCKER_CMD=()
+DOCKER_ARGS_ARRAY=()
+
+# no args passed, run bash interactively
 if [[ $# -eq 0 ]]; then
-  args+="-it "
-  docker create --name "$ctr" -v /var/tmp --entrypoint /usr/local/bin/entrypoint-provider -e "TYPE=${TYPE}" -e "INSTANCE_PREFIX=${INSTANCE_PREFIX}" $args "${image}" /bin/bash >/dev/null
+    DOCKER_ARGS_ARRAY=( ${DOCKER_ARGS:--it} )
+    DOCKER_CMD=( /bin/bash )
 else
-  docker create --name "$ctr" -v /var/tmp --entrypoint /usr/local/bin/entrypoint-provider -e "TYPE=${TYPE}" -e "INSTANCE_PREFIX=${INSTANCE_PREFIX}" $args "${image}" "$@" >/dev/null
+    # args passed, so just pass those through
+    DOCKER_CMD=( "$@" )
+    DOCKER_ARGS_ARRAY=( ${DOCKER_ARGS:--i} )
 fi
+
+docker create --name "$ctr" -v /var/tmp --entrypoint /usr/local/bin/entrypoint-provider -e "TYPE=${TYPE}" -e "INSTANCE_PREFIX=${INSTANCE_PREFIX}" "${DOCKER_ARGS_ARRAY[@]}" "${image}" -- "${DOCKER_CMD[@]}" >/dev/null
 
 "${tar_cmd}" ${tar_opts} -c . | docker cp - $ctr:/usr/share/ansible/openshift-ansible/inventory/dynamic/injected
 
