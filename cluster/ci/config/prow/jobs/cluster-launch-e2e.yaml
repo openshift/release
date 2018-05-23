@@ -44,6 +44,9 @@ objects:
   metadata:
     name: ${JOB_NAME_SAFE}
     namespace: ${NAMESPACE}
+    annotations:
+      # we want to gather the teardown logs no matter what
+      ci-operator.openshift.io/wait-for-container-artifacts: teardown
   spec:
     restartPolicy: Never
     activeDeadlineSeconds: 7200
@@ -114,6 +117,8 @@ objects:
         mkdir -p /tmp/output
         cd /tmp/output
 
+        # TODO: the test binary should really be a more structured command - most of these flags should be
+        #       autodetected from the running cluster.
         # TODO: bump nodes up to 40 again
         set -x
         if [[ -n "${TEST_SUITE}" || -n "${TEST_FOCUS}" ]]; then
@@ -141,16 +146,23 @@ objects:
       env:
       - name: INSTANCE_PREFIX
         value: ${NAMESPACE}-${JOB_NAME_HASH}
+      - name: TYPE
+        value: ${CLUSTER_TYPE}
       command:
-      - /usr/local/bin/entrypoint-${CLUSTER_TYPE}
+      - /usr/local/bin/entrypoint-provider
       args:
-      - ansible-playbook
-      - -vv
-      - -e
-      - openshift_test_repo=${RPM_REPO}
-      - -e
-      - oreg_url=${IMAGE_FORMAT}
-      - playbooks/${CLUSTER_TYPE}/openshift-cluster/launch.yml
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -euo pipefail
+
+        trap 'rc=$?; if [[ $rc -ne 0 ]]; then touch /tmp/exit; fi; exit $rc' EXIT
+        trap 'kill $(jobs -p); exit 0' TERM
+
+        ansible-playbook -vv \
+          -e openshift_test_repo=${RPM_REPO} -e 'oreg_url=${IMAGE_FORMAT}' \
+          playbooks/${CLUSTER_TYPE}/openshift-cluster/launch.yml
 
     # Performs cleanup of all created resources
     - name: teardown
@@ -165,6 +177,8 @@ objects:
       env:
       - name: INSTANCE_PREFIX
         value: ${NAMESPACE}-${JOB_NAME_HASH}
+      - name: TYPE
+        value: ${CLUSTER_TYPE}
       command:
       - /bin/bash
       - -c
@@ -208,7 +222,7 @@ objects:
           done < /tmp/nodes
 
           echo "Deprovisioning cluster ..."
-          /usr/local/bin/entrypoint-${CLUSTER_TYPE} ansible-playbook -vv playbooks/${CLUSTER_TYPE}/openshift-cluster/deprovision.yml
+          /usr/local/bin/entrypoint-provider ansible-playbook -vv playbooks/${CLUSTER_TYPE}/openshift-cluster/deprovision.yml
         }
 
         trap 'teardown' EXIT
