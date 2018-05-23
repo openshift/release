@@ -1012,10 +1012,10 @@ presubmits:
     agent: jenkins
     labels:
       master: ci.openshift.redhat.com
-    always_run: true
+    always_run: false
     context: ci/openshift-jenkins/integration
-    rerun_command: "/test integration"
-    trigger: "((?m)^/test( all| integration),?(\\s+|$))"
+    rerun_command: "/test old-integration"
+    trigger: "((?m)^/test( old-integration),?(\\s+|$))"
   - name: test_pull_request_image_registry_unit
     agent: jenkins
     labels:
@@ -1031,7 +1031,7 @@ presubmits:
     - master
     rerun_command: "/test unit"
     always_run: true
-    trigger: "((?m)^/test( unit),?(\\s+|$))"
+    trigger: "((?m)^/test( all| unit),?(\\s+|$))"
     decorate: true
     spec:
       serviceAccountName: ci-operator
@@ -1051,6 +1051,44 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=unit
+  - name: pull-ci-image-registry-integration
+    agent: kubernetes
+    context: ci/prow/integration
+    branches:
+    - master
+    rerun_command: "/test integration"
+    always_run: true
+    trigger: "((?m)^/test( all| integration),?(\\s+|$))"
+    decorate: true
+    spec:
+      serviceAccountName: ci-operator
+      volumes:
+      - name: job-definition
+        configMap:
+          name: prow-job-master-sidecar
+      containers:
+      - name: test
+        image: ci-operator:latest
+        volumeMounts:
+        - name: job-definition
+          mountPath: /usr/local/integration
+          subPath: master-sidecar.yaml
+        env:
+        - name: COMMAND
+          value: TEST_KUBECONFIG=${KUBECONFIG} ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=true make test-integration
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-image-registry
+              key: config.json
+        command:
+        - ci-operator
+        args:
+        - --delete-when-idle=10m
+        - --artifact-dir=$(ARTIFACTS)
+        - --dry-run=false
+        - --template=/usr/local/integration
+        - --target=integration
   - name: pull-ci-image-registry-e2e
     agent: kubernetes
     context: ci/prow/e2e
@@ -1058,7 +1096,7 @@ presubmits:
     - master
     rerun_command: "/test e2e"
     always_run: true
-    trigger: "((?m)^/test( e2e),?(\\s+|$))"
+    trigger: "((?m)^/test( all| e2e),?(\\s+|$))"
     decorate: true
     spec:
       serviceAccountName: ci-operator
