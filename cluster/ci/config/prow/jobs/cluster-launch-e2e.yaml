@@ -21,6 +21,9 @@ parameters:
 - name: TEST_SUITE
 - name: TEST_FOCUS
 - name: TEST_SKIP
+- name: TEST_SUITE_SERIAL
+- name: TEST_FOCUS_SERIAL
+- name: TEST_SKIP_SERIAL
 objects:
 
 # We want the cluster to be able to access these images
@@ -113,10 +116,19 @@ objects:
 
         # TODO: bump nodes up to 40 again
         set -x
-        ginkgo -v -noColor -nodes=30 $( which extended.test ) -- \
-          -suite "${TEST_SUITE}" -ginkgo.focus="${TEST_FOCUS}" -ginkgo.focus="${TEST_SKIP}" \
-          -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit \
-          -test.timeout=2h ${PROVIDER_ARGS-}
+        if [[ -n "${TEST_SUITE}" || -n "${TEST_FOCUS}" ]]; then
+          ginkgo -v -noColor -nodes=30 $( which extended.test ) -- \
+            -suite "${TEST_SUITE}" -ginkgo.focus="${TEST_FOCUS}" -ginkgo.skip="${TEST_SKIP}" \
+            -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit \
+            -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
+        fi
+        if [[ -n "${TEST_SUITE_SERIAL}" || -n "${TEST_FOCUS_SERIAL}" ]]; then
+          ginkgo -v -noColor -nodes=1 $( which extended.test ) -- \
+            -suite "${TEST_SUITE_SERIAL}" -ginkgo.focus="${TEST_FOCUS_SERIAL}" -ginkgo.skip="${TEST_SKIP_SERIAL}" \
+            -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit/serial \
+            -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
+        fi
+        exit ${rc:-0}
 
     # Runs an install
     - name: setup
