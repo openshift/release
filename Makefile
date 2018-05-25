@@ -141,7 +141,19 @@ prow-cluster-jobs:
 	oc create configmap prow-job-master-sidecar --from-file=cluster/ci/config/prow/jobs/master-sidecar.yaml -o yaml --dry-run | oc apply -f -
 .PHONY: prow-cluster-jobs
 
-prow-jobs: prow-cluster-jobs
+prow-rpm-mirrors:
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/rpm-mirrors/deployment.yaml
+.PHONY: prow-rpm-mirrors
+
+prow-rpm-mirrors-secrets:
+	oc create secret generic rpm-mirror-repos \
+		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
+		--from-file=cluster/ci/config/prow/openshift/rpm-mirrors/docker.repo \
+		--from-file=cluster/ci/config/prow/openshift/rpm-mirrors/rhel.repo \
+		-o yaml --dry-run | oc apply -f -
+.PHONY: prow-rpm-mirrors-secrets
+
+prow-jobs: prow-cluster-jobs prow-rpm-mirrors
 	$(MAKE) applyTemplate WHAT=cluster/ci/jobs/commenter.yaml
 	$(MAKE) apply WHAT=projects/prometheus/test/build.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/jobs/os.yaml
