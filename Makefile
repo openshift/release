@@ -160,8 +160,13 @@ prow-jobs: prow-cluster-jobs prow-rpm-mirrors
 	$(MAKE) applyTemplate WHAT=projects/acs-engine/build.yaml
 .PHONY: prow-jobs
 
-projects: gcsweb kube-state-metrics oauth-proxy origin-stable origin-release prometheus test-bases image-pruner-setup autoscaler descheduler node-problem-detector publishing-bot cluster-capacity content-mirror image-registry service-idler
+projects: gcsweb kube-state-metrics oauth-proxy origin origin-stable origin-release prometheus test-bases image-pruner-setup autoscaler descheduler node-problem-detector publishing-bot cluster-capacity content-mirror image-registry service-idler
 .PHONY: projects
+
+origin:
+	oc create configmap ci-operator-origin --from-file=projects/origin/config.json -o yaml --dry-run | oc apply -f -
+	$(MAKE) apply WHAT=projects/origin/src-cache-origin.yaml
+.PHONY: origin
 
 image-registry:
 	oc create configmap ci-operator-image-registry --from-file=projects/image-registry/config.json -o yaml --dry-run | oc apply -f -
