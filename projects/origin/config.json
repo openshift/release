@@ -1,0 +1,56 @@
+{
+  "tag_specification": {
+    "namespace": "openshift",
+    "name": "origin-v3.10",
+    "tag": "",
+    "tag_overrides": {}
+  },
+  "base_rpm_images": [
+    {
+      "namespace": "openshift",
+      "name": "origin-v3.10",
+      "tag": "base",
+      "as": "base"
+    }
+  ],
+  "test_base_image": {
+    "namespace": "ci",
+    "name": "src-cache-origin",
+    "tag": "master"
+  },
+
+  "binary_build_commands": "make build",
+  "rpm_build_commands": "make build-rpms",
+
+  "images": [
+    {
+      "from": "base",
+      "to": "cli",
+      "context_dir": "images/cli/"
+    },
+    {
+      "from": "base",
+      "to": "hypershift",
+      "context_dir": "images/hypershift/"
+    },
+    {
+      "from": "base",
+      "to": "hyperkube",
+      "context_dir": "images/hyperkube/"
+    },
+    {
+      "from": "cli",
+      "to": "control-plane",
+      "context_dir": "images/origin/"
+    }
+  ],
+
+  "tests": [
+    {
+      "as": "unit",
+      "from": "src",
+      "commands": "ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1 hack/test-go.sh",
+      "artifact_dir": "/tmp/artifacts"
+    }
+  ]
+}
