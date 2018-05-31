@@ -94,7 +94,7 @@ prow-builds:
 
 prow-update:
 ifeq ($(WHAT),)
-	for name in deck hook horologium jenkins-operator plank sinker tide tot; do \
+	for name in deck hook horologium jenkins-operator plank sinker tide tot artifact-uploader cherrypick config-updater needs-rebase refresh; do \
 		oc start-build bc/$$name-binaries ; \
 	done
 else
