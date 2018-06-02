@@ -170,10 +170,14 @@ presubmits:
     agent: jenkins
     labels:
       master: ci.openshift.redhat.com
-    always_run: false
+    branches:
+    - release-3.9
+    - release-3.8
+    - release-3.7
+    always_run: true
     context: ci/openshift-jenkins/unit
-    rerun_command: "/test old-unit"
-    trigger: "((?m)^/test( old-unit),?(\\s+|$))"
+    rerun_command: "/test unit"
+    trigger: "((?m)^/test( all| unit),?(\\s+|$))"
 
   - name: test_pull_request_origin_integration
     agent: jenkins
@@ -1805,6 +1809,30 @@ postsubmits:
       master: ci.openshift.redhat.com
     branches:
     - master
+  - name: branch-ci-image-registry-images
+    agent: kubernetes
+    branches:
+    - master
+    decorate: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-image-registry
+              key: config.json
+        command:
+        - ci-operator
+        - --delete-when-idle=10m
+        - --artifact-dir=$(ARTIFACTS)
+        - --dry-run=false
+        - --target=[images]
+        - --promote
+
   openshift/origin-web-console:
   - name: test_branch_origin_web_console
     agent: jenkins

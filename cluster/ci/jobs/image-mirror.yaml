@@ -1,0 +1,47 @@
+kind: List
+apiVersion: v1
+items:
+- apiVersion: batch/v2alpha1
+  kind: CronJob
+  metadata:
+    name: "image-mirror-origin-v3.10"
+    labels:
+      app: "image-mirror-origin-v3.10"
+  spec:
+    schedule: "0 */2 * * *"
+    concurrencyPolicy: Forbid
+    successfulJobsHistoryLimit: 1
+    failedJobsHistoryLimit: 2
+    jobTemplate:
+      spec:
+        template:
+          metadata:
+            name: "image-mirror-origin-v3.10"
+            labels:
+              app: "image-mirror-origin-v3.10"
+          spec:
+            restartPolicy: OnFailure
+            volumes:
+            - name: push
+              secret:
+                secretName: registry-push
+            - name: config
+              configMap:
+                name: image-mirror
+            containers:
+            - name: "mirror"
+              image: "openshift/origin-cli:v3.10"
+              volumeMounts:
+              - name: push
+                mountPath: /home/mirror
+              - name: config
+                mountPath: /etc/imagemirror
+              env:
+              - name: HOME
+                value: /home/mirror
+              command:
+              - oc
+              args:
+              - image
+              - mirror
+              - -f=/etc/imagemirror/origin_v3_10
