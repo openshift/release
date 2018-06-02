@@ -157,10 +157,11 @@ prow-jobs: prow-cluster-jobs prow-rpm-mirrors
 	$(MAKE) applyTemplate WHAT=cluster/ci/jobs/commenter.yaml
 	$(MAKE) apply WHAT=projects/prometheus/test/build.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/jobs/os.yaml
-	$(MAKE) applyTemplate WHAT=projects/acs-engine/build.yaml
+	$(MAKE) applyTemplate WHAT=projects/acs-engine/test-image-build.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/ci-operator/roles.yaml
 .PHONY: prow-jobs
 
-projects: gcsweb kube-state-metrics oauth-proxy origin origin-stable origin-release prometheus test-bases image-pruner-setup autoscaler descheduler node-problem-detector publishing-bot cluster-capacity content-mirror image-registry service-idler
+projects: gcsweb kube-state-metrics oauth-proxy origin origin-stable origin-release prometheus test-bases image-mirror-setup image-pruner-setup autoscaler descheduler node-problem-detector publishing-bot cluster-capacity content-mirror image-registry service-idler
 .PHONY: projects
 
 origin:
@@ -249,6 +250,11 @@ image-pruner-setup:
 	oc create serviceaccount image-pruner -o yaml --dry-run | oc apply -f -
 	oc adm policy --as=system:admin add-cluster-role-to-user system:image-pruner -z image-pruner
 	$(MAKE) apply WHAT=cluster/ci/jobs/image-pruner.yaml
+.PHONY: image-pruner-setup
+
+image-mirror-setup:
+	oc create configmap image-mirror --from-file=cluster/ci/config/mirroring/ -o yaml --dry-run | oc apply -f -
+	$(MAKE) apply WHAT=cluster/ci/jobs/image-mirror.yaml
 .PHONY: image-pruner-setup
 
 cluster-operator-roles:
