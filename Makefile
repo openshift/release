@@ -161,11 +161,12 @@ prow-jobs: prow-cluster-jobs prow-rpm-mirrors
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/ci-operator/roles.yaml
 .PHONY: prow-jobs
 
-projects: gcsweb kube-state-metrics oauth-proxy origin origin-stable origin-release prometheus test-bases image-mirror-setup image-pruner-setup autoscaler descheduler node-problem-detector publishing-bot cluster-capacity content-mirror image-registry service-idler
+projects: gcsweb kube-state-metrics oauth-proxy origin origin-stable origin-release metrics-server prometheus test-bases image-mirror-setup image-pruner-setup autoscaler descheduler node-problem-detector publishing-bot cluster-capacity content-mirror image-registry service-idler
 .PHONY: projects
 
 origin:
 	oc create configmap ci-operator-origin --from-file=projects/origin/config.json -o yaml --dry-run | oc apply -f -
+	oc create configmap ci-operator-origin-web-console-server --from-file=config.json=projects/origin/web-console-server.config.json -o yaml --dry-run | oc apply -f -
 	$(MAKE) apply WHAT=projects/origin/src-cache-origin.yaml
 .PHONY: origin
 
@@ -174,14 +175,21 @@ image-registry:
 .PHONY: image-registry
 
 cluster-capacity:
+	oc create configmap ci-operator-kubernetes-cluster-capacity --from-file=config.json=projects/kubernetes/cluster-capacity.config.json -o yaml --dry-run | oc apply -f -
 	$(MAKE) apply WHAT=projects/kubernetes/cluster-capacity.yaml
 .PHONY: cluster-capacity
 
+metrics-server:
+	oc create configmap ci-operator-kubernetes-metrics-server --from-file=config.json=projects/kubernetes/metrics-server.config.json -o yaml --dry-run | oc apply -f -
+.PHONY: metrics-server
+
 autoscaler:
+	oc create configmap ci-operator-kubernetes-autoscaler --from-file=config.json=projects/kubernetes/autoscaler.config.json -o yaml --dry-run | oc apply -f -
 	$(MAKE) apply WHAT=projects/kubernetes/autoscaler.yaml
 .PHONY: autoscaler
 
 descheduler:
+	oc create configmap ci-operator-kubernetes-descheduler --from-file=config.json=projects/kubernetes/descheduler.config.json -o yaml --dry-run | oc apply -f -
 	$(MAKE) apply WHAT=projects/kubernetes/descheduler.yaml
 .PHONY: descheduler
 
@@ -215,6 +223,7 @@ publishing-bot:
 .PHONY: publishing-bot
 
 origin-stable:
+	$(MAKE) apply WHAT=projects/origin-stable/release.yaml
 	$(MAKE) apply WHAT=projects/origin-stable/stable-3.9.yaml
 	$(MAKE) apply WHAT=projects/origin-stable/stable-3.10.yaml
 .PHONY: origin-stable
