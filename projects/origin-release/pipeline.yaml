@@ -131,3 +131,33 @@ objects:
     triggers:
     - imageChange: {} 
       type: ImageChange       
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    labels:
+      app: origin-release
+    name: "origin-release-nodejs-0.10"
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: DockerImage
+        name: "${PUSH_REPOSITORY}:nodejs-0.10"
+      pushSecret:
+        name: "dockerhub"
+    source:
+      git:
+        ref: "${SOURCE_REF}"
+        uri: "${SOURCE_URL}"
+      contextDir: "projects/origin-release/nodejs-0.10/"
+      type: Git
+    strategy:
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: origin-release:base
+        imageOptimizationPolicy: SkipLayers
+    triggers:
+    - imageChange: {}
+      type: ImageChange
