@@ -33,6 +33,11 @@ jenkins_operators:
   max_goroutines: 20
   allow_cancellations: true
   job_url_template: 'http://kata-jenkins-ci.westus2.cloudapp.azure.com/job/{{.Spec.Job}}/{{.Status.JenkinsBuildID}}'
+- label_selector: master=jenkins-tectonic.prod.coreos.systems
+  max_concurrency: 1
+  max_goroutines: 1
+  allow_cancellations: true
+  job_url_template: 'https://jenkins-tectonic.prod.coreos.systems/job/{{.Spec.Job}}/{{.Status.JenkinsBuildID}}'
 
 sinker:
   resync_period: 1h
@@ -1060,6 +1065,24 @@ presubmits:
     context: ci/openshift-jenkins
     rerun_command: "/test"
     trigger: "((?m)^/test,?(\\s+|$))"
+
+  openshift/console:
+  - name: console-build
+    agent: jenkins
+    labels:
+      master: jenkins-tectonic.prod.coreos.systems
+    always_run: true
+    context: ci/console-jenkins/build
+    rerun_command: "/test build"
+    trigger: "((?m)^/test build,?(\\s+|$))"
+  - name: console-pr-image
+    agent: jenkins
+    labels:
+      master: jenkins-tectonic.prod.coreos.systems
+    always_run: true
+    context: ci/console-jenkins/image
+    rerun_command: "/test image"
+    trigger: "((?m)^/test image,?(\\s+|$))"
 
   openshift/origin-web-console-server:
   - name: test_pull_request_origin_web_console_server_check
