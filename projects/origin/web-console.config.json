@@ -18,26 +18,16 @@
     "cluster": "https://api.ci.openshift.org",
     "namespace": "openshift",
     "name": "release",
-    "tag": "golang-1.9"
+    "tag": "nodejs-0.10"
   },
 
-  "binary_build_commands": "make build",
-  "test_binary_build_commands": "OS_GOFLAGS='-race' make build",
-  "rpm_build_commands": "make build-rpms",
-
-  "images": [
-    {
-      "from": "base",
-      "to": "web-console",
-      "context_dir": "images/origin-web-console/"
-    }
-  ],
+  "test_binary_build_commands": "yum install -y java-1.?.0-openjdk Xvfb firefox; yum clean all -y; dbus-uuidgen > /etc/machine-id",
 
   "tests": [
     {
       "as": "unit",
-      "from": "test-bin",
-      "commands": "ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1 make check -j -k",
+      "from": "src",
+      "commands": "export PATH=$PATH:$(pwd)/node_modules/.bin; export HOME=/tmp; ARTIFACT_DIR=/tmp/artifacts make test",
       "artifact_dir": "/tmp/artifacts"
     }
   ]
