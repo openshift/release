@@ -254,3 +254,81 @@ objects:
           kind: ImageStreamTag
           name: "${NAME}:latest"
       type: ImageChange
+
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: console-jenkins-operator
+    annotations:
+      prometheus.io/scrape: "true"
+  spec:
+    selector:
+      app: prow
+      component: console-jenkins-operator
+    ports:
+    - port: 80
+      targetPort: 8080
+    type: ClusterIP
+- apiVersion: apps.openshift.io/v1
+  kind: DeploymentConfig
+  metadata:
+    name: console-jenkins-operator
+    labels:
+      app: prow
+      component: console-jenkins-operator
+  spec:
+    # Do not scale up.
+    replicas: 1
+    revisionHistoryLimit: 2
+    strategy:
+      type: Recreate
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: console-jenkins-operator
+      spec:
+        serviceAccountName: jenkins-operator
+        containers:
+        - name: console-jenkins-operator
+          image: " "
+          args:
+          - --jenkins-url=https://jenkins-tectonic.prod.coreos.systems
+          - --jenkins-user=tidebot
+          - --jenkins-token-file=/etc/jenkins/basic
+          - --label-selector=master=jenkins-tectonic.prod.coreos.systems
+          - --dry-run=false
+          ports:
+          - name: logs
+            containerPort: 8080
+          volumeMounts:
+          - mountPath: /etc/jenkins
+            name: jenkins
+            readOnly: true
+          - name: oauth
+            mountPath: /etc/github
+            readOnly: true
+          - name: config
+            mountPath: /etc/config
+            readOnly: true
+        volumes:
+        - name: jenkins
+          secret:
+            defaultMode: 420
+            secretName: console-jenkins-token
+        - name: oauth
+          secret:
+            secretName: oauth-token
+        - name: config
+          configMap:
+            name: config
+    triggers:
+    - type: ConfigChange
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - console-jenkins-operator
+        from:
+          kind: ImageStreamTag
+          name: "${NAME}:latest"
+      type: ImageChange

@@ -48,6 +48,8 @@ prow-secrets:
 	oc create secret generic jenkins-tokens --from-literal=basic=${CI_PASS} -o yaml --dry-run | oc apply -f -
 	# KATA_CI_PASS is a token for katabuilder to authenticate in http://kata-jenkins-ci.westus2.cloudapp.azure.com/
 	oc create secret generic kata-jenkins-token --from-literal=basic=${KATA_CI_PASS} -o yaml --dry-run | oc apply -f -
+	# CONSOLE_CI_PASS is a token for tidebot to authenticate in http://jenkins-tectonic.prod.coreos.systems/
+	oc create secret generic console-jenkins-token --from-literal=basic=${CONSOLE_CI_PASS} -o yaml --dry-run | oc apply -f -
 	# HMAC_TOKEN is used for encrypting Github webhook payloads.
 	oc create secret generic hmac-token --from-literal=hmac=${HMAC_TOKEN} -o yaml --dry-run | oc apply -f -
 	# SQ_OAUTH_TOKEN is used for merging PRs
