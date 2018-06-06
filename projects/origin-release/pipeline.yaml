@@ -136,27 +136,57 @@ objects:
   metadata:
     labels:
       app: origin-release
-    name: "origin-release-nodejs-0.10"
+    name: "origin-release-nodejs-8"
   spec:
     successfulBuildsHistoryLimit: 1
     failedBuildsHistoryLimit: 2
     output:
       to:
         kind: DockerImage
-        name: "${PUSH_REPOSITORY}:nodejs-0.10"
+        name: "${PUSH_REPOSITORY}:nodejs-8"
       pushSecret:
         name: "dockerhub"
     source:
       git:
         ref: "${SOURCE_REF}"
         uri: "${SOURCE_URL}"
-      contextDir: "projects/origin-release/nodejs-0.10/"
+      contextDir: "projects/origin-release/nodejs-8/"
       type: Git
     strategy:
       dockerStrategy:
         from:
-          kind: ImageStreamTag
-          name: origin-release:base
+          kind: DockerImage
+          name: centos/nodejs-8-centos7:latest
+        imageOptimizationPolicy: SkipLayers
+    triggers:
+    - imageChange: {}
+      type: ImageChange
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    labels:
+      app: origin-release
+    name: "origin-release-nodejs-8-browser-tests"
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: DockerImage
+        name: "${PUSH_REPOSITORY}:nodejs-8-browser-tess"
+      pushSecret:
+        name: "dockerhub"
+    source:
+      git:
+        ref: "${SOURCE_REF}"
+        uri: "${SOURCE_URL}"
+      contextDir: "projects/origin-release/nodejs-8-browser-tests/"
+      type: Git
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: openshift/origin-release:nodejs-8
         imageOptimizationPolicy: SkipLayers
     triggers:
     - imageChange: {}
