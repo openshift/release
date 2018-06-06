@@ -514,35 +514,6 @@ presubmits:
         - --dry-run=false
         - --target=unit
 
-  openshift/descheduler:
-  - name: pull-ci-kubernetes-descheduler-unit
-    agent: kubernetes
-    context: ci/prow/unit
-    branches:
-    - master
-    rerun_command: "/test unit"
-    always_run: true
-    trigger: "((?m)^/test( all| unit),?(\\s+|$))"
-    decorate: true
-    spec:
-      serviceAccountName: ci-operator
-      containers:
-      - name: test
-        image: ci-operator:latest
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              name: ci-operator-kubernetes-descheduler
-              key: config.json
-        command:
-        - ci-operator
-        args:
-        - --delete-when-idle=10m
-        - --artifact-dir=$(ARTIFACTS)
-        - --dry-run=false
-        - --target=unit
-
   openshift/os:
   - name: pull-ci-os-container-check
     agent: kubernetes
@@ -1590,6 +1561,33 @@ presubmits:
     context: ci/openshift-jenkins
     rerun_command: "/test e2e"
     trigger: "((?m)^/test( all| e2e),?(\\s+|$))"
+  - name: pull-ci-kubernetes-descheduler-unit
+    agent: kubernetes
+    context: ci/prow/unit
+    branches:
+    - master
+    rerun_command: "/test unit"
+    always_run: true
+    trigger: "((?m)^/test( all| unit),?(\\s+|$))"
+    decorate: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-kubernetes-descheduler
+              key: config.json
+        command:
+        - ci-operator
+        args:
+        - --delete-when-idle=10m
+        - --artifact-dir=$(ARTIFACTS)
+        - --dry-run=false
+        - --target=unit
 
   openshift/service-catalog:
   - name: test_pull_request_openshift_service_catalog
