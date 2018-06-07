@@ -4,10 +4,12 @@
 #
 # The standard name for this image is openshift/origin-release
 #
-FROM centos:7
+FROM        centos:7
 
 ENV VERSION=1.8.3 \
-    GOPATH=/go
+    GOARM=5 \
+    GOPATH=/go \
+    GOROOT=/usr/local/go
 ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
 
 COPY cbs-paas7-openshift-multiarch-el7-build.repo /etc/yum.repos.d/
@@ -21,10 +23,10 @@ RUN yum install -y epel-release && \
     git config --system user.name origin-release-container && \
     git config --system user.email origin-release@redhat.com
 
-RUN INSTALL_PKGS="golang-${VERSION}" && \
-    yum install -y $INSTALL_PKGS && \
-    rpm -V $INSTALL_PKGS && \
+ADD *.rpm /tmp/origin-rpm/
+RUN yum install -y /tmp/origin-rpm/*.rpm && \
     yum clean all && \
+    curl https://storage.googleapis.com/golang/go$VERSION.linux-amd64.tar.gz | tar -C /usr/local -xzf - && \
     go get golang.org/x/tools/cmd/cover \
         golang.org/x/tools/cmd/goimports \
         github.com/tools/godep \
@@ -33,8 +35,12 @@ RUN INSTALL_PKGS="golang-${VERSION}" && \
     mv $GOPATH/bin/* /usr/bin/ && \
     rm -rf $GOPATH/* && \
     mkdir $GOPATH/bin && \
-    ln -s /usr/bin/imagebuilder $GOPATH/bin/imagebuilder
+    ln -s /usr/bin/imagebuilder $GOPATH/bin/imagebuilder && \
+    ln -s /usr/bin/goimports $GOPATH/bin/goimports
     # TODO: symlink for backwards compatibility with hack/build-images.sh only, remove
+
+RUN chmod g+xw -R $GOPATH && \
+    chmod g+xw -R $(go env GOROOT)
 
 ENV OS_VERSION_FILE=/go/src/github.com/openshift/origin/os-version-defs
 
