@@ -36,7 +36,8 @@ RUN yum install -y /tmp/origin-rpm/*.rpm && \
     mv $GOPATH/bin/* /usr/bin/ && \
     rm -rf $GOPATH/* && \
     mkdir $GOPATH/bin && \
-    ln -s /usr/bin/imagebuilder $GOPATH/bin/imagebuilder
+    ln -s /usr/bin/imagebuilder $GOPATH/bin/imagebuilder && \
+    ln -s /usr/bin/goimports $GOPATH/bin/goimports
     # TODO: symlink for backwards compatibility with hack/build-images.sh only, remove
 
 RUN chmod g+xw -R $GOPATH && \
