@@ -69,6 +69,8 @@ prow-secrets:
 	oc create secret generic repo-management-token --from-literal=oauth=${REPO_MANAGEMENT_TOKEN} -o yaml --dry-run | oc apply -f -
 	# gce.json is used by jobs operating against GCE
 	oc create secret generic cluster-secrets-gcp --from-file=cluster/test-deploy/gcp/gce.json --from-file=cluster/test-deploy/gcp/ssh-privatekey --from-file=cluster/test-deploy/gcp/ssh-publickey --from-file=cluster/test-deploy/gcp/ops-mirror.pem -o yaml --dry-run | oc apply -f -
+	# gce.json is used by jobs operating against AWS
+	oc create secret generic cluster-secrets-aws --from-file=cluster/test-deploy/aws/.awscred --from-file=cluster/test-deploy/aws/pull-secret --from-file=cluster/test-deploy/aws/license --from-file=cluster/test-deploy/aws/ssh-privatekey --from-file=cluster/test-deploy/aws/ssh-publickey -o yaml --dry-run | oc apply -f -
 .PHONY: prow-secrets
 
 prow-builds:
@@ -136,10 +138,12 @@ prow-services:
 .PHONY: prow-services
 
 prow-cluster-jobs:
+	oc create configmap cluster-profile-aws --from-file=cluster/test-deploy/aws/openshift.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap cluster-profile-gcp --from-file=cluster/test-deploy/gcp/vars.yaml --from-file=cluster/test-deploy/gcp/vars-origin.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap cluster-profile-gcp-ha --from-file=cluster/test-deploy/gcp/vars.yaml --from-file=cluster/test-deploy/gcp/vars-origin.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap cluster-profile-gcp-ha-static --from-file=cluster/test-deploy/gcp/vars.yaml --from-file=cluster/test-deploy/gcp/vars-origin.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap prow-job-cluster-launch-e2e --from-file=cluster/ci/config/prow/jobs/cluster-launch-e2e.yaml -o yaml --dry-run | oc apply -f -
+	oc create configmap prow-job-cluster-launch-installer-e2e --from-file=cluster/ci/config/prow/jobs/cluster-launch-installer-e2e.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap prow-job-master-sidecar --from-file=cluster/ci/config/prow/jobs/master-sidecar.yaml -o yaml --dry-run | oc apply -f -
 .PHONY: prow-cluster-jobs
 
@@ -168,6 +172,7 @@ projects: gcsweb kube-state-metrics oauth-proxy origin origin-stable origin-rele
 
 origin:
 	oc create configmap ci-operator-origin --from-file=projects/origin/config.json -o yaml --dry-run | oc apply -f -
+	oc create configmap ci-operator-origin-installer --from-file=projects/openshift-installer/config.json -o yaml --dry-run | oc apply -f -
 	oc create configmap ci-operator-origin-web-console-server --from-file=config.json=projects/origin/web-console-server.config.json -o yaml --dry-run | oc apply -f -
 	$(MAKE) apply WHAT=projects/origin/src-cache-origin.yaml
 .PHONY: origin

@@ -112,6 +112,7 @@ tide:
     - openshift/node-problem-detector
     - openshift/kubernetes-autoscaler
     - openshift/openshift-restclient-java
+    - openshift/installer
     labels:
     - lgtm
     missingLabels:
@@ -1569,6 +1570,87 @@ presubmits:
         - make
         args:
         - check
+
+  openshift/installer:
+  - name: pull-ci-origin-installer-unit
+    agent: kubernetes
+    context: ci/prow/unit
+    branches:
+    - master
+    rerun_command: "/test unit"
+    always_run: true
+    trigger: "((?m)^/test( all| unit),?(\\s+|$))"
+    decorate: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-origin-installer
+              key: config.json
+        command:
+        - ci-operator
+        args:
+        - --delete-when-idle=10m
+        - --artifact-dir=$(ARTIFACTS)
+        - --dry-run=false
+        - --target=unit
+
+  - name: pull-ci-origin-installer-e2e-aws
+    agent: kubernetes
+    context: ci/prow/e2e-aws
+    branches:
+    - master
+    rerun_command: "/test e2e-aws"
+    always_run: true
+    trigger: "((?m)^/test( all| e2e-aws),?(\\s+|$))"
+    decorate: true
+    spec:
+      serviceAccountName: ci-operator
+      volumes:
+      - name: job-definition
+        configMap:
+          name: prow-job-cluster-launch-installer-e2e
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+          - configMap:
+              name: cluster-profile-aws
+      containers:
+      - name: test
+        image: ci-operator:latest
+        volumeMounts:
+        - name: job-definition
+          mountPath: /usr/local/e2e-aws
+          subPath: cluster-launch-installer-e2e.yaml
+        - name: cluster-profile
+          mountPath: /usr/local/e2e-aws-cluster-profile
+        env:
+        - name: TEST_FOCUS
+          value: Suite:openshift/conformance/parallel
+        - name: JOB_NAME_SAFE
+          value: e2e-aws
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-origin-installer
+              key: config.json
+        command:
+        - ci-operator
+        - --delete-when-idle=10m
+        - --dry-run=false
+        - --artifact-dir=$(ARTIFACTS)
+        - --secret-dir=/usr/local/e2e-aws-cluster-profile 
+        - --template=/usr/local/e2e-aws
+        - --target=e2e-aws
 
 postsubmits:
   openshift/origin:
