@@ -178,7 +178,6 @@ image-registry:
 
 cluster-capacity:
 	oc create configmap ci-operator-kubernetes-cluster-capacity --from-file=config.json=projects/kubernetes/cluster-capacity.config.json -o yaml --dry-run | oc apply -f -
-	$(MAKE) apply WHAT=projects/kubernetes/cluster-capacity.yaml
 .PHONY: cluster-capacity
 
 metrics-server:
@@ -187,12 +186,10 @@ metrics-server:
 
 autoscaler:
 	oc create configmap ci-operator-kubernetes-autoscaler --from-file=config.json=projects/kubernetes/autoscaler.config.json -o yaml --dry-run | oc apply -f -
-	$(MAKE) apply WHAT=projects/kubernetes/autoscaler.yaml
 .PHONY: autoscaler
 
 descheduler:
 	oc create configmap ci-operator-kubernetes-descheduler --from-file=config.json=projects/kubernetes/descheduler.config.json -o yaml --dry-run | oc apply -f -
-	$(MAKE) apply WHAT=projects/kubernetes/descheduler.yaml
 .PHONY: descheduler
 
 content-mirror:
