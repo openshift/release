@@ -167,35 +167,23 @@ prow-jobs: prow-cluster-jobs prow-rpm-mirrors
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/ci-operator/roles.yaml
 .PHONY: prow-jobs
 
-projects: gcsweb kube-state-metrics oauth-proxy origin origin-stable origin-release metrics-server prometheus test-bases image-mirror-setup image-pruner-setup autoscaler descheduler node-problem-detector publishing-bot cluster-capacity content-mirror image-registry service-idler
+projects: gcsweb kube-state-metrics oauth-proxy origin origin-stable origin-release prometheus test-bases image-mirror-setup image-pruner-setup node-problem-detector publishing-bot content-mirror service-idler
 .PHONY: projects
 
 origin:
 	oc create configmap ci-operator-origin --from-file=projects/origin/config.json -o yaml --dry-run | oc apply -f -
 	oc create configmap ci-operator-origin-installer --from-file=projects/openshift-installer/config.json -o yaml --dry-run | oc apply -f -
 	oc create configmap ci-operator-origin-web-console-server --from-file=config.json=projects/origin/web-console-server.config.json -o yaml --dry-run | oc apply -f -
+	oc create configmap ci-operator-image-registry --from-file=projects/image-registry/config.json -o yaml --dry-run | oc apply -f -
 	$(MAKE) apply WHAT=projects/origin/src-cache-origin.yaml
 .PHONY: origin
 
-image-registry:
-	oc create configmap ci-operator-image-registry --from-file=projects/image-registry/config.json -o yaml --dry-run | oc apply -f -
-.PHONY: image-registry
-
-cluster-capacity:
+kubernetes:
 	oc create configmap ci-operator-kubernetes-cluster-capacity --from-file=config.json=projects/kubernetes/cluster-capacity.config.json -o yaml --dry-run | oc apply -f -
-.PHONY: cluster-capacity
-
-metrics-server:
 	oc create configmap ci-operator-kubernetes-metrics-server --from-file=config.json=projects/kubernetes/metrics-server.config.json -o yaml --dry-run | oc apply -f -
-.PHONY: metrics-server
-
-autoscaler:
 	oc create configmap ci-operator-kubernetes-autoscaler --from-file=config.json=projects/kubernetes/autoscaler.config.json -o yaml --dry-run | oc apply -f -
-.PHONY: autoscaler
-
-descheduler:
 	oc create configmap ci-operator-kubernetes-descheduler --from-file=config.json=projects/kubernetes/descheduler.config.json -o yaml --dry-run | oc apply -f -
-.PHONY: descheduler
+.PHONY: kubernetes
 
 content-mirror:
 	$(MAKE) apply WHAT=projects/content-mirror/pipeline.yaml
