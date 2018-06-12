@@ -113,6 +113,7 @@ tide:
     - openshift/kubernetes-autoscaler
     - openshift/openshift-restclient-java
     - openshift/installer
+    - openshift/coredns
     labels:
     - lgtm
     missingLabels:
@@ -507,6 +508,36 @@ presubmits:
           valueFrom:
             configMapKeyRef:
               name: ci-operator-kubernetes-cluster-capacity
+              key: config.json
+        command:
+        - ci-operator
+        args:
+        - --delete-when-idle=10m
+        - --artifact-dir=$(ARTIFACTS)
+        - --dry-run=false
+        - --target=unit
+        - --target=[images]
+
+  openshift/coredns:
+  - name: pull-ci-kubernetes-coredns-unit
+    agent: kubernetes
+    context: ci/prow/unit
+    branches:
+    - master
+    rerun_command: "/test unit"
+    always_run: true
+    trigger: "((?m)^/test( all| unit),?(\\s+|$))"
+    decorate: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-kubernetes-coredns
               key: config.json
         command:
         - ci-operator
@@ -2234,6 +2265,32 @@ postsubmits:
           valueFrom:
             configMapKeyRef:
               name: ci-operator-kubernetes-cluster-capacity
+              key: config.json
+        command:
+        - ci-operator
+        args:
+        - --delete-when-idle=10m
+        - --artifact-dir=$(ARTIFACTS)
+        - --dry-run=false
+        - --target=[images]
+        - --promote
+
+  openshift/coredns:
+  - name: branch-ci-kubernetes-coredns-images
+    agent: kubernetes
+    branches:
+    - master
+    decorate: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-kubernetes-coredns
               key: config.json
         command:
         - ci-operator
