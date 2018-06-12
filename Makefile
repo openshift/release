@@ -180,6 +180,7 @@ origin:
 
 kubernetes:
 	oc create configmap ci-operator-kubernetes-cluster-capacity --from-file=config.json=projects/kubernetes/cluster-capacity.config.json -o yaml --dry-run | oc apply -f -
+	oc create configmap ci-operator-kubernetes-coredns --from-file=config.json=projects/kubernetes/coredns.config.json -o yaml --dry-run | oc apply -f -
 	oc create configmap ci-operator-kubernetes-metrics-server --from-file=config.json=projects/kubernetes/metrics-server.config.json -o yaml --dry-run | oc apply -f -
 	oc create configmap ci-operator-kubernetes-autoscaler --from-file=config.json=projects/kubernetes/autoscaler.config.json -o yaml --dry-run | oc apply -f -
 	oc create configmap ci-operator-kubernetes-descheduler --from-file=config.json=projects/kubernetes/descheduler.config.json -o yaml --dry-run | oc apply -f -
