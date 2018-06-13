@@ -257,8 +257,15 @@ image-pruner-setup:
 image-mirror-setup:
 	oc create configmap image-mirror --from-file=cluster/ci/config/mirroring/ -o yaml --dry-run | oc apply -f -
 	$(MAKE) apply WHAT=cluster/ci/jobs/image-mirror.yaml
-.PHONY: image-pruner-setup
+.PHONY: image-mirror-setup
 
 cluster-operator-roles:
 	$(MAKE) apply WHAT=projects/cluster-operator/cluster-operator-team-roles.yaml
 	$(MAKE) applyTemplate WHAT=projects/cluster-operator/cluster-operator-roles-template.yaml
+.PHONY: cluster-operator-roles
+
+pod-utils:
+	for name in artifact-uploader clonerefs entrypoint gcsupload initupload sidecar; do \
+		$(MAKE) apply WHAT=tools/pod-utils/$$name.yaml ; \
+	done
+.PHONY: pod-utils
