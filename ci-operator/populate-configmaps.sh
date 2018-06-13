@@ -12,7 +12,7 @@ config="$( dirname "${BASH_SOURCE[0]}" )/config"
 
 for org_dir in $( find "${config}" -mindepth 1 -maxdepth 1 -type d ); do
 	org="$( basename "${org_dir}" )"
-	for repo_dir in "${config}/${org}/"*; do
+	for repo_dir in $( find "${config}/${org}" -mindepth 1 -maxdepth 1 -type d ); do
 		repo="$( basename "${repo_dir}" )"
 		oc create configmap "ci-operator-${org}-${repo}" --from-file=config.json="${config}/${org}/${repo}/config.json" -o yaml --dry-run | oc apply -f -
 	done
