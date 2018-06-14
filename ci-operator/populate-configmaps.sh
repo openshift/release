@@ -14,6 +14,10 @@ for org_dir in $( find "${config}" -mindepth 1 -maxdepth 1 -type d ); do
 	org="$( basename "${org_dir}" )"
 	for repo_dir in $( find "${config}/${org}" -mindepth 1 -maxdepth 1 -type d ); do
 		repo="$( basename "${repo_dir}" )"
-		oc create configmap "ci-operator-${org}-${repo}" --from-file=config.json="${config}/${org}/${repo}/config.json" -o yaml --dry-run | oc apply -f -
+		files=()
+		for config_file in $( find "${config}/${org}/${repo}" -mindepth 1 -maxdepth 1 -type f -name "*.json" ); do
+			files+=( "--from-file=$( basename "${config_file}" )=${config_file}" )
+		done
+		oc create configmap "ci-operator-${org}-${repo}" "${files[@]}" -o yaml --dry-run | oc apply -f -
 	done
 done
