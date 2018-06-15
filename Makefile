@@ -269,3 +269,7 @@ pod-utils:
 		$(MAKE) apply WHAT=tools/pod-utils/$$name.yaml ; \
 	done
 .PHONY: pod-utils
+
+monitor-project-lifecycle:
+	oc create configmap ci-operator-monitor-project-lifecycle --from-file=projects/monitor-project-lifecycle/config.json -o yaml --dry-run | oc apply -f -
+.PHONY: monitor-project-lifecycle

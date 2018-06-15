@@ -2315,6 +2315,32 @@ postsubmits:
     branches:
     - master
 
+  openshift/monitor-project-lifecycle:
+  - name: pull-ci-monitor-project-lifecycle-images
+    agent: kubernetes
+    branches:
+    - master
+    decorate: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-monitor-project-lifecycle
+              key: config.json
+        command:
+        - ci-operator
+        args:
+        - --delete-when-idle=10m
+        - --artifact-dir=$(ARTIFACTS)
+        - --dry-run=false
+        - --target=[images]
+        - --promote
+
 periodics:
 - name: ami_build_origin_int_fedora_crio
   agent: jenkins
