@@ -37,6 +37,7 @@ if [[ -z "${FROM-}" ]]; then
 fi
 if [[ -z "${TO-}" ]]; then
   echo "Must set TO= to the major/minor version of the next release, e.g. 3.10"
+  exit 1
 fi
 
 for repo in "${REPOS[@]}"; do
@@ -73,7 +74,7 @@ for repo in "${REPOS[@]}"; do
   echo ${TO} > .release; git add .release; git commit -S -m "Branch for v${TO}"
   git tag -f -s -a -m "v${TO}.0-alpha.0" v${TO}.0-alpha.0
   if [[ "${1-}" == "push" ]]; then
-    git push origin "release-${FROM}" "v${TO}.0-alpha.0" "v${FROM}.0-rc.0"
+    git push origin "release-${FROM}" "v${TO}.0-alpha.0" "v${FROM}.0-rc.0" "${BRANCH}"
   fi
 
   popd &>/dev/null
