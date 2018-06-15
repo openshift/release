@@ -1,0 +1,81 @@
+#!/bin/sh
+
+set -euo pipefail
+
+# Creates a new release branch for FROM, then creates a new commit into master and
+# tags it as TO, then pushes both to upstream.
+#
+# Usage: TO= FROM= ./branch [tag|reset|push]
+#
+# Argument:
+# * <empty>: displays latest commit on the branch
+# * tag:     creates the tags and branches locally
+# * reset:   deletes the branches or tags to start over
+# * push:    actually push the branches and tags
+
+DIR=${DIR:-/tmp/dist}
+BRANCH=${BRANCH:-master}
+REPOS=(
+  openshift/cluster-capacity
+  openshift/coredns
+  openshift/descheduler
+  openshift/image-registry
+  openshift/kubernetes-autoscaler
+  openshift/kubernetes-metrics-server
+  openshift/openshift-ansible
+  openshift/origin
+  openshift/origin-aggregated-logging
+  openshift/origin-metrics
+  openshift/origin-web-console
+  openshift/origin-web-console-server
+  openshift/service-catalog
+)
+
+if [[ -z "${FROM-}" ]]; then
+	echo "Must set FROM= to the major/minor version of the current release, e.g. 3.9"
+  exit 1
+fi
+if [[ -z "${TO-}" ]]; then
+  echo "Must set TO= to the major/minor version of the next release, e.g. 3.10"
+fi
+
+for repo in "${REPOS[@]}"; do
+  if [[ -d ${DIR}/src/github.com/${repo} ]]; then
+    pushd ${DIR}/src/github.com/${repo} &>/dev/null
+  else
+    mkdir -p ${DIR}/src/github.com/${repo}
+    pushd ${DIR}/src/github.com/${repo} &>/dev/null
+    git clone --depth=1 --branch ${BRANCH} git@github.com:${repo} .
+  fi
+
+  if [[ "${1-}" == "" ]]; then
+    echo ${repo} '|' $( git log --oneline -1 HEAD )
+    continue
+  fi
+
+  if [[ "${1-}" == "reset" ]]; then
+    git fetch origin ${BRANCH} 2>/dev/null
+    git reset origin/${BRANCH} --hard >/dev/null
+    git branch -D release-${FROM} || true
+    git tag -d v${FROM}.0-rc.0 || true
+    git tag -d v${TO}.0-alpha.0 || true
+    continue
+  fi
+
+  ! git rev-parse release-${FROM} &>/dev/null
+  ! git rev-parse v${TO}.0-alpha.0 &>/dev/null
+  ! git rev-parse v${TO}.0-rc.0 &>/dev/null
+
+  git checkout -b release-${FROM} ${BRANCH}
+  git checkout ${BRANCH}
+
+  git tag -f -s -a -m "v${FROM}.0-rc.0" v${FROM}.0-rc.0
+  echo ${TO} > .release; git add .release; git commit -S -m "Branch for v${TO}"
+  git tag -f -s -a -m "v${TO}.0-alpha.0" v${TO}.0-alpha.0
+  if [[ "${1-}" == "push" ]]; then
+    git push origin "release-${FROM}" "v${TO}.0-alpha.0" "v${FROM}.0-rc.0"
+  fi
+
+  popd &>/dev/null
+done
+
