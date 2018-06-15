@@ -184,6 +184,34 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=unit
+  - name: pull-ci-origin-unit-3.10
+    agent: kubernetes
+    context: ci/prow/unit
+    branches:
+    - release-3.10
+    rerun_command: "/test unit"
+    always_run: true
+    trigger: "((?m)^/test( all| unit),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-origin
+              key: release-3.10.json
+        command:
+        - ci-operator
+        args:
+        - --delete-when-idle=10m
+        - --artifact-dir=$(ARTIFACTS)
+        - --dry-run=false
+        - --target=unit
 
   - name: test_pull_request_origin_unit
     agent: jenkins
@@ -670,6 +698,35 @@ presubmits:
         - --dry-run=false
         - --target=unit
         - --target=[images]
+  - name: pull-ci-kubernetes-autoscaler-unit-3.10
+    agent: kubernetes
+    context: ci/prow/unit
+    branches:
+    - release-3.10
+    rerun_command: "/test unit"
+    always_run: true
+    trigger: "((?m)^/test( all| unit),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-kubernetes-autoscaler
+              key: release-3.10.json
+        command:
+        - ci-operator
+        args:
+        - --delete-when-idle=10m
+        - --artifact-dir=$(ARTIFACTS)
+        - --dry-run=false
+        - --target=unit
+        - --target=[images]
 
   openshift/cluster-capacity:
   - name: pull-ci-kubernetes-cluster-capacity-unit
@@ -693,6 +750,35 @@ presubmits:
             configMapKeyRef:
               name: ci-operator-kubernetes-cluster-capacity
               key: master.json
+        command:
+        - ci-operator
+        args:
+        - --delete-when-idle=10m
+        - --artifact-dir=$(ARTIFACTS)
+        - --dry-run=false
+        - --target=unit
+        - --target=[images]
+  - name: pull-ci-kubernetes-cluster-capacity-unit-3.10
+    agent: kubernetes
+    context: ci/prow/unit
+    branches:
+    - release-3.10
+    rerun_command: "/test unit"
+    always_run: true
+    trigger: "((?m)^/test( all| unit),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-kubernetes-cluster-capacity
+              key: release-3.10.json
         command:
         - ci-operator
         args:
@@ -1510,6 +1596,34 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=unit
+  - name: pull-ci-origin-web-console-server-unit-3.10
+    agent: kubernetes
+    context: ci/prow/unit
+    branches:
+    - release-3.10
+    rerun_command: "/test unit"
+    always_run: true
+    trigger: "((?m)^/test( all| unit),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-origin-web-console-server
+              key: release-3.10.json
+        command:
+        - ci-operator
+        args:
+        - --delete-when-idle=10m
+        - --artifact-dir=$(ARTIFACTS)
+        - --dry-run=false
+        - --target=unit
   - name: pull-ci-origin-web-console-server-e2e
     agent: kubernetes
     context: ci/prow/e2e
@@ -1568,6 +1682,64 @@ presubmits:
             --artifact-dir=$(ARTIFACTS) \
             --secret-dir=/usr/local/e2e-gcp-cluster-profile --template=/usr/local/e2e-gcp \
             --target=e2e-gcp
+  - name: pull-ci-origin-web-console-server-e2e-3.10
+    agent: kubernetes
+    context: ci/prow/e2e
+    branches:
+    - release-3.10
+    rerun_command: "/test e2e"
+    always_run: true
+    trigger: "((?m)^/test( all| e2e),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      volumes:
+      - name: job-definition
+        configMap:
+          name: prow-job-cluster-launch-e2e
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      containers:
+      - name: test
+        image: ci-operator:latest
+        volumeMounts:
+        - name: job-definition
+          mountPath: /usr/local/e2e-gcp
+          subPath: cluster-launch-e2e.yaml
+        - name: cluster-profile
+          mountPath: /usr/local/e2e-gcp-cluster-profile
+        env:
+        - name: TEST_FOCUS
+          value: Suite:openshift/conformance/parallel
+        - name: JOB_NAME_SAFE
+          value: e2e-gcp
+        - name: CLUSTER_TYPE
+          value: gcp
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-origin-web-console-server
+              key: release-3.10.json
+        - name: RPM_REPO_BASEURL_REF
+          value: https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/release-3.10/.latest-rpms
+        command:
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -e
+          export RPM_REPO="$( curl -q "${RPM_REPO_BASEURL_REF}" 2>/dev/null)"
+          ci-operator \
+            --delete-when-idle=10m --dry-run=false \
+            --artifact-dir=$(ARTIFACTS) \
+            --secret-dir=/usr/local/e2e-gcp-cluster-profile --template=/usr/local/e2e-gcp \
+            --target=e2e-gcp
 
   openshift/image-registry:
   - name: pull-ci-image-registry-unit
@@ -1591,6 +1763,34 @@ presubmits:
             configMapKeyRef:
               name: ci-operator-openshift-image-registry
               key: master.json
+        command:
+        - ci-operator
+        args:
+        - --delete-when-idle=10m
+        - --artifact-dir=$(ARTIFACTS)
+        - --dry-run=false
+        - --target=unit
+  - name: pull-ci-image-registry-unit-3.10
+    agent: kubernetes
+    context: ci/prow/unit
+    branches:
+    - release-3.10
+    rerun_command: "/test unit"
+    always_run: true
+    trigger: "((?m)^/test( all| unit),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-image-registry
+              key: release-3.10.json
         command:
         - ci-operator
         args:
@@ -1629,6 +1829,45 @@ presubmits:
             configMapKeyRef:
               name: ci-operator-openshift-image-registry
               key: master.json
+        command:
+        - ci-operator
+        args:
+        - --delete-when-idle=10m
+        - --artifact-dir=$(ARTIFACTS)
+        - --dry-run=false
+        - --template=/usr/local/integration
+        - --target=integration
+  - name: pull-ci-image-registry-integration-3.10
+    agent: kubernetes
+    context: ci/prow/integration
+    branches:
+    - release-3.10
+    rerun_command: "/test integration"
+    always_run: true
+    trigger: "((?m)^/test( all| integration),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      volumes:
+      - name: job-definition
+        configMap:
+          name: prow-job-master-sidecar
+      containers:
+      - name: test
+        image: ci-operator:latest
+        volumeMounts:
+        - name: job-definition
+          mountPath: /usr/local/integration
+          subPath: master-sidecar.yaml
+        env:
+        - name: COMMAND
+          value: TEST_KUBECONFIG=${KUBECONFIG} ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=true make test-integration
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-image-registry
+              key: release-3.10.json
         command:
         - ci-operator
         args:
@@ -1697,6 +1936,66 @@ presubmits:
             --artifact-dir=$(ARTIFACTS) \
             --secret-dir=/usr/local/e2e-gcp-cluster-profile --template=/usr/local/e2e-gcp \
             --target=e2e-gcp
+  - name: pull-ci-image-registry-e2e-3.10
+    agent: kubernetes
+    context: ci/prow/e2e
+    branches:
+    - release-3.10
+    rerun_command: "/test e2e"
+    always_run: true
+    trigger: "((?m)^/test( all| e2e),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      volumes:
+      - name: job-definition
+        configMap:
+          name: prow-job-cluster-launch-e2e
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      containers:
+      - name: test
+        image: ci-operator:latest
+        volumeMounts:
+        - name: job-definition
+          mountPath: /usr/local/e2e-gcp
+          subPath: cluster-launch-e2e.yaml
+        - name: cluster-profile
+          mountPath: /usr/local/e2e-gcp-cluster-profile
+        env:
+        - name: TEST_FOCUS
+          value: Suite:openshift/conformance/parallel
+        - name: TEST_FOCUS_SERIAL
+          value: Suite:openshift/registry/serial
+        - name: JOB_NAME_SAFE
+          value: e2e-gcp
+        - name: CLUSTER_TYPE
+          value: gcp
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-image-registry
+              key: release-3.10.json
+        - name: RPM_REPO_BASEURL_REF
+          value: https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/release-3.10/.latest-rpms
+        command:
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -e
+          export RPM_REPO="$( curl -q "${RPM_REPO_BASEURL_REF}" 2>/dev/null)"
+          ci-operator \
+            --delete-when-idle=10m --dry-run=false \
+            --artifact-dir=$(ARTIFACTS) \
+            --secret-dir=/usr/local/e2e-gcp-cluster-profile --template=/usr/local/e2e-gcp \
+            --target=e2e-gcp
 
   openshift/kubernetes-metrics-server:
   - name: pull-ci-kubernetes-metrics-server-unit
@@ -1720,6 +2019,35 @@ presubmits:
             configMapKeyRef:
               name: ci-operator-kubernetes-metrics-server
               key: master.json
+        command:
+        - ci-operator
+        args:
+        - --delete-when-idle=10m
+        - --artifact-dir=$(ARTIFACTS)
+        - --dry-run=false
+        - --target=unit
+        - --target=[images]
+  - name: pull-ci-kubernetes-metrics-server-unit-3.10
+    agent: kubernetes
+    context: ci/prow/unit
+    branches:
+    - release-3.10
+    rerun_command: "/test unit"
+    always_run: true
+    trigger: "((?m)^/test( all| unit),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-kubernetes-metrics-server
+              key: release-3.10.json
         command:
         - ci-operator
         args:
@@ -1851,14 +2179,6 @@ presubmits:
     trigger: "((?m)^/test( all| e2e),?(\\s+|$))"
 
   openshift/descheduler:
-  - name:  test_pull_request_descheduler_gce_39
-    agent: jenkins
-    labels:
-      master: ci.openshift.redhat.com
-    always_run: true
-    context: ci/openshift-jenkins
-    rerun_command: "/test e2e"
-    trigger: "((?m)^/test( all| e2e),?(\\s+|$))"
   - name: pull-ci-kubernetes-descheduler-unit
     agent: kubernetes
     context: ci/prow/unit
@@ -1880,6 +2200,35 @@ presubmits:
             configMapKeyRef:
               name: ci-operator-kubernetes-descheduler
               key: master.json
+        command:
+        - ci-operator
+        args:
+        - --delete-when-idle=10m
+        - --artifact-dir=$(ARTIFACTS)
+        - --dry-run=false
+        - --target=unit
+        - --target=[images]
+  - name: pull-ci-kubernetes-descheduler-unit-3.10
+    agent: kubernetes
+    context: ci/prow/unit
+    branches:
+    - release-3.10
+    rerun_command: "/test unit"
+    always_run: true
+    trigger: "((?m)^/test( all| unit),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-kubernetes-descheduler
+              key: release-3.10.json
         command:
         - ci-operator
         args:
@@ -2432,6 +2781,30 @@ postsubmits:
             configMapKeyRef:
               name: ci-operator-openshift-image-registry
               key: master.json
+        command:
+        - ci-operator
+        - --delete-when-idle=10m
+        - --artifact-dir=$(ARTIFACTS)
+        - --dry-run=false
+        - --target=[images]
+        - --promote
+  - name: branch-ci-image-registry-images-3.10
+    agent: kubernetes
+    branches:
+    - release-3.10
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-image-registry
+              key: release-3.10.json
         command:
         - ci-operator
         - --delete-when-idle=10m
