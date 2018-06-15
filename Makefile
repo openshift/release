@@ -173,7 +173,7 @@ projects: gcsweb kube-state-metrics oauth-proxy origin origin-stable origin-rele
 ci-operator-config:
 	$(MAKE) apply WHAT=ci-operator/infra/src-cache-origin.yaml
 	ci-operator/populate-configmaps.sh
-.PHONY ci-operator-config
+.PHONY: ci-operator-config
 
 content-mirror:
 	$(MAKE) apply WHAT=projects/content-mirror/pipeline.yaml
