@@ -163,8 +163,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              name: ci-operator-origin
-              key: config.json
+              name: ci-operator-openshift-origin
+              key: master.json
         command:
         - ci-operator
         args:
@@ -478,7 +478,7 @@ presubmits:
           valueFrom:
             configMapKeyRef:
               name: ci-operator-kubernetes-autoscaler
-              key: config.json
+              key: master.json
         command:
         - ci-operator
         args:
@@ -508,7 +508,7 @@ presubmits:
           valueFrom:
             configMapKeyRef:
               name: ci-operator-kubernetes-cluster-capacity
-              key: config.json
+              key: master.json
         command:
         - ci-operator
         args:
@@ -538,7 +538,7 @@ presubmits:
           valueFrom:
             configMapKeyRef:
               name: ci-operator-kubernetes-coredns
-              key: config.json
+              key: master.json
         command:
         - ci-operator
         args:
@@ -1159,22 +1159,131 @@ presubmits:
     trigger: "((?m)^/test,?(\\s+|$))"
 
   openshift/console:
-  - name: console-build
-    agent: jenkins
-    labels:
-      master: jenkins-tectonic.prod.coreos.systems
+  - name: pull-ci-console-backend
+    agent: kubernetes
+    context: ci/prow/backend
+    rerun_command: "/test backend"
     always_run: true
-    context: ci/console-jenkins/build
-    rerun_command: "/test build"
-    trigger: "((?m)^/test build,?(\\s+|$))"
-  - name: console-pr-image
-    agent: jenkins
-    labels:
-      master: jenkins-tectonic.prod.coreos.systems
+    trigger: "((?m)^/test( all| backend),?(\\s+|$))"
+    decorate: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-console
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --delete-when-idle=10m
+        - --artifact-dir=$(ARTIFACTS)
+        - --dry-run=false
+        - --target=backend
+  - name: pull-ci-console-frontend
+    agent: kubernetes
+    context: ci/prow/frontend
+    rerun_command: "/test frontend"
     always_run: true
-    context: ci/console-jenkins/image
-    rerun_command: "/test image"
-    trigger: "((?m)^/test image,?(\\s+|$))"
+    trigger: "((?m)^/test( all| frontend),?(\\s+|$))"
+    decorate: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-console
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --delete-when-idle=10m
+        - --artifact-dir=$(ARTIFACTS)
+        - --dry-run=false
+        - --target=frontend
+  - name: pull-ci-console-crud
+    agent: kubernetes
+    context: ci/prow/crud
+    rerun_command: "/test crud"
+    always_run: true
+    trigger: "((?m)^/test( all| crud),?(\\s+|$))"
+    decorate: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-console
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --delete-when-idle=10m
+        - --artifact-dir=$(ARTIFACTS)
+        - --dry-run=false
+        - --target=crud
+  - name: pull-ci-console-alm
+    agent: kubernetes
+    context: ci/prow/alm
+    rerun_command: "/test alm"
+    always_run: true
+    trigger: "((?m)^/test( all| alm),?(\\s+|$))"
+    decorate: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-console
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --delete-when-idle=10m
+        - --artifact-dir=$(ARTIFACTS)
+        - --dry-run=false
+        - --target=alm
+  - name: pull-ci-console-performance
+    agent: kubernetes
+    context: ci/prow/performance
+    rerun_command: "/test performance"
+    always_run: true
+    trigger: "((?m)^/test( all| performance),?(\\s+|$))"
+    decorate: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-console
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --delete-when-idle=10m
+        - --artifact-dir=$(ARTIFACTS)
+        - --dry-run=false
+        - --target=performance
 
   openshift/origin-web-console-server:
   - name: pull-ci-origin-web-console-server-unit
@@ -1195,8 +1304,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              name: ci-operator-origin-web-console-server
-              key: config.json
+              name: ci-operator-openshift-origin-web-console-server
+              key: master.json
         command:
         - ci-operator
         args:
@@ -1245,8 +1354,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              name: ci-operator-origin-web-console-server
-              key: config.json
+              name: ci-operator-openshift-origin-web-console-server
+              key: master.json
         - name: RPM_REPO_BASEURL_REF
           value: https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/master/.latest-rpms
         command:
@@ -1281,8 +1390,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              name: ci-operator-image-registry
-              key: config.json
+              name: ci-operator-openshift-image-registry
+              key: master.json
         command:
         - ci-operator
         args:
@@ -1318,8 +1427,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              name: ci-operator-image-registry
-              key: config.json
+              name: ci-operator-openshift-image-registry
+              key: master.json
         command:
         - ci-operator
         args:
@@ -1371,8 +1480,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              name: ci-operator-image-registry
-              key: config.json
+              name: ci-operator-openshift-image-registry
+              key: master.json
         - name: RPM_REPO_BASEURL_REF
           value: https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/master/.latest-rpms
         command:
@@ -1408,7 +1517,7 @@ presubmits:
           valueFrom:
             configMapKeyRef:
               name: ci-operator-kubernetes-metrics-server
-              key: config.json
+              key: master.json
         command:
         - ci-operator
         args:
@@ -1567,7 +1676,7 @@ presubmits:
           valueFrom:
             configMapKeyRef:
               name: ci-operator-kubernetes-descheduler
-              key: config.json
+              key: master.json
         command:
         - ci-operator
         args:
@@ -1621,8 +1730,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              name: ci-operator-origin-installer
-              key: config.json
+              name: ci-operator-openshift-installer
+              key: master.json
         command:
         - ci-operator
         args:
@@ -1672,8 +1781,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              name: ci-operator-origin-installer
-              key: config.json
+              name: ci-operator-openshift-installer
+              key: master.json
         command:
         - ci-operator
         - --delete-when-idle=10m
@@ -2115,8 +2224,8 @@ postsubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              name: ci-operator-image-registry
-              key: config.json
+              name: ci-operator-openshift-image-registry
+              key: master.json
         command:
         - ci-operator
         - --delete-when-idle=10m
@@ -2147,8 +2256,8 @@ postsubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              name: ci-operator-origin-web-console-server
-              key: config.json
+              name: ci-operator-openshift-origin-web-console-server
+              key: master.json
         command:
         - ci-operator
         - --delete-when-idle=10m
@@ -2187,7 +2296,7 @@ postsubmits:
           valueFrom:
             configMapKeyRef:
               name: ci-operator-kubernetes-descheduler
-              key: config.json
+              key: master.json
         command:
         - ci-operator
         args:
@@ -2213,7 +2322,7 @@ postsubmits:
           valueFrom:
             configMapKeyRef:
               name: ci-operator-kubernetes-metrics-server
-              key: config.json
+              key: master.json
         command:
         - ci-operator
         args:
@@ -2239,7 +2348,7 @@ postsubmits:
           valueFrom:
             configMapKeyRef:
               name: ci-operator-kubernetes-autoscaler
-              key: config.json
+              key: master.json
         command:
         - ci-operator
         args:
@@ -2265,7 +2374,7 @@ postsubmits:
           valueFrom:
             configMapKeyRef:
               name: ci-operator-kubernetes-cluster-capacity
-              key: config.json
+              key: master.json
         command:
         - ci-operator
         args:
@@ -2291,7 +2400,7 @@ postsubmits:
           valueFrom:
             configMapKeyRef:
               name: ci-operator-kubernetes-coredns
-              key: config.json
+              key: master.json
         command:
         - ci-operator
         args:
