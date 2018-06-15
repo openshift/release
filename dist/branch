@@ -31,6 +31,47 @@ REPOS=(
   openshift/service-catalog
 )
 
+for repo in "${REPOS[@]}"; do
+  if [[ ! -d ${DIR}/src/github.com/${repo} ]]; then
+    mkdir -p ${DIR}/src/github.com/${repo}
+    pushd ${DIR}/src/github.com/${repo} &>/dev/null
+    git clone --depth=1 --branch ${BRANCH} git@github.com:${repo} .
+    popd &>/dev/null
+  fi
+done
+
+# create a commit in each repo
+if [[ "${1-}" == "bump" ]]; then
+  for repo in "${REPOS[@]}"; do
+    pushd ${DIR}/src/github.com/${repo} &>/dev/null
+    git checkout ${BRANCH}
+    git fetch origin ${BRANCH} 2>/dev/null
+    git reset --hard origin/${BRANCH} >/dev/null
+    echo date '+%Y%m%d-%H%M%S' > .repo-date; git add .repo-date; git commit -S -m "Updating branch ${BRANCH}"
+    popd &>/dev/null
+  done
+  exit 0
+fi
+
+# clear the repos back to a known state
+if [[ "${1-}" == "reset" ]]; then
+  for repo in "${REPOS[@]}"; do
+    pushd ${DIR}/src/github.com/${repo} &>/dev/null
+    git fetch origin ${BRANCH} 2>/dev/null
+    git checkout ${BRANCH}
+    git reset origin/${BRANCH} --hard >/dev/null
+    if [[ -n "${FROM-}" ]]; then
+      git branch -D release-${FROM} || true
+      git tag -d v${FROM}.0-rc.0 || true
+    fi
+    if [[ -n "${TO-}" ]]; then
+      git tag -d v${TO}.0-alpha.0 || true
+    fi
+    popd &>/dev/null
+  done
+  exit 0
+fi
+
 if [[ -z "${FROM-}" ]]; then
 	echo "Must set FROM= to the major/minor version of the current release, e.g. 3.9"
   exit 1
@@ -41,25 +82,10 @@ if [[ -z "${TO-}" ]]; then
 fi
 
 for repo in "${REPOS[@]}"; do
-  if [[ -d ${DIR}/src/github.com/${repo} ]]; then
-    pushd ${DIR}/src/github.com/${repo} &>/dev/null
-  else
-    mkdir -p ${DIR}/src/github.com/${repo}
-    pushd ${DIR}/src/github.com/${repo} &>/dev/null
-    git clone --depth=1 --branch ${BRANCH} git@github.com:${repo} .
-  fi
+  pushd ${DIR}/src/github.com/${repo} &>/dev/null
 
   if [[ "${1-}" == "" ]]; then
     echo ${repo} '|' $( git log --oneline -1 HEAD )
-    continue
-  fi
-
-  if [[ "${1-}" == "reset" ]]; then
-    git fetch origin ${BRANCH} 2>/dev/null
-    git reset origin/${BRANCH} --hard >/dev/null
-    git branch -D release-${FROM} || true
-    git tag -d v${FROM}.0-rc.0 || true
-    git tag -d v${TO}.0-alpha.0 || true
     continue
   fi
 
