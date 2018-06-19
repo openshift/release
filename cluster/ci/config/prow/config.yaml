@@ -2223,6 +2223,35 @@ presubmits:
     context: ci/openshift-jenkins/service-catalog
     rerun_command: "/test service-catalog"
     trigger: "((?m)^/test service-catalog,?(\\s+|$))"
+  - name: pull-ci-openshift-service-catalog-unit
+    agent: kubernetes
+    context: ci/prow/unit
+    branches:
+    - master
+    rerun_command: "/test unit"
+    always_run: true
+    trigger: "((?m)^/test( all| unit),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-service-catalog
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --delete-when-idle=10m
+        - --artifact-dir=$(ARTIFACTS)
+        - --dry-run=false
+        - --target=unit
+        - --target=[images]
 
   openshift/autoheal:
   - name: pull-autoheal-check
@@ -3206,6 +3235,35 @@ postsubmits:
       master: ci.openshift.redhat.com
     branches:
     - master
+
+  openshift/service-catalog:
+  - name: branch-ci-openshift-service-catalog-images
+    agent: kubernetes
+    labels:
+      artifacts: images
+    branches:
+    - master
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-service-catalog
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --delete-when-idle=10m
+        - --artifact-dir=$(ARTIFACTS)
+        - --dry-run=false
+        - --target=[images]
+        - --promote
 
 periodics:
 - name: ami_build_origin_int_fedora_crio
