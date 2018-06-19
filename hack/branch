@@ -13,25 +13,13 @@ set -euo pipefail
 # * reset:   deletes the branches or tags to start over
 # * push:    actually push the branches and tags
 
+base=$( dirname "${BASH_SOURCE[0]}")
+source "${base}/lib/constants.sh"
+
 DIR=${DIR:-/tmp/dist}
 BRANCH=${BRANCH:-master}
-REPOS=(
-  openshift/cluster-capacity
-  openshift/coredns
-  openshift/descheduler
-  openshift/image-registry
-  openshift/kubernetes-autoscaler
-  openshift/kubernetes-metrics-server
-  openshift/openshift-ansible
-  openshift/origin
-  openshift/origin-aggregated-logging
-  openshift/origin-metrics
-  openshift/origin-web-console
-  openshift/origin-web-console-server
-  openshift/service-catalog
-)
 
-for repo in "${REPOS[@]}"; do
+for repo in "${MANAGED_REPOS[@]}"; do
   if [[ ! -d ${DIR}/src/github.com/${repo} ]]; then
     mkdir -p ${DIR}/src/github.com/${repo}
     pushd ${DIR}/src/github.com/${repo} &>/dev/null
@@ -42,7 +30,7 @@ done
 
 # create a commit in each repo
 if [[ "${1-}" == "bump" ]]; then
-  for repo in "${REPOS[@]}"; do
+  for repo in "${MANAGED_REPOS[@]}"; do
     pushd ${DIR}/src/github.com/${repo} &>/dev/null
     git checkout ${BRANCH}
     git fetch origin ${BRANCH} 2>/dev/null
@@ -55,7 +43,7 @@ fi
 
 # clear the repos back to a known state
 if [[ "${1-}" == "reset" ]]; then
-  for repo in "${REPOS[@]}"; do
+  for repo in "${MANAGED_REPOS[@]}"; do
     pushd ${DIR}/src/github.com/${repo} &>/dev/null
     git fetch origin ${BRANCH} 2>/dev/null
     git checkout ${BRANCH}
@@ -81,7 +69,7 @@ if [[ -z "${TO-}" ]]; then
   exit 1
 fi
 
-for repo in "${REPOS[@]}"; do
+for repo in "${MANAGED_REPOS[@]}"; do
   pushd ${DIR}/src/github.com/${repo} &>/dev/null
 
   if [[ "${1-}" == "" ]]; then
