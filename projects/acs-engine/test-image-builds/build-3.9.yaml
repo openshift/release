@@ -1,0 +1,26 @@
+kind: BuildConfig
+apiVersion: v1
+metadata:
+  name: acs-engine-tests-3.9
+  namespace: azure
+spec:
+  successfulBuildsHistoryLimit: 1
+  failedBuildsHistoryLimit: 2
+  output:
+    to:
+      kind: ImageStreamTag
+      name: "acs-engine-tests:v3.9"
+  source:
+    contextDir: "projects/acs-engine/test-image-builds/Dockerfiles/3.9/"
+    git:
+      uri: "https://github.com/openshift/release"
+      ref: "master"
+    type: Git
+  strategy:
+    dockerStrategy:
+      from:
+        kind: DockerImage
+        name: quay.io/deis/go-dev:v1.9.1
+      imageOptimizationPolicy: SkipLayers
+  triggers:
+  - type: ConfigChange
