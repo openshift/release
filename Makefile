@@ -243,6 +243,12 @@ image-pruner-setup:
 	$(MAKE) apply WHAT=cluster/ci/jobs/image-pruner.yaml
 .PHONY: image-pruner-setup
 
+# Regenerate the mirror files by looking at what we are publishing to the image stream.
+image-mirror-files:
+	VERSION=v3.10 hack/mirror-file > cluster/ci/config/mirroring/origin_v3_10
+	VERSION=v3.11 TAG=v3.11,v3.11.0,latest hack/mirror-file > cluster/ci/config/mirroring/origin_v3_11
+.PHONY: image-mirror-files
+
 image-mirror-setup:
 	oc create configmap image-mirror --from-file=cluster/ci/config/mirroring/ -o yaml --dry-run | oc apply -f -
 	$(MAKE) apply WHAT=cluster/ci/jobs/image-mirror.yaml
