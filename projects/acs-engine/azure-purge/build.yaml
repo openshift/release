@@ -1,0 +1,28 @@
+kind: BuildConfig
+apiVersion: v1
+metadata:
+  name: azure-purge
+  namespace: azure
+spec:
+  successfulBuildsHistoryLimit: 1
+  failedBuildsHistoryLimit: 2
+  output:
+    to:
+      kind: ImageStreamTag
+      name: "azure-purge:latest"
+  source:
+    contextDir: "src/go/"
+    git:
+      uri: "git@github.com:openshift/azure-misc.git"
+    type: Git
+    sourceSecret:
+      name: azure-common
+  strategy:
+    dockerStrategy:
+      dockerfilePath: Dockerfile.azure-purge
+      from:
+        kind: DockerImage
+        name: golang:1.10-alpine
+      imageOptimizationPolicy: SkipLayers
+  triggers:
+  - type: ConfigChange

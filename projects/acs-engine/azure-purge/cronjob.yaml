@@ -1,0 +1,41 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: azure-purge
+  namespace: azure
+spec:
+  schedule: "0 15 * * *" 
+  jobTemplate:             
+    spec:
+      template:
+        metadata:
+          labels:          
+            name: azure-purge
+        spec:
+          successfulJobsHistoryLimit: 3 
+          failedJobsHistoryLimit: 2     
+          containers:
+          - name: azure-purge
+            image: registry.svc.ci.openshift.org/azure/azure-purge:latest
+            env:
+            - name: AZURE_TENANT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: azure-secret
+                  key: azure_tenant_id
+            - name: AZURE_SUBSCRIPTION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: azure-secret
+                  key: azure_subscription_id
+            - name: AZURE_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: azure-secret
+                  key: azure_client_id
+            - name: AZURE_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: azure-secret
+                  key: azure_client_secret
+          restartPolicy: Never
