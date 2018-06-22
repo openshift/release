@@ -30,13 +30,13 @@ prow-crd:
 .PHONY: prow-crd
 
 prow-config:
-	oc create cm config --from-file=config=cluster/ci/config/prow/config.yaml
-	oc create cm plugins --from-file=plugins=cluster/ci/config/prow/plugins.yaml
+	oc create cm config --from-file=config.yaml=cluster/ci/config/prow/config.yaml
+	oc create cm plugins --from-file=plugins.yaml=cluster/ci/config/prow/plugins.yaml
 .PHONY: prow-config
 
 prow-config-update:
-	oc create cm config --from-file=config=cluster/ci/config/prow/config.yaml -o yaml --dry-run | oc replace -f -
-	oc create cm plugins --from-file=plugins=cluster/ci/config/prow/plugins.yaml -o yaml --dry-run | oc replace -f -
+	oc create cm config --from-file=config.yaml=cluster/ci/config/prow/config.yaml -o yaml --dry-run | oc replace -f -
+	oc create cm plugins --from-file=plugins.yaml=cluster/ci/config/prow/plugins.yaml -o yaml --dry-run | oc replace -f -
 .PHONY: prow-config-update
 
 prow-secrets:
