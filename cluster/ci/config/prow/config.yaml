@@ -103,6 +103,7 @@ tide:
   - repos:
     - openshift/kubernetes-metrics-server
     - openshift/origin-aggregated-logging
+    - openshift/origin-metrics
     - openshift/origin-web-console
     - openshift/origin-web-console-server
     - openshift/console
@@ -1574,6 +1575,36 @@ presubmits:
           valueFrom:
             configMapKeyRef:
               name: ci-operator-openshift-origin-aggregated-logging
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --delete-when-idle=10m
+        - --artifact-dir=$(ARTIFACTS)
+        - --dry-run=false
+        - --target=[images]
+
+  openshift/origin-metrics:
+  - name: pull-ci-openshift-origin-metrics-images
+    agent: kubernetes
+    context: ci/prow/images
+    branches:
+    - master
+    rerun_command: "/test images"
+    always_run: true
+    trigger: "((?m)^/test( all| images),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-origin-metrics
               key: master.json
         command:
         - ci-operator
@@ -3107,12 +3138,33 @@ postsubmits:
     - release-3.10
 
   openshift/origin-metrics:
-  - name: push_origin_metrics_release
-    agent: jenkins
+  - name: branch-ci-openshift-origin-metrics-images
+    agent: kubernetes
     labels:
-      master: ci.openshift.redhat.com
+      artifacts: images
     branches:
     - master
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-origin-metrics
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --delete-when-idle=10m
+        - --artifact-dir=$(ARTIFACTS)
+        - --dry-run=false
+        - --target=[images]
+        - --promote
   - name: push_origin_metrics_release_310
     agent: jenkins
     labels:
