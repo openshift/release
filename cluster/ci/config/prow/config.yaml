@@ -115,6 +115,7 @@ tide:
     - openshift/openshift-restclient-java
     - openshift/installer
     - openshift/coredns
+    - openshift/telemeter
     labels:
     - lgtm
     missingLabels:
@@ -848,6 +849,37 @@ presubmits:
         - --target=unit
         - --target=[images]
 
+  openshift/telemeter:
+  - name: pull-ci-openshift-telemeter-unit
+    agent: kubernetes
+    context: ci/prow/unit
+    branches:
+    - master
+    rerun_command: "/test unit"
+    always_run: true
+    trigger: "((?m)^/test( all| unit),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-telemeter
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --delete-when-idle=10m
+        - --artifact-dir=$(ARTIFACTS)
+        - --dry-run=false
+        - --target=unit
+        - --target=[images]
+
   openshift/os:
   - name: pull-ci-os-container-check
     agent: kubernetes
@@ -1521,6 +1553,35 @@ presubmits:
     context: ci/openshift-jenkins/json-file
     rerun_command: "/test json-file"
     trigger: "((?m)^/test( all| json-file),?(\\s+|$))"
+
+  - name: pull-ci-openshift-origin-aggregated-logging-images
+    agent: kubernetes
+    context: ci/prow/unit
+    branches:
+    - master
+    rerun_command: "/test unit"
+    always_run: true
+    trigger: "((?m)^/test( all| unit),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-origin-aggregated-logging
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --delete-when-idle=10m
+        - --artifact-dir=$(ARTIFACTS)
+        - --dry-run=false
+        - --target=[images]
 
   openshift/origin-web-console:
   - name: test_pull_request_origin_web_console_310
@@ -2426,6 +2487,8 @@ postsubmits:
             configMapKeyRef:
               name: ci-operator-openshift-origin
               key: master.json
+        - name: OVERRIDE_SPEC
+          value: '{"promotion": {"cluster": "https://api.ci.openshift.org", "namespace": "openshift", "name": "origin-v3.11", "additional_images": {"base": "base"}}}'
         command:
         - ci-operator
         args:
@@ -3009,12 +3072,33 @@ postsubmits:
         - --promote
 
   openshift/origin-aggregated-logging:
-  - name: push_origin_aggregated_logging_release
-    agent: jenkins
+  - name: branch-ci-openshift-origin-aggregated-logging-images
+    agent: kubernetes
     labels:
-      master: ci.openshift.redhat.com
+      artifacts: images
     branches:
     - master
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-origin-aggregated-logging
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --delete-when-idle=10m
+        - --artifact-dir=$(ARTIFACTS)
+        - --dry-run=false
+        - --target=[images]
+        - --promote
   - name: push_origin_aggregated_logging_release_310
     agent: jenkins
     labels:
@@ -3279,6 +3363,35 @@ postsubmits:
           valueFrom:
             configMapKeyRef:
               name: ci-operator-kubernetes-coredns
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --delete-when-idle=10m
+        - --artifact-dir=$(ARTIFACTS)
+        - --dry-run=false
+        - --target=[images]
+        - --promote
+
+  openshift/telemeter:
+  - name: branch-ci-openshift-telemeter-images
+    agent: kubernetes
+    labels:
+      artifacts: images
+    branches:
+    - master
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-telemeter
               key: master.json
         command:
         - ci-operator
