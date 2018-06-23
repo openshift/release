@@ -259,7 +259,7 @@ cluster-operator-roles:
 .PHONY: cluster-operator-roles
 
 pod-utils:
-	for name in artifact-uploader clonerefs entrypoint gcsupload initupload sidecar; do \
+	for name in prow-test artifact-uploader clonerefs entrypoint gcsupload initupload sidecar; do \
 		$(MAKE) apply WHAT=tools/pod-utils/$$name.yaml ; \
 	done
 .PHONY: pod-utils
@@ -270,3 +270,10 @@ acs-engine:
 	$(MAKE) apply WHAT=projects/acs-engine/binary-build.yaml
 	$(MAKE) apply WHAT=projects/acs-engine/test-image-builds/
 .PHONY: acs-engine
+
+check:
+	# perform basic check on the jobs
+	python hack/lib/check_jobs.py cluster/ci/config/prow/config.yaml
+	# test that the prow config is parseable
+	mkpj --config-path cluster/ci/config/prow/config.yaml --job branch-ci-origin-images --base-ref master --base-sha abcdef
+.PHONY: check
