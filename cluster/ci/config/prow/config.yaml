@@ -2348,6 +2348,23 @@ presubmits:
     spec:
       containers:
       - image: registry.svc.ci.openshift.org/ci/promrules:latest
+  - name: pull-ci-openshift-release-config
+    agent: kubernetes
+    context: ci/prow/config
+    branches:
+    - master
+    run_if_changed: '^(hack/.*)|(Makefile)|(cluster/ci/config/prow/config.yaml)$'
+    rerun_command: "/test config"
+    trigger: "/test config"
+    decorate: true
+    spec:
+      containers:
+      - name: test
+        command:
+        - make
+        args:
+        - check
+        image: prow-test:latest
 
   kubernetes-incubator/descheduler:
   - name: ci-kubernetes-descheduler-e2e-gce
