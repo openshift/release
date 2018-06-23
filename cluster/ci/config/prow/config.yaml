@@ -178,7 +178,6 @@ presubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=unit
@@ -206,7 +205,6 @@ presubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=unit
@@ -262,7 +260,6 @@ presubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=integration
@@ -293,7 +290,6 @@ presubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=verify
@@ -766,7 +762,6 @@ presubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=unit
@@ -795,7 +790,6 @@ presubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=unit
@@ -826,7 +820,6 @@ presubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=unit
@@ -855,7 +848,6 @@ presubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=unit
@@ -886,7 +878,6 @@ presubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=unit
@@ -917,7 +908,6 @@ presubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=unit
@@ -998,12 +988,13 @@ presubmits:
   openshift/ci-operator:
   - name: pull-ci-operator-unit
     agent: kubernetes
-    context: pull-ci-operator-unit
+    context: ci/prow/unit
     branches:
     - master
-    rerun_command: "/test pull-ci-operator-unit"
-    trigger: "/test pull-ci-operator-unit"
+    rerun_command: "/test unit"
+    trigger: "/test (all |unit)"
     decorate: true
+    always_run: true
     spec:
       containers:
       - name: test
@@ -1012,7 +1003,25 @@ presubmits:
         args:
         - test
         - ./...
-        image: docker.io/golang:latest
+        image: openshift/origin-release:golang-1.9
+  - name: pull-ci-operator-build
+    agent: kubernetes
+    context: ci/prow/build
+    branches:
+    - master
+    rerun_command: "/test build"
+    trigger: "/test (all |build)"
+    decorate: true
+    always_run: true
+    spec:
+      containers:
+      - name: test
+        command:
+        - /usr/local/go/bin/go
+        args:
+        - build
+        - ./...
+        image: openshift/origin-release:golang-1.9
 
   openshift/ose:
   - name: test_pull_request_ose_check_and_verify_tasks
@@ -1076,7 +1085,6 @@ presubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=unit
@@ -1640,7 +1648,6 @@ presubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=[images]
@@ -1670,7 +1677,6 @@ presubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=[images]
@@ -1720,7 +1726,6 @@ presubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=backend
@@ -1745,7 +1750,6 @@ presubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=frontend
@@ -1775,7 +1779,6 @@ presubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=unit
@@ -1803,7 +1806,6 @@ presubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=unit
@@ -1861,7 +1863,7 @@ presubmits:
           set -e
           export RPM_REPO="$( curl -q "${RPM_REPO_BASEURL_REF}" 2>/dev/null)"
           ci-operator \
-            --delete-when-idle=10m --dry-run=false \
+            --dry-run=false \
             --artifact-dir=$(ARTIFACTS) \
             --secret-dir=/usr/local/e2e-gcp-cluster-profile --template=/usr/local/e2e-gcp \
             --target=e2e-gcp
@@ -1919,7 +1921,7 @@ presubmits:
           set -e
           export RPM_REPO="$( curl -q "${RPM_REPO_BASEURL_REF}" 2>/dev/null)"
           ci-operator \
-            --delete-when-idle=10m --dry-run=false \
+            --dry-run=false \
             --artifact-dir=$(ARTIFACTS) \
             --secret-dir=/usr/local/e2e-gcp-cluster-profile --template=/usr/local/e2e-gcp \
             --target=e2e-gcp
@@ -1949,7 +1951,6 @@ presubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=unit
@@ -1977,7 +1978,6 @@ presubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=unit
@@ -2015,7 +2015,6 @@ presubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --template=/usr/local/integration
@@ -2054,7 +2053,6 @@ presubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --template=/usr/local/integration
@@ -2115,7 +2113,7 @@ presubmits:
           set -e
           export RPM_REPO="$( curl -q "${RPM_REPO_BASEURL_REF}" 2>/dev/null)"
           ci-operator \
-            --delete-when-idle=10m --dry-run=false \
+            --dry-run=false \
             --artifact-dir=$(ARTIFACTS) \
             --secret-dir=/usr/local/e2e-gcp-cluster-profile --template=/usr/local/e2e-gcp \
             --target=e2e-gcp
@@ -2175,7 +2173,7 @@ presubmits:
           set -e
           export RPM_REPO="$( curl -q "${RPM_REPO_BASEURL_REF}" 2>/dev/null)"
           ci-operator \
-            --delete-when-idle=10m --dry-run=false \
+            --dry-run=false \
             --artifact-dir=$(ARTIFACTS) \
             --secret-dir=/usr/local/e2e-gcp-cluster-profile --template=/usr/local/e2e-gcp \
             --target=e2e-gcp
@@ -2205,7 +2203,6 @@ presubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=unit
@@ -2234,7 +2231,6 @@ presubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=unit
@@ -2403,7 +2399,6 @@ presubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=unit
@@ -2432,7 +2427,6 @@ presubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=unit
@@ -2471,7 +2465,6 @@ presubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=unit
@@ -2517,7 +2510,6 @@ presubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=unit
@@ -2568,7 +2560,6 @@ presubmits:
               key: master.json
         command:
         - ci-operator
-        - --delete-when-idle=10m
         - --dry-run=false
         - --artifact-dir=$(ARTIFACTS)
         - --secret-dir=/usr/local/e2e-aws-cluster-profile
@@ -2601,7 +2592,6 @@ postsubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=[images]
@@ -2831,7 +2821,6 @@ postsubmits:
               key: master.json
         command:
         - ci-operator
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=[images]
@@ -3113,7 +3102,6 @@ postsubmits:
               key: master.json
         command:
         - ci-operator
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=[images]
@@ -3139,7 +3127,6 @@ postsubmits:
               key: release-3.10.json
         command:
         - ci-operator
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=[images]
@@ -3174,7 +3161,6 @@ postsubmits:
               key: master.json
         command:
         - ci-operator
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=[images]
@@ -3200,7 +3186,6 @@ postsubmits:
               key: release-3.10.json
         command:
         - ci-operator
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=[images]
@@ -3229,7 +3214,6 @@ postsubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=[images]
@@ -3264,7 +3248,6 @@ postsubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=[images]
@@ -3299,7 +3282,6 @@ postsubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=[images]
@@ -3326,7 +3308,6 @@ postsubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=[images]
@@ -3355,7 +3336,6 @@ postsubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=[images]
@@ -3382,7 +3362,6 @@ postsubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=[images]
@@ -3411,7 +3390,6 @@ postsubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=[images]
@@ -3438,7 +3416,6 @@ postsubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=[images]
@@ -3467,7 +3444,6 @@ postsubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=[images]
@@ -3494,7 +3470,6 @@ postsubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=[images]
@@ -3523,7 +3498,6 @@ postsubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=[images]
@@ -3552,7 +3526,6 @@ postsubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=[images]
@@ -3595,7 +3568,6 @@ postsubmits:
         command:
         - ci-operator
         args:
-        - --delete-when-idle=10m
         - --artifact-dir=$(ARTIFACTS)
         - --dry-run=false
         - --target=[images]
