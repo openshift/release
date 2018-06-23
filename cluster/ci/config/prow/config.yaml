@@ -1010,16 +1010,35 @@ presubmits:
     trigger: "((?m)^/test( all| networking),?(\\s+|$))"
 
   openshift/openshift-ansible:
-  - name: test_pull_request_openshift_ansible_tox
-    agent: jenkins
-    labels:
-      master: ci.openshift.redhat.com
-    always_run: true
-    context: ci/openshift-jenkins/tox
-    rerun_command: "/test tox"
-    trigger: "((?m)^/test( all| tox),?(\\s+|$))"
+  - name: pull-ci-openshift-openshift-ansible-unit
+    agent: kubernetes
+    context: ci/prow/unit
     branches:
     - master
+    rerun_command: "/test unit"
+    always_run: true
+    trigger: "((?m)^/test( all| unit| tox),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-openshift-ansible
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --delete-when-idle=10m
+        - --artifact-dir=$(ARTIFACTS)
+        - --dry-run=false
+        - --target=unit
+        - --target=[images]
 
   - name: test_pull_request_openshift_ansible_tox_310
     agent: jenkins
@@ -2732,6 +2751,32 @@ postsubmits:
     - master
 
   openshift/openshift-ansible:
+  - name: branch-ci-openshift-openshift-ansible-images
+    agent: kubernetes
+    labels:
+      artifacts: images
+    branches:
+    - master
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-openshift-ansible
+              key: master.json
+        command:
+        - ci-operator
+        - --delete-when-idle=10m
+        - --artifact-dir=$(ARTIFACTS)
+        - --dry-run=false
+        - --target=[images]
+        - --promote
   - name: test_branch_openshift_ansible_extended_conformance_gce_37
     agent: jenkins
     labels:
