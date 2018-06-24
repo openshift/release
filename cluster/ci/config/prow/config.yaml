@@ -291,6 +291,60 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --target=verify
 
+  - name: pull-ci-origin-e2e-gcp
+    agent: kubernetes
+    context: ci/prow/e2e-gcp
+    branches:
+    - master
+    rerun_command: "/test e2e-gcp"
+    always_run: true
+    trigger: "((?m)^/test( all| e2e-gcp),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      volumes:
+      - name: job-definition
+        configMap:
+          name: prow-job-cluster-launch-e2e
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      containers:
+      - name: test
+        image: ci-operator:latest
+        volumeMounts:
+        - name: job-definition
+          mountPath: /usr/local/e2e-gcp
+          subPath: cluster-launch-e2e.yaml
+        - name: cluster-profile
+          mountPath: /usr/local/e2e-gcp-cluster-profile
+        env:
+        - name: TEST_FOCUS
+          value: Suite:openshift/conformance/parallel
+        - name: TEST_FOCUS_SERIAL
+          value: Suite:openshift/registry/serial
+        - name: JOB_NAME_SAFE
+          value: e2e-gcp
+        - name: CLUSTER_TYPE
+          value: gcp
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-origin
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --secret-dir=/usr/local/e2e-gcp-cluster-profile
+        - --template=/usr/local/e2e-gcp
+        - --target=e2e-gcp
+
   - name: test_pull_request_origin_end_to_end
     agent: jenkins
     labels:
@@ -420,7 +474,6 @@ presubmits:
     always_run: true
     branches:
     - cli-pre-rebase
-    - master
     context: ci/openshift-jenkins/gcp
     rerun_command: "/test gcp"
     trigger: "((?m)^/test( all| gcp),?(\\s+|$))"
