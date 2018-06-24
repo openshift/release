@@ -28,7 +28,7 @@
 
   "images": [
     {
-      "from": "os",
+      "from": "os-without-rpms",
       "to": "base",
       "context_dir": "images/base/"
     },
@@ -142,12 +142,45 @@
     }
   ],
 
+  "raw_steps": [
+    {
+      "pipeline_image_cache_step": {
+        "from": "bin",
+        "to": "bin-cross",
+        "commands": "mkdir -p _output/local/releases; touch _output/local/releases/CHECKSUM; echo $'FROM bin AS bin\\nFROM rpms AS rpms\\nFROM centos:7\\nCOPY --from=bin /go/src/github.com/openshift/origin/_output/local/releases /srv/zips/\\nCOPY --from=rpms /go/src/github.com/openshift/origin/_output/local/releases/rpms/* /srv/repo/' > _output/local/releases/Dockerfile; make build-cross"
+      }
+    },
+    {
+      "project_directory_image_build_step": {
+        "from": "os-without-rpms",
+        "to": "artifacts",
+        "inputs": {
+          "bin-cross": {"paths": [{"source_path": "/go/src/github.com/openshift/origin/_output/local/releases/Dockerfile", "destination_dir": "."}], "as": ["bin"]},
+          "rpms":      {"as": ["rpms"]},
+          "src":       {}
+        },
+        "optional": true
+      }
+    },
+    {
+      "output_image_tag_step": {
+        "from": "artifacts",
+        "to": {"name": "stable", "tag": "artifacts"},
+        "optional": true
+      }
+    }
+  ],
+
   "resources": {
     "*": {
       "requests": { "cpu": "100m", "memory": "200Mi" },
       "limits":   { "cpu": "2",    "memory": "6Gi" }
     },
     "bin": {
+      "requests": { "cpu": "3",    "memory": "7Gi" },
+      "limits":   { "cpu": "7",    "memory": "9Gi" }
+    },
+    "bin-cross": {
       "requests": { "cpu": "3",    "memory": "7Gi" },
       "limits":   { "cpu": "7",    "memory": "9Gi" }
     },
