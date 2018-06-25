@@ -131,6 +131,45 @@ prowjob_namespace: ci
 pod_namespace: ci
 log_level: debug
 
+_templates:
+  e2e-gcp: &e2e-gcp
+    agent: kubernetes
+    decorate: true
+    skip_cloning: true
+  e2e-gcp-spec: &e2e-gcp-spec
+    serviceAccountName: ci-operator
+    volumes:
+    - name: job-definition
+      configMap:
+        name: prow-job-cluster-launch-e2e
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-gcp
+        - configMap:
+            name: cluster-profile-gcp
+  e2e-gcp-container: &e2e-gcp-container
+    name: test
+    image: ci-operator:latest
+    volumeMounts:
+    - name: job-definition
+      mountPath: /usr/local/e2e-gcp
+      subPath: cluster-launch-e2e.yaml
+    - name: cluster-profile
+      mountPath: /usr/local/e2e-gcp-cluster-profile
+    command:
+    - /bin/bash
+    - -c
+    - |
+      #!/bin/bash
+      set -e
+      export RPM_REPO="$( curl -q "${RPM_REPO_BASEURL_REF}" 2>/dev/null)"
+      ci-operator \
+        --artifact-dir=$(ARTIFACTS) \
+        --secret-dir=/usr/local/e2e-gcp-cluster-profile --template=/usr/local/e2e-gcp \
+        --target=e2e-gcp
+
 presubmits:
   openshift/origin:
   - name: test_pull_request_origin_verify_310
@@ -292,37 +331,17 @@ presubmits:
         - --target=verify
 
   - name: pull-ci-origin-e2e-gcp
-    agent: kubernetes
-    context: ci/prow/e2e-gcp
+    context: ci/prow/gcp
     branches:
     - master
-    rerun_command: "/test e2e-gcp"
+    rerun_command: "/test gcp"
     always_run: true
-    trigger: "((?m)^/test( all| e2e-gcp),?(\\s+|$))"
-    decorate: true
-    skip_cloning: true
+    trigger: "((?m)^/test( all| gcp),?(\\s+|$))"
+    <<: *e2e-gcp
     spec:
-      serviceAccountName: ci-operator
-      volumes:
-      - name: job-definition
-        configMap:
-          name: prow-job-cluster-launch-e2e
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
+      <<: *e2e-gcp-spec
       containers:
-      - name: test
-        image: ci-operator:latest
-        volumeMounts:
-        - name: job-definition
-          mountPath: /usr/local/e2e-gcp
-          subPath: cluster-launch-e2e.yaml
-        - name: cluster-profile
-          mountPath: /usr/local/e2e-gcp-cluster-profile
+      - <<: *e2e-gcp-container
         env:
         - name: TEST_FOCUS
           value: Suite:openshift/conformance/parallel
