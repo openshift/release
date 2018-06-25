@@ -348,6 +348,62 @@ presubmits:
         - --template=/usr/local/e2e-gcp
         - --target=e2e-gcp
 
+  - name: pull-ci-origin-launch-gcp
+    agent: kubernetes
+    context: ci/prow/launch-gcp
+    branches:
+    - master
+    rerun_command: "/test launch-gcp"
+    always_run: true
+    trigger: "((?m)^/test( launch-gcp),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      volumes:
+      - name: job-definition
+        configMap:
+          name: prow-job-cluster-launch-e2e
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      containers:
+      - name: test
+        image: ci-operator:latest
+        volumeMounts:
+        - name: job-definition
+          mountPath: /usr/local/e2e-gcp
+          subPath: cluster-launch-e2e.yaml
+        - name: cluster-profile
+          mountPath: /usr/local/e2e-gcp-cluster-profile
+        env:
+        - name: TEST_COMMAND
+          value: "sleep 7200 & wait"
+        - name: TEST_FOCUS_SERIAL
+          value: Suite:openshift/registry/serial
+        - name: JOB_NAME_SAFE
+          value: e2e-gcp
+        - name: CLUSTER_TYPE
+          value: gcp
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-origin
+              key: master.json
+        - name: OVERRIDE_SPEC
+          value: '{"test_base_image": {"cluster": "", "namespace": "ci", "name": "src-cache-origin", "tag": "master"}}'
+        command:
+        - ci-operator
+        args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --secret-dir=/usr/local/e2e-gcp-cluster-profile
+        - --template=/usr/local/e2e-gcp
+        - --target=e2e-gcp
+
   - name: test_pull_request_origin_end_to_end
     agent: jenkins
     labels:
@@ -667,17 +723,6 @@ presubmits:
     context: ci/openshift-jenkins/cross
     rerun_command: "/test cross"
     trigger: "((?m)^/test cross,?(\\s+|$))"
-
-  - name: test_pull_request_origin_launch_gce
-    agent: jenkins
-    labels:
-      master: ci.openshift.redhat.com
-    always_run: false
-    branches:
-    - master
-    context: ci/openshift-jenkins/launch-gcp
-    rerun_command: "/test launch-gcp"
-    trigger: "((?m)^/test launch-gcp,?(\\s+|$))"
 
   - name: test_pull_request_origin_launch_gce_310
     agent: jenkins
@@ -1300,22 +1345,125 @@ presubmits:
             --secret-dir=/usr/local/e2e-gcp-cluster-profile --template=/usr/local/e2e-gcp \
             --target=e2e-gcp
 
-  - name: test_pull_request_openshift_ansible_extended_conformance_gce_ha
-    agent: jenkins
-    labels:
-      master: ci.openshift.redhat.com
-    always_run: false
-    context: ci/openshift-jenkins/gcp-ha
-    rerun_command: "/test gcp-ha"
-    trigger: "((?m)^/test gcp-ha,?(\\s+|$))"
+  - name: pull-ci-openshift-openshift-ansible-e2e-gcp-ha
+    agent: kubernetes
+    context: ci/prow/gcp-ha
     branches:
     - master
+    rerun_command: "/test gcp-ha"
+    always_run: false
+    trigger: "((?m)^/test( all| gcp-ha),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      volumes:
+      - name: job-definition
+        configMap:
+          name: prow-job-cluster-launch-e2e
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp-ha
+      containers:
+      - name: test
+        image: ci-operator:latest
+        volumeMounts:
+        - name: job-definition
+          mountPath: /usr/local/e2e-gcp
+          subPath: cluster-launch-e2e.yaml
+        - name: cluster-profile
+          mountPath: /usr/local/e2e-gcp-cluster-profile
+        env:
+        - name: TEST_FOCUS
+          value: Suite:openshift/conformance/parallel
+        - name: JOB_NAME_SAFE
+          value: e2e-gcp
+        - name: CLUSTER_TYPE
+          value: gcp
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-openshift-ansible
+              key: master.json
+        - name: RPM_REPO_BASEURL_REF
+          value: https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/master/.latest-rpms
+        command:
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -e
+          export RPM_REPO="$( curl -q "${RPM_REPO_BASEURL_REF}" 2>/dev/null)"
+          ci-operator \
+            --artifact-dir=$(ARTIFACTS) \
+            --secret-dir=/usr/local/e2e-gcp-cluster-profile --template=/usr/local/e2e-gcp \
+            --target=e2e-gcp
+
+  - name: pull-ci-openshift-openshift-ansible-launch-gcp
+    agent: kubernetes
+    context: ci/prow/launch-gcp
+    branches:
+    - master
+    rerun_command: "/test launch-gcp"
+    trigger: "((?m)^/test( launch-gcp),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      volumes:
+      - name: job-definition
+        configMap:
+          name: prow-job-cluster-launch-e2e
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      containers:
+      - name: test
+        image: ci-operator:latest
+        volumeMounts:
+        - name: job-definition
+          mountPath: /usr/local/e2e-gcp
+          subPath: cluster-launch-e2e.yaml
+        - name: cluster-profile
+          mountPath: /usr/local/e2e-gcp-cluster-profile
+        env:
+        - name: TEST_COMMAND
+          value: "sleep 7200 & wait"
+        - name: JOB_NAME_SAFE
+          value: e2e-gcp
+        - name: CLUSTER_TYPE
+          value: gcp
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-openshift-ansible
+              key: master.json
+        - name: RPM_REPO_BASEURL_REF
+          value: https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/master/.latest-rpms
+        command:
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -e
+          export RPM_REPO="$( curl -q "${RPM_REPO_BASEURL_REF}" 2>/dev/null)"
+          ci-operator \
+            --artifact-dir=$(ARTIFACTS) \
+            --secret-dir=/usr/local/e2e-gcp-cluster-profile --template=/usr/local/e2e-gcp \
+            --target=e2e-gcp
 
   - name: test_pull_request_openshift_ansible_extended_conformance_gce_ha_310
     agent: jenkins
     labels:
       master: ci.openshift.redhat.com
-    always_run: false
     context: ci/openshift-jenkins/gcp-ha
     rerun_command: "/test gcp-ha"
     trigger: "((?m)^/test gcp-ha,?(\\s+|$))"
@@ -1509,17 +1657,6 @@ presubmits:
     context: ci/openshift-jenkins/system-containers
     rerun_command: "/test system-containers"
     trigger: "((?m)^/test( all| system-containers),?(\\s+|$))"
-
-  - name: test_pull_request_openshift_ansible_launch_gce
-    agent: jenkins
-    labels:
-      master: ci.openshift.redhat.com
-    always_run: false
-    context: ci/openshift-jenkins/launch-gcp
-    rerun_command: "/test launch-gcp"
-    trigger: "((?m)^/test launch-gcp,?(\\s+|$))"
-    branches:
-    - master
 
   - name: test_pull_request_openshift_ansible_launch_gce_310
     agent: jenkins
