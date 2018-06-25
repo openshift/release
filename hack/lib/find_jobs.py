@@ -13,7 +13,9 @@ def find_jobs_for_branch(jobs, branch):
 
 errors = 0
 y = yaml.load(open(sys.argv[1]))
-for job in find_jobs_for_branch(y['postsubmits'][sys.argv[2]], sys.argv[3]):
-  print "postsubmit: %s" % (job['name'])
-for job in find_jobs_for_branch(y['presubmits'][sys.argv[2]], sys.argv[3]):
-  print "presubmit: %s%s" % (job['name'], '' if 'always_run' in job and ['always_run'] else ' [opt]')
+if sys.argv[2] in y['postsubmits']:
+  for job in find_jobs_for_branch(y['postsubmits'][sys.argv[2]], sys.argv[3]):
+    print "postsubmit: %s" % (job['name'])
+if sys.argv[2] in y['presubmits']:
+  for job in find_jobs_for_branch(y['presubmits'][sys.argv[2]], sys.argv[3]):
+    print "presubmit: %s%s" % (job['name'], '' if 'always_run' in job and ['always_run'] else ' [opt]')
