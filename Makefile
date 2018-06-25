@@ -266,9 +266,9 @@ pod-utils:
 
 acs-engine:
 	oc new-project azure --description='OpenShift on Azure' --display-name='OSA' ; \
-	$(MAKE) apply WHAT=projects/acs-engine/rbac.yaml ; \
-	$(MAKE) apply WHAT=projects/acs-engine/binary-build.yaml
-	$(MAKE) apply WHAT=projects/acs-engine/test-image-builds/
+	$(MAKE) apply WHAT=projects/azure/rbac.yaml ; \
+	$(MAKE) apply WHAT=projects/azure/acs-engine/binary-build.yaml
+	$(MAKE) apply WHAT=projects/azure/acs-engine/test-image-builds/
 .PHONY: acs-engine
 
 check:
