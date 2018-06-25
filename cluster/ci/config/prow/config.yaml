@@ -1239,16 +1239,63 @@ presubmits:
     branches:
     - release-3.10
 
-  - name: test_pull_request_openshift_ansible_extended_conformance_gce
-    agent: jenkins
-    labels:
-      master: ci.openshift.redhat.com
-    always_run: true
-    context: ci/openshift-jenkins/gcp
-    rerun_command: "/test gcp"
-    trigger: "((?m)^/test( all| gcp),?(\\s+|$))"
+  - name: pull-ci-openshift-openshift-ansible-e2e-gcp
+    agent: kubernetes
+    context: ci/prow/gcp
     branches:
     - master
+    rerun_command: "/test gcp"
+    always_run: true
+    trigger: "((?m)^/test( all| gcp),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      volumes:
+      - name: job-definition
+        configMap:
+          name: prow-job-cluster-launch-e2e
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      containers:
+      - name: test
+        image: ci-operator:latest
+        volumeMounts:
+        - name: job-definition
+          mountPath: /usr/local/e2e-gcp
+          subPath: cluster-launch-e2e.yaml
+        - name: cluster-profile
+          mountPath: /usr/local/e2e-gcp-cluster-profile
+        env:
+        - name: TEST_FOCUS
+          value: Suite:openshift/conformance/parallel
+        - name: JOB_NAME_SAFE
+          value: e2e-gcp
+        - name: CLUSTER_TYPE
+          value: gcp
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-openshift-ansible
+              key: master.json
+        - name: RPM_REPO_BASEURL_REF
+          value: https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/master/.latest-rpms
+        command:
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -e
+          export RPM_REPO="$( curl -q "${RPM_REPO_BASEURL_REF}" 2>/dev/null)"
+          ci-operator \
+            --artifact-dir=$(ARTIFACTS) \
+            --secret-dir=/usr/local/e2e-gcp-cluster-profile --template=/usr/local/e2e-gcp \
+            --target=e2e-gcp
 
   - name: test_pull_request_openshift_ansible_extended_conformance_gce_ha
     agent: jenkins
