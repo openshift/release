@@ -1751,6 +1751,8 @@ presubmits:
     context: ci/prow/backend
     rerun_command: "/test backend"
     always_run: true
+    branches:
+    - master
     trigger: "((?m)^/test( all| backend),?(\\s+|$))"
     decorate: true
     spec:
@@ -1769,11 +1771,14 @@ presubmits:
         args:
         - --artifact-dir=$(ARTIFACTS)
         - --target=backend
+        - --target=[images]
   - name: pull-ci-console-frontend
     agent: kubernetes
     context: ci/prow/frontend
     rerun_command: "/test frontend"
     always_run: true
+    branches:
+    - master
     trigger: "((?m)^/test( all| frontend),?(\\s+|$))"
     decorate: true
     spec:
@@ -3150,6 +3155,32 @@ postsubmits:
         - --target=[images]
         - --promote
 
+  openshift/console:
+  - name: branch-ci-origin-console-images
+    agent: kubernetes
+    labels:
+      artifacts: images
+    branches:
+    - master
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-console
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=[images]
+        - --promote
   openshift/origin-web-console:
   - name: test_branch_origin_web_console
     agent: jenkins
