@@ -12,7 +12,9 @@ parameters:
   required: true
 - name: IMAGE_ANSIBLE
   required: true
-- name: IMAGE_TESTS
+- name: LOCAL_IMAGE_SRC
+  required: true
+- name: IMAGE_CLI
   required: true
 - name: RPM_REPO
   required: true
@@ -64,11 +66,22 @@ objects:
       secret:
         secretName: ${JOB_NAME_SAFE}-cluster-profile
 
+    initContainers:
+    - name: cli
+      image: ${IMAGE_CLI}
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      command:
+      - cp
+      - /usr/bin/oc
+      - /tmp/shared/oc
+
     containers:
 
     # Once admin.kubeconfig exists, executes shared tests
     - name: test
-      image: ${IMAGE_TESTS}
+      image: ${LOCAL_IMAGE_SRC}
       resources:
         requests:
           cpu: 1
@@ -86,8 +99,6 @@ objects:
       env:
       - name: HOME
         value: /tmp/home
-      - name: TEST_COMMAND
-        value: "${TEST_COMMAND}"
       command:
       - /bin/bash
       - -c
@@ -97,8 +108,6 @@ objects:
 
         trap 'touch /tmp/shared/exit' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
-
-        cp "$(which oc)" /tmp/shared/
 
         mkdir -p "${HOME}"
 
@@ -115,8 +124,8 @@ objects:
         # don't let clients impact the global kubeconfig
         cp /tmp/shared/admin.kubeconfig /tmp/admin.kubeconfig
         export KUBECONFIG=/tmp/admin.kubeconfig
-
-        PATH=/usr/libexec/origin:$PATH
+        export ARTIFACT_DIR=/tmp/artifacts
+        export PATH=/tmp/shared:$PATH
 
         # set up cloud provider specific env vars
         if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
@@ -127,32 +136,7 @@ objects:
           export PROVIDER_ARGS='-provider=gce -gce-zone=us-east1-c -gce-project=openshift-gce-devel-ci'
         fi
 
-        mkdir -p /tmp/output
-        cd /tmp/output
-
-        # create the environment, but exit before we run tests
-        if [[ -n "${TEST_COMMAND-}" ]]; then
-          ${TEST_COMMAND}
-          exit 0
-        fi
-
-        # TODO: the test binary should really be a more structured command - most of these flags should be
-        #       autodetected from the running cluster.
-        # TODO: bump nodes up to 40 again
-        set -x
-        if [[ -n "${TEST_SUITE}" || -n "${TEST_FOCUS}" ]]; then
-          ginkgo -v -noColor -nodes=30 $( which extended.test ) -- \
-            -suite "${TEST_SUITE}" -ginkgo.focus="${TEST_FOCUS}" -ginkgo.skip="${TEST_SKIP}" \
-            -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit \
-            -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
-        fi
-        if [[ -n "${TEST_SUITE_SERIAL}" || -n "${TEST_FOCUS_SERIAL}" ]]; then
-          ginkgo -v -noColor -nodes=1 $( which extended.test ) -- \
-            -suite "${TEST_SUITE_SERIAL}" -ginkgo.focus="${TEST_FOCUS_SERIAL}" -ginkgo.skip="${TEST_SKIP_SERIAL}" \
-            -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit/serial \
-            -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
-        fi
-        exit ${rc:-0}
+        ${TEST_COMMAND}
 
     # Runs an install
     - name: setup
