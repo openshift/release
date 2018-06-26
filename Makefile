@@ -264,12 +264,14 @@ pod-utils:
 	done
 .PHONY: pod-utils
 
-acs-engine:
+azure:
 	oc new-project azure --description='OpenShift on Azure' --display-name='OSA' ; \
+	oc create secret generic azure-credentials --from-literal=azure_client_id=${AZURE_CLIENT_ID} --from-literal=azure_client_secret=${AZURE_CLIENT_SECRET} --from-literal=azure_tenant_id=${AZURE_TENANT_ID} --from-literal=azure_subscription_id=${AZURE_SUBSCRIPTION_ID} -n azure
 	$(MAKE) apply WHAT=projects/azure/rbac.yaml ; \
 	$(MAKE) apply WHAT=projects/azure/acs-engine/binary-build.yaml
 	$(MAKE) apply WHAT=projects/azure/acs-engine/test-image-builds/
-.PHONY: acs-engine
+	$(MAKE) apply WHAT=projects/azure/azure-purge/
+.PHONY: azure
 
 check:
 	# perform basic check on the jobs
