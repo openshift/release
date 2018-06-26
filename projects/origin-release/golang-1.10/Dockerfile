@@ -6,7 +6,7 @@
 #
 FROM        centos:7
 
-ENV VERSION=1.10 \
+ENV VERSION=1.10.3 \
     GOARM=5 \
     GOPATH=/go \
     GOROOT=/usr/local/go
