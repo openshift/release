@@ -71,6 +71,10 @@ prow-secrets:
 	oc create secret generic cluster-secrets-gcp --from-file=cluster/test-deploy/gcp/gce.json --from-file=cluster/test-deploy/gcp/ssh-privatekey --from-file=cluster/test-deploy/gcp/ssh-publickey --from-file=cluster/test-deploy/gcp/ops-mirror.pem -o yaml --dry-run | oc apply -f -
 	# gce.json is used by jobs operating against AWS
 	oc create secret generic cluster-secrets-aws --from-file=cluster/test-deploy/aws/.awscred --from-file=cluster/test-deploy/aws/pull-secret --from-file=cluster/test-deploy/aws/license --from-file=cluster/test-deploy/aws/ssh-privatekey --from-file=cluster/test-deploy/aws/ssh-publickey -o yaml --dry-run | oc apply -f -
+
+	# $DOCKERCONFIGJSON is the path to the json file
+	oc secrets new dockerhub ${DOCKERCONFIGJSON}
+	oc secrets link builder dockerhub
 .PHONY: prow-secrets
 
 prow-builds:
@@ -210,9 +214,6 @@ origin-stable:
 .PHONY: origin-stable
 
 origin-release:
-	# $DOCKERCONFIGJSON is the path to the json file
-	oc secrets new dockerhub ${DOCKERCONFIGJSON}
-	oc secrets link builder dockerhub
 	$(MAKE) applyTemplate WHAT=projects/origin-release/pipeline.yaml
 .PHONY: origin-release
 
