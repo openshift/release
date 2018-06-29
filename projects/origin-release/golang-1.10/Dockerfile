@@ -7,6 +7,7 @@
 FROM        centos:7
 
 ENV VERSION=1.10.3 \
+    GOCACHE=/go/.cache \
     GOARM=5 \
     GOPATH=/go \
     GOROOT=/usr/local/go
@@ -34,7 +35,7 @@ RUN yum install -y /tmp/origin-rpm/*.rpm && \
         github.com/openshift/imagebuilder/cmd/imagebuilder \
         k8s.io/test-infra/prow/cmd/clonerefs && \
     mv $GOPATH/bin/* /usr/bin/ && \
-    rm -rf $GOPATH/* && \
+    rm -rf $GOPATH/* $GOPATH/.cache && \
     mkdir $GOPATH/bin && \
     ln -s /usr/bin/imagebuilder $GOPATH/bin/imagebuilder && \
     ln -s /usr/bin/goimports $GOPATH/bin/goimports
