@@ -3252,48 +3252,6 @@ postsubmits:
       master: ci.openshift.redhat.com
     branches:
     - master
-  openshift/os:
-  - name: branch-ci-os-container-build
-    agent: kubernetes
-    branches:
-    - master
-    decorate: true
-    spec:
-      volumes:
-      - name: docker-socket
-        hostPath:
-          path: /var/run/docker.sock
-      - name: docker-binary
-        hostPath:
-          path: /usr/bin/docker-current
-      serviceAccountName: privileged-builder
-      containers:
-      - name: build
-        image: registry.svc.ci.openshift.org/ci/origin-release:golang-1.9
-        volumeMounts:
-        - name: docker-socket
-          mountPath: /var/run/docker.sock
-        - name: docker-binary
-          mountPath: /usr/bin/docker
-        securityContext:
-          # TODO: the team has promised me they will be able to remove this soon
-          privileged: true
-          runAsUser: 0
-        command:
-        - /bin/bash
-        - -c
-        - |
-          #!/bin/bash
-          set -euo pipefail
-          cat {atomic-centos-continuous,rhcos-continuous,ignition}.repo >/tmp/preserve
-          rm *.repo
-          mv /tmp/preserve openshift.repo
-          curl http://rpm-mirror.ci.svc >> openshift.repo 2>/dev/null
-          echo "true" > generate-openshift-repo
-          imagebuilder -privileged -t docker-registry.default.svc:5000/openshift/os:latest .
-          docker login docker-registry.default.svc:5000 -u serviceaccount -p "$( cat /var/run/secrets/kubernetes.io/serviceaccount/token )"
-          docker push docker-registry.default.svc:5000/openshift/os:latest
-          docker rmi docker-registry.default.svc:5000/openshift/os:latest
 
   kubernetes-incubator/cri-o:
   - name: test_branch_crio_e2e_rhel
