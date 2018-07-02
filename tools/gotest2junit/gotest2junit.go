@@ -32,17 +32,19 @@ type testSuite struct {
 
 func main() {
 	summarize := false
+	verbose := false
 	flag.BoolVar(&summarize, "summary", true, "display a summary as items are processed")
+	flag.BoolVar(&verbose, "v", false, "display passing results")
 	flag.Parse()
 
-	if err := process(os.Stdin, summarize); err != nil {
+	if err := process(os.Stdin, summarize, verbose); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func process(r io.Reader, summarize bool) error {
-	suites, err := stream(r, summarize)
+func process(r io.Reader, summarize, verbose bool) error {
+	suites, err := stream(r, summarize, verbose)
 	if err != nil {
 		return err
 	}
@@ -86,7 +88,7 @@ func newTestSuites(suites map[string]*testSuite) *api.TestSuites {
 	return all
 }
 
-func stream(r io.Reader, summarize bool) (map[string]*testSuite, error) {
+func stream(r io.Reader, summarize, verbose bool) (map[string]*testSuite, error) {
 	suites := make(map[string]*testSuite)
 	defaultTest := &api.TestCase{
 		Name: "build and execution",
@@ -166,9 +168,10 @@ func stream(r io.Reader, summarize bool) (map[string]*testSuite, error) {
 				Message: r.Output,
 			}
 		case "pass":
-			if summarize {
+			if summarize && verbose {
 				fmt.Fprintf(os.Stderr, "PASS: %s %s %s\n", r.Package, r.Test, time.Duration(r.Elapsed*float64(time.Second)))
 			}
+			test.SystemOut = ""
 			test.Duration = r.Elapsed
 		case "fail":
 			if summarize {
