@@ -255,6 +255,7 @@ image-pruner-setup:
 image-mirror-files:
 	VERSION=v3.10 hack/mirror-file > cluster/ci/config/mirroring/origin_v3_10
 	VERSION=v3.11 TAG=v3.11,v3.11.0,latest hack/mirror-file > cluster/ci/config/mirroring/origin_v3_11
+	BASE=quay.io/openshift/origin- VERSION=v3.11 TAG=v3.11,v3.11.0,latest hack/mirror-file > cluster/ci/config/mirroring/origin_v3_11_quay
 .PHONY: image-mirror-files
 
 image-mirror-setup:
