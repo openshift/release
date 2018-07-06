@@ -6,7 +6,7 @@
     "tag": "",
     "tag_overrides": {}
   },
-  "base_rpm_images": {
+  "base_images": {
     "os": {
       "cluster": "https://api.ci.openshift.org",
       "namespace": "openshift",
@@ -28,52 +28,52 @@
 
   "images": [
     {
-      "from": "os-without-rpms",
-      "to": "base-without-rpms",
+      "from": "os",
+      "to": "base",
       "context_dir": "images/base/"
     },
     {
-      "from": "base",
+      "from": "base-with-rpms",
       "to": "pod",
       "context_dir": "images/pod/"
     },
     {
-      "from": "base",
+      "from": "base-with-rpms",
       "to": "template-service-broker",
       "context_dir": "images/template-service-broker/"
     },
     {
-      "from": "base",
+      "from": "base-with-rpms",
       "to": "cli",
       "context_dir": "images/cli/"
     },
     {
-      "from": "base",
+      "from": "base-with-rpms",
       "to": "hypershift",
       "context_dir": "images/hypershift/"
     },
     {
-      "from": "base",
+      "from": "base-with-rpms",
       "to": "hyperkube",
       "context_dir": "images/hyperkube/"
     },
     {
-      "from": "base",
+      "from": "base-with-rpms",
       "to": "egress-router",
       "context_dir": "images/egress/router/"
     },
     {
-      "from": "base",
+      "from": "base-with-rpms",
       "to": "egress-http-proxy",
       "context_dir": "images/egress/http-proxy/"
     },
     {
-      "from": "base",
+      "from": "base-with-rpms",
       "to": "egress-dns-proxy",
       "context_dir": "images/egress/dns-proxy/"
     },
     {
-      "from": "base",
+      "from": "base-with-rpms",
       "to": "keepalived-ipfailover",
       "context_dir": "images/ipfailover/keepalived/"
     },
@@ -152,7 +152,7 @@
     },
     {
       "project_directory_image_build_step": {
-        "from": "os-without-rpms",
+        "from": "os",
         "to": "artifacts",
         "inputs": {
           "bin-cross": {"paths": [{"source_path": "/go/src/github.com/openshift/origin/_output/local/releases/Dockerfile", "destination_dir": "."}], "as": ["bin"]},
@@ -170,19 +170,18 @@
       }
     },
     {
-      "project_directory_image_build_step": {
-        "from": "os",
-        "to": "base",
-        "context_dir": "images/base/"
-      }
-    },
-    {
-      "output_image_tag_step": {
-        "from": "base-without-rpms",
-        "to": {"name": "stable", "tag": "base"}
+      "rpm_image_injection_step": {
+        "from": "base",
+        "to": "base-with-rpms"
       }
     }
   ],
+
+  "promotion": {
+    "additional_images": {
+      "artifacts": "artifacts"
+    }
+  },
 
   "resources": {
     "*": {
