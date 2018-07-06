@@ -765,6 +765,35 @@ presubmits:
     rerun_command: "/test cross"
     trigger: "((?m)^/test cross,?(\\s+|$))"
 
+  - name: pull-ci-origin-cross
+    agent: kubernetes
+    context: ci/prow/cross
+    rerun_command: "/test cross"
+    trigger: "((?m)^/test cross,?(\\s+|$))"
+    run_if_changed: '^(hack/)|(Makefile)|(.*_(windows|linux|darwin|unsupported)(_test)?\.go)$'
+    branches:
+    - master
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-origin
+              key: master.json
+        - name: OVERRIDE_SPEC
+          value: '{"test_base_image": {"cluster": "", "namespace": "ci", "name": "src-cache-origin", "tag": "master"}}'
+        command:
+        - ci-operator
+        args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=artifacts
+
   - name: test_pull_request_origin_launch_gce_310
     agent: jenkins
     labels:
@@ -2871,6 +2900,7 @@ postsubmits:
         args:
         - --artifact-dir=$(ARTIFACTS)
         - --target=[images]
+        - --target=artifacts
         - --promote
   - name: ami_build_origin_int_rhel_build
     agent: jenkins
@@ -2931,8 +2961,6 @@ postsubmits:
     labels:
       master: ci.openshift.redhat.com
     branches:
-    - master
-    - stage
     - release-3.6
     - release-3.7
     - release-3.8
