@@ -600,6 +600,59 @@ presubmits:
         - --template=/usr/local/e2e-gcp
         - --target=e2e-gcp
 
+  - name: pull-ci-origin-conformance-k8s-310
+    agent: kubernetes
+    context: ci/prow/conformance-k8s
+    branches:
+    - release-3.10
+    rerun_command: "/test conformance-k8s"
+    trigger: "((?m)^/test( conformance-k8s),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      volumes:
+      - name: job-definition
+        configMap:
+          name: prow-job-cluster-launch-src
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      containers:
+      - name: test
+        image: ci-operator:latest
+        volumeMounts:
+        - name: job-definition
+          mountPath: /usr/local/e2e-gcp
+          subPath: cluster-launch-src.yaml
+        - name: cluster-profile
+          mountPath: /usr/local/e2e-gcp-cluster-profile
+        env:
+        - name: TEST_COMMAND
+          value: test/extended/conformance-k8s.sh
+        - name: JOB_NAME_SAFE
+          value: e2e-gcp
+        - name: CLUSTER_TYPE
+          value: gcp
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-origin
+              key: master.json
+        - name: OVERRIDE_SPEC
+          value: '{"test_base_image": {"cluster": "", "namespace": "ci", "name": "src-cache-origin", "tag": "master"}}'
+        command:
+        - ci-operator
+        args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --secret-dir=/usr/local/e2e-gcp-cluster-profile
+        - --template=/usr/local/e2e-gcp
+        - --target=e2e-gcp
+
   - name: test_pull_request_origin_extended_networking_310
     agent: jenkins
     labels:
@@ -3886,16 +3939,62 @@ periodics:
   labels:
       master: ci.openshift.redhat.com
   interval: 24h
-- name: test_branch_origin_extended_conformance_k8s_39
+
+- name: periodic-ci-origin-conformance-k8s
+  interval: 24h
+  agent: kubernetes
+  decorate: true
+  skip_cloning: true
+  spec:
+    serviceAccountName: ci-operator
+    volumes:
+    - name: job-definition
+      configMap:
+        name: prow-job-cluster-launch-src
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-gcp
+        - configMap:
+            name: cluster-profile-gcp
+    containers:
+    - name: test
+      image: ci-operator:latest
+      volumeMounts:
+      - name: job-definition
+        mountPath: /usr/local/e2e-gcp
+        subPath: cluster-launch-src.yaml
+      - name: cluster-profile
+        mountPath: /usr/local/e2e-gcp-cluster-profile
+      env:
+      - name: TEST_COMMAND
+        value: test/extended/conformance-k8s.sh
+      - name: JOB_NAME_SAFE
+        value: e2e-gcp
+      - name: CLUSTER_TYPE
+        value: gcp
+      - name: CONFIG_SPEC
+        valueFrom:
+          configMapKeyRef:
+            name: ci-operator-openshift-origin
+            key: master.json
+      - name: OVERRIDE_SPEC
+        value: '{"test_base_image": {"cluster": "", "namespace": "ci", "name": "src-cache-origin", "tag": "master"}}'
+      command:
+      - ci-operator
+      args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --secret-dir=/usr/local/e2e-gcp-cluster-profile
+      - --template=/usr/local/e2e-gcp
+      - --target=e2e-gcp
+      - --git-ref=openshift/origin@master
+
+- name: test_branch_origin_extended_conformance_k8s_310
   agent: jenkins
   labels:
       master: ci.openshift.redhat.com
-  interval: 12h
-- name: test_branch_origin_extended_conformance_k8s
-  agent: jenkins
-  labels:
-      master: ci.openshift.redhat.com
-  interval: 12h
+  interval: 24h
 - name: test_branch_origin_extended_builds
   agent: jenkins
   labels:
