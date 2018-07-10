@@ -120,6 +120,7 @@ tide:
     - openshift/installer
     - openshift/coredns
     - openshift/telemeter
+    - openshift/service-serving-cert-signer
     - openshift/service-catalog
     labels:
     - lgtm
@@ -1067,6 +1068,35 @@ presubmits:
           valueFrom:
             configMapKeyRef:
               name: ci-operator-openshift-telemeter
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=unit
+        - --target=[images]
+
+  openshift/service-serving-cert-signer:
+  - name: pull-ci-openshift-service-serving-cert-signer-unit
+    agent: kubernetes
+    context: ci/prow/unit
+    branches:
+    - master
+    rerun_command: "/test unit"
+    always_run: true
+    trigger: "((?m)^/test( all| unit),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-service-serving-cert-signer
               key: master.json
         command:
         - ci-operator
@@ -3821,6 +3851,33 @@ postsubmits:
           valueFrom:
             configMapKeyRef:
               name: ci-operator-openshift-telemeter
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=[images]
+        - --promote
+
+  openshift/service-serving-cert-signer:
+  - name: branch-ci-openshift-service-serving-cert-signer-images
+    agent: kubernetes
+    labels:
+      artifacts: images
+    branches:
+    - master
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-service-serving-cert-signer
               key: master.json
         command:
         - ci-operator
