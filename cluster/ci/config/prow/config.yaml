@@ -107,6 +107,10 @@ tide:
     - openshift/origin-web-console
     - openshift/origin-web-console-server
     - openshift/console
+    - openshift/prometheus-operator
+    - openshift/kube-rbac-proxy
+    - openshift/kube-state-metrics
+    - openshift/configmap-reload
     - openshift/cluster-operator
     - openshift/os
     - openshift/redhat-release-coreos
@@ -3931,6 +3935,168 @@ postsubmits:
           valueFrom:
             configMapKeyRef:
               name: ci-operator-openshift-service-serving-cert-signer
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=[images]
+        - --promote
+
+  openshift/prometheus-operator:
+  - name: branch-ci-openshift-prometheus-operator-images
+    agent: kubernetes
+    labels:
+      artifacts: images
+    branches:
+    - openshift-master
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-prometheus-operator
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=[images]
+        - --promote
+
+  openshift/prometheus-config-reloader:
+  - name: branch-ci-openshift-prometheus-config-reloader-images
+    agent: kubernetes
+    labels:
+      artifacts: images
+    branches:
+    - openshift-master
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-prometheus-config-reloader
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=[images]
+        - --promote
+
+  openshift/kube-rbac-proxy:
+  - name: branch-ci-openshift-kube-rbac-proxy-images
+    agent: kubernetes
+    labels:
+      artifacts: images
+    branches:
+    - openshift-master
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-kube-rbac-proxy
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=[images]
+        - --promote
+
+  openshift/kube-state-metrics:
+  - name: branch-ci-openshift-kube-state-metrics-images
+    agent: kubernetes
+    labels:
+      artifacts: images
+    branches:
+    - openshift-master
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-kube-state-metrics
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=[images]
+        - --promote
+
+  openshift/configmap-reload:
+  - name: branch-ci-openshift-configmap-reload-images
+    agent: kubernetes
+    labels:
+      artifacts: images
+    branches:
+    - openshift-master
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-configmap-reload
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=[images]
+        - --promote
+
+  openshift/cluster-monitoring-operator:
+  - name: branch-ci-openshift-cluster-monitoring-operator-images
+    agent: kubernetes
+    labels:
+      artifacts: images
+    branches:
+    - openshift-master
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-cluster-monitoring-operator
               key: master.json
         command:
         - ci-operator
