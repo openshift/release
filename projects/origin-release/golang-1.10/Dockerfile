@@ -26,7 +26,7 @@ RUN yum install -y epel-release && \
 
 ADD *.rpm /tmp/origin-rpm/
 RUN yum install -y /tmp/origin-rpm/*.rpm && \
-    yum clean all && \
+    yum clean all 
 
 #Download go for  amd64 unless other archs are explicitly defined
 RUN case "$(arch)" in \
