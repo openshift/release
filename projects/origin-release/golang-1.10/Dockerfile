@@ -27,8 +27,18 @@ RUN yum install -y epel-release && \
 ADD *.rpm /tmp/origin-rpm/
 RUN yum install -y /tmp/origin-rpm/*.rpm && \
     yum clean all && \
-    curl https://storage.googleapis.com/golang/go$VERSION.linux-amd64.tar.gz | tar -C /usr/local -xzf - && \
-    go get golang.org/x/tools/cmd/cover \
+
+#Download go for  amd64 unless other archs are explicitly defined
+RUN case "$(arch)" in \
+        ppc64le) goarch='ppc64le';; \
+        aarch64) goarch='arm64';; \
+        s390x) goarch='s390x';; \
+        *) goarch='amd64';; \
+    esac; \
+    curl https://storage.googleapis.com/golang/go$VERSION.linux-$goarch.tar.gz | tar -C /usr/local -xzf -; \
+    go version
+
+RUN go get golang.org/x/tools/cmd/cover \
         golang.org/x/tools/cmd/goimports \
         github.com/tools/godep \
         github.com/golang/lint/golint \
