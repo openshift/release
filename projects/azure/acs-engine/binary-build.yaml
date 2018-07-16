@@ -114,15 +114,20 @@ items:
     selector:
       name: acs-engine-web
 
-- apiVersion: apps.openshift.io/v1
-  kind: DeploymentConfig
+- apiVersion: apps/v1
+  kind: Deployment
   metadata:
     name: acs-engine-web
     namespace: azure
+    annotations:
+      image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"acs-engine:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"binaries\")].image"}]'
     labels:
       name: acs-engine-web
   spec:
     replicas: 1
+    selector:
+      matchLabels:
+        name: acs-engine-web
     template:
       metadata:
         labels:
@@ -135,14 +140,3 @@ items:
           - containerPort: 8080
             name: binaries
             protocol: TCP
-        terminationGracePeriodSeconds: 1
-    triggers:
-    - type: ConfigChange
-    - imageChangeParams:
-        automatic: true
-        containerNames:
-        - binaries
-        from:
-          kind: ImageStreamTag
-          name: acs-engine:latest
-      type: ImageChange
