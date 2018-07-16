@@ -22,6 +22,13 @@ in the new repository. Also run
 
 to verify your scripts work.
 
+### Software required for build
+
+On Fedora:
+```
+dnf install -y golang git gcc rpm-build make docker createrepo
+```
+
 ### Run a build 
 
 Creates appropriate binaries in `_output/local/bin/<GOOS>/<GOARCH>`:
