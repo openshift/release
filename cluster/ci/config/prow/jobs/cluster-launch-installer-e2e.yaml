@@ -153,7 +153,7 @@ objects:
       image: ${IMAGE_INSTALLER}
       volumeMounts:
       - name: shared-tmp
-        mountPath: /tmp
+        mountPath: /tmp/shared
       - name: cluster-profile
         mountPath: /etc/openshift-installer
       - name: artifacts
@@ -170,24 +170,24 @@ objects:
         #!/bin/bash
         set -euo pipefail
 
-        trap 'rc=$?; if [[ $rc -ne 0 ]]; then touch /tmp/exit; fi; exit $rc' EXIT
+        trap 'rc=$?; if [[ $rc -ne 0 ]]; then touch /tmp/shared/exit; fi; exit $rc' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
 
-        mkdir /tmp/cluster
-        cp /etc/openshift-installer/* /tmp/cluster/
+        mkdir /tmp/shared/cluster
+        cp /etc/openshift-installer/* /tmp/shared/cluster/
 
         export AWS_SHARED_CREDENTIALS_FILE=/etc/openshift-installer/.awscred
         export NAME=${INSTANCE_PREFIX}
         (
           export EMAIL=test@ci.openshift.io
           export PASSWORD=$( date +%s | sha256sum | base64 | head -c 32 ; echo )
-          cat /etc/openshift-installer/openshift.yaml | envsubst > /tmp/cluster/inputs.yaml
+          cat /etc/openshift-installer/openshift.yaml | envsubst > /tmp/shared/cluster/inputs.yaml
         )
         echo "Invoking installer ..."
-        
-        cd /tmp/cluster
+
+        cd /tmp/shared/cluster
         tectonic init --config=inputs.yaml
-        mv -f ${NAME}/* /tmp/cluster/
+        mv -f ${NAME}/* /tmp/shared/cluster/
         mkdir /tmp/artifacts/installer
         cp inputs.yaml config.yaml internal.yaml terraform.tfvars /tmp/artifacts/installer/
 
@@ -196,7 +196,7 @@ objects:
         export KUBECONFIG=$(pwd)/generated/auth/kubeconfig
         # wait until oc shows up
         while true; do
-          if [[ -f /tmp/exit ]]; then
+          if [[ -f /tmp/shared/exit ]]; then
             echo "Interrupted"
             exit 1
           fi
