@@ -4620,3 +4620,28 @@ periodics:
   labels:
     master: ci.dev.openshift.redhat.com
   interval: 4h
+- name: branch-ci-openshift-azure-helm-images
+  interval: 24h
+  agent: kubernetes
+  labels:
+    artifacts: images
+  branches:
+  - master
+  decorate: true
+  skip_cloning: true
+  spec:
+    serviceAccountName: ci-operator
+    containers:
+    - name: test
+      image: ci-operator:latest
+      env:
+      - name: CONFIG_SPEC
+        valueFrom:
+          configMapKeyRef:
+            name: ci-operator-openshift-azure-helm
+            key: master.json
+      command:
+      - ci-operator
+      args:
+      - --target=[images]
+      - --promote
