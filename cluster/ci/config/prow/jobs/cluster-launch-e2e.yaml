@@ -174,9 +174,7 @@ objects:
       image: ${IMAGE_ANSIBLE}
       volumeMounts:
       - name: shared-tmp
-        mountPath: /tmp/shared
-      - name: artifacts
-        mountPath: /tmp/artifacts
+        mountPath: /tmp
       - name: cluster-profile
         mountPath: /usr/share/ansible/openshift-ansible/inventory/dynamic/injected
       env:
@@ -193,7 +191,7 @@ objects:
         #!/bin/bash
         set -euo pipefail
 
-        trap 'rc=$?; if [[ $rc -ne 0 ]]; then touch /tmp/shared/exit; fi; exit $rc' EXIT
+        trap 'rc=$?; if [[ $rc -ne 0 ]]; then touch /tmp/exit; fi; exit $rc' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
 
         ansible-playbook -vv \
