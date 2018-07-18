@@ -49,7 +49,7 @@ objects:
   spec:
     restartPolicy: Never
     activeDeadlineSeconds: 10800
-    terminationGracePeriodSeconds: 600
+    terminationGracePeriodSeconds: 900
     volumes:
     - name: artifacts
       emptyDir: {}
@@ -210,13 +210,14 @@ objects:
             sleep 15 & wait
             continue
           fi
-          if ! /tmp/oc get users 2>/dev/null; then
-            echo "Waiting for OpenShift API at $(/tmp/oc whoami --show-server) to respond ..."
+          if ! /tmp/oc get deploy/router -n tectonic-ingress 2>/dev/null; then
+            echo "Waiting for router to be created ..."
             sleep 15 & wait
             continue
           fi
           break
         done
+        /tmp/oc wait deploy/router -n tectonic-ingress --for condition=available --timeout=5m
         echo "Copied kubeconfig, installation successful"
         cp $KUBECONFIG /tmp/admin.kubeconfig
 
@@ -244,15 +245,16 @@ objects:
           set +e
           touch /tmp/shared/exit
           export PATH=$PATH:/tmp/shared
+          (
           echo "Gathering artifacts ..."
           export KUBECONFIG=/tmp/shared/admin.kubeconfig
           mkdir -p /tmp/artifacts/pods /tmp/artifacts/nodes /tmp/artifacts/metrics
 
-          oc get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' > /tmp/nodes
-          oc get pods --all-namespaces --template '{{ range .items }}{{ $name := .metadata.name }}{{ $ns := .metadata.namespace }}{{ range .spec.containers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ range .spec.initContainers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ end }}' > /tmp/containers
-          oc get nodes -o json > /tmp/artifacts/nodes.json
-          oc get events --all-namespaces -o json > /tmp/artifacts/events.json
-          oc get pods -l openshift.io/component=api --all-namespaces --template '{{ range .items }}-n {{ .metadata.namespace }} {{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/pods-api
+          oc --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' > /tmp/nodes
+          oc --request-timeout=5s get pods --all-namespaces --template '{{ range .items }}{{ $name := .metadata.name }}{{ $ns := .metadata.namespace }}{{ range .spec.containers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ range .spec.initContainers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ end }}' > /tmp/containers
+          oc --request-timeout=5s get nodes -o json > /tmp/artifacts/nodes.json
+          oc --request-timeout=5s get events --all-namespaces -o json > /tmp/artifacts/events.json
+          oc --request-timeout=5s get pods -l openshift.io/component=api --all-namespaces --template '{{ range .items }}-n {{ .metadata.namespace }} {{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/pods-api
 
           while IFS= read -r i; do
             file="$( echo "$i" | cut -d ' ' -f 3 | tr -s ' ' '_' )"
@@ -278,12 +280,15 @@ objects:
               oc get --raw /api/v1/nodes/$i/proxy/logs/journal/${j}system.journal | gzip -c > /tmp/artifacts/nodes/$i/journal.gz
             done < /tmp/journals
           done < /tmp/nodes
+          ) &
+          sleep 60
 
           echo "Deprovisioning cluster ..."
           export AWS_SHARED_CREDENTIALS_FILE=/etc/openshift-installer/.awscred
           cd /tmp/shared/cluster
-          set -e
-          tectonic destroy --dir=. --log-level=debug
+          for i in `seq 1 2`; do
+            tectonic destroy --dir=. --log-level=debug
+          done
         }
 
         trap 'teardown' EXIT

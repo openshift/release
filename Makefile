@@ -144,6 +144,7 @@ prow-services:
 prow-cluster-jobs:
 	oc create configmap cluster-profile-aws --from-file=cluster/test-deploy/aws/openshift.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap cluster-profile-gcp --from-file=cluster/test-deploy/gcp/vars.yaml --from-file=cluster/test-deploy/gcp/vars-origin.yaml -o yaml --dry-run | oc apply -f -
+	oc create configmap cluster-profile-gcp-crio --from-file=cluster/test-deploy/gcp-crio/vars.yaml --from-file=cluster/test-deploy/gcp-crio/vars-origin.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap cluster-profile-gcp-ha --from-file=cluster/test-deploy/gcp/vars.yaml --from-file=cluster/test-deploy/gcp/vars-origin.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap cluster-profile-gcp-ha-static --from-file=cluster/test-deploy/gcp/vars.yaml --from-file=cluster/test-deploy/gcp/vars-origin.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap prow-job-cluster-launch-e2e --from-file=cluster/ci/config/prow/jobs/cluster-launch-e2e.yaml -o yaml --dry-run | oc apply -f -
@@ -275,10 +276,11 @@ pod-utils:
 .PHONY: pod-utils
 
 azure:
-	oc new-project azure --description='OpenShift on Azure' --display-name='OSA' ; \
-	oc create secret generic azure-credentials --from-literal=azure_client_id=${AZURE_CLIENT_ID} --from-literal=azure_client_secret=${AZURE_CLIENT_SECRET} --from-literal=azure_tenant_id=${AZURE_TENANT_ID} --from-literal=azure_subscription_id=${AZURE_SUBSCRIPTION_ID} -n azure
-	$(MAKE) apply WHAT=projects/azure/rbac.yaml ; \
+	$(MAKE) apply WHAT=projects/azure/rbac.yaml 
+	oc create secret generic azure-credentials --from-literal=azure_client_id=${AZURE_CLIENT_ID} --from-literal=azure_client_secret=${AZURE_CLIENT_SECRET} --from-literal=azure_tenant_id=${AZURE_TENANT_ID} --from-literal=azure_subscription_id=${AZURE_SUBSCRIPTION_ID} -n azure 
+	oc create secret generic aws-reg-master --from-literal=username=${AWS_REG_USERNAME} --from-literal=password=${AWS_REG_PASSWORD} -n azure 
 	$(MAKE) apply WHAT=projects/azure/acs-engine/binary-build.yaml
+	$(MAKE) apply WHAT=projects/azure/azure-cicd/
 	$(MAKE) apply WHAT=projects/azure/acs-engine/test-image-builds/
 	$(MAKE) apply WHAT=projects/azure/azure-purge/
 .PHONY: azure

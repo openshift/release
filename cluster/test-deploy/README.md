@@ -33,7 +33,7 @@ cp $SHARED_SECRETS/gce/aos-serviceaccount.json $RELEASE_TOOLS/gcp-dev/gce.json
 
 cp $SHARED_SECRETS/gce/cloud-user@gce.pem $RELEASE_TOOLS/gcp-dev/ssh-privatekey
 
-cp $SHARED_SECRETS/mirror/client.p12 $RELEASE_TOOLS/gcp-dev/ops-mirror.pem
+cp $SHARED_SECRETS/mirror/ops-mirror.pem $RELEASE_TOOLS/gcp-dev/ops-mirror.pem
 ```
 
 ### Configure installer variables
