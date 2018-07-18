@@ -28,14 +28,14 @@ ADD *.rpm /tmp/origin-rpm/
 RUN yum install -y /tmp/origin-rpm/*.rpm && \
     yum clean all 
 
-#Download go for  amd64 unless other archs are explicitly defined
+#Download go for amd64 unless other archs are detected
 RUN case "$(arch)" in \
-        ppc64le) goarch='ppc64le';; \
-        aarch64) goarch='arm64';; \
-        s390x) goarch='s390x';; \
-        *) goarch='amd64';; \
+        ppc64le) GOARCH='ppc64le';; \
+        aarch64) GOARCH='arm64';; \
+        s390x) GOARCH='s390x';; \
+        *) GOARCH='amd64';; \
     esac; \
-    curl https://storage.googleapis.com/golang/go$VERSION.linux-$goarch.tar.gz | tar -C /usr/local -xzf -; \
+    curl https://storage.googleapis.com/golang/go$VERSION.linux-$GOARCH.tar.gz | tar -C /usr/local -xzf -; \
     go version
 
 RUN go get golang.org/x/tools/cmd/cover \
