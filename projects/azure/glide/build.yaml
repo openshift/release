@@ -1,0 +1,48 @@
+kind: List
+apiVersion: v1
+items:
+
+- apiVersion: image.openshift.io/v1
+  kind: ImageStream
+  metadata:
+    name: glide
+    namespace: azure
+
+- kind: BuildConfig
+  apiVersion: v1
+  metadata:
+    name: glide
+    namespace: azure
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: glide:go1.10
+    source:
+      dockerfile: |
+        FROM release:golang-1.10
+
+        RUN wget https://github.com/Masterminds/glide/releases/download/v0.13.1/glide-v0.13.1-linux-amd64.tar.gz && \
+            tar -xzf glide-v0.13.1-linux-amd64.tar.gz && \
+            mv linux-amd64/glide /usr/bin/ && \
+            rm -rf linux-amd64/ glide-v0.13.1-linux-amd64.tar.gz && \
+            git config --global user.email origin-release-container && \
+            git config --global user.email origin-release@redhat.com
+      type: Dockerfile
+    strategy:
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: release:golang-1.10
+          namespace: openshift
+        imageOptimizationPolicy: SkipLayers
+    triggers:
+    - type: ConfigChange
+    - imageChange:
+        from:
+          kind: ImageStreamTag
+          name: release:golang-1.10
+          namespace: openshift
+      type: ImageChange
