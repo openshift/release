@@ -2649,6 +2649,67 @@ presubmits:
     context: ci/openshift-jenkins
     rerun_command: "/test"
     trigger: "((?m)^/test,?(\\s+|$))"
+  - name: pull-ci-jenkins-e2e-canary
+    agent: kubernetes
+    context: ci/prow/e2e
+    branches:
+    - master
+    rerun_command: "/test e2e"
+    always_run: false
+    trigger: "((?m)^/test( all| e2e),?(\\s+|$))"
+    decorate: true
+    spec:
+      serviceAccountName: ci-operator
+      volumes:
+      - name: job-definition
+        configMap: 
+          name: prow-job-cluster-launch-e2e-gmontero-testing
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      containers:
+      - name: test
+        image: ci-operator:latest
+        volumeMounts:
+        - name: job-definition
+          mountPath: /usr/local/e2e-gcp
+          subPath: cluster-launch-e2e-gmontero-testing.yaml
+        - name: cluster-profile
+          mountPath: /usr/local/e2e-gcp-cluster-profile
+        env:
+        - name: PREPARE_COMMAND
+          value: tag-in-image.sh
+        - name: TEST_FOCUS
+          value: openshift pipieline
+        - name: TEST_FOCUS_SERIAL
+          value: openshift pipeline
+        - name: JOB_NAME_SAFE
+          value: e2e-gcp
+        - name: CLUSTER_TYPE
+          value: gcp
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-jenkins-canary
+              key: master.json
+        - name: RPM_REPO_BASEURL_REF
+          value: https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/master/.latest-rpms
+        command:
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -e
+          export RPM_REPO="$( curl -q "${RPM_REPO_BASEURL_REF}" 2>/dev/null)"
+          ci-operator \
+            --delete-when-idle=10m --dry-run=false \
+            --artifact-dir=$(ARTIFACTS) \
+            --secret-dir=/usr/local/e2e-gcp-cluster-profile --template=/usr/local/e2e-gcp \
+            --target=e2e-gcp
 
   openshift/jenkins-plugin:
   - name: test_pull_request_jenkins_plugin
