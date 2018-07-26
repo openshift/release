@@ -148,6 +148,7 @@ prow-cluster-jobs:
 	oc create configmap cluster-profile-gcp-ha --from-file=cluster/test-deploy/gcp/vars.yaml --from-file=cluster/test-deploy/gcp/vars-origin.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap cluster-profile-gcp-ha-static --from-file=cluster/test-deploy/gcp/vars.yaml --from-file=cluster/test-deploy/gcp/vars-origin.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap prow-job-cluster-launch-e2e --from-file=cluster/ci/config/prow/jobs/cluster-launch-e2e.yaml -o yaml --dry-run | oc apply -f -
+	oc create configmap prow-job-cluster-launch-e2e-gmontero-testing --from-file=cluster/ci/config/prow/jobs/cluster-launch-e2e-gmontero-testing.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap prow-job-cluster-launch-src --from-file=cluster/ci/config/prow/jobs/cluster-launch-src.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap prow-job-cluster-launch-installer-e2e --from-file=cluster/ci/config/prow/jobs/cluster-launch-installer-e2e.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap prow-job-master-sidecar --from-file=cluster/ci/config/prow/jobs/master-sidecar.yaml -o yaml --dry-run | oc apply -f -
