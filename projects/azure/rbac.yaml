@@ -21,7 +21,7 @@ items:
   - pweil-
   - kwoodson
 
-- apiVersion: rbac.authorization.k8s.io/v1beta1
+- apiVersion: rbac.authorization.k8s.io/v1
   kind: RoleBinding
   metadata:
     name: azure-team-admin
@@ -36,7 +36,7 @@ items:
     name: admin
 
 # Our test images need to be pulled from different CI systems
-- apiVersion: rbac.authorization.k8s.io/v1beta1
+- apiVersion: rbac.authorization.k8s.io/v1
   kind: RoleBinding
   metadata:
     name: image-puller
@@ -75,3 +75,69 @@ items:
   roleRef:
     kind: Role
     name: token-refresher
+    namespace: azure
+
+# ci-operator can promote images in the azure namespace
+- kind: Role
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: image-tagger
+    namespace: azure
+  rules:
+  - apiGroups:
+    - ""
+    - image.openshift.io
+    resources:
+    - imagestreamtags
+    - imagestreams
+    verbs:
+    - update
+    - patch
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: image-tagger-ci-operator
+    namespace: azure
+  roleRef:
+    kind: Role
+    name: image-tagger
+    namespace: azure
+  subjects:
+  - kind: ServiceAccount
+    name: ci-operator
+    namespace: ci
+
+# ci-operator can access images in the azure namespace.
+# Presumably, anonymous access is required to make fetching
+# images from other clusters work ootb.
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    name: image-access-anonymous
+    namespace: azure
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:anonymous
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:unauthenticated
+  roleRef:
+    kind: Role
+    apiGroup: rbac.authorization.k8s.io
+    name: image-access
+    namespace: azure
+- kind: Role
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: image-access
+    namespace: azure
+  rules:
+  - apiGroups:
+    - ""
+    - image.openshift.io
+    resources:
+    - imagestreamtags
+    - imagestreams
+    verbs:
+    - get
