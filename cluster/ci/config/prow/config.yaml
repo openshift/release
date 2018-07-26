@@ -3049,6 +3049,35 @@ presubmits:
         args:
         - test
 
+  openshift/openshift-azure:
+  - name: pull-ci-openshift-azure
+    agent: kubernetes
+    labels:
+      artifacts: images
+    context: ci/prow/build
+    branches:
+    - master
+    rerun_command: "/test build"
+    always_run: true
+    trigger: "((?m)^/test( all| build),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-openshift-azure
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --target=[images]
+
 postsubmits:
   openshift/origin:
   - name: branch-ci-origin-images
@@ -4216,6 +4245,32 @@ postsubmits:
         - --target=[images]
         - --promote
 
+  openshift/openshift-azure:
+  - name: branch-ci-openshift-azure-images
+    agent: kubernetes
+    labels:
+      artifacts: images
+    branches:
+    - master
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-openshift-azure
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --target=[images]
+        - --promote
+
 periodics:
 - name: ami_build_origin_int_fedora_crio
   agent: jenkins
@@ -4657,29 +4712,3 @@ periodics:
   labels:
     master: ci.dev.openshift.redhat.com
   interval: 4h
-- name: branch-ci-openshift-azure-helm-images
-  interval: 24h
-  agent: kubernetes
-  labels:
-    artifacts: images
-  branches:
-  - master
-  decorate: true
-  skip_cloning: true
-  spec:
-    serviceAccountName: ci-operator
-    containers:
-    - name: test
-      image: ci-operator:latest
-      env:
-      - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            name: ci-operator-openshift-azure-helm
-            key: master.json
-      command:
-      - ci-operator
-      args:
-      - --git-ref=jim-minter/azure-helm@master # TODO: Remove once this job is moved to a {pre,post}submit
-      - --target=[images]
-      - --promote
