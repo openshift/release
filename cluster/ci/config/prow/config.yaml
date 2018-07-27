@@ -3234,6 +3234,35 @@ presubmits:
         args:
         - --target=[images]
 
+  openshift/azure-misc:
+  - name: pull-ci-openshift-azure-misc
+    agent: kubernetes
+    labels:
+      artifacts: images
+    context: ci/prow/build
+    branches:
+    - master
+    rerun_command: "/test build"
+    always_run: true
+    trigger: "((?m)^/test( all| build),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-azure-misc
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --target=[images]
+
 postsubmits:
   openshift/origin:
   - name: branch-ci-origin-images
@@ -4420,6 +4449,32 @@ postsubmits:
           valueFrom:
             configMapKeyRef:
               name: ci-operator-openshift-openshift-azure
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --target=[images]
+        - --promote
+
+  openshift/azure-misc:
+  - name: branch-ci-openshift-azure-misc-images
+    agent: kubernetes
+    labels:
+      artifacts: images
+    branches:
+    - master
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-azure-misc
               key: master.json
         command:
         - ci-operator
