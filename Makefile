@@ -286,7 +286,7 @@ azure:
 	$(MAKE) apply WHAT=projects/azure/acs-engine/binary-build.yaml
 	$(MAKE) apply WHAT=projects/azure/acs-engine/test-image-builds/
 	$(MAKE) apply WHAT=projects/azure/azure-purge/
-	$(MAKE) apply WHAT=projects/azure/plugin-base/
+	$(MAKE) apply WHAT=projects/azure/base-images/
 	$(MAKE) apply WHAT=projects/azure/token-refresh/
 .PHONY: azure
 
