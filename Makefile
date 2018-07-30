@@ -147,11 +147,11 @@ prow-cluster-jobs:
 	oc create configmap cluster-profile-gcp-crio --from-file=cluster/test-deploy/gcp-crio/vars.yaml --from-file=cluster/test-deploy/gcp-crio/vars-origin.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap cluster-profile-gcp-ha --from-file=cluster/test-deploy/gcp/vars.yaml --from-file=cluster/test-deploy/gcp/vars-origin.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap cluster-profile-gcp-ha-static --from-file=cluster/test-deploy/gcp/vars.yaml --from-file=cluster/test-deploy/gcp/vars-origin.yaml -o yaml --dry-run | oc apply -f -
-	oc create configmap prow-job-cluster-launch-e2e --from-file=cluster/ci/config/prow/jobs/cluster-launch-e2e.yaml -o yaml --dry-run | oc apply -f -
-	oc create configmap prow-job-cluster-launch-e2e-gmontero-testing --from-file=cluster/ci/config/prow/jobs/cluster-launch-e2e-gmontero-testing.yaml -o yaml --dry-run | oc apply -f -
-	oc create configmap prow-job-cluster-launch-src --from-file=cluster/ci/config/prow/jobs/cluster-launch-src.yaml -o yaml --dry-run | oc apply -f -
-	oc create configmap prow-job-cluster-launch-installer-e2e --from-file=cluster/ci/config/prow/jobs/cluster-launch-installer-e2e.yaml -o yaml --dry-run | oc apply -f -
-	oc create configmap prow-job-master-sidecar --from-file=cluster/ci/config/prow/jobs/master-sidecar.yaml -o yaml --dry-run | oc apply -f -
+	oc create configmap prow-job-cluster-launch-e2e --from-file=ci-operator/templates/cluster-launch-e2e.yaml -o yaml --dry-run | oc apply -f -
+	oc create configmap prow-job-cluster-launch-e2e-gmontero-testing --from-file=ci-operator/templates/cluster-launch-e2e-gmontero-testing.yaml -o yaml --dry-run | oc apply -f -
+	oc create configmap prow-job-cluster-launch-src --from-file=ci-operator/templates/cluster-launch-src.yaml -o yaml --dry-run | oc apply -f -
+	oc create configmap prow-job-cluster-launch-installer-e2e --from-file=ci-operator/templates/cluster-launch-installer-e2e.yaml -o yaml --dry-run | oc apply -f -
+	oc create configmap prow-job-master-sidecar --from-file=ci-operator/templates/master-sidecar.yaml -o yaml --dry-run | oc apply -f -
 .PHONY: prow-cluster-jobs
 
 prow-rpm-mirrors:
@@ -169,7 +169,7 @@ prow-rpm-mirrors-secrets:
 prow-jobs: prow-cluster-jobs prow-rpm-mirrors
 	$(MAKE) applyTemplate WHAT=cluster/ci/jobs/commenter.yaml
 	$(MAKE) apply WHAT=projects/prometheus/test/build.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/jobs/os.yaml
+	$(MAKE) apply WHAT=ci-operator/templates/os.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/ci-operator/roles.yaml
 .PHONY: prow-jobs
 
