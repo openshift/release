@@ -278,6 +278,7 @@ pod-utils:
 
 azure:
 	# set up azure namespace and policies
+	$(MAKE) apply WHAT=projects/azure/cluster-wide.yaml
 	$(MAKE) apply WHAT=projects/azure/rbac.yaml
 	# secrets
 	oc create secret generic azure-credentials --from-literal=azure_client_id=${AZURE_CLIENT_ID} --from-literal=azure_client_secret=${AZURE_CLIENT_SECRET} --from-literal=azure_tenant_id=${AZURE_TENANT_ID} --from-literal=azure_subscription_id=${AZURE_SUBSCRIPTION_ID} -o yaml --dry-run | oc apply -n azure -f -
