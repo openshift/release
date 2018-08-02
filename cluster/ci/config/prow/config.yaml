@@ -3211,6 +3211,25 @@ presubmits:
         - --template=/usr/local/e2e-aws
         - --target=e2e-aws
 
+  - name: yaml-lint
+    trigger: "(?m)^/test yaml-lint"
+    rerun_command: "/test yaml-lint"
+    context: ci/prow/yaml-lint
+    always_run: true
+    skip_report: false
+    agent: kubernetes
+    decorate: true
+    spec:
+      containers:
+      - image: quay.io/coreos/yamllint
+        env:
+        - name: IS_CONTAINER
+          value: 'TRUE'
+        command:
+          - sh
+        args:
+          - ./hack/yaml-lint.sh
+
   openshift/ci-vm-operator:
   - name: pull-ci-vm-operator-build
     agent: kubernetes
