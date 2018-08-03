@@ -53,6 +53,7 @@ objects:
           - --jenkins-token-file=/etc/jenkins/basic
           - --label-selector=master=ci.openshift.redhat.com
           - --config-path=/etc/config/config.yaml
+          - --job-config-path=/etc/job-config
           - --dry-run=false
           ports:
           - name: logs
@@ -67,6 +68,9 @@ objects:
           - name: config
             mountPath: /etc/config
             readOnly: true
+          - name: job-config
+            mountPath: /etc/job-config
+            readOnly: true
         volumes:
         - name: jenkins
           secret:
@@ -78,6 +82,9 @@ objects:
         - name: config
           configMap:
             name: config
+        - name: job-config
+          configMap:
+            name: job-config
     triggers:
     - type: ConfigChange
     - imageChangeParams:
@@ -136,6 +143,7 @@ objects:
           - --ca-cert-file=/etc/certificates/ca_cert.pem
           - --csrf-protect=true
           - --dry-run=false
+          - --job-config-path=/etc/job-config
           ports:
           - name: logs
             containerPort: 8080
@@ -152,6 +160,9 @@ objects:
           - name: certificates
             mountPath: /etc/certificates
             readOnly: true
+          - name: job-config
+            mountPath: /etc/job-config
+            readOnly: true
         volumes:
         - name: jenkins
           secret:
@@ -166,6 +177,9 @@ objects:
         - name: certificates
           secret:
             secretName: certificates
+        - name: job-config
+          configMap:
+            name: job-config
     triggers:
     - type: ConfigChange
     - imageChangeParams:
@@ -221,6 +235,7 @@ objects:
           - --label-selector=master=jenkins.katacontainers.io
           - --csrf-protect=true
           - --dry-run=false
+          - --job-config-path=/etc/job-config
           ports:
           - name: logs
             containerPort: 8080
@@ -234,6 +249,9 @@ objects:
           - name: config
             mountPath: /etc/config
             readOnly: true
+          - name: job-config
+            mountPath: /etc/job-config
+            readOnly: true
         volumes:
         - name: jenkins
           secret:
@@ -245,6 +263,9 @@ objects:
         - name: config
           configMap:
             name: config
+        - name: job-config
+          configMap:
+            name: job-config
     triggers:
     - type: ConfigChange
     - imageChangeParams:
@@ -299,6 +320,7 @@ objects:
           - --jenkins-token-file=/etc/jenkins/basic
           - --label-selector=master=jenkins-tectonic.prod.coreos.systems
           - --dry-run=false
+          - --job-config-path=/etc/job-config
           ports:
           - name: logs
             containerPort: 8080
@@ -312,6 +334,9 @@ objects:
           - name: config
             mountPath: /etc/config
             readOnly: true
+          - name: job-config
+            mountPath: /etc/job-config
+            readOnly: true
         volumes:
         - name: jenkins
           secret:
@@ -323,6 +348,9 @@ objects:
         - name: config
           configMap:
             name: config
+        - name: job-config
+          configMap:
+            name: job-config
     triggers:
     - type: ConfigChange
     - imageChangeParams:
