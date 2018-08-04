@@ -135,3 +135,21 @@ presubmits:
         - sh
         args:
         - ./hack/shellcheck.sh
+
+  - name: pull-ci-origin-installer-tf-fmt
+    trigger: "((?m)^/test( all| tf-fmt),?(\\s+|$))"
+    rerun_command: "/test tf-fmt"
+    context: ci/prow/tf-fmt
+    always_run: true
+    agent: kubernetes
+    decorate: true
+    spec:
+      containers:
+      - image: quay.io/coreos/terraform-alpine:v0.11.7
+        env:
+        - name: IS_CONTAINER
+          value: 'TRUE'
+        command:
+        - sh
+        args:
+        - ./hack/tf-fmt.sh
