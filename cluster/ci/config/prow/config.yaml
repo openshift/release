@@ -125,7 +125,6 @@ tide:
     - openshift/descheduler
     - openshift/node-problem-detector
     - openshift/kubernetes-autoscaler
-    - openshift/openshift-azure
     - openshift/openshift-restclient-java
     - openshift/coredns
     - openshift/telemeter
@@ -137,6 +136,15 @@ tide:
     - needs-ok-to-test
     - do-not-merge/work-in-progress
     - do-not-merge/hold
+  - repos:
+    - openshift/openshift-azure
+    labels:
+    - lgtm
+    missingLabels:
+    - needs-ok-to-test
+    - do-not-merge/work-in-progress
+    - do-not-merge/hold
+    - do-not-merge/needs-signoff
 
 prowjob_namespace: ci
 pod_namespace: ci
@@ -2353,6 +2361,45 @@ presubmits:
         args:
           - ./hack/yaml-lint.sh
 
+  - name: ci-pull-openshift-installer-tf-lint
+    trigger: "(?m)^/test tf-lint"
+    rerun_command: "/test tf-lint"
+    context: ci/prow/tf-lint
+    always_run: true
+    skip_report: false
+    agent: kubernetes
+    decorate: true
+    spec:
+      containers:
+      - image: quay.io/coreos/tflint
+        env:
+        - name: IS_CONTAINER
+          value: 'TRUE'
+        command:
+          - sh
+        args:
+          - ./hack/tf-lint.sh
+
+  - name: go-vet
+    trigger: "(?m)^/test go-vet"
+    rerun_command: "/test go-vet"
+    context: ci/prow/go-vet
+    always_run: true
+    skip_report: false
+    agent: kubernetes
+    decorate: true
+    spec:
+      containers:
+      - image: quay.io/coreos/golang-testing
+        env:
+        - name: IS_CONTAINER
+          value: 'TRUE'
+        command:
+        - sh
+        args:
+        - ./hack/go-vet.sh
+        - "./installer/..."
+
   openshift/ci-vm-operator:
   - name: pull-ci-vm-operator-build
     agent: kubernetes
@@ -2698,12 +2745,6 @@ postsubmits:
       master: ci.openshift.redhat.com
     branches:
     - release-3.10
-  - name: test_branch_origin_extended_conformance_azure_39
-    agent: jenkins
-    labels:
-      master: ci.openshift.redhat.com
-    branches:
-    - release-3.9
   - name: test_branch_origin_extended_conformance_azure_310
     agent: jenkins
     labels:
@@ -3995,10 +4036,6 @@ periodics:
     agent: jenkins
     labels:
         master: ci.openshift.redhat.com
-  - name: azure_build_node_image_centos_39
-    agent: jenkins
-    labels:
-        master: ci.openshift.redhat.com
   - name: azure_build_node_image_centos
     agent: jenkins
     labels:
@@ -4010,10 +4047,6 @@ periodics:
   interval: 24h
   run_after_success:
   - name: azure_build_node_image_rhel_310
-    agent: jenkins
-    labels:
-        master: ci.openshift.redhat.com
-  - name: azure_build_node_image_rhel_39
     agent: jenkins
     labels:
         master: ci.openshift.redhat.com
