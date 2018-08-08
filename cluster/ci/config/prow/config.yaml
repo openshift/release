@@ -2342,7 +2342,7 @@ presubmits:
         - --template=/usr/local/e2e-aws
         - --target=e2e-aws
 
-  - name: yaml-lint
+  - name: ci-pull-openshift-installer-yaml-lint
     trigger: "(?m)^/test yaml-lint"
     rerun_command: "/test yaml-lint"
     context: ci/prow/yaml-lint
@@ -2379,6 +2379,25 @@ presubmits:
           - sh
         args:
           - ./hack/tf-lint.sh
+
+  - name: ci-pull-openshift-installer-shellcheck
+    trigger: "(?m)^/test shellcheck"
+    rerun_command: "/test shellcheck"
+    context: ci/prow/shellcheck
+    always_run: true
+    skip_report: false
+    agent: kubernetes
+    decorate: true
+    spec:
+      containers:
+      - image: quay.io/coreos/shellcheck-alpine:v0.5.0
+        env:
+        - name: IS_CONTAINER
+          value: "TRUE"
+        command:
+        - sh
+        args:
+        - ./hack/shellcheck.sh
 
   openshift/ci-vm-operator:
   - name: pull-ci-vm-operator-build
