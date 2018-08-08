@@ -37,13 +37,37 @@ items:
   - kind: ServiceAccount
     name: ci-operator
     namespace: ci
-  
+
 - kind: ClusterRoleBinding
   apiVersion: authorization.openshift.io/v1
   metadata:
     name: self-provisioner-ci-operator
   roleRef:
     name: self-provisioner
+  subjects:
+  - kind: ServiceAccount
+    name: ci-operator
+    namespace: ci
+
+- kind: ClusterRole
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: namespace-annotator
+  rules:
+  - apiGroups:
+    - ""
+    resources:
+    - namespaces
+    verbs:
+    - get
+    - update
+
+- kind: ClusterRoleBinding
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: namespace-annotator-ci-operator
+  roleRef:
+    name: namespace-annotator
   subjects:
   - kind: ServiceAccount
     name: ci-operator
