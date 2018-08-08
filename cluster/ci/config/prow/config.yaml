@@ -2380,6 +2380,26 @@ presubmits:
         args:
           - ./hack/tf-lint.sh
 
+  - name: go-vet
+    trigger: "(?m)^/test go-vet"
+    rerun_command: "/test go-vet"
+    context: ci/prow/go-vet
+    always_run: true
+    skip_report: false
+    agent: kubernetes
+    decorate: true
+    spec:
+      containers:
+      - image: quay.io/coreos/golang-testing
+        env:
+        - name: IS_CONTAINER
+          value: 'TRUE'
+        command:
+        - sh
+        args:
+        - ./hack/go-vet.sh
+        - "./installer/..."
+
   openshift/ci-vm-operator:
   - name: pull-ci-vm-operator-build
     agent: kubernetes
