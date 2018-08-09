@@ -1,6 +1,6 @@
 presubmits:
   openshift/descheduler:
-  - name: pull-ci-kubernetes-descheduler-unit
+  - name: pull-ci-openshift-descheduler-unit
     agent: kubernetes
     context: ci/prow/unit
     branches:
@@ -19,7 +19,7 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              name: ci-operator-kubernetes-descheduler
+              name: ci-operator-openshift-descheduler
               key: master.json
         command:
         - ci-operator
@@ -27,7 +27,7 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --target=unit
         - --target=[images]
-  - name: pull-ci-kubernetes-descheduler-unit-3.10
+  - name: pull-ci-openshift-descheduler-unit-3.10
     agent: kubernetes
     context: ci/prow/unit
     branches:
@@ -46,7 +46,7 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              name: ci-operator-kubernetes-descheduler
+              name: ci-operator-openshift-descheduler
               key: release-3.10.json
         command:
         - ci-operator
@@ -54,7 +54,7 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --target=unit
         - --target=[images]
-  - name: pull-ci-kubernetes-descheduler-e2e-gce-3.10
+  - name: pull-ci-openshift-descheduler-e2e-gce-3.10
     agent: kubernetes
     always_run: true
     context: ci/prow/e2e
@@ -85,16 +85,16 @@ presubmits:
           mountPath: /usr/local/e2e-gcp
           subPath: cluster-launch-src.yaml
         - name: cluster-profile
-          mountPath: /usr/local/kubernetes-descheduler-e2e-cluster-profile
+          mountPath: /usr/local/openshift-descheduler-e2e-cluster-profile
         env:
         - name: JOB_NAME_SAFE
-          value: kubernetes-descheduler-e2e
+          value: openshift-descheduler-e2e
         - name: CLUSTER_TYPE
           value: gcp
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              name: ci-operator-kubernetes-descheduler
+              name: ci-operator-openshift-descheduler
               key: release-3.10.json
         - name: TEST_COMMAND
           value: "cp /tmp/admin.kubeconfig /tmp/admin.conf && make test-e2e"
@@ -106,9 +106,9 @@ presubmits:
         - |
           #!/bin/bash
           set -e
-          export RPM_REPO="$( curl -q "${RPM_REPO_BASEURL_REF}" 2>/dev/null)"
+          export RPM_REPO="$(curl -q "${RPM_REPO_BASEURL_REF}" 2>/dev/null)"
           ci-operator \
             --artifact-dir=$(ARTIFACTS) \
-            --secret-dir=/usr/local/kubernetes-descheduler-e2e-cluster-profile \
+            --secret-dir=/usr/local/openshift-descheduler-e2e-cluster-profile \
             --template=/usr/local/e2e-gcp \
             --target=e2e-gcp
