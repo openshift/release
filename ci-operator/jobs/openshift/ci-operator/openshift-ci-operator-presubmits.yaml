@@ -1,0 +1,40 @@
+presubmits:
+  openshift/ci-operator:
+  - name: pull-ci-operator-unit
+    agent: kubernetes
+    context: ci/prow/unit
+    branches:
+    - master
+    - dockerless-build-temporary
+    rerun_command: "/test unit"
+    trigger: "/test (all |unit)"
+    decorate: true
+    always_run: true
+    spec:
+      containers:
+      - name: test
+        command:
+        - /usr/local/go/bin/go
+        args:
+        - test
+        - ./...
+        image: openshift/origin-release:golang-1.9
+  - name: pull-ci-operator-build
+    agent: kubernetes
+    context: ci/prow/build
+    branches:
+    - master
+    - dockerless-build-temporary
+    rerun_command: "/test build"
+    trigger: "/test (all |build)"
+    decorate: true
+    always_run: true
+    spec:
+      containers:
+      - name: test
+        command:
+        - /usr/local/go/bin/go
+        args:
+        - build
+        - ./...
+        image: openshift/origin-release:golang-1.9
