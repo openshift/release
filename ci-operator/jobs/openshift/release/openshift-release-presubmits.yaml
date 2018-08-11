@@ -1,0 +1,28 @@
+presubmits:
+  openshift/release:
+  - name: check_prometheus_rules
+    agent: kubernetes
+    run_if_changed: '^(projects/prometheus/prometheus.rules.yaml)$'
+    context: ci/openshift/promrules
+    rerun_command: "/test promrules"
+    trigger: "((?m)^/test promrules,?(\\s+|$))"
+    spec:
+      containers:
+      - image: registry.svc.ci.openshift.org/ci/promrules:latest
+  - name: pull-ci-openshift-release-config
+    agent: kubernetes
+    context: ci/prow/config
+    branches:
+    - master
+    run_if_changed: '^(hack/.*)|(Makefile)|(cluster/ci/config/prow/config.yaml)|(ci-operator/jobs/.*)$'
+    rerun_command: "/test config"
+    trigger: "/test config"
+    decorate: true
+    spec:
+      containers:
+      - name: test
+        command:
+        - make
+        args:
+        - check
+        image: prow-test:latest
