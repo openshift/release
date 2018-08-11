@@ -1,0 +1,74 @@
+presubmits:
+  openshift/os:
+  - name: pull-ci-os-container-check
+    agent: kubernetes
+    context: pull-ci-os-container-check
+    branches:
+    - master
+    - dockerless-build-temporary
+    rerun_command: "/test check"
+    always_run: true
+    trigger: "((?m)^/test( all| check),?(\\s+|$))"
+    decorate: true
+    spec:
+      volumes:
+      - name: docker-socket
+        hostPath:
+          path: /var/run/docker.sock
+      serviceAccountName: privileged-builder
+      containers:
+      - name: build
+        image: registry.svc.ci.openshift.org/ci/origin-release:golang-1.9
+        volumeMounts:
+        - name: docker-socket
+          mountPath: /var/run/docker.sock
+        securityContext:
+          # TODO: the team has promised me they will be able to remove this soon
+          privileged: true
+          runAsUser: 0
+        command:
+        - ./.prow.sh
+
+  - name: pull-ci-os-container-build
+    agent: kubernetes
+    context: pull-ci-os-container-build
+    branches:
+    - master
+    - dockerless-build-temporary
+    rerun_command: "/test build"
+    always_run: true
+    trigger: "((?m)^/test( all| build),?(\\s+|$))"
+    decorate: true
+    spec:
+      volumes:
+      - name: docker-socket
+        hostPath:
+          path: /var/run/docker.sock
+      - name: docker-binary
+        hostPath:
+          path: /usr/bin/docker
+      serviceAccountName: privileged-builder
+      containers:
+      - name: build
+        image: registry.svc.ci.openshift.org/ci/origin-release:golang-1.9
+        volumeMounts:
+        - name: docker-socket
+          mountPath: /var/run/docker.sock
+        - name: docker-binary
+          mountPath: /usr/bin/docker
+        securityContext:
+          # TODO: the team has promised me they will be able to remove this soon
+          privileged: true
+          runAsUser: 0
+        command:
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -euo pipefail
+          cat {atomic-centos-continuous,rhcos-continuous,ignition}.repo >/tmp/preserve
+          rm *.repo
+          mv /tmp/preserve openshift.repo
+          curl http://rpm-mirror.ci.svc >> openshift.repo 2>/dev/null
+          echo "true" > generate-openshift-repo
+          imagebuilder -privileged .
