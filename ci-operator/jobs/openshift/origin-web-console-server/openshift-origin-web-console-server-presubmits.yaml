@@ -1,0 +1,170 @@
+presubmits:
+  openshift/origin-web-console-server:
+  - name: pull-ci-origin-web-console-server-unit
+    agent: kubernetes
+    context: ci/prow/unit
+    branches:
+    - master
+    - dockerless-build-temporary
+    rerun_command: "/test unit"
+    always_run: true
+    trigger: "((?m)^/test( all| unit),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-origin-web-console-server
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=unit
+  - name: pull-ci-origin-web-console-server-unit-3.10
+    agent: kubernetes
+    context: ci/prow/unit
+    branches:
+    - release-3.10
+    rerun_command: "/test unit"
+    always_run: true
+    trigger: "((?m)^/test( all| unit),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-origin-web-console-server
+              key: release-3.10.json
+        command:
+        - ci-operator
+        args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=unit
+  - name: pull-ci-origin-web-console-server-e2e
+    agent: kubernetes
+    context: ci/prow/e2e
+    branches:
+    - master
+    - dockerless-build-temporary
+    rerun_command: "/test e2e"
+    always_run: true
+    trigger: "((?m)^/test( all| e2e),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      volumes:
+      - name: job-definition
+        configMap:
+          name: prow-job-cluster-launch-e2e
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      containers:
+      - name: test
+        image: ci-operator:latest
+        volumeMounts:
+        - name: job-definition
+          mountPath: /usr/local/e2e-gcp
+          subPath: cluster-launch-e2e.yaml
+        - name: cluster-profile
+          mountPath: /usr/local/e2e-gcp-cluster-profile
+        env:
+        - name: TEST_FOCUS
+          value: Suite:openshift/conformance/parallel
+        - name: JOB_NAME_SAFE
+          value: e2e-gcp
+        - name: CLUSTER_TYPE
+          value: gcp
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-origin-web-console-server
+              key: master.json
+        - name: RPM_REPO_BASEURL_REF
+          value: https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/master/.latest-rpms
+        command:
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -e
+          export RPM_REPO="$( curl -q "${RPM_REPO_BASEURL_REF}" 2>/dev/null)"
+          ci-operator \
+            --artifact-dir=$(ARTIFACTS) \
+            --secret-dir=/usr/local/e2e-gcp-cluster-profile --template=/usr/local/e2e-gcp \
+            --target=e2e-gcp
+  - name: pull-ci-origin-web-console-server-e2e-3.10
+    agent: kubernetes
+    context: ci/prow/e2e
+    branches:
+    - release-3.10
+    rerun_command: "/test e2e"
+    always_run: true
+    trigger: "((?m)^/test( all| e2e),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      volumes:
+      - name: job-definition
+        configMap:
+          name: prow-job-cluster-launch-e2e
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      containers:
+      - name: test
+        image: ci-operator:latest
+        volumeMounts:
+        - name: job-definition
+          mountPath: /usr/local/e2e-gcp
+          subPath: cluster-launch-e2e.yaml
+        - name: cluster-profile
+          mountPath: /usr/local/e2e-gcp-cluster-profile
+        env:
+        - name: TEST_FOCUS
+          value: Suite:openshift/conformance/parallel
+        - name: JOB_NAME_SAFE
+          value: e2e-gcp
+        - name: CLUSTER_TYPE
+          value: gcp
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-origin-web-console-server
+              key: release-3.10.json
+        - name: RPM_REPO_BASEURL_REF
+          value: https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/release-3.10/.latest-rpms
+        command:
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -e
+          export RPM_REPO="$( curl -q "${RPM_REPO_BASEURL_REF}" 2>/dev/null)"
+          ci-operator \
+            --artifact-dir=$(ARTIFACTS) \
+            --secret-dir=/usr/local/e2e-gcp-cluster-profile --template=/usr/local/e2e-gcp \
+            --target=e2e-gcp

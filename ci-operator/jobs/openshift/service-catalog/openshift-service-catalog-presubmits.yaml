@@ -1,0 +1,37 @@
+presubmits:
+  openshift/service-catalog:
+  - name: test_pull_request_openshift_service_catalog
+    agent: jenkins
+    labels:
+      master: ci.openshift.redhat.com
+    always_run: true
+    context: ci/openshift-jenkins/service-catalog
+    rerun_command: "/test service-catalog"
+    trigger: "((?m)^/test service-catalog,?(\\s+|$))"
+  - name: pull-ci-openshift-service-catalog-unit
+    agent: kubernetes
+    context: ci/prow/unit
+    branches:
+    - master
+    rerun_command: "/test unit"
+    always_run: true
+    trigger: "((?m)^/test( all| unit),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-service-catalog
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=unit
+        - --target=[images]
