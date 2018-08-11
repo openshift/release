@@ -1,0 +1,28 @@
+presubmits:
+  openshift/origin-metrics:
+  - name: pull-ci-openshift-origin-metrics-images
+    agent: kubernetes
+    context: ci/prow/images
+    branches:
+    - master
+    rerun_command: "/test images"
+    always_run: true
+    trigger: "((?m)^/test( all| images),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-origin-metrics
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=[images]
