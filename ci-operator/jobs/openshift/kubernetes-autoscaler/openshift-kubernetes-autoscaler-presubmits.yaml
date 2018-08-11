@@ -1,0 +1,56 @@
+presubmits:
+  openshift/kubernetes-autoscaler:
+  - name: pull-ci-kubernetes-autoscaler-unit
+    agent: kubernetes
+    context: ci/prow/unit
+    branches:
+    - master
+    rerun_command: "/test unit"
+    always_run: true
+    trigger: "((?m)^/test( all| unit),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-kubernetes-autoscaler
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=unit
+        - --target=[images]
+  - name: pull-ci-kubernetes-autoscaler-unit-3.10
+    agent: kubernetes
+    context: ci/prow/unit
+    branches:
+    - release-3.10
+    rerun_command: "/test unit"
+    always_run: true
+    trigger: "((?m)^/test( all| unit),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-kubernetes-autoscaler
+              key: release-3.10.json
+        command:
+        - ci-operator
+        args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=unit
+        - --target=[images]
