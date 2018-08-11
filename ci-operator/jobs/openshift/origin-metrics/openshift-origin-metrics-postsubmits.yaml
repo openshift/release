@@ -1,0 +1,33 @@
+postsubmits:
+  openshift/origin-metrics:
+  - name: branch-ci-openshift-origin-metrics-images
+    agent: kubernetes
+    labels:
+      artifacts: images
+    branches:
+    - master
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-origin-metrics
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=[images]
+        - --promote
+  - name: push_origin_metrics_release_310
+    agent: jenkins
+    labels:
+      master: ci.openshift.redhat.com
+    branches:
+    - release-3.10
