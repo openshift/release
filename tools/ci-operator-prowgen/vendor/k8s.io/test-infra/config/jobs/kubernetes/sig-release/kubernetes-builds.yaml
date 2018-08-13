@@ -1,0 +1,180 @@
+periodics:
+- interval: 5m
+  name: ci-kubernetes-build
+  labels:
+    preset-service-account: "true"
+    preset-dind-enabled: "true"
+  spec:
+    containers:
+    - image: gcr.io/k8s-testimages/bootstrap:v20180730-c3257f6c0
+      args:
+      - --repo=k8s.io/kubernetes
+      - --repo=k8s.io/release
+      - --root=/go/src
+      - --timeout=30
+      - --scenario=kubernetes_build
+      - --
+      - --allow-dup
+      - --fast
+      # docker-in-docker needs privileged mode
+      securityContext:
+        privileged: true
+      resources:
+        requests:
+          cpu: 4
+          memory: "8Gi"
+
+- interval: 1h
+  name: ci-kubernetes-build-beta
+  labels:
+    preset-service-account: "true"
+    preset-dind-enabled: "true"
+  spec:
+    containers:
+    - image: gcr.io/k8s-testimages/bootstrap:v20180730-c3257f6c0
+      args:
+      - --repo=k8s.io/kubernetes=release-1.11
+      - --repo=k8s.io/release
+      - --root=/go/src
+      - --timeout=180
+      - --scenario=kubernetes_build
+      - --
+      - --allow-dup
+      - --extra-publish-file=k8s-beta
+      - --hyperkube
+      - --registry=gcr.io/kubernetes-ci-images
+      # docker-in-docker needs privileged mode
+      securityContext:
+        privileged: true
+      resources:
+        requests:
+          cpu: 4
+          memory: "8Gi"
+
+- interval: 2h
+  name: ci-kubernetes-build-debian-unstable
+  labels:
+    preset-service-account: "true"
+    preset-dind-enabled: "true"
+  spec:
+    containers:
+    - image: gcr.io/k8s-testimages/bootstrap:v20180730-c3257f6c0
+      args:
+      - --repo=k8s.io/release
+      - --root=/go/src
+      - --timeout=50
+      - --scenario=execute
+      - --
+      - ./debian/jenkins.sh
+      # docker-in-docker needs privileged mode
+      securityContext:
+        privileged: true
+      resources:
+        requests:
+          cpu: 4
+          memory: "8Gi"
+
+- interval: 30m
+  name: ci-kubernetes-build-stable1
+  labels:
+    preset-service-account: "true"
+    preset-dind-enabled: "true"
+  spec:
+    containers:
+    - image: gcr.io/k8s-testimages/bootstrap:v20180730-c3257f6c0
+      args:
+      - --repo=k8s.io/kubernetes=release-1.10
+      - --repo=k8s.io/release
+      - --root=/go/src
+      - --timeout=180
+      - --scenario=kubernetes_build
+      - --
+      - --allow-dup
+      - --extra-publish-file=k8s-stable1
+      - --hyperkube
+      - --registry=gcr.io/kubernetes-ci-images
+      # docker-in-docker needs privileged mode
+      securityContext:
+        privileged: true
+      resources:
+        requests:
+          cpu: 4
+          memory: "8Gi"
+
+- interval: 1h
+  name: ci-kubernetes-build-stable2
+  labels:
+    preset-service-account: "true"
+    preset-dind-enabled: "true"
+  spec:
+    containers:
+    - image: gcr.io/k8s-testimages/bootstrap:v20180730-c3257f6c0
+      args:
+      - --repo=k8s.io/kubernetes=release-1.9
+      - --repo=k8s.io/release
+      - --root=/go/src
+      - --timeout=180
+      - --scenario=kubernetes_build
+      - --
+      - --allow-dup
+      - --extra-publish-file=k8s-stable2
+      - --hyperkube
+      - --registry=gcr.io/kubernetes-ci-images
+      # docker-in-docker needs privileged mode
+      securityContext:
+        privileged: true
+      resources:
+        requests:
+          cpu: 4
+          memory: "8Gi"
+
+- interval: 2h
+  name: ci-kubernetes-build-stable3
+  labels:
+    preset-service-account: "true"
+    preset-dind-enabled: "true"
+  spec:
+    containers:
+    - image: gcr.io/k8s-testimages/bootstrap:v20180730-c3257f6c0
+      args:
+      - --repo=k8s.io/kubernetes=release-1.8
+      - --repo=k8s.io/release
+      - --root=/go/src
+      - --timeout=180
+      - --scenario=kubernetes_build
+      - --
+      - --allow-dup
+      - --extra-publish-file=k8s-stable3
+      # docker-in-docker needs privileged mode
+      securityContext:
+        privileged: true
+      resources:
+        requests:
+          cpu: 4
+          memory: "8Gi"
+
+- interval: 1h
+  name: ci-kubernetes-cross-build
+  labels:
+    preset-service-account: "true"
+    preset-dind-enabled: "true"
+  spec:
+    containers:
+    - image: gcr.io/k8s-testimages/bootstrap:v20180730-c3257f6c0
+      args:
+      - --repo=k8s.io/kubernetes
+      - --repo=k8s.io/release
+      - --root=/go/src
+      - --timeout=120
+      - --scenario=kubernetes_build
+      - --
+      - --hyperkube
+      - --registry=gcr.io/kubernetes-ci-images
+      - --suffix=-cross
+      # docker-in-docker needs privileged mode
+      securityContext:
+        privileged: true
+      resources:
+        requests:
+          cpu: 7
+          memory: "41Gi"

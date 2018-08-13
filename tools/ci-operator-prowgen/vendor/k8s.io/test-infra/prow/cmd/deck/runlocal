@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Copyright 2017 The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd $DIR
+cd static
+HOST="https://prow.k8s.io"
+if [[ $1 == "openshift" ]]; then
+	HOST="https://deck-ci.svc.ci.openshift.org"
+fi
+curl "$HOST/data.js?var=allBuilds" > data.js
+curl "$HOST/tide.js?var=tideData" > tide.js
+curl "$HOST/plugin-help.js?var=allHelp" > plugin-help.js
+curl "$HOST/pr-data.js" > pr-data.js
+bazel run --run_under="cd $DIR && " //prow/cmd/deck:deck -- --run-local --static-files-location=./static --config-path ../../config.yaml

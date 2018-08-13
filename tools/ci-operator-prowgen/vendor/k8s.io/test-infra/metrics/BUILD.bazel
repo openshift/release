@@ -1,0 +1,65 @@
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
+)
+
+config_setting(
+    name = "k8",
+    values = {"host_cpu": "k8"},
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "darwin",
+    values = {"host_cpu": "darwin"},
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "bigquery",
+    srcs = ["bigquery.py"],
+    data = glob(["configs/**"]) + select({
+        ":darwin": ["@jq_osx//file"],
+        ":k8": ["@jq_linux//file"],
+    }),
+    deps = [
+        "@dateutil",
+        "@influxdb",
+        "@pytz",
+        "@requests",
+        "@yaml",
+    ],
+)
+
+py_test(
+    name = "bigquery_test",
+    srcs = [
+        "bigquery.py",
+        "bigquery_test.py",
+    ],
+    args = select({
+        ":k8": ["--jq=$(location @jq_linux//file)"],
+        ":darwin": ["--jq=$(location @jq_osx//file)"],
+    }),
+    data = glob(["configs/*"]) + ["README.md"] + select({
+        ":k8": ["@jq_linux//file"],
+        ":darwin": ["@jq_osx//file"],
+    }),
+    deps = [
+        "@dateutil",
+        "@influxdb",
+        "@pytz",
+        "@requests",
+        "@yaml",
+    ],
+)
