@@ -209,6 +209,7 @@ objects:
         while true; do
           if [[ -f /tmp/exit ]]; then
             echo "Interrupted"
+            cp $KUBECONFIG /tmp/admin.kubeconfig
             exit 1
           fi
           if [[ ! -f /tmp/oc ]]; then
@@ -228,9 +229,13 @@ objects:
           fi
           break
         done
-        /tmp/oc wait deploy/router -n tectonic-ingress --for condition=available --timeout=5m
-        echo "Copied kubeconfig, installation successful"
+        if ! /tmp/oc wait deploy/router -n tectonic-ingress --for condition=available --timeout=5m; then
+          echo "Installation failed"
+          cp $KUBECONFIG /tmp/admin.kubeconfig
+          exit 1
+        fi
         cp $KUBECONFIG /tmp/admin.kubeconfig
+        echo "Installation successful"
 
     # Performs cleanup of all created resources
     - name: teardown
