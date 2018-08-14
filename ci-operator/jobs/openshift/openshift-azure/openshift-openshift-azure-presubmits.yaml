@@ -14,18 +14,37 @@ presubmits:
     skip_cloning: true
     spec:
       serviceAccountName: ci-operator
+      volumes:
+      - name: job-definition
+        configMap:
+          name: prow-job-cluster-launch-installer-e2e-azure
+      - name: cluster-secrets-azure
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-azure
       containers:
       - name: test
         image: ci-operator:latest
+        volumeMounts:
+        - name: job-definition
+          mountPath: /usr/local/e2e-azure
+          subPath: cluster-launch-e2e-azure.yaml
+        - name: cluster-secrets-azure
+          mountPath: /usr/local/e2e-azure-secret
         env:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
               name: ci-operator-openshift-openshift-azure
               key: master.json
+        - name: JOB_NAME_SAFE
+          value: e2e-azure
+        - name: CLUSTER_TYPE
+          value: azure
         command:
         - ci-operator
         args:
-        - --target=[images]
-        - --target=verify
-        - --target=unit
+        #no targets, run everything
+        - --secret-dir=/usr/local/e2e-azure-secret
+        - --template=/usr/local/e2e-azure
