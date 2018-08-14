@@ -1,0 +1,28 @@
+presubmits:
+  openshift/api:
+  - name: pull-ci-openshift-api-verify
+    agent: kubernetes
+    context: ci/prow/unit
+    branches:
+    - master
+    rerun_command: "/test verify"
+    always_run: true
+    trigger: "((?m)^/test( all| verify),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-api
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=verify
