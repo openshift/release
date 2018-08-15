@@ -1,0 +1,27 @@
+postsubmits:
+  openshift/machine-config-operator:
+  - name: branch-ci-openshift-machine-config-operator-images
+    agent: kubernetes
+    labels:
+      artifacts: images
+    branches:
+    - master
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-machine-config-operator
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=[images]
+        - --promote
