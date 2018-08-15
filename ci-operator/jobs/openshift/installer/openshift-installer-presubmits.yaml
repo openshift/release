@@ -199,3 +199,24 @@ presubmits:
         args:
         - ./hack/go-vet.sh
         - ./...
+
+  - name: ci-pull-openshift-installer-golint
+    trigger: "(?m)^/test golint"
+    rerun_command: "/test golint"
+    context: ci/prow/golint
+    always_run: true
+    skip_report: false
+    agent: kubernetes
+    decorate: true
+    spec:
+      containers:
+      - image: quay.io/coreos/golang-testing
+        env:
+        - name: IS_CONTAINER
+          value: "TRUE"
+        command:
+        - sh
+        args:
+        - ./hack/go-lint.sh
+        - installer/...
+        - tests/smoke
