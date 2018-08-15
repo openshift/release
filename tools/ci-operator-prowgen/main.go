@@ -49,25 +49,6 @@ func bindOptions(flag *flag.FlagSet) *options {
 // Generate a PodSpec that runs `ci-operator`, to be used in Presubmit/Postsubmit
 // Various pieces are derived from `org`, `repo`, `branch` and `target`.
 // `additionalArgs` are passed as additional arguments to `ci-operator`
-// Example
-// -------
-// containers:
-// - args:
-//   - --artifact-dir=$(ARTIFACTS)
-//   - --target=<target>
-//   - <additionalArgs>
-//   command:
-//   - ci-operator
-//   env:
-//   - name: CONFIG_SPEC
-//     valueFrom:
-//       configMapKeyRef:
-//         key: <branch>.json
-//         name: ci-operator-<org>-<repo>
-//   image: ci-operator:latest
-//   name: ""
-//   resources: {}
-// serviceAccountName: ci-operator
 func generatePodSpec(org, repo, branch, target string, additionalArgs ...string) *kubeapi.PodSpec {
 	configMapKeyRef := kubeapi.EnvVarSource{
 		ConfigMapKeyRef: &kubeapi.ConfigMapKeySelector{
@@ -102,19 +83,6 @@ type testDescription struct {
 }
 
 // Generate a Presubmit job for the given parameters
-// Example
-// -------
-// - agent: kubernetes
-//   always_run: true
-//   branches:
-//   - <branch>
-//   context: ci/prow/<test.Name>
-//   decorate: true
-//   name: pull-ci-<org>-<repo>-<test.Name>
-//   rerun_command: /test <test.Name>
-//   skip_cloning: true
-//   spec: <generatePodSpec>
-//   trigger: ((?m)^/test( all| <test.Name>),?(\\s+|$))
 func generatePresubmitForTest(test testDescription, org, repo, branch string) *prowconfig.Presubmit {
 	presubmit := prowconfig.Presubmit{
 		Agent:        "kubernetes",
@@ -134,14 +102,8 @@ func generatePresubmitForTest(test testDescription, org, repo, branch string) *p
 }
 
 // Generate a Presubmit job for the given parameters
-// Example
-// - agent: kubernetes
-//   decorate: true
-//   name: branch-ci-<org>-<repo>-<test.Name>
-//   skip_cloning: true
-//   spec: <generatePodSpec>
 func generatePostsubmitForTest(test testDescription, org, repo, branch string, additionalArgs ...string) *prowconfig.Postsubmit {
-	postsubmit := prowconfig.Postsubmit{
+	return &prowconfig.Postsubmit{
 		Agent: "kubernetes",
 		Name:  fmt.Sprintf("branch-ci-%s-%s-%s", org, repo, test.Name),
 		Spec:  generatePodSpec(org, repo, branch, test.Target, additionalArgs...),
@@ -150,7 +112,6 @@ func generatePostsubmitForTest(test testDescription, org, repo, branch string, a
 			Decorate:         true,
 		},
 	}
-	return &postsubmit
 }
 
 // Given a ci-operator configuration file and basic information about what
