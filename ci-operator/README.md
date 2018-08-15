@@ -64,6 +64,11 @@ as a reference:
   itself exiting. The test container is given access to the generated
   configuration and the `admin.kubeconfig`.
 
+To access the cluster, the test should use the standard configuration loading
+rules, which are described in the upstream documentation:
+
+https://kubernetes.io/docs/tasks/administer-cluster/access-cluster-api
+
 
 # Using a template
 
