@@ -166,8 +166,38 @@ func TestGenerateJobsWithImages(t *testing.T) {
 }
 
 func TestExtractRepoElementsFromPath(t *testing.T) {
-	org, repo, branch := extractRepoElementsFromPath("../../ci-operator/openshift/component/master.json")
-	checkString(t, "org", org, "openshift")
-	checkString(t, "repo", repo, "component")
-	checkString(t, "branch", branch, "master")
+	testCases := []struct {
+		path           string
+		expectedOrg    string
+		expectedRepo   string
+		expectedBranch string
+		expectedError  bool
+	}{
+		{"../../ci-operator/openshift/component/master.json", "openshift", "component", "master", false},
+		{"master.json", "", "", "", true},
+		{"dir/master.json", "", "", "", true},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.path, func(t *testing.T) {
+			org, repo, branch, err := extractRepoElementsFromPath(tc.path)
+			if !tc.expectedError {
+				if err != nil {
+					t.Errorf("returned unexpected error '%v", err)
+				}
+				if org != tc.expectedOrg {
+					t.Errorf("org extracted incorrectly: got '%s', expected '%s'", org, tc.expectedOrg)
+				}
+				if repo != tc.expectedRepo {
+					t.Errorf("repo extracted incorrectly: got '%s', expected '%s'", repo, tc.expectedRepo)
+				}
+				if branch != tc.expectedBranch {
+					t.Errorf("branch extracted incorrectly: got '%s', expected '%s'", branch, tc.expectedBranch)
+				}
+			} else { // expected error
+				if err == nil {
+					t.Errorf("expected to return error, got org=%s repo=%s branch=%s instead", org, repo, branch)
+				}
+			}
+		})
+	}
 }

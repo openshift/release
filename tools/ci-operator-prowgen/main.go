@@ -161,47 +161,59 @@ func generateJobs(
 	}
 }
 
-func readCiOperatorConfig(configFilePath string) *cioperatorapi.ReleaseBuildConfiguration {
+func readCiOperatorConfig(configFilePath string) (*cioperatorapi.ReleaseBuildConfiguration, error) {
 	data, err := ioutil.ReadFile(configFilePath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to read ci-operator config (%v)\n", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("failed to read ci-operator config (%v)", err)
 	}
 
 	var configSpec *cioperatorapi.ReleaseBuildConfiguration
 	if err := json.Unmarshal(data, &configSpec); err != nil {
-		fmt.Printf("failed to load ci-operator config (%v)\n", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("failed to load ci-operator config (%v)", err)
 	}
 
-	return configSpec
+	return configSpec, nil
 }
 
 // We use the directory/file naming convention to encode useful information
 // about component repository information.
 // The convention for ci-operator config files in this repo:
 // ci-operator/config/ORGANIZATION/COMPONENT/BRANCH.json
-func extractRepoElementsFromPath(configFilePath string) (string, string, string) {
+func extractRepoElementsFromPath(configFilePath string) (string, string, string, error) {
 	configSpecDir := filepath.Dir(configFilePath)
 	repo := filepath.Base(configSpecDir)
-	org := filepath.Base(filepath.Dir(configSpecDir))
-	branch := strings.TrimSuffix(filepath.Base(configFilePath), filepath.Ext(configFilePath))
-
-	return org, repo, branch
-}
-
-func generateProwJobsFromConfigFile(configFilePath string) []byte {
-	configSpec := readCiOperatorConfig(configFilePath)
-	org, repo, branch := extractRepoElementsFromPath(configFilePath)
-	jobConfig := generateJobs(configSpec, org, repo, branch)
-
-	jobConfigAsYaml, err := yaml.Marshal(*jobConfig)
-	if err != nil {
-		fmt.Printf("failed to marshal the job config (%v)", err)
-		os.Exit(1)
+	if repo == "." || repo == "/" {
+		return "", "", "", fmt.Errorf("Could not extract repo from '%s' (expected path like '.../ORG/REPO/BRANCH.json", configFilePath)
 	}
 
-	return jobConfigAsYaml
+	org := filepath.Base(filepath.Dir(configSpecDir))
+	if org == "." || org == "/" {
+		return "", "", "", fmt.Errorf("Could not extract org from '%s' (expected path like '.../ORG/REPO/BRANCH.json", configFilePath)
+	}
+
+	branch := strings.TrimSuffix(filepath.Base(configFilePath), filepath.Ext(configFilePath))
+
+	return org, repo, branch, nil
+}
+
+func generateProwJobsFromConfigFile(configFilePath string) ([]byte, error) {
+	configSpec, err := readCiOperatorConfig(configFilePath)
+	if err != nil {
+		return nil, err
+	}
+
+	org, repo, branch, err := extractRepoElementsFromPath(configFilePath)
+	if err != nil {
+		return nil, err
+	}
+
+	jobConfig := generateJobs(configSpec, org, repo, branch)
+	jobConfigAsYaml, err := yaml.Marshal(*jobConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal the job config (%v)", err)
+	}
+
+	return jobConfigAsYaml, nil
 }
 
 // Iterate over all ci-operator config files under a given path and generate a
@@ -210,48 +222,50 @@ func generateProwJobsFromConfigFile(configFilePath string) []byte {
 // Example:
 // for each config file like `configDir/org/component/branch.json`
 // generate Prow job config file `jobDir/org/component/branch.yaml
-func generateAllProwJobs(configDir, jobDir string) {
+func generateAllProwJobs(configDir, jobDir string) error {
 	err := filepath.Walk(configDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error encontered while generating Prow job config: %v\n", err)
 			return err
 		}
 		if !info.IsDir() && filepath.Ext(path) == ".json" {
-			jobConfigAsYaml := generateProwJobsFromConfigFile(path)
+			jobConfigAsYaml, err := generateProwJobsFromConfigFile(path)
+			if err != nil {
+				return err
+			}
 			suffixPath := filepath.Dir(strings.TrimPrefix(path, configDir))
 			jobDirForComponent := filepath.Join(jobDir, suffixPath)
 			os.MkdirAll(jobDirForComponent, os.ModePerm)
 			branch := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 			target := filepath.Join(jobDirForComponent, fmt.Sprintf("%s.yaml", branch))
-			err := ioutil.WriteFile(target, jobConfigAsYaml, 0664)
+			err = ioutil.WriteFile(target, jobConfigAsYaml, 0664)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Failed to write job config to '%s' (%v)\n", target, err)
-				return err
+				return fmt.Errorf("Failed to write job config to '%s' (%v)", target, err)
 			}
 		}
 		return nil
 	})
 
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to generate all Prow jobs\n")
-		os.Exit(1)
+		return fmt.Errorf("Failed to generate all Prow jobs")
 	}
+
+	return nil
 }
 
 // Detect the root directory of this Git repository and then return absolute
 // ci-operator config (`ci-operator/config`) and prow job config
 // (`ci-operator/jobs`) directory paths in it.
-func inferConfigDirectories() (string, string) {
+func inferConfigDirectories() (string, string, error) {
 	repoRootRaw, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to determine repository root with 'git rev-parse --show-toplevel")
-		os.Exit(1)
+		return "", "", fmt.Errorf("failed to determine repository root with 'git rev-parse --show-toplevel' (%v)", err)
 	}
 	repoRoot := strings.TrimSpace(string(repoRootRaw))
 	configDir := filepath.Join(repoRoot, "ci-operator", "config")
 	jobDir := filepath.Join(repoRoot, "ci-operator", "jobs")
 
-	return configDir, jobDir
+	return configDir, jobDir, nil
 }
 
 func main() {
@@ -265,10 +279,18 @@ func main() {
 	}
 
 	if len(opt.ciOperatorConfigPath) > 0 {
-		jobConfigAsYaml := generateProwJobsFromConfigFile(opt.ciOperatorConfigPath)
-		fmt.Printf(string(jobConfigAsYaml))
+		if jobConfigAsYaml, err := generateProwJobsFromConfigFile(opt.ciOperatorConfigPath); err != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+			os.Exit(1)
+		} else {
+			fmt.Printf(string(jobConfigAsYaml))
+		}
 	} else if opt.fullRepoMode {
-		configDir, jobDir := inferConfigDirectories()
+		configDir, jobDir, err := inferConfigDirectories()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+			os.Exit(1)
+		}
 		generateAllProwJobs(configDir, jobDir)
 	} else if len(opt.ciOperatorConfigDir) > 0 && len(opt.prowJobConfigDir) > 0 {
 		generateAllProwJobs(opt.ciOperatorConfigDir, opt.prowJobConfigDir)
