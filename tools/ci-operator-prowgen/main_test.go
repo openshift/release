@@ -1,168 +1,312 @@
 package main
 
 import (
-	"strings"
 	"testing"
 
 	ciop "github.com/openshift/ci-operator/pkg/api"
+	kubeapi "k8s.io/api/core/v1"
+	prowconfig "k8s.io/test-infra/prow/config"
+	prowkube "k8s.io/test-infra/prow/kube"
+
+	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/util/diff"
 )
 
-func checkCondition(t *testing.T, forHumans string, condition bool) {
-	if !condition {
-		t.Errorf("'%s' does not hold", forHumans)
-	}
-}
-
-func checkString(t *testing.T, member, value, expected string) {
-	if value != expected {
-		t.Errorf(
-			"%s not set correctly: expected '%s', got '%s'",
-			member,
-			expected,
-			value,
-		)
-	}
-}
-
 func TestGeneratePodSpec(t *testing.T) {
-	podSpec := generatePodSpec("organization", "repo", "branch", "target")
-	checkString(t, "podSpec.ServiceAccountName", podSpec.ServiceAccountName, "ci-operator")
-	checkString(t, "podSpec.Containers[0].Image", podSpec.Containers[0].Image, "ci-operator:latest")
-	checkString(t, "podSpec.Containers[0].Command[0]", podSpec.Containers[0].Command[0], "ci-operator")
-	checkString(t,
-		"podSpec.Containers[0].Args",
-		strings.Join(podSpec.Containers[0].Args, " "),
-		"--artifact-dir=$(ARTIFACTS) --target=target",
-	)
-	checkString(t, "podSpec.Containers[0].Env[0].Name", podSpec.Containers[0].Env[0].Name, "CONFIG_SPEC")
-	checkString(t,
-		"podSpec.Containers[0].Env[0].ValueFrom.ConfigMapKeyRef.LocalObjectReference.Name",
-		podSpec.Containers[0].Env[0].ValueFrom.ConfigMapKeyRef.LocalObjectReference.Name,
-		"ci-operator-organization-repo",
-	)
-	checkString(t,
-		"podSpec.Containers[0].Env[0].ValueFrom.ConfigMapKeyRef.Key",
-		podSpec.Containers[0].Env[0].ValueFrom.ConfigMapKeyRef.Key,
-		"branch.json",
-	)
-}
+	tests := []struct {
+		org            string
+		repo           string
+		branch         string
+		target         string
+		additionalArgs []string
 
-func TestGeneratePodSpecWithAdditionalArgs(t *testing.T) {
-	podSpec := generatePodSpec("organization", "repo", "branch", "target", "--promote", "something")
-	checkString(t,
-		"podSpec.Containers[0].Args",
-		strings.Join(podSpec.Containers[0].Args, " "),
-		"--artifact-dir=$(ARTIFACTS) --target=target --promote something",
-	)
+		expected *kubeapi.PodSpec
+	}{
+		{
+			org:            "organization",
+			repo:           "repo",
+			branch:         "branch",
+			target:         "target",
+			additionalArgs: []string{},
+
+			expected: &kubeapi.PodSpec{
+				ServiceAccountName: "ci-operator",
+				Containers: []kubeapi.Container{
+					kubeapi.Container{
+						Image:   "ci-operator:latest",
+						Command: []string{"ci-operator"},
+						Args:    []string{"--artifact-dir=$(ARTIFACTS)", "--target=target"},
+						Env: []kubeapi.EnvVar{
+							kubeapi.EnvVar{
+								Name: "CONFIG_SPEC",
+								ValueFrom: &kubeapi.EnvVarSource{
+									ConfigMapKeyRef: &kubeapi.ConfigMapKeySelector{
+										LocalObjectReference: kubeapi.LocalObjectReference{
+											Name: "ci-operator-organization-repo",
+										},
+										Key: "branch.json",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			org:            "organization",
+			repo:           "repo",
+			branch:         "branch",
+			target:         "target",
+			additionalArgs: []string{"--promote", "something"},
+
+			expected: &kubeapi.PodSpec{
+				ServiceAccountName: "ci-operator",
+				Containers: []kubeapi.Container{
+					kubeapi.Container{
+						Image:   "ci-operator:latest",
+						Command: []string{"ci-operator"},
+						Args:    []string{"--artifact-dir=$(ARTIFACTS)", "--target=target", "--promote", "something"},
+						Env: []kubeapi.EnvVar{
+							kubeapi.EnvVar{
+								Name: "CONFIG_SPEC",
+								ValueFrom: &kubeapi.EnvVarSource{
+									ConfigMapKeyRef: &kubeapi.ConfigMapKeySelector{
+										LocalObjectReference: kubeapi.LocalObjectReference{
+											Name: "ci-operator-organization-repo",
+										},
+										Key: "branch.json",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		var podSpec *kubeapi.PodSpec
+		if len(tc.additionalArgs) == 0 {
+			podSpec = generatePodSpec(tc.org, tc.repo, tc.branch, tc.target)
+		} else {
+			podSpec = generatePodSpec(tc.org, tc.repo, tc.branch, tc.target, tc.additionalArgs...)
+		}
+		if !equality.Semantic.DeepEqual(podSpec, tc.expected) {
+			t.Errorf("expected PodSpec diff:\n%s", diff.ObjectDiff(tc.expected, podSpec))
+		}
+	}
 }
 
 func TestGeneratePresubmitForTest(t *testing.T) {
-	presubmit := generatePresubmitForTest(testDescription{"name", "target"}, "organization", "repo", "branch")
-	checkString(t, "presubmit.Agent", presubmit.Agent, "kubernetes")
-	checkCondition(t, "presubmit.AlwaysRun == true", presubmit.AlwaysRun)
-	checkString(t, "presubmit.Brancher.Branches[0]", presubmit.Brancher.Branches[0], "branch")
-	checkString(t, "presubmit.Context", presubmit.Context, "ci/prow/name")
-	checkString(t, "presubmit.Name", presubmit.Name, "pull-ci-organization-repo-name")
-	checkString(t, "presubmit.RerunCommand", presubmit.RerunCommand, "/test name")
-	checkCondition(t, "presubmit.Spec != nil", presubmit.Spec != nil)
-	checkString(t, "presubmit.Trigger", presubmit.Trigger, "((?m)^/test( all| name),?(\\\\s+|$))")
-	checkCondition(t,
-		"presubmit.UtilityConfig.DecorationConfig.SkipCloning == true",
-		presubmit.UtilityConfig.DecorationConfig.SkipCloning,
-	)
-	checkCondition(t, "presubmit.UtilityConfig.Decorate == true", presubmit.UtilityConfig.Decorate)
+	tests := []struct {
+		name     string
+		target   string
+		org      string
+		repo     string
+		branch   string
+		expected *prowconfig.Presubmit
+	}{
+		{
+			name:   "testname",
+			target: "target",
+			org:    "org",
+			repo:   "repo",
+			branch: "branch",
+
+			expected: &prowconfig.Presubmit{
+				Agent:        "kubernetes",
+				AlwaysRun:    true,
+				Brancher:     prowconfig.Brancher{Branches: []string{"branch"}},
+				Context:      "ci/prow/testname",
+				Name:         "pull-ci-org-repo-testname",
+				RerunCommand: "/test testname",
+				Trigger:      `((?m)^/test( all| testname),?(\\s+|$))`,
+				UtilityConfig: prowconfig.UtilityConfig{
+					DecorationConfig: &prowkube.DecorationConfig{SkipCloning: true},
+					Decorate:         true,
+				},
+			},
+		},
+	}
+	for _, tc := range tests {
+		presubmit := generatePresubmitForTest(testDescription{tc.name, tc.target}, tc.org, tc.repo, tc.branch)
+		presubmit.Spec = nil // tested in generatePodSpec
+
+		if !equality.Semantic.DeepEqual(presubmit, tc.expected) {
+			t.Errorf("expected presubmit diff:\n%s", diff.ObjectDiff(tc.expected, presubmit))
+		}
+	}
 }
 
-func TestGeneratePostsubmitForTest(t *testing.T) {
-	postsubmit := generatePostsubmitForTest(
-		testDescription{"name", "target"},
-		"organization",
-		"repo",
-		"branch",
-		"--promote",
-		"something",
-	)
-	checkString(t, "postsubmit.Agent", postsubmit.Agent, "kubernetes")
-	checkString(t, "postsubmit.Name", postsubmit.Name, "branch-ci-organization-repo-name")
-	checkCondition(t, "postsubmit.Spec != nil", postsubmit.Spec != nil)
-	checkString(t,
-		"postsubmit.Spec.Containers[0].Args",
-		strings.Join(postsubmit.Spec.Containers[0].Args, " "),
-		"--artifact-dir=$(ARTIFACTS) --target=target --promote something",
-	)
+func TestGeneratePostSumitForTest(t *testing.T) {
+	tests := []struct {
+		name           string
+		target         string
+		org            string
+		repo           string
+		branch         string
+		additionalArgs []string
 
-	checkCondition(t,
-		"postsubmit.UtilityConfig.DecorationConfig.SkipCloning == true",
-		postsubmit.UtilityConfig.DecorationConfig.SkipCloning,
-	)
-	checkCondition(t, "postsubmit.UtilityConfig.Decorate == true", postsubmit.UtilityConfig.Decorate)
+		expected *prowconfig.Postsubmit
+	}{
+		{
+			name:           "name",
+			target:         "target",
+			org:            "organization",
+			repo:           "repository",
+			branch:         "branch",
+			additionalArgs: []string{},
+
+			expected: &prowconfig.Postsubmit{
+				Agent: "kubernetes",
+				Name:  "branch-ci-organization-repository-name",
+				UtilityConfig: prowconfig.UtilityConfig{
+					DecorationConfig: &prowkube.DecorationConfig{SkipCloning: true},
+					Decorate:         true,
+				},
+			},
+		},
+		{
+			name:           "name",
+			target:         "target",
+			org:            "organization",
+			repo:           "repository",
+			branch:         "branch",
+			additionalArgs: []string{"--promote", "additionalArg"},
+
+			expected: &prowconfig.Postsubmit{
+				Agent: "kubernetes",
+				Name:  "branch-ci-organization-repository-name",
+				UtilityConfig: prowconfig.UtilityConfig{
+					DecorationConfig: &prowkube.DecorationConfig{SkipCloning: true},
+					Decorate:         true,
+				},
+			},
+		},
+	}
+	for _, tc := range tests {
+		var postsubmit *prowconfig.Postsubmit
+
+		if len(tc.additionalArgs) == 0 {
+			postsubmit = generatePostsubmitForTest(testDescription{tc.name, tc.target}, tc.org, tc.repo, tc.branch)
+		} else {
+			postsubmit = generatePostsubmitForTest(testDescription{tc.name, tc.target}, tc.org, tc.repo, tc.branch, tc.additionalArgs...)
+			// tests that additional args were propagated to the PodSpec
+			if !equality.Semantic.DeepEqual(postsubmit.Spec.Containers[0].Args[2:], tc.additionalArgs) {
+				t.Errorf("additional args not propagated to postsubmit:\n%s", diff.ObjectDiff(tc.additionalArgs, postsubmit.Spec.Containers[0].Args[2:]))
+			}
+		}
+
+		postsubmit.Spec = nil // tested in TestGeneratePodSpec
+
+		if !equality.Semantic.DeepEqual(postsubmit, tc.expected) {
+			t.Errorf("expected postsubmit diff:\n%s", diff.ObjectDiff(tc.expected, postsubmit))
+		}
+	}
 }
 
 func TestGenerateJobs(t *testing.T) {
-	mockConfig := ciop.ReleaseBuildConfiguration{
-		Tests: []ciop.TestStepConfiguration{
-			ciop.TestStepConfiguration{As: "derTest"},
-			ciop.TestStepConfiguration{As: "leTest"},
-		}}
-	jobConfig := generateJobs(&mockConfig, "organization", "repo", "branch")
-	presubmits := (*jobConfig).Presubmits
-	postsubmits := (*jobConfig).Postsubmits
+	tests := []struct {
+		config *ciop.ReleaseBuildConfiguration
+		org    string
+		repo   string
+		branch string
 
-	checkCondition(t, "len(presubmits) == 1", len(presubmits) == 1)
-	checkCondition(t, "len(postsubmits) == 1", len(postsubmits) == 1)
-	checkCondition(t,
-		"len(presubmits[\"organization/repo\"]) == 2",
-		len(presubmits["organization/repo"]) == 2,
-	)
-	checkCondition(t,
-		"len(postsubmits[\"organization/repo\"]) == 2",
-		len(postsubmits["organization/repo"]) == 2,
-	)
-	checkString(t,
-		"presubmits[\"organization/repo\"][0].Name",
-		presubmits["organization/repo"][0].Name,
-		"pull-ci-organization-repo-derTest",
-	)
-	checkString(t,
-		"postsubmits[\"organization/repo\"][0].Name",
-		postsubmits["organization/repo"][0].Name,
-		"branch-ci-organization-repo-derTest",
-	)
+		expectedPresubmits  map[string][]string
+		expectedPostsubmits map[string][]string
+		expected            *prowconfig.JobConfig
+	}{
+		{
+			config: &ciop.ReleaseBuildConfiguration{
+				Tests: []ciop.TestStepConfiguration{
+					ciop.TestStepConfiguration{As: "derTest"},
+					ciop.TestStepConfiguration{As: "leTest"},
+				},
+			},
+			org:    "organization",
+			repo:   "repository",
+			branch: "branch",
+			expected: &prowconfig.JobConfig{
+				Presubmits: map[string][]prowconfig.Presubmit{
+					"organization/repository": []prowconfig.Presubmit{
+						prowconfig.Presubmit{Name: "pull-ci-organization-repository-derTest"},
+						prowconfig.Presubmit{Name: "pull-ci-organization-repository-leTest"},
+					},
+				},
+				Postsubmits: map[string][]prowconfig.Postsubmit{
+					"organization/repository": []prowconfig.Postsubmit{
+						prowconfig.Postsubmit{Name: "branch-ci-organization-repository-derTest"},
+						prowconfig.Postsubmit{Name: "branch-ci-organization-repository-leTest"},
+					},
+				},
+			},
+		}, {
+			config: &ciop.ReleaseBuildConfiguration{
+				Tests: []ciop.TestStepConfiguration{
+					ciop.TestStepConfiguration{As: "derTest"},
+					ciop.TestStepConfiguration{As: "leTest"},
+				},
+				Images: []ciop.ProjectDirectoryImageBuildStepConfiguration{
+					ciop.ProjectDirectoryImageBuildStepConfiguration{},
+				},
+			},
+			org:    "organization",
+			repo:   "repository",
+			branch: "branch",
+			expected: &prowconfig.JobConfig{
+				Presubmits: map[string][]prowconfig.Presubmit{
+					"organization/repository": []prowconfig.Presubmit{
+						prowconfig.Presubmit{Name: "pull-ci-organization-repository-derTest"},
+						prowconfig.Presubmit{Name: "pull-ci-organization-repository-leTest"},
+						prowconfig.Presubmit{Name: "pull-ci-organization-repository-images"},
+					},
+				},
+				Postsubmits: map[string][]prowconfig.Postsubmit{
+					"organization/repository": []prowconfig.Postsubmit{
+						prowconfig.Postsubmit{Name: "branch-ci-organization-repository-derTest"},
+						prowconfig.Postsubmit{Name: "branch-ci-organization-repository-leTest"},
+						prowconfig.Postsubmit{
+							Name:   "branch-ci-organization-repository-images",
+							Labels: map[string]string{"artifacts": "images"}},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		jobConfig := generateJobs(tc.config, tc.org, tc.repo, tc.branch)
+
+		prune(jobConfig) // prune the fields that are tested in TestGeneratePre/PostsubmitForTest
+
+		if !equality.Semantic.DeepEqual(jobConfig, tc.expected) {
+			t.Errorf("expected job config diff:\n%s", diff.ObjectDiff(tc.expected, jobConfig))
+		}
+	}
 }
 
-func TestGenerateJobsWithImages(t *testing.T) {
-	mockConfig := ciop.ReleaseBuildConfiguration{
-		Images: []ciop.ProjectDirectoryImageBuildStepConfiguration{
-			ciop.ProjectDirectoryImageBuildStepConfiguration{},
-		},
-		Tests: []ciop.TestStepConfiguration{
-			ciop.TestStepConfiguration{As: "derTest"},
-			ciop.TestStepConfiguration{As: "leTest"},
-		}}
-	jobConfig := generateJobs(&mockConfig, "organization", "repo", "branch")
-	presubmits := (*jobConfig).Presubmits
-	postsubmits := (*jobConfig).Postsubmits
-
-	checkCondition(t, "len(presubmits) == 1", len(presubmits) == 1)
-	checkCondition(t, "len(postsubmits) == 1", len(postsubmits) == 1)
-	checkCondition(t,
-		"len(presubmits[\"organization/repo\"]) == 3",
-		len(presubmits["organization/repo"]) == 3,
-	)
-	checkCondition(t,
-		"len(postsubmits[\"organization/repo\"]) == 3",
-		len(postsubmits["organization/repo"]) == 3,
-	)
-	checkString(t,
-		"presubmits[\"organization/repo\"][2].Name",
-		presubmits["organization/repo"][2].Name,
-		"pull-ci-organization-repo-images",
-	)
-	checkString(t,
-		"postsubmits[\"organization/repo\"][2].Name",
-		postsubmits["organization/repo"][2].Name,
-		"branch-ci-organization-repo-images",
-	)
+func prune(jobConfig *prowconfig.JobConfig) {
+	for repo := range jobConfig.Presubmits {
+		for i := range jobConfig.Presubmits[repo] {
+			jobConfig.Presubmits[repo][i].AlwaysRun = false
+			jobConfig.Presubmits[repo][i].Context = ""
+			jobConfig.Presubmits[repo][i].Trigger = ""
+			jobConfig.Presubmits[repo][i].RerunCommand = ""
+			jobConfig.Presubmits[repo][i].Agent = ""
+			jobConfig.Presubmits[repo][i].Spec = nil
+			jobConfig.Presubmits[repo][i].Brancher = prowconfig.Brancher{}
+			jobConfig.Presubmits[repo][i].UtilityConfig = prowconfig.UtilityConfig{}
+		}
+	}
+	for repo := range jobConfig.Postsubmits {
+		for i := range jobConfig.Postsubmits[repo] {
+			jobConfig.Postsubmits[repo][i].Agent = ""
+			jobConfig.Postsubmits[repo][i].Spec = nil
+			jobConfig.Postsubmits[repo][i].UtilityConfig = prowconfig.UtilityConfig{}
+		}
+	}
 }
 
 func TestExtractRepoElementsFromPath(t *testing.T) {
