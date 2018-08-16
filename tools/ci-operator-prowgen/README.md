@@ -11,7 +11,7 @@ configuration from the ci-operator configuration file.
 To use the generator, you need to build it:
 
 ```
-$ go build
+$ go build ./tools/ci-operator/prowgen
 ```
 
 ### Full-repository
@@ -130,11 +130,11 @@ way.
 To build the generator, run:
 
 ```
-$ go build
+$ go build ./ci-operator-prowgen
 ```
 
 To run unit-tests, run:
 
 ```
-$ go test
+$ go test ./ci-operator-prowgen
 ```
