@@ -1,6 +1,8 @@
 package main
 
 import (
+	"io/ioutil"
+	"log"
 	"testing"
 
 	ciop "github.com/openshift/ci-operator/pkg/api"
@@ -273,9 +275,38 @@ func TestGenerateJobs(t *testing.T) {
 					},
 				},
 			},
+		}, {
+			config: &ciop.ReleaseBuildConfiguration{
+				Tests: []ciop.TestStepConfiguration{
+					ciop.TestStepConfiguration{As: "images"},
+				},
+				Images: []ciop.ProjectDirectoryImageBuildStepConfiguration{
+					ciop.ProjectDirectoryImageBuildStepConfiguration{},
+				},
+			},
+			org:    "organization",
+			repo:   "repository",
+			branch: "branch",
+			expected: &prowconfig.JobConfig{
+				Presubmits: map[string][]prowconfig.Presubmit{
+					"organization/repository": []prowconfig.Presubmit{
+						prowconfig.Presubmit{Name: "pull-ci-organization-repository-images"},
+						prowconfig.Presubmit{Name: "pull-ci-organization-repository-[images]"},
+					},
+				},
+				Postsubmits: map[string][]prowconfig.Postsubmit{
+					"organization/repository": []prowconfig.Postsubmit{
+						prowconfig.Postsubmit{Name: "branch-ci-organization-repository-images"},
+						prowconfig.Postsubmit{
+							Name:   "branch-ci-organization-repository-[images]",
+							Labels: map[string]string{"artifacts": "images"}},
+					},
+				},
+			},
 		},
 	}
 
+	log.SetOutput(ioutil.Discard)
 	for _, tc := range tests {
 		jobConfig := generateJobs(tc.config, tc.org, tc.repo, tc.branch)
 

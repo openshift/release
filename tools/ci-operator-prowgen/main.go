@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -146,9 +147,18 @@ func generateJobs(
 		postsubmits[orgrepo] = append(postsubmits[orgrepo], *generatePostsubmitForTest(test, org, repo, branch))
 	}
 
-	if len(configSpec.Images) > 0 && !imagesTest {
-		// TODO: somehow handle the images case better than just not creating this job when there is name conflict
-		test := testDescription{Name: "images", Target: "[images]"}
+	if len(configSpec.Images) > 0 {
+		var test testDescription
+		if imagesTest {
+			log.Print(
+				"WARNING: input config file has 'images' test defined\n" +
+					"This may get confused with built-in '[images]' target. Consider renaming this test.\n",
+			)
+			test = testDescription{Name: "[images]", Target: "[images]"}
+		} else {
+			test = testDescription{Name: "images", Target: "[images]"}
+		}
+
 		presubmits[orgrepo] = append(presubmits[orgrepo], *generatePresubmitForTest(test, org, repo, branch))
 		imagesPostsubmit := generatePostsubmitForTest(test, org, repo, branch, "--promote")
 		imagesPostsubmit.Labels = map[string]string{"artifacts": "images"}
