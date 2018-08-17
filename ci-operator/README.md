@@ -39,7 +39,7 @@ To add an e2e test:
    gathered in the previous steps.
 
 
-# Provisioning a cluster
+### Provisioning a cluster
 
 Contrary to other types of tests, e2e tests usually require a cluster, not just
 a single container.  While there aren't yet native primitives in `ci-operator`
@@ -70,7 +70,7 @@ rules, which are described in the upstream documentation:
 https://kubernetes.io/docs/tasks/administer-cluster/access-cluster-api
 
 
-# Using a template
+### Using a template
 
 Normally, ci-operator executes all steps defined in its configuration file or,
 with the `--target` argument, only a single step and its dependencies.  A
