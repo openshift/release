@@ -24,17 +24,21 @@ items:
       dockerfile: |
         FROM docker.io/centos:7
         # install golang-1.10
-        RUN mkdir -p /go && chmod -R 777 /go && \
+        RUN mkdir -p /go /tmp/home && chmod -R 777 /go /tmp/home && \
             curl https://storage.googleapis.com/golang/go1.10.3.linux-amd64.tar.gz | tar -C /usr/local -xzf -
         ENV GOROOT /usr/local/go
         ENV GOPATH /go
         ENV PATH $GOPATH/bin:$GOROOT/bin:$PATH
+        ENV HOME /tmp/home
         WORKDIR /go
         # install glide
         RUN curl -L https://github.com/Masterminds/glide/releases/download/v0.13.1/glide-v0.13.1-linux-amd64.tar.gz | tar -C /tmp/ -xzf -
         RUN mv /tmp/linux-amd64/glide /usr/bin
+        # install tooling
+        RUN yum update -y && yum install tar wget git make which -y && \
+            # enable git clone with random user (glide dependency)
+            git config --system core.logallrefupdates false
         # install azure cli
-        RUN yum update -y && yum install tar wget git make which -y
         RUN rpm --import https://packages.microsoft.com/keys/microsoft.asc && \
             sh -c 'echo -e "[azure-cli]\nname=Azure CLI\nbaseurl=https://packages.microsoft.com/yumrepos/azure-cli\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" > /etc/yum.repos.d/azure-cli.repo' && \
             yum install azure-cli -y
