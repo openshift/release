@@ -21,6 +21,7 @@ import (
 
 type options struct {
 	ciOperatorConfigPath string
+	prowJobConfigPath    string
 
 	fullRepoMode bool
 
@@ -35,6 +36,7 @@ func bindOptions(flag *flag.FlagSet) *options {
 	opt := &options{}
 
 	flag.StringVar(&opt.ciOperatorConfigPath, "source-config", "", "Path to ci-operator configuration file in openshift/release repository.")
+	flag.StringVar(&opt.prowJobConfigPath, "target-job-config", "", "Path to a file wher Prow job config will be written. If the file already exists and contains Prow job config, generated jobs will be merged with existing ones")
 
 	flag.BoolVar(&opt.fullRepoMode, "full-repo", false, "If set to true, the generator will walk over all ci-operator config files in openshift/release repository and regenerate all component prow job config files")
 
@@ -206,24 +208,42 @@ func extractRepoElementsFromPath(configFilePath string) (string, string, string,
 	return org, repo, branch, nil
 }
 
-func generateProwJobsFromConfigFile(configFilePath string) ([]byte, error) {
+func generateProwJobsFromConfigFile(configFilePath string) (*prowconfig.JobConfig, string, string, error) {
 	configSpec, err := readCiOperatorConfig(configFilePath)
 	if err != nil {
-		return nil, err
+		return nil, "", "", err
 	}
 
 	org, repo, branch, err := extractRepoElementsFromPath(configFilePath)
 	if err != nil {
-		return nil, err
+		return nil, "", "", err
 	}
 
 	jobConfig := generateJobs(configSpec, org, repo, branch)
-	jobConfigAsYaml, err := yaml.Marshal(*jobConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal the job config (%v)", err)
+
+	return jobConfig, org, repo, nil
+}
+
+func writeJobsIntoComponentDirectory(jobDir, org, repo string, jobConfig *prowconfig.JobConfig) error {
+	jobDirForComponent := filepath.Join(jobDir, org, repo)
+	os.MkdirAll(jobDirForComponent, os.ModePerm)
+	presubmitPath := filepath.Join(jobDirForComponent, fmt.Sprintf("%s-%s-presubmits.yaml", org, repo))
+	postsubmitPath := filepath.Join(jobDirForComponent, fmt.Sprintf("%s-%s-postsubmits.yaml", org, repo))
+
+	presubmits := *jobConfig
+	presubmits.Postsubmits = nil
+	postsubmits := *jobConfig
+	postsubmits.Presubmits = nil
+
+	if err := mergeJobsIntoFile(presubmitPath, &presubmits); err != nil {
+		return err
 	}
 
-	return jobConfigAsYaml, nil
+	if err := mergeJobsIntoFile(postsubmitPath, &postsubmits); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Iterate over all ci-operator config files under a given path and generate a
@@ -239,18 +259,13 @@ func generateAllProwJobs(configDir, jobDir string) error {
 			return err
 		}
 		if !info.IsDir() && filepath.Ext(path) == ".json" {
-			jobConfigAsYaml, err := generateProwJobsFromConfigFile(path)
+			jobConfig, org, repo, err := generateProwJobsFromConfigFile(path)
 			if err != nil {
 				return err
 			}
-			suffixPath := filepath.Dir(strings.TrimPrefix(path, configDir))
-			jobDirForComponent := filepath.Join(jobDir, suffixPath)
-			os.MkdirAll(jobDirForComponent, os.ModePerm)
-			branch := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-			target := filepath.Join(jobDirForComponent, fmt.Sprintf("%s.yaml", branch))
-			err = ioutil.WriteFile(target, jobConfigAsYaml, 0664)
-			if err != nil {
-				return fmt.Errorf("Failed to write job config to '%s' (%v)", target, err)
+
+			if err = writeJobsIntoComponentDirectory(jobDir, org, repo, jobConfig); err != nil {
+				return err
 			}
 		}
 		return nil
@@ -278,6 +293,104 @@ func inferConfigDirectories() (string, string, error) {
 	return configDir, jobDir, nil
 }
 
+func writeJobs(jobConfig *prowconfig.JobConfig) error {
+	jobConfigAsYaml, err := yaml.Marshal(*jobConfig)
+	if err != nil {
+		return fmt.Errorf("failed to marshal the job config (%v)", err)
+	}
+	fmt.Printf(string(jobConfigAsYaml))
+	return nil
+}
+
+func readJobConfig(path string) (*prowconfig.JobConfig, error) {
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read Prow job config (%v)", err)
+	}
+
+	var jobConfig *prowconfig.JobConfig
+	if err := yaml.Unmarshal(data, &jobConfig); err != nil {
+		return nil, fmt.Errorf("failed to load Prow job config (%v)", err)
+	}
+
+	return jobConfig, nil
+}
+
+func writeJobsToFile(path string, jobConfig *prowconfig.JobConfig) error {
+	jobConfigAsYaml, err := yaml.Marshal(*jobConfig)
+	if err != nil {
+		return fmt.Errorf("failed to marshal the job config (%v)", err)
+	}
+	if err := ioutil.WriteFile(path, jobConfigAsYaml, 0664); err != nil {
+		return fmt.Errorf("Failed to write job config to '%s' (%v)", path, err)
+	}
+
+	return nil
+}
+
+func mergeJobConfig(destination, source *prowconfig.JobConfig) {
+	if source.Presubmits != nil {
+		if destination.Presubmits == nil {
+			destination.Presubmits = map[string][]prowconfig.Presubmit{}
+		}
+		for repo, jobs := range source.Presubmits {
+			if _, hasKey := destination.Presubmits[repo]; !hasKey {
+				destination.Presubmits[repo] = []prowconfig.Presubmit{}
+			}
+			newJobs := map[string]prowconfig.Presubmit{}
+			for _, job := range jobs {
+				newJobs[job.Name] = job
+			}
+			for i, oldJob := range destination.Presubmits[repo] {
+				if job, hasKey := newJobs[oldJob.Name]; hasKey {
+					destination.Presubmits[repo][i] = job
+					delete(newJobs, oldJob.Name)
+				}
+			}
+			for _, job := range newJobs {
+				destination.Presubmits[repo] = append(destination.Presubmits[repo], job)
+			}
+		}
+	}
+	if source.Postsubmits != nil {
+		if destination.Postsubmits == nil {
+			destination.Postsubmits = map[string][]prowconfig.Postsubmit{}
+		}
+		for repo, jobs := range source.Postsubmits {
+			if _, hasKey := destination.Postsubmits[repo]; !hasKey {
+				destination.Postsubmits[repo] = []prowconfig.Postsubmit{}
+			}
+			newJobs := map[string]prowconfig.Postsubmit{}
+			for _, job := range jobs {
+				newJobs[job.Name] = job
+			}
+			for i, oldJob := range destination.Postsubmits[repo] {
+				if job, hasKey := newJobs[oldJob.Name]; hasKey {
+					destination.Postsubmits[repo][i] = job
+					delete(newJobs, oldJob.Name)
+				}
+			}
+			for _, job := range newJobs {
+				destination.Postsubmits[repo] = append(destination.Postsubmits[repo], job)
+			}
+		}
+	}
+}
+
+func mergeJobsIntoFile(prowConfigPath string, jobConfig *prowconfig.JobConfig) error {
+	existingJobConfig, err := readJobConfig(prowConfigPath)
+	if err != nil {
+		existingJobConfig = &prowconfig.JobConfig{}
+	}
+	mergeJobConfig(existingJobConfig, jobConfig)
+
+	if err = writeJobsToFile(prowConfigPath, existingJobConfig); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func main() {
 	flagSet := flag.NewFlagSet("", flag.ExitOnError)
 	opt := bindOptions(flagSet)
@@ -289,11 +402,20 @@ func main() {
 	}
 
 	if len(opt.ciOperatorConfigPath) > 0 {
-		if jobConfigAsYaml, err := generateProwJobsFromConfigFile(opt.ciOperatorConfigPath); err != nil {
+		if jobConfig, _, _, err := generateProwJobsFromConfigFile(opt.ciOperatorConfigPath); err != nil {
 			fmt.Fprintf(os.Stderr, "%v\n", err)
 			os.Exit(1)
 		} else {
-			fmt.Printf(string(jobConfigAsYaml))
+			if len(opt.prowJobConfigPath) > 0 {
+				err = mergeJobsIntoFile(opt.prowJobConfigPath, jobConfig)
+			} else {
+				err = writeJobs(jobConfig)
+			}
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "failed to write the job configuration (%v)\n", err)
+				os.Exit(1)
+			}
+
 		}
 	} else if opt.fullRepoMode {
 		configDir, jobDir, err := inferConfigDirectories()
