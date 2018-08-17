@@ -195,13 +195,15 @@ objects:
           export EXPIRATION_DATE=$( date -d '4 hours' --iso=minutes --utc )
           cat /etc/openshift-installer/openshift.yaml | envsubst > /tmp/cluster/inputs.yaml
         )
+        mkdir /tmp/artifacts/installer
+        cp /tmp/cluster/inputs.yaml /tmp/artifacts/installer/
+
         echo "Invoking installer ..."
         
         cd /tmp/cluster
         tectonic init --config=inputs.yaml
         mv -f ${NAME}/* /tmp/cluster/
-        mkdir /tmp/artifacts/installer
-        cp inputs.yaml config.yaml internal.yaml terraform.tfvars /tmp/artifacts/installer/
+        cp config.yaml internal.yaml terraform.tfvars /tmp/artifacts/installer/
 
         tectonic install --dir=. --log-level=debug
 
