@@ -311,9 +311,9 @@ objects:
 
           while IFS= read -r i; do
             file="$( echo "$i" | cut -d ' ' -f 3 | tr -s ' ' '_' )"
-            oc exec $i -- /bin/bash -c 'oc get --raw /debug/pprof/heap --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig' > /tmp/artifacts/metrics/${file}-heap.gz
+            oc exec $i -- /bin/bash -c 'oc get --raw /debug/pprof/heap --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig' > /tmp/artifacts/metrics/${file}-heap
             oc exec $i -- /bin/bash -c 'oc get --raw /metrics --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig' | gzip -c > /tmp/artifacts/metrics/${file}-api.gz
-            oc exec $i -- /bin/bash -c 'oc get --raw /debug/pprof/heap --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig' > /tmp/artifacts/metrics/${file}-controllers-heap.gz
+            oc exec $i -- /bin/bash -c 'oc get --raw /debug/pprof/heap --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig' > /tmp/artifacts/metrics/${file}-controllers-heap
             oc exec $i -- /bin/bash -c 'oc get --raw /metrics --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig' | gzip -c > /tmp/artifacts/metrics/${file}-controllers.gz
           done < /tmp/pods-api
           while IFS= read -r i; do
@@ -324,7 +324,7 @@ objects:
           while IFS= read -r i; do
             mkdir -p /tmp/artifacts/nodes/$i
             oc get --raw /api/v1/nodes/$i/proxy/metrics | gzip -c > /tmp/artifacts/metrics/node-$i.gz
-            oc get --raw /api/v1/nodes/$i/proxy/debug/pprof/heap > /tmp/artifacts/nodes/$i/heap.gz
+            oc get --raw /api/v1/nodes/$i/proxy/debug/pprof/heap > /tmp/artifacts/nodes/$i/heap
             oc get --raw /api/v1/nodes/$i/proxy/logs/messages | gzip -c > /tmp/artifacts/nodes/$i/messages.gz
             oc get --raw /api/v1/nodes/$i/proxy/logs/secure | gzip -c > /tmp/artifacts/nodes/$i/secure.gz
             oc get --raw /api/v1/nodes/$i/proxy/logs/audit | gzip -c > /tmp/artifacts/nodes/$i/audit.gz
