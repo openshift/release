@@ -1,0 +1,91 @@
+{
+  "tag_specification": {
+    "cluster": "https://api.ci.openshift.org",
+    "namespace": "openshift",
+    "name": "origin-v3.11",
+    "tag": "",
+    "tag_overrides": {}
+  },
+  "base_images": {
+    "root": {
+      "cluster": "https://api.ci.openshift.org",
+      "namespace": "openshift",
+      "name": "release",
+      "tag": "golang-1.10"
+    },
+    "base": {
+      "cluster": "https://api.ci.openshift.org",
+      "namespace": "openshift",
+      "name": "origin-v3.11",
+      "tag": "base"
+    },
+    "ansible": {
+      "cluster": "https://api.ci.openshift.org",
+      "namespace": "openshift",
+      "name": "origin-v3.11",
+      "tag": "ansible"
+    },
+    "test_base_image": {
+      "cluster": "https://api.ci.openshift.org",
+      "namespace": "openshift",
+      "name": "release",
+      "tag": "golang-1.10"
+    }
+  },
+  "canonical_go_repository": "github.com/openshift/cluster-operator",
+  "binary_build_commands": "NO_DOCKER=1 make build",
+  "images": [
+    {
+      "from": "base",
+      "to": "cluster-operator",
+      "dockerfile_path": "build/cluster-operator/Dockerfile",
+      "inputs": {
+        "bin": { "paths": [{ "source_path": "/go/src/github.com/openshift/cluster-operator/bin/cluster-operator", "destination_dir": "." }] }
+      }
+    },
+    {
+      "from": "ansible",
+      "to": "cluster-operator-ansible",
+      "context_dir": "build/cluster-operator-ansible"
+    },
+    {
+      "from": "root",
+      "to": "builder-base",
+      "dockerfile_path": "build/build-image/Dockerfile",
+      "optional": true
+    },
+    {
+      "from": "builder-base",
+      "to": "test-base",
+      "dockerfile_path": "build/test-image/Dockerfile",
+      "optional": true
+    }
+  ],
+  "tests": [
+    {
+      "as": "verify",
+      "from": "test-base",
+      "commands": "git reset HEAD --hard && git clean -f -d && NO_DOCKER=1 make verify"
+    },
+    {
+      "as": "unit",
+      "from": "test-base",
+      "commands": "NO_DOCKER=1 make test-unit"
+    },
+    {
+      "as": "integration",
+      "from": "bin",
+      "commands": "NO_DOCKER=1 make test-integration"
+    }
+  ],
+  "resources": {
+    "*": {
+      "requests": { "cpu": "100m", "memory": "200Mi" },
+      "limits":   { "cpu": "2",    "memory": "4Gi" }
+    },
+    "unit": {
+      "requests": { "cpu": "2",    "memory": "1Gi" },
+      "limits":   { "cpu": "4",    "memory": "4Gi" }
+    }
+  }
+}
