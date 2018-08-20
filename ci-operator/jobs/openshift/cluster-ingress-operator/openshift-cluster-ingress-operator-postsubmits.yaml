@@ -1,27 +1,47 @@
 postsubmits:
   openshift/cluster-ingress-operator:
-  - name: branch-ci-openshift-cluster-ingress-operator-images
-    agent: kubernetes
-    labels:
-      artifacts: images
-    branches:
-    - master
+  - agent: kubernetes
     decorate: true
+    name: branch-ci-openshift-cluster-ingress-operator-unit-master
     skip_cloning: true
     spec:
-      serviceAccountName: ci-operator
       containers:
-      - name: test
-        image: ci-operator:latest
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=unit
+        command:
+        - ci-operator
         env:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              name: ci-operator-openshift-cluster-ingress-operator
               key: master.json
-        command:
-        - ci-operator
-        args:
+              name: ci-operator-openshift-cluster-ingress-operator
+        image: ci-operator:latest
+        name: ""
+        resources: {}
+      serviceAccountName: ci-operator
+  - agent: kubernetes
+    decorate: true
+    labels:
+      artifacts: images
+    name: branch-ci-openshift-cluster-ingress-operator-images-master
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
         - --artifact-dir=$(ARTIFACTS)
         - --target=[images]
         - --promote
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.json
+              name: ci-operator-openshift-cluster-ingress-operator
+        image: ci-operator:latest
+        name: ""
+        resources: {}
+      serviceAccountName: ci-operator
