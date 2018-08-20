@@ -225,14 +225,21 @@ objects:
             sleep 15 & wait
             continue
           fi
-          if ! /tmp/oc get deploy/router -n tectonic-ingress 2>/dev/null; then
+          # check multiple namespaces while we are transitioning to the new locations
+          if /tmp/oc get deploy/router -n tectonic-ingress 2>/dev/null; then
+            router_namespace=tectonic-ingress
+          elif /tmp/oc get deploy/router -n openshift-ingress 2>/dev/null; then
+            router_namespace=openshift-ingress
+          elif /tmp/oc get deploy/router -n default 2>/dev/null; then
+            router_namespace=default
+          else
             echo "Waiting for router to be created ..."
             sleep 15 & wait
             continue
           fi
           break
         done
-        if ! /tmp/oc wait deploy/router -n tectonic-ingress --for condition=available --timeout=5m; then
+        if ! /tmp/oc wait deploy/router -n "${router_namespace}" --for condition=available --timeout=5m; then
           echo "Installation failed"
           cp $KUBECONFIG /tmp/admin.kubeconfig
           exit 1
