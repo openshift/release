@@ -17,6 +17,9 @@ import (
 	kubeapi "k8s.io/api/core/v1"
 	prowconfig "k8s.io/test-infra/prow/config"
 	prowkube "k8s.io/test-infra/prow/kube"
+
+	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/util/diff"
 )
 
 type options struct {
@@ -327,7 +330,8 @@ func writeJobsToFile(path string, jobConfig *prowconfig.JobConfig) error {
 	return nil
 }
 
-func mergeJobConfig(destination, source *prowconfig.JobConfig) {
+func mergeJobConfig(destination, source *prowconfig.JobConfig) bool {
+	anythingChanged := false
 	if source.Presubmits != nil {
 		if destination.Presubmits == nil {
 			destination.Presubmits = map[string][]prowconfig.Presubmit{}
@@ -342,12 +346,19 @@ func mergeJobConfig(destination, source *prowconfig.JobConfig) {
 			}
 			for i, oldJob := range destination.Presubmits[repo] {
 				if job, hasKey := newJobs[oldJob.Name]; hasKey {
-					destination.Presubmits[repo][i] = job
+					if !equality.Semantic.DeepEqual(destination.Presubmits[repo][i], job) {
+						log.Printf("Existing Prow job config already has a different presubmit '%s', will be overwritten", oldJob.Name)
+						log.Printf("Difference:\n%s", diff.ObjectDiff(destination.Presubmits[repo][i], job))
+						destination.Presubmits[repo][i] = job
+						anythingChanged = true
+					}
 					delete(newJobs, oldJob.Name)
 				}
 			}
 			for _, job := range newJobs {
+				log.Printf("Adding new presubmit '%s'", job.Name)
 				destination.Presubmits[repo] = append(destination.Presubmits[repo], job)
+				anythingChanged = true
 			}
 		}
 	}
@@ -365,15 +376,24 @@ func mergeJobConfig(destination, source *prowconfig.JobConfig) {
 			}
 			for i, oldJob := range destination.Postsubmits[repo] {
 				if job, hasKey := newJobs[oldJob.Name]; hasKey {
-					destination.Postsubmits[repo][i] = job
+					if !equality.Semantic.DeepEqual(destination.Postsubmits[repo][i], job) {
+						log.Printf("Existing Prow job config already has a different postsubmit '%s', will be overwritten", oldJob.Name)
+						log.Printf("Difference:\n%s", diff.ObjectDiff(destination.Postsubmits[repo][i], job))
+						destination.Postsubmits[repo][i] = job
+						anythingChanged = true
+					}
 					delete(newJobs, oldJob.Name)
 				}
 			}
 			for _, job := range newJobs {
+				log.Printf("Adding new postsubmit '%s'", job.Name)
 				destination.Postsubmits[repo] = append(destination.Postsubmits[repo], job)
+				anythingChanged = true
 			}
 		}
 	}
+
+	return anythingChanged
 }
 
 func mergeJobsIntoFile(prowConfigPath string, jobConfig *prowconfig.JobConfig) error {
@@ -381,7 +401,9 @@ func mergeJobsIntoFile(prowConfigPath string, jobConfig *prowconfig.JobConfig) e
 	if err != nil {
 		existingJobConfig = &prowconfig.JobConfig{}
 	}
-	mergeJobConfig(existingJobConfig, jobConfig)
+	if wasChanged := mergeJobConfig(existingJobConfig, jobConfig); wasChanged {
+		log.Printf("^^^ Generated jobs into '%s'", prowConfigPath)
+	}
 
 	if err = writeJobsToFile(prowConfigPath, existingJobConfig); err != nil {
 		return err
