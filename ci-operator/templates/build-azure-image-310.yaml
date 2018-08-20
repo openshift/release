@@ -1,0 +1,318 @@
+# This template is being used for testing OpenShift Ansible image builds for Azure.
+# At the moment it cannot be reused to launch cluster for Origin tests
+kind: Template
+apiVersion: template.openshift.io/v1
+
+parameters:
+- name: JOB_NAME_SAFE
+  required: true
+- name: JOB_NAME_HASH
+  required: true
+- name: LOCAL_IMAGE_BIN
+  required: true
+- name: NAMESPACE
+  required: true
+- name: CLUSTER_TYPE
+  value: "azure"
+  required: true
+- name: AZURE_VM_SIZE
+  value: "Standard_D2s_v3"
+  required: true
+- name: OPENSHIFT_RELEASE
+  value: "3.10"
+  required: true
+- name: IMAGE_ANSIBLE
+  required: true
+
+objects:
+
+# We want the cluster to be able to access these images
+- kind: RoleBinding
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: ${JOB_NAME_SAFE}-image-puller
+    namespace: ${NAMESPACE}
+  roleRef:
+    name: system:image-puller
+  subjects:
+  - kind: SystemGroup
+    name: system:unauthenticated
+
+# The build pod will create an instance and install openshift
+- kind: Pod
+  apiVersion: v1
+  metadata:
+    name: ${JOB_NAME_SAFE}
+    namespace: ${NAMESPACE}
+    annotations:
+      # we want to gather the teardown logs no matter what
+      ci-operator.openshift.io/wait-for-container-artifacts: teardown
+  spec:
+    restartPolicy: Never
+    activeDeadlineSeconds: 10800
+    terminationGracePeriodSeconds: 600
+    volumes:
+    - name: shared-tmp
+      emptyDir: {}
+    - name: shared-data
+      emptyDir: {}
+    - name: cluster-secrets-azure
+      secret:
+        secretName: azure
+
+    containers:
+    - name: buildimage
+      image: ${IMAGE_ANSIBLE}
+      resources:
+        requests:
+          cpu: 1
+          memory: 300Mi
+        limits:
+          cpu: 3
+          memory: 4Gi
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      - name: cluster-secrets-azure
+        mountPath: /usr/share/ansible/openshift-ansible/inventory/dynamic/injected
+      env:
+      - name: HOME
+        value: /usr/share/ansible/openshift-ansible
+      - name: AZURE_VM_SIZE
+        value: "${AZURE_VM_SIZE}"
+      - name: JOB_NAME_SAFE
+        value: "${JOB_NAME_SAFE}"
+      - name: JOB_NAME_HASH
+        value: "${JOB_NAME_HASH}"
+      - name: OPENSHIFT_RELEASE
+        value: "${OPENSHIFT_RELEASE}"
+      - name: TYPE
+        value: azure
+      - name: INSTANCE_PREFIX
+        value: ${NAMESPACE}-${JOB_NAME_HASH}
+      command:
+      - /usr/local/bin/entrypoint-provider
+      args:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        # error handling and sync code
+        set -euo pipefail
+
+        trap '[ $? == 0 ] || touch /tmp/shared/exit' EXIT
+        trap 'kill $(jobs -p); exit 0' TERM
+
+        # We need to persist this variable so that we can clean it up when we exit
+        echo "RESOURCE_GROUP=${INSTANCE_PREFIX}-$(TZ=Etc/UTC date +%Y%m%d%H%M)" >>/tmp/shared/environment
+        echo "IMAGE_NAME=centos7-$OPENSHIFT_RELEASE-$(TZ=Etc/UTC date +%Y%m%d%H%M)" >>/tmp/shared/environment
+
+        # Get resource group and image name
+        source /tmp/shared/environment
+        echo "RESOURCE_GROUP=${RESOURCE_GROUP}"
+        echo "IMAGE_NAME=${IMAGE_NAME}"
+        echo $(pwd)
+
+        # Source azure creds
+        source /usr/share/ansible/openshift-ansible/inventory/dynamic/injected/credentials
+
+        ansible-playbook \
+          -e openshift_azure_resource_group_name=$RESOURCE_GROUP \
+          -e openshift_azure_resource_location=eastus \
+          -e openshift_azure_input_image_ns=images \
+          -e openshift_azure_input_image_prefix=centos7-base \
+          -e openshift_azure_output_image_ns=images \
+          -e openshift_azure_output_image_name=$IMAGE_NAME \
+          -e openshift_azure_storage_account=openshiftimages \
+          -e openshift_azure_storage_account_ns=images \
+          -e openshift_azure_container=images \
+          -e openshift_azure_vm_size=$AZURE_VM_SIZE \
+          -e openshift_azure_install_repo=$(curl -qs https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/release-${OPENSHIFT_RELEASE}/.latest-rpms) \
+          playbooks/azure/openshift-cluster/build_node_image.yml
+
+        az login --service-principal -u ${AZURE_CLIENT_ID} -p ${AZURE_CLIENT_SECRET} --tenant ${AZURE_TENANT} &>/dev/null
+        az group delete -n ${RESOURCE_GROUP} -y
+
+        touch /tmp/shared/image_create
+
+    # Runs an install
+    - name: buildcluster
+      image: ${LOCAL_IMAGE_BIN}
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      - name: cluster-secrets-azure
+        mountPath: /etc/azure/credentials
+      env:
+      - name: TYPE
+        value: ${CLUSTER_TYPE}
+      - name: HOME
+        value: /tmp/shared/home
+      - name: OPENSHIFT_RELEASE
+        value: "${OPENSHIFT_RELEASE}"
+      command:
+      - /bin/bash
+      - -c
+      - |
+       #!/bin/bash
+        # error handling and sync code
+        set -euo pipefail
+        echo "starting buildcluster"
+
+        echo "Starting cluster build."
+        trap '[ "$?" == 0 ] || touch /tmp/shared/exit' EXIT
+        trap 'kill $(jobs -p); exit 0' TERM
+
+        # Cluster creation specific configuration.
+        echo "mkdir"
+        mkdir -p "${HOME}"
+
+        # wait until the setup job creates admin.kubeconfig
+        while true; do
+          if [[ ! -f  /tmp/shared/image_create ]]; then
+            echo "sleeping waiting for image_create"
+            echo "Files:"
+            ls -lah /tmp/shared/
+            sleep 15 & wait
+            continue
+          fi
+          # if we got admin kubeconfig file with failure marker, ignore. Teardown is in progress.
+          if [[ -f  /tmp/shared/exit ]]; then
+             echo "Exiting.  Found /tmp/shared/exit."
+             exit 1
+          fi
+          break
+        done
+        echo "Found image create marker file."
+
+        source /etc/azure/credentials/secret
+        az login --service-principal -u ${AZURE_CLIENT_ID} -p ${AZURE_CLIENT_SECRET} --tenant ${AZURE_TENANT_ID} &>/dev/null
+        # TODO: Configure these from prow
+        export DNS_DOMAIN=osadev.cloud
+        export DNS_RESOURCEGROUP=dns
+        export DEPLOY_VERSION=v${OPENSHIFT_RELEASE}
+        export RUN_SYNC_LOCAL=true
+        export DEPLOY_OS="centos7"
+        export IMAGE_RESOURCEGROUP=images
+
+        source /tmp/shared/environment
+        export IMAGE_RESOURCENAME=${IMAGE_NAME}
+        # TODO: for full e2e image needs to be built too
+        cd /go/src/github.com/openshift/openshift-azure/
+
+        # added timeout as this seems to loop infinitely awaiting cluster deployment
+        timeout 30m ./hack/create.sh ${RESOURCE_GROUP}-e2e
+
+        # if completed pass generated data to other stage
+        cp -r /go/src/github.com/openshift/openshift-azure/_data /tmp/shared/
+
+        touch /tmp/shared/e2e_tests
+
+    - name: tagimage
+      image: ${IMAGE_ANSIBLE}
+      resources:
+        requests:
+          cpu: 1
+          memory: 300Mi
+        limits:
+          cpu: 3
+          memory: 4Gi
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      - name: cluster-secrets-azure
+        mountPath: /usr/share/ansible/openshift-ansible/inventory/dynamic/injected
+      env:
+      - name: HOME
+        value: /usr/share/ansible/openshift-ansible
+      - name: TYPE
+        value: azure
+      command:
+      - /usr/local/bin/entrypoint-provider
+      args:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        # error handling and sync code
+        set -euo pipefail
+
+        trap '[ "$?" == 0 ] || touch /tmp/shared/exit' EXIT
+        trap 'kill $(jobs -p); exit 0' TERM
+
+        # wait until testing our image has succeeded
+        while true; do
+          if [[ ! -f  /tmp/shared/e2e_tests ]]; then
+            sleep 15 & wait
+            continue
+          fi
+          # if we got admin kubeconfig file with failure marker, ignore. Teardown is in progress.
+          if [[ -f  /tmp/shared/exit ]]; then
+             exit 1
+          fi
+          break
+        done
+        echo "Found image create marker file."
+
+        # Get resource group and image name
+        source /tmp/shared/environment
+
+        # Source azure creds
+        source /usr/share/ansible/openshift-ansible/inventory/dynamic/injected/credentials
+
+        echo $(pwd)
+
+        ansible-playbook \
+          -e openshift_azure_resource_group_name=$RESOURCE_GROUP \
+          -e openshift_azure_input_image_ns=images \
+          -e openshift_azure_input_image_name=$IMAGE_NAME \
+          playbooks/azure/openshift-cluster/tag_image_as_valid.yml
+
+        touch /tmp/shared/exit
+
+        exit 0
+
+    # Performs cleanup of all created resources
+    - name: teardown
+      image: ${LOCAL_IMAGE_BIN}
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      - name: cluster-secrets-azure
+        mountPath: /etc/azure/credentials
+      env:
+      - name: TYPE
+        value: ${CLUSTER_TYPE}
+      - name: HOME
+        value: /tmp/shared/home
+      command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        function teardown() {
+          set +e
+          mkdir -p "${HOME}"
+          export HOME=/tmp/shared
+          export DNS_DOMAIN=osadev.cloud
+          export DNS_RESOURCEGROUP=dns
+
+          cp -r /tmp/shared/_data /go/src/github.com/openshift/openshift-azure/
+          cd /go/src/github.com/openshift/openshift-azure/
+          source /etc/azure/credentials/secret
+          az login --service-principal -u ${AZURE_CLIENT_ID} -p ${AZURE_CLIENT_SECRET} --tenant ${AZURE_TENANT_ID} &>/dev/null
+          ./hack/delete.sh ${RESOURCE_GROUP}
+
+          trap 'teardown' EXIT
+          trap 'kill $(jobs -p); exit 0' TERM
+        }
+
+        trap 'teardown' EXIT
+        trap 'kill $(jobs -p); exit 0' TERM
+
+        for i in `seq 1 120`; do
+          if [[ -f /tmp/shared/exit ]]; then
+            exit 0
+          fi
+          sleep 60 & wait
+        done
