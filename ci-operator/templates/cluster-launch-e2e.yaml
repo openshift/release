@@ -18,6 +18,7 @@ parameters:
   required: true
 - name: CLUSTER_TYPE
   required: true
+- name: UPGRADE_VERSION
 - name: TEST_SUITE
 - name: TEST_FOCUS
 - name: TEST_SKIP
@@ -191,6 +192,12 @@ objects:
         ansible-playbook -vv \
           -e openshift_test_repo=${RPM_REPO} -e 'oreg_url=${IMAGE_FORMAT}' \
           playbooks/${CLUSTER_TYPE}/openshift-cluster/launch.yml
+
+        if [[ -n "${UPGRADE_VERSION}" ]]; then
+          ansible-playbook -vv \
+          -e openshift_test_repo=${RPM_REPO} -e 'oreg_url=${IMAGE_FORMAT}' \
+          playbooks/byo/openshift-cluster/upgrades/v${UPGRADE_VERSION}/upgrade.yml
+        fi
 
     # Performs cleanup of all created resources
     - name: teardown
