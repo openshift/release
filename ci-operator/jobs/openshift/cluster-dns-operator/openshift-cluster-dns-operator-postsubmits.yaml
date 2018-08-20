@@ -1,0 +1,47 @@
+postsubmits:
+  openshift/cluster-dns-operator:
+  - agent: kubernetes
+    decorate: true
+    name: branch-ci-openshift-cluster-dns-operator-unit-master
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=unit
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.json
+              name: ci-operator-openshift-cluster-dns-operator
+        image: ci-operator:latest
+        name: ""
+        resources: {}
+      serviceAccountName: ci-operator
+  - agent: kubernetes
+    decorate: true
+    labels:
+      artifacts: images
+    name: branch-ci-openshift-cluster-dns-operator-images-master
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=[images]
+        - --promote
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.json
+              name: ci-operator-openshift-cluster-dns-operator
+        image: ci-operator:latest
+        name: ""
+        resources: {}
+      serviceAccountName: ci-operator
