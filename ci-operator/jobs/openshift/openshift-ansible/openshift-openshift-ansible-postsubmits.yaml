@@ -24,6 +24,30 @@ postsubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --target=[images]
         - --promote
+  - name: branch-ci-openshift-openshift-ansible-images
+    agent: kubernetes
+    labels:
+      artifacts: images
+    branches:
+    - release-3.10
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-openshift-ansible
+              key: release-3.10.json
+        command:
+        - ci-operator
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=[images]
+        - --promote
   - name: test_branch_openshift_ansible_extended_conformance_gce_37
     agent: jenkins
     labels:
