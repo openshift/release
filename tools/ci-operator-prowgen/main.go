@@ -80,13 +80,95 @@ func generatePodSpec(org, repo, branch, target string, additionalArgs ...string)
 	}
 }
 
+func generatePodSpecE2E(org, repo, branch, template, command string) *kubeapi.PodSpec {
+	templateBase := strings.TrimSuffix(filepath.Base(template), filepath.Ext(template))
+	return &kubeapi.PodSpec{
+		ServiceAccountName: "ci-operator",
+		Volumes: []kubeapi.Volume{
+			kubeapi.Volume{
+				Name: "job-definition",
+				VolumeSource: kubeapi.VolumeSource{
+					ConfigMap: &kubeapi.ConfigMapVolumeSource{
+						LocalObjectReference: kubeapi.LocalObjectReference{
+							Name: fmt.Sprintf("prow-job-%s", templateBase)}}}},
+			kubeapi.Volume{
+				Name: "cluster-profile",
+				VolumeSource: kubeapi.VolumeSource{
+					Projected: &kubeapi.ProjectedVolumeSource{
+						Sources: []kubeapi.VolumeProjection{
+							kubeapi.VolumeProjection{
+								Secret: &kubeapi.SecretProjection{
+									LocalObjectReference: kubeapi.LocalObjectReference{Name: "cluster-secrets-gcp"},
+								},
+							},
+							kubeapi.VolumeProjection{
+								ConfigMap: &kubeapi.ConfigMapProjection{
+									LocalObjectReference: kubeapi.LocalObjectReference{Name: "cluster-profile-gcp"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Containers: []kubeapi.Container{
+			kubeapi.Container{
+				Name:  "test",
+				Image: "ci-operator:latest",
+				VolumeMounts: []kubeapi.VolumeMount{
+					kubeapi.VolumeMount{
+						Name:      "job-definition",
+						MountPath: "/usr/local/e2e-gcp",
+						SubPath:   template},
+					kubeapi.VolumeMount{
+						Name:      "cluster-profile",
+						MountPath: "/usr/local/e2e-cluster-profile"}},
+				Env: []kubeapi.EnvVar{
+					kubeapi.EnvVar{
+						Name:  "JOB_NAME_SAFE",
+						Value: fmt.Sprintf("%s-%s-%s", org, repo, branch)},
+					kubeapi.EnvVar{
+						Name:  "CLUSTER_TYPE",
+						Value: "gcp"},
+					kubeapi.EnvVar{
+						Name: "CONFIG_SPEC",
+						ValueFrom: &kubeapi.EnvVarSource{
+							ConfigMapKeyRef: &kubeapi.ConfigMapKeySelector{
+								LocalObjectReference: kubeapi.LocalObjectReference{
+									Name: fmt.Sprintf("ci-operator-%s-%s", org, repo),
+								},
+								Key: fmt.Sprintf("%s.json", branch)},
+						},
+					},
+					kubeapi.EnvVar{
+						Name:  "TEST_COMMAND",
+						Value: command},
+					kubeapi.EnvVar{
+						Name:  "RPM_REPO_BASEURL_REF",
+						Value: "https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/master/.latest-rpms"},
+				},
+				Command: []string{
+					"/bin/bash", "-c",
+					`#!/bin/bash
+set -e
+export RPM_REPO="$( curl -q "${RPM_REPO_BASEURL_REF}" 2>/dev/null)"
+ci-operator \
+    --artifact-dir=$(ARTIFACTS) \
+    --secret-dir=/usr/local/e2e-cluster-profile \
+    --template=/usr/local/e2e-gcp \
+    --target=e2e-gcp`},
+			},
+		},
+	}
+}
+
 type testDescription struct {
 	Name   string
 	Target string
 }
 
 // Generate a Presubmit job for the given parameters
-func generatePresubmitForTest(test testDescription, org, repo, branch string) *prowconfig.Presubmit {
+func generatePresubmitForTest(test testDescription, org, repo, branch string, podSpec *kubeapi.PodSpec) *prowconfig.Presubmit {
 	return &prowconfig.Presubmit{
 		Agent:        "kubernetes",
 		AlwaysRun:    true,
@@ -94,7 +176,7 @@ func generatePresubmitForTest(test testDescription, org, repo, branch string) *p
 		Context:      fmt.Sprintf("ci/prow/%s", test.Name),
 		Name:         fmt.Sprintf("pull-ci-%s-%s-%s-%s", org, repo, branch, test.Name),
 		RerunCommand: fmt.Sprintf("/test %s", test.Name),
-		Spec:         generatePodSpec(org, repo, branch, test.Target),
+		Spec:         podSpec,
 		Trigger:      fmt.Sprintf(`((?m)^/test( all| %s),?(\\s+|$))`, test.Name),
 		UtilityConfig: prowconfig.UtilityConfig{
 			DecorationConfig: &prowkube.DecorationConfig{SkipCloning: true},
@@ -104,7 +186,7 @@ func generatePresubmitForTest(test testDescription, org, repo, branch string) *p
 }
 
 // Generate a Presubmit job for the given parameters
-func generatePostsubmitForTest(test testDescription, org, repo, branch string, additionalArgs ...string) *prowconfig.Postsubmit {
+func generatePostsubmitForTest(test testDescription, org, repo, branch string, podSpec *kubeapi.PodSpec, additionalArgs ...string) *prowconfig.Postsubmit {
 	return &prowconfig.Postsubmit{
 		Agent: "kubernetes",
 		Name:  fmt.Sprintf("branch-ci-%s-%s-%s-%s", org, repo, branch, test.Name),
@@ -144,8 +226,14 @@ func generateJobs(
 			imagesTest = true
 		}
 		test := testDescription{Name: element.As, Target: element.As}
-		presubmits[orgrepo] = append(presubmits[orgrepo], *generatePresubmitForTest(test, org, repo, branch))
-		postsubmits[orgrepo] = append(postsubmits[orgrepo], *generatePostsubmitForTest(test, org, repo, branch))
+		var podSpec *kubeapi.PodSpec
+		if element.As != "e2e" {
+			podSpec = generatePodSpec(org, repo, branch, test.Target)
+		} else {
+			podSpec = generatePodSpecE2E(org, repo, branch, string(element.From), element.Commands)
+		}
+		presubmits[orgrepo] = append(presubmits[orgrepo], *generatePresubmitForTest(test, org, repo, branch, podSpec))
+		postsubmits[orgrepo] = append(postsubmits[orgrepo], *generatePostsubmitForTest(test, org, repo, branch, podSpec))
 	}
 
 	if len(configSpec.Images) > 0 {
@@ -160,8 +248,9 @@ func generateJobs(
 			test = testDescription{Name: "images", Target: "[images]"}
 		}
 
-		presubmits[orgrepo] = append(presubmits[orgrepo], *generatePresubmitForTest(test, org, repo, branch))
-		imagesPostsubmit := generatePostsubmitForTest(test, org, repo, branch, "--promote")
+		podSpec := generatePodSpec(org, repo, branch, test.Target)
+		presubmits[orgrepo] = append(presubmits[orgrepo], *generatePresubmitForTest(test, org, repo, branch, podSpec))
+		imagesPostsubmit := generatePostsubmitForTest(test, org, repo, branch, podSpec, "--promote")
 		imagesPostsubmit.Labels = map[string]string{"artifacts": "images"}
 		postsubmits[orgrepo] = append(postsubmits[orgrepo], *imagesPostsubmit)
 	}
