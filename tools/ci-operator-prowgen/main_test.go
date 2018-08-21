@@ -376,3 +376,162 @@ func TestExtractRepoElementsFromPath(t *testing.T) {
 		})
 	}
 }
+
+func TestMergeJobConfig(t *testing.T) {
+	tests := []struct {
+		destination, source, expected *prowconfig.JobConfig
+	}{
+		{
+			destination: &prowconfig.JobConfig{},
+			source: &prowconfig.JobConfig{
+				Presubmits: map[string][]prowconfig.Presubmit{
+					"organization/repository": []prowconfig.Presubmit{
+						prowconfig.Presubmit{Name: "source-job", Context: "ci/prow/source"},
+					},
+				},
+			},
+			expected: &prowconfig.JobConfig{
+				Presubmits: map[string][]prowconfig.Presubmit{
+					"organization/repository": []prowconfig.Presubmit{
+						prowconfig.Presubmit{Name: "source-job", Context: "ci/prow/source"},
+					},
+				},
+			},
+		}, {
+			destination: &prowconfig.JobConfig{
+				Presubmits: map[string][]prowconfig.Presubmit{
+					"organization/repository": []prowconfig.Presubmit{
+						prowconfig.Presubmit{Name: "another-job", Context: "ci/prow/another"},
+					},
+				},
+			},
+			source: &prowconfig.JobConfig{
+				Presubmits: map[string][]prowconfig.Presubmit{
+					"organization/repository": []prowconfig.Presubmit{
+						prowconfig.Presubmit{Name: "source-job", Context: "ci/prow/source"},
+					},
+				},
+			},
+			expected: &prowconfig.JobConfig{
+				Presubmits: map[string][]prowconfig.Presubmit{
+					"organization/repository": []prowconfig.Presubmit{
+						prowconfig.Presubmit{Name: "source-job", Context: "ci/prow/source"},
+						prowconfig.Presubmit{Name: "another-job", Context: "ci/prow/another"},
+					},
+				},
+			},
+		}, {
+			destination: &prowconfig.JobConfig{
+				Presubmits: map[string][]prowconfig.Presubmit{
+					"organization/repository": []prowconfig.Presubmit{
+						prowconfig.Presubmit{Name: "same-job", Context: "ci/prow/same"},
+					},
+				},
+			},
+			source: &prowconfig.JobConfig{
+				Presubmits: map[string][]prowconfig.Presubmit{
+					"organization/repository": []prowconfig.Presubmit{
+						prowconfig.Presubmit{Name: "same-job", Context: "ci/prow/different"},
+					},
+				},
+			},
+			expected: &prowconfig.JobConfig{
+				Presubmits: map[string][]prowconfig.Presubmit{
+					"organization/repository": []prowconfig.Presubmit{
+						prowconfig.Presubmit{Name: "same-job", Context: "ci/prow/different"},
+					},
+				},
+			},
+		}, {
+			destination: &prowconfig.JobConfig{},
+			source: &prowconfig.JobConfig{
+				Postsubmits: map[string][]prowconfig.Postsubmit{
+					"organization/repository": []prowconfig.Postsubmit{
+						prowconfig.Postsubmit{Name: "source-job", Agent: "ci/prow/source"},
+					},
+				},
+			},
+			expected: &prowconfig.JobConfig{
+				Postsubmits: map[string][]prowconfig.Postsubmit{
+					"organization/repository": []prowconfig.Postsubmit{
+						prowconfig.Postsubmit{Name: "source-job", Agent: "ci/prow/source"},
+					},
+				},
+			},
+		}, {
+			destination: &prowconfig.JobConfig{
+				Postsubmits: map[string][]prowconfig.Postsubmit{
+					"organization/repository": []prowconfig.Postsubmit{
+						prowconfig.Postsubmit{Name: "another-job", Agent: "ci/prow/another"},
+					},
+				},
+			},
+			source: &prowconfig.JobConfig{
+				Postsubmits: map[string][]prowconfig.Postsubmit{
+					"organization/repository": []prowconfig.Postsubmit{
+						prowconfig.Postsubmit{Name: "source-job", Agent: "ci/prow/source"},
+					},
+				},
+			},
+			expected: &prowconfig.JobConfig{
+				Postsubmits: map[string][]prowconfig.Postsubmit{
+					"organization/repository": []prowconfig.Postsubmit{
+						prowconfig.Postsubmit{Name: "source-job", Agent: "ci/prow/source"},
+						prowconfig.Postsubmit{Name: "another-job", Agent: "ci/prow/another"},
+					},
+				},
+			},
+		}, {
+			destination: &prowconfig.JobConfig{
+				Postsubmits: map[string][]prowconfig.Postsubmit{
+					"organization/repository": []prowconfig.Postsubmit{
+						prowconfig.Postsubmit{Name: "same-job", Agent: "ci/prow/same"},
+					},
+				},
+			},
+			source: &prowconfig.JobConfig{
+				Postsubmits: map[string][]prowconfig.Postsubmit{
+					"organization/repository": []prowconfig.Postsubmit{
+						prowconfig.Postsubmit{Name: "same-job", Agent: "ci/prow/different"},
+					},
+				},
+			},
+			expected: &prowconfig.JobConfig{
+				Postsubmits: map[string][]prowconfig.Postsubmit{
+					"organization/repository": []prowconfig.Postsubmit{
+						prowconfig.Postsubmit{Name: "same-job", Agent: "ci/prow/different"},
+					},
+				},
+			},
+		}, {
+			destination: &prowconfig.JobConfig{
+				Postsubmits: map[string][]prowconfig.Postsubmit{
+					"organization/repository": []prowconfig.Postsubmit{
+						prowconfig.Postsubmit{Name: "same-job", Agent: "ci/prow/same"},
+					},
+				},
+			},
+			source: &prowconfig.JobConfig{
+				Postsubmits: map[string][]prowconfig.Postsubmit{
+					"organization/repository": []prowconfig.Postsubmit{
+						prowconfig.Postsubmit{Name: "same-job", Agent: "ci/prow/same"},
+					},
+				},
+			},
+			expected: &prowconfig.JobConfig{
+				Postsubmits: map[string][]prowconfig.Postsubmit{
+					"organization/repository": []prowconfig.Postsubmit{
+						prowconfig.Postsubmit{Name: "same-job", Agent: "ci/prow/same"},
+					},
+				},
+			},
+		},
+	}
+	for _, tc := range tests {
+		mergeJobConfig(tc.destination, tc.source)
+
+		if !equality.Semantic.DeepEqual(tc.destination, tc.expected) {
+			t.Errorf("expected merged job config diff:\n%s", diff.ObjectDiff(tc.expected, tc.destination))
+		}
+	}
+}
