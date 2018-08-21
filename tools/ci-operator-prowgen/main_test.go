@@ -1,8 +1,12 @@
 package main
 
 import (
+	"bytes"
+	"fmt"
 	"io/ioutil"
 	"log"
+	"os"
+	"path/filepath"
 	"testing"
 
 	ciop "github.com/openshift/ci-operator/pkg/api"
@@ -524,6 +528,319 @@ func TestMergeJobConfig(t *testing.T) {
 
 		if !equality.Semantic.DeepEqual(tc.destination, tc.expected) {
 			t.Errorf("expected merged job config diff:\n%s", diff.ObjectDiff(tc.expected, tc.destination))
+		}
+	}
+}
+
+func prepareInputs(org, component, branch string, configJSON, prowConfigYAML []byte) (string, string, string, error) {
+	dir, err := ioutil.TempDir("", "prowgen-test")
+	if err != nil {
+		return "", "", "", err
+	}
+
+	workDir := filepath.Join(dir, org, component)
+	if err = os.MkdirAll(workDir, os.ModePerm); err != nil {
+		return "", "", dir, err
+	}
+
+	fullConfigPath := filepath.Join(workDir, fmt.Sprintf("%s.json", branch))
+	fullProwConfigPath := filepath.Join(workDir, "jobs.yaml")
+
+	if err = ioutil.WriteFile(fullConfigPath, configJSON, 0664); err != nil {
+		return "", "", dir, err
+	}
+	if err = ioutil.WriteFile(fullProwConfigPath, prowConfigYAML, 0664); err != nil {
+		return "", "", dir, err
+	}
+
+	return fullConfigPath, fullProwConfigPath, dir, nil
+}
+
+func TestFromCIOperatorConfigToProwYaml(t *testing.T) {
+	tests := []struct {
+		org              string
+		component        string
+		branch           string
+		configJSON       []byte
+		prowOldYAML      []byte
+		prowExpectedYAML []byte
+	}{
+		{
+			org:       "super",
+			component: "duper",
+			branch:    "branch",
+			configJSON: []byte(`{
+  "tag_specification": {
+    "cluster": "https://api.ci.openshift.org", "namespace": "openshift", "name": "origin-v3.11", "tag": ""
+  },
+  "base_images": {
+    "base": {
+      "cluster": "https://api.ci.openshift.org", "namespace": "openshift", "name": "origin-v3.11", "tag": "base"
+    }
+  },
+  "test_base_image": {
+    "cluster": "https://api.ci.openshift.org", "namespace": "openshift", "name": "release", "tag": "golang-1.10"
+  },
+  "images": [{"from": "base", "to": "service-serving-cert-signer"}],
+
+  "tests": [{"as": "unit", "from": "src", "commands": "make test-unit"}]}`),
+			prowOldYAML: []byte(""),
+			prowExpectedYAML: []byte(`postsubmits:
+  super/duper:
+  - agent: kubernetes
+    decorate: true
+    name: branch-ci-super-duper-branch-images
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=[images]
+        - --promote
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: branch.json
+              name: ci-operator-super-duper
+        image: ci-operator:latest
+        name: ""
+        resources: {}
+      serviceAccountName: ci-operator
+presubmits:
+  super/duper:
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - branch
+    context: ci/prow/unit
+    decorate: true
+    name: pull-ci-super-duper-branch-unit
+    rerun_command: /test unit
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=unit
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: branch.json
+              name: ci-operator-super-duper
+        image: ci-operator:latest
+        name: ""
+        resources: {}
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| unit),?(\\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - branch
+    context: ci/prow/images
+    decorate: true
+    name: pull-ci-super-duper-branch-images
+    rerun_command: /test images
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=[images]
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: branch.json
+              name: ci-operator-super-duper
+        image: ci-operator:latest
+        name: ""
+        resources: {}
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| images),?(\\s+|$))
+`)}, {
+			org:       "super",
+			component: "duper",
+			branch:    "branch",
+			configJSON: []byte(`{
+  "tag_specification": {
+    "cluster": "https://api.ci.openshift.org", "namespace": "openshift", "name": "origin-v3.11", "tag": ""
+  },
+  "base_images": {
+    "base": {
+      "cluster": "https://api.ci.openshift.org", "namespace": "openshift", "name": "origin-v3.11", "tag": "base"
+    }
+  },
+  "test_base_image": {
+    "cluster": "https://api.ci.openshift.org", "namespace": "openshift", "name": "release", "tag": "golang-1.10"
+  },
+  "images": [{"from": "base", "to": "service-serving-cert-signer"}],
+
+  "tests": [{"as": "unit", "from": "src", "commands": "make test-unit"}]}`),
+			prowOldYAML: []byte(`postsubmits:
+  super/duper:
+  - agent: kubernetes
+    decorate: true
+    name: branch-ci-super-duper-branch-do-not-overwrite
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=unit
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: branch.json
+              name: ci-operator-super-duper
+        image: ci-operator:latest
+        name: ""
+        resources: {}
+      serviceAccountName: ci-operator
+`),
+			prowExpectedYAML: []byte(`postsubmits:
+  super/duper:
+  - agent: kubernetes
+    decorate: true
+    name: branch-ci-super-duper-branch-images
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=[images]
+        - --promote
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: branch.json
+              name: ci-operator-super-duper
+        image: ci-operator:latest
+        name: ""
+        resources: {}
+      serviceAccountName: ci-operator
+  - agent: kubernetes
+    decorate: true
+    name: branch-ci-super-duper-branch-do-not-overwrite
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=unit
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: branch.json
+              name: ci-operator-super-duper
+        image: ci-operator:latest
+        name: ""
+        resources: {}
+      serviceAccountName: ci-operator
+presubmits:
+  super/duper:
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - branch
+    context: ci/prow/unit
+    decorate: true
+    name: pull-ci-super-duper-branch-unit
+    rerun_command: /test unit
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=unit
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: branch.json
+              name: ci-operator-super-duper
+        image: ci-operator:latest
+        name: ""
+        resources: {}
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| unit),?(\\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - branch
+    context: ci/prow/images
+    decorate: true
+    name: pull-ci-super-duper-branch-images
+    rerun_command: /test images
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=[images]
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: branch.json
+              name: ci-operator-super-duper
+        image: ci-operator:latest
+        name: ""
+        resources: {}
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| images),?(\\s+|$))
+`),
+		},
+	}
+	for _, tc := range tests {
+		configPath, prowJobsPath, tempDir, err := prepareInputs(tc.org, tc.component, tc.branch, tc.configJSON, tc.prowOldYAML)
+		if tempDir != "" {
+			defer os.RemoveAll(tempDir)
+		}
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+			continue
+		}
+
+		jobConfig, _, _, err := generateProwJobsFromConfigFile(configPath)
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+			continue
+		}
+		err = mergeJobsIntoFile(prowJobsPath, jobConfig)
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+			continue
+		}
+
+		data, err := ioutil.ReadFile(prowJobsPath)
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+			continue
+		}
+
+		if bytes.Compare(data, tc.prowExpectedYAML) != 0 {
+			t.Errorf("Generated Prow YAML differs from expected!\n%s", diff.StringDiff(string(tc.prowExpectedYAML), string(data)))
 		}
 	}
 }
