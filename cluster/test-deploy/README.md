@@ -38,7 +38,7 @@ cp $SHARED_SECRETS/mirror/ops-mirror.pem $RELEASE_TOOLS/gcp-dev/ops-mirror.pem
 
 ### Configure installer variables
 
-**Add new installer variables** to a file such as `gcp-dev/myvars.yaml` (any YAML file in the profile directory will be treated as a variables file). Keep in mind that the precedence order of the variable files in the profile is unspecified: to override variables in `vars.yaml` or `vars-origin.yaml` just modify those files directly for now.
+**Add new installer variables** to a file such as `gcp-dev/zz_vars.yaml` (any YAML file in the profile directory will be treated as a variables file, and for now, the `zz_` prefix ensures that your variables will override any predefined ones). Keep in mind that the precedence order of the variable files in the profile is unspecified: to override variables in `vars.yaml` or `vars-origin.yaml` just modify those files directly for now.
 
 ## Usage
 
