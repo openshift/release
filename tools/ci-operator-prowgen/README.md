@@ -11,7 +11,7 @@ configuration from the ci-operator configuration file.
 To use the generator, you need to build it:
 
 ```
-$ go build ./tools/ci-operator/prowgen
+$ go build ./tools/ci-operator-prowgen
 ```
 
 ### Full-repository
@@ -126,12 +126,6 @@ also uses the `--promote` option to promote the component images built in this
 way.
 
 ## Develop
-
-To build the generator, run:
-
-```
-$ go build ./ci-operator-prowgen
-```
 
 To run unit-tests, run:
 
