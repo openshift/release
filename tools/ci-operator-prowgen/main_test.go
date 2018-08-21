@@ -122,7 +122,7 @@ func TestGeneratePresubmitForTest(t *testing.T) {
 				AlwaysRun:    true,
 				Brancher:     prowconfig.Brancher{Branches: []string{"branch"}},
 				Context:      "ci/prow/testname",
-				Name:         "pull-ci-org-repo-testname-branch",
+				Name:         "pull-ci-org-repo-branch-testname",
 				RerunCommand: "/test testname",
 				Trigger:      `((?m)^/test( all| testname),?(\\s+|$))`,
 				UtilityConfig: prowconfig.UtilityConfig{
@@ -163,7 +163,7 @@ func TestGeneratePostSumitForTest(t *testing.T) {
 
 			expected: &prowconfig.Postsubmit{
 				Agent: "kubernetes",
-				Name:  "branch-ci-organization-repository-name-branch",
+				Name:  "branch-ci-organization-repository-branch-name",
 				UtilityConfig: prowconfig.UtilityConfig{
 					DecorationConfig: &prowkube.DecorationConfig{SkipCloning: true},
 					Decorate:         true,
@@ -180,7 +180,7 @@ func TestGeneratePostSumitForTest(t *testing.T) {
 
 			expected: &prowconfig.Postsubmit{
 				Agent: "kubernetes",
-				Name:  "branch-ci-organization-repository-name-branch",
+				Name:  "branch-ci-organization-repository-branch-name",
 				UtilityConfig: prowconfig.UtilityConfig{
 					DecorationConfig: &prowkube.DecorationConfig{SkipCloning: true},
 					Decorate:         true,
@@ -233,14 +233,14 @@ func TestGenerateJobs(t *testing.T) {
 			expected: &prowconfig.JobConfig{
 				Presubmits: map[string][]prowconfig.Presubmit{
 					"organization/repository": []prowconfig.Presubmit{
-						prowconfig.Presubmit{Name: "pull-ci-organization-repository-derTest-branch"},
-						prowconfig.Presubmit{Name: "pull-ci-organization-repository-leTest-branch"},
+						prowconfig.Presubmit{Name: "pull-ci-organization-repository-branch-derTest"},
+						prowconfig.Presubmit{Name: "pull-ci-organization-repository-branch-leTest"},
 					},
 				},
 				Postsubmits: map[string][]prowconfig.Postsubmit{
 					"organization/repository": []prowconfig.Postsubmit{
-						prowconfig.Postsubmit{Name: "branch-ci-organization-repository-derTest-branch"},
-						prowconfig.Postsubmit{Name: "branch-ci-organization-repository-leTest-branch"},
+						prowconfig.Postsubmit{Name: "branch-ci-organization-repository-branch-derTest"},
+						prowconfig.Postsubmit{Name: "branch-ci-organization-repository-branch-leTest"},
 					},
 				},
 			},
@@ -260,17 +260,17 @@ func TestGenerateJobs(t *testing.T) {
 			expected: &prowconfig.JobConfig{
 				Presubmits: map[string][]prowconfig.Presubmit{
 					"organization/repository": []prowconfig.Presubmit{
-						prowconfig.Presubmit{Name: "pull-ci-organization-repository-derTest-branch"},
-						prowconfig.Presubmit{Name: "pull-ci-organization-repository-leTest-branch"},
-						prowconfig.Presubmit{Name: "pull-ci-organization-repository-images-branch"},
+						prowconfig.Presubmit{Name: "pull-ci-organization-repository-branch-derTest"},
+						prowconfig.Presubmit{Name: "pull-ci-organization-repository-branch-leTest"},
+						prowconfig.Presubmit{Name: "pull-ci-organization-repository-branch-images"},
 					},
 				},
 				Postsubmits: map[string][]prowconfig.Postsubmit{
 					"organization/repository": []prowconfig.Postsubmit{
-						prowconfig.Postsubmit{Name: "branch-ci-organization-repository-derTest-branch"},
-						prowconfig.Postsubmit{Name: "branch-ci-organization-repository-leTest-branch"},
+						prowconfig.Postsubmit{Name: "branch-ci-organization-repository-branch-derTest"},
+						prowconfig.Postsubmit{Name: "branch-ci-organization-repository-branch-leTest"},
 						prowconfig.Postsubmit{
-							Name:   "branch-ci-organization-repository-images-branch",
+							Name:   "branch-ci-organization-repository-branch-images",
 							Labels: map[string]string{"artifacts": "images"}},
 					},
 				},
@@ -290,15 +290,15 @@ func TestGenerateJobs(t *testing.T) {
 			expected: &prowconfig.JobConfig{
 				Presubmits: map[string][]prowconfig.Presubmit{
 					"organization/repository": []prowconfig.Presubmit{
-						prowconfig.Presubmit{Name: "pull-ci-organization-repository-images-branch"},
-						prowconfig.Presubmit{Name: "pull-ci-organization-repository-[images]-branch"},
+						prowconfig.Presubmit{Name: "pull-ci-organization-repository-branch-images"},
+						prowconfig.Presubmit{Name: "pull-ci-organization-repository-branch-[images]"},
 					},
 				},
 				Postsubmits: map[string][]prowconfig.Postsubmit{
 					"organization/repository": []prowconfig.Postsubmit{
-						prowconfig.Postsubmit{Name: "branch-ci-organization-repository-images-branch"},
+						prowconfig.Postsubmit{Name: "branch-ci-organization-repository-branch-images"},
 						prowconfig.Postsubmit{
-							Name:   "branch-ci-organization-repository-[images]-branch",
+							Name:   "branch-ci-organization-repository-branch-[images]",
 							Labels: map[string]string{"artifacts": "images"}},
 					},
 				},

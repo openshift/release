@@ -95,10 +95,10 @@ func generatePresubmitForTest(test testDescription, org, repo, branch string) *p
 		AlwaysRun:    true,
 		Brancher:     prowconfig.Brancher{Branches: []string{branch}},
 		Context:      fmt.Sprintf("ci/prow/%s", test.Name),
-		Name:         fmt.Sprintf("pull-ci-%s-%s-%s-%s", org, repo, test.Name, branch),
+		Name:         fmt.Sprintf("pull-ci-%s-%s-%s-%s", org, repo, branch, test.Name),
 		RerunCommand: fmt.Sprintf("/test %s", test.Name),
 		Spec:         generatePodSpec(org, repo, branch, test.Target),
-		Trigger:      fmt.Sprintf("((?m)^/test( all| %s),?(\\\\s+|$))", test.Name),
+		Trigger:      fmt.Sprintf(`((?m)^/test( all| %s),?(\\s+|$))`, test.Name),
 		UtilityConfig: prowconfig.UtilityConfig{
 			DecorationConfig: &prowkube.DecorationConfig{SkipCloning: true},
 			Decorate:         true,
@@ -110,7 +110,7 @@ func generatePresubmitForTest(test testDescription, org, repo, branch string) *p
 func generatePostsubmitForTest(test testDescription, org, repo, branch string, additionalArgs ...string) *prowconfig.Postsubmit {
 	return &prowconfig.Postsubmit{
 		Agent: "kubernetes",
-		Name:  fmt.Sprintf("branch-ci-%s-%s-%s-%s", org, repo, test.Name, branch),
+		Name:  fmt.Sprintf("branch-ci-%s-%s-%s-%s", org, repo, branch, test.Name),
 		Spec:  generatePodSpec(org, repo, branch, test.Target, additionalArgs...),
 		UtilityConfig: prowconfig.UtilityConfig{
 			DecorationConfig: &prowkube.DecorationConfig{SkipCloning: true},
