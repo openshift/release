@@ -2,40 +2,35 @@
 # This is the image that controls the standard build environment for releasing OpenShift Origin.
 # It is responsible for performing a cross platform build of OpenShift.
 #
-# The standard name for this image is openshift/origin-release
+# The standard name for this image is openshift/fedora-origin-release
 #
-FROM   fedora:28 
+# Valid values for ARCH (used to download gorpm): arm64, ppc64le, s390x, arm64
 
-ENV VERSION=1.11beta1 \
-    GOCACHE=/go/.cache \
+FROM   fedora:28 
+ARG VERSION
+ENV VERSION=${VERSION:-1.11beta1} 
+ARG ARCH
+ENV ARCH=${ARCH:-amd64} 
+ENV GOCACHE=/go/.cache \
     GOARM=5 \
     GOPATH=/go \
     GOROOT=/usr/local/go
 ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
 
+#needed for goversioninfo
 COPY cbs-paas7-openshift-multiarch-el7-build.repo /etc/yum.repos.d/
 #remove sysvinit-tools? 
-RUN INSTALL_PKGS="bc bind-utils bsdtar ceph-common createrepo device-mapper device-mapper-persistent-data e2fsprogs ethtool file findutils gcc git glibc-static gpgme gpgme-devel hostname iptables jq krb5-devel libassuan libassuan-devel lsof make mercurial nmap-ncat openssl protobuf-compiler rsync socat tar tito tree util-linux wget which xfsprogs zip goversioninfo" && \
-    yum install -y $INSTALL_PKGS && \
+RUN INSTALL_PKGS="bc bind-utils bsdtar ceph-common createrepo device-mapper device-mapper-persistent-data e2fsprogs ethtool file findutils gcc git glibc-static gpgme gpgme-devel hostname iptables jq krb5-devel libassuan libassuan-devel libseccomp-devel lsof make mercurial nmap-ncat openssl protobuf-compiler rsync socat tar tito tree util-linux wget which xfsprogs zip goversioninfo" && \
+    dnf install -y $INSTALL_PKGS && \
 #    rpm -V $INSTALL_PKGS && \
-    yum clean all && \
+    dnf clean all && \
     touch /os-build-image 
 
 ADD *.rpm /tmp/origin-rpm/
-RUN yum install -y /tmp/origin-rpm/*.rpm && \
-    yum clean all
-
-#Download go for  amd64 unless other archs are explicitly defined
-RUN case "$(arch)" in \
-	ppc64le) goarch='ppc64le';; \
-	aarch64) goarch='arm64';; \
-	s390x) goarch='s390x';; \
-	*) goarch='amd64';; \
-    esac; \
-    curl https://storage.googleapis.com/golang/go$VERSION.linux-$goarch.tar.gz | tar -C /usr/local -xzf -; \
-    go version
-
-RUN go get golang.org/x/tools/cmd/cover \
+RUN dnf install -y /tmp/origin-rpm/*.rpm && \
+    dnf clean all && \
+    curl https://storage.googleapis.com/golang/go$VERSION.linux-$ARCH.tar.gz | tar -C /usr/local -xzf - && \
+    go get golang.org/x/tools/cmd/cover \
         golang.org/x/tools/cmd/goimports \
         github.com/tools/godep \
         github.com/golang/lint/golint \
@@ -49,8 +44,10 @@ RUN go get golang.org/x/tools/cmd/cover \
     # TODO: symlink for backwards compatibility with hack/build-images.sh only, remove
 
 RUN chmod g+xw -R $GOPATH && \
-    chmod g+xw -R $(go env GOROOT)
+    chmod g+xw -R $(go env GOROOT) 
+
+CMD ["/bin/bash"]
 
 WORKDIR /go/src/github.com/openshift/origin
-LABEL io.k8s.display-name="OpenShift Origin Release Environment (golang-$VERSION)" \
+LABEL io.k8s.display-name="OpenShift Origin Release Environment (golang-$VERSION) (Fedora 28)" \
       io.k8s.description="This is the standard release image for OpenShift Origin and contains the necessary build tools to build the platform."
