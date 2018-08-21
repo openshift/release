@@ -11,9 +11,14 @@ approve:
   - openshift
   implicit_self_approve: true
   lgtm_acts_as_approve: true
+- repos:
+  - openshift/enterprise-images
+  implicit_self_approve: true
+  lgtm_acts_as_approve: true
+  review_acts_as_approve: true
 
 blunderbuss:
-  file_weight_count: 2
+  max_request_count: 2
 
 heart:
   adorees:
@@ -27,6 +32,18 @@ config_updater:
       name: plugins
     cluster/ci/config/prow/labels.yaml:
       name: labels
+    ci-operator/jobs/**/*.yaml:
+      name: job-config
+    cluster/test-deploy/aws/*.yaml:
+      name: cluster-profile-aws
+    cluster/test-deploy/gcp/*.yaml:
+      name: cluster-profile-gcp
+    cluster/test-deploy/gcp-ha/*.yaml:
+      name: cluster-profile-gcp-ha
+    cluster/test-deploy/gcp-crio/*.yaml:
+      name: cluster-profile-gcp-crio
+    cluster/test-deploy/gcp-ha-static/*.yaml:
+      name: cluster-profile-gcp-ha-static
     ci-operator/config/kubernetes/descheduler/master.json:
       name: ci-operator-kubernetes-descheduler
     ci-operator/config/kubernetes/descheduler/release-3.10.json:
@@ -47,12 +64,16 @@ config_updater:
       name: ci-operator-kubernetes-cluster-capacity
     ci-operator/config/kubernetes/cluster-capacity/release-3.10.json:
       name: ci-operator-kubernetes-cluster-capacity
+    ci-operator/config/openshift/api/master.json:
+      name: ci-operator-openshift-api
     ci-operator/config/openshift/origin/master.json:
       name: ci-operator-openshift-origin
     ci-operator/config/openshift/origin/release-3.10.json:
       name: ci-operator-openshift-origin
     ci-operator/config/openshift/installer/master.json:
       name: ci-operator-openshift-installer
+    ci-operator/config/openshift/cluster-version-operator/master.json:
+      name: ci-operator-openshift-cluster-version-operator
     ci-operator/config/openshift/origin-web-console-server/master.json:
       name: ci-operator-openshift-origin-web-console-server
     ci-operator/config/openshift/origin-web-console-server/release-3.10.json:
@@ -61,6 +82,8 @@ config_updater:
       name: ci-operator-openshift-console
     ci-operator/config/openshift/console/release-3.10.json:
       name: ci-operator-openshift-console
+    ci-operator/config/openshift/imagebuilder/master.json:
+      name: ci-operator-openshift-imagebuilder
     ci-operator/config/openshift/image-registry/master.json:
       name: ci-operator-openshift-image-registry
     ci-operator/config/openshift/image-registry/release-3.10.json:
@@ -77,13 +100,59 @@ config_updater:
       name: ci-operator-openshift-telemeter
     ci-operator/config/openshift/service-serving-cert-signer/master.json:
       name: ci-operator-openshift-service-serving-cert-signer
+    ci-operator/config/openshift/jenkins/master.json:
+      name: ci-operator-openshift-jenkins-canary
+    ci-operator/config/openshift/jenkins/openshift-3.10.json:
+      name: ci-operator-openshift-jenkins-canary
     ci-operator/config/openshift/origin-aggregated-logging/master.json:
       name: ci-operator-openshift-origin-aggregated-logging
     ci-operator/config/openshift/origin-metrics/master.json:
       name: ci-operator-openshift-origin-metrics
+    ci-operator/config/openshift/cluster-monitoring-operator/master.json:
+      name: ci-operator-openshift-cluster-monitoring-operator
+    ci-operator/config/openshift/configmap-reload/master.json:
+      name: ci-operator-openshift-configmap-reload
+    ci-operator/config/openshift/kube-rbac-proxy/master.json:
+      name: ci-operator-openshift-kube-rbac-proxy
+    ci-operator/config/openshift/kube-state-metrics/master.json:
+      name: ci-operator-openshift-kube-state-metrics
+    ci-operator/config/openshift/prometheus-operator/master.json:
+      name: ci-operator-openshift-prometheus-operator
+    ci-operator/config/openshift/openshift-azure/master.json:
+      name: ci-operator-openshift-openshift-azure
+    ci-operator/config/openshift/azure-misc/master.json:
+      name: ci-operator-openshift-azure-misc
+    ci-operator/templates/cluster-launch-e2e-azure.yaml:
+      name: prow-job-cluster-launch-e2e-azure
+    ci-operator/templates/cluster-launch-e2e-gmontero-testing.yaml:
+      name: prow-job-cluster-launch-e2e-gmontero-testing
+    ci-operator/templates/cluster-launch-e2e.yaml:
+      name: prow-job-cluster-launch-e2e
+    ci-operator/templates/cluster-launch-installer-e2e.yaml:
+      name: prow-job-cluster-launch-installer-e2e
+    ci-operator/templates/cluster-launch-src.yaml:
+      name: prow-job-cluster-launch-src
+    ci-operator/templates/master-sidecar.yaml:
+      name: prow-job-master-sidecar
+    ci-operator/config/openshift/machine-api-operator/master.json:
+      name: ci-operator-openshift-machine-api-operator
+    ci-operator/config/openshift/machine-config-operator/master.json:
+      name: ci-operator-openshift-machine-config-operator
+    ci-operator/config/openshift/ci-operator/*.json:
+      name: ci-operator-openshift-ci-operator
+    ci-operator/config/openshift/cluster-operator/*.json:
+      name: ci-operator-openshift-cluster-operator
 
 sigmention:
   regexp: (?m)@openshift/sig-([\w-]*)
+
+label:
+  additional_labels:
+  - do-not-merge/needs-signoff
+
+owners:
+  skip_collaborators:
+  - openshift/openshift-azure
 
 external_plugins:
   openshift:
@@ -99,6 +168,9 @@ external_plugins:
     - pull_request
   openshift/release:
   - name: config-updater.ci
+    events:
+    - pull_request
+  - name: config-updater.azure
     events:
     - pull_request
 
@@ -138,6 +210,21 @@ plugins:
   - blunderbuss
   - trigger
 
+  openshift/enterprise-images:
+  - approve
+  - blunderbuss
+
+  openshift/openshift-azure:
+  - approve
+  - golint
+  - trigger
+
+  openshift/azure-misc:
+  - approve
+  - blunderbuss
+  - golint
+  - trigger
+
   openshift/origin-aggregated-logging:
   - trigger
 
@@ -153,6 +240,18 @@ plugins:
   openshift/console:
   - trigger
 
+  openshift/prometheus-operator:
+  - trigger
+
+  openshift/kube-rbac-proxy:
+  - trigger
+
+  openshift/kube-state-metrics:
+  - trigger
+
+  openshift/configmap-reload:
+  - trigger
+
   openshift/openshift-cns-testdrive:
   - trigger
 
@@ -164,6 +263,18 @@ plugins:
 
   openshift/ci-operator:
   - trigger
+  - blunderbuss
+  - approve
+
+  openshift/ci-vm-operator:
+  - trigger
+  - blunderbuss
+  - approve
+
+  openshift/ci-ns-ttl-controller:
+  - trigger
+  - blunderbuss
+  - approve
 
   openshift/online-hibernation:
   - approve
@@ -194,9 +305,16 @@ plugins:
   openshift/os:
   - trigger
 
+  openshift/api:
+  - trigger
+  - blunderbuss
+  - approve
+
   openshift/release:
   - trigger
   - config-updater
+  - approve
+  - golint
 
   openshift/jenkins:
   - approve
@@ -231,6 +349,12 @@ plugins:
   openshift/cluster-monitoring-operator:
   - approve
   - blunderbuss
+  - trigger
+
+  openshift/cluster-version-operator:
+  - approve
+  - blunderbuss
+  - trigger
 
   openshift/monitor-project-lifecycle:
   - approve
@@ -250,10 +374,6 @@ plugins:
   - trigger
   - wip
   - yuks
-
-  openshift/azure-misc:
-  - approve
-  - blunderbuss
 
   kubernetes-incubator/cri-o:
   - trigger
@@ -277,7 +397,9 @@ plugins:
   - trigger
 
   openshift/installer:
+  - approve
   - docs-no-retest
+  - golint
   - trigger
 
   openshift/telemeter:
@@ -285,3 +407,29 @@ plugins:
 
   openshift/origin-metrics:
   - trigger
+
+  openshift/machine-api-operator:
+  - golint
+  - trigger
+  - approve
+
+  openshift/machine-config-operator:
+  - golint
+  - trigger
+  - approve
+  - blunderbuss
+
+  openshift/imagebuilder:
+  - golint
+  - trigger
+  - approve
+
+  openshift/cluster-ingress-operator:
+  - trigger
+  - approve
+  - blunderbuss
+
+  openshift/cluster-dns-operator:
+  - trigger
+  - approve
+  - blunderbuss

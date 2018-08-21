@@ -1,0 +1,62 @@
+postsubmits:
+  openshift/ci-operator:
+  - agent: kubernetes
+    decorate: true
+    name: branch-ci-openshift-ci-operator-master-unit
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=unit
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.json
+              name: ci-operator-openshift-ci-operator
+        image: ci-operator:latest
+      serviceAccountName: ci-operator
+  - agent: kubernetes
+    decorate: true
+    name: branch-ci-openshift-ci-operator-master-lint
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=lint
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.json
+              name: ci-operator-openshift-ci-operator
+        image: ci-operator:latest
+      serviceAccountName: ci-operator
+  - agent: kubernetes
+    decorate: true
+    labels:
+      artifacts: images
+    name: branch-ci-openshift-ci-operator-master-images
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=[images]
+        - --promote
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.json
+              name: ci-operator-openshift-ci-operator
+        image: ci-operator:latest
+      serviceAccountName: ci-operator

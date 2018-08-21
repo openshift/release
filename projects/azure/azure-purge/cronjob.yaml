@@ -5,37 +5,38 @@ metadata:
   namespace: azure
 spec:
   schedule: "0 15 * * *" 
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 2
   jobTemplate:             
     spec:
       template:
         metadata:
-          labels:          
+          labels:
             name: azure-purge
         spec:
-          successfulJobsHistoryLimit: 3 
-          failedJobsHistoryLimit: 2     
           containers:
           - name: azure-purge
-            image: registry.svc.ci.openshift.org/azure/azure-purge:latest
+            image: registry.svc.ci.openshift.org/azure/azure-misc:purge
             env:
             - name: AZURE_TENANT_ID
               valueFrom:
                 secretKeyRef:
-                  name: azure-credentials
+                  name: cluster-secrets-azure
                   key: azure_tenant_id
             - name: AZURE_SUBSCRIPTION_ID
               valueFrom:
                 secretKeyRef:
-                  name: azure-credentials
+                  name: cluster-secrets-azure
                   key: azure_subscription_id
             - name: AZURE_CLIENT_ID
               valueFrom:
                 secretKeyRef:
-                  name: azure-credentials
+                  name: cluster-secrets-azure
                   key: azure_client_id
             - name: AZURE_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: azure-credentials
+                  name: cluster-secrets-azure
                   key: azure_client_secret
           restartPolicy: Never

@@ -23,8 +23,9 @@ REF=${REF:-${BRANCH}}
 
 file="$( mktemp -t prowjobs )"
 
-for repo in "${MANAGED_REPOS[@]}"; do
-  if [[ "${2-}" != "" && "${2-}" != "${repo}" ]]; then
+# TODO: force all repos to normalize to a standard branch strategy (monitoring team)
+for repo in `python "${base}/lib/repos_with_job_labels.py" "${config}" "" "${BRANCH}" "artifacts" | sort`; do
+  if [[ -n "${2-}" && "${2-}" != "${repo}" ]]; then
     continue
   fi
 
@@ -38,7 +39,7 @@ for repo in "${MANAGED_REPOS[@]}"; do
   fi
 
   echo "${BRANCH} @ ${ref} | ${repo}"
-  if [[ "${1-}" == "" ]]; then
+  if [[ -z "${1-}" ]]; then
     continue
   fi
   if ! jobs="$( python "${base}/lib/jobs_with_labels.py" "${config}" "${repo}" "${BRANCH}" "artifacts" )"; then

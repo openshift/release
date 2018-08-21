@@ -147,10 +147,11 @@ prow-cluster-jobs:
 	oc create configmap cluster-profile-gcp-crio --from-file=cluster/test-deploy/gcp-crio/vars.yaml --from-file=cluster/test-deploy/gcp-crio/vars-origin.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap cluster-profile-gcp-ha --from-file=cluster/test-deploy/gcp/vars.yaml --from-file=cluster/test-deploy/gcp/vars-origin.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap cluster-profile-gcp-ha-static --from-file=cluster/test-deploy/gcp/vars.yaml --from-file=cluster/test-deploy/gcp/vars-origin.yaml -o yaml --dry-run | oc apply -f -
-	oc create configmap prow-job-cluster-launch-e2e --from-file=cluster/ci/config/prow/jobs/cluster-launch-e2e.yaml -o yaml --dry-run | oc apply -f -
-	oc create configmap prow-job-cluster-launch-src --from-file=cluster/ci/config/prow/jobs/cluster-launch-src.yaml -o yaml --dry-run | oc apply -f -
-	oc create configmap prow-job-cluster-launch-installer-e2e --from-file=cluster/ci/config/prow/jobs/cluster-launch-installer-e2e.yaml -o yaml --dry-run | oc apply -f -
-	oc create configmap prow-job-master-sidecar --from-file=cluster/ci/config/prow/jobs/master-sidecar.yaml -o yaml --dry-run | oc apply -f -
+	oc create configmap prow-job-cluster-launch-e2e --from-file=ci-operator/templates/cluster-launch-e2e.yaml -o yaml --dry-run | oc apply -f -
+	oc create configmap prow-job-cluster-launch-e2e-gmontero-testing --from-file=ci-operator/templates/cluster-launch-e2e-gmontero-testing.yaml -o yaml --dry-run | oc apply -f -
+	oc create configmap prow-job-cluster-launch-src --from-file=ci-operator/templates/cluster-launch-src.yaml -o yaml --dry-run | oc apply -f -
+	oc create configmap prow-job-cluster-launch-installer-e2e --from-file=ci-operator/templates/cluster-launch-installer-e2e.yaml -o yaml --dry-run | oc apply -f -
+	oc create configmap prow-job-master-sidecar --from-file=ci-operator/templates/master-sidecar.yaml -o yaml --dry-run | oc apply -f -
 .PHONY: prow-cluster-jobs
 
 prow-rpm-mirrors:
@@ -168,11 +169,11 @@ prow-rpm-mirrors-secrets:
 prow-jobs: prow-cluster-jobs prow-rpm-mirrors
 	$(MAKE) applyTemplate WHAT=cluster/ci/jobs/commenter.yaml
 	$(MAKE) apply WHAT=projects/prometheus/test/build.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/jobs/os.yaml
+	$(MAKE) apply WHAT=ci-operator/templates/os.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/ci-operator/roles.yaml
 .PHONY: prow-jobs
 
-projects: gcsweb kube-state-metrics oauth-proxy origin origin-stable origin-release prometheus test-bases image-mirror-setup image-pruner-setup node-problem-detector publishing-bot image-registry-publishing-bot content-mirror service-idler acs-engine
+projects: gcsweb kube-state-metrics oauth-proxy origin origin-stable origin-release prometheus test-bases image-mirror-setup image-pruner-setup node-problem-detector publishing-bot image-registry-publishing-bot content-mirror service-idler azure
 .PHONY: projects
 
 ci-operator-config:
@@ -276,18 +277,28 @@ pod-utils:
 .PHONY: pod-utils
 
 azure:
-	$(MAKE) apply WHAT=projects/azure/rbac.yaml 
-	oc create secret generic azure-credentials --from-literal=azure_client_id=${AZURE_CLIENT_ID} --from-literal=azure_client_secret=${AZURE_CLIENT_SECRET} --from-literal=azure_tenant_id=${AZURE_TENANT_ID} --from-literal=azure_subscription_id=${AZURE_SUBSCRIPTION_ID} -n azure 
-	oc create secret generic aws-reg-master --from-literal=username=${AWS_REG_USERNAME} --from-literal=password=${AWS_REG_PASSWORD} -n azure 
+	# set up azure namespace and policies
+	$(MAKE) apply WHAT=projects/azure/cluster-wide.yaml
+	$(MAKE) apply WHAT=projects/azure/rbac.yaml
+	# ci namespace objects
+	oc create secret generic cluster-secrets-azure --from-file=cluster/test-deploy/azure/secret -o yaml --dry-run | oc apply -n ci -f -
+	oc create configmap prow-job-cluster-launch-e2e-azure --from-file=ci-operator/templates/cluster-launch-e2e-azure.yaml -o yaml --dry-run | oc apply -n ci -f -
+	
+	# azure namespace objects
+	oc create secret generic cluster-secrets-azure --from-literal=azure_client_id=${AZURE_CLIENT_ID} --from-literal=azure_client_secret=${AZURE_CLIENT_SECRET} --from-literal=azure_tenant_id=${AZURE_TENANT_ID} --from-literal=azure_subscription_id=${AZURE_SUBSCRIPTION_ID} -o yaml --dry-run | oc apply -n azure -f -
+	oc create secret generic aws-reg-master --from-literal=username=${AWS_REG_USERNAME} --from-literal=password=${AWS_REG_PASSWORD} -o yaml --dry-run | oc apply -n azure -f -
+	oc create secret generic hmac-token --from-literal=hmac=${HMAC_TOKEN} -o yaml --dry-run | oc apply -n azure -f -
+	oc create secret generic oauth-token --from-literal=oauth=${OAUTH_TOKEN} -o yaml --dry-run | oc apply -n azure -f -
+	# the rest of the config
 	$(MAKE) apply WHAT=projects/azure/acs-engine/binary-build.yaml
-	$(MAKE) apply WHAT=projects/azure/azure-cicd/
 	$(MAKE) apply WHAT=projects/azure/acs-engine/test-image-builds/
 	$(MAKE) apply WHAT=projects/azure/azure-purge/
+	$(MAKE) apply WHAT=projects/azure/base-images/
+	$(MAKE) apply WHAT=projects/azure/config-updater/
+	$(MAKE) apply WHAT=projects/azure/token-refresh/
 .PHONY: azure
 
 check:
-	# perform basic check on the jobs
-	python hack/lib/check_jobs.py cluster/ci/config/prow/config.yaml
 	# test that the prow config is parseable
-	mkpj --config-path cluster/ci/config/prow/config.yaml --job branch-ci-origin-images --base-ref master --base-sha abcdef
+	mkpj --config-path cluster/ci/config/prow/config.yaml --job-config-path ci-operator/jobs/ --job branch-ci-origin-images --base-ref master --base-sha abcdef
 .PHONY: check

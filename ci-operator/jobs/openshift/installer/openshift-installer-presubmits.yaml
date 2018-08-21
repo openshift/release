@@ -1,0 +1,222 @@
+presubmits:
+  openshift/installer:
+  - name: pull-ci-origin-installer-unit
+    agent: kubernetes
+    context: ci/prow/unit
+    branches:
+    - master
+    rerun_command: "/test unit"
+    always_run: true
+    trigger: "((?m)^/test( all| unit),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-installer
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=unit
+
+  - name: pull-ci-origin-installer-e2e-aws
+    agent: kubernetes
+    context: ci/prow/e2e-aws
+    branches:
+    - master
+    - dockerless-build-temporary
+    rerun_command: "/test e2e-aws"
+    # The abomination below is equivilent to `^((?!Documentation).)*$`. Since
+    # Go doesn't support negative lookaheads, we are stuck with the following.
+    run_if_changed: "^([^D]|D(D|oD|ocD|ocuD|ocum(D|e(D|n(D|t(D|aD|atD|atiD|atioD)))))*([^Do]|o[^Dc]|oc[^Du]|ocu[^Dm]|ocum([^De]|e([^Dn]|n([^Dt]|t([^Da]|a[^Dt]|at[^Di]|ati[^Do]|atio[^Dn]))))))*(D(D|oD|ocD|ocuD|ocum(D|e(D|n(D|t(D|aD|atD|atiD|atioD)))))*(o|oc|ocu|ocum(e(n(t(a|at|ati|atio)?)?)?)?)?)?$"
+    trigger: "((?m)^/test( all| e2e-aws),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      volumes:
+      - name: job-definition
+        configMap:
+          name: prow-job-cluster-launch-installer-e2e
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+          - configMap:
+              name: cluster-profile-aws
+      containers:
+      - name: test
+        image: ci-operator:latest
+        volumeMounts:
+        - name: job-definition
+          mountPath: /usr/local/e2e-aws
+          subPath: cluster-launch-installer-e2e.yaml
+        - name: cluster-profile
+          mountPath: /usr/local/e2e-aws-cluster-profile
+        env:
+        - name: TEST_FOCUS
+          value: "The HAProxy router should set Forwarded headers appropriately"
+        - name: JOB_NAME_SAFE
+          value: e2e-aws
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-installer
+              key: master.json
+        command:
+        - ci-operator
+        - --artifact-dir=$(ARTIFACTS)
+        - --secret-dir=/usr/local/e2e-aws-cluster-profile
+        - --template=/usr/local/e2e-aws
+        - --target=e2e-aws
+
+  - name: ci-pull-openshift-installer-yaml-lint
+    trigger: "(?m)^/test yaml-lint"
+    rerun_command: "/test yaml-lint"
+    context: ci/prow/yaml-lint
+    always_run: true
+    skip_report: false
+    agent: kubernetes
+    decorate: true
+    spec:
+      containers:
+      - image: quay.io/coreos/yamllint
+        env:
+        - name: IS_CONTAINER
+          value: 'TRUE'
+        command:
+          - sh
+        args:
+          - ./hack/yaml-lint.sh
+
+  - name: ci-pull-openshift-installer-tf-lint
+    trigger: "(?m)^/test tf-lint"
+    rerun_command: "/test tf-lint"
+    context: ci/prow/tf-lint
+    always_run: true
+    skip_report: false
+    agent: kubernetes
+    decorate: true
+    spec:
+      containers:
+      - image: quay.io/coreos/tflint
+        env:
+        - name: IS_CONTAINER
+          value: 'TRUE'
+        command:
+          - sh
+        args:
+          - ./hack/tf-lint.sh
+
+  - name: ci-pull-openshift-installer-shellcheck
+    trigger: "(?m)^/test shellcheck"
+    rerun_command: "/test shellcheck"
+    context: ci/prow/shellcheck
+    always_run: true
+    skip_report: false
+    agent: kubernetes
+    decorate: true
+    spec:
+      containers:
+      - image: quay.io/coreos/shellcheck-alpine:v0.5.0
+        env:
+        - name: IS_CONTAINER
+          value: "TRUE"
+        command:
+        - sh
+        args:
+        - ./hack/shellcheck.sh
+
+  - name: pull-ci-origin-installer-tf-fmt
+    trigger: "((?m)^/test( all| tf-fmt),?(\\s+|$))"
+    rerun_command: "/test tf-fmt"
+    context: ci/prow/tf-fmt
+    always_run: true
+    agent: kubernetes
+    decorate: true
+    spec:
+      containers:
+      - image: quay.io/coreos/terraform-alpine:v0.11.7
+        env:
+        - name: IS_CONTAINER
+          value: 'TRUE'
+        command:
+        - sh
+        args:
+        - ./hack/tf-fmt.sh
+
+  - name: ci-pull-openshift-installer-bazel-build-tarball
+    trigger: "(?m)^/test build-tarball"
+    rerun_command: "/test build-tarball"
+    context: ci/prow/build-tarball
+    always_run: true
+    skip_report: false
+    agent: kubernetes
+    decorate: true
+    spec:
+      containers:
+      - image: quay.io/coreos/tectonic-builder:bazel-v0.3
+        env:
+        - name: HOME
+          value: /tmp
+        - name: IS_CONTAINER
+          value: "TRUE"
+        - name: USER
+          value: bazel
+        command:
+        - sh
+        args:
+        - ./hack/test-bazel-build-tarball.sh
+        - --action_env=HOME=/tmp
+
+  - name: ci-pull-openshift-installer-go-vet
+    trigger: "(?m)^/test go-vet"
+    rerun_command: "/test go-vet"
+    context: ci/prow/go-vet
+    always_run: true
+    skip_report: false
+    agent: kubernetes
+    decorate: true
+    spec:
+      containers:
+      - image: quay.io/coreos/golang-testing
+        env:
+        - name: IS_CONTAINER
+          value: 'TRUE'
+        command:
+        - sh
+        args:
+        - ./hack/go-vet.sh
+        - ./...
+
+  - name: ci-pull-openshift-installer-golint
+    trigger: "(?m)^/test golint"
+    rerun_command: "/test golint"
+    context: ci/prow/golint
+    always_run: true
+    skip_report: false
+    agent: kubernetes
+    decorate: true
+    spec:
+      containers:
+      - image: quay.io/coreos/golang-testing
+        env:
+        - name: IS_CONTAINER
+          value: "TRUE"
+        command:
+        - sh
+        args:
+        - ./hack/go-lint.sh
+        - installer/...
+        - tests/smoke
