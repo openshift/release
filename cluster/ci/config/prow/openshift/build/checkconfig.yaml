@@ -4,50 +4,11 @@ items:
 - kind: ImageStream
   apiVersion: v1
   metadata:
-    name: "checkconfig"
-- kind: BuildConfig
-  apiVersion: v1
-  metadata:
-    name: "checkconfig-binaries"
-    labels:
-      ci.openshift.io/source-repo: test-infra
-  spec:
-    successfulBuildsHistoryLimit: 1
-    failedBuildsHistoryLimit: 2
-    output:
-      to:
-        kind: ImageStreamTag
-        name: "checkconfig:binaries"
-    source:
-      git:
-        uri: https://github.com/openshift/test-infra.git
-        ref: "master"
-      type: Git
-      dockerfile: |
-        FROM docker.io/golang:1.10.0
-
-        COPY . /go/src/k8s.io/test-infra
-        RUN cd /go/src/k8s.io/test-infra && \
-            cd prow && \
-            CGO_ENABLED=0 go install ./cmd/... && \
-            rm -rf /go/src /go/pkg
-    strategy:
-      dockerStrategy:
-        from:
-          kind: DockerImage
-          name: docker.io/golang:1.10.0
-        imageOptimizationPolicy: SkipLayers
-    triggers:
-    - type: ConfigChange
-    - type: GitHub
-      github:
-        secretReference:
-          name: github-deploymentconfig-trigger
-
+    name: checkconfig
 - apiVersion: v1
   kind: BuildConfig
   metadata:
-    name: "checkconfig"
+    name: checkconfig
     labels:
       ci.openshift.io/source-repo: test-infra
   spec:
@@ -56,25 +17,25 @@ items:
     output:
       to:
         kind: ImageStreamTag
-        name: "checkconfig:latest"
+        name: checkconfig:latest
     source:
       git:
         uri: https://github.com/openshift/test-infra.git
-        ref: "master"
+        ref: master
       images:
       - from:
           kind: ImageStreamTag
-          name: "checkconfig:binaries"
+          name: test-infra:binaries
         paths:
         - destinationDir: .
-          sourcePath: "/go/bin/checkconfig"
+          sourcePath: /go/bin/checkconfig
     strategy:
       dockerStrategy:
         imageOptimizationPolicy: SkipLayers
-        dockerfilePath: "prow/cmd/checkconfig/Dockerfile"
+        dockerfilePath: prow/cmd/checkconfig/Dockerfile
     triggers:
     - imageChange:
         from:
           kind: ImageStreamTag
-          name: "checkconfig:binaries"
+          name: test-infra:binaries
       type: ImageChange
