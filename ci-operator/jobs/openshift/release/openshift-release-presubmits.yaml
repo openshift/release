@@ -17,6 +17,7 @@ presubmits:
     rerun_command: "/test config"
     trigger: ((?m)^/test( all| config),?(\\s+|$))
     decorate: true
+    always_run: true
     spec:
       containers:
       - image: checkconfig:latest
@@ -26,3 +27,19 @@ presubmits:
         - --config-path ./cluster/ci/config/prow/config.yaml
         - --job-config-path ./ci-operator/jobs/
         - --plugin-config ./cluster/ci/config/prow/plugins.yaml
+  - name: pull-ci-openshift-release-master-ci-operator-config
+    agent: kubernetes
+    context: ci/prow/ci-operator-config
+    branches:
+    - master
+    rerun_command: "/test ci-operator-config"
+    trigger: ((?m)^/test( all| ci-operator-config),?(\\s+|$))
+    decorate: true
+    always_run: true
+    spec:
+      containers:
+      - image: ci-operator-checkconfig:latest
+        command:
+        - /ci-operator-checkconfig
+        args:
+        - --config-dir ./ci-operator/config/
