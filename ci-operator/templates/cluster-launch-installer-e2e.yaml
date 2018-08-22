@@ -81,6 +81,8 @@ objects:
       env:
       - name: HOME
         value: /tmp/home
+      - name: KUBECONFIG
+        value: /tmp/admin.kubeconfig
       command:
       - /bin/bash
       - -c
@@ -111,7 +113,6 @@ objects:
 
         # don't let clients impact the global kubeconfig
         cp /tmp/shared/admin.kubeconfig /tmp/admin.kubeconfig
-        export KUBECONFIG=/tmp/admin.kubeconfig
 
         PATH=/usr/libexec/origin:$PATH
 
@@ -172,6 +173,10 @@ objects:
         value: ${NAMESPACE}-${JOB_NAME_HASH}
       - name: TYPE
         value: ${CLUSTER_TYPE}
+      - name: AWS_SHARED_CREDENTIALS_FILE
+        value: /etc/openshift-installer/.awscred
+      - name: KUBECONFIG
+        value: /tmp/cluster/generated/auth/kubeconfig
       command:
       - /bin/bash
       - -c
@@ -185,7 +190,6 @@ objects:
         mkdir /tmp/cluster
         cp /etc/openshift-installer/* /tmp/cluster/
 
-        export AWS_SHARED_CREDENTIALS_FILE=/etc/openshift-installer/.awscred
         export NAME=${INSTANCE_PREFIX}
         (
           export EMAIL=test@ci.openshift.io
@@ -207,7 +211,6 @@ objects:
 
         tectonic install --dir=. --log-level=debug
 
-        export KUBECONFIG=$(pwd)/generated/auth/kubeconfig
         # wait until oc shows up
         while true; do
           if [[ -f /tmp/exit ]]; then
@@ -239,7 +242,7 @@ objects:
           fi
           break
         done
-        if ! /tmp/oc wait deploy/router -n "${router_namespace}" --for condition=available --timeout=5m; then
+        if ! /tmp/oc wait deploy/router -n "${router_namespace}" --for condition=available --timeout=20m; then
           echo "Installation failed"
           cp $KUBECONFIG /tmp/admin.kubeconfig
           exit 1
@@ -262,6 +265,8 @@ objects:
         value: ${NAMESPACE}-${JOB_NAME_HASH}
       - name: TYPE
         value: ${CLUSTER_TYPE}
+      - name: KUBECONFIG
+        value: /tmp/shared/admin.kubeconfig
       command:
       - /bin/bash
       - -c
@@ -273,7 +278,6 @@ objects:
           export PATH=$PATH:/tmp/shared
 
           echo "Gathering artifacts ..."
-          export KUBECONFIG=/tmp/shared/admin.kubeconfig
           mkdir -p /tmp/artifacts/pods /tmp/artifacts/nodes /tmp/artifacts/metrics
 
           oc --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' > /tmp/nodes
