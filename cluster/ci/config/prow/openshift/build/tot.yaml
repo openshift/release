@@ -1,62 +1,14 @@
 apiVersion: v1
-kind: Template
-parameters:
-- name: SOURCE_URL
-  displayName: Source URL
-  description: Git source URL to use for building the image
-  value: https://github.com/openshift/test-infra.git
-- name: SOURCE_REF
-  displayName: Source reference
-  description: Git source ref to use for building the image
-  value: master
-objects:
+kind: List
+items:
 - kind: ImageStream
   apiVersion: v1
   metadata:
-    name: "tot"
-- kind: BuildConfig
-  apiVersion: v1
-  metadata:
-    name: "tot-binaries"
-    labels:
-      ci.openshift.io/source-repo: test-infra
-  spec:
-    successfulBuildsHistoryLimit: 1
-    failedBuildsHistoryLimit: 2
-    output:
-      to:
-        kind: ImageStreamTag
-        name: "tot:binaries"
-    source:
-      git:
-        uri: "${SOURCE_URL}"
-        ref: "${SOURCE_REF}"
-      type: Git
-      dockerfile: |
-        FROM docker.io/golang:1.10.0
-
-        COPY . /go/src/k8s.io/test-infra
-        RUN cd /go/src/k8s.io/test-infra && \
-            cd prow && \
-            CGO_ENABLED=0 go install ./cmd/... && \
-            rm -rf /go/src /go/pkg
-    strategy:
-      dockerStrategy:
-        from:
-          kind: DockerImage
-          name: docker.io/golang:1.10.0
-        imageOptimizationPolicy: SkipLayers
-    triggers:
-    - type: ConfigChange
-    - type: GitHub
-      github:
-        secretReference:
-          name: github-deploymentconfig-trigger
-
+    name: tot
 - apiVersion: v1
   kind: BuildConfig
   metadata:
-    name: "tot"
+    name: tot
     labels:
       ci.openshift.io/source-repo: test-infra
   spec:
@@ -65,25 +17,25 @@ objects:
     output:
       to:
         kind: ImageStreamTag
-        name: "tot:latest"
+        name: tot:latest
     source:
       git:
-        uri: "${SOURCE_URL}"
-        ref: "${SOURCE_REF}"
+        uri: https://github.com/openshift/test-infra.git
+        ref: master
       images:
       - from:
           kind: ImageStreamTag
-          name: "tot:binaries"
+          name: test-infra:binaries
         paths:
         - destinationDir: .
-          sourcePath: "/go/bin/tot"
+          sourcePath: /go/bin/tot
     strategy:
       dockerStrategy:
         imageOptimizationPolicy: SkipLayers
-        dockerfilePath: "prow/cmd/tot/Dockerfile"
+        dockerfilePath: prow/cmd/tot/Dockerfile
     triggers:
     - imageChange:
         from:
           kind: ImageStreamTag
-          name: "tot:binaries"
+          name: test-infra:binaries
       type: ImageChange
