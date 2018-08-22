@@ -78,20 +78,21 @@ prow-secrets:
 .PHONY: prow-secrets
 
 prow-builds:
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/cherrypick.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/binaries.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/cherrypick.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/checkconfig.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/deck.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/hook.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/horologium.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/jenkins_operator.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/needs_rebase.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/plank.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/refresh.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/sinker.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/tide.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/tot.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/build/tracer.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/config-updater/build.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/deck.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/hook.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/horologium.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/jenkins_operator.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/needs_rebase.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/plank.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/refresh.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/sinker.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/tide.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/tot.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/tracer.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/config-updater/build.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/ci-operator/build.yaml
 	$(MAKE) apply WHAT=tools/pod-utils/artifact-uploader.yaml
 	$(MAKE) apply WHAT=tools/pod-utils/clonerefs.yaml
