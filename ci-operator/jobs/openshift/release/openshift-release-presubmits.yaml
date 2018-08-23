@@ -47,3 +47,18 @@ presubmits:
         args:
         - --config-dir
         - ./ci-operator/config/
+  - name: pull-ci-openshift-release-master-generated-config
+    agent: kubernetes
+    context: ci/prow/generated-config
+    branches:
+    - master
+    rerun_command: "/test generated-config"
+    trigger: ((?m)^/test( all| generated-config),?(\\s+|$))
+    decorate: true
+    always_run: true
+    skip_report: true
+    spec:
+      containers:
+      - image: ci-operator-prowgen:latest
+        command:
+        - hack/validate-generated-config.sh
