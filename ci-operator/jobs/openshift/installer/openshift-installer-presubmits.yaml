@@ -32,7 +32,6 @@ presubmits:
     context: ci/prow/e2e-aws
     branches:
     - master
-    - dockerless-build-temporary
     rerun_command: "/test e2e-aws"
     # The abomination below is equivilent to `^((?!Documentation).)*$`. Since
     # Go doesn't support negative lookaheads, we are stuck with the following.
@@ -64,7 +63,7 @@ presubmits:
           mountPath: /usr/local/e2e-aws-cluster-profile
         env:
         - name: TEST_FOCUS
-          value: "The HAProxy router should set Forwarded headers appropriately"
+          value: "Secrets should be consumable from pods in volume with defaultMode set"
         - name: JOB_NAME_SAFE
           value: e2e-aws
         - name: CLUSTER_TYPE
@@ -80,6 +79,59 @@ presubmits:
         - --secret-dir=/usr/local/e2e-aws-cluster-profile
         - --template=/usr/local/e2e-aws
         - --target=e2e-aws
+
+  - name: pull-ci-origin-installer-e2e-aws-all
+    agent: kubernetes
+    context: ci/prow/e2e-aws-all
+    branches:
+    - master
+    rerun_command: "/test e2e-aws-all"
+    always_run: false
+    trigger: "((?m)^/test( e2e-aws-all),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      volumes:
+      - name: job-definition
+        configMap:
+          name: prow-job-cluster-launch-installer-e2e
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+          - configMap:
+              name: cluster-profile-aws
+      containers:
+      - name: test
+        image: ci-operator:latest
+        volumeMounts:
+        - name: job-definition
+          mountPath: /usr/local/e2e-aws-all
+          subPath: cluster-launch-installer-e2e.yaml
+        - name: cluster-profile
+          mountPath: /usr/local/e2e-aws-cluster-profile
+        env:
+        - name: TEST_FOCUS
+          value: Suite:openshift/conformance/parallel
+        - name: TEST_FOCUS_SERIAL
+          value: Suite:openshift/registry/serial
+        - name: JOB_NAME_SAFE
+          value: e2e-aws-all
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-installer
+              key: master.json
+        command:
+        - ci-operator
+        - --artifact-dir=$(ARTIFACTS)
+        - --secret-dir=/usr/local/e2e-aws-cluster-profile
+        - --template=/usr/local/e2e-aws-all
+        - --target=e2e-aws-all
 
   - name: ci-pull-openshift-installer-yaml-lint
     trigger: "(?m)^/test yaml-lint"
