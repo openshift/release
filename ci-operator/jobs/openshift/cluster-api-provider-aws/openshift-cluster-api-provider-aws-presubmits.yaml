@@ -1,0 +1,29 @@
+presubmits:
+  openshift/cluster-api-provider-aws:
+  - name: pull-ci-origin-cluster-api-provider-aws-unit
+    agent: kubernetes
+    context: ci/prow/unit
+    branches:
+    - master
+    rerun_command: "/test unit"
+    always_run: true
+    trigger: "((?m)^/test( all| unit),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-cluster-api-provider-aws
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=unit
+        - --target=[images]
