@@ -1,112 +1,84 @@
 presubmits:
   openshift/descheduler:
-  - name: pull-ci-kubernetes-descheduler-unit
-    agent: kubernetes
-    context: ci/prow/unit
+  - agent: kubernetes
+    always_run: true
     branches:
     - master
-    rerun_command: "/test unit"
-    always_run: true
-    trigger: "((?m)^/test( all| unit),?(\\s+|$))"
-    decorate: true
-    skip_cloning: true
-    spec:
-      serviceAccountName: ci-operator
-      containers:
-      - name: test
-        image: ci-operator:latest
-        resources: {"requests": {"cpu": "10m"},"limits":{"cpu":"500m"}}
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              name: ci-operator-kubernetes-descheduler
-              key: master.json
-        command:
-        - ci-operator
-        args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --target=unit
-        - --target=[images]
-  - name: pull-ci-kubernetes-descheduler-unit-3.10
-    agent: kubernetes
     context: ci/prow/unit
-    branches:
-    - release-3.10
-    rerun_command: "/test unit"
-    always_run: true
-    trigger: "((?m)^/test( all| unit),?(\\s+|$))"
     decorate: true
+    name: pull-ci-kubernetes-descheduler-unit
+    rerun_command: /test unit
     skip_cloning: true
     spec:
-      serviceAccountName: ci-operator
       containers:
-      - name: test
-        image: ci-operator:latest
-        resources: {"requests": {"cpu": "10m"},"limits":{"cpu":"500m"}}
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              name: ci-operator-kubernetes-descheduler
-              key: release-3.10.json
-        command:
-        - ci-operator
-        args:
+      - args:
         - --artifact-dir=$(ARTIFACTS)
         - --target=unit
         - --target=[images]
-  - name: pull-ci-kubernetes-descheduler-e2e-gce-3.10
-    agent: kubernetes
-    always_run: true
-    context: ci/prow/e2e
-    branches:
-    - release-3.10
-    rerun_command: "/test e2e"
-    trigger: "((?m)^/test( all| e2e),?(\\s+|$))"
-    decorate: true
-    skip_cloning: true
-    spec:
-      serviceAccountName: ci-operator
-      volumes:
-      - name: job-definition
-        configMap:
-          name: prow-job-cluster-launch-src
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
-      containers:
-      - name: test
-        image: ci-operator:latest
-        resources: {"requests": {"cpu": "10m"},"limits":{"cpu":"500m"}}
-        volumeMounts:
-        - name: job-definition
-          mountPath: /usr/local/e2e-gcp
-          subPath: cluster-launch-src.yaml
-        - name: cluster-profile
-          mountPath: /usr/local/kubernetes-descheduler-e2e-cluster-profile
+        command:
+        - ci-operator
         env:
-        - name: JOB_NAME_SAFE
-          value: kubernetes-descheduler-e2e
-        - name: CLUSTER_TYPE
-          value: gcp
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
+              key: master.json
               name: ci-operator-kubernetes-descheduler
-              key: release-3.10.json
-        - name: TEST_COMMAND
-          value: "cp /tmp/admin.kubeconfig /tmp/admin.conf && make test-e2e"
-        - name: RPM_REPO_BASEURL_REF
-          value: https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/release-3.10/.latest-rpms
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| unit),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-3.10
+    context: ci/prow/unit
+    decorate: true
+    name: pull-ci-kubernetes-descheduler-unit-3.10
+    rerun_command: /test unit
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=unit
+        - --target=[images]
         command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: release-3.10.json
+              name: ci-operator-kubernetes-descheduler
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| unit),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-3.10
+    context: ci/prow/e2e
+    decorate: true
+    name: pull-ci-kubernetes-descheduler-e2e-gce-3.10
+    rerun_command: /test e2e
+    skip_cloning: true
+    spec:
+      containers:
+      - command:
         - /bin/bash
         - -c
-        - |
+        - |-
           #!/bin/bash
           set -e
           export RPM_REPO="$( curl -q "${RPM_REPO_BASEURL_REF}" 2>/dev/null)"
@@ -115,3 +87,43 @@ presubmits:
             --secret-dir=/usr/local/kubernetes-descheduler-e2e-cluster-profile \
             --template=/usr/local/e2e-gcp \
             --target=e2e-gcp
+        env:
+        - name: JOB_NAME_SAFE
+          value: kubernetes-descheduler-e2e
+        - name: CLUSTER_TYPE
+          value: gcp
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: release-3.10.json
+              name: ci-operator-kubernetes-descheduler
+        - name: TEST_COMMAND
+          value: cp /tmp/admin.kubeconfig /tmp/admin.conf && make test-e2e
+        - name: RPM_REPO_BASEURL_REF
+          value: https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/release-3.10/.latest-rpms
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-gcp
+          name: job-definition
+          subPath: cluster-launch-src.yaml
+        - mountPath: /usr/local/kubernetes-descheduler-e2e-cluster-profile
+          name: cluster-profile
+      serviceAccountName: ci-operator
+      volumes:
+      - configMap:
+          name: prow-job-cluster-launch-src
+        name: job-definition
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+    trigger: ((?m)^/test( all| e2e),?(\s+|$))

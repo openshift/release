@@ -1,37 +1,26 @@
 periodics:
-- name: ami_build_origin_int_rhel_base
-  agent: jenkins
+- agent: jenkins
+  cron: ""
+  interval: 24h
   labels:
-      master: ci.openshift.redhat.com
-  interval: 24h
-- name: periodic-ci-origin-conformance-k8s
-  interval: 24h
-  agent: kubernetes
+    master: ci.openshift.redhat.com
+  name: ami_build_origin_int_rhel_base
+- agent: kubernetes
+  cron: ""
   decorate: true
+  interval: 24h
+  name: periodic-ci-origin-conformance-k8s
   skip_cloning: true
   spec:
-    serviceAccountName: ci-operator
-    volumes:
-    - name: job-definition
-      configMap:
-        name: prow-job-cluster-launch-src
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-gcp
-        - configMap:
-            name: cluster-profile-gcp
     containers:
-    - name: test
-      image: ci-operator:latest
-      resources: {"requests": {"cpu": "10m"},"limits":{"cpu":"500m"}}
-      volumeMounts:
-      - name: job-definition
-        mountPath: /usr/local/e2e-gcp
-        subPath: cluster-launch-src.yaml
-      - name: cluster-profile
-        mountPath: /usr/local/e2e-gcp-cluster-profile
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --secret-dir=/usr/local/e2e-gcp-cluster-profile
+      - --template=/usr/local/e2e-gcp
+      - --target=e2e-gcp
+      - --git-ref=openshift/origin@master
+      command:
+      - ci-operator
       env:
       - name: TEST_COMMAND
         value: test/extended/conformance-k8s.sh
@@ -42,66 +31,93 @@ periodics:
       - name: CONFIG_SPEC
         valueFrom:
           configMapKeyRef:
-            name: ci-operator-openshift-origin
             key: master.json
+            name: ci-operator-openshift-origin
       - name: OVERRIDE_SPEC
-        value: '{"test_base_image": {"cluster": "", "namespace": "ci", "name": "src-cache-origin", "tag": "master"}}'
-      command:
-      - ci-operator
-      args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --secret-dir=/usr/local/e2e-gcp-cluster-profile
-      - --template=/usr/local/e2e-gcp
-      - --target=e2e-gcp
-      - --git-ref=openshift/origin@master
-
-- name: test_branch_origin_extended_conformance_k8s_310
-  agent: jenkins
-  labels:
-      master: ci.openshift.redhat.com
+        value: '{"test_base_image": {"cluster": "", "namespace": "ci", "name": "src-cache-origin",
+          "tag": "master"}}'
+      image: ci-operator:latest
+      name: test
+      resources:
+        limits:
+          cpu: 500m
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/e2e-gcp
+        name: job-definition
+        subPath: cluster-launch-src.yaml
+      - mountPath: /usr/local/e2e-gcp-cluster-profile
+        name: cluster-profile
+    serviceAccountName: ci-operator
+    volumes:
+    - configMap:
+        name: prow-job-cluster-launch-src
+      name: job-definition
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-gcp
+        - configMap:
+            name: cluster-profile-gcp
+- agent: jenkins
+  cron: ""
   interval: 24h
-- name: test_branch_origin_extended_builds
-  agent: jenkins
   labels:
-      master: ci.openshift.redhat.com
+    master: ci.openshift.redhat.com
+  name: test_branch_origin_extended_conformance_k8s_310
+- agent: jenkins
+  cron: ""
   interval: 24h
-- name: test_branch_origin_extended_clusterup
-  agent: jenkins
   labels:
-      master: ci.openshift.redhat.com
+    master: ci.openshift.redhat.com
+  name: test_branch_origin_extended_builds
+- agent: jenkins
+  cron: ""
   interval: 24h
-- name: test_branch_origin_extended_gssapi
-  agent: jenkins
   labels:
-      master: ci.openshift.redhat.com
+    master: ci.openshift.redhat.com
+  name: test_branch_origin_extended_clusterup
+- agent: jenkins
+  cron: ""
   interval: 24h
-- name: test_branch_origin_extended_image_ecosystem
-  agent: jenkins
   labels:
-      master: ci.openshift.redhat.com
+    master: ci.openshift.redhat.com
+  name: test_branch_origin_extended_gssapi
+- agent: jenkins
+  cron: ""
   interval: 24h
-- name: test_branch_origin_extended_image_registry
-  agent: jenkins
   labels:
-      master: ci.openshift.redhat.com
+    master: ci.openshift.redhat.com
+  name: test_branch_origin_extended_image_ecosystem
+- agent: jenkins
+  cron: ""
   interval: 24h
-- name: test_branch_origin_extended_ldap_groups
-  agent: jenkins
   labels:
-      master: ci.openshift.redhat.com
+    master: ci.openshift.redhat.com
+  name: test_branch_origin_extended_image_registry
+- agent: jenkins
+  cron: ""
   interval: 24h
-- name: test_branch_origin_extended_networking
-  agent: jenkins
   labels:
-      master: ci.openshift.redhat.com
+    master: ci.openshift.redhat.com
+  name: test_branch_origin_extended_ldap_groups
+- agent: jenkins
+  cron: ""
   interval: 24h
-- name: ci-kubernetes-conformance-node-e2e-rhel
-  agent: jenkins
   labels:
-      master: ci.openshift.redhat.com
+    master: ci.openshift.redhat.com
+  name: test_branch_origin_extended_networking
+- agent: jenkins
+  cron: ""
   interval: 2h
-- name: ci-kubernetes-conformance-node-e2e-containerized-rhel
-  agent: jenkins
   labels:
-      master: ci.openshift.redhat.com
+    master: ci.openshift.redhat.com
+  name: ci-kubernetes-conformance-node-e2e-rhel
+- agent: jenkins
+  cron: ""
   interval: 2h
+  labels:
+    master: ci.openshift.redhat.com
+  name: ci-kubernetes-conformance-node-e2e-containerized-rhel

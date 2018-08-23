@@ -1,47 +1,50 @@
 presubmits:
   openshift/ci-ns-ttl-controller:
-  - name: pull-ci-ns-ttl-controller-build
-    agent: kubernetes
+  - agent: kubernetes
+    always_run: true
     context: ci/prow/build
-    rerun_command: "/test build"
-    always_run: true
-    trigger: "((?m)^/test( all| build),?(\\s+|$))"
     decorate: true
+    name: pull-ci-ns-ttl-controller-build
+    rerun_command: /test build
     spec:
       containers:
-      - name: test
-        image: registry.svc.ci.openshift.org/openshift/release:golang-1.10
-        command:
-        - make
-        args:
+      - args:
         - build
-  - name: pull-ci-ns-ttl-controller-unit
-    agent: kubernetes
+        command:
+        - make
+        image: registry.svc.ci.openshift.org/openshift/release:golang-1.10
+        name: test
+        resources: {}
+    trigger: ((?m)^/test( all| build),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
     context: ci/prow/unit
-    rerun_command: "/test unit"
-    always_run: true
-    trigger: "((?m)^/test( all| unit),?(\\s+|$))"
     decorate: true
+    name: pull-ci-ns-ttl-controller-unit
+    rerun_command: /test unit
     spec:
       containers:
-      - name: test
-        image: registry.svc.ci.openshift.org/openshift/release:golang-1.10
+      - args:
+        - test
         command:
         - make
-        args:
-        - test
-  - name: pull-ci-ns-ttl-controller-lint
-    agent: kubernetes
+        image: registry.svc.ci.openshift.org/openshift/release:golang-1.10
+        name: test
+        resources: {}
+    trigger: ((?m)^/test( all| unit),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
     context: ci/prow/lint
-    rerun_command: "/test lint"
-    always_run: true
-    trigger: "((?m)^/test( all| lint),?(\\s+|$))"
     decorate: true
+    name: pull-ci-ns-ttl-controller-lint
+    rerun_command: /test lint
     spec:
       containers:
-      - name: test
-        image: registry.svc.ci.openshift.org/openshift/release:golang-1.10
+      - args:
+        - test
         command:
         - make
-        args:
-        - test
+        image: registry.svc.ci.openshift.org/openshift/release:golang-1.10
+        name: test
+        resources: {}
+    trigger: ((?m)^/test( all| lint),?(\s+|$))
