@@ -68,9 +68,9 @@ prow-secrets:
 	# REPO_MANAGEMENT_TOKEN is the token used by the mangement periodic job to manage repo configs
 	oc create secret generic repo-management-token --from-literal=oauth=${REPO_MANAGEMENT_TOKEN} -o yaml --dry-run | oc apply -f -
 	# gce.json is used by jobs operating against GCE
-	oc create secret generic cluster-secrets-gcp --from-file=cluster/test-deploy/gcp/gce.json --from-file=cluster/test-deploy/gcp/ssh-privatekey --from-file=cluster/test-deploy/gcp/ssh-publickey --from-file=cluster/test-deploy/gcp/ops-mirror.pem -o yaml --dry-run | oc apply -f -
+	oc create secret generic cluster-secrets-gcp --from-file=cluster/test-deploy/gcp/gce.json --from-file=cluster/test-deploy/gcp/ssh-privatekey --from-file=cluster/test-deploy/gcp/ssh-publickey --from-file=cluster/test-deploy/gcp/ops-mirror.pem --from-file=cluster/test-deploy/gcp/telemeter-token -o yaml --dry-run | oc apply -f -
 	# gce.json is used by jobs operating against AWS
-	oc create secret generic cluster-secrets-aws --from-file=cluster/test-deploy/aws/.awscred --from-file=cluster/test-deploy/aws/pull-secret --from-file=cluster/test-deploy/aws/license --from-file=cluster/test-deploy/aws/ssh-privatekey --from-file=cluster/test-deploy/aws/ssh-publickey -o yaml --dry-run | oc apply -f -
+	oc create secret generic cluster-secrets-aws --from-file=cluster/test-deploy/aws/.awscred --from-file=cluster/test-deploy/aws/pull-secret --from-file=cluster/test-deploy/aws/license --from-file=cluster/test-deploy/aws/ssh-privatekey --from-file=cluster/test-deploy/aws/ssh-publickey --from-file=cluster/test-deploy/aws/telemeter-token -o yaml --dry-run | oc apply -f -
 
 	# $DOCKERCONFIGJSON is the path to the json file
 	oc secrets new dockerhub ${DOCKERCONFIGJSON}
