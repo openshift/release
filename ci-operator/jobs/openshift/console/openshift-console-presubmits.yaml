@@ -1,57 +1,65 @@
 presubmits:
   openshift/console:
-  - name: pull-ci-console-backend
-    agent: kubernetes
+  - agent: kubernetes
+    always_run: true
     branches:
     - master
     - dockerless-build-temporary
     context: ci/prow/backend
-    rerun_command: "/test backend"
-    always_run: true
-    trigger: "((?m)^/test( all| backend),?(\\s+|$))"
     decorate: true
+    name: pull-ci-console-backend
+    rerun_command: /test backend
     spec:
-      serviceAccountName: ci-operator
       containers:
-      - name: test
-        image: ci-operator:latest
-        resources: {"requests": {"cpu": "10m"},"limits":{"cpu":"500m"}}
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=backend
+        - --target=[images]
+        command:
+        - ci-operator
         env:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              name: ci-operator-openshift-console
               key: master.json
-        command:
-        - ci-operator
-        args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --target=backend
-        - --target=[images]
-  - name: pull-ci-console-frontend
-    agent: kubernetes
+              name: ci-operator-openshift-console
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| backend),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
     branches:
     - master
     - dockerless-build-temporary
     context: ci/prow/frontend
-    rerun_command: "/test frontend"
-    always_run: true
-    trigger: "((?m)^/test( all| frontend),?(\\s+|$))"
     decorate: true
+    name: pull-ci-console-frontend
+    rerun_command: /test frontend
     spec:
-      serviceAccountName: ci-operator
       containers:
-      - name: test
-        image: ci-operator:latest
-        resources: {"requests": {"cpu": "10m"},"limits":{"cpu":"500m"}}
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=frontend
+        command:
+        - ci-operator
         env:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              name: ci-operator-openshift-console
               key: master.json
-        command:
-        - ci-operator
-        args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --target=frontend
+              name: ci-operator-openshift-console
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| frontend),?(\s+|$))

@@ -1,63 +1,72 @@
 presubmits:
   openshift/release:
-  - name: check_prometheus_rules
-    agent: kubernetes
-    run_if_changed: '^(projects/prometheus/prometheus.rules.yaml)$'
+  - agent: kubernetes
+    always_run: false
     context: ci/openshift/promrules
-    rerun_command: "/test promrules"
-    trigger: "((?m)^/test promrules,?(\\s+|$))"
+    name: check_prometheus_rules
+    rerun_command: /test promrules
+    run_if_changed: ^(projects/prometheus/prometheus.rules.yaml)$
     spec:
       containers:
       - image: registry.svc.ci.openshift.org/ci/promrules:latest
-  - name: pull-ci-openshift-release-master-config
-    agent: kubernetes
-    context: ci/prow/config
+        name: ""
+        resources: {}
+    trigger: ((?m)^/test promrules,?(\s+|$))
+  - agent: kubernetes
+    always_run: true
     branches:
     - master
-    rerun_command: "/test config"
-    trigger: ((?m)^/test( all| config),?(\\s+|$))
+    context: ci/prow/config
     decorate: true
-    always_run: true
+    name: pull-ci-openshift-release-master-config
+    rerun_command: /test config
     spec:
       containers:
-      - image: checkconfig:latest
-        command:
-        - /checkconfig
-        args:
+      - args:
         - --config-path
         - ./cluster/ci/config/prow/config.yaml
         - --job-config-path
         - ./ci-operator/jobs/
         - --plugin-config
         - ./cluster/ci/config/prow/plugins.yaml
-  - name: pull-ci-openshift-release-master-ci-operator-config
-    agent: kubernetes
-    context: ci/prow/ci-operator-config
+        command:
+        - /checkconfig
+        image: checkconfig:latest
+        name: ""
+        resources: {}
+    trigger: ((?m)^/test( all| config),?(\\s+|$))
+  - agent: kubernetes
+    always_run: true
     branches:
     - master
-    rerun_command: "/test ci-operator-config"
-    trigger: ((?m)^/test( all| ci-operator-config),?(\\s+|$))
+    context: ci/prow/ci-operator-config
     decorate: true
-    always_run: true
+    name: pull-ci-openshift-release-master-ci-operator-config
+    rerun_command: /test ci-operator-config
     spec:
       containers:
-      - image: ci-operator-checkconfig:latest
-        command:
-        - ci-operator-checkconfig
-        args:
+      - args:
         - --config-dir
         - ./ci-operator/config/
-  - name: pull-ci-openshift-release-master-generated-config
-    agent: kubernetes
-    context: ci/prow/generated-config
+        command:
+        - ci-operator-checkconfig
+        image: ci-operator-checkconfig:latest
+        name: ""
+        resources: {}
+    trigger: ((?m)^/test( all| ci-operator-config),?(\\s+|$))
+  - agent: kubernetes
+    always_run: false
     branches:
     - master
-    rerun_command: "/test generated-config"
-    trigger: ((?m)^/test generated-config,?(\\s+|$))
+    context: ci/prow/generated-config
     decorate: true
-    always_run: false
+    name: pull-ci-openshift-release-master-generated-config
+    rerun_command: /test generated-config
     spec:
       containers:
-      - image: ci-operator-prowgen:latest
-        command:
+      - command:
         - hack/validate-generated-config.sh
+        image: ci-operator-prowgen:latest
+        name: ""
+        resources: {}
+    trigger: ((?m)^/test generated-config,?(\\s+|$))

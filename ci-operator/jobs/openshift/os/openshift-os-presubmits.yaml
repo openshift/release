@@ -1,69 +1,48 @@
 presubmits:
   openshift/os:
-  - name: pull-ci-os-container-check
-    agent: kubernetes
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    - dockerless-build-temporary
     context: pull-ci-os-container-check
-    branches:
-    - master
-    - dockerless-build-temporary
-    rerun_command: "/test check"
-    always_run: true
-    trigger: "((?m)^/test( all| check),?(\\s+|$))"
     decorate: true
+    name: pull-ci-os-container-check
+    rerun_command: /test check
     spec:
-      volumes:
-      - name: docker-socket
-        hostPath:
-          path: /var/run/docker.sock
-      serviceAccountName: privileged-builder
       containers:
-      - name: build
-        image: registry.svc.ci.openshift.org/ci/origin-release:golang-1.9
-        volumeMounts:
-        - name: docker-socket
-          mountPath: /var/run/docker.sock
-        securityContext:
-          # TODO: the team has promised me they will be able to remove this soon
-          privileged: true
-          runAsUser: 0
-        command:
+      - command:
         - ./.prow.sh
-
-  - name: pull-ci-os-container-build
-    agent: kubernetes
-    context: pull-ci-os-container-build
+        image: registry.svc.ci.openshift.org/ci/origin-release:golang-1.9
+        name: build
+        resources: {}
+        securityContext:
+          privileged: true
+          runAsUser: 0
+        volumeMounts:
+        - mountPath: /var/run/docker.sock
+          name: docker-socket
+      serviceAccountName: privileged-builder
+      volumes:
+      - hostPath:
+          path: /var/run/docker.sock
+        name: docker-socket
+    trigger: ((?m)^/test( all| check),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
     branches:
     - master
     - dockerless-build-temporary
-    rerun_command: "/test build"
-    always_run: true
-    trigger: "((?m)^/test( all| build),?(\\s+|$))"
+    context: pull-ci-os-container-build
     decorate: true
+    name: pull-ci-os-container-build
+    rerun_command: /test build
     spec:
-      volumes:
-      - name: docker-socket
-        hostPath:
-          path: /var/run/docker.sock
-      - name: docker-binary
-        hostPath:
-          path: /usr/bin/docker
-      serviceAccountName: privileged-builder
       containers:
-      - name: build
-        image: registry.svc.ci.openshift.org/ci/origin-release:golang-1.9
-        volumeMounts:
-        - name: docker-socket
-          mountPath: /var/run/docker.sock
-        - name: docker-binary
-          mountPath: /usr/bin/docker
-        securityContext:
-          # TODO: the team has promised me they will be able to remove this soon
-          privileged: true
-          runAsUser: 0
-        command:
+      - command:
         - /bin/bash
         - -c
-        - |
+        - |-
           #!/bin/bash
           set -euo pipefail
           cat {atomic-centos-continuous,rhcos-continuous,ignition}.repo >/tmp/preserve
@@ -72,3 +51,23 @@ presubmits:
           curl http://rpm-mirror.ci.svc >> openshift.repo 2>/dev/null
           echo "true" > generate-openshift-repo
           imagebuilder -privileged .
+        image: registry.svc.ci.openshift.org/ci/origin-release:golang-1.9
+        name: build
+        resources: {}
+        securityContext:
+          privileged: true
+          runAsUser: 0
+        volumeMounts:
+        - mountPath: /var/run/docker.sock
+          name: docker-socket
+        - mountPath: /usr/bin/docker
+          name: docker-binary
+      serviceAccountName: privileged-builder
+      volumes:
+      - hostPath:
+          path: /var/run/docker.sock
+        name: docker-socket
+      - hostPath:
+          path: /usr/bin/docker
+        name: docker-binary
+    trigger: ((?m)^/test( all| build),?(\s+|$))

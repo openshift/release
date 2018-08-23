@@ -1,71 +1,58 @@
 presubmits:
   openshift/installer:
-  - name: pull-ci-origin-installer-unit
-    agent: kubernetes
-    context: ci/prow/unit
+  - agent: kubernetes
+    always_run: true
     branches:
     - master
-    rerun_command: "/test unit"
-    always_run: true
-    trigger: "((?m)^/test( all| unit),?(\\s+|$))"
+    context: ci/prow/unit
     decorate: true
+    name: pull-ci-origin-installer-unit
+    rerun_command: /test unit
     skip_cloning: true
     spec:
-      serviceAccountName: ci-operator
       containers:
-      - name: test
-        image: ci-operator:latest
-        resources: {"requests": {"cpu": "10m"},"limits":{"cpu":"500m"}}
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=unit
+        command:
+        - ci-operator
         env:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              name: ci-operator-openshift-installer
               key: master.json
-        command:
-        - ci-operator
-        args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --target=unit
-
-  - name: pull-ci-origin-installer-e2e-aws
-    agent: kubernetes
-    context: ci/prow/e2e-aws
+              name: ci-operator-openshift-installer
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| unit),?(\s+|$))
+  - agent: kubernetes
+    always_run: false
     branches:
     - master
-    rerun_command: "/test e2e-aws"
-    # The abomination below is equivilent to `^((?!Documentation).)*$`. Since
-    # Go doesn't support negative lookaheads, we are stuck with the following.
-    run_if_changed: "^([^D]|D(D|oD|ocD|ocuD|ocum(D|e(D|n(D|t(D|aD|atD|atiD|atioD)))))*([^Do]|o[^Dc]|oc[^Du]|ocu[^Dm]|ocum([^De]|e([^Dn]|n([^Dt]|t([^Da]|a[^Dt]|at[^Di]|ati[^Do]|atio[^Dn]))))))*(D(D|oD|ocD|ocuD|ocum(D|e(D|n(D|t(D|aD|atD|atiD|atioD)))))*(o|oc|ocu|ocum(e(n(t(a|at|ati|atio)?)?)?)?)?)?$"
-    trigger: "((?m)^/test( all| e2e-aws),?(\\s+|$))"
+    context: ci/prow/e2e-aws
     decorate: true
+    name: pull-ci-origin-installer-e2e-aws
+    rerun_command: /test e2e-aws
+    run_if_changed: ^([^D]|D(D|oD|ocD|ocuD|ocum(D|e(D|n(D|t(D|aD|atD|atiD|atioD)))))*([^Do]|o[^Dc]|oc[^Du]|ocu[^Dm]|ocum([^De]|e([^Dn]|n([^Dt]|t([^Da]|a[^Dt]|at[^Di]|ati[^Do]|atio[^Dn]))))))*(D(D|oD|ocD|ocuD|ocum(D|e(D|n(D|t(D|aD|atD|atiD|atioD)))))*(o|oc|ocu|ocum(e(n(t(a|at|ati|atio)?)?)?)?)?)?$
     skip_cloning: true
     spec:
-      serviceAccountName: ci-operator
-      volumes:
-      - name: job-definition
-        configMap:
-          name: prow-job-cluster-launch-installer-e2e
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-          - configMap:
-              name: cluster-profile-aws
       containers:
-      - name: test
-        image: ci-operator:latest
-        resources: {"requests": {"cpu": "10m"},"limits":{"cpu":"500m"}}
-        volumeMounts:
-        - name: job-definition
-          mountPath: /usr/local/e2e-aws
-          subPath: cluster-launch-installer-e2e.yaml
-        - name: cluster-profile
-          mountPath: /usr/local/e2e-aws-cluster-profile
+      - command:
+        - ci-operator
+        - --artifact-dir=$(ARTIFACTS)
+        - --secret-dir=/usr/local/e2e-aws-cluster-profile
+        - --template=/usr/local/e2e-aws
+        - --target=e2e-aws
         env:
         - name: TEST_FOCUS
-          value: "Secrets should be consumable from pods in volume with defaultMode set"
+          value: Secrets should be consumable from pods in volume with defaultMode
+            set
         - name: JOB_NAME_SAFE
           value: e2e-aws
         - name: CLUSTER_TYPE
@@ -73,31 +60,26 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              name: ci-operator-openshift-installer
               key: master.json
-        command:
-        - ci-operator
-        - --artifact-dir=$(ARTIFACTS)
-        - --secret-dir=/usr/local/e2e-aws-cluster-profile
-        - --template=/usr/local/e2e-aws
-        - --target=e2e-aws
-
-  - name: pull-ci-origin-installer-e2e-aws-all
-    agent: kubernetes
-    context: ci/prow/e2e-aws-all
-    branches:
-    - master
-    rerun_command: "/test e2e-aws-all"
-    always_run: false
-    trigger: "((?m)^/test( e2e-aws-all),?(\\s+|$))"
-    decorate: true
-    skip_cloning: true
-    spec:
+              name: ci-operator-openshift-installer
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-aws
+          name: job-definition
+          subPath: cluster-launch-installer-e2e.yaml
+        - mountPath: /usr/local/e2e-aws-cluster-profile
+          name: cluster-profile
       serviceAccountName: ci-operator
       volumes:
-      - name: job-definition
-        configMap:
+      - configMap:
           name: prow-job-cluster-launch-installer-e2e
+        name: job-definition
       - name: cluster-profile
         projected:
           sources:
@@ -105,16 +87,24 @@ presubmits:
               name: cluster-secrets-aws
           - configMap:
               name: cluster-profile-aws
+    trigger: ((?m)^/test( all| e2e-aws),?(\s+|$))
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - master
+    context: ci/prow/e2e-aws-all
+    decorate: true
+    name: pull-ci-origin-installer-e2e-aws-all
+    rerun_command: /test e2e-aws-all
+    skip_cloning: true
+    spec:
       containers:
-      - name: test
-        image: ci-operator:latest
-        resources: {"requests": {"cpu": "10m"},"limits":{"cpu":"500m"}}
-        volumeMounts:
-        - name: job-definition
-          mountPath: /usr/local/e2e-aws-all
-          subPath: cluster-launch-installer-e2e.yaml
-        - name: cluster-profile
-          mountPath: /usr/local/e2e-aws-all-cluster-profile
+      - command:
+        - ci-operator
+        - --artifact-dir=$(ARTIFACTS)
+        - --secret-dir=/usr/local/e2e-aws-all-cluster-profile
+        - --template=/usr/local/e2e-aws-all
+        - --target=e2e-aws-all
         env:
         - name: TEST_FOCUS
           value: Suite:openshift/conformance/parallel
@@ -127,101 +117,123 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              name: ci-operator-openshift-installer
               key: master.json
-        command:
-        - ci-operator
-        - --artifact-dir=$(ARTIFACTS)
-        - --secret-dir=/usr/local/e2e-aws-all-cluster-profile
-        - --template=/usr/local/e2e-aws-all
-        - --target=e2e-aws-all
-
-  - name: ci-pull-openshift-installer-yaml-lint
-    trigger: "(?m)^/test yaml-lint"
-    rerun_command: "/test yaml-lint"
+              name: ci-operator-openshift-installer
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-aws-all
+          name: job-definition
+          subPath: cluster-launch-installer-e2e.yaml
+        - mountPath: /usr/local/e2e-aws-all-cluster-profile
+          name: cluster-profile
+      serviceAccountName: ci-operator
+      volumes:
+      - configMap:
+          name: prow-job-cluster-launch-installer-e2e
+        name: job-definition
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+          - configMap:
+              name: cluster-profile-aws
+    trigger: ((?m)^/test( e2e-aws-all),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
     context: ci/prow/yaml-lint
-    always_run: true
-    skip_report: false
-    agent: kubernetes
     decorate: true
+    name: ci-pull-openshift-installer-yaml-lint
+    rerun_command: /test yaml-lint
     spec:
       containers:
-      - image: quay.io/coreos/yamllint
-        env:
-        - name: IS_CONTAINER
-          value: 'TRUE'
+      - args:
+        - ./hack/yaml-lint.sh
         command:
-          - sh
-        args:
-          - ./hack/yaml-lint.sh
-
-  - name: ci-pull-openshift-installer-tf-lint
-    trigger: "(?m)^/test tf-lint"
-    rerun_command: "/test tf-lint"
-    context: ci/prow/tf-lint
-    always_run: true
-    skip_report: false
-    agent: kubernetes
-    decorate: true
-    spec:
-      containers:
-      - image: quay.io/coreos/tflint
-        env:
-        - name: IS_CONTAINER
-          value: 'TRUE'
-        command:
-          - sh
-        args:
-          - ./hack/tf-lint.sh
-
-  - name: ci-pull-openshift-installer-shellcheck
-    trigger: "(?m)^/test shellcheck"
-    rerun_command: "/test shellcheck"
-    context: ci/prow/shellcheck
-    always_run: true
-    skip_report: false
-    agent: kubernetes
-    decorate: true
-    spec:
-      containers:
-      - image: quay.io/coreos/shellcheck-alpine:v0.5.0
+        - sh
         env:
         - name: IS_CONTAINER
           value: "TRUE"
-        command:
-        - sh
-        args:
-        - ./hack/shellcheck.sh
-
-  - name: pull-ci-origin-installer-tf-fmt
-    trigger: "((?m)^/test( all| tf-fmt),?(\\s+|$))"
-    rerun_command: "/test tf-fmt"
-    context: ci/prow/tf-fmt
+        image: quay.io/coreos/yamllint
+        name: ""
+        resources: {}
+    trigger: (?m)^/test yaml-lint
+  - agent: kubernetes
     always_run: true
-    agent: kubernetes
+    context: ci/prow/tf-lint
     decorate: true
+    name: ci-pull-openshift-installer-tf-lint
+    rerun_command: /test tf-lint
     spec:
       containers:
-      - image: quay.io/coreos/terraform-alpine:v0.11.7
+      - args:
+        - ./hack/tf-lint.sh
+        command:
+        - sh
         env:
         - name: IS_CONTAINER
-          value: 'TRUE'
-        command:
-        - sh
-        args:
-        - ./hack/tf-fmt.sh
-
-  - name: ci-pull-openshift-installer-bazel-build-tarball
-    trigger: "(?m)^/test build-tarball"
-    rerun_command: "/test build-tarball"
-    context: ci/prow/build-tarball
+          value: "TRUE"
+        image: quay.io/coreos/tflint
+        name: ""
+        resources: {}
+    trigger: (?m)^/test tf-lint
+  - agent: kubernetes
     always_run: true
-    skip_report: false
-    agent: kubernetes
+    context: ci/prow/shellcheck
     decorate: true
+    name: ci-pull-openshift-installer-shellcheck
+    rerun_command: /test shellcheck
     spec:
       containers:
-      - image: quay.io/coreos/tectonic-builder:bazel-v0.3
+      - args:
+        - ./hack/shellcheck.sh
+        command:
+        - sh
+        env:
+        - name: IS_CONTAINER
+          value: "TRUE"
+        image: quay.io/coreos/shellcheck-alpine:v0.5.0
+        name: ""
+        resources: {}
+    trigger: (?m)^/test shellcheck
+  - agent: kubernetes
+    always_run: true
+    context: ci/prow/tf-fmt
+    decorate: true
+    name: pull-ci-origin-installer-tf-fmt
+    rerun_command: /test tf-fmt
+    spec:
+      containers:
+      - args:
+        - ./hack/tf-fmt.sh
+        command:
+        - sh
+        env:
+        - name: IS_CONTAINER
+          value: "TRUE"
+        image: quay.io/coreos/terraform-alpine:v0.11.7
+        name: ""
+        resources: {}
+    trigger: ((?m)^/test( all| tf-fmt),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    context: ci/prow/build-tarball
+    decorate: true
+    name: ci-pull-openshift-installer-bazel-build-tarball
+    rerun_command: /test build-tarball
+    spec:
+      containers:
+      - args:
+        - ./hack/test-bazel-build-tarball.sh
+        - --action_env=HOME=/tmp
+        command:
+        - sh
         env:
         - name: HOME
           value: /tmp
@@ -229,69 +241,68 @@ presubmits:
           value: "TRUE"
         - name: USER
           value: bazel
-        command:
-        - sh
-        args:
-        - ./hack/test-bazel-build-tarball.sh
-        - --action_env=HOME=/tmp
-
-  - name: ci-pull-openshift-installer-go-fmt
-    trigger: "(?m)^/test go-fmt"
-    rerun_command: "/test go-fmt"
-    context: ci/prow/go-fmt
+        image: quay.io/coreos/tectonic-builder:bazel-v0.3
+        name: ""
+        resources: {}
+    trigger: (?m)^/test build-tarball
+  - agent: kubernetes
     always_run: true
-    skip_report: false
-    agent: kubernetes
+    context: ci/prow/go-fmt
     decorate: true
+    name: ci-pull-openshift-installer-go-fmt
+    rerun_command: /test go-fmt
     spec:
       containers:
-      - image: quay.io/coreos/golang-testing
-        env:
-        - name: IS_CONTAINER
-          value: 'TRUE'
-        command:
-        - sh
-        args:
+      - args:
         - ./hack/go-fmt.sh
         - .
-
-  - name: ci-pull-openshift-installer-go-vet
-    trigger: "(?m)^/test go-vet"
-    rerun_command: "/test go-vet"
-    context: ci/prow/go-vet
-    always_run: true
-    skip_report: false
-    agent: kubernetes
-    decorate: true
-    spec:
-      containers:
-      - image: quay.io/coreos/golang-testing
-        env:
-        - name: IS_CONTAINER
-          value: 'TRUE'
         command:
         - sh
-        args:
-        - ./hack/go-vet.sh
-        - ./...
-
-  - name: ci-pull-openshift-installer-golint
-    trigger: "(?m)^/test golint"
-    rerun_command: "/test golint"
-    context: ci/prow/golint
-    always_run: true
-    skip_report: false
-    agent: kubernetes
-    decorate: true
-    spec:
-      containers:
-      - image: quay.io/coreos/golang-testing
         env:
         - name: IS_CONTAINER
           value: "TRUE"
+        image: quay.io/coreos/golang-testing
+        name: ""
+        resources: {}
+    trigger: (?m)^/test go-fmt
+  - agent: kubernetes
+    always_run: true
+    context: ci/prow/go-vet
+    decorate: true
+    name: ci-pull-openshift-installer-go-vet
+    rerun_command: /test go-vet
+    spec:
+      containers:
+      - args:
+        - ./hack/go-vet.sh
+        - ./...
         command:
         - sh
-        args:
+        env:
+        - name: IS_CONTAINER
+          value: "TRUE"
+        image: quay.io/coreos/golang-testing
+        name: ""
+        resources: {}
+    trigger: (?m)^/test go-vet
+  - agent: kubernetes
+    always_run: true
+    context: ci/prow/golint
+    decorate: true
+    name: ci-pull-openshift-installer-golint
+    rerun_command: /test golint
+    spec:
+      containers:
+      - args:
         - ./hack/go-lint.sh
         - installer/...
         - tests/smoke
+        command:
+        - sh
+        env:
+        - name: IS_CONTAINER
+          value: "TRUE"
+        image: quay.io/coreos/golang-testing
+        name: ""
+        resources: {}
+    trigger: (?m)^/test golint
