@@ -1,0 +1,51 @@
+apiVersion: prow.k8s.io/v1
+kind: ProwJob
+metadata:
+  creationTimestamp: null
+  labels:
+    prow.k8s.io/job: kubernetes-explicit-decoration
+    prow.k8s.io/refs.org: test-org
+    prow.k8s.io/refs.pull: "1"
+    prow.k8s.io/refs.repo: test-repo
+    prow.k8s.io/type: presubmit
+  name: 2d005bf9-8170-11e8-a34f-54ee753e2644
+spec:
+  agent: kubernetes
+  cluster: default
+  context: kubernetes-explicit-decoration
+  decoration_config:
+    gcs_configuration:
+      bucket: explicit-bucket
+      path_strategy: explicit
+    gcs_credentials_secret: explicit-service-account
+    grace_period: 1
+    timeout: 1
+    utility_images:
+      clonerefs: clonerefs:explicit
+      entrypoint: entrypoint:explicit
+      initupload: initupload:explicit
+      sidecar: sidecar:explicit
+  job: kubernetes-explicit-decoration
+  pod_spec:
+    containers:
+    - args:
+      - test
+      - ./...
+      image: golang:latest
+      name: ""
+      resources: {}
+  refs:
+    base_ref: master
+    base_sha: basesha
+    org: test-org
+    pulls:
+    - author: bob
+      number: 1
+      sha: pullsha
+    repo: test-repo
+  report: true
+  rerun_command: /test kubernetes-explicit-decoration
+  type: presubmit
+status:
+  startTime: 2018-07-06T22:59:02Z
+  state: triggered

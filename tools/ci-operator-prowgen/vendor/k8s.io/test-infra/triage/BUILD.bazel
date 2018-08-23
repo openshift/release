@@ -1,0 +1,50 @@
+load("@build_bazel_rules_nodejs//:defs.bzl", "jasmine_node_test")
+
+py_test(
+    name = "summarize_test",
+    srcs = [
+        "berghelroach.py",
+        "summarize.py",
+        "summarize_test.py",
+    ],
+)
+
+py_test(
+    name = "berghelroach_test",
+    srcs = [
+        "berghelroach.py",
+        "berghelroach_test.py",
+    ],
+)
+
+filegroup(
+    name = "node_modules",
+    srcs = glob(["node_modules/**/*"]),
+    visibility = ["//visibility:public"],
+)
+
+jasmine_node_test(
+    name = "script_test",
+    srcs = ["script_test.js"],
+    data = ["js-srcs"],
+    node_modules = ":node_modules",
+)
+
+filegroup(
+    name = "js-srcs",
+    srcs = glob(["*.js"]),
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
+    visibility = ["//visibility:public"],
+)
