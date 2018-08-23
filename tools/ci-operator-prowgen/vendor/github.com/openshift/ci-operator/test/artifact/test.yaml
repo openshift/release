@@ -1,0 +1,88 @@
+kind: Template
+apiVersion: template.openshift.io/v1
+metadata:
+  name: test-with-artifacts
+
+parameters:
+- name: NAMESPACE
+  requried: true
+- name: IMAGE_TESTS
+  required: true
+objects:
+
+# We want the cluster to be able to access these images
+- kind: RoleBinding
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: ${JOB_NAME_SAFE}-image-puller
+    namespace: ${NAMESPACE}
+  roleRef:
+    name: system:image-puller
+  subjects:
+  - kind: SystemGroup
+    name: system:unauthenticated
+
+- kind: Pod
+  apiVersion: v1
+  metadata:
+    name: test-with-artifacts
+    namespace: ${NAMESPACE}
+    annotations:
+      ci-operator.openshift.io/wait-for-container-artifacts: wait3
+  spec:
+    restartPolicy: Never
+    activeDeadlineSeconds: 7200
+    terminationGracePeriodSeconds: 600
+    volumes:
+    - name: artifacts
+      emptyDir: {}
+
+    containers:
+
+    - name: pass1
+      image: ${IMAGE_TESTS}
+      volumeMounts:
+      - name: artifacts
+        mountPath: /tmp/artifacts
+      command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -euo pipefail
+
+        echo "hi, artifacts" > /tmp/artifacts/test2
+        sleep 3
+        exit 0
+
+    - name: fail2
+      image: ${IMAGE_TESTS}
+      volumeMounts:
+      - name: artifacts
+        mountPath: /tmp/artifacts
+      command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -euo pipefail
+
+        echo "hi, artifacts" > /tmp/artifacts/test2
+        sleep 5
+        exit 1
+
+    - name: wait3
+      image: ${IMAGE_TESTS}
+      volumeMounts:
+      - name: artifacts
+        mountPath: /tmp/artifacts
+      command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -euo pipefail
+
+        echo "CHANGED, artifacts" > /tmp/artifacts/test1
+        sleep 7
+        exit 0

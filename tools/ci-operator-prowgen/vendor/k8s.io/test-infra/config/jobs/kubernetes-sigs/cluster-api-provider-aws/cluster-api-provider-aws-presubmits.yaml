@@ -1,0 +1,25 @@
+presubmits:
+  kubernetes-sigs/cluster-api-provider-aws:
+  - name: pull-cluster-api-provider-aws-make
+    always_run: true
+    labels:
+      preset-service-account: "true"
+      preset-dind-enabled: "true"
+    spec:
+      containers:
+      - args:
+        - "--repo=sigs.k8s.io/$(REPO_NAME)=$(PULL_REFS)"
+        - "--root=/go/src"
+        - "--upload=gs://kubernetes-jenkins/pr-logs"
+        - "--timeout=90"
+        - "--scenario=execute"
+        - "--"
+        - "make"
+        - "images"
+        # docker-in-docker needs privileged mode
+        securityContext:
+          privileged: true
+        image: gcr.io/k8s-testimages/kubekins-e2e:v20180730-8b7ab3104-1.10
+        resources:
+          requests:
+            memory: "6Gi"
