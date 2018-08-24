@@ -17,7 +17,7 @@ function populate_owners() {
 	local repo="$2"
 	local target_dir="${temp_workdir}/${org}/${repo}"
 	mkdir -p "${target_dir}"
-	git clone "git@github.com:${org}/${repo}.git" "${target_dir}"
+	git clone --depth 1 --single-branch "git@github.com:${org}/${repo}.git" "${target_dir}"
 	if [[ -f "${target_dir}/OWNERS" ]]; then
 		cp "${target_dir}/OWNERS" "${jobs}/${org}/${repo}"
 		if [[ -d "${config}/${org}/${repo}" ]]; then
