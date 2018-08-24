@@ -26,12 +26,38 @@ presubmits:
         args:
         - --artifact-dir=$(ARTIFACTS)
         - --target=unit
+        
+  - name: pull-ci-origin-cluster-api-provider-aws-images
+    agent: kubernetes
+    context: ci/prow/images
+    branches:
+    - master
+    rerun_command: "/test images"
+    always_run: true
+    trigger: "((?m)^/test( all| images),?(\\s+|$))"
+    decorate: true
+    skip_cloning: true
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - name: test
+        image: ci-operator:latest
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              name: ci-operator-openshift-cluster-api-provider-aws
+              key: master.json
+        command:
+        - ci-operator
+        args:
+        - --artifact-dir=$(ARTIFACTS)
         - --target=[images]
 
   - name: ci-kubernetes-aws-actuator
     agent: jenkins
     labels:
         master: ci.openshift.redhat.com
-    context: ci/openshift-jenkins
+    context: ci/jenkins/e2e
     rerun_command: "/test e2e"
     trigger: "((?m)^/test( all| e2e),?(\\s+|$))"
