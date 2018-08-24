@@ -10,6 +10,8 @@ parameters:
   required: true
 - name: LOCAL_IMAGE_BIN
   required: true
+- name: IMAGE_SYNC
+  required: true
 - name: NAMESPACE
   required: true
 - name: CLUSTER_TYPE
@@ -128,6 +130,8 @@ objects:
         value: ${CLUSTER_TYPE}
       - name: HOME
         value: /tmp/shared/home
+      - name: SYNC_IMAGE
+        value: ${IMAGE_SYNC}
       command:
       - /bin/bash
       - -c
@@ -147,6 +151,7 @@ objects:
         source /etc/azure/credentials/secret
         az login --service-principal -u ${AZURE_CLIENT_ID} -p ${AZURE_CLIENT_SECRET} --tenant ${AZURE_TENANT_ID} &>/dev/null
         # TODO: Configure these from prow
+        echo "Using sync image ${SYNC_IMAGE}"
         export DNS_DOMAIN=osadev.cloud
         export DNS_RESOURCEGROUP=dns
         export DEPLOY_VERSION=v3.10
@@ -156,7 +161,7 @@ objects:
         # Azure cli fails miserably now with az image list 
         # https://github.com/Azure/azure-cli/issues/7019
         #export IMAGE_RESOURCENAME=$(az image list -g $IMAGE_RESOURCEGROUP -o json --query "[?starts_with(name, '${DEPLOY_OS:-rhel7}-${DEPLOY_VERSION//v}') && tags.valid=='true'].name | sort(@) | [-1]" | tr -d '"')
-        export IMAGE_RESOURCENAME=centos7-3.10-201808031447
+        export IMAGE_RESOURCENAME=centos7-3.10-201808231458
         # TODO: for full e2e image needs to be built too  
         cd /go/src/github.com/openshift/openshift-azure/
        
