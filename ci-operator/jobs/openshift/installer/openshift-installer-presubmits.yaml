@@ -232,6 +232,26 @@ presubmits:
         - ./hack/test-bazel-build-tarball.sh
         - --action_env=HOME=/tmp
 
+  - name: ci-pull-openshift-installer-go-fmt
+    trigger: "(?m)^/test go-fmt"
+    rerun_command: "/test go-fmt"
+    context: ci/prow/go-fmt
+    always_run: true
+    skip_report: false
+    agent: kubernetes
+    decorate: true
+    spec:
+      containers:
+      - image: quay.io/coreos/golang-testing
+        env:
+        - name: IS_CONTAINER
+          value: 'TRUE'
+        command:
+        - sh
+        args:
+        - ./hack/go-fmt.sh
+        - .
+
   - name: ci-pull-openshift-installer-go-vet
     trigger: "(?m)^/test go-vet"
     rerun_command: "/test go-vet"
