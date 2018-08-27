@@ -134,6 +134,7 @@ complexity and duplication, which should be cleared in the future.
     containers:
     - name: test
       image: ci-operator:latest
+      resources: {"requests": {"cpu": "10m"},"limits":{"cpu":"500m"}}
       volumeMounts:
       - name: job-definition
         mountPath: /usr/local/e2e-gcp
