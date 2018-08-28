@@ -4,6 +4,11 @@ base_images:
     name: origin-v4.0
     namespace: openshift
     tag: base
+  base-smoke:
+    cluster: https://api.ci.openshift.org
+    namespace: openshift
+    name: origin-release
+    tag: bazel
 binary_build_commands: go build ./installer/cmd/tectonic
 canonical_go_repository: github.com/openshift/installer
 images:
@@ -18,6 +23,20 @@ images:
       as:
       - build
   to: installer
+- dockerfile_path: images/tectonic-installer/Dockerfile.ci
+  from: base-smoke
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/installer/tectonic
+    root:
+      as:
+      - build
+  to: installer-bazel
+- dockerfile_path: images/installer-origin-release/Dockerfile.ci
+  from: installer-bazel
+  to: installer-smoke
 resources:
   '*':
     limits:
