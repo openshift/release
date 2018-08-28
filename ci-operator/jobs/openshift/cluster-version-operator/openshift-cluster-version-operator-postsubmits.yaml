@@ -1,28 +1,32 @@
 postsubmits:
   openshift/cluster-version-operator:
-  - name: branch-ci-openshift-cluster-version-operator-images
-    agent: kubernetes
-    labels:
-      artifacts: images
+  - agent: kubernetes
     branches:
     - master
     decorate: true
+    labels:
+      artifacts: images
+    name: branch-ci-openshift-cluster-version-operator-images
     skip_cloning: true
     spec:
-      serviceAccountName: ci-operator
       containers:
-      - name: test
-        image: ci-operator:latest
-        resources: {"requests": {"cpu": "10m"},"limits":{"cpu":"500m"}}
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=[images]
+        - --promote
+        command:
+        - ci-operator
         env:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              name: ci-operator-openshift-cluster-version-operator
               key: master.json
-        command:
-        - ci-operator
-        args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --target=[images]
-        - --promote
+              name: ci-operator-openshift-cluster-version-operator
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator

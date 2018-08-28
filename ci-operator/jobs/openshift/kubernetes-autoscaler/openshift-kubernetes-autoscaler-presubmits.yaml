@@ -1,58 +1,66 @@
 presubmits:
   openshift/kubernetes-autoscaler:
-  - name: pull-ci-kubernetes-autoscaler-unit
-    agent: kubernetes
-    context: ci/prow/unit
+  - agent: kubernetes
+    always_run: true
     branches:
     - master
-    rerun_command: "/test unit"
-    always_run: true
-    trigger: "((?m)^/test( all| unit),?(\\s+|$))"
+    context: ci/prow/unit
     decorate: true
+    name: pull-ci-kubernetes-autoscaler-unit
+    rerun_command: /test unit
     skip_cloning: true
     spec:
-      serviceAccountName: ci-operator
       containers:
-      - name: test
-        image: ci-operator:latest
-        resources: {"requests": {"cpu": "10m"},"limits":{"cpu":"500m"}}
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=unit
+        - --target=[images]
+        command:
+        - ci-operator
         env:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              name: ci-operator-kubernetes-autoscaler
               key: master.json
-        command:
-        - ci-operator
-        args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --target=unit
-        - --target=[images]
-  - name: pull-ci-kubernetes-autoscaler-unit-3.10
-    agent: kubernetes
-    context: ci/prow/unit
+              name: ci-operator-kubernetes-autoscaler
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| unit),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
     branches:
     - release-3.10
-    rerun_command: "/test unit"
-    always_run: true
-    trigger: "((?m)^/test( all| unit),?(\\s+|$))"
+    context: ci/prow/unit
     decorate: true
+    name: pull-ci-kubernetes-autoscaler-unit-3.10
+    rerun_command: /test unit
     skip_cloning: true
     spec:
-      serviceAccountName: ci-operator
       containers:
-      - name: test
-        image: ci-operator:latest
-        resources: {"requests": {"cpu": "10m"},"limits":{"cpu":"500m"}}
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=unit
+        - --target=[images]
+        command:
+        - ci-operator
         env:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              name: ci-operator-kubernetes-autoscaler
               key: release-3.10.json
-        command:
-        - ci-operator
-        args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --target=unit
-        - --target=[images]
+              name: ci-operator-kubernetes-autoscaler
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| unit),?(\s+|$))

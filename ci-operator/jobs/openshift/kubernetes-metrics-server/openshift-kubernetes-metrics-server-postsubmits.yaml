@@ -1,54 +1,62 @@
 postsubmits:
   openshift/kubernetes-metrics-server:
-  - name: branch-ci-kubernetes-metrics-server-images
-    agent: kubernetes
-    labels:
-      artifacts: images
+  - agent: kubernetes
     branches:
     - master
     decorate: true
+    labels:
+      artifacts: images
+    name: branch-ci-kubernetes-metrics-server-images
     skip_cloning: true
     spec:
-      serviceAccountName: ci-operator
       containers:
-      - name: test
-        image: ci-operator:latest
-        resources: {"requests": {"cpu": "10m"},"limits":{"cpu":"500m"}}
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=[images]
+        - --promote
+        command:
+        - ci-operator
         env:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              name: ci-operator-kubernetes-metrics-server
               key: master.json
-        command:
-        - ci-operator
-        args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --target=[images]
-        - --promote
-  - name: branch-ci-kubernetes-metrics-server-images-3.10
-    agent: kubernetes
-    labels:
-      artifacts: images
+              name: ci-operator-kubernetes-metrics-server
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+  - agent: kubernetes
     branches:
     - release-3.10
     decorate: true
+    labels:
+      artifacts: images
+    name: branch-ci-kubernetes-metrics-server-images-3.10
     skip_cloning: true
     spec:
-      serviceAccountName: ci-operator
       containers:
-      - name: test
-        image: ci-operator:latest
-        resources: {"requests": {"cpu": "10m"},"limits":{"cpu":"500m"}}
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=[images]
+        - --promote
+        command:
+        - ci-operator
         env:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              name: ci-operator-kubernetes-metrics-server
               key: release-3.10.json
-        command:
-        - ci-operator
-        args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --target=[images]
-        - --promote
+              name: ci-operator-kubernetes-metrics-server
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
