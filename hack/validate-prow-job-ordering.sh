@@ -24,7 +24,10 @@ if ! diff -Naupr "${workdir}/jobs" "${jobs_dir}"> "${workdir}/diff"; then
 [ERROR] automation in place that manipulates these configs and consistent formatting
 [ERORR] helps reviewing the changes the automation does.
 
-[ERROR] Please apply the following changes to your Prow job configuration:
+[ERROR] Run the following command to re-format the Prow jobs:
+[ERROR] $ docker run -it -v \$(pwd)/ci-operator/jobs:/jobs:z registry.svc.ci.openshift.org/ci/determinize-prow-jobs:latest --prow-jobs-dir /jobs
+
+[ERROR] The following errors were found:
 
 EOF
   cat "${workdir}/diff"
