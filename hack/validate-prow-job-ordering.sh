@@ -31,4 +31,5 @@ if ! diff -Naupr "${workdir}/jobs" "${jobs_dir}"> "${workdir}/diff"; then
 
 EOF
   cat "${workdir}/diff"
+  exit 1
 fi
