@@ -1,181 +1,142 @@
 presubmits:
   openshift/openshift-ansible:
-  - name: pull-ci-openshift-openshift-ansible-unit
-    agent: kubernetes
-    context: ci/prow/unit
+  - agent: kubernetes
+    always_run: true
     branches:
     - master
     - dockerless-build-temporary
-    rerun_command: "/test unit"
-    always_run: true
-    trigger: "((?m)^/test( all| unit| tox),?(\\s+|$))"
+    context: ci/prow/unit
     decorate: true
+    name: pull-ci-openshift-openshift-ansible-unit
+    rerun_command: /test unit
     skip_cloning: true
     spec:
-      serviceAccountName: ci-operator
       containers:
-      - name: test
-        image: ci-operator:latest
-        resources: {"requests": {"cpu": "10m"},"limits":{"cpu":"500m"}}
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              name: ci-operator-openshift-openshift-ansible
-              key: master.json
-        - name: HOME
-          value: /tmp/home
-        command:
-        - ci-operator
-        args:
+      - args:
         - --artifact-dir=$(ARTIFACTS)
         - --target=unit
         - --target=[images]
-
-  - name: test_pull_request_openshift_ansible_tox_310
-    agent: jenkins
-    labels:
-      master: ci.openshift.redhat.com
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.json
+              name: ci-operator-openshift-openshift-ansible
+        - name: HOME
+          value: /tmp/home
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| unit| tox),?(\s+|$))
+  - agent: jenkins
     always_run: true
-    context: ci/openshift-jenkins/tox
-    rerun_command: "/test tox"
-    trigger: "((?m)^/test( all| tox),?(\\s+|$))"
     branches:
     - release-3.10
     - release-3.9
     - release-3.7
-
-  - name: test_pull_request_openshift_ansible_logging
-    agent: jenkins
+    context: ci/openshift-jenkins/tox
     labels:
       master: ci.openshift.redhat.com
-    skip_report: false
+    name: test_pull_request_openshift_ansible_tox_310
+    rerun_command: /test tox
+    trigger: ((?m)^/test( all| tox),?(\s+|$))
+  - agent: jenkins
+    always_run: false
     branches:
-      - master
-      - stage
-      - es5.x
+    - master
+    - stage
+    - es5.x
     context: ci/openshift-jenkins/logging
-    run_if_changed: "^roles/openshift_logging.*|playbooks/openshift-logging/.*"
-    rerun_command: "/test logging"
-    trigger: "((?m)^/test( all| logging),?(\\s+|$))"
-
-  - name: test_pull_request_openshift_ansible_logging_310
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
-    skip_report: false
+    name: test_pull_request_openshift_ansible_logging
+    rerun_command: /test logging
+    run_if_changed: ^roles/openshift_logging.*|playbooks/openshift-logging/.*
+    trigger: ((?m)^/test( all| logging),?(\s+|$))
+  - agent: jenkins
+    always_run: false
     branches:
-      - release-3.10
+    - release-3.10
     context: ci/openshift-jenkins/logging
-    rerun_command: "/test logging"
-    run_if_changed: "^roles/openshift_logging.*|playbooks/openshift-logging/.*"
-    trigger: "((?m)^/test( all| logging),?(\\s+|$))"
-
-  - name: test_pull_request_openshift_ansible_logging_39
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
-    skip_report: false
-    branches:
-      - release-3.9
-    context: ci/openshift-jenkins/logging
-    rerun_command: "/test logging"
-    run_if_changed: "^roles/openshift_logging.*|playbooks/openshift-logging/.*"
-    trigger: "((?m)^/test( all| logging),?(\\s+|$))"
-
-  - name: test_pull_request_openshift_ansible_logging_37
-    agent: jenkins
-    labels:
-      master: ci.openshift.redhat.com
-    branches:
-      - release-3.7
-    context: ci/openshift-jenkins/logging
-    rerun_command: "/test logging"
-    run_if_changed: "^roles/openshift_logging.*|playbooks/.+/openshift-cluster/openshift.logging.*"
-    trigger: "((?m)^/test( all| logging),?(\\s+|$))"
-
-  - name: test_pull_request_openshift_ansible_logging_36
-    agent: jenkins
-    labels:
-      master: ci.openshift.redhat.com
-    branches:
-      - release-3.6
-    context: ci/openshift-jenkins/logging
-    rerun_command: "/test logging"
-    run_if_changed: "^roles/openshift_logging.*|playbooks/.+/openshift-cluster/openshift.logging.*"
-    trigger: "((?m)^/test( all| logging),?(\\s+|$))"
-
-  - name: test_pull_request_openshift_ansible_extended_conformance_gce_37
-    agent: jenkins
-    labels:
-      master: ci.openshift.redhat.com
-    always_run: true
-    context: ci/openshift-jenkins/gcp
-    rerun_command: "/test gcp"
-    trigger: "((?m)^/test( all| gcp),?(\\s+|$))"
-    branches:
-    - release-3.7
-
-  - name: test_pull_request_openshift_ansible_extended_conformance_gce_39
-    agent: jenkins
-    labels:
-      master: ci.openshift.redhat.com
-    always_run: true
-    context: ci/openshift-jenkins/gcp
-    rerun_command: "/test gcp"
-    trigger: "((?m)^/test( all| gcp),?(\\s+|$))"
+    name: test_pull_request_openshift_ansible_logging_310
+    rerun_command: /test logging
+    run_if_changed: ^roles/openshift_logging.*|playbooks/openshift-logging/.*
+    trigger: ((?m)^/test( all| logging),?(\s+|$))
+  - agent: jenkins
+    always_run: false
     branches:
     - release-3.9
-
-  - name: pull-ci-openshift-openshift-ansible-e2e-gcp
-    agent: kubernetes
-    context: ci/prow/gcp
+    context: ci/openshift-jenkins/logging
+    labels:
+      master: ci.openshift.redhat.com
+    name: test_pull_request_openshift_ansible_logging_39
+    rerun_command: /test logging
+    run_if_changed: ^roles/openshift_logging.*|playbooks/openshift-logging/.*
+    trigger: ((?m)^/test( all| logging),?(\s+|$))
+  - agent: jenkins
+    always_run: false
+    branches:
+    - release-3.7
+    context: ci/openshift-jenkins/logging
+    labels:
+      master: ci.openshift.redhat.com
+    name: test_pull_request_openshift_ansible_logging_37
+    rerun_command: /test logging
+    run_if_changed: ^roles/openshift_logging.*|playbooks/.+/openshift-cluster/openshift.logging.*
+    trigger: ((?m)^/test( all| logging),?(\s+|$))
+  - agent: jenkins
+    always_run: false
+    branches:
+    - release-3.6
+    context: ci/openshift-jenkins/logging
+    labels:
+      master: ci.openshift.redhat.com
+    name: test_pull_request_openshift_ansible_logging_36
+    rerun_command: /test logging
+    run_if_changed: ^roles/openshift_logging.*|playbooks/.+/openshift-cluster/openshift.logging.*
+    trigger: ((?m)^/test( all| logging),?(\s+|$))
+  - agent: jenkins
+    always_run: true
+    branches:
+    - release-3.7
+    context: ci/openshift-jenkins/gcp
+    labels:
+      master: ci.openshift.redhat.com
+    name: test_pull_request_openshift_ansible_extended_conformance_gce_37
+    rerun_command: /test gcp
+    trigger: ((?m)^/test( all| gcp),?(\s+|$))
+  - agent: jenkins
+    always_run: true
+    branches:
+    - release-3.9
+    context: ci/openshift-jenkins/gcp
+    labels:
+      master: ci.openshift.redhat.com
+    name: test_pull_request_openshift_ansible_extended_conformance_gce_39
+    rerun_command: /test gcp
+    trigger: ((?m)^/test( all| gcp),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
     branches:
     - master
     - dockerless-build-temporary
-    rerun_command: "/test gcp"
-    always_run: true
-    trigger: "((?m)^/test( all| gcp),?(\\s+|$))"
+    context: ci/prow/gcp
     decorate: true
+    name: pull-ci-openshift-openshift-ansible-e2e-gcp
+    rerun_command: /test gcp
     skip_cloning: true
     spec:
-      serviceAccountName: ci-operator
-      volumes:
-      - name: job-definition
-        configMap:
-          name: prow-job-cluster-launch-e2e
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
       containers:
-      - name: test
-        image: ci-operator:latest
-        resources: {"requests": {"cpu": "10m"},"limits":{"cpu":"500m"}}
-        volumeMounts:
-        - name: job-definition
-          mountPath: /usr/local/e2e-gcp
-          subPath: cluster-launch-e2e.yaml
-        - name: cluster-profile
-          mountPath: /usr/local/e2e-gcp-cluster-profile
-        env:
-        - name: TEST_FOCUS
-          value: Suite:openshift/conformance/parallel
-        - name: JOB_NAME_SAFE
-          value: e2e-gcp
-        - name: CLUSTER_TYPE
-          value: gcp
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              name: ci-operator-openshift-openshift-ansible
-              key: master.json
-        - name: RPM_REPO_BASEURL_REF
-          value: https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/master/.latest-rpms
-        command:
+      - command:
         - /bin/bash
         - -c
         - |
@@ -186,40 +147,6 @@ presubmits:
             --artifact-dir=$(ARTIFACTS) \
             --secret-dir=/usr/local/e2e-gcp-cluster-profile --template=/usr/local/e2e-gcp \
             --target=e2e-gcp
-
-  - name: pull-ci-openshift-openshift-ansible-e2e-gcp-310
-    agent: kubernetes
-    context: ci/prow/gcp
-    branches:
-    - release-3.10
-    rerun_command: "/test gcp"
-    always_run: true
-    trigger: "((?m)^/test( all| gcp),?(\\s+|$))"
-    decorate: true
-    skip_cloning: true
-    spec:
-      serviceAccountName: ci-operator
-      volumes:
-      - name: job-definition
-        configMap:
-          name: prow-job-cluster-launch-e2e
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
-      containers:
-      - name: test
-        image: ci-operator:latest
-        resources: {"requests": {"cpu": "10m"},"limits":{"cpu":"500m"}}
-        volumeMounts:
-        - name: job-definition
-          mountPath: /usr/local/e2e-gcp
-          subPath: cluster-launch-e2e.yaml
-        - name: cluster-profile
-          mountPath: /usr/local/e2e-gcp-cluster-profile
         env:
         - name: TEST_FOCUS
           value: Suite:openshift/conformance/parallel
@@ -230,72 +157,112 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
+              key: master.json
               name: ci-operator-openshift-openshift-ansible
+        - name: RPM_REPO_BASEURL_REF
+          value: https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/master/.latest-rpms
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-gcp
+          name: job-definition
+          subPath: cluster-launch-e2e.yaml
+        - mountPath: /usr/local/e2e-gcp-cluster-profile
+          name: cluster-profile
+      serviceAccountName: ci-operator
+      volumes:
+      - configMap:
+          name: prow-job-cluster-launch-e2e
+        name: job-definition
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+    trigger: ((?m)^/test( all| gcp),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-3.10
+    context: ci/prow/gcp
+    decorate: true
+    name: pull-ci-openshift-openshift-ansible-e2e-gcp-310
+    rerun_command: /test gcp
+    skip_cloning: true
+    spec:
+      containers:
+      - command:
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -e
+          export RPM_REPO="$( curl -q "${RPM_REPO_BASEURL_REF}" 2>/dev/null)"
+          ci-operator \
+            --artifact-dir=$(ARTIFACTS) \
+            --secret-dir=/usr/local/e2e-gcp-cluster-profile --template=/usr/local/e2e-gcp \
+            --target=e2e-gcp
+        env:
+        - name: TEST_FOCUS
+          value: Suite:openshift/conformance/parallel
+        - name: JOB_NAME_SAFE
+          value: e2e-gcp
+        - name: CLUSTER_TYPE
+          value: gcp
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
               key: release-3.10.json
+              name: ci-operator-openshift-openshift-ansible
         - name: RPM_REPO_BASEURL_REF
           value: https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/release-3.10/.latest-rpms
-        command:
-        - /bin/bash
-        - -c
-        - |
-          #!/bin/bash
-          set -e
-          export RPM_REPO="$( curl -q "${RPM_REPO_BASEURL_REF}" 2>/dev/null)"
-          ci-operator \
-            --artifact-dir=$(ARTIFACTS) \
-            --secret-dir=/usr/local/e2e-gcp-cluster-profile --template=/usr/local/e2e-gcp \
-            --target=e2e-gcp
-
-  - name: pull-ci-openshift-openshift-ansible-e2e-gcp-crio
-    agent: kubernetes
-    context: ci/prow/gcp-crio
-    branches:
-    - master
-    - dockerless-build-temporary
-    rerun_command: "/test gcp-crio"
-    always_run: false
-    run_if_changed: '^roles/(container_runtime|openshift_node|openshift_node_group)|^(playbooks/prerequisites)'
-    trigger: "((?m)^/test( gcp-crio),?(\\s+|$))"
-    decorate: true
-    skip_cloning: true
-    spec:
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-gcp
+          name: job-definition
+          subPath: cluster-launch-e2e.yaml
+        - mountPath: /usr/local/e2e-gcp-cluster-profile
+          name: cluster-profile
       serviceAccountName: ci-operator
       volumes:
-      - name: job-definition
-        configMap:
+      - configMap:
           name: prow-job-cluster-launch-e2e
+        name: job-definition
       - name: cluster-profile
         projected:
           sources:
           - secret:
               name: cluster-secrets-gcp
           - configMap:
-              name: cluster-profile-gcp-crio
+              name: cluster-profile-gcp
+    trigger: ((?m)^/test( all| gcp),?(\s+|$))
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - master
+    - dockerless-build-temporary
+    context: ci/prow/gcp-crio
+    decorate: true
+    name: pull-ci-openshift-openshift-ansible-e2e-gcp-crio
+    rerun_command: /test gcp-crio
+    run_if_changed: ^roles/(container_runtime|openshift_node|openshift_node_group)|^(playbooks/prerequisites)
+    skip_cloning: true
+    spec:
       containers:
-      - name: test
-        image: ci-operator:latest
-        resources: {"requests": {"cpu": "10m"},"limits":{"cpu":"500m"}}
-        volumeMounts:
-        - name: job-definition
-          mountPath: /usr/local/e2e-gcp-crio
-          subPath: cluster-launch-e2e.yaml
-        - name: cluster-profile
-          mountPath: /usr/local/e2e-gcp-crio-cluster-profile
-        env:
-        - name: TEST_FOCUS
-          value: Suite:openshift/conformance/parallel
-        - name: JOB_NAME_SAFE
-          value: e2e-gcp-crio
-        - name: CLUSTER_TYPE
-          value: gcp
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              name: ci-operator-openshift-openshift-ansible
-              key: master.json
-        - name: RPM_REPO_BASEURL_REF
-          value: https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/master/.latest-rpms
-        command:
+      - command:
         - /bin/bash
         - -c
         - |
@@ -307,41 +274,69 @@ presubmits:
             --secret-dir=/usr/local/e2e-gcp-crio-cluster-profile \
             --template=/usr/local/e2e-gcp-crio \
             --target=e2e-gcp-crio
-
-  - name: pull-ci-openshift-openshift-ansible-e2e-gcp-ha
-    agent: kubernetes
-    context: ci/prow/gcp-ha
-    branches:
-    - master
-    - dockerless-build-temporary
-    rerun_command: "/test gcp-ha"
-    always_run: false
-    trigger: "((?m)^/test( all| gcp-ha),?(\\s+|$))"
-    decorate: true
-    skip_cloning: true
-    spec:
+        env:
+        - name: TEST_FOCUS
+          value: Suite:openshift/conformance/parallel
+        - name: JOB_NAME_SAFE
+          value: e2e-gcp-crio
+        - name: CLUSTER_TYPE
+          value: gcp
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.json
+              name: ci-operator-openshift-openshift-ansible
+        - name: RPM_REPO_BASEURL_REF
+          value: https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/master/.latest-rpms
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-gcp-crio
+          name: job-definition
+          subPath: cluster-launch-e2e.yaml
+        - mountPath: /usr/local/e2e-gcp-crio-cluster-profile
+          name: cluster-profile
       serviceAccountName: ci-operator
       volumes:
-      - name: job-definition
-        configMap:
+      - configMap:
           name: prow-job-cluster-launch-e2e
+        name: job-definition
       - name: cluster-profile
         projected:
           sources:
           - secret:
               name: cluster-secrets-gcp
           - configMap:
-              name: cluster-profile-gcp-ha
+              name: cluster-profile-gcp-crio
+    trigger: ((?m)^/test( gcp-crio),?(\s+|$))
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - master
+    - dockerless-build-temporary
+    context: ci/prow/gcp-ha
+    decorate: true
+    name: pull-ci-openshift-openshift-ansible-e2e-gcp-ha
+    rerun_command: /test gcp-ha
+    skip_cloning: true
+    spec:
       containers:
-      - name: test
-        image: ci-operator:latest
-        resources: {"requests": {"cpu": "10m"},"limits":{"cpu":"500m"}}
-        volumeMounts:
-        - name: job-definition
-          mountPath: /usr/local/e2e-gcp
-          subPath: cluster-launch-e2e.yaml
-        - name: cluster-profile
-          mountPath: /usr/local/e2e-gcp-cluster-profile
+      - command:
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -e
+          export RPM_REPO="$( curl -q "${RPM_REPO_BASEURL_REF}" 2>/dev/null)"
+          ci-operator \
+            --artifact-dir=$(ARTIFACTS) \
+            --secret-dir=/usr/local/e2e-gcp-cluster-profile --template=/usr/local/e2e-gcp \
+            --target=e2e-gcp
         env:
         - name: TEST_FOCUS
           value: Suite:openshift/conformance/parallel
@@ -352,11 +347,49 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              name: ci-operator-openshift-openshift-ansible
               key: master.json
+              name: ci-operator-openshift-openshift-ansible
         - name: RPM_REPO_BASEURL_REF
           value: https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/master/.latest-rpms
-        command:
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-gcp
+          name: job-definition
+          subPath: cluster-launch-e2e.yaml
+        - mountPath: /usr/local/e2e-gcp-cluster-profile
+          name: cluster-profile
+      serviceAccountName: ci-operator
+      volumes:
+      - configMap:
+          name: prow-job-cluster-launch-e2e
+        name: job-definition
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp-ha
+    trigger: ((?m)^/test( all| gcp-ha),?(\s+|$))
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - master
+    - dockerless-build-temporary
+    context: ci/prow/launch-gcp
+    decorate: true
+    name: pull-ci-openshift-openshift-ansible-launch-gcp
+    rerun_command: /test launch-gcp
+    skip_cloning: true
+    spec:
+      containers:
+      - command:
         - /bin/bash
         - -c
         - |
@@ -367,43 +400,9 @@ presubmits:
             --artifact-dir=$(ARTIFACTS) \
             --secret-dir=/usr/local/e2e-gcp-cluster-profile --template=/usr/local/e2e-gcp \
             --target=e2e-gcp
-
-  - name: pull-ci-openshift-openshift-ansible-launch-gcp
-    agent: kubernetes
-    context: ci/prow/launch-gcp
-    branches:
-    - master
-    - dockerless-build-temporary
-    rerun_command: "/test launch-gcp"
-    trigger: "((?m)^/test( launch-gcp),?(\\s+|$))"
-    decorate: true
-    skip_cloning: true
-    spec:
-      serviceAccountName: ci-operator
-      volumes:
-      - name: job-definition
-        configMap:
-          name: prow-job-cluster-launch-e2e
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
-      containers:
-      - name: test
-        image: ci-operator:latest
-        resources: {"requests": {"cpu": "10m"},"limits":{"cpu":"500m"}}
-        volumeMounts:
-        - name: job-definition
-          mountPath: /usr/local/e2e-gcp
-          subPath: cluster-launch-e2e.yaml
-        - name: cluster-profile
-          mountPath: /usr/local/e2e-gcp-cluster-profile
         env:
         - name: TEST_COMMAND
-          value: "sleep 7200 & wait"
+          value: sleep 7200 & wait
         - name: JOB_NAME_SAFE
           value: e2e-gcp
         - name: CLUSTER_TYPE
@@ -411,218 +410,217 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              name: ci-operator-openshift-openshift-ansible
               key: master.json
+              name: ci-operator-openshift-openshift-ansible
         - name: RPM_REPO_BASEURL_REF
           value: https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/master/.latest-rpms
-        command:
-        - /bin/bash
-        - -c
-        - |
-          #!/bin/bash
-          set -e
-          export RPM_REPO="$( curl -q "${RPM_REPO_BASEURL_REF}" 2>/dev/null)"
-          ci-operator \
-            --artifact-dir=$(ARTIFACTS) \
-            --secret-dir=/usr/local/e2e-gcp-cluster-profile --template=/usr/local/e2e-gcp \
-            --target=e2e-gcp
-
-  - name: test_pull_request_openshift_ansible_extended_conformance_gce_ha_310
-    agent: jenkins
-    labels:
-      master: ci.openshift.redhat.com
-    context: ci/openshift-jenkins/gcp-ha
-    rerun_command: "/test gcp-ha"
-    trigger: "((?m)^/test gcp-ha,?(\\s+|$))"
-    branches:
-    - release-3.10
-
-  - name: test_pull_request_openshift_ansible_install_upgrade_gce_310
-    agent: jenkins
-    labels:
-      master: ci.openshift.redhat.com
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-gcp
+          name: job-definition
+          subPath: cluster-launch-e2e.yaml
+        - mountPath: /usr/local/e2e-gcp-cluster-profile
+          name: cluster-profile
+      serviceAccountName: ci-operator
+      volumes:
+      - configMap:
+          name: prow-job-cluster-launch-e2e
+        name: job-definition
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+    trigger: ((?m)^/test( launch-gcp),?(\s+|$))
+  - agent: jenkins
     always_run: false
-    skip_report: true
-    context: ci/openshift-jenkins/gcp-upgrade
-    rerun_command: "/test gcp-upgrade"
-    trigger: "((?m)^/test( all| gcp-upgrade),?(\\s+|$))"
     branches:
     - release-3.10
-
-  - name: test_pull_request_openshift_ansible_extended_conformance_azure
-    agent: jenkins
+    context: ci/openshift-jenkins/gcp-ha
     labels:
       master: ci.openshift.redhat.com
-    always_run: true
+    name: test_pull_request_openshift_ansible_extended_conformance_gce_ha_310
+    rerun_command: /test gcp-ha
+    trigger: ((?m)^/test gcp-ha,?(\s+|$))
+  - agent: jenkins
+    always_run: false
+    branches:
+    - release-3.10
+    context: ci/openshift-jenkins/gcp-upgrade
+    labels:
+      master: ci.openshift.redhat.com
+    name: test_pull_request_openshift_ansible_install_upgrade_gce_310
+    rerun_command: /test gcp-upgrade
     skip_report: true
-    context: ci/openshift-jenkins/azure
-    rerun_command: "/test azure"
-    trigger: "((?m)^/test( all| azure),?(\\s+|$))"
+    trigger: ((?m)^/test( all| gcp-upgrade),?(\s+|$))
+  - agent: jenkins
+    always_run: true
     branches:
     - master
     - dockerless-build-temporary
-
-  - name: test_pull_request_openshift_ansible_extended_conformance_azure_310
-    agent: jenkins
+    context: ci/openshift-jenkins/azure
     labels:
       master: ci.openshift.redhat.com
-    always_run: true
+    name: test_pull_request_openshift_ansible_extended_conformance_azure
+    rerun_command: /test azure
     skip_report: true
-    context: ci/openshift-jenkins/azure
-    rerun_command: "/test azure"
-    trigger: "((?m)^/test( all| azure),?(\\s+|$))"
+    trigger: ((?m)^/test( all| azure),?(\s+|$))
+  - agent: jenkins
+    always_run: true
     branches:
     - release-3.10
-
-  - name: test_pull_request_openshift_ansible_extended_conformance_install
-    agent: jenkins
+    context: ci/openshift-jenkins/azure
     labels:
       master: ci.openshift.redhat.com
-    always_run: true
-    branches:
-      - master
-      - dockerless-build-temporary
-    context: ci/openshift-jenkins/install
-    rerun_command: "/test install"
-    trigger: "((?m)^/test( all| install),?(\\s+|$))"
-
-  - name: test_pull_request_openshift_ansible_extended_conformance_install_310
-    agent: jenkins
-    labels:
-      master: ci.openshift.redhat.com
-    always_run: true
-    branches:
-      - release-3.10
-    context: ci/openshift-jenkins/install
-    rerun_command: "/test install"
-    trigger: "((?m)^/test( all| install),?(\\s+|$))"
-
-  - name: test_pull_request_openshift_ansible_extended_conformance_install_release_36
-    agent: jenkins
-    labels:
-      master: ci.openshift.redhat.com
-    always_run: true
-    branches:
-      - release-3.6
-    context: ci/openshift-jenkins/install
-    rerun_command: "/test install"
-    trigger: "((?m)^/test( all| install),?(\\s+|$))"
-
-  - name: test_pull_request_openshift_ansible_extended_conformance_install_release_37
-    agent: jenkins
-    labels:
-      master: ci.openshift.redhat.com
-    always_run: true
-    branches:
-      - release-3.7
-    context: ci/openshift-jenkins/install
-    rerun_command: "/test install"
-    trigger: "((?m)^/test( all| install),?(\\s+|$))"
-
-  - name: test_pull_request_openshift_ansible_extended_conformance_install_release_39
-    agent: jenkins
-    labels:
-      master: ci.openshift.redhat.com
-    always_run: true
-    branches:
-      - release-3.9
-    context: ci/openshift-jenkins/install
-    rerun_command: "/test install"
-    trigger: "((?m)^/test( all| install),?(\\s+|$))"
-
-  - name: test_pull_request_openshift_ansible_extended_conformance_install_update
-    agent: jenkins
-    labels:
-      master: ci.openshift.redhat.com
-    always_run: false
+    name: test_pull_request_openshift_ansible_extended_conformance_azure_310
+    rerun_command: /test azure
     skip_report: true
+    trigger: ((?m)^/test( all| azure),?(\s+|$))
+  - agent: jenkins
+    always_run: true
+    branches:
+    - master
+    - dockerless-build-temporary
+    context: ci/openshift-jenkins/install
+    labels:
+      master: ci.openshift.redhat.com
+    name: test_pull_request_openshift_ansible_extended_conformance_install
+    rerun_command: /test install
+    trigger: ((?m)^/test( all| install),?(\s+|$))
+  - agent: jenkins
+    always_run: true
+    branches:
+    - release-3.10
+    context: ci/openshift-jenkins/install
+    labels:
+      master: ci.openshift.redhat.com
+    name: test_pull_request_openshift_ansible_extended_conformance_install_310
+    rerun_command: /test install
+    trigger: ((?m)^/test( all| install),?(\s+|$))
+  - agent: jenkins
+    always_run: true
+    branches:
+    - release-3.6
+    context: ci/openshift-jenkins/install
+    labels:
+      master: ci.openshift.redhat.com
+    name: test_pull_request_openshift_ansible_extended_conformance_install_release_36
+    rerun_command: /test install
+    trigger: ((?m)^/test( all| install),?(\s+|$))
+  - agent: jenkins
+    always_run: true
+    branches:
+    - release-3.7
+    context: ci/openshift-jenkins/install
+    labels:
+      master: ci.openshift.redhat.com
+    name: test_pull_request_openshift_ansible_extended_conformance_install_release_37
+    rerun_command: /test install
+    trigger: ((?m)^/test( all| install),?(\s+|$))
+  - agent: jenkins
+    always_run: true
+    branches:
+    - release-3.9
+    context: ci/openshift-jenkins/install
+    labels:
+      master: ci.openshift.redhat.com
+    name: test_pull_request_openshift_ansible_extended_conformance_install_release_39
+    rerun_command: /test install
+    trigger: ((?m)^/test( all| install),?(\s+|$))
+  - agent: jenkins
+    always_run: false
     branches:
     - release-3.10
     context: ci/openshift-jenkins/upgrade
-    rerun_command: "/test upgrade"
-    trigger: "((?m)^/test( upgrade),?(\\s+|$))"
-
-  - name: test_pull_request_openshift_ansible_extended_conformance_install_containerized
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
-    always_run: true
+    name: test_pull_request_openshift_ansible_extended_conformance_install_update
+    rerun_command: /test upgrade
     skip_report: true
+    trigger: ((?m)^/test( upgrade),?(\s+|$))
+  - agent: jenkins
+    always_run: true
     branches:
     - release-3.7
     - release-3.8
     - release-3.9
     context: ci/openshift-jenkins/containerized
-    rerun_command: "/test containerized"
-    trigger: "((?m)^/test( all| containerized),?(\\s+|$))"
-
-  - name: test_pull_request_openshift_ansible_extended_conformance_install_crio_rpm_310
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
-    always_run: true
+    name: test_pull_request_openshift_ansible_extended_conformance_install_containerized
+    rerun_command: /test containerized
     skip_report: true
-    context: ci/openshift-jenkins/extended_conformance_install_crio_rpm
-    rerun_command: "/test crio"
-    trigger: "((?m)^/test( all| crio),?(\\s+|$))"
+    trigger: ((?m)^/test( all| containerized),?(\s+|$))
+  - agent: jenkins
+    always_run: true
     branches:
     - release-3.10
-
-  - name: test_pull_request_openshift_ansible_extended_conformance_install_update_containerized
-    agent: jenkins
+    context: ci/openshift-jenkins/extended_conformance_install_crio_rpm
     labels:
       master: ci.openshift.redhat.com
+    name: test_pull_request_openshift_ansible_extended_conformance_install_crio_rpm_310
+    rerun_command: /test crio
+    skip_report: true
+    trigger: ((?m)^/test( all| crio),?(\s+|$))
+  - agent: jenkins
     always_run: false
     branches:
     - release-3.7
     - release-3.8
     - release-3.9
-    skip_report: true
     context: ci/openshift-jenkins/containerized_upgrade
-    rerun_command: "/test containerized-upgrade"
-    trigger: "((?m)^/test( containerized-upgrade),?(\\s+|$))"
-
-  - name: test_pull_request_openshift_ansible_extended_conformance_install_in_tree
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
+    name: test_pull_request_openshift_ansible_extended_conformance_install_update_containerized
+    rerun_command: /test containerized-upgrade
+    skip_report: true
+    trigger: ((?m)^/test( containerized-upgrade),?(\s+|$))
+  - agent: jenkins
     always_run: false
-    skip_report: true
     context: ci/openshift-jenkins/install_in_tree
-    rerun_command: "/test install-in-tree"
-    trigger: "((?m)^/test install-in-tree,?(\\s+|$))"
-
-  - name: test_pull_request_openshift_ansible_extended_conformance_install_system_containers_39
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
-    always_run: true
+    name: test_pull_request_openshift_ansible_extended_conformance_install_in_tree
+    rerun_command: /test install-in-tree
     skip_report: true
+    trigger: ((?m)^/test install-in-tree,?(\s+|$))
+  - agent: jenkins
+    always_run: true
     branches:
     - release-3.9
     context: ci/openshift-jenkins/system-containers
-    rerun_command: "/test system-containers"
-    trigger: "((?m)^/test( all| system-containers),?(\\s+|$))"
-
-  - name: test_pull_request_openshift_ansible_extended_conformance_install_system_containers_37
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
-    always_run: true
+    name: test_pull_request_openshift_ansible_extended_conformance_install_system_containers_39
+    rerun_command: /test system-containers
     skip_report: true
+    trigger: ((?m)^/test( all| system-containers),?(\s+|$))
+  - agent: jenkins
+    always_run: true
     branches:
     - release-3.7
     context: ci/openshift-jenkins/system-containers
-    rerun_command: "/test system-containers"
-    trigger: "((?m)^/test( all| system-containers),?(\\s+|$))"
-
-  - name: test_pull_request_openshift_ansible_launch_gce_310
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
+    name: test_pull_request_openshift_ansible_extended_conformance_install_system_containers_37
+    rerun_command: /test system-containers
+    skip_report: true
+    trigger: ((?m)^/test( all| system-containers),?(\s+|$))
+  - agent: jenkins
     always_run: false
-    context: ci/openshift-jenkins/launch-gcp
-    rerun_command: "/test launch-gcp"
-    trigger: "((?m)^/test launch-gcp,?(\\s+|$))"
     branches:
     - release-3.10
+    context: ci/openshift-jenkins/launch-gcp
+    labels:
+      master: ci.openshift.redhat.com
+    name: test_pull_request_openshift_ansible_launch_gce_310
+    rerun_command: /test launch-gcp
+    trigger: ((?m)^/test launch-gcp,?(\s+|$))

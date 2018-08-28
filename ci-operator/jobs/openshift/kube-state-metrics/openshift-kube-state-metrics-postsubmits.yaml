@@ -1,28 +1,32 @@
 postsubmits:
   openshift/kube-state-metrics:
-  - name: branch-ci-openshift-kube-state-metrics-images
-    agent: kubernetes
-    labels:
-      artifacts: images
+  - agent: kubernetes
     branches:
     - openshift-master
     decorate: true
+    labels:
+      artifacts: images
+    name: branch-ci-openshift-kube-state-metrics-images
     skip_cloning: true
     spec:
-      serviceAccountName: ci-operator
       containers:
-      - name: test
-        image: ci-operator:latest
-        resources: {"requests": {"cpu": "10m"},"limits":{"cpu":"500m"}}
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=[images]
+        - --promote
+        command:
+        - ci-operator
         env:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              name: ci-operator-openshift-kube-state-metrics
               key: master.json
-        command:
-        - ci-operator
-        args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --target=[images]
-        - --promote
+              name: ci-operator-openshift-kube-state-metrics
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator

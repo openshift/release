@@ -1,205 +1,201 @@
 presubmits:
   openshift/origin:
-
-  - name: test_pull_request_origin_verify_310
-    agent: jenkins
-    labels:
-      master: ci.openshift.redhat.com
+  - agent: jenkins
     always_run: true
     branches:
     - release-3.10
     context: ci/openshift-jenkins/verify
-    rerun_command: "/test verify"
-    trigger: "((?m)^/test( all| verify),?(\\s+|$))"
-
-  - name: test_pull_request_origin_cmd
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
+    name: test_pull_request_origin_verify_310
+    rerun_command: /test verify
+    trigger: ((?m)^/test( all| verify),?(\s+|$))
+  - agent: jenkins
     always_run: true
     context: ci/openshift-jenkins/cmd
-    rerun_command: "/test cmd"
-    trigger: "((?m)^/test( all| cmd),?(\\s+|$))"
-
-  - name: pull-ci-origin-unit
-    agent: kubernetes
-    context: ci/prow/unit
+    labels:
+      master: ci.openshift.redhat.com
+    name: test_pull_request_origin_cmd
+    rerun_command: /test cmd
+    trigger: ((?m)^/test( all| cmd),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
     branches:
     - master
     - dockerless-build-temporary
-    rerun_command: "/test unit"
-    always_run: true
-    trigger: "((?m)^/test( all| unit),?(\\s+|$))"
+    context: ci/prow/unit
     decorate: true
+    name: pull-ci-origin-unit
+    rerun_command: /test unit
     skip_cloning: true
     spec:
-      serviceAccountName: ci-operator
       containers:
-      - name: test
-        image: ci-operator:latest
-        resources: {"requests": {"cpu": "10m"},"limits":{"cpu":"500m"}}
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=unit
+        command:
+        - ci-operator
         env:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              name: ci-operator-openshift-origin
               key: master.json
+              name: ci-operator-openshift-origin
         - name: OVERRIDE_SPEC
-          value: '{"test_base_image": {"cluster": "", "namespace": "ci", "name": "src-cache-origin", "tag": "master"}}'
-        command:
-        - ci-operator
-        args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --target=unit
-  - name: pull-ci-origin-unit-3.10
-    agent: kubernetes
-    context: ci/prow/unit
+          value: '{"test_base_image": {"cluster": "", "namespace": "ci", "name": "src-cache-origin",
+            "tag": "master"}}'
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| unit),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
     branches:
     - release-3.10
-    rerun_command: "/test unit"
-    always_run: true
-    trigger: "((?m)^/test( all| unit),?(\\s+|$))"
+    context: ci/prow/unit
     decorate: true
+    name: pull-ci-origin-unit-3.10
+    rerun_command: /test unit
     skip_cloning: true
     spec:
-      serviceAccountName: ci-operator
       containers:
-      - name: test
-        image: ci-operator:latest
-        resources: {"requests": {"cpu": "10m"},"limits":{"cpu":"500m"}}
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=unit
+        command:
+        - ci-operator
         env:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              name: ci-operator-openshift-origin
               key: release-3.10.json
-        command:
-        - ci-operator
-        args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --target=unit
-
-  - name: test_pull_request_origin_unit
-    agent: jenkins
-    labels:
-      master: ci.openshift.redhat.com
+              name: ci-operator-openshift-origin
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| unit),?(\s+|$))
+  - agent: jenkins
+    always_run: true
     branches:
     - cli-pre-rebase
     - release-3.9
     - release-3.8
     - release-3.7
-    always_run: true
     context: ci/openshift-jenkins/unit
-    rerun_command: "/test unit"
-    trigger: "((?m)^/test( all| unit),?(\\s+|$))"
-
-  - name: test_pull_request_origin_integration_310
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
+    name: test_pull_request_origin_unit
+    rerun_command: /test unit
+    trigger: ((?m)^/test( all| unit),?(\s+|$))
+  - agent: jenkins
     always_run: true
     branches:
     - release-3.10
     context: ci/openshift-jenkins/integration
-    rerun_command: "/test integration"
-    trigger: "((?m)^/test( all| integration),?(\\s+|$))"
-
-  - name: pull-ci-origin-integration
-    agent: kubernetes
-    context: ci/prow/integration
+    labels:
+      master: ci.openshift.redhat.com
+    name: test_pull_request_origin_integration_310
+    rerun_command: /test integration
+    trigger: ((?m)^/test( all| integration),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
     branches:
     - master
     - dockerless-build-temporary
-    rerun_command: "/test integration"
-    always_run: true
-    trigger: "((?m)^/test( all| integration),?(\\s+|$))"
+    context: ci/prow/integration
     decorate: true
+    name: pull-ci-origin-integration
+    rerun_command: /test integration
     skip_cloning: true
     spec:
-      serviceAccountName: ci-operator
       containers:
-      - name: test
-        image: ci-operator:latest
-        resources: {"requests": {"cpu": "10m"},"limits":{"cpu":"500m"}}
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              name: ci-operator-openshift-origin
-              key: master.json
-        - name: OVERRIDE_SPEC
-          value: '{"test_base_image": {"cluster": "", "namespace": "ci", "name": "src-cache-origin", "tag": "master"}}'
-        command:
-        - ci-operator
-        args:
+      - args:
         - --artifact-dir=$(ARTIFACTS)
         - --target=integration
-
-  - name: pull-ci-origin-verify
-    agent: kubernetes
-    context: ci/prow/verify
-    branches:
-    - master
-    - dockerless-build-temporary
-    rerun_command: "/test verify"
-    always_run: true
-    trigger: "((?m)^/test( all| verify),?(\\s+|$))"
-    decorate: true
-    skip_cloning: true
-    spec:
-      serviceAccountName: ci-operator
-      containers:
-      - name: test
-        image: ci-operator:latest
-        resources: {"requests": {"cpu": "10m"},"limits":{"cpu":"500m"}}
+        command:
+        - ci-operator
         env:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              name: ci-operator-openshift-origin
               key: master.json
+              name: ci-operator-openshift-origin
         - name: OVERRIDE_SPEC
-          value: '{"test_base_image": {"cluster": "", "namespace": "ci", "name": "src-cache-origin", "tag": "master"}}'
-        command:
-        - ci-operator
-        args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --target=verify
-
-  - name: pull-ci-origin-e2e-gcp
-    agent: kubernetes
-    context: ci/prow/gcp
+          value: '{"test_base_image": {"cluster": "", "namespace": "ci", "name": "src-cache-origin",
+            "tag": "master"}}'
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| integration),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
     branches:
     - master
     - dockerless-build-temporary
-    rerun_command: "/test gcp"
-    always_run: true
-    trigger: "((?m)^/test( all| gcp),?(\\s+|$))"
+    context: ci/prow/verify
     decorate: true
+    name: pull-ci-origin-verify
+    rerun_command: /test verify
     skip_cloning: true
     spec:
-      serviceAccountName: ci-operator
-      volumes:
-      - name: job-definition
-        configMap:
-          name: prow-job-cluster-launch-e2e
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
       containers:
-      - name: test
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=verify
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.json
+              name: ci-operator-openshift-origin
+        - name: OVERRIDE_SPEC
+          value: '{"test_base_image": {"cluster": "", "namespace": "ci", "name": "src-cache-origin",
+            "tag": "master"}}'
         image: ci-operator:latest
-        resources: {"requests": {"cpu": "10m"},"limits":{"cpu":"500m"}}
-        volumeMounts:
-        - name: job-definition
-          mountPath: /usr/local/e2e-gcp
-          subPath: cluster-launch-e2e.yaml
-        - name: cluster-profile
-          mountPath: /usr/local/e2e-gcp-cluster-profile
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| verify),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    - dockerless-build-temporary
+    context: ci/prow/gcp
+    decorate: true
+    name: pull-ci-origin-e2e-gcp
+    rerun_command: /test gcp
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --secret-dir=/usr/local/e2e-gcp-cluster-profile
+        - --template=/usr/local/e2e-gcp
+        - --target=e2e-gcp
+        command:
+        - ci-operator
         env:
         - name: TEST_FOCUS
           value: Suite:openshift/conformance/parallel
@@ -212,53 +208,57 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              name: ci-operator-openshift-origin
               key: master.json
+              name: ci-operator-openshift-origin
         - name: OVERRIDE_SPEC
-          value: '{"test_base_image": {"cluster": "", "namespace": "ci", "name": "src-cache-origin", "tag": "master"}}'
-        command:
-        - ci-operator
-        args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --secret-dir=/usr/local/e2e-gcp-cluster-profile
-        - --template=/usr/local/e2e-gcp
-        - --target=e2e-gcp
-
-  - name: pull-ci-origin-e2e-gcp-crio
-    agent: kubernetes
-    context: ci/prow/gcp-crio
-    branches:
-    - master
-    - dockerless-build-temporary
-    rerun_command: "/test gcp-crio"
-    run_if_changed: '^(vendor/k8s.io/kubernetes/pkg/kubelet)|^(pkg/build/builder)'
-    always_run: false
-    trigger: "((?m)^/test( gcp-crio),?(\\s+|$))"
-    decorate: true
-    skip_cloning: true
-    spec:
+          value: '{"test_base_image": {"cluster": "", "namespace": "ci", "name": "src-cache-origin",
+            "tag": "master"}}'
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-gcp
+          name: job-definition
+          subPath: cluster-launch-e2e.yaml
+        - mountPath: /usr/local/e2e-gcp-cluster-profile
+          name: cluster-profile
       serviceAccountName: ci-operator
       volumes:
-      - name: job-definition
-        configMap:
+      - configMap:
           name: prow-job-cluster-launch-e2e
+        name: job-definition
       - name: cluster-profile
         projected:
           sources:
           - secret:
               name: cluster-secrets-gcp
           - configMap:
-              name: cluster-profile-gcp-crio
+              name: cluster-profile-gcp
+    trigger: ((?m)^/test( all| gcp),?(\s+|$))
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - master
+    - dockerless-build-temporary
+    context: ci/prow/gcp-crio
+    decorate: true
+    name: pull-ci-origin-e2e-gcp-crio
+    rerun_command: /test gcp-crio
+    run_if_changed: ^(vendor/k8s.io/kubernetes/pkg/kubelet)|^(pkg/build/builder)
+    skip_cloning: true
+    spec:
       containers:
-      - name: test
-        image: ci-operator:latest
-        resources: {"requests": {"cpu": "10m"},"limits":{"cpu":"500m"}}
-        volumeMounts:
-        - name: job-definition
-          mountPath: /usr/local/e2e-gcp-crio
-          subPath: cluster-launch-e2e.yaml
-        - name: cluster-profile
-          mountPath: /usr/local/e2e-gcp-crio-cluster-profile
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --secret-dir=/usr/local/e2e-gcp-crio-cluster-profile
+        - --template=/usr/local/e2e-gcp-crio
+        - --target=e2e-gcp-crio
+        command:
+        - ci-operator
         env:
         - name: TEST_FOCUS
           value: Suite:openshift/conformance/parallel
@@ -271,54 +271,59 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              name: ci-operator-openshift-origin
               key: master.json
+              name: ci-operator-openshift-origin
         - name: OVERRIDE_SPEC
-          value: '{"test_base_image": {"cluster": "", "namespace": "ci", "name": "src-cache-origin", "tag": "master"}}'
-        command:
-        - ci-operator
-        args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --secret-dir=/usr/local/e2e-gcp-crio-cluster-profile
-        - --template=/usr/local/e2e-gcp-crio
-        - --target=e2e-gcp-crio
-
-  - name: pull-ci-origin-launch-gcp
-    agent: kubernetes
-    context: ci/prow/launch-gcp
-    branches:
-    - master
-    - dockerless-build-temporary
-    rerun_command: "/test launch-gcp"
-    trigger: "((?m)^/test( launch-gcp),?(\\s+|$))"
-    decorate: true
-    skip_cloning: true
-    spec:
+          value: '{"test_base_image": {"cluster": "", "namespace": "ci", "name": "src-cache-origin",
+            "tag": "master"}}'
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-gcp-crio
+          name: job-definition
+          subPath: cluster-launch-e2e.yaml
+        - mountPath: /usr/local/e2e-gcp-crio-cluster-profile
+          name: cluster-profile
       serviceAccountName: ci-operator
       volumes:
-      - name: job-definition
-        configMap:
+      - configMap:
           name: prow-job-cluster-launch-e2e
+        name: job-definition
       - name: cluster-profile
         projected:
           sources:
           - secret:
               name: cluster-secrets-gcp
           - configMap:
-              name: cluster-profile-gcp
+              name: cluster-profile-gcp-crio
+    trigger: ((?m)^/test( gcp-crio),?(\s+|$))
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - master
+    - dockerless-build-temporary
+    context: ci/prow/launch-gcp
+    decorate: true
+    name: pull-ci-origin-launch-gcp
+    rerun_command: /test launch-gcp
+    skip_cloning: true
+    spec:
       containers:
-      - name: test
-        image: ci-operator:latest
-        resources: {"requests": {"cpu": "10m"},"limits":{"cpu":"500m"}}
-        volumeMounts:
-        - name: job-definition
-          mountPath: /usr/local/e2e-gcp-launch
-          subPath: cluster-launch-e2e.yaml
-        - name: cluster-profile
-          mountPath: /usr/local/e2e-gcp-launch-cluster-profile
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --secret-dir=/usr/local/e2e-gcp-launch-cluster-profile
+        - --template=/usr/local/e2e-gcp-launch
+        - --target=e2e-gcp-launch
+        command:
+        - ci-operator
         env:
         - name: TEST_COMMAND
-          value: "sleep 7200 & wait"
+          value: sleep 7200 & wait
         - name: TEST_FOCUS_SERIAL
           value: Suite:openshift/registry/serial
         - name: JOB_NAME_SAFE
@@ -328,86 +333,96 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              name: ci-operator-openshift-origin
               key: master.json
+              name: ci-operator-openshift-origin
         - name: OVERRIDE_SPEC
-          value: '{"test_base_image": {"cluster": "", "namespace": "ci", "name": "src-cache-origin", "tag": "master"}}'
-        command:
-        - ci-operator
-        args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --secret-dir=/usr/local/e2e-gcp-launch-cluster-profile
-        - --template=/usr/local/e2e-gcp-launch
-        - --target=e2e-gcp-launch
-
-  - name: test_pull_request_origin_end_to_end
-    agent: jenkins
-    labels:
-      master: ci.openshift.redhat.com
+          value: '{"test_base_image": {"cluster": "", "namespace": "ci", "name": "src-cache-origin",
+            "tag": "master"}}'
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-gcp-launch
+          name: job-definition
+          subPath: cluster-launch-e2e.yaml
+        - mountPath: /usr/local/e2e-gcp-launch-cluster-profile
+          name: cluster-profile
+      serviceAccountName: ci-operator
+      volumes:
+      - configMap:
+          name: prow-job-cluster-launch-e2e
+        name: job-definition
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+    trigger: ((?m)^/test( launch-gcp),?(\s+|$))
+  - agent: jenkins
     always_run: true
     context: ci/openshift-jenkins/end_to_end
-    rerun_command: "/test end_to_end"
-    trigger: "((?m)^/test( all| end_to_end),?(\\s+|$))"
-
-  - name: test_pull_request_origin_extended_conformance_install_36
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
+    name: test_pull_request_origin_end_to_end
+    rerun_command: /test end_to_end
+    trigger: ((?m)^/test( all| end_to_end),?(\s+|$))
+  - agent: jenkins
     always_run: true
     branches:
     - release-3.6
     context: ci/openshift-jenkins/extended_conformance_install
-    rerun_command: "/test extended_conformance_install"
-    trigger: "((?m)^/test( all| extended_conformance_install),?(\\s+|$))"
-
-  - name: test_pull_request_origin_extended_conformance_install_37
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
+    name: test_pull_request_origin_extended_conformance_install_36
+    rerun_command: /test extended_conformance_install
+    trigger: ((?m)^/test( all| extended_conformance_install),?(\s+|$))
+  - agent: jenkins
     always_run: true
     branches:
     - release-3.7
     context: ci/openshift-jenkins/extended_conformance_install
-    rerun_command: "/test extended_conformance_install"
-    trigger: "((?m)^/test( all| extended_conformance_install),?(\\s+|$))"
-
-  - name: test_pull_request_origin_extended_conformance_install_38
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
+    name: test_pull_request_origin_extended_conformance_install_37
+    rerun_command: /test extended_conformance_install
+    trigger: ((?m)^/test( all| extended_conformance_install),?(\s+|$))
+  - agent: jenkins
     always_run: true
     branches:
     - release-3.8
     context: ci/openshift-jenkins/extended_conformance_install
-    rerun_command: "/test extended_conformance_install"
-    trigger: "((?m)^/test( all| extended_conformance_install),?(\\s+|$))"
-
-  - name: test_pull_request_origin_extended_conformance_install_39
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
+    name: test_pull_request_origin_extended_conformance_install_38
+    rerun_command: /test extended_conformance_install
+    trigger: ((?m)^/test( all| extended_conformance_install),?(\s+|$))
+  - agent: jenkins
     always_run: true
     branches:
     - release-3.9
     context: ci/openshift-jenkins/extended_conformance_install
-    rerun_command: "/test extended_conformance_install"
-    trigger: "((?m)^/test( all| extended_conformance_install),?(\\s+|$))"
-
-  - name: test_pull_request_origin_extended_conformance_install_310
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
+    name: test_pull_request_origin_extended_conformance_install_39
+    rerun_command: /test extended_conformance_install
+    trigger: ((?m)^/test( all| extended_conformance_install),?(\s+|$))
+  - agent: jenkins
     always_run: true
     branches:
     - release-3.10
     context: ci/openshift-jenkins/extended_conformance_install
-    rerun_command: "/test extended_conformance_install"
-    trigger: "((?m)^/test( all| extended_conformance_install),?(\\s+|$))"
-
-  - name: test_pull_request_origin_extended_conformance_install
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
+    name: test_pull_request_origin_extended_conformance_install_310
+    rerun_command: /test extended_conformance_install
+    trigger: ((?m)^/test( all| extended_conformance_install),?(\s+|$))
+  - agent: jenkins
     always_run: true
     branches:
     - cli-pre-rebase
@@ -415,109 +430,91 @@ presubmits:
     - stage
     - dockerless-build-temporary
     context: ci/openshift-jenkins/extended_conformance_install
-    rerun_command: "/test extended_conformance_install"
-    trigger: "((?m)^/test( all| extended_conformance_install),?(\\s+|$))"
-
-  - name: test_pull_request_origin_extended_conformance_install_update
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
+    name: test_pull_request_origin_extended_conformance_install
+    rerun_command: /test extended_conformance_install
+    trigger: ((?m)^/test( all| extended_conformance_install),?(\s+|$))
+  - agent: jenkins
     always_run: false
-    skip_report: true
     branches:
     - release-3.10
     context: ci/openshift-jenkins/extended_conformance_install_update
-    rerun_command: "/test extended_conformance_install_update"
-    trigger: "((?m)^/test( extended_conformance_install_update),?(\\s+|$))"
-
-  - name: test_pull_request_origin_extended_conformance_gce_37
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
+    name: test_pull_request_origin_extended_conformance_install_update
+    rerun_command: /test extended_conformance_install_update
+    skip_report: true
+    trigger: ((?m)^/test( extended_conformance_install_update),?(\s+|$))
+  - agent: jenkins
     always_run: true
     branches:
     - release-3.7
     context: ci/openshift-jenkins/gcp
-    rerun_command: "/test gcp"
-    trigger: "((?m)^/test( all| gcp),?(\\s+|$))"
-
-  - name: test_pull_request_origin_extended_conformance_gce_39
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
+    name: test_pull_request_origin_extended_conformance_gce_37
+    rerun_command: /test gcp
+    trigger: ((?m)^/test( all| gcp),?(\s+|$))
+  - agent: jenkins
     always_run: true
     branches:
     - release-3.9
     context: ci/openshift-jenkins/gcp
-    rerun_command: "/test gcp"
-    trigger: "((?m)^/test( all| gcp),?(\\s+|$))"
-
-  - name: test_pull_request_origin_extended_conformance_gce_310
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
+    name: test_pull_request_origin_extended_conformance_gce_39
+    rerun_command: /test gcp
+    trigger: ((?m)^/test( all| gcp),?(\s+|$))
+  - agent: jenkins
     always_run: true
     branches:
     - release-3.10
     context: ci/openshift-jenkins/gcp
-    rerun_command: "/test gcp"
-    trigger: "((?m)^/test( all| gcp),?(\\s+|$))"
-
-  - name: test_pull_request_origin_extended_conformance_gce
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
+    name: test_pull_request_origin_extended_conformance_gce_310
+    rerun_command: /test gcp
+    trigger: ((?m)^/test( all| gcp),?(\s+|$))
+  - agent: jenkins
     always_run: true
     branches:
     - cli-pre-rebase
     context: ci/openshift-jenkins/gcp
-    rerun_command: "/test gcp"
-    trigger: "((?m)^/test( all| gcp),?(\\s+|$))"
-
-  - name: test_pull_request_origin_extended_conformance_k8s_310
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
+    name: test_pull_request_origin_extended_conformance_gce
+    rerun_command: /test gcp
+    trigger: ((?m)^/test( all| gcp),?(\s+|$))
+  - agent: jenkins
+    always_run: false
     branches:
     - release-3.10
-    always_run: false
     context: ci/openshift-jenkins/extended_conformance_k8s
-    rerun_command: "/test conformance_k8s"
-    trigger: "((?m)^/test conformance_k8s,?(\\s+|$))"
-
-  - name: pull-ci-origin-conformance-k8s
-    agent: kubernetes
-    context: ci/prow/conformance-k8s
+    labels:
+      master: ci.openshift.redhat.com
+    name: test_pull_request_origin_extended_conformance_k8s_310
+    rerun_command: /test conformance_k8s
+    trigger: ((?m)^/test conformance_k8s,?(\s+|$))
+  - agent: kubernetes
+    always_run: false
     branches:
     - master
     - dockerless-build-temporary
-    rerun_command: "/test conformance-k8s"
-    trigger: "((?m)^/test( conformance-k8s),?(\\s+|$))"
+    context: ci/prow/conformance-k8s
     decorate: true
+    name: pull-ci-origin-conformance-k8s
+    rerun_command: /test conformance-k8s
     skip_cloning: true
     spec:
-      serviceAccountName: ci-operator
-      volumes:
-      - name: job-definition
-        configMap:
-          name: prow-job-cluster-launch-src
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
       containers:
-      - name: test
-        image: ci-operator:latest
-        resources: {"requests": {"cpu": "10m"},"limits":{"cpu":"500m"}}
-        volumeMounts:
-        - name: job-definition
-          mountPath: /usr/local/e2e-gcp
-          subPath: cluster-launch-src.yaml
-        - name: cluster-profile
-          mountPath: /usr/local/e2e-gcp-cluster-profile
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --secret-dir=/usr/local/e2e-gcp-cluster-profile
+        - --template=/usr/local/e2e-gcp
+        - --target=e2e-gcp
+        command:
+        - ci-operator
         env:
         - name: TEST_COMMAND
           value: test/extended/conformance-k8s.sh
@@ -528,33 +525,29 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              name: ci-operator-openshift-origin
               key: master.json
+              name: ci-operator-openshift-origin
         - name: OVERRIDE_SPEC
-          value: '{"test_base_image": {"cluster": "", "namespace": "ci", "name": "src-cache-origin", "tag": "master"}}'
-        command:
-        - ci-operator
-        args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --secret-dir=/usr/local/e2e-gcp-cluster-profile
-        - --template=/usr/local/e2e-gcp
-        - --target=e2e-gcp
-
-  - name: pull-ci-origin-conformance-k8s-310
-    agent: kubernetes
-    context: ci/prow/conformance-k8s
-    branches:
-    - release-3.10
-    rerun_command: "/test conformance-k8s"
-    trigger: "((?m)^/test( conformance-k8s),?(\\s+|$))"
-    decorate: true
-    skip_cloning: true
-    spec:
+          value: '{"test_base_image": {"cluster": "", "namespace": "ci", "name": "src-cache-origin",
+            "tag": "master"}}'
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-gcp
+          name: job-definition
+          subPath: cluster-launch-src.yaml
+        - mountPath: /usr/local/e2e-gcp-cluster-profile
+          name: cluster-profile
       serviceAccountName: ci-operator
       volumes:
-      - name: job-definition
-        configMap:
+      - configMap:
           name: prow-job-cluster-launch-src
+        name: job-definition
       - name: cluster-profile
         projected:
           sources:
@@ -562,16 +555,25 @@ presubmits:
               name: cluster-secrets-gcp
           - configMap:
               name: cluster-profile-gcp
+    trigger: ((?m)^/test( conformance-k8s),?(\s+|$))
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - release-3.10
+    context: ci/prow/conformance-k8s
+    decorate: true
+    name: pull-ci-origin-conformance-k8s-310
+    rerun_command: /test conformance-k8s
+    skip_cloning: true
+    spec:
       containers:
-      - name: test
-        image: ci-operator:latest
-        resources: {"requests": {"cpu": "10m"},"limits":{"cpu":"500m"}}
-        volumeMounts:
-        - name: job-definition
-          mountPath: /usr/local/e2e-gcp
-          subPath: cluster-launch-src.yaml
-        - name: cluster-profile
-          mountPath: /usr/local/e2e-gcp-cluster-profile
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --secret-dir=/usr/local/e2e-gcp-cluster-profile
+        - --template=/usr/local/e2e-gcp
+        - --target=e2e-gcp
+        command:
+        - ci-operator
         env:
         - name: TEST_COMMAND
           value: test/extended/conformance-k8s.sh
@@ -582,295 +584,301 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              name: ci-operator-openshift-origin
               key: master.json
+              name: ci-operator-openshift-origin
         - name: OVERRIDE_SPEC
-          value: '{"test_base_image": {"cluster": "", "namespace": "ci", "name": "src-cache-origin", "tag": "master"}}'
-        command:
-        - ci-operator
-        args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --secret-dir=/usr/local/e2e-gcp-cluster-profile
-        - --template=/usr/local/e2e-gcp
-        - --target=e2e-gcp
-
-  - name: test_pull_request_origin_extended_networking_310
-    agent: jenkins
-    labels:
-      master: ci.openshift.redhat.com
+          value: '{"test_base_image": {"cluster": "", "namespace": "ci", "name": "src-cache-origin",
+            "tag": "master"}}'
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-gcp
+          name: job-definition
+          subPath: cluster-launch-src.yaml
+        - mountPath: /usr/local/e2e-gcp-cluster-profile
+          name: cluster-profile
+      serviceAccountName: ci-operator
+      volumes:
+      - configMap:
+          name: prow-job-cluster-launch-src
+        name: job-definition
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+    trigger: ((?m)^/test( conformance-k8s),?(\s+|$))
+  - agent: jenkins
     always_run: false
     branches:
     - release-3.10
     context: ci/openshift-jenkins/extended_networking
-    rerun_command: "/test extended_networking"
-    trigger: "((?m)^/test extended_networking,?(\\s+|$))"
-
-  - name: test_pull_request_origin_extended_networking
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
+    name: test_pull_request_origin_extended_networking_310
+    rerun_command: /test extended_networking
+    trigger: ((?m)^/test extended_networking,?(\s+|$))
+  - agent: jenkins
     always_run: false
     branches:
     - master
     context: ci/openshift-jenkins/extended_networking
-    rerun_command: "/test extended_networking"
-    trigger: "((?m)^/test extended_networking,?(\\s+|$))"
-
-  - name: test_pull_request_origin_extended_builds
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
+    name: test_pull_request_origin_extended_networking
+    rerun_command: /test extended_networking
+    trigger: ((?m)^/test extended_networking,?(\s+|$))
+  - agent: jenkins
+    always_run: false
     branches:
     - master
     - dockerless-build-temporary
-    run_if_changed: '^(pkg/oc/cli/cmd/startbuild.go)|^(pkg/build)|^(pkg/cmd/infra/builder)|^(test/extended/builds)|^(test/extended/testdata/builds)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)'
     context: ci/openshift-jenkins/extended_builds
-    rerun_command: "/test extended_builds"
-    trigger: "((?m)^/test extended_builds,?(\\s+|$))"
-
-  - name: test_pull_request_origin_extended_builds_310
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
+    name: test_pull_request_origin_extended_builds
+    rerun_command: /test extended_builds
+    run_if_changed: ^(pkg/oc/cli/cmd/startbuild.go)|^(pkg/build)|^(pkg/cmd/infra/builder)|^(test/extended/builds)|^(test/extended/testdata/builds)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)
+    trigger: ((?m)^/test extended_builds,?(\s+|$))
+  - agent: jenkins
+    always_run: false
     branches:
     - release-3.10
-    run_if_changed: '^(pkg/oc/cli/cmd/startbuild.go)|^(pkg/build)|^(pkg/cmd/infra/builder)|^(test/extended/builds)|^(test/extended/testdata/builds)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)'
     context: ci/openshift-jenkins/extended_builds
-    rerun_command: "/test extended_builds"
-    trigger: "((?m)^/test extended_builds,?(\\s+|$))"
-
-  - name: test_pull_request_origin_extended_clusterup
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
+    name: test_pull_request_origin_extended_builds_310
+    rerun_command: /test extended_builds
+    run_if_changed: ^(pkg/oc/cli/cmd/startbuild.go)|^(pkg/build)|^(pkg/cmd/infra/builder)|^(test/extended/builds)|^(test/extended/testdata/builds)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)
+    trigger: ((?m)^/test extended_builds,?(\s+|$))
+  - agent: jenkins
+    always_run: true
     branches:
     - master
     - dockerless-build-temporary
-    always_run: true
     context: ci/openshift-jenkins/extended_clusterup
-    rerun_command: "/test extended_clusterup"
-    trigger: "((?m)^/test extended_clusterup,?(\\s+|$))"
-
-  - name: test_pull_request_origin_extended_clusterup_310
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
+    name: test_pull_request_origin_extended_clusterup
+    rerun_command: /test extended_clusterup
+    trigger: ((?m)^/test extended_clusterup,?(\s+|$))
+  - agent: jenkins
     always_run: true
     branches:
     - release-3.10
     context: ci/openshift-jenkins/extended_clusterup
-    rerun_command: "/test extended_clusterup"
-    trigger: "((?m)^/test extended_clusterup,?(\\s+|$))"
-
-  - name: test_pull_request_origin_extended_gssapi_310
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
+    name: test_pull_request_origin_extended_clusterup_310
+    rerun_command: /test extended_clusterup
+    trigger: ((?m)^/test extended_clusterup,?(\s+|$))
+  - agent: jenkins
     always_run: false
     branches:
     - release-3.10
     context: ci/openshift-jenkins/extended_gssapi
-    rerun_command: "/test extended_gssapi"
-    trigger: "((?m)^/test extended_gssapi,?(\\s+|$))"
-
-  - name: test_pull_request_origin_extended_gssapi
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
+    name: test_pull_request_origin_extended_gssapi_310
+    rerun_command: /test extended_gssapi
+    trigger: ((?m)^/test extended_gssapi,?(\s+|$))
+  - agent: jenkins
     always_run: false
     branches:
     - master
     - dockerless-build-temporary
     context: ci/openshift-jenkins/extended_gssapi
-    rerun_command: "/test extended_gssapi"
-    trigger: "((?m)^/test extended_gssapi,?(\\s+|$))"
-
-  - name: test_pull_request_origin_extended_image_ecosystem_310
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
-    branches:
-    - release-3.10
-    run_if_changed: '^(test/extended/image_ecosystem)|^(examples/db-templates)|^(examples/quickstarts)|^(examples/image-streams)|^(examples/jenkins)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)'
-    context: ci/openshift-jenkins/extended_image_ecosystem
-    rerun_command: "/test extended_image_ecosystem"
-    trigger: "((?m)^/test extended_image_ecosystem,?(\\s+|$))"
-
-  - name: test_pull_request_origin_extended_image_ecosystem
-    agent: jenkins
-    labels:
-      master: ci.openshift.redhat.com
-    branches:
-    - master
-    - dockerless-build-temporary
-    run_if_changed: '^(test/extended/image_ecosystem)|^(examples/db-templates)|^(examples/quickstarts)|^(examples/image-streams)|^(examples/jenkins)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)'
-    context: ci/openshift-jenkins/extended_image_ecosystem
-    rerun_command: "/test extended_image_ecosystem"
-    trigger: "((?m)^/test extended_image_ecosystem,?(\\s+|$))"
-
-  - name: test_pull_request_origin_extended_image_registry_310
-    agent: jenkins
-    labels:
-      master: ci.openshift.redhat.com
+    name: test_pull_request_origin_extended_gssapi
+    rerun_command: /test extended_gssapi
+    trigger: ((?m)^/test extended_gssapi,?(\s+|$))
+  - agent: jenkins
     always_run: false
     branches:
     - release-3.10
-    run_if_changed: '^(pkg/image)|^(test/extended/registry)|^(test/extended/images)|^(test/extended/imageapis)|^(vendor/github.com/docker/distribution)'
-    context: ci/openshift-jenkins/extended_image_registry
-    rerun_command: "/test extended_image_registry"
-    trigger: "((?m)^/test extended_image_registry,?(\\s+|$))"
-
-  - name: test_pull_request_origin_extended_image_registry
-    agent: jenkins
+    context: ci/openshift-jenkins/extended_image_ecosystem
     labels:
       master: ci.openshift.redhat.com
+    name: test_pull_request_origin_extended_image_ecosystem_310
+    rerun_command: /test extended_image_ecosystem
+    run_if_changed: ^(test/extended/image_ecosystem)|^(examples/db-templates)|^(examples/quickstarts)|^(examples/image-streams)|^(examples/jenkins)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)
+    trigger: ((?m)^/test extended_image_ecosystem,?(\s+|$))
+  - agent: jenkins
+    always_run: false
     branches:
     - master
     - dockerless-build-temporary
-    always_run: false
-    run_if_changed: '^(pkg/image)|^(test/extended/registry)|^(test/extended/images)|^(test/extended/imageapis)|^(vendor/github.com/docker/distribution)'
-    context: ci/openshift-jenkins/extended_image_registry
-    rerun_command: "/test extended_image_registry"
-    trigger: "((?m)^/test extended_image_registry,?(\\s+|$))"
-
-  - name: test_pull_request_origin_extended_ldap_groups_310
-    agent: jenkins
+    context: ci/openshift-jenkins/extended_image_ecosystem
     labels:
       master: ci.openshift.redhat.com
+    name: test_pull_request_origin_extended_image_ecosystem
+    rerun_command: /test extended_image_ecosystem
+    run_if_changed: ^(test/extended/image_ecosystem)|^(examples/db-templates)|^(examples/quickstarts)|^(examples/image-streams)|^(examples/jenkins)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)
+    trigger: ((?m)^/test extended_image_ecosystem,?(\s+|$))
+  - agent: jenkins
+    always_run: false
+    branches:
+    - release-3.10
+    context: ci/openshift-jenkins/extended_image_registry
+    labels:
+      master: ci.openshift.redhat.com
+    name: test_pull_request_origin_extended_image_registry_310
+    rerun_command: /test extended_image_registry
+    run_if_changed: ^(pkg/image)|^(test/extended/registry)|^(test/extended/images)|^(test/extended/imageapis)|^(vendor/github.com/docker/distribution)
+    trigger: ((?m)^/test extended_image_registry,?(\s+|$))
+  - agent: jenkins
+    always_run: false
+    branches:
+    - master
+    - dockerless-build-temporary
+    context: ci/openshift-jenkins/extended_image_registry
+    labels:
+      master: ci.openshift.redhat.com
+    name: test_pull_request_origin_extended_image_registry
+    rerun_command: /test extended_image_registry
+    run_if_changed: ^(pkg/image)|^(test/extended/registry)|^(test/extended/images)|^(test/extended/imageapis)|^(vendor/github.com/docker/distribution)
+    trigger: ((?m)^/test extended_image_registry,?(\s+|$))
+  - agent: jenkins
     always_run: false
     branches:
     - release-3.10
     context: ci/openshift-jenkins/extended_ldap_groups
-    rerun_command: "/test extended_ldap_groups"
-    trigger: "((?m)^/test extended_ldap_groups,?(\\s+|$))"
-
-  - name: test_pull_request_origin_extended_ldap_groups
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
+    name: test_pull_request_origin_extended_ldap_groups_310
+    rerun_command: /test extended_ldap_groups
+    trigger: ((?m)^/test extended_ldap_groups,?(\s+|$))
+  - agent: jenkins
     always_run: false
     branches:
     - master
     - dockerless-build-temporary
     context: ci/openshift-jenkins/extended_ldap_groups
-    rerun_command: "/test extended_ldap_groups"
-    trigger: "((?m)^/test extended_ldap_groups,?(\\s+|$))"
-
-  - name: pull-ci-origin-cross
-    agent: kubernetes
+    labels:
+      master: ci.openshift.redhat.com
+    name: test_pull_request_origin_extended_ldap_groups
+    rerun_command: /test extended_ldap_groups
+    trigger: ((?m)^/test extended_ldap_groups,?(\s+|$))
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - master
+    - dockerless-build-temporary
     context: ci/prow/cross
-    rerun_command: "/test cross"
-    trigger: "((?m)^/test cross,?(\\s+|$))"
-    run_if_changed: '^(hack/)|(Makefile)|(.*_(windows|linux|darwin|unsupported)(_test)?\.go)$'
-    branches:
-    - master
-    - dockerless-build-temporary
     decorate: true
+    name: pull-ci-origin-cross
+    rerun_command: /test cross
+    run_if_changed: ^(hack/)|(Makefile)|(.*_(windows|linux|darwin|unsupported)(_test)?\.go)$
     skip_cloning: true
     spec:
-      serviceAccountName: ci-operator
       containers:
-      - name: test
-        image: ci-operator:latest
-        resources: {"requests": {"cpu": "10m"},"limits":{"cpu":"500m"}}
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              name: ci-operator-openshift-origin
-              key: master.json
-        - name: OVERRIDE_SPEC
-          value: '{"test_base_image": {"cluster": "", "namespace": "ci", "name": "src-cache-origin", "tag": "master"}}'
-        command:
-        - ci-operator
-        args:
+      - args:
         - --artifact-dir=$(ARTIFACTS)
         - --target=artifacts
-
-  - name: test_pull_request_origin_launch_gce_310
-    agent: jenkins
-    labels:
-      master: ci.openshift.redhat.com
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.json
+              name: ci-operator-openshift-origin
+        - name: OVERRIDE_SPEC
+          value: '{"test_base_image": {"cluster": "", "namespace": "ci", "name": "src-cache-origin",
+            "tag": "master"}}'
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test cross,?(\s+|$))
+  - agent: jenkins
     always_run: false
     branches:
     - release-3.10
     context: ci/openshift-jenkins/launch-gcp
-    rerun_command: "/test launch-gcp"
-    trigger: "((?m)^/test launch-gcp,?(\\s+|$))"
-
-  - name: test_pull_request_origin_extended_conformance_crio_rpm_310
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
+    name: test_pull_request_origin_launch_gce_310
+    rerun_command: /test launch-gcp
+    trigger: ((?m)^/test launch-gcp,?(\s+|$))
+  - agent: jenkins
+    always_run: true
     branches:
     - release-3.10
-    always_run: true
-    skip_report: true
     context: ci/openshift-jenkins/extended_conformance_crio_rpm
-    rerun_command: "/test crio"
-    trigger: "((?m)^/test crio,?(\\s+|$))"
-
-  - name: test_pull_request_origin_service_catalog_39
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
+    name: test_pull_request_origin_extended_conformance_crio_rpm_310
+    rerun_command: /test crio
+    skip_report: true
+    trigger: ((?m)^/test crio,?(\s+|$))
+  - agent: jenkins
     always_run: false
     branches:
     - release-3.9
-    run_if_changed: '^(pkg/cmd/server/bootstrappolicy)|^(pkg/oc/bootstrap/docker/openshift)|^(cmd/service-catalog)|^(examples/service-catalog)'
     context: ci/openshift-jenkins/service-catalog
-    rerun_command: "/test service-catalog"
-    trigger: "((?m)^/test service-catalog,?(\\s+|$))"
-
-  - name: test_pull_request_origin_service_catalog_310
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
+    name: test_pull_request_origin_service_catalog_39
+    rerun_command: /test service-catalog
+    run_if_changed: ^(pkg/cmd/server/bootstrappolicy)|^(pkg/oc/bootstrap/docker/openshift)|^(cmd/service-catalog)|^(examples/service-catalog)
+    trigger: ((?m)^/test service-catalog,?(\s+|$))
+  - agent: jenkins
     always_run: false
     branches:
     - release-3.10
-    run_if_changed: '^(pkg/cmd/server/bootstrappolicy)|^(pkg/oc/bootstrap/docker/openshift)|^(cmd/service-catalog)|^(examples/service-catalog)'
     context: ci/openshift-jenkins/service-catalog
-    rerun_command: "/test service-catalog"
-    trigger: "((?m)^/test service-catalog,?(\\s+|$))"
-
-  - name: test_pull_request_origin_service_catalog
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
+    name: test_pull_request_origin_service_catalog_310
+    rerun_command: /test service-catalog
+    run_if_changed: ^(pkg/cmd/server/bootstrappolicy)|^(pkg/oc/bootstrap/docker/openshift)|^(cmd/service-catalog)|^(examples/service-catalog)
+    trigger: ((?m)^/test service-catalog,?(\s+|$))
+  - agent: jenkins
     always_run: false
     branches:
     - cli-pre-rebase
     - master
     - dockerless-build-temporary
-    run_if_changed: '^(pkg/cmd/server/bootstrappolicy)|^(pkg/oc/bootstrap/docker/openshift)|^(examples/service-catalog)|^(pkg/oc/bootstrap/clusteradd/components/service-catalog)'
     context: ci/openshift-jenkins/service-catalog
-    rerun_command: "/test service-catalog"
-    trigger: "((?m)^/test service-catalog,?(\\s+|$))"
-
-  - name: test_pull_request_origin_extended_conformance_azure_310
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
+    name: test_pull_request_origin_service_catalog
+    rerun_command: /test service-catalog
+    run_if_changed: ^(pkg/cmd/server/bootstrappolicy)|^(pkg/oc/bootstrap/docker/openshift)|^(examples/service-catalog)|^(pkg/oc/bootstrap/clusteradd/components/service-catalog)
+    trigger: ((?m)^/test service-catalog,?(\s+|$))
+  - agent: jenkins
     always_run: true
-    # TODO: Remove once the job is stable
-    skip_report: true
     branches:
     - release-3.10
     context: ci/openshift-jenkins/azure
-    rerun_command: "/test azure"
-    trigger: "((?m)^/test( all| azure),?(\\s+|$))"
-
-  - name: test_pull_request_origin_extended_conformance_azure
-    agent: jenkins
     labels:
       master: ci.openshift.redhat.com
-    always_run: true
-    # TODO: Remove once the job is stable
+    name: test_pull_request_origin_extended_conformance_azure_310
+    rerun_command: /test azure
     skip_report: true
+    trigger: ((?m)^/test( all| azure),?(\s+|$))
+  - agent: jenkins
+    always_run: true
     branches:
     - master
     - dockerless-build-temporary
     context: ci/openshift-jenkins/azure
-    rerun_command: "/test azure"
-    trigger: "((?m)^/test( all| azure),?(\\s+|$))"
+    labels:
+      master: ci.openshift.redhat.com
+    name: test_pull_request_origin_extended_conformance_azure
+    rerun_command: /test azure
+    skip_report: true
+    trigger: ((?m)^/test( all| azure),?(\s+|$))

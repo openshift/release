@@ -1,11 +1,11 @@
 periodics:
-- name: periodic-retester
-  agent: kubernetes
+- agent: kubernetes
+  cron: ""
   interval: 2h
+  name: periodic-retester
   spec:
     containers:
-    - image: docker-registry.default.svc:5000/ci/commenter:latest
-      args:
+    - args:
       - |-
         --query=is:pr
         state:open
@@ -24,24 +24,26 @@ periodics:
         --comment=/retest
 
         Please review the [full test history](https://openshift-gce-devel.appspot.com/pr/{{.Number}}) for this PR and help us cut down flakes.
-
       - --template
       - --ceiling=1
       - --confirm
+      image: docker-registry.default.svc:5000/ci/commenter:latest
+      name: ""
+      resources: {}
       volumeMounts:
-      - name: token
-        mountPath: /etc/oauth
+      - mountPath: /etc/oauth
+        name: token
     volumes:
     - name: token
       secret:
         secretName: openshift-bot-token
-- name: periodic-issue-close
+- agent: kubernetes
+  cron: ""
   interval: 6h
-  agent: kubernetes
+  name: periodic-issue-close
   spec:
     containers:
-    - image: docker-registry.default.svc:5000/ci/commenter:latest
-      args:
+    - args:
       - |-
         --query=repo:openshift/origin
         -label:lifecycle/frozen
@@ -59,20 +61,23 @@ periodics:
       - --template
       - --ceiling=10
       - --confirm
+      image: docker-registry.default.svc:5000/ci/commenter:latest
+      name: ""
+      resources: {}
       volumeMounts:
-      - name: token
-        mountPath: /etc/oauth
+      - mountPath: /etc/oauth
+        name: token
     volumes:
     - name: token
       secret:
         secretName: openshift-bot-token
-- name: periodic-issue-rotten
+- agent: kubernetes
+  cron: ""
   interval: 6h
-  agent: kubernetes
+  name: periodic-issue-rotten
   spec:
     containers:
-    - image: docker-registry.default.svc:5000/ci/commenter:latest
-      args:
+    - args:
       - |-
         --query=repo:openshift/origin
         -label:lifecycle/frozen
@@ -94,20 +99,23 @@ periodics:
       - --template
       - --ceiling=10
       - --confirm
+      image: docker-registry.default.svc:5000/ci/commenter:latest
+      name: ""
+      resources: {}
       volumeMounts:
-      - name: token
-        mountPath: /etc/oauth
+      - mountPath: /etc/oauth
+        name: token
     volumes:
     - name: token
       secret:
         secretName: openshift-bot-token
-- name: periodic-issue-stale
+- agent: kubernetes
+  cron: ""
   interval: 6h
-  agent: kubernetes
+  name: periodic-issue-stale
   spec:
     containers:
-    - image: docker-registry.default.svc:5000/ci/commenter:latest
-      args:
+    - args:
       - |-
         --query=repo:openshift/origin
         -label:lifecycle/frozen
@@ -128,35 +136,41 @@ periodics:
       - --template
       - --ceiling=10
       - --confirm
+      image: docker-registry.default.svc:5000/ci/commenter:latest
+      name: ""
+      resources: {}
       volumeMounts:
-      - name: token
-        mountPath: /etc/oauth
+      - mountPath: /etc/oauth
+        name: token
     volumes:
     - name: token
       secret:
         secretName: openshift-bot-token
-- name: periodic-label-sync
+- agent: kubernetes
+  cron: ""
   interval: 24h
-  agent: kubernetes
+  name: periodic-label-sync
   spec:
     containers:
-    - image: gcr.io/k8s-testimages/label_sync:v20180227-377685119
-      args:
+    - args:
       - --config=/etc/config/labels.yaml
       - --confirm=true
       - --orgs=openshift
       - --token=/etc/github/oauth
+      image: gcr.io/k8s-testimages/label_sync:v20180227-377685119
+      name: ""
+      resources: {}
       volumeMounts:
-      - name: token
-        mountPath: /etc/github
+      - mountPath: /etc/github
+        name: token
         readOnly: true
-      - name: config
-        mountPath: /etc/config
+      - mountPath: /etc/config
+        name: config
         readOnly: true
     volumes:
     - name: token
       secret:
         secretName: repo-management-token
-    - name: config
-      configMap:
+    - configMap:
         name: labels
+      name: config
