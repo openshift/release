@@ -1,6 +1,5 @@
 ---
 openshift_use_crio: true
-openshift_crio_enable_docker_gc: true
 
 openshift_gcp_node_group_config:
   - name: master
@@ -32,13 +31,40 @@ openshift_node_groups:
   - 'node-role.kubernetes.io/master=true'
   - 'node-role.kubernetes.io/infra=true'
   - 'role=infra'
+  - 'runtime=cri-o'
+  edits:
+  - key: kubeletArguments.container-runtime
+    value:
+    - "remote"
+  - key: kubeletArguments.container-runtime-endpoint
+    value:
+    - "unix:///var/run/crio/crio.sock"
+  - key: kubeletArguments.image-service-endpoint
+    value:
+    - "unix:///var/run/crio/crio.sock"
+  - key: kubeletArguments.runtime-request-timeout
+    value:
+    - "10m"
 - name: node-config-node
   labels:
   - 'node-role.kubernetes.io/compute=true'
   - 'role=app'
+  - 'runtime=cri-o'
   edits:
   - key: kubeletArguments.pods-per-core
     value: ['20']
+  - key: kubeletArguments.container-runtime
+    value:
+    - "remote"
+  - key: kubeletArguments.container-runtime-endpoint
+    value:
+    - "unix:///var/run/crio/crio.sock"
+  - key: kubeletArguments.image-service-endpoint
+    value:
+    - "unix:///var/run/crio/crio.sock"
+  - key: kubeletArguments.runtime-request-timeout
+    value:
+    - "10m"
 
 openshift_gcp_project: openshift-gce-devel-ci
 public_hosted_zone: origin-ci-int-gce.dev.rhcloud.com
