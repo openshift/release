@@ -25,13 +25,13 @@ for suite in test/*/; do
 	for test in ${suite}/testdata/*.txt; do
 		test_name=$( basename ${test} '.txt' )
 
-		cat "${test}" | junitreport -type "${suite_name}" -suites flat > "${WORKINGDIR}/${test_name}_flat.xml"
+		junitreport -type "${suite_name}" -suites flat <"${test}" >"${WORKINGDIR}/${test_name}_flat.xml"
 		if ! diff ${diff_args} "${suite}/reports/${test_name}_flat.xml" "${WORKINGDIR}/${test_name}_flat.xml"; then
 			echo "[FAIL] Test '${test_name}' in suite '${suite_name}' failed for flat suite builder."
 			exit 1
 		fi
 
-		cat "${WORKINGDIR}/${test_name}_flat.xml" | junitreport summarize > "${WORKINGDIR}/${test_name}_summary.txt"
+		junitreport summarize <"${WORKINGDIR}/${test_name}_flat.xml" >"${WORKINGDIR}/${test_name}_summary.txt"
 		if ! diff ${diff_args} "${suite}/summaries/${test_name}_summary.txt" "${WORKINGDIR}/${test_name}_summary.txt"; then
 			echo "[FAIL] Test '${test_name}' in suite '${suite_name}' failed to summarize flat XML."
 		fi

@@ -383,8 +383,8 @@ readonly -f os::cmd::internal::get_results
 
 # os::cmd::internal::get_last_results prints the stderr and stdout from the last attempt
 function os::cmd::internal::get_last_results() {
-	cat "${os_cmd_internal_tmpout}" | awk 'BEGIN { RS = "\x1e" } END { print $0 }'
-	cat "${os_cmd_internal_tmperr}" | awk 'BEGIN { RS = "\x1e" } END { print $0 }'
+	awk 'BEGIN { RS = "\x1e" } END { print $0 }' <"${os_cmd_internal_tmpout}"
+	awk 'BEGIN { RS = "\x1e" } END { print $0 }' <"${os_cmd_internal_tmperr}"
 }
 readonly -f os::cmd::internal::get_last_results
 
