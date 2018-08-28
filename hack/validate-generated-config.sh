@@ -16,4 +16,17 @@ cp -r "${ci_operator_dir}" "${workdir}"
 
 "$( dirname "${BASH_SOURCE[0]}" )/update-generated-config.sh"
 
-diff -Naupr "${ci_operator_dir}" "${workdir}/ci-operator"
+if ! diff -Naupr "${ci_operator_dir}" "${workdir}/ci-operator"> "${workdir}/diff"; then
+  cat << EOF
+[ERROR] This check enforces that Prow Job configuration YAML files are generated
+[ERROR] correctly. We have automation in place that generates these configs and
+[ERROR] new changes to these job configurations should occur from a re-generation.
+
+[ERROR] Run the following command to re-generate the Prow jobs:
+[ERROR] $ docker run -it -v \$(pwd)/ci-operator:/ci-operator:z registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest --config-dir /ci-operator/config --prow-jobs-dir /ci-operator/jobs
+
+[ERROR] The following errors were found:
+
+EOF
+  cat "${workdir}/diff"
+fi
