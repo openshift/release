@@ -94,6 +94,62 @@ presubmits:
     always_run: false
     branches:
     - master
+    context: ci/prow/e2e-aws-smoke
+    decorate: true
+    name: pull-ci-origin-installer-e2e-aws-smoke
+    rerun_command: /test e2e-aws-smoke
+    # The abomination below is equivalent to `^((?!Documentation).)*$`. Since
+    # Go doesn't support negative lookaheads, we are stuck with the following.
+    run_if_changed: ^([^D]|D(D|oD|ocD|ocuD|ocum(D|e(D|n(D|t(D|aD|atD|atiD|atioD)))))*([^Do]|o[^Dc]|oc[^Du]|ocu[^Dm]|ocum([^De]|e([^Dn]|n([^Dt]|t([^Da]|a[^Dt]|at[^Di]|ati[^Do]|atio[^Dn]))))))*(D(D|oD|ocD|ocuD|ocum(D|e(D|n(D|t(D|aD|atD|atiD|atioD)))))*(o|oc|ocu|ocum(e(n(t(a|at|ati|atio)?)?)?)?)?)?$
+    skip_cloning: true
+    spec:
+      containers:
+      - command:
+        - ci-operator
+        - --artifact-dir=$(ARTIFACTS)
+        - --secret-dir=/usr/local/e2e-aws-smoke-cluster-profile
+        - --template=/usr/local/e2e-aws-smoke
+        - --target=e2e-aws-smoke
+        env:
+        - name: JOB_NAME_SAFE
+          value: e2e-aws-smoke
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.json
+              name: ci-operator-openshift-installer
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-aws-smoke
+          name: job-definition
+          subPath: cluster-launch-installer-e2e-smoke.yaml
+        - mountPath: /usr/local/e2e-aws-smoke-cluster-profile
+          name: cluster-profile
+      serviceAccountName: ci-operator
+      volumes:
+      - configMap:
+          name: prow-job-cluster-launch-installer-e2e
+        name: job-definition
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+          - configMap:
+              name: cluster-profile-aws
+    trigger: ((?m)^/test( all| e2e-aws-smoke),?(\s+|$))
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - master
     context: ci/prow/e2e-aws-all
     decorate: true
     name: pull-ci-openshift-installer-e2e-aws-all
