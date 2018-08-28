@@ -29,4 +29,5 @@ if ! diff -Naupr "${ci_operator_dir}" "${workdir}/ci-operator"> "${workdir}/diff
 
 EOF
   cat "${workdir}/diff"
+  exit 1
 fi
