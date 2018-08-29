@@ -1,0 +1,32 @@
+postsubmits:
+  openshift/kubernetes-autoscaler:
+  - agent: kubernetes
+    branches:
+    - release-3.11
+    decorate: true
+    labels:
+      artifacts: images
+    name: branch-ci-kubernetes-autoscaler-images-release-3.11
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=[images]
+        - --promote
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.json
+              name: ci-operator-kubernetes-autoscaler
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator

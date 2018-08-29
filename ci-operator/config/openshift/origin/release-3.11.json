@@ -1,0 +1,216 @@
+{
+  "tag_specification": {
+    "cluster": "https://api.ci.openshift.org",
+    "namespace": "openshift",
+    "name": "origin-v3.11",
+    "tag": "",
+    "tag_overrides": {}
+  },
+  "base_images": {
+    "os": {
+      "cluster": "https://api.ci.openshift.org",
+      "namespace": "openshift",
+      "name": "centos",
+      "tag": "7"
+    }
+  },
+  "test_base_image": {
+    "cluster": "https://api.ci.openshift.org",
+    "namespace": "openshift",
+    "name": "release",
+    "tag": "golang-1.10"
+  },
+
+  "canonical_go_repository": "github.com/openshift/origin",
+
+  "binary_build_commands": "make build",
+  "rpm_build_commands": "make build-rpms",
+
+  "images": [
+    {
+      "from": "os",
+      "to": "base",
+      "context_dir": "images/base/"
+    },
+    {
+      "from": "base-with-rpms",
+      "to": "pod",
+      "context_dir": "images/pod/"
+    },
+    {
+      "from": "base-with-rpms",
+      "to": "template-service-broker",
+      "context_dir": "images/template-service-broker/"
+    },
+    {
+      "from": "base-with-rpms",
+      "to": "cli",
+      "context_dir": "images/cli/"
+    },
+    {
+      "from": "base-with-rpms",
+      "to": "hypershift",
+      "context_dir": "images/hypershift/"
+    },
+    {
+      "from": "base-with-rpms",
+      "to": "hyperkube",
+      "context_dir": "images/hyperkube/"
+    },
+    {
+      "from": "base-with-rpms",
+      "to": "egress-router",
+      "context_dir": "images/egress/router/"
+    },
+    {
+      "from": "base-with-rpms",
+      "to": "egress-http-proxy",
+      "context_dir": "images/egress/http-proxy/"
+    },
+    {
+      "from": "base-with-rpms",
+      "to": "egress-dns-proxy",
+      "context_dir": "images/egress/dns-proxy/"
+    },
+    {
+      "from": "base-with-rpms",
+      "to": "keepalived-ipfailover",
+      "context_dir": "images/ipfailover/keepalived/"
+    },
+
+    {
+      "from": "cli",
+      "to": "control-plane",
+      "context_dir": "images/origin/"
+    },
+    {
+      "from": "cli",
+      "to": "tests",
+      "context_dir": "images/tests/"
+    },
+    {
+      "from": "cli",
+      "to": "deployer",
+      "context_dir": "images/deployer/"
+    },
+    {
+      "from": "cli",
+      "to": "recycler",
+      "context_dir": "images/recycler/"
+    },
+    {
+      "from": "cli",
+      "to": "docker-builder",
+      "context_dir": "images/builder/docker/docker-builder"
+    },
+    {
+      "from": "cli",
+      "to": "haproxy-router",
+      "context_dir": "images/router/haproxy/"
+    },
+    {
+      "from": "cli",
+      "to": "f5-router",
+      "context_dir": "images/router/f5/"
+    },
+
+    {
+      "from": "control-plane",
+      "to": "node",
+      "context_dir": "images/node/"
+    }
+  ],
+
+  "tests": [
+    {
+      "as": "unit",
+      "from": "src",
+      "commands": "ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1 TEST_KUBE=true KUBERNETES_SERVICE_HOST= hack/test-go.sh",
+      "artifact_dir": "/tmp/artifacts"
+    },
+    {
+      "as": "integration",
+      "from": "bin",
+      "commands": "ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1 KUBERNETES_SERVICE_HOST= make test-integration",
+      "artifact_dir": "/tmp/artifacts"
+    },
+    {
+      "as": "verify",
+      "from": "bin",
+      "commands": "ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1 KUBERNETES_SERVICE_HOST= make verify -k",
+      "artifact_dir": "/tmp/artifacts"
+    }
+  ],
+
+  "raw_steps": [
+    {
+      "pipeline_image_cache_step": {
+        "from": "bin",
+        "to": "bin-cross",
+        "commands": "mkdir -p _output/local/releases; touch _output/local/releases/CHECKSUM; echo $'FROM bin AS bin\\nFROM rpms AS rpms\\nFROM centos:7\\nCOPY --from=bin /go/src/github.com/openshift/origin/_output/local/releases /srv/zips/\\nCOPY --from=rpms /go/src/github.com/openshift/origin/_output/local/releases/rpms/* /srv/repo/' > _output/local/releases/Dockerfile; make build-cross"
+      }
+    },
+    {
+      "project_directory_image_build_step": {
+        "from": "os",
+        "to": "artifacts",
+        "inputs": {
+          "bin-cross": {"paths": [{"source_path": "/go/src/github.com/openshift/origin/_output/local/releases/Dockerfile", "destination_dir": "."}], "as": ["bin"]},
+          "rpms":      {"as": ["rpms"]},
+          "src":       {}
+        },
+        "optional": true
+      }
+    },
+    {
+      "output_image_tag_step": {
+        "from": "artifacts",
+        "to": {"name": "stable", "tag": "artifacts"},
+        "optional": true
+      }
+    },
+    {
+      "rpm_image_injection_step": {
+        "from": "base",
+        "to": "base-with-rpms"
+      }
+    }
+  ],
+
+  "promotion": {
+    "additional_images": {
+      "artifacts": "artifacts"
+    }
+  },
+
+  "resources": {
+    "*": {
+      "requests": { "cpu": "100m", "memory": "200Mi" },
+      "limits":   { "cpu": "2",    "memory": "6Gi" }
+    },
+    "bin": {
+      "requests": { "cpu": "3",    "memory": "7Gi" },
+      "limits":   { "cpu": "7",    "memory": "11Gi" }
+    },
+    "bin-cross": {
+      "requests": { "cpu": "3",    "memory": "8Gi" },
+      "limits":   { "cpu": "7",    "memory": "11Gi" }
+    },
+    "rpms": {
+      "requests": { "cpu": "2",    "memory": "6Gi" },
+      "limits":   { "cpu": "6",    "memory": "10Gi" }
+    },
+    "unit": {
+      "requests": { "cpu": "3",    "memory": "5Gi" },
+      "limits":   { "cpu": "7",    "memory": "11Gi" }
+    },
+    "integration": {
+      "requests": { "cpu": "3",    "memory": "5Gi" },
+      "limits":   { "cpu": "7",    "memory": "11Gi" }
+    },
+    "verify": {
+      "requests": { "cpu": "2",    "memory": "6Gi" },
+      "limits":   { "cpu": "6",    "memory": "11Gi" }
+    }
+  }
+}
