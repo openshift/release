@@ -1,0 +1,53 @@
+presubmits:
+  openshift/origin-aggregated-logging:
+  - agent: jenkins
+    always_run: true
+    branches:
+    - release-3.11
+    context: ci/openshift-jenkins/logging
+    labels:
+      master: ci.openshift.redhat.com
+    name: test_pull_request_origin_aggregated_logging_journald-release-3.11
+    rerun_command: /test logging
+    trigger: ((?m)^/test( all| logging),?(\s+|$))
+  - agent: jenkins
+    always_run: true
+    branches:
+    - release-3.11
+    context: ci/openshift-jenkins/json-file
+    labels:
+      master: ci.openshift.redhat.com
+    name: test_pull_request_origin_aggregated_logging_json_file-release-3.11
+    rerun_command: /test json-file
+    trigger: ((?m)^/test( all| json-file),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-3.11
+    context: ci/prow/images
+    decorate: true
+    name: pull-ci-openshift-origin-aggregated-logging-images-release-3.11
+    rerun_command: /test images
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=[images]
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.json
+              name: ci-operator-openshift-origin-aggregated-logging
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| images),?(\s+|$))
