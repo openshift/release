@@ -2,10 +2,11 @@
 openshift_use_crio: true
 openshift_crio_enable_docker_gc: true
 
+openshift_gcp_infra_network_instance_group: ig-n
 openshift_gcp_node_group_config:
   - name: master
     suffix: m
-    tags: ocp-master,ocp-infra-node,ocp-node
+    tags: ocp-master,ocp-node
     machine_type: n1-standard-2
     boot_disk_size: 150
     scale: 1
@@ -13,7 +14,7 @@ openshift_gcp_node_group_config:
     wait_for_stable: true
   - name: node
     suffix: n
-    tags: ocp-node
+    tags: ocp-node,ocp-infra-node
     machine_type: n1-standard-2
     boot_disk_size: 150
     scale: 3
@@ -30,11 +31,11 @@ openshift_node_groups:
 - name: node-config-master
   labels:
   - 'node-role.kubernetes.io/master=true'
-  - 'node-role.kubernetes.io/infra=true'
   - 'role=infra'
 - name: node-config-node
   labels:
   - 'node-role.kubernetes.io/compute=true'
+  - 'node-role.kubernetes.io/infra=true'
   - 'role=app'
   edits:
   - key: kubeletArguments.pods-per-core
