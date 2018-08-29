@@ -82,7 +82,7 @@ related to a test suite is considered test case output.
   go test -v -cover ./... | junitreport --suites=nested --roots=github.com/maintainer > report.xml
 
   # Describe failures and skipped tests in an existing jUnit XML file
-  cat report.xml | %[1]s summarize
+  %[1]s summarize <report.xml
 
   # Consume 'os::cmd' output from to create a jUnit XML file
   JUNIT_REPORT='true' hack/test-cmd.sh | junitreport --type=os::cmd > report.xml

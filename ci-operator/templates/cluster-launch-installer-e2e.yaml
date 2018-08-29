@@ -124,7 +124,7 @@ objects:
           cp /tmp/cluster/ssh-privatekey ~/.ssh/google_compute_engine || true
           export PROVIDER_ARGS='-provider=gce -gce-zone=us-east1-c -gce-project=openshift-gce-devel-ci'
         elif [[ "${CLUSTER_TYPE}" == "aws" ]]; then
-          region="$( cat /tmp/shared/cluster/terraform.tfvars | python -c 'import sys, json; print json.load(sys.stdin)["tectonic_aws_region"]' )"
+          region="$( python -c 'import sys, json; print json.load(sys.stdin)["tectonic_aws_region"]' </tmp/shared/cluster/terraform.tfvars )"
           export PROVIDER_ARGS="-provider=aws -gce-zone=${region}"
         fi
 
@@ -197,7 +197,7 @@ objects:
           export SSH_KEY="$( cat /etc/openshift-installer/ssh-publickey )"
           export EC2_AMI_OVERRIDE=ami-02323e873420d8eab
           export EXPIRATION_DATE=$( date -d '4 hours' --iso=minutes --utc )
-          cat /etc/openshift-installer/openshift.yaml | envsubst > /tmp/cluster/inputs.yaml
+          envsubst </etc/openshift-installer/openshift.yaml >/tmp/cluster/inputs.yaml
         )
         mkdir /tmp/artifacts/installer
         cp /tmp/cluster/inputs.yaml /tmp/artifacts/installer/
