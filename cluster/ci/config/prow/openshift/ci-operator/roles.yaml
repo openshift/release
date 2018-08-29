@@ -106,3 +106,31 @@ items:
   - kind: ServiceAccount
     name: ci-operator
     namespace: ci
+
+- kind: ClusterRole
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: manage-events
+  rules:
+  - apiGroups:
+    - ""
+    resources:
+    - events
+    verbs:
+    - create
+    - get
+    - list
+    - watch
+
+- kind: ClusterRoleBinding
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: manage-events-ci-operator
+  roleRef:
+    name: manage-events
+  subjects:
+  - kind: ServiceAccount
+    name: ci-operator
+    namespace: ci
+  userNames:
+  - system:serviceaccount:ci:ci-operator
