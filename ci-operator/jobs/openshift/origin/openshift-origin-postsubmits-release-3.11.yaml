@@ -1,0 +1,60 @@
+postsubmits:
+  openshift/origin:
+  - agent: kubernetes
+    branches:
+    - release-3.11
+    decorate: true
+    labels:
+      artifacts: images
+    name: branch-ci-origin-images-release-3.11
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=[images]
+        - --target=artifacts
+        - --promote
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.json
+              name: ci-operator-openshift-origin
+        - name: OVERRIDE_SPEC
+          value: '{"promotion": {"cluster": "https://api.ci.openshift.org", "namespace":
+            "openshift", "name": "origin-v3.11", "additional_images": {"base": "base"}}}'
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+  - agent: jenkins
+    branches:
+    - release-3.11
+    labels:
+      master: ci.openshift.redhat.com
+    name: ami_build_origin_int_rhel_build-release-3.11
+  - agent: jenkins
+    branches:
+    - release-3.11
+    labels:
+      master: ci.openshift.redhat.com
+    name: test_branch_origin_extended_conformance_gce-release-3.11
+  - agent: jenkins
+    branches:
+    - release-3.11
+    labels:
+      master: ci.openshift.redhat.com
+    name: test_branch_origin_extended_conformance_install-release-3.11
+  - agent: jenkins
+    branches:
+    - release-3.11
+    labels:
+      master: ci.openshift.redhat.com
+    name: test_branch_origin_extended_conformance_azure-release-3.11

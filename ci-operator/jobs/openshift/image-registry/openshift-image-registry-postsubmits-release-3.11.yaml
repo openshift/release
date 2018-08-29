@@ -1,0 +1,49 @@
+postsubmits:
+  openshift/image-registry:
+  - agent: jenkins
+    branches:
+    - release-3.11
+    labels:
+      master: ci.openshift.redhat.com
+    name: test_branch_image_registry_extended-release-3.11
+  - agent: jenkins
+    branches:
+    - release-3.11
+    labels:
+      master: ci.openshift.redhat.com
+    name: test_branch_image_registry_integration-release-3.11
+  - agent: jenkins
+    branches:
+    - release-3.11
+    labels:
+      master: ci.openshift.redhat.com
+    name: test_branch_image_registry_unit-release-3.11
+  - agent: kubernetes
+    branches:
+    - release-3.11
+    decorate: true
+    labels:
+      artifacts: images
+    name: branch-ci-image-registry-images-release-3.11
+    skip_cloning: true
+    spec:
+      containers:
+      - command:
+        - ci-operator
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=[images]
+        - --promote
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.json
+              name: ci-operator-openshift-image-registry
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
