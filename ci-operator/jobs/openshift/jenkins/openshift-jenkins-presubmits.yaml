@@ -88,11 +88,16 @@ presubmits:
       - command:
         - /bin/bash
         - -c
-        - "#!/bin/bash\nset -e\nexport RPM_REPO=\"$( curl -q \"${RPM_REPO_BASEURL_REF}\"
-          2>/dev/null)\"\nci-operator \\\n  --give-pr-author-access-to-namespace=true
-          \\\n  --delete-when-idle=10m --dry-run=false \\\n  --artifact-dir=$(ARTIFACTS)
-          \\\n  --secret-dir=/usr/local/e2e-gcp-cluster-profile --template=/usr/local/e2e-gcp
-          \\\n  --target=e2e-gcp            "
+        - |
+          #!/bin/bash
+          set -e
+          export RPM_REPO="$( curl -q "${RPM_REPO_BASEURL_REF}" 2>/dev/null)"
+          ci-operator \
+            --give-pr-author-access-to-namespace=true \
+            --delete-when-idle=10m --dry-run=false \
+            --artifact-dir=$(ARTIFACTS) \
+            --secret-dir=/usr/local/e2e-gcp-cluster-profile --template=/usr/local/e2e-gcp \
+            --target=e2e-gcp
         env:
         - name: PREPARE_COMMAND
           value: tag-in-image.sh
