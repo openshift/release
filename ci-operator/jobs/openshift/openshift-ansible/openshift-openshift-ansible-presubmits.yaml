@@ -639,6 +639,66 @@ presubmits:
           - configMap:
               name: cluster-profile-gcp
     trigger: ((?m)^/test( launch-gcp),?(\s+|$))
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - master
+    - dockerless-build-temporary
+    context: ci/prow/aws
+    decorate: true
+    name: pull-ci-openshift-openshift-ansible-e2e-aws
+    rerun_command: /test aws
+    skip_cloning: true
+    spec:
+      containers:
+      - command:
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -e
+          export RPM_REPO_BASEURL="$( curl -q "${RPM_REPO_BASEURL_REF}" 2>/dev/null)"
+          ci-operator \
+            --artifact-dir=$(ARTIFACTS) \
+            --secret-dir=/usr/local/e2e-aws-cluster-profile \
+            --template=/usr/local/e2e-aws \
+            --target=e2e-aws
+        env:
+        - name: TEST_FOCUS
+          value: Suite:openshift/conformance/parallel
+        - name: JOB_NAME_SAFE
+          value: e2e-aws
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.json
+              name: ci-operator-openshift-openshift-ansible
+        - name: RPM_REPO_BASEURL_REF
+          value: https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/master/.latest-rpms
+        image: ci-operator:latest
+        name: test
+        resources: {}
+        volumeMounts:
+        - mountPath: /usr/local/e2e-aws
+          name: job-definition
+          subPath: cluster-launch-e2e-openshift-ansible.yaml
+        - mountPath: /usr/local/e2e-aws-cluster-profile
+          name: cluster-profile
+      serviceAccountName: ci-operator
+      volumes:
+      - configMap:
+          name: prow-job-cluster-launch-e2e-openshift-ansible
+        name: job-definition
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+          - configMap:
+              name: cluster-profile-aws
+    trigger: ((?m)^/test( all| aws),?(\s+|$))
   - agent: jenkins
     always_run: false
     branches:
