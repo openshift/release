@@ -92,6 +92,68 @@ func TestOrgRepos(t *testing.T) {
 	assertEqual(t, orgRepos, expected)
 }
 
+func TestGetConfig(t *testing.T) {
+	dir, err := ioutil.TempDir("", "populate-owners-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	repoAB := filepath.Join(dir, "a", "b")
+	err = os.MkdirAll(repoAB, 0777)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, test := range []struct{
+		name     string
+		input    *orgRepo
+		expected *orgRepo
+		error    *regexp.Regexp
+	}{
+		{
+			name: "config exists",
+			input: &orgRepo{
+				Directories:  []string{"some/directory"},
+				Organization: "a",
+				Repository:   "b",
+			},
+			expected: &orgRepo{
+				Directories:  []string{"some/directory", filepath.Join(dir, "a", "b")},
+				Organization: "a",
+				Repository:   "b",
+			},
+		},
+		{
+			name: "config does not exist",
+			input: &orgRepo{
+				Directories:  []string{"some/directory"},
+				Organization: "c",
+				Repository:   "d",
+			},
+			expected: &orgRepo{
+				Directories:  []string{"some/directory"},
+				Organization: "c",
+				Repository:   "d",
+			},
+			error: regexp.MustCompile("^stat .*/c/d: no such file or directory"),
+		},
+	} {
+		t.Run(test.name, func (t *testing.T) {
+			err := test.input.getConfig(dir)
+			if test.error == nil {
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else if !test.error.MatchString(err.Error()) {
+				t.Fatalf("unexpected error: %v does not match %v", err, test.error)
+			}
+
+			assertEqual(t, test.input, test.expected)
+		})
+	}
+}
+
 func TestExtractOwners(t *testing.T) {
 	dir, err := ioutil.TempDir("", "populate-owners-")
 	if err != nil {
