@@ -31,4 +31,6 @@ for t in ['postsubmits','presubmits']:
       count += len(newjobs)
       y[t][repo] = newjobs
 if count > 0:
-  print yaml.dump(y, default_flow_style=False, Dumper=yaml.RoundTripDumper)
+  out = yaml.dump(y, default_flow_style=False, Dumper=yaml.RoundTripDumper)
+  out = out.replace(from_branch+'.json', to_branch+'.json')
+  print out
