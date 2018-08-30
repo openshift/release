@@ -1,0 +1,25 @@
+---
+vm_prefix: "{{ lookup('env', 'INSTANCE_PREFIX') }}"
+
+type: aws
+aws_user: "ec2-user"
+python: "/usr/bin/python"
+aws_key: "libra"
+aws_region: "us-east-1"
+aws_cluster_id: "{{ lookup('env', 'INSTANCE_PREFIX') }}"
+aws_subnet: "subnet-cf57c596" # us-east-1d
+
+aws_ami_tags:
+  "tag:operating_system": "rhel"
+  "tag:image_stage": "base"
+  "tag:ready": "yes"
+
+aws_instances:
+- name: "{{ vm_prefix }}-master"
+  ansible_groups:
+    - masters
+    - etcd
+    - nodes
+  aws_flavor: t2.large
+  aws_security_group: public
+  node_group: "node-config-all-in-one"
