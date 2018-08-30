@@ -17,7 +17,7 @@ cp -r "${jobs_dir}" "${workdir}"
 
 "$( dirname "${BASH_SOURCE[0]}" )/order-prow-job-config.sh"
 
-if ! diff -Naupr "${workdir}/jobs" "${jobs_dir}"> "${workdir}/diff"; then
+if ! diff -Naupr -I '^[[:space:]]*#.*' "${workdir}/jobs" "${jobs_dir}"> "${workdir}/diff"; then
   cat << EOF
 [ERROR] This check enforces Prow Job configuration YAML file format (ordering,
 [ERROR] linebreaks, indentation) to be consistent over the whole repository. We have
