@@ -93,6 +93,20 @@ func orgRepos(dir string) (orgRepos []*orgRepo, err error) {
 	return orgRepos, err
 }
 
+func (orgRepo *orgRepo) getConfig(dir string) (err error) {
+	path := filepath.Join(dir, orgRepo.Organization, orgRepo.Repository)
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+
+	if info.IsDir() {
+		orgRepo.Directories = append(orgRepo.Directories, path)
+	}
+
+	return nil
+}
+
 func (orgRepo *orgRepo) getOwners() (err error) {
 	dir, err := ioutil.TempDir("", "populate-owners-")
 	if err != nil {
@@ -296,8 +310,14 @@ func pullOwners(directory string) (err error) {
 		return err
 	}
 
+	config := filepath.Join(repoRoot, "ci-operator", "config")
 	for _, orgRepo := range orgRepos {
-		err := orgRepo.getOwners()
+		err = orgRepo.getConfig(config)
+		if err != nil && !os.IsNotExist(err) {
+			return err
+		}
+
+		err = orgRepo.getOwners()
 		if err != nil && !os.IsNotExist(err) {
 			return err
 		}
