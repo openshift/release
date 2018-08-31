@@ -1,0 +1,24 @@
+postsubmits:
+  tnozicka/openshift-acme:
+  - agent: kubernetes
+    decorate: true
+    name: branch-ci-tnozicka-openshift-acme-master-images
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=[images]
+        - --promote
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.json
+              name: ci-operator-tnozicka-openshift-acme
+        image: ci-operator:latest
+        name: ""
+        resources: {}
+      serviceAccountName: ci-operator
