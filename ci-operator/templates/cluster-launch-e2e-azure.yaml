@@ -150,7 +150,7 @@ objects:
         mkdir -p "${HOME}"
         source /etc/azure/credentials/secret
         az login --service-principal -u ${AZURE_CLIENT_ID} -p ${AZURE_CLIENT_SECRET} --tenant ${AZURE_TENANT_ID} &>/dev/null
-        # aad integration configuration
+        # aad integration configuration - we dont test aad so populate as dummy
         export AZURE_AAD_CLIENT_ID=$AZURE_CLIENT_ID
         export AZURE_AAD_CLIENT_SECRET=$AZURE_CLIENT_SECRET
         # TODO: Configure these from prow
@@ -160,10 +160,7 @@ objects:
         export DEPLOY_VERSION=v3.10
         export RUN_SYNC_LOCAL=true
         export IMAGE_RESOURCEGROUP=images
-        # Azure cli fails miserably now with az image list 
-        # https://github.com/Azure/azure-cli/issues/7019
-        #export IMAGE_RESOURCENAME=$(az image list -g $IMAGE_RESOURCEGROUP -o json --query "[?starts_with(name, '${DEPLOY_OS:-rhel7}-${DEPLOY_VERSION//v}') && tags.valid=='true'].name | sort(@) | [-1]" | tr -d '"')
-        export IMAGE_RESOURCENAME=rhel7-3.10-201808271500
+        export IMAGE_RESOURCENAME=$(az image list -g $IMAGE_RESOURCEGROUP -o json --query "[?starts_with(name, '${DEPLOY_OS:-rhel7}-${DEPLOY_VERSION//v}') && tags.valid=='true'].name | sort(@) | [-1]" | tr -d '"')
         # TODO: for full e2e image needs to be built too  
         cd /go/src/github.com/openshift/openshift-azure/
        
