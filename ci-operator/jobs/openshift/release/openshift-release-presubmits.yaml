@@ -3,12 +3,16 @@ presubmits:
   - agent: kubernetes
     always_run: false
     context: ci/openshift/promrules
+    decorate: true
     name: check_prometheus_rules
     rerun_command: /test promrules
     run_if_changed: ^(projects/prometheus/prometheus.rules.yaml)$
+    skip_cloning: true
     spec:
       containers:
-      - image: registry.svc.ci.openshift.org/ci/promrules:latest
+      - command:
+        - /go/entrypoint.sh
+        image: registry.svc.ci.openshift.org/ci/promrules:latest
         name: ""
         resources: {}
     trigger: ((?m)^/test promrules,?(\s+|$))
