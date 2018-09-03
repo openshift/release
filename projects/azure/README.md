@@ -10,7 +10,7 @@ Prow configuration is located in this repository `ci-operator/jobs/openshift/ope
 
 To run CI-Operator job manually you need to have to have [CI-Operator](https://github.com/openshift/ci-operator) installed in your path.
 Modify secret location in file `cluster-launch-e2e-azure.yaml` as below. This is because `ci-operator` set secret based on path where files are located and they are different in local development and CI server.
-``` - name: cluster-secrets-azure
+``` - name: cluster-secrets-azure-file
       secret:
          secretName: azure
 ```
@@ -24,6 +24,15 @@ ci-operator --config ci-operator/config/openshift/openshift-azure/master.yaml --
 ```
 
 # Secret rotation
+
+We use 2 types of secrets. Both of them contain the same data but in a different formats. 
+
+```
+-file - file based secret. It can be sourced by script (see ci-operator jobs code)
+-env - environment based secret. It can be injected to pod using pod spec (see azure-purge code)
+```
+
+## File secret
 
 OSA jobs are using `Web API App` credentials on Azure to run jobs. If for some reason you need to rotate secret, follow this process:
 
@@ -41,24 +50,26 @@ export AZURE_SUBSCRIPTION_ID=<subscription id>
 4. Create a secret
 
 ```
-oc create secret generic cluster-secrets-azure --from-file=cluster/test-deploy/azure/secret -o yaml --dry-run | oc apply -n ci -f -	
+oc create secret generic cluster-secrets-azure-file --from-file=cluster/test-deploy/azure/secret -o yaml --dry-run | oc apply -n ci -f -	
 ```
 
 5. (Optional, if you dont have access to CI namespace)
 
 ```
-oc apply secret generic cluster-secrets-azure-temp --from-file=cluster/test-deploy/azure/secret -o yaml --dry-run | oc apply -n azure -f -
+oc apply secret generic cluster-secrets-azure-file --from-file=cluster/test-deploy/azure/secret -o yaml --dry-run | oc apply -n azure -f -
 ```
 
 and ask somebody, who has access to execute:
 
 ```
-oc get secret cluster-secrets-azure-temp --export -n azure -o yaml | sed 's/cluster-secrets-azure-temp/cluster-secrets-azure/g' | oc apply -f - -n ci
+oc get secret cluster-secrets-azure-file --export -n azure -o yaml | oc apply -f - -n ci
 ```
 
-6. Do the same for azure secret. It has slightly different format:
+## Env secret
+
+Rotate azure env secret:
 
 ```
 source ./cluster/test-deploy/azure/secret
-oc create secret generic cluster-secrets-azure --from-literal=azure_client_id=${AZURE_CLIENT_ID} --from-literal=azure_client_secret=${AZURE_CLIENT_SECRET} --from-literal=azure_tenant_id=${AZURE_TENANT_ID} --from-literal=azure_subscription_id=${AZURE_SUBSCRIPTION_ID} -o yaml --dry-run | oc apply -n azure -f -
+oc create secret generic cluster-secrets-azure-env --from-literal=azure_client_id=${AZURE_CLIENT_ID} --from-literal=azure_client_secret=${AZURE_CLIENT_SECRET} --from-literal=azure_tenant_id=${AZURE_TENANT_ID} --from-literal=azure_subscription_id=${AZURE_SUBSCRIPTION_ID} -o yaml --dry-run | oc apply -n azure -f -
 ```
