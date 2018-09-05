@@ -195,10 +195,11 @@ objects:
           export SSH_KEY="$( cat /etc/openshift-installer/ssh-publickey )"
           export EC2_AMI_OVERRIDE=ami-06d864b4154214132
           export EXPIRATION_DATE=$( date -d '4 hours' --iso=minutes --utc )
+          export PULL_SECRET="$(jq -c </etc/openshift-installer/pull-secret)"
           envsubst </etc/openshift-installer/openshift.yaml >/tmp/cluster/inputs.yaml
         )
         mkdir /tmp/artifacts/installer
-        cp /tmp/cluster/inputs.yaml /tmp/artifacts/installer/
+        sed 's/pullSecret: .*/pullSecret: '{"REDACTED": {}}/' </tmp/cluster/inputs.yaml >/tmp/artifacts/installer/inputs.yaml
 
         echo "Invoking installer ..."
         
