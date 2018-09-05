@@ -23,6 +23,9 @@ parameters:
   required: true
 - name: IMAGE_ANSIBLE
   required: true
+- name: DEPLOY_OS
+  value: "centos7"
+  required: true
 
 objects:
 
@@ -88,6 +91,8 @@ objects:
         value: "${OPENSHIFT_RELEASE}"
       - name: TYPE
         value: azure
+      - name: DEPLOY_OS
+        value: "${DEPLOY_OS}"
       - name: INSTANCE_PREFIX
         value: ${NAMESPACE}-${JOB_NAME_HASH}
       command:
@@ -105,7 +110,7 @@ objects:
 
         # We need to persist this variable so that we can clean it up when we exit
         echo "RESOURCE_GROUP=${INSTANCE_PREFIX}-$(TZ=Etc/UTC date +%Y%m%d%H%M)" >>/tmp/shared/environment
-        echo "IMAGE_NAME=centos7-$OPENSHIFT_RELEASE-$(TZ=Etc/UTC date +%Y%m%d%H%M)" >>/tmp/shared/environment
+        echo "IMAGE_NAME=${DEPLOY_OS}-$OPENSHIFT_RELEASE-$(TZ=Etc/UTC date +%Y%m%d%H%M)" >>/tmp/shared/environment
 
         # Get resource group and image name
         source /tmp/shared/environment
@@ -120,7 +125,7 @@ objects:
           -e openshift_azure_resource_group_name=$RESOURCE_GROUP \
           -e openshift_azure_resource_location=eastus \
           -e openshift_azure_input_image_ns=images \
-          -e openshift_azure_input_image_prefix=centos7-base \
+          -e openshift_azure_input_image_prefix=${DEPLOY_OS}-base \
           -e openshift_azure_output_image_ns=images \
           -e openshift_azure_output_image_name=$IMAGE_NAME \
           -e openshift_azure_storage_account=openshiftimages \
@@ -150,6 +155,8 @@ objects:
         value: /tmp/shared/home
       - name: OPENSHIFT_RELEASE
         value: "${OPENSHIFT_RELEASE}"
+      - name: DEPLOY_OS
+        value: "${DEPLOY_OS}"
       command:
       - /bin/bash
       - -c
@@ -159,20 +166,16 @@ objects:
         set -euo pipefail
         echo "starting buildcluster"
 
-        echo "Starting cluster build."
         trap '[ "$?" == 0 ] || touch /tmp/shared/exit' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
 
         # Cluster creation specific configuration.
-        echo "mkdir"
         mkdir -p "${HOME}"
 
         # wait until the setup job creates admin.kubeconfig
         while true; do
           if [[ ! -f  /tmp/shared/image_create ]]; then
             echo "sleeping waiting for image_create"
-            echo "Files:"
-            ls -lah /tmp/shared/
             sleep 15 & wait
             continue
           fi
@@ -192,12 +195,10 @@ objects:
         export DNS_RESOURCEGROUP=dns
         export DEPLOY_VERSION=v${OPENSHIFT_RELEASE}
         export RUN_SYNC_LOCAL=true
-        export DEPLOY_OS="centos7"
         export IMAGE_RESOURCEGROUP=images
 
         source /tmp/shared/environment
         export IMAGE_RESOURCENAME=${IMAGE_NAME}
-        # TODO: for full e2e image needs to be built too
         cd /go/src/github.com/openshift/openshift-azure/
 
         # added timeout as this seems to loop infinitely awaiting cluster deployment
@@ -259,8 +260,6 @@ objects:
 
         # Source azure creds
         source /usr/share/ansible/openshift-ansible/inventory/dynamic/injected/credentials
-
-        echo $(pwd)
 
         ansible-playbook \
           -e openshift_azure_resource_group_name=$RESOURCE_GROUP \
