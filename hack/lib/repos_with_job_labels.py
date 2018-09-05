@@ -16,7 +16,7 @@ for dirpath, dirnames, filenames in os.walk(dir):
       if len(sys.argv) > 3:
         jobs = list(filter(lambda x: 'branches' in x and sys.argv[3] in x['branches'], jobs))
       if len(sys.argv) > 4:
-        jobs = list(filter(lambda x: 'labels' in x and sys.argv[4] in x['labels'], jobs))
+        jobs = list(filter(lambda x: 'labels' in x and x['labels'] and sys.argv[4] in x['labels'], jobs))
       if len(jobs) > 0:
         print repo
         count += 1
