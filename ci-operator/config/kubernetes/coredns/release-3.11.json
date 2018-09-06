@@ -1,0 +1,56 @@
+{
+  "tag_specification": {
+    "cluster": "https://api.ci.openshift.org",
+    "namespace": "openshift",
+    "name": "origin-v3.11",
+    "tag": "",
+    "tag_overrides": {}
+  },
+  "base_images": {
+    "base": {
+      "cluster": "https://api.ci.openshift.org",
+      "namespace": "openshift",
+      "name": "origin-v3.11",
+      "tag": "base"
+    }
+  },
+  "test_base_image": {
+    "cluster": "https://api.ci.openshift.org",
+    "namespace": "openshift",
+    "name": "release",
+    "tag": "golang-1.10"
+  },
+
+  "canonical_go_repository": "github.com/coredns/coredns",
+
+  "images": [
+    {
+      "from": "base",
+      "to": "coredns",
+      "dockerfile_path": "Dockerfile.ci"
+    }
+  ],
+
+  "tests": [
+    {
+      "as": "unit",
+      "from": "src",
+      "commands": "go test ./..."
+    }
+  ],
+
+  "resources": {
+    "*": {
+      "requests": { "cpu": "100m", "memory": "200Mi" },
+      "limits":   { "cpu": "2",    "memory": "4Gi" }
+    },
+    "bin": {
+      "requests": { "cpu": "2",    "memory": "4Gi" },
+      "limits":   { "cpu": "5",    "memory": "5Gi" }
+    },
+    "unit": {
+      "requests": { "cpu": "2",    "memory": "4Gi" },
+      "limits":   { "cpu": "5",    "memory": "5Gi" }
+    }
+  }
+}
