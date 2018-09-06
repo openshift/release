@@ -6,7 +6,7 @@
 #
 FROM        centos:7
 
-ENV VERSION=1.11beta1 \
+ENV VERSION=1.11 \
     GOCACHE=/go/.cache \
     GOARM=5 \
     GOPATH=/go \
