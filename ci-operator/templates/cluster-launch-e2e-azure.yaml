@@ -46,6 +46,8 @@ objects:
     activeDeadlineSeconds: 10800
     terminationGracePeriodSeconds: 600
     volumes:
+    - name: artifacts
+      emptyDir: {}
     - name: shared-tmp
       emptyDir: {}
     - name: shared-data
@@ -177,6 +179,8 @@ objects:
         mountPath: /tmp/shared
       - name: cluster-secrets-azure
         mountPath: /etc/azure/credentials
+      - name: artifacts
+        mountPath: /tmp/artifacts
       env:
       - name: INSTANCE_PREFIX
         value: ${NAMESPACE}-${JOB_NAME_HASH}
@@ -195,11 +199,15 @@ objects:
           export HOME=/tmp/shared
           export DNS_DOMAIN=osadev.cloud
           export DNS_RESOURCEGROUP=dns
+          export KUBECONFIG=/tmp/shared/_data/_out/admin.kubeconfig
   
           cp -r /tmp/shared/_data /go/src/github.com/openshift/openshift-azure/
           cd /go/src/github.com/openshift/openshift-azure/
           source /etc/azure/credentials/secret
           az login --service-principal -u ${AZURE_CLIENT_ID} -p ${AZURE_CLIENT_SECRET} --tenant ${AZURE_TENANT_ID} &>/dev/null
+          oc get po --all-namespaces -o wide > /tmp/artifacts/pods
+          oc get no -o wide > /tmp/artifacts/nodes
+          oc get events --all-namespaces > /tmp/artifacts/events
           ./hack/delete.sh ${INSTANCE_PREFIX}
   
           trap 'teardown' EXIT
