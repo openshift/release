@@ -66,7 +66,7 @@ objects:
       emptyDir: {}
     - name: cluster-profile
       secret:
-        secretName: ${JOB_NAME_SAFE}-cluster-profile
+        secretName: e2e-${CLUSTER_TYPE}-cluster-profile
 
     containers:
 
@@ -192,13 +192,13 @@ objects:
         trap 'rc=$?; if [[ $rc -ne 0 ]]; then touch /tmp/shared/exit; else touch /tmp/shared/install; fi; exit $rc' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
 
-        oreg_url=${IMAGE_FORMAT}
+        oreg_url="${IMAGE_FORMAT}"
         if [[ -n "${PREVIOUS_IMAGE_TAG}" ]]; then
-          oreg_url='docker.io/openshift/origin-${component}:'${PREVIOUS_IMAGE_TAG}
+          oreg_url="'docker.io/openshift/origin-${component}:'${PREVIOUS_IMAGE_TAG}"
         fi
 
         ansible-playbook -vv \
-          -e openshift_test_repo=${PREVIOUS_RPM_REPO} \
+          -e openshift_test_repo="${PREVIOUS_RPM_REPO}" \
           -e oreg_url=${oreg_url} \
           playbooks/${CLUSTER_TYPE}/openshift-cluster/launch.yml
 
