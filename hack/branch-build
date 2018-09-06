@@ -18,6 +18,8 @@ BRANCH=${BRANCH:-master}
 REF=${REF:-${BRANCH}}
 
 file="$( mktemp -t prowjobs )"
+config="${base}/../ci-operator/jobs/*.yaml"
+prowconfig="-config-path ${base}/../cluster/ci/config/prow/config.yaml -job-config-path ${base}/../ci-operator/jobs"
 
 # TODO: force all repos to normalize to a standard branch strategy (monitoring team)
 for repo in `managed_repos "${BRANCH}"`; do
@@ -42,13 +44,12 @@ for repo in `managed_repos "${BRANCH}"`; do
     echo "info: ${repo} has no jobs tagged for artifacts on branch ${BRANCH}" 2>&1
     continue
   fi
-
   for job in "${jobs}"; do
     if [[ "${1-}" == "create" ]]; then
       echo "---" >> ${file}
-      mkpj -config-path "${config}" -job ${job} -base-ref ${REF} -base-sha ${ref} >> ${file}
+      mkpj $prowconfig -job ${job} -base-ref ${REF} -base-sha ${ref} >> ${file}
     else
-      echo "mkpj -config-path '${config}' -job ${job} -base-ref ${REF} -base-sha ${ref}"
+      echo "mkpj $prowconfig -job ${job} -base-ref ${REF} -base-sha ${ref}"
     fi
   done
 done
