@@ -137,3 +137,94 @@ items:
               - mirror
               - -f=/etc/imagemirror/origin_v3_11_quay
               - --skip-multiple-scopes # quay chokes when requesting multiple
+- apiVersion: batch/v1beta1
+  kind: CronJob
+  metadata:
+    name: "image-mirror-origin-v4.0"
+    labels:
+      app: "image-mirror-origin-v4.0"
+  spec:
+    schedule: "0 * * * *"
+    concurrencyPolicy: Forbid
+    successfulJobsHistoryLimit: 1
+    failedJobsHistoryLimit: 2
+    jobTemplate:
+      spec:
+        template:
+          metadata:
+            name: "image-mirror-origin-v4.0"
+            labels:
+              app: "image-mirror-origin-v4.0"
+          spec:
+            restartPolicy: OnFailure
+            volumes:
+            - name: push
+              secret:
+                secretName: registry-push
+            - name: config
+              configMap:
+                name: image-mirror
+            containers:
+            - name: "mirror"
+              image: "openshift/origin-cli:v3.10"
+              volumeMounts:
+              - name: push
+                mountPath: /home/mirror/.docker/config.json
+                subPath: .dockerconfigjson
+              - name: config
+                mountPath: /etc/imagemirror
+              env:
+              - name: HOME
+                value: /home/mirror
+              command:
+              - oc
+              args:
+              - image
+              - mirror
+              - -f=/etc/imagemirror/origin_v4_0
+- apiVersion: batch/v1beta1
+  kind: CronJob
+  metadata:
+    name: "image-mirror-origin-v4.0-quay"
+    labels:
+      app: "image-mirror-origin-v4.0-quay"
+  spec:
+    schedule: "0 * * * *"
+    concurrencyPolicy: Forbid
+    successfulJobsHistoryLimit: 1
+    failedJobsHistoryLimit: 2
+    jobTemplate:
+      spec:
+        template:
+          metadata:
+            name: "image-mirror-origin-v4.0-quay"
+            labels:
+              app: "image-mirror-origin-v4.0-quay"
+          spec:
+            restartPolicy: OnFailure
+            volumes:
+            - name: push
+              secret:
+                secretName: registry-push
+            - name: config
+              configMap:
+                name: image-mirror
+            containers:
+            - name: "mirror"
+              image: "openshift/origin-cli:v3.10"
+              volumeMounts:
+              - name: push
+                mountPath: /home/mirror/.docker/config.json
+                subPath: .dockerconfigjson
+              - name: config
+                mountPath: /etc/imagemirror
+              env:
+              - name: HOME
+                value: /home/mirror
+              command:
+              - oc
+              args:
+              - image
+              - mirror
+              - -f=/etc/imagemirror/origin_v4_0_quay
+              - --skip-multiple-scopes # quay chokes when requesting multiple
