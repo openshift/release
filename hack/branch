@@ -50,6 +50,11 @@ if [[ "${1-}" == "fast-forward" ]]; then
     exit 1
   fi
   TO_BRANCH=release-${TO}
+  if [[ -n "${PUSH-}" ]]; then
+    echo "info: Pushing ${TO_BRANCH}"
+  else
+    echo "info: Showing commits that exist on ${BRANCH} but not ${TO_BRANCH}, set PUSH=1 to push"
+  fi
   for repo in `managed_repos "${TO_BRANCH}"`; do
     echo "${repo}"
     pushd ${DIR}/src/github.com/${repo} &>/dev/null
@@ -67,8 +72,9 @@ if [[ "${1-}" == "fast-forward" ]]; then
       continue
     fi
     git --no-pager log --oneline origin/${TO_BRANCH}..${TO_BRANCH}
-    # TODO: for safety comment this out most of the time
-    # git push origin "${TO_BRANCH}"
+    if [[ -n "${PUSH-}" ]]; then
+      git push origin "${TO_BRANCH}"
+    fi
     popd &>/dev/null
   done
   exit 0
