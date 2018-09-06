@@ -10,8 +10,6 @@ parameters:
   required: true
 - name: IMAGE_FORMAT
   required: true
-- name: PREVIOUS_IMAGE_TAG
-  required: true
 - name: IMAGE_ANSIBLE
   required: true
 - name: PREVIOUS_IMAGE_ANSIBLE
@@ -23,6 +21,7 @@ parameters:
 - name: CLUSTER_TYPE
   required: true
 - name: PREVIOUS_RPM_REPO
+- name: PREVIOUS_IMAGE_TAG
 - name: TEST_SUITE
 - name: TEST_FOCUS
 - name: TEST_SKIP
@@ -193,8 +192,14 @@ objects:
         trap 'rc=$?; if [[ $rc -ne 0 ]]; then touch /tmp/shared/exit; else touch /tmp/shared/install; fi; exit $rc' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
 
+        oreg_url=${IMAGE_FORMAT}
+        if [[ -n "${PREVIOUS_IMAGE_TAG}" ]]; then
+          oreg_url='docker.io/openshift/origin-${component}:'${PREVIOUS_IMAGE_TAG}
+        fi
+
         ansible-playbook -vv \
-          -e openshift_test_repo=${PREVIOUS_RPM_REPO} -e 'oreg_url=docker.io/openshift/origin-${component}:${PREVIOUS_IMAGE_TAG}' \
+          -e openshift_test_repo=${PREVIOUS_RPM_REPO} \
+          -e oreg_url=${oreg_url} \
           playbooks/${CLUSTER_TYPE}/openshift-cluster/launch.yml
 
     # Optionally upgrade cluster
@@ -232,7 +237,8 @@ objects:
         echo "Cluster installed"
 
         ansible-playbook -vv \
-          -e openshift_test_repo=${RPM_REPO} -e 'oreg_url=${IMAGE_FORMAT}' \
+          -e openshift_test_repo=${RPM_REPO} \
+          -e 'oreg_url=${IMAGE_FORMAT}' \
           playbooks/${CLUSTER_TYPE}/openshift-cluster/upgrade.yml
 
     # Performs cleanup of all created resources
