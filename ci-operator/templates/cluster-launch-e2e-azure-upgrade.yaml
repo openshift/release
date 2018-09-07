@@ -1,0 +1,215 @@
+# This template is being used for testing OpenShift on Azure. 
+# At the moment it cannot be reused to launch cluster for Origin tests
+kind: Template
+apiVersion: template.openshift.io/v1
+
+parameters:
+- name: JOB_NAME_SAFE
+  required: true
+- name: JOB_NAME_HASH
+  required: true
+- name: LOCAL_IMAGE_BIN
+  required: true
+- name: IMAGE_SYNC
+  required: true
+- name: NAMESPACE
+  required: true
+- name: CLUSTER_TYPE
+  value: "azure"
+  required: true
+
+objects:
+
+# We want the cluster to be able to access these images
+- kind: RoleBinding
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: ${JOB_NAME_SAFE}-image-puller
+    namespace: ${NAMESPACE}
+  roleRef:
+    name: system:image-puller
+  subjects:
+  - kind: SystemGroup
+    name: system:unauthenticated
+
+# The e2e pod spins up a cluster, runs e2e tests, and then cleans up the cluster.
+- kind: Pod
+  apiVersion: v1
+  metadata:
+    name: ${JOB_NAME_SAFE}
+    namespace: ${NAMESPACE}
+    annotations:
+      # we want to gather the teardown logs no matter what
+      ci-operator.openshift.io/wait-for-container-artifacts: teardown
+  spec:
+    restartPolicy: Never
+    activeDeadlineSeconds: 10800
+    terminationGracePeriodSeconds: 600
+    volumes:
+    - name: artifacts
+      emptyDir: {}
+    - name: shared-tmp
+      emptyDir: {}
+    - name: shared-data
+      emptyDir: {}
+    - name: cluster-secrets-azure
+      secret:
+        secretName: e2e-azure-secret
+
+    containers:
+
+    # Runs an upgrade
+    - name: test
+      image: ${LOCAL_IMAGE_BIN}
+      resources:
+        requests:
+          cpu: 1
+          memory: 300Mi
+        limits:
+          cpu: 3
+          memory: 4Gi
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      env:
+      - name: HOME
+        value: /tmp/shared/home
+      - name: INSTANCE_PREFIX
+        value: ${NAMESPACE}-${JOB_NAME_HASH}
+      command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        # error handling and sync code
+        set -euo pipefail
+
+        trap 'touch /tmp/shared/exit' EXIT
+        trap 'kill $(jobs -p); exit 0' TERM
+
+        mkdir -p "${HOME}"
+
+        # wait until the setup job creates admin.kubeconfig
+        while true; do
+          if [[ ! -f  /tmp/shared/_data/_out/admin.kubeconfig ]]; then
+            sleep 15 & wait
+            continue
+          fi
+          # if we got admin kubeconfig file with failure marker, ignore. Teardown is in progress. 
+          if [[ -f  /tmp/shared/exit ]]; then
+             exit 1
+          fi
+          break
+        done
+        echo "Found shared kubeconfig"
+
+        cp -r /tmp/shared/_data /go/src/github.com/openshift/openshift-azure/
+        cd /go/src/github.com/openshift/openshift-azure/
+        ./hack/upgrade.sh ${INSTANCE_PREFIX}
+
+    # Runs an install
+    - name: setup
+      image: ${LOCAL_IMAGE_BIN}
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      - name: cluster-secrets-azure
+        mountPath: /etc/azure/credentials
+      env:
+      - name: INSTANCE_PREFIX
+        value: ${NAMESPACE}-${JOB_NAME_HASH}
+      - name: TYPE
+        value: ${CLUSTER_TYPE}
+      - name: HOME
+        value: /tmp/shared/home
+      - name: SYNC_IMAGE
+        value: ${IMAGE_SYNC}
+      command:
+      - /bin/bash
+      - -c
+      - |
+       #!/bin/bash
+        # error handling and sync code
+        set -euo pipefail
+
+        trap 'rc=$?; if [[ $rc -ne 0 ]]; then 
+        # on failure we copy details for clean-up
+        cp -r /go/src/github.com/openshift/openshift-azure/_data /tmp/shared/ &>/dev/null
+        touch /tmp/shared/exit; fi; exit $rc' EXIT
+        trap 'kill $(jobs -p); exit 0' TERM
+
+        # Cluster creation specific configuration.
+        mkdir -p "${HOME}"
+        source /etc/azure/credentials/secret
+        az login --service-principal -u ${AZURE_CLIENT_ID} -p ${AZURE_CLIENT_SECRET} --tenant ${AZURE_TENANT_ID} &>/dev/null
+        # aad integration configuration - we dont test aad so populate as dummy
+        export AZURE_AAD_CLIENT_ID=$AZURE_CLIENT_ID
+        export AZURE_AAD_CLIENT_SECRET=$AZURE_CLIENT_SECRET
+        # TODO: Configure these from prow
+        echo "Using sync image ${SYNC_IMAGE}"
+        export DNS_DOMAIN=osadev.cloud
+        export DNS_RESOURCEGROUP=dns
+        export DEPLOY_VERSION=v3.10
+        export RUN_SYNC_LOCAL=true
+        export IMAGE_RESOURCEGROUP=images
+        export IMAGE_RESOURCENAME=$(az image list -g $IMAGE_RESOURCEGROUP -o json --query "[?starts_with(name, '${DEPLOY_OS:-rhel7}-${DEPLOY_VERSION//v}') && tags.valid=='true'].name | sort(@) | [-1]" | tr -d '"')
+        # TODO: for full e2e image needs to be built too  
+        cd /go/src/github.com/openshift/openshift-azure/
+       
+        ./hack/create.sh ${INSTANCE_PREFIX}
+
+        # if completed pass generated data to other stage
+        cp -r /go/src/github.com/openshift/openshift-azure/_data /tmp/shared/
+
+    # Performs cleanup of all created resources
+    - name: teardown
+      image: ${LOCAL_IMAGE_BIN}
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      - name: cluster-secrets-azure
+        mountPath: /etc/azure/credentials
+      - name: artifacts
+        mountPath: /tmp/artifacts
+      env:
+      - name: INSTANCE_PREFIX
+        value: ${NAMESPACE}-${JOB_NAME_HASH}
+      - name: TYPE
+        value: ${CLUSTER_TYPE}
+      - name: HOME
+        value: /tmp/shared/home
+      command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        function teardown() {
+          set +e
+          mkdir -p "${HOME}"
+          export HOME=/tmp/shared
+          export DNS_DOMAIN=osadev.cloud
+          export DNS_RESOURCEGROUP=dns
+          export KUBECONFIG=/tmp/shared/_data/_out/admin.kubeconfig
+  
+          cp -r /tmp/shared/_data /go/src/github.com/openshift/openshift-azure/
+          cd /go/src/github.com/openshift/openshift-azure/
+          source /etc/azure/credentials/secret
+          az login --service-principal -u ${AZURE_CLIENT_ID} -p ${AZURE_CLIENT_SECRET} --tenant ${AZURE_TENANT_ID} &>/dev/null
+          oc get po --all-namespaces -o wide > /tmp/artifacts/pods
+          oc get no -o wide > /tmp/artifacts/nodes
+          oc get events --all-namespaces > /tmp/artifacts/events
+          ./hack/delete.sh ${INSTANCE_PREFIX}
+  
+          trap 'teardown' EXIT
+          trap 'kill $(jobs -p); exit 0' TERM
+        }
+
+        trap 'teardown' EXIT
+        trap 'kill $(jobs -p); exit 0' TERM
+
+        for i in `seq 1 120`; do
+          if [[ -f /tmp/shared/exit ]]; then
+            exit 0
+          fi
+          sleep 60 & wait
+        done
