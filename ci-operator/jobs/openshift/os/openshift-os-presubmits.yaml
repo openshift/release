@@ -4,7 +4,6 @@ presubmits:
     always_run: true
     branches:
     - master
-    - dockerless-build-temporary
     context: pull-ci-os-container-check
     decorate: true
     name: pull-ci-os-container-check
@@ -13,61 +12,11 @@ presubmits:
       containers:
       - command:
         - ./.prow.sh
-        image: registry.svc.ci.openshift.org/ci/origin-release:golang-1.9
+        image: quay.io/cgwalters/coreos-assembler
         name: build
         resources: {}
         securityContext:
           privileged: true
           runAsUser: 0
-        volumeMounts:
-        - mountPath: /var/run/docker.sock
-          name: docker-socket
       serviceAccountName: privileged-builder
-      volumes:
-      - hostPath:
-          path: /var/run/docker.sock
-        name: docker-socket
     trigger: ((?m)^/test( all| check),?(\s+|$))
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    - dockerless-build-temporary
-    context: pull-ci-os-container-build
-    decorate: true
-    name: pull-ci-os-container-build
-    rerun_command: /test build
-    spec:
-      containers:
-      - command:
-        - /bin/bash
-        - -c
-        - |-
-          #!/bin/bash
-          set -euo pipefail
-          cat {atomic-centos-continuous,rhcos-continuous,ignition}.repo >/tmp/preserve
-          rm *.repo
-          mv /tmp/preserve openshift.repo
-          curl http://rpm-mirror.ci.svc >> openshift.repo 2>/dev/null
-          echo "true" > generate-openshift-repo
-          imagebuilder -privileged .
-        image: registry.svc.ci.openshift.org/ci/origin-release:golang-1.9
-        name: build
-        resources: {}
-        securityContext:
-          privileged: true
-          runAsUser: 0
-        volumeMounts:
-        - mountPath: /var/run/docker.sock
-          name: docker-socket
-        - mountPath: /usr/bin/docker
-          name: docker-binary
-      serviceAccountName: privileged-builder
-      volumes:
-      - hostPath:
-          path: /var/run/docker.sock
-        name: docker-socket
-      - hostPath:
-          path: /usr/bin/docker
-        name: docker-binary
-    trigger: ((?m)^/test( all| build),?(\s+|$))
