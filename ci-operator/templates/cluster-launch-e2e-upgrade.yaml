@@ -192,15 +192,16 @@ objects:
         trap 'rc=$?; if [[ $rc -ne 0 ]]; then touch /tmp/shared/exit; else touch /tmp/shared/install; fi; exit $rc' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
 
+        # Don't expand IMAGE_FORMAT here - it contains '${component}'
         oreg_url='${IMAGE_FORMAT}'
-        if [[ -n '${PREVIOUS_IMAGE_TAG}' ]]; then
+        if [[ -n "${PREVIOUS_IMAGE_TAG}" ]]; then
           oreg_url='docker.io/openshift/origin-${component}:${PREVIOUS_IMAGE_TAG}'
         fi
 
         ansible-playbook -vv \
           -e openshift_test_repo="${PREVIOUS_RPM_REPO}" \
-          -e 'oreg_url=${oreg_url}' \
-          playbooks/${CLUSTER_TYPE}/openshift-cluster/launch.yml
+          -e oreg_url="${oreg_url}" \
+          playbooks/"${TYPE}"/openshift-cluster/launch.yml
 
     # Optionally upgrade cluster
     - name: upgrade
@@ -238,8 +239,8 @@ objects:
 
         ansible-playbook -vv \
           -e openshift_test_repo="${RPM_REPO}" \
-          -e 'oreg_url=${IMAGE_FORMAT}' \
-          playbooks/${CLUSTER_TYPE}/openshift-cluster/upgrade.yml
+          -e oreg_url="${IMAGE_FORMAT}" \
+          playbooks/"${TYPE}"/openshift-cluster/upgrade.yml
 
     # Performs cleanup of all created resources
     - name: teardown
@@ -308,7 +309,7 @@ objects:
           wait
 
           echo "Deprovisioning cluster ..."
-          /usr/local/bin/entrypoint-provider ansible-playbook -vv playbooks/${CLUSTER_TYPE}/openshift-cluster/deprovision.yml
+          /usr/local/bin/entrypoint-provider ansible-playbook -vv playbooks/"${TYPE}"/openshift-cluster/deprovision.yml
         }
 
         trap 'teardown' EXIT
