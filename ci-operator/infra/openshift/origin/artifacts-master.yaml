@@ -1,0 +1,82 @@
+# Run an RPM server for release artifacts
+#
+kind: List
+apiVersion: v1
+items:
+- apiVersion: route.openshift.io/v1
+  kind: Route
+  metadata:
+    name: artifacts-openshift-origin-master
+  spec:
+    host: artifacts-openshift-master.svc.ci.openshift.org
+    to:
+      name: artifacts-openshift-origin-master
+    tls:
+      termination: Edge
+      insecureEdgeTerminationPolicy: Redirect
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: artifacts-openshift-origin-master
+  spec:
+    selector:
+      app: artifacts-openshift-origin-master
+    ports:
+    - port: 80
+      targetPort: 8080
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: artifacts-openshift-origin-master
+    annotations:
+      image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","namespace":"openshift","name":"origin-v4.0:artifacts"},"fieldPath":"spec.template.spec.containers[?(@.name==\"srv\")].image"}]'
+  spec:
+    replicas: 2
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app: artifacts-openshift-origin-master
+    template:
+      metadata:
+        labels:
+          app: artifacts-openshift-origin-master
+      spec:
+        containers:
+        - name: srv
+          image: registry.svc.ci.openshift.org/openshift/origin-v4.0:artifacts
+          command:
+          - /bin/bash
+          - -c
+          args:
+          - "\n#!/bin/bash\ncat <<END >>/tmp/serve.py\nimport time, threading, socket,
+            SocketServer, BaseHTTPServer, SimpleHTTPServer\n\n# Create socket\naddr
+            = ('', 8080)\nsock = socket.socket (socket.AF_INET, socket.SOCK_STREAM)\nsock.setsockopt(socket.SOL_SOCKET,
+            socket.SO_REUSEADDR, 1)\nsock.bind(addr)\nsock.listen(5)\n\n# Launch multiple
+            listeners as threads\nclass Thread(threading.Thread):\n\tdef __init__(self,
+            i):\n\t\tthreading.Thread.__init__(self)\n\t\tself.i = i\n\t\tself.daemon
+            = True\n\t\tself.start()\n\tdef run(self):\n\t\thttpd = BaseHTTPServer.HTTPServer(addr,
+            SimpleHTTPServer.SimpleHTTPRequestHandler, False)\n\n\t\t# Prevent the HTTP
+            server from re-binding every handler.\n\t\t# https://stackoverflow.com/questions/46210672/\n\t\thttpd.socket
+            = sock\n\t\thttpd.server_bind = self.server_close = lambda self: None\n\n\t\thttpd.serve_forever()\n[Thread(i)
+            for i in range(100)]\ntime.sleep(9e9)\nEND\npython /tmp/serve.py\n\t\t\t\t\t\t\t"
+          ports:
+          - containerPort: 8080
+            protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+              scheme: HTTP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /
+              port: 8080
+              scheme: HTTP
+          resources:
+            requests:
+              cpu: 50m
+              memory: 50Mi
+          workingDir: /srv
+        restartPolicy: Always
+        terminationGracePeriodSeconds: 1
