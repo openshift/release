@@ -4,12 +4,12 @@ presubmits:
     always_run: true
     branches:
     - master
-    context: ci/prow/build
+    context: ci/prow/e2e
     decorate: true
     labels:
       artifacts: images
-    name: pull-ci-openshift-azure
-    rerun_command: /test build
+    name: pull-ci-openshift-azure-e2e
+    rerun_command: /test e2e
     skip_cloning: true
     spec:
       containers:
@@ -18,6 +18,7 @@ presubmits:
         - --give-pr-author-access-to-namespace=true
         - --secret-dir=/usr/local/e2e-azure-secret
         - --template=/usr/local/e2e-azure
+        - --target=e2e-azure
         command:
         - ci-operator
         env:
@@ -53,7 +54,73 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-azure
-    trigger: ((?m)^/test( all| build),?(\s+|$))
+    trigger: ((?m)^/test( all| e2e),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/unit
+    decorate: true
+    labels:
+      artifacts: images
+    name: pull-ci-openshift-azure-unit
+    rerun_command: /test unit
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --give-pr-author-access-to-namespace=true
+        - --target=unit
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.json
+              name: ci-operator-openshift-openshift-azure
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| unit),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/verify
+    decorate: true
+    labels:
+      artifacts: images
+    name: pull-ci-openshift-azure-verify
+    rerun_command: /test verify
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --give-pr-author-access-to-namespace=true
+        - --target=verify
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.json
+              name: ci-operator-openshift-openshift-azure
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| verify),?(\s+|$))
   - agent: kubernetes
     always_run: false
     branches:
