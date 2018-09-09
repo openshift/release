@@ -5,8 +5,8 @@ export INSTANCE_PREFIX
 export TYPE
 
 # Select RPMs based on branch or tag
-REF ?= "master"
-LATEST = $(shell curl -q "https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/$(REF)/.latest-rpms" 2>/dev/null)
+REF ?= "v4.0"
+LATEST = "https://rpms.svc.ci.openshift.org/openshift-origin-$(REF)/"
 REPO ?= $(LATEST)
 
 up: check-cluster
@@ -18,6 +18,7 @@ down: check-cluster
 .PHONY: down
 
 sh: check-cluster
+	@echo ansible-playbook -e "openshift_test_repo=$(REPO)" playbooks/$(TYPE)/openshift-cluster/launch.yml
 	cd $(PROFILE)/ && ../../bin/ansible.sh
 .PHONY: sh
 
