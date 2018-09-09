@@ -163,11 +163,11 @@ complexity and duplication, which should be cleared in the future.
         mountPath: /usr/local/e2e-gcp
         subPath: cluster-launch-src.yaml
       - name: cluster-profile
-        mountPath: /usr/local/openshift-descheduler-e2e-cluster-profile
+        mountPath: /usr/local/e2e-gcp-cluster-profile
       env:
       # unique identifier: names gcp instances, etc.
       - name: JOB_NAME_SAFE
-        value: openshift-descheduler-e2e
+        value: e2e-gcp
       - name: CLUSTER_TYPE
         value: gcp
       # ci-operator configuration file, loaded into a configmap in the cluster
@@ -183,19 +183,13 @@ complexity and duplication, which should be cleared in the future.
       - name: TEST_COMMAND
         value: "cp /tmp/admin.kubeconfig /tmp/admin.conf && make test-e2e"
       # required for jobs that use openshift-ansible to create a cluster
-      - name: RPM_REPO_BASEURL_REF
-        value: https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/release-3.10/.latest-rpms
+      - name: RPM_REPO
+        value: https://rpms.svc.ci.openshift.org/openshift-origin-v4.0/
       # actual ci-operator call
       command:
-      - /bin/bash
-      - -c
-      - |
-        #!/bin/bash
-        set -e
-        export RPM_REPO="$(curl -q "${RPM_REPO_BASEURL_REF}" 2>/dev/null)"
-        ci-operator \
-          --artifact-dir=$(ARTIFACTS) \
-          --secret-dir=/usr/local/openshift-descheduler-e2e-cluster-profile \
-          --template=/usr/local/e2e-gcp \
-          --target=e2e-gcp
+      - ci-operator
+      - --artifact-dir=$(ARTIFACTS)
+      - --secret-dir=/usr/local/e2e-gcp-cluster-profile
+      - --template=/usr/local/e2e-gcp
+      - --target=e2e-gcp
 ```
