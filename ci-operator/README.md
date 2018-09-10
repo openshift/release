@@ -10,7 +10,7 @@ Conventions
 
 Under this directory, we have three main directories:
 
-*  `config/$org/$repo/$branch.json`
+*  `config/$org/$repo/$branch.yaml`
    Contains your ci-operator definition which describes how the images and tests
    in your repo works. These files are copied into config maps on the CI cluster
    and referenced by Prow jobs. If you are building branches within a fork of a
@@ -176,7 +176,7 @@ complexity and duplication, which should be cleared in the future.
         valueFrom:
           configMapKeyRef:
             name: ci-operator-openshift-descheduler
-            key: release-3.10.json
+            key: release-3.10.yaml
       # the actual test command (the variable name and format is specific to
       # the template being used (cluster-launch-src.yaml, in this case), see
       # the definition for more details)
