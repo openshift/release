@@ -107,7 +107,7 @@ objects:
 
         mkdir -p "${HOME}"
 
-        # wait until the setup job creates admin.kubeconfig
+        # wait until the upgrade job creates /tmp/shared/test
         while true; do
           if [[ ! -f /tmp/shared/test ]]; then
             sleep 15 & wait
@@ -115,7 +115,7 @@ objects:
           fi
           break
         done
-        echo "Found shared kubeconfig"
+        echo "Found test flag"
 
         # don't let clients impact the global kubeconfig
         cp /tmp/shared/admin.kubeconfig /tmp/admin.kubeconfig
@@ -242,6 +242,8 @@ objects:
           -e openshift_test_repo="${RPM_REPO}" \
           -e 'oreg_url=${IMAGE_FORMAT}' \
           playbooks/"${TYPE}"/openshift-cluster/upgrade.yml
+
+        cp -rf /tmp/admin.kubeconfig /tmp/shared/admin.kubeconfig
 
     # Performs cleanup of all created resources
     - name: teardown
