@@ -17,6 +17,12 @@ parameters:
 - name: CLUSTER_TYPE
   value: "azure"
   required: true
+- name: TEST_FOCUS
+- name: TEST_SKIP
+  value: "\\[local\\]"
+- name: TEST_FOCUS_SERIAL
+- name: TEST_SKIP_SERIAL
+  value: "\\[local\\]"
 
 objects:
 
@@ -82,11 +88,12 @@ objects:
       - -c
       - |
         #!/bin/bash
-        # error handling and sync code
         set -euo pipefail
 
         trap 'touch /tmp/shared/exit' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
+
+        cp "$(which oc)" /tmp/shared/
 
         mkdir -p "${HOME}"
 
@@ -104,15 +111,29 @@ objects:
         done
         echo "Found shared kubeconfig"
 
-        # test specific code
         # don't let clients impact the global kubeconfig
         cp -r /tmp/shared/_data /tmp/openshift/
         export KUBECONFIG=/tmp/openshift/_data/_out/admin.kubeconfig
 
         PATH=/usr/libexec/origin:$PATH
-        cd /usr/libexec/origin/
-        # screen output and artifacts
-        ./ginkgo extended.test | tee /tmp/artifacts/conformance
+
+        # TODO: the test binary should really be a more structured command - most of these flags should be
+        #       autodetected from the running cluster.
+        # TODO: bump nodes up to 40 again
+        set -x
+        if [[ -n "${TEST_FOCUS}" ]]; then
+          ginkgo -v -noColor -nodes=30 $( which extended.test ) -- \
+            -ginkgo.focus="${TEST_FOCUS}" -ginkgo.skip="${TEST_SKIP}" \
+            -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit \
+            -test.timeout=2h || rc=$?
+        fi
+        if [[ -n "${TEST_FOCUS_SERIAL}" ]]; then
+          ginkgo -v -noColor -nodes=1 $( which extended.test ) -- \
+            -ginkgo.focus="${TEST_FOCUS_SERIAL}" -ginkgo.skip="${TEST_SKIP_SERIAL}" \
+            -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit/serial \
+            -test.timeout=2h || rc=$?
+        fi
+        exit ${rc:-0}
 
     # Runs an install
     - name: setup
