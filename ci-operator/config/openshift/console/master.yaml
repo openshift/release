@@ -1,76 +1,54 @@
-{
-  "tag_specification": {
-    "cluster": "https://api.ci.openshift.org",
-    "namespace": "openshift",
-    "name": "origin-v4.0",
-    "tag": "",
-    "tag_overrides": {}
-  },
-  "base_images": {
-    "base": {
-      "cluster": "https://api.ci.openshift.org",
-      "namespace": "openshift",
-      "name": "origin-v4.0",
-      "tag": "base"
-    }
-  },
-  "test_base_image": {
-    "cluster": "https://api.ci.openshift.org",
-    "namespace": "openshift",
-    "name": "release",
-    "tag": "tectonic-console-builder"
-  },
-
-  "test_binary_build_commands": "./build.sh",
-
-  "images": [
-    {
-      "to": "console",
-      "from": "base",
-      "inputs": {
-        "root": {"as": ["build"]}
-      }
-    }
-  ],
-
-  "tests": [
-    {
-      "as": "backend",
-      "from": "test-bin",
-      "commands": "export ARTIFACT_DIR=/tmp/artifacts; ./test-backend.sh",
-      "artifact_dir": "/tmp/artifacts"
-    },
-    {
-      "as": "frontend",
-      "from": "test-bin",
-      "commands": "export ARTIFACT_DIR=/tmp/artifacts; ./test-frontend.sh",
-      "artifact_dir": "/tmp/artifacts"
-    },
-    {
-      "as": "crud",
-      "from": "test-bin",
-      "commands": "export ARTIFACT_DIR=/tmp/artifacts; ./test-gui.sh crud",
-      "artifact_dir": "/tmp/artifacts"
-    },
-    {
-      "as": "alm",
-      "from": "test-bin",
-      "commands": "export ARTIFACT_DIR=/tmp/artifacts; ./test-gui.sh alm",
-      "artifact_dir": "/tmp/artifacts"
-    },
-    {
-      "as": "performance",
-      "from": "test-bin",
-      "commands": "export ARTIFACT_DIR=/tmp/artifacts; ./test-gui.sh performance",
-      "artifact_dir": "/tmp/artifacts"
-    }
-  ],
-
-
-  "resources": {
-    "*": {
-      "requests": { "cpu": "100m", "memory": "200Mi" },
-      "limits":   { "cpu": "2",    "memory": "4Gi" }
-    }
-  }
-}
+base_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: origin-v4.0
+    namespace: openshift
+    tag: base
+images:
+- from: base
+  inputs:
+    root:
+      as:
+      - build
+  to: console
+resources:
+  '*':
+    limits:
+      cpu: '2'
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: origin-v4.0
+  namespace: openshift
+  tag: ''
+  tag_overrides: {}
+test_base_image:
+  cluster: https://api.ci.openshift.org
+  name: release
+  namespace: openshift
+  tag: tectonic-console-builder
+test_binary_build_commands: ./build.sh
+tests:
+- artifact_dir: /tmp/artifacts
+  as: backend
+  commands: export ARTIFACT_DIR=/tmp/artifacts; ./test-backend.sh
+  from: test-bin
+- artifact_dir: /tmp/artifacts
+  as: frontend
+  commands: export ARTIFACT_DIR=/tmp/artifacts; ./test-frontend.sh
+  from: test-bin
+- artifact_dir: /tmp/artifacts
+  as: crud
+  commands: export ARTIFACT_DIR=/tmp/artifacts; ./test-gui.sh crud
+  from: test-bin
+- artifact_dir: /tmp/artifacts
+  as: alm
+  commands: export ARTIFACT_DIR=/tmp/artifacts; ./test-gui.sh alm
+  from: test-bin
+- artifact_dir: /tmp/artifacts
+  as: performance
+  commands: export ARTIFACT_DIR=/tmp/artifacts; ./test-gui.sh performance
+  from: test-bin
