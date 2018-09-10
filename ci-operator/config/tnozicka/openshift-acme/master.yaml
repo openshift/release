@@ -1,64 +1,43 @@
-{
-  "base_images": {
-    "os": {
-      "cluster": "https://api.ci.openshift.org",
-      "namespace": "openshift",
-      "name": "centos",
-      "tag": "7"
-    }
-  },
-  "test_base_image": {
-    "cluster": "https://api.ci.openshift.org",
-    "namespace": "openshift",
-    "name": "release",
-    "tag": "golang-1.10"
-  },
-
-  "canonical_go_repository": "github.com/tnozicka/openshift-acme",
-
-  "binary_build_commands": "make build GOFLAGS='-v'",
-  "test_binary_build_commands": "make build GOFLAGS='-v -race'",
-
-  "images": [
-    {
-      "from": "os",
-      "to": "openshift-acme",
-      "dockerfile_path": "images/Dockerfile",
-      "inputs": {
-        "bin": {
-          "as": ["bin"]
-        }
-      }
-    }
-  ],
-
-  "promotion": {
-    "cluster": "https://api.ci.openshift.org",
-    "namespace": "ci",
-    "tag": "latest"
-  },
-
-  "tests": [
-    {
-      "as": "verify",
-      "from": "bin",
-      "commands": "make verify -k"
-    },
-    {
-      "as": "unit",
-      "from": "test-bin",
-      "commands": "make test"
-    }
-  ],
-
-  "resources": {
-    "resources": {
-      "resources": {
-        "*": {
-          "requests": { "cpu": "3",    "memory": "1Gi" },
-          "limits":   { "cpu": "6",    "memory": "3Gi" }
-        }
-      }
-    }
-  }
-}
+base_images:
+  os:
+    cluster: https://api.ci.openshift.org
+    name: centos
+    namespace: openshift
+    tag: '7'
+binary_build_commands: make build GOFLAGS='-v'
+canonical_go_repository: github.com/tnozicka/openshift-acme
+images:
+- dockerfile_path: images/Dockerfile
+  from: os
+  inputs:
+    bin:
+      as:
+      - bin
+  to: openshift-acme
+promotion:
+  cluster: https://api.ci.openshift.org
+  namespace: ci
+  tag: latest
+resources:
+  resources:
+    resources:
+      '*':
+        limits:
+          cpu: '6'
+          memory: 3Gi
+        requests:
+          cpu: '3'
+          memory: 1Gi
+test_base_image:
+  cluster: https://api.ci.openshift.org
+  name: release
+  namespace: openshift
+  tag: golang-1.10
+test_binary_build_commands: make build GOFLAGS='-v -race'
+tests:
+- as: verify
+  commands: make verify -k
+  from: bin
+- as: unit
+  commands: make test
+  from: test-bin
