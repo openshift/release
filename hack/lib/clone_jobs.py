@@ -32,5 +32,5 @@ for t in ['postsubmits','presubmits']:
       y[t][repo] = newjobs
 if count > 0:
   out = yaml.dump(y, default_flow_style=False, Dumper=yaml.RoundTripDumper)
-  out = out.replace(from_branch+'.json', to_branch+'.json')
+  out = out.replace(from_branch+'.yaml', to_branch+'.yaml')
   print out
