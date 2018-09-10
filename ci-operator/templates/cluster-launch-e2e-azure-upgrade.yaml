@@ -129,13 +129,14 @@ objects:
       - -c
       - |
        #!/bin/bash
-        # error handling and sync code
         set -euo pipefail
-
+        
+        # trap acts as a switch/router for the next phases
         trap 'rc=$?; if [[ $rc -ne 0 ]]; then 
-        # on failure we copy details for clean-up
-        cp -r /go/src/github.com/openshift/openshift-azure/_data /tmp/shared/ &>/dev/null
-        touch /tmp/shared/exit; fi; exit $rc' EXIT
+          touch /tmp/shared/exit;
+        fi; 
+        cp -r /go/src/github.com/openshift/openshift-azure/_data /tmp/shared &>/dev/null
+        exit $rc' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
 
         # Cluster creation specific configuration.
@@ -145,7 +146,6 @@ objects:
         # aad integration configuration - we dont test aad so populate as dummy
         export AZURE_AAD_CLIENT_ID=$AZURE_CLIENT_ID
         export AZURE_AAD_CLIENT_SECRET=$AZURE_CLIENT_SECRET
-        # TODO: Configure these from prow
         echo "Using sync image ${SYNC_IMAGE}"
         export DNS_DOMAIN=osadev.cloud
         export DNS_RESOURCEGROUP=dns
@@ -153,13 +153,10 @@ objects:
         export RUN_SYNC_LOCAL=true
         export IMAGE_RESOURCEGROUP=images
         export IMAGE_RESOURCENAME=$(az image list -g $IMAGE_RESOURCEGROUP -o json --query "[?starts_with(name, '${DEPLOY_OS:-rhel7}-${DEPLOY_VERSION//v}') && tags.valid=='true'].name | sort(@) | [-1]" | tr -d '"')
-        # TODO: for full e2e image needs to be built too  
+        # create cluster for test
         cd /go/src/github.com/openshift/openshift-azure/
-       
         ./hack/create.sh ${INSTANCE_PREFIX}
 
-        # if completed pass generated data to other stage
-        cp -r /go/src/github.com/openshift/openshift-azure/_data /tmp/shared/
 
     # Performs cleanup of all created resources
     - name: teardown
@@ -183,6 +180,8 @@ objects:
       - -c
       - |
         #!/bin/bash
+
+        # teardown is collecting debug data and deleting all used resources
         function teardown() {
           set +e
           mkdir -p "${HOME}"
@@ -207,6 +206,7 @@ objects:
         trap 'teardown' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
 
+        # teardown is triggered on file marker
         for i in `seq 1 120`; do
           if [[ -f /tmp/shared/exit ]]; then
             exit 0
