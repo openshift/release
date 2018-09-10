@@ -20,7 +20,7 @@ If you are running this job not in CI cluster development namespace, but on othe
 
 Run job:
 ```
-ci-operator --config ci-operator/config/openshift/openshift-azure/master.json --namespace=namespace-name --git-ref=openshift/openshift-azure@master --template ci-operator/templates/cluster-launch-e2e-azure.yaml --secret-dir $(pwd)/cluster/test-deploy/azure/
+ci-operator --config ci-operator/config/openshift/openshift-azure/master.yaml --namespace=namespace-name --git-ref=openshift/openshift-azure@master --template ci-operator/templates/cluster-launch-e2e-azure.yaml --secret-dir $(pwd)/cluster/test-deploy/azure/
 ```
 
 # Secret rotation
