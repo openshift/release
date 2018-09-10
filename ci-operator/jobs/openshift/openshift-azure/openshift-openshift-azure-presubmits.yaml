@@ -178,3 +178,63 @@ presubmits:
           - secret:
               name: cluster-secrets-azure
     trigger: ((?m)^/test upgrade,?(\s+|$))
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - master
+    context: ci/prow/conformance
+    decorate: true
+    labels:
+      artifacts: images
+    name: pull-ci-openshift-azure-conformance
+    rerun_command: /test conformance
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --secret-dir=/usr/local/e2e-azure-secret
+        - --template=/usr/local/e2e-azure-conformance
+        - --target=[output:stable:sync]
+        - --target=e2e-azure-conformance
+        command:
+        - ci-operator
+        env:
+        - name: TEST_FOCUS
+          value: Suite:openshift/conformance/parallel
+        - name: TEST_FOCUS_SERIAL
+          value: Suite:openshift/registry/serial
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-openshift-azure
+        - name: JOB_NAME_SAFE
+          value: e2e-azure-conformance
+        - name: CLUSTER_TYPE
+          value: azure
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-azure-conformance
+          name: job-definition
+          subPath: cluster-launch-e2e-azure-conformance.yaml
+        - mountPath: /usr/local/e2e-azure-secret
+          name: cluster-secrets-azure
+      serviceAccountName: ci-operator
+      volumes:
+      - configMap:
+          name: prow-job-cluster-launch-e2e-azure-conformance
+        name: job-definition
+      - name: cluster-secrets-azure
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-azure
+    trigger: ((?m)^/test conformance,?(\s+|$))
