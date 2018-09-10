@@ -1,77 +1,51 @@
-{
-  "base_images": {
-    "os": {
-      "cluster": "https://api.ci.openshift.org",
-      "namespace": "openshift",
-      "name": "centos",
-      "tag": "7"
-    }
-  },
-  "test_base_image": {
-    "cluster": "https://api.ci.openshift.org",
-    "namespace": "openshift",
-    "name": "release",
-    "tag": "golang-1.10"
-  },
-
-  "canonical_go_repository": "github.com/openshift/ci-operator",
-
-  "binary_build_commands": "make install",
-
-  "images": [
-    {
-      "from": "os",
-      "to": "ci-operator",
-      "context_dir": "images/ci-operator/",
-      "inputs": {
-        "bin": {
-          "paths": [{
-            "source_path": "/go/bin/ci-operator",
-            "destination_dir": "."
-          }]
-        }
-      }
-    },
-    {
-      "from": "os",
-      "to": "ci-operator-checkconfig",
-      "context_dir": "images/ci-operator-checkconfig/",
-      "inputs": {
-        "bin": {
-          "paths": [{
-            "source_path": "/go/bin/ci-operator-checkconfig",
-            "destination_dir": "."
-          }]
-        }
-      }
-    }
-  ],
-
-  "promotion": {
-    "cluster": "https://api.ci.openshift.org",
-    "namespace": "ci",
-    "tag": "latest"
-  },
-
-  "tests": [
-    {
-      "as": "unit",
-      "from": "src",
-      "commands": "ARTIFACT_DIR=/tmp/artifacts make test",
-      "artifact_dir": "/tmp/artifacts"
-    },
-    {
-      "as": "lint",
-      "from": "src",
-      "commands": "ARTIFACT_DIR=/tmp/artifacts make check",
-      "artifact_dir": "/tmp/artifacts"
-    }
-  ],
-
-  "resources": {
-    "*": {
-      "requests": { "cpu": "100m", "memory": "200Mi" },
-      "limits":   { "cpu": "2",    "memory": "6Gi" }
-    }
-  }
-}
+base_images:
+  os:
+    cluster: https://api.ci.openshift.org
+    name: centos
+    namespace: openshift
+    tag: '7'
+binary_build_commands: make install
+canonical_go_repository: github.com/openshift/ci-operator
+images:
+- context_dir: images/ci-operator/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/ci-operator
+  to: ci-operator
+- context_dir: images/ci-operator-checkconfig/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/ci-operator-checkconfig
+  to: ci-operator-checkconfig
+promotion:
+  cluster: https://api.ci.openshift.org
+  namespace: ci
+  tag: latest
+resources:
+  '*':
+    limits:
+      cpu: '2'
+      memory: 6Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_base_image:
+  cluster: https://api.ci.openshift.org
+  name: release
+  namespace: openshift
+  tag: golang-1.10
+tests:
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: ARTIFACT_DIR=/tmp/artifacts make test
+  from: src
+- artifact_dir: /tmp/artifacts
+  as: lint
+  commands: ARTIFACT_DIR=/tmp/artifacts make check
+  from: src

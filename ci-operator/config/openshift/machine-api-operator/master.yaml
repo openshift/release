@@ -1,49 +1,34 @@
-{
-  "tag_specification": {
-    "cluster": "https://api.ci.openshift.org",
-    "namespace": "openshift",
-    "name": "origin-v4.0",
-    "tag": "",
-    "tag_overrides": {}
-  },
-  "base_images": {
-    "base": {
-      "cluster": "https://api.ci.openshift.org",
-      "namespace": "openshift",
-      "name": "origin-v4.0",
-      "tag": "base"
-    }
-  },
-  "test_base_image": {
-    "cluster": "https://api.ci.openshift.org",
-    "namespace": "openshift",
-    "name": "release",
-    "tag": "golang-1.10"
-  },
-
-  "canonical_go_repository": "github.com/openshift/machine-api-operator",
-
-  "binary_build_commands": "NO_DOCKER=1 make build",
-
-  "images": [
-    {
-      "from": "base",
-      "to": "machine-api-operator"
-    }
-  ],
-
-  "tests": [
-    {
-      "as": "unit",
-      "from": "src",
-      "commands": "NO_DOCKER=1 make test"
-    }
-  ],
-
-  "resources": {
-    "*": {
-      "requests": { "cpu": "100m", "memory": "200Mi" },
-      "limits":   { "cpu": "2",    "memory": "4Gi" }
-    }
-  }
-}
+base_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: origin-v4.0
+    namespace: openshift
+    tag: base
+binary_build_commands: NO_DOCKER=1 make build
+canonical_go_repository: github.com/openshift/machine-api-operator
+images:
+- from: base
+  to: machine-api-operator
+resources:
+  '*':
+    limits:
+      cpu: '2'
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: origin-v4.0
+  namespace: openshift
+  tag: ''
+  tag_overrides: {}
+test_base_image:
+  cluster: https://api.ci.openshift.org
+  name: release
+  namespace: openshift
+  tag: golang-1.10
+tests:
+- as: unit
+  commands: NO_DOCKER=1 make test
+  from: src

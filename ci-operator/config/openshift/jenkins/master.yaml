@@ -1,123 +1,104 @@
-{
-    "tag_specification": {
-        "cluster": "https://api.ci.openshift.org",
-        "namespace": "openshift",
-        "name": "origin-v4.0",
-        "tag": "",
-        "tag_overrides": {}
-    },
-    "base_images": {
-        "base": {
-            "cluster": "https://api.ci.openshift.org",
-            "namespace": "openshift",
-            "name": "origin-v4.0",
-            "tag": "cli"
-        },
-        "cluster-tests": {
-            "cluster": "https://api.ci.openshift.org",
-            "namespace": "openshift",
-            "name": "origin-v4.0",
-            "tag": "tests"
-        }
-    },
-    "test_base_image": {
-        "cluster": "https://api.ci.openshift.org",
-        "namespace": "openshift",
-        "name": "release",
-        "tag": "golang-1.9"
-    },
-    "images": [
-        {
-            "from": "cluster-tests",
-            "to": "jenkins-e2e-tests",
-            "optional": true,
-            "inputs": {"src": {"paths": [{"source_path": "/go/src/github.com/openshift/jenkins/test-e2e/.","destination_dir": "."}]}}
-        },
-        {
-            "from": "base",
-            "to": "bin-2-centos",
-            "optional": true,
-            "dockerfile_path": "Dockerfile",
-            "inputs": {"src": {"paths": [{"source_path": "/go/src/github.com/openshift/jenkins/2/.","destination_dir": "."}]}}
-        },
-        {
-            "from": "base",
-            "to": "bin-slave-base-centos",
-            "optional": true,
-            "dockerfile_path": "Dockerfile",
-            "inputs": {"src": {"paths": [{"source_path": "/go/src/github.com/openshift/jenkins/slave-base/.","destination_dir": "."}]}}
-        },
-        {
-            "from": "bin-slave-base-centos",
-            "to": "bin-agent-maven-35-centos",
-            "optional": true,
-            "dockerfile_path": "Dockerfile",
-            "inputs": {"src": {"paths": [{"source_path": "/go/src/github.com/openshift/jenkins/agent-maven-3.5/.","destination_dir": "."}]}}
-        },
-        {
-            "from": "bin-slave-base-centos",
-            "to": "bin-agent-nodejs-8-centos",
-            "optional": true,
-            "dockerfile_path": "Dockerfile",
-            "inputs": {"src": {"paths": [{"source_path": "/go/src/github.com/openshift/jenkins/agent-nodejs-8/.","destination_dir": "."}]}}
-        }
-    ],
-    "raw_steps": [
-        {
-            "output_image_tag_step": {
-                "from": "bin-2-centos",
-                "to": {
-                    "name": "stable",
-                    "tag": "prepare",
-                    "as": "prepare"
-                },
-                "optional": true
-            }
-        },
-        {
-            "output_image_tag_step": {
-                "from": "bin-agent-maven-35-centos",
-                "to": {
-                    "name": "stable",
-                    "tag": "maven_agent",
-                    "as": "maven_agent"
-                },
-                "optional": true
-            }
-        },
-        {
-            "output_image_tag_step": {
-                "from": "bin-agent-nodejs-8-centos",
-                "to": {
-                    "name": "stable",
-                    "tag": "nodejs_agent",
-                    "as": "nodejs_agent"
-                },
-                "optional": true
-            }
-        },
-        {
-            "output_image_tag_step": {
-                "from": "jenkins-e2e-tests",
-                "to": {
-                    "name": "stable",
-                    "tag": "tests",
-                    "as": "tests"
-                },
-                "optional": true
-            }
-        }
-    ],
-    "resources": {
-        "*": {
-            "requests": {
-                "cpu": "100m",
-                "memory": "200Mi"
-            },
-            "limits": {
-                "cpu": "2",
-                "memory": "4Gi"
-            }
-        }
-    }
-}
+base_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: origin-v4.0
+    namespace: openshift
+    tag: cli
+  cluster-tests:
+    cluster: https://api.ci.openshift.org
+    name: origin-v4.0
+    namespace: openshift
+    tag: tests
+images:
+- from: cluster-tests
+  inputs:
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/jenkins/test-e2e/.
+  optional: true
+  to: jenkins-e2e-tests
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/jenkins/2/.
+  optional: true
+  to: bin-2-centos
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/jenkins/slave-base/.
+  optional: true
+  to: bin-slave-base-centos
+- dockerfile_path: Dockerfile
+  from: bin-slave-base-centos
+  inputs:
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/jenkins/agent-maven-3.5/.
+  optional: true
+  to: bin-agent-maven-35-centos
+- dockerfile_path: Dockerfile
+  from: bin-slave-base-centos
+  inputs:
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/jenkins/agent-nodejs-8/.
+  optional: true
+  to: bin-agent-nodejs-8-centos
+raw_steps:
+- output_image_tag_step:
+    from: bin-2-centos
+    optional: true
+    to:
+      as: prepare
+      name: stable
+      tag: prepare
+- output_image_tag_step:
+    from: bin-agent-maven-35-centos
+    optional: true
+    to:
+      as: maven_agent
+      name: stable
+      tag: maven_agent
+- output_image_tag_step:
+    from: bin-agent-nodejs-8-centos
+    optional: true
+    to:
+      as: nodejs_agent
+      name: stable
+      tag: nodejs_agent
+- output_image_tag_step:
+    from: jenkins-e2e-tests
+    optional: true
+    to:
+      as: tests
+      name: stable
+      tag: tests
+resources:
+  '*':
+    limits:
+      cpu: '2'
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: origin-v4.0
+  namespace: openshift
+  tag: ''
+  tag_overrides: {}
+test_base_image:
+  cluster: https://api.ci.openshift.org
+  name: release
+  namespace: openshift
+  tag: golang-1.9

@@ -1,65 +1,59 @@
-{
-  "tag_specification": {
-    "cluster": "https://api.ci.openshift.org",
-    "namespace": "openshift",
-    "name": "origin-v4.0",
-    "tag": "",
-    "tag_overrides": {}
-  },
-  "base_rpm_images": {
-    "base": {
-      "cluster": "https://api.ci.openshift.org",
-      "namespace": "openshift",
-      "name": "origin-v4.0",
-      "tag": "base"
-    }
-  },
-  "test_base_image": {
-    "cluster": "https://api.ci.openshift.org",
-    "namespace": "openshift",
-    "name": "release",
-    "tag": "golang-1.10"
-  },
-
-  "canonical_go_repository": "k8s.io/autoscaler",
-
-  "binary_build_commands": "make build",
-  "test_binary_build_commands": "OS_GOFLAGS='-race' make build",
-  "rpm_build_commands": "make build-rpms",
-
-  "images": [
-    {
-      "from": "base",
-      "to": "cluster-autoscaler",
-      "context_dir": "images/cluster-autoscaler/"
-    }
-  ],
-
-  "tests": [
-    {
-      "as": "unit",
-      "from": "src",
-      "commands": "ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1 hack/test-go.sh",
-      "artifact_dir": "/tmp/artifacts"
-    }
-  ],
-
-  "resources": {
-    "*": {
-      "requests": { "cpu": "100m", "memory": "200Mi" },
-      "limits":   { "cpu": "2",    "memory": "4Gi" }
-    },
-    "bin": {
-      "requests": { "cpu": "2",    "memory": "4Gi" },
-      "limits":   { "cpu": "5",    "memory": "5Gi" }
-    },
-    "test-bin": {
-      "requests": { "cpu": "2",    "memory": "4Gi" },
-      "limits":   { "cpu": "5",    "memory": "7Gi" }
-    },
-    "unit": {
-      "requests": { "cpu": "2",    "memory": "4Gi" },
-      "limits":   { "cpu": "5",    "memory": "7Gi" }
-    }
-  }
-}
+base_rpm_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: origin-v4.0
+    namespace: openshift
+    tag: base
+binary_build_commands: make build
+canonical_go_repository: k8s.io/autoscaler
+images:
+- context_dir: images/cluster-autoscaler/
+  from: base
+  to: cluster-autoscaler
+resources:
+  '*':
+    limits:
+      cpu: '2'
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  bin:
+    limits:
+      cpu: '5'
+      memory: 5Gi
+    requests:
+      cpu: '2'
+      memory: 4Gi
+  test-bin:
+    limits:
+      cpu: '5'
+      memory: 7Gi
+    requests:
+      cpu: '2'
+      memory: 4Gi
+  unit:
+    limits:
+      cpu: '5'
+      memory: 7Gi
+    requests:
+      cpu: '2'
+      memory: 4Gi
+rpm_build_commands: make build-rpms
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: origin-v4.0
+  namespace: openshift
+  tag: ''
+  tag_overrides: {}
+test_base_image:
+  cluster: https://api.ci.openshift.org
+  name: release
+  namespace: openshift
+  tag: golang-1.10
+test_binary_build_commands: OS_GOFLAGS='-race' make build
+tests:
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1 hack/test-go.sh
+  from: src

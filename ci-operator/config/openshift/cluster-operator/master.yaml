@@ -1,96 +1,76 @@
-{
-  "tag_specification": {
-    "cluster": "https://api.ci.openshift.org",
-    "namespace": "openshift",
-    "name": "origin-v4.0",
-    "tag": "",
-    "tag_overrides": {}
-  },
-  "base_images": {
-    "root": {
-      "cluster": "https://api.ci.openshift.org",
-      "namespace": "openshift",
-      "name": "release",
-      "tag": "golang-1.10"
-    },
-    "base": {
-      "cluster": "https://api.ci.openshift.org",
-      "namespace": "openshift",
-      "name": "origin-v4.0",
-      "tag": "base"
-    },
-    "ansible": {
-      "cluster": "https://api.ci.openshift.org",
-      "namespace": "openshift",
-      "name": "origin-v4.0",
-      "tag": "ansible"
-    }
-  },
-  "test_base_image": {
-    "cluster": "https://api.ci.openshift.org",
-    "namespace": "openshift",
-    "name": "release",
-    "tag": "golang-1.10"
-  },
-  "canonical_go_repository": "github.com/openshift/cluster-operator",
-  "binary_build_commands": "NO_DOCKER=1 make build",
-  "images": [
-    {
-      "from": "base",
-      "to": "cluster-operator",
-      "dockerfile_path": "build/cluster-operator/Dockerfile",
-      "inputs": {
-        "bin": { 
-          "paths": [
-            { "source_path": "/go/src/github.com/openshift/cluster-operator/bin/cluster-operator", "destination_dir": "." },
-            { "source_path": "/go/src/github.com/openshift/cluster-operator/bin/coutil", "destination_dir": "." }
-          ] 
-        }
-      }
-    },
-    {
-      "from": "ansible",
-      "to": "cluster-operator-ansible",
-      "context_dir": "build/cluster-operator-ansible"
-    },
-    {
-      "from": "root",
-      "to": "builder-base",
-      "dockerfile_path": "build/build-image/Dockerfile",
-      "optional": true
-    },
-    {
-      "from": "builder-base",
-      "to": "test-base",
-      "dockerfile_path": "build/test-image/Dockerfile",
-      "optional": true
-    }
-  ],
-  "tests": [
-    {
-      "as": "verify",
-      "from": "test-base",
-      "commands": "git reset HEAD --hard && git clean -f -d && NO_DOCKER=1 make verify"
-    },
-    {
-      "as": "unit",
-      "from": "test-base",
-      "commands": "NO_DOCKER=1 make test-unit"
-    },
-    {
-      "as": "integration",
-      "from": "bin",
-      "commands": "NO_DOCKER=1 make test-integration"
-    }
-  ],
-  "resources": {
-    "*": {
-      "requests": { "cpu": "100m", "memory": "200Mi" },
-      "limits":   { "cpu": "2",    "memory": "4Gi" }
-    },
-    "unit": {
-      "requests": { "cpu": "2",    "memory": "1Gi" },
-      "limits":   { "cpu": "4",    "memory": "4Gi" }
-    }
-  }
-}
+base_images:
+  ansible:
+    cluster: https://api.ci.openshift.org
+    name: origin-v4.0
+    namespace: openshift
+    tag: ansible
+  base:
+    cluster: https://api.ci.openshift.org
+    name: origin-v4.0
+    namespace: openshift
+    tag: base
+  root:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+binary_build_commands: NO_DOCKER=1 make build
+canonical_go_repository: github.com/openshift/cluster-operator
+images:
+- dockerfile_path: build/cluster-operator/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/cluster-operator/bin/cluster-operator
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/cluster-operator/bin/coutil
+  to: cluster-operator
+- context_dir: build/cluster-operator-ansible
+  from: ansible
+  to: cluster-operator-ansible
+- dockerfile_path: build/build-image/Dockerfile
+  from: root
+  optional: true
+  to: builder-base
+- dockerfile_path: build/test-image/Dockerfile
+  from: builder-base
+  optional: true
+  to: test-base
+resources:
+  '*':
+    limits:
+      cpu: '2'
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  unit:
+    limits:
+      cpu: '4'
+      memory: 4Gi
+    requests:
+      cpu: '2'
+      memory: 1Gi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: origin-v4.0
+  namespace: openshift
+  tag: ''
+  tag_overrides: {}
+test_base_image:
+  cluster: https://api.ci.openshift.org
+  name: release
+  namespace: openshift
+  tag: golang-1.10
+tests:
+- as: verify
+  commands: git reset HEAD --hard && git clean -f -d && NO_DOCKER=1 make verify
+  from: test-base
+- as: unit
+  commands: NO_DOCKER=1 make test-unit
+  from: test-base
+- as: integration
+  commands: NO_DOCKER=1 make test-integration
+  from: bin

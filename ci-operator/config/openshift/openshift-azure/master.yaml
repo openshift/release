@@ -1,65 +1,50 @@
-{
-  "tag_specification": {
-    "cluster": "https://api.ci.openshift.org",
-    "namespace": "openshift",
-    "name": "origin-v3.10",
-    "tag": "",
-    "tag_overrides": {}
-  },
-  "base_images": {
-    "base": {
-      "cluster": "https://api.ci.openshift.org",
-      "namespace": "azure",
-      "name": "plugin-base",
-      "tag": "latest"
-    }
-  },
-  "test_base_image": {
-    "cluster": "https://api.ci.openshift.org",
-    "namespace": "azure",
-    "name": "test-base",
-    "tag": "latest"
-  },
-
-  "canonical_go_repository": "github.com/openshift/openshift-azure",
-
-  "binary_build_commands": "make build sync",
-
-  "images": [
-    {
-      "from": "base",
-      "to": "sync",
-      "dockerfile_path": "Dockerfile.sync",
-      "inputs": {
-        "bin": {"paths": [{"source_path": "/go/src/github.com/openshift/openshift-azure/sync", "destination_dir": "."}]},
-        "root": {"as": ["sync"]}
-      }
-    }
-  ],
-
-  "tests": [
-    {
-      "as": "verify",
-      "from": "src",
-      "commands": "make verify"
-    },
-    {
-      "as": "unit",
-      "from": "src",
-      "commands": "make unit"
-    }
-  ],
-
-  "promotion": {
-    "cluster": "https://api.ci.openshift.org",
-    "namespace": "azure",
-    "name": "azure-plugins"
-  },
-
-  "resources": {
-    "*": {
-      "requests": { "cpu": "100m", "memory": "200Mi" },
-      "limits":   { "cpu": "2",    "memory": "4Gi" }
-    }
-  }
-}
+base_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: plugin-base
+    namespace: azure
+    tag: latest
+binary_build_commands: make build sync
+canonical_go_repository: github.com/openshift/openshift-azure
+images:
+- dockerfile_path: Dockerfile.sync
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/openshift-azure/sync
+    root:
+      as:
+      - sync
+  to: sync
+promotion:
+  cluster: https://api.ci.openshift.org
+  name: azure-plugins
+  namespace: azure
+resources:
+  '*':
+    limits:
+      cpu: '2'
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: origin-v3.10
+  namespace: openshift
+  tag: ''
+  tag_overrides: {}
+test_base_image:
+  cluster: https://api.ci.openshift.org
+  name: test-base
+  namespace: azure
+  tag: latest
+tests:
+- as: verify
+  commands: make verify
+  from: src
+- as: unit
+  commands: make unit
+  from: src
