@@ -50,8 +50,6 @@ objects:
       emptyDir: {}
     - name: shared-tmp
       emptyDir: {}
-    - name: shared-data
-      emptyDir: {}
     - name: cluster-secrets-azure
       secret:
         secretName: e2e-azure-secret
@@ -103,6 +101,17 @@ objects:
         done
         echo "Found shared kubeconfig"
 
+        source /etc/azure/credentials/secret
+        az login --service-principal -u ${AZURE_CLIENT_ID} -p ${AZURE_CLIENT_SECRET} --tenant ${AZURE_TENANT_ID} &>/dev/null
+        # aad integration configuration - we dont test aad so populate as dummy
+        export AZURE_AAD_CLIENT_ID=$AZURE_CLIENT_ID
+        export AZURE_AAD_CLIENT_SECRET=$AZURE_CLIENT_SECRET
+        export DNS_DOMAIN=osadev.cloud
+        export DNS_RESOURCEGROUP=dns
+        export DEPLOY_VERSION=v3.10
+        export IMAGE_RESOURCEGROUP=images
+        export IMAGE_RESOURCENAME=$(az image list -g $IMAGE_RESOURCEGROUP -o json --query "[?starts_with(name, '${DEPLOY_OS:-rhel7}-${DEPLOY_VERSION//v}') && tags.valid=='true'].name | sort(@) | [-1]" | tr -d '"')
+
         cp -r /tmp/shared/_data /go/src/github.com/openshift/openshift-azure/
         cd /go/src/github.com/openshift/openshift-azure/
         ./hack/upgrade.sh ${INSTANCE_PREFIX}
@@ -150,7 +159,6 @@ objects:
         export DNS_DOMAIN=osadev.cloud
         export DNS_RESOURCEGROUP=dns
         export DEPLOY_VERSION=v3.10
-        export RUN_SYNC_LOCAL=true
         export IMAGE_RESOURCEGROUP=images
         export IMAGE_RESOURCENAME=$(az image list -g $IMAGE_RESOURCEGROUP -o json --query "[?starts_with(name, '${DEPLOY_OS:-rhel7}-${DEPLOY_VERSION//v}') && tags.valid=='true'].name | sort(@) | [-1]" | tr -d '"')
         # create cluster for test
