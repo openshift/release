@@ -1,0 +1,342 @@
+kind: Template
+apiVersion: template.openshift.io/v1
+
+parameters:
+- name: JOB_NAME_SAFE
+  required: true
+- name: JOB_NAME_HASH
+  required: true
+- name: NAMESPACE
+  required: true
+- name: IMAGE_CLI
+  required: true
+- name: IMAGE_FORMAT
+  required: true
+- name: IMAGE_INSTALLER
+  required: true
+- name: IMAGE_TESTS
+  required: true
+- name: IMAGE_INSTALLER_SMOKE
+  required: true
+- name: CLUSTER_TYPE
+  required: true
+
+objects:
+
+# We want the cluster to be able to access these images
+- kind: RoleBinding
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: ${JOB_NAME_SAFE}-image-puller
+    namespace: ${NAMESPACE}
+  roleRef:
+    name: system:image-puller
+  subjects:
+  - kind: SystemGroup
+    name: system:unauthenticated
+
+# The e2e pod spins up a cluster, runs e2e tests, and then cleans up the cluster.
+- kind: Pod
+  apiVersion: v1
+  metadata:
+    name: ${JOB_NAME_SAFE}
+    namespace: ${NAMESPACE}
+    annotations:
+      # we want to gather the teardown logs no matter what
+      ci-operator.openshift.io/wait-for-container-artifacts: teardown
+  spec:
+    restartPolicy: Never
+    activeDeadlineSeconds: 10800
+    terminationGracePeriodSeconds: 900
+    volumes:
+    - name: artifacts
+      emptyDir: {}
+    - name: shared-tmp
+      emptyDir: {}
+    - name: cluster-profile
+      secret:
+        secretName: ${JOB_NAME_SAFE}-cluster-profile
+
+    initContainers:
+    - name: cli
+      image: ${IMAGE_CLI}
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      command:
+      - cp
+      - /usr/bin/oc
+      - /tmp/shared/oc
+
+    - name: smoke-test
+      image: ${IMAGE_INSTALLER_SMOKE}
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      command:
+      - cp
+      - /usr/bin/smoke
+      - /tmp/shared/smoke
+
+    containers:
+
+    # Once admin.kubeconfig exists, executes shared tests
+    - name: test
+      image: ${IMAGE_INSTALLER_SMOKE}
+      resources:
+        requests:
+          cpu: 1
+          memory: 300Mi
+        limits:
+          cpu: 3
+          memory: 2Gi
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      - name: cluster-profile
+        mountPath: /tmp/cluster
+      - name: artifacts
+        mountPath: /tmp/artifacts
+      env:
+      - name: HOME
+        value: /tmp/home
+      - name: USER
+        value: bazel
+      - name: KUBECONFIG
+        value: /tmp/admin.kubeconfig
+      command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -euo pipefail
+
+        trap 'touch /tmp/shared/exit' EXIT
+        trap 'kill $(jobs -p); exit 0' TERM
+
+        mkdir -p "${HOME}"
+
+        # wait until the setup job creates admin.kubeconfig
+        while true; do
+          if [[ -f /tmp/shared/exit ]]; then
+            echo "Another process exited" 2>&1
+            exit 1
+          fi
+          if [[ ! -f /tmp/shared/admin.kubeconfig ]]; then
+            sleep 15 & wait
+            continue
+          fi
+          break
+        done
+        echo "Found shared kubeconfig"
+
+        # don't let clients impact the global kubeconfig
+        cp /tmp/shared/admin.kubeconfig /tmp/admin.kubeconfig
+
+        PATH=/usr/libexec/origin:$PATH
+
+        # set up cloud provider specific env vars
+        if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
+          export GOOGLE_APPLICATION_CREDENTIALS="/tmp/cluster/gce.json"
+          export KUBE_SSH_USER=cloud-user
+          mkdir -p ~/.ssh
+          cp /tmp/cluster/ssh-privatekey ~/.ssh/google_compute_engine || true
+          export PROVIDER_ARGS='-provider=gce -gce-zone=us-east1-c -gce-project=openshift-gce-devel-ci'
+        elif [[ "${CLUSTER_TYPE}" == "aws" ]]; then
+          region="$( python -c 'import sys, json; print json.load(sys.stdin)["tectonic_aws_region"]' </tmp/shared/cluster/terraform.tfvars )"
+          export PROVIDER_ARGS="-provider=aws -gce-zone=${region}"
+        fi
+
+        mkdir -p /tmp/output
+        cd /tmp/output
+
+        exit ${rc:-0}
+
+    # Runs an install
+    - name: setup
+      image: ${IMAGE_INSTALLER_SMOKE}
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp
+      - name: cluster-profile
+        mountPath: /etc/openshift-installer
+      - name: artifacts
+        mountPath: /tmp/artifacts
+      env:
+      - name: INSTANCE_PREFIX
+        value: ${NAMESPACE}-${JOB_NAME_HASH}
+      - name: TYPE
+        value: ${CLUSTER_TYPE}
+      - name: AWS_SHARED_CREDENTIALS_FILE
+        value: /etc/openshift-installer/.awscred
+      - name: KUBECONFIG
+        value: /tmp/cluster/generated/auth/kubeconfig
+      command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -euo pipefail
+
+        trap 'rc=$?; if [[ $rc -ne 0 ]]; then touch /tmp/exit; fi; exit $rc' EXIT
+        trap 'kill $(jobs -p); exit 0' TERM
+
+        mkdir /tmp/cluster
+        cp /etc/openshift-installer/* /tmp/cluster/
+
+        export NAME=${INSTANCE_PREFIX}
+        (
+          export EMAIL=test@ci.openshift.io
+          export PASSWORD=$( date +%s | sha256sum | base64 | head -c 32 ; echo )
+          export SSH_KEY="$( cat /etc/openshift-installer/ssh-publickey )"
+          export EC2_AMI_OVERRIDE=ami-07307c397daf4d02e
+          export EXPIRATION_DATE=$( date -d '4 hours' --iso=minutes --utc )
+          envsubst </etc/openshift-installer/openshift.yaml >/tmp/cluster/inputs.yaml
+        )
+        mkdir /tmp/artifacts/installer
+        cp /tmp/cluster/inputs.yaml /tmp/artifacts/installer/
+
+        echo "Invoking installer ..."
+
+        cd /tmp/cluster
+        tectonic init --config=inputs.yaml
+        mv -f ${NAME}/* /tmp/cluster/
+        cp config.yaml internal.yaml terraform.tfvars /tmp/artifacts/installer/
+
+        tectonic install --dir=. --log-level=debug
+
+        # wait until oc shows up
+        while true; do
+          if [[ -f /tmp/exit ]]; then
+            echo "Interrupted"
+            cp $KUBECONFIG /tmp/admin.kubeconfig
+            exit 1
+          fi
+          if [[ ! -f /tmp/oc ]]; then
+            echo "Waiting for oc binary to show up ..."
+            sleep 15 & wait
+            continue
+          fi
+          if ! /tmp/oc get nodes 2>/dev/null; then
+            echo "Waiting for API at $(/tmp/oc whoami --show-server) to respond ..."
+            sleep 15 & wait
+            continue
+          fi
+          # check multiple namespaces while we are transitioning to the new locations
+          if /tmp/oc get deploy/router -n tectonic-ingress 2>/dev/null; then
+            router_namespace=tectonic-ingress
+          elif /tmp/oc get deploy/router -n openshift-ingress 2>/dev/null; then
+            router_namespace=openshift-ingress
+          elif /tmp/oc get deploy/router -n default 2>/dev/null; then
+            router_namespace=default
+          else
+            echo "Waiting for router to be created ..."
+            sleep 15 & wait
+            continue
+          fi
+          break
+        done
+        if ! /tmp/oc wait deploy/router -n "${router_namespace}" --for condition=available --timeout=20m; then
+          echo "Installation failed"
+          cp $KUBECONFIG /tmp/admin.kubeconfig
+          exit 1
+        fi
+        cp $KUBECONFIG /tmp/admin.kubeconfig
+        echo "Installation successful"
+        echo "Starting installer smoke tests..."
+        export SMOKE_KUBECONFIG=${KUBECONFIG}
+        export SMOKE_MANIFEST_PATHS=/tmp/cluster/generated/manifests
+        # 3 masters/3 workers/1 bootstrap
+        export SMOKE_NODE_COUNT=7
+        if ! /tmp/smoke -cluster -test.v; then
+          echo "Smoke tests failed"
+          exit 1
+        fi
+        echo "Smoke tests passed"
+
+    # Performs cleanup of all created resources
+    - name: teardown
+      image: ${IMAGE_INSTALLER_SMOKE}
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      - name: cluster-profile
+        mountPath: /etc/openshift-installer
+      - name: artifacts
+        mountPath: /tmp/artifacts
+      env:
+      - name: INSTANCE_PREFIX
+        value: ${NAMESPACE}-${JOB_NAME_HASH}
+      - name: TYPE
+        value: ${CLUSTER_TYPE}
+      - name: KUBECONFIG
+        value: /tmp/shared/admin.kubeconfig
+      command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        function teardown() {
+          set +e
+          touch /tmp/shared/exit
+          export PATH=$PATH:/tmp/shared
+
+          echo "Gathering artifacts ..."
+          mkdir -p /tmp/artifacts/pods /tmp/artifacts/nodes /tmp/artifacts/metrics
+
+          oc --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' > /tmp/nodes
+          oc --request-timeout=5s get pods --all-namespaces --template '{{ range .items }}{{ $name := .metadata.name }}{{ $ns := .metadata.namespace }}{{ range .spec.containers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ range .spec.initContainers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ end }}' > /tmp/containers
+          oc --request-timeout=5s get nodes -o json > /tmp/artifacts/nodes.json
+          oc --request-timeout=5s get events --all-namespaces -o json > /tmp/artifacts/events.json
+          oc --request-timeout=5s get pods -l openshift.io/component=api --all-namespaces --template '{{ range .items }}-n {{ .metadata.namespace }} {{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/pods-api
+
+          # gather nodes first in parallel since they may contain the most relevant debugging info
+          while IFS= read -r i; do
+            mkdir -p /tmp/artifacts/nodes/$i
+            (
+            oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/messages | gzip -c > /tmp/artifacts/nodes/$i/messages.gz
+            oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/journal | sed -e 's|.*href="\(.*\)".*|\1|;t;d' > /tmp/journals
+            while IFS= read -r j; do
+              oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/journal/${j}system.journal | gzip -c > /tmp/artifacts/nodes/$i/journal.gz
+            done < /tmp/journals
+            oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/metrics | gzip -c > /tmp/artifacts/metrics/node-$i.gz
+            oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/debug/pprof/heap > /tmp/artifacts/nodes/$i/heap
+            oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/secure | gzip -c > /tmp/artifacts/nodes/$i/secure.gz
+            oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/audit | gzip -c > /tmp/artifacts/nodes/$i/audit.gz
+            ) &
+          done < /tmp/nodes
+
+          while IFS= read -r i; do
+            file="$( echo "$i" | cut -d ' ' -f 3 | tr -s ' ' '_' )"
+            oc exec $i -- /bin/bash -c 'oc get --raw /debug/pprof/heap --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig' > /tmp/artifacts/metrics/${file}-heap
+            oc exec $i -- /bin/bash -c 'oc get --raw /metrics --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig' | gzip -c > /tmp/artifacts/metrics/${file}-api.gz
+            oc exec $i -- /bin/bash -c 'oc get --raw /debug/pprof/heap --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig' > /tmp/artifacts/metrics/${file}-controllers-heap
+            oc exec $i -- /bin/bash -c 'oc get --raw /metrics --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig' | gzip -c > /tmp/artifacts/metrics/${file}-controllers.gz
+          done < /tmp/pods-api
+
+          while IFS= read -r i; do
+            file="$( echo "$i" | cut -d ' ' -f 2,3,5 | tr -s ' ' '_' )"
+            oc logs --request-timeout=20s $i | gzip -c > /tmp/artifacts/pods/${file}.log.gz
+            oc logs --request-timeout=20s -p $i | gzip -c > /tmp/artifacts/pods/${file}_previous.log.gz
+          done < /tmp/containers
+
+          echo "Waiting for node logs to finish ..."
+          wait
+
+          echo "Deprovisioning cluster ..."
+          export AWS_SHARED_CREDENTIALS_FILE=/etc/openshift-installer/.awscred
+          cd /tmp/shared/cluster
+          for i in `seq 1 2`; do
+            tectonic destroy --dir=. --log-level=debug
+          done
+        }
+
+        trap 'teardown' EXIT
+        trap 'kill $(jobs -p); exit 0' TERM
+
+        for i in `seq 1 120`; do
+          if [[ -f /tmp/shared/exit ]]; then
+            exit 0
+          fi
+          sleep 60 & wait
+        done
