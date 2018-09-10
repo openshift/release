@@ -1,65 +1,43 @@
-{
-  "tag_specification": {
-    "cluster": "https://api.ci.openshift.org",
-    "namespace": "openshift",
-    "name": "origin-v4.0",
-    "tag": "",
-    "tag_overrides": {}
-  },
-  "base_images": {
-    "base": {
-      "cluster": "https://api.ci.openshift.org",
-      "namespace": "openshift",
-      "name": "origin-v4.0",
-      "tag": "base"
-    }
-  },
-  "test_base_image": {
-    "cluster": "https://api.ci.openshift.org",
-    "namespace": "openshift",
-    "name": "release",
-    "tag": "golang-1.10"
-  },
-  "canonical_go_repository": "github.com/openshift/machine-config-operator",
-  "images": [
-    {
-      "from": "base",
-      "to": "machine-config-controller",
-      "dockerfile_path": "Dockerfile.machine-config-controller"
-    },
-    {
-      "from": "base",
-      "to": "machine-config-server",
-      "dockerfile_path": "Dockerfile.machine-config-server"
-    },
-    {
-      "from": "base",
-      "to": "machine-config-daemon",
-      "dockerfile_path": "Dockerfile.machine-config-daemon"
-    },
-    {
-      "from": "base",
-      "to": "machine-config-operator",
-      "dockerfile_path": "Dockerfile.machine-config-operator"
-    }
-  ],
-  "tests": [
-    {
-      "as": "unit",
-      "from": "src",
-      "commands": "go test ./..."
-    }
-  ],
-  "resources": {
-    "*": {
-      "requests": {
-        "cpu": "100m",
-        "memory": "200Mi"
-      },
-      "limits": {
-        "cpu": "2",
-        "memory": "4Gi"
-      }
-    }
-  }
-}
+base_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: origin-v4.0
+    namespace: openshift
+    tag: base
+canonical_go_repository: github.com/openshift/machine-config-operator
+images:
+- dockerfile_path: Dockerfile.machine-config-controller
+  from: base
+  to: machine-config-controller
+- dockerfile_path: Dockerfile.machine-config-server
+  from: base
+  to: machine-config-server
+- dockerfile_path: Dockerfile.machine-config-daemon
+  from: base
+  to: machine-config-daemon
+- dockerfile_path: Dockerfile.machine-config-operator
+  from: base
+  to: machine-config-operator
+resources:
+  '*':
+    limits:
+      cpu: '2'
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: origin-v4.0
+  namespace: openshift
+  tag: ''
+  tag_overrides: {}
+test_base_image:
+  cluster: https://api.ci.openshift.org
+  name: release
+  namespace: openshift
+  tag: golang-1.10
+tests:
+- as: unit
+  commands: go test ./...
+  from: src

@@ -1,54 +1,38 @@
-{
-  "tag_specification": {
-    "cluster": "https://api.ci.openshift.org",
-    "namespace": "openshift",
-    "name": "origin-v3.11",
-    "tag": "",
-    "tag_overrides": {}
-  },
-  "base_images": {
-    "base": {
-      "cluster": "https://api.ci.openshift.org",
-      "namespace": "openshift",
-      "name": "origin-v3.11",
-      "tag": "base"
-    }
-  },
-  "test_base_image": {
-    "cluster": "https://api.ci.openshift.org",
-    "namespace": "openshift",
-    "name": "release",
-    "tag": "golang-1.10"
-  },
-
-  "canonical_go_repository": "github.com/openshift/cluster-api-provider-aws",
-
-  "binary_build_commands": "make build",
-
-  "images": [
-    {
-      "from": "base",
-      "to": "machine-controller",
-      "dockerfile_path": "cmd/machine-controller/Dockerfile"
-    },
-    {
-      "from": "base",
-      "to": "cluster-controller",
-      "dockerfile_path": "cmd/cluster-controller/Dockerfile"
-    }
-  ],
-  "tests": [
-    {
-      "as": "unit",
-      "from": "src",
-      "commands": "make test"
-    }
-  ],
-
-  "resources": {
-    "*": {
-      "requests": { "cpu": "100m", "memory": "200Mi" },
-      "limits":   { "cpu": "2",    "memory": "4Gi" }
-    }
-  }
-}
+base_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: origin-v3.11
+    namespace: openshift
+    tag: base
+binary_build_commands: make build
+canonical_go_repository: github.com/openshift/cluster-api-provider-aws
+images:
+- dockerfile_path: cmd/machine-controller/Dockerfile
+  from: base
+  to: machine-controller
+- dockerfile_path: cmd/cluster-controller/Dockerfile
+  from: base
+  to: cluster-controller
+resources:
+  '*':
+    limits:
+      cpu: '2'
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: origin-v3.11
+  namespace: openshift
+  tag: ''
+  tag_overrides: {}
+test_base_image:
+  cluster: https://api.ci.openshift.org
+  name: release
+  namespace: openshift
+  tag: golang-1.10
+tests:
+- as: unit
+  commands: make test
+  from: src
