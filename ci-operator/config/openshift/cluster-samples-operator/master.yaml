@@ -1,14 +1,26 @@
-base_rpm_images:
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: origin-v4.0
+  namespace: openshift
+base_images:
   base:
     cluster: https://api.ci.openshift.org
     name: origin-v4.0
     namespace: openshift
     tag: base
-binary_build_commands: go build -v -o cluster-samples-operator ./cmd/cluster-samples-operator/
+test_base_image:
+  cluster: https://api.ci.openshift.org
+  name: release
+  namespace: openshift
+  tag: golang-1.10
+canonical_go_repository: github.com/openshift/cluster-samples-operator
 images:
-- context_dir: images/cluster-samples-operator/
-  from: base
-  to: ose-cluster-samples-operator
+- from: base
+  to: cluster-samples-operator
+tests:
+- as: unit
+  commands: go test ./...
+  from: src
 resources:
   '*':
     limits:
@@ -17,20 +29,3 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  cluster: https://api.ci.openshift.org
-  name: origin-v4.0
-  namespace: openshift
-  tag: ''
-  tag_overrides: {}
-test_base_image:
-  cluster: https://api.ci.openshift.org
-  name: release
-  namespace: openshift
-  tag: golang-1.10
-test_binary_build_commands: OS_GOFLAGS='-race' go test ./...
-tests:
-- artifact_dir: /tmp/artifacts
-  as: unit
-  commands: ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1 hack/test-go.sh
-  from: test-bin
