@@ -195,13 +195,16 @@ objects:
 
         # Don't expand IMAGE_FORMAT here - it contains '${component}'
         oreg_url='${IMAGE_FORMAT}'
+        openshift_release=''
         if [[ -n "${PREVIOUS_IMAGE_TAG}" ]]; then
           oreg_url='docker.io/openshift/origin-${component}:${PREVIOUS_IMAGE_TAG}'
+          openshift_release="${PREVIOUS_IMAGE_TAG}"
         fi
 
         ansible-playbook -vv \
           -e openshift_test_repo="${PREVIOUS_RPM_REPO}" \
           -e oreg_url="${oreg_url}" \
+          -e openshift_release="${openshift_release}" \
           playbooks/"${TYPE}"/openshift-cluster/launch.yml
 
         cp -rf /tmp/admin.kubeconfig /tmp/shared/admin.kubeconfig
