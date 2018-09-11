@@ -4,7 +4,7 @@ postsubmits:
     branches:
     - master
     decorate: true
-    name: branch-ci-openshift-azure
+    name: branch-ci-openshift-openshift-azure
     skip_cloning: true
     spec:
       containers:
@@ -42,6 +42,55 @@ postsubmits:
       volumes:
       - configMap:
           name: prow-job-cluster-launch-e2e-azure
+        name: job-definition
+      - name: cluster-secrets-azure
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-azure
+  - agent: kubernetes
+    branches:
+    - master
+    decorate: true
+    name: branch-ci-openshift-openshift-azure-upgrade
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --secret-dir=/usr/local/e2e-azure-secret
+        - --template=/usr/local/e2e-azure-upgrade
+        - --target=[output:stable:sync]
+        - --target=e2e-azure-upgrade
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-openshift-azure
+        - name: JOB_NAME_SAFE
+          value: e2e-azure-upgrade
+        - name: CLUSTER_TYPE
+          value: azure
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-azure-upgrade
+          name: job-definition
+          subPath: cluster-launch-e2e-azure-upgrade.yaml
+        - mountPath: /usr/local/e2e-azure-secret
+          name: cluster-secrets-azure
+      serviceAccountName: ci-operator
+      volumes:
+      - configMap:
+          name: prow-job-cluster-launch-e2e-azure-upgrade
         name: job-definition
       - name: cluster-secrets-azure
         projected:
