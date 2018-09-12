@@ -90,16 +90,20 @@ presubmits:
     spec:
       containers:
       - args:
-        - ./hack/go-fmt.sh
-        - .
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=gofmt
         command:
-        - sh
+        - ci-operator
         env:
-        - name: IS_CONTAINER
-          value: "TRUE"
-        image: openshift/origin-release:golang-1.10
-        name: ""
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-cluster-api-provider-aws
+        image: ci-operator:latest
+        name: test
         resources: {}
+      serviceAccountName: ci-operator
     trigger: ((?m)^/test(all| go-fmt),?(\s+|$))
   - agent: kubernetes
     always_run: true
@@ -110,16 +114,20 @@ presubmits:
     spec:
       containers:
       - args:
-        - ./hack/go-vet.sh
-        - ./...
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=govet
         command:
-        - sh
+        - ci-operator
         env:
-        - name: IS_CONTAINER
-          value: "TRUE"
-        image: openshift/origin-release:golang-1.10
-        name: ""
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-cluster-api-provider-aws
+        image: ci-operator:latest
+        name: test
         resources: {}
+      serviceAccountName: ci-operator
     trigger: ((?m)^/test(all| go-vet),?(\s+|$))
   - agent: kubernetes
     always_run: true
@@ -130,16 +138,20 @@ presubmits:
     spec:
       containers:
       - args:
-        - -c
-        - ./hack/go-lint.sh $(go list -f '{{ .ImportPath }}' ./...)
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=golint
         command:
-        - sh
+        - ci-operator
         env:
-        - name: IS_CONTAINER
-          value: "TRUE"
-        image: openshift/origin-release:golang-1.10
-        name: ""
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-cluster-api-provider-aws
+        image: ci-operator:latest
+        name: test
         resources: {}
+      serviceAccountName: ci-operator
     trigger: ((?m)^/test(all| golint),?(\s+|$))
   - agent: jenkins
     always_run: true
