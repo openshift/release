@@ -21,8 +21,8 @@ parameters:
 - name: CLUSTER_TYPE
   required: true
 - name: PREVIOUS_RPM_REPO
-- name: PREVIOUS_IMAGE_TAG
-  required: false
+- name: PREVIOUS_ANSIBLE_VERSION
+  required: true
 - name: TEST_SUITE
 - name: TEST_FOCUS
 - name: TEST_SKIP
@@ -193,15 +193,11 @@ objects:
         trap 'rc=$?; if [[ $rc -ne 0 ]]; then touch /tmp/shared/exit; else touch /tmp/shared/install; fi; exit $rc' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
 
-        # Don't expand IMAGE_FORMAT here - it contains '${component}'
-        oreg_url='${IMAGE_FORMAT}'
-        if [[ -n "${PREVIOUS_IMAGE_TAG}" ]]; then
-          oreg_url='docker.io/openshift/origin-${component}:${PREVIOUS_IMAGE_TAG}'
-        fi
-
         ansible-playbook -vv \
           -e openshift_test_repo="${PREVIOUS_RPM_REPO}" \
-          -e oreg_url="${oreg_url}" \
+          -e oreg_url='docker.io/openshift/origin-${component}:v${PREVIOUS_ANSIBLE_VERSION}' \
+          -e openshift_release="${PREVIOUS_ANSIBLE_VERSION}" \
+          -e openshift_version="${PREVIOUS_ANSIBLE_VERSION}.0" \
           playbooks/"${TYPE}"/openshift-cluster/launch.yml
 
         cp -rf /tmp/admin.kubeconfig /tmp/shared/admin.kubeconfig
