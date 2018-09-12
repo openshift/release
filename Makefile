@@ -286,11 +286,11 @@ azure:
 	$(MAKE) apply WHAT=projects/azure/cluster-wide.yaml
 	$(MAKE) apply WHAT=projects/azure/rbac.yaml
 	# ci namespace objects
-	oc create secret generic cluster-secrets-azure --from-file=cluster/test-deploy/azure/secret -o yaml --dry-run | oc apply -n ci -f -
+	oc create secret generic cluster-secrets-azure-file --from-file=cluster/test-deploy/azure/secret -o yaml --dry-run | oc apply -n ci -f -
 	oc create configmap prow-job-cluster-launch-e2e-azure --from-file=ci-operator/templates/cluster-launch-e2e-azure.yaml -o yaml --dry-run | oc apply -n ci -f -
 
 	# azure namespace objects
-	oc create secret generic cluster-secrets-azure --from-literal=azure_client_id=${AZURE_CLIENT_ID} --from-literal=azure_client_secret=${AZURE_CLIENT_SECRET} --from-literal=azure_tenant_id=${AZURE_TENANT_ID} --from-literal=azure_subscription_id=${AZURE_SUBSCRIPTION_ID} -o yaml --dry-run | oc apply -n azure -f -
+	oc create secret generic cluster-secrets-azure-env --from-literal=azure_client_id=${AZURE_CLIENT_ID} --from-literal=azure_client_secret=${AZURE_CLIENT_SECRET} --from-literal=azure_tenant_id=${AZURE_TENANT_ID} --from-literal=azure_subscription_id=${AZURE_SUBSCRIPTION_ID} -o yaml --dry-run | oc apply -n azure -f -
 	oc create secret generic aws-reg-master --from-literal=username=${AWS_REG_USERNAME} --from-literal=password=${AWS_REG_PASSWORD} -o yaml --dry-run | oc apply -n azure -f -
 	oc create secret generic hmac-token --from-literal=hmac=${HMAC_TOKEN} -o yaml --dry-run | oc apply -n azure -f -
 	oc create secret generic oauth-token --from-literal=oauth=${OAUTH_TOKEN} -o yaml --dry-run | oc apply -n azure -f -
