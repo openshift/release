@@ -1,19 +1,20 @@
 presubmits:
-  openshift/machine-config-operator:
+  openshift/cluster-monitoring-operator:
   - agent: kubernetes
     always_run: true
     branches:
     - master
-    context: ci/prow/unit
+    context: ci/prow/images
     decorate: true
-    name: pull-ci-openshift-machine-config-operator-unit
-    rerun_command: /test unit
+    labels:
+      artifacts: images
+    name: pull-ci-openshift-cluster-monitoring-operator-images
+    rerun_command: /test images
     skip_cloning: true
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --target=unit
         - --target=[images]
         - --target=[release:latest]
         command:
@@ -23,7 +24,7 @@ presubmits:
           valueFrom:
             configMapKeyRef:
               key: master.yaml
-              name: ci-operator-openshift-machine-config-operator
+              name: ci-operator-openshift-cluster-monitoring-operator
         image: ci-operator:latest
         name: test
         resources:
@@ -32,4 +33,4 @@ presubmits:
           requests:
             cpu: 10m
       serviceAccountName: ci-operator
-    trigger: ((?m)^/test( all| unit),?(\s+|$))
+    trigger: ""
