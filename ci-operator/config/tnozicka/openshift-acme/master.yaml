@@ -4,8 +4,18 @@ base_images:
     name: centos
     namespace: openshift
     tag: '7'
-binary_build_commands: make build GOFLAGS='-v'
+
+test_base_image:
+  cluster: https://api.ci.openshift.org
+  name: release
+  namespace: openshift
+  tag: golang-1.10
+
 canonical_go_repository: github.com/tnozicka/openshift-acme
+
+binary_build_commands: make build GOFLAGS='-v'
+test_binary_build_commands: make build GOFLAGS='-v -race'
+
 images:
 - dockerfile_path: images/Dockerfile
   from: os
@@ -14,10 +24,28 @@ images:
       as:
       - bin
   to: openshift-acme
+
 promotion:
   cluster: https://api.ci.openshift.org
   namespace: ci
   tag: latest
+
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: origin-v4.0
+  namespace: openshift
+  tag: ''
+  tag_overrides: {}
+
+tests:
+- as: verify
+  commands: make verify -k
+  from: bin
+
+- as: unit
+  commands: make test
+  from: test-bin
+
 resources:
   resources:
     resources:
@@ -28,16 +56,3 @@ resources:
         requests:
           cpu: '3'
           memory: 1Gi
-test_base_image:
-  cluster: https://api.ci.openshift.org
-  name: release
-  namespace: openshift
-  tag: golang-1.10
-test_binary_build_commands: make build GOFLAGS='-v -race'
-tests:
-- as: verify
-  commands: make verify -k
-  from: bin
-- as: unit
-  commands: make test
-  from: test-bin
