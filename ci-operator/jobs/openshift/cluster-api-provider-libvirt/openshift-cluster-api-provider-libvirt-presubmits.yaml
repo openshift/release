@@ -33,6 +33,37 @@ presubmits:
     trigger: ((?m)^/test( all| unit),?(\s+|$))
   - agent: kubernetes
     always_run: true
+    branches:
+    - master
+    context: ci/prow/images
+    decorate: true
+    name: pull-ci-origin-cluster-api-provider-libvirt-images
+    rerun_command: /test images
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=[images]
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-cluster-api-provider-libvirt
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| images),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
     context: ci/prow/yaml-lint
     decorate: true
     name: pull-ci-openshift-cluster-api-provider-libvirt-yaml-lint
