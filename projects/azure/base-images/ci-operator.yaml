@@ -1,0 +1,42 @@
+kind: List
+apiVersion: v1
+items:
+# Holds tags that we know they work for us.
+- apiVersion: image.openshift.io/v1
+  kind: ImageStream
+  metadata:
+    name: ci-operator
+    namespace: azure
+
+- kind: BuildConfig
+  apiVersion: v1
+  metadata:
+    name: ci-operator
+    namespace: azure
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: ci-operator:latest
+    source:
+      git:
+        uri: https://github.com/openshift/ci-operator.git
+        ref: bc933dc7cbc70137aef9fea6143624a193f041f0
+      dockerfile: |
+        FROM openshift/origin-release:golang-1.9
+        WORKDIR /go/src/github.com/openshift/ci-operator
+        COPY . .
+        RUN go install ./cmd/ci-operator
+        FROM centos:7
+        COPY --from=0 /go/bin/ci-operator /usr/bin/ci-operator
+      type: Git
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: docker.io/centos:7
+        imageOptimizationPolicy: SkipLayers
+    triggers:
+    - type: ConfigChange
