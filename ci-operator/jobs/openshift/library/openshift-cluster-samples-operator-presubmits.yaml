@@ -1,0 +1,32 @@
+presubmits:
+  openshift/library:
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/verify
+    decorate: true
+    name: pull-ci-openshift-library-unit-master
+    rerun_command: /test verify
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --target=verify
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-library
+        image: ci-operator:latest
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| verify),?(\s+|$))
