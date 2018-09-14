@@ -306,13 +306,18 @@ presubmits:
     skip_cloning: true
     spec:
       containers:
-      - command:
-        - ci-operator
-        - --artifact-dir=$(ARTIFACTS)
-        - --secret-dir=/usr/local/e2e-gcp-cluster-profile
-        - --template=/usr/local/e2e-gcp-major-upgrade-311
-        - --target=e2e-gcp-major-upgrade-311
-        - --give-pr-author-access-to-namespace=true
+      - args:
+        - |
+          export PREVIOUS_RPM_REPO="$( curl -q "${PREVIOUS_RPM_REPO_BASEREF}" 2>/dev/null)"
+          ci-operator \
+            --artifact-dir=$(ARTIFACTS)
+            --secret-dir=/usr/local/e2e-gcp-cluster-profile
+            --template=/usr/local/e2e-gcp-major-upgrade-311
+            --target=e2e-gcp-major-upgrade-311
+            --give-pr-author-access-to-namespace=true
+        command:
+        - /bin/bash
+        - -c
         env:
         - name: TEST_FOCUS
           value: Suite:openshift/conformance/parallel
@@ -325,8 +330,8 @@ presubmits:
             configMapKeyRef:
               key: release-3.11.yaml
               name: ci-operator-openshift-openshift-ansible
-        - name: PREVIOUS_RPM_REPO
-          value: https://rpms.svc.ci.openshift.org/openshift-origin-v3.10/
+        - name: PREVIOUS_RPM_REPO_BASEREF
+          value: https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/release-3.10/.latest-rpms
         - name: RPM_REPO
           value: https://rpms.svc.ci.openshift.org/openshift-origin-v3.11/
         - name: PREVIOUS_IMAGE_ANSIBLE
