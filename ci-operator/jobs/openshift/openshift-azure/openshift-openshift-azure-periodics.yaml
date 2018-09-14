@@ -31,3 +31,48 @@ periodics:
     labels:
       master: ci.openshift.redhat.com
     name: azure_build_node_image_rhel_310
+- agent: kubernetes
+  cron: ""
+  decorate: true
+  interval: 24h
+  name: azure-build-node-image-rhel-310
+  skip_cloning: true
+  spec:
+    containers:
+    - args:
+      - --secret-dir=/usr/local/e2e-azure-secret
+      - --template=/usr/local/azure-image-build
+      - --target=azure-image-build
+      command:
+      - ci-operator
+      env:
+      - name: CONFIG_SPEC
+        valueFrom:
+          configMapKeyRef:
+            key: release-3.10.yaml
+            # Use openshift-ansible ci-operator config for as long as
+            # the node build code is part of that repo.
+            name: ci-operator-openshift-openshift-ansible
+      - name: JOB_NAME_SAFE
+        value: azure-image-build
+      - name: CLUSTER_TYPE
+        value: azure
+      image: ci-operator:latest
+      name: test
+      resources: {}
+      volumeMounts:
+      - mountPath: /usr/local/azure-image-build
+        name: job-definition
+        subPath: azure-image-build.yaml
+      - mountPath: /usr/local/e2e-azure-secret
+        name: cluster-secrets-azure-file
+    serviceAccountName: ci-operator
+    volumes:
+    - configMap:
+        name: prow-job-azure-build-image
+      name: job-definition
+    - name: cluster-secrets-azure-file
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-azure-file

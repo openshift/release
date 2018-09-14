@@ -8,8 +8,6 @@ parameters:
   required: true
 - name: JOB_NAME_HASH
   required: true
-- name: LOCAL_IMAGE_BIN
-  required: true
 - name: NAMESPACE
   required: true
 - name: CLUSTER_TYPE
@@ -142,7 +140,7 @@ objects:
 
     # Runs an install
     - name: setup
-      image: ${LOCAL_IMAGE_BIN}
+      image: registry.svc.ci.openshift.org/azure/openshift-azure:latest
       volumeMounts:
       - name: shared-tmp
         mountPath: /tmp/shared
@@ -190,11 +188,9 @@ objects:
 
         source /etc/azure/credentials/secret
         az login --service-principal -u ${AZURE_CLIENT_ID} -p ${AZURE_CLIENT_SECRET} --tenant ${AZURE_TENANT_ID} &>/dev/null
-        # TODO: Configure these from prow
         export DNS_DOMAIN=osadev.cloud
         export DNS_RESOURCEGROUP=dns
         export DEPLOY_VERSION=v${OPENSHIFT_RELEASE}
-        export RUN_SYNC_LOCAL=true
         export IMAGE_RESOURCEGROUP=images
 
         source /tmp/shared/environment
@@ -271,7 +267,7 @@ objects:
 
     # Performs cleanup of all created resources
     - name: teardown
-      image: ${LOCAL_IMAGE_BIN}
+      image: registry.svc.ci.openshift.org/azure/openshift-azure:latest
       volumeMounts:
       - name: shared-tmp
         mountPath: /tmp/shared
@@ -298,6 +294,8 @@ objects:
           cd /go/src/github.com/openshift/openshift-azure/
           source /etc/azure/credentials/secret
           az login --service-principal -u ${AZURE_CLIENT_ID} -p ${AZURE_CLIENT_SECRET} --tenant ${AZURE_TENANT_ID} &>/dev/null
+          
+          source /tmp/shared/environment
           ./hack/delete.sh ${RESOURCE_GROUP}
 
           trap 'teardown' EXIT
