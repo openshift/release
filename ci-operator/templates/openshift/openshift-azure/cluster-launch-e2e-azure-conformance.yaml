@@ -17,9 +17,11 @@ parameters:
 - name: CLUSTER_TYPE
   value: "azure"
   required: true
+- name: TEST_SUITE
 - name: TEST_FOCUS
 - name: TEST_SKIP
   value: "\\[local\\]"
+- name: TEST_SUITE_SERIAL
 - name: TEST_FOCUS_SERIAL
 - name: TEST_SKIP_SERIAL
   value: "\\[local\\]"
@@ -122,17 +124,17 @@ objects:
         # TODO: bump nodes up to 40 again
         source /tmp/shared/overrides
         set -x
-        if [[ -n "${TEST_FOCUS}" ]]; then
+       if [[ -n "${TEST_SUITE}" || -n "${TEST_FOCUS}" ]]; then
           ginkgo -v -noColor -nodes=30 $( which extended.test ) -- \
-            -ginkgo.focus="${TEST_FOCUS}" -ginkgo.skip="${TEST_SKIP}" \
+            -suite "${TEST_SUITE}" -ginkgo.focus="${TEST_FOCUS}" -ginkgo.skip="${TEST_SKIP}" \
             -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit \
-            -test.timeout=2h || rc=$?
+            -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
         fi
-        if [[ -n "${TEST_FOCUS_SERIAL}" ]]; then
+        if [[ -n "${TEST_SUITE_SERIAL}" || -n "${TEST_FOCUS_SERIAL}" ]]; then
           ginkgo -v -noColor -nodes=1 $( which extended.test ) -- \
-            -ginkgo.focus="${TEST_FOCUS_SERIAL}" -ginkgo.skip="${TEST_SKIP_SERIAL}" \
+            -suite "${TEST_SUITE_SERIAL}" -ginkgo.focus="${TEST_FOCUS_SERIAL}" -ginkgo.skip="${TEST_SKIP_SERIAL}" \
             -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit/serial \
-            -test.timeout=2h || rc=$?
+            -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
         fi
         exit ${rc:-0}
 
