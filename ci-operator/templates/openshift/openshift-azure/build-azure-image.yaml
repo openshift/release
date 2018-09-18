@@ -114,10 +114,13 @@ objects:
         source /tmp/shared/environment
         echo "RESOURCE_GROUP=${RESOURCE_GROUP}"
         echo "IMAGE_NAME=${IMAGE_NAME}"
-        echo $(pwd)
 
-        # Source azure creds
-        source /usr/share/ansible/openshift-ansible/inventory/dynamic/injected/secret
+        # The ansible playbook expects to source a file named "credentials"
+        cp /usr/share/ansible/openshift-ansible/inventory/dynamic/injected/secret /usr/share/ansible/openshift-ansible/inventory/dynamic/injected/credentials
+        # TODO: Remove once the following change in cherrypicked in release-3.10
+        # https://github.com/openshift/openshift-ansible/pull/10118
+        sed -i -e "s#AZURE_CLIENT_SECRET#AZURE_SECRET#" /usr/share/ansible/openshift-ansible/inventory/dynamic/injected/credentials
+        sed -i -e "s#AZURE_TENANT_ID#AZURE_TENANT#" /usr/share/ansible/openshift-ansible/inventory/dynamic/injected/credentials
 
         ansible-playbook \
           -e openshift_azure_resource_group_name=$RESOURCE_GROUP \
@@ -133,7 +136,8 @@ objects:
           -e openshift_azure_install_repo=$(curl -qs https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/release-${OPENSHIFT_RELEASE}/.latest-rpms) \
           playbooks/azure/openshift-cluster/build_node_image.yml
 
-        az login --service-principal -u ${AZURE_CLIENT_ID} -p ${AZURE_CLIENT_SECRET} --tenant ${AZURE_TENANT} &>/dev/null
+        source /usr/share/ansible/openshift-ansible/inventory/dynamic/injected/secret
+        az login --service-principal -u ${AZURE_CLIENT_ID} -p ${AZURE_CLIENT_SECRET} --tenant ${AZURE_TENANT_ID} &>/dev/null
         az group delete -n ${RESOURCE_GROUP} -y
 
         touch /tmp/shared/image_create
