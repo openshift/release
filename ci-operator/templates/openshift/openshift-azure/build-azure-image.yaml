@@ -60,6 +60,8 @@ objects:
     - name: cluster-secrets-azure
       secret:
         secretName: e2e-azure-secret
+    - name: openshift-azure
+      emptyDir: {}
 
     containers:
     - name: buildimage
@@ -144,10 +146,12 @@ objects:
 
     # Runs an install
     - name: setup
-      image: registry.svc.ci.openshift.org/azure/openshift-azure:latest
+      image: registry.svc.ci.openshift.org/azure/test-base:latest
       volumeMounts:
       - name: shared-tmp
         mountPath: /tmp/shared
+      - name: openshift-azure
+        mountPath: /go
       - name: cluster-secrets-azure
         mountPath: /etc/azure/credentials
       env:
@@ -194,10 +198,15 @@ objects:
         export DNS_RESOURCEGROUP=dns
         export DEPLOY_VERSION=v${OPENSHIFT_RELEASE}
         export IMAGE_RESOURCEGROUP=images
-
         source /tmp/shared/environment
         export IMAGE_RESOURCENAME=${IMAGE_NAME}
-        cd /go/src/github.com/openshift/openshift-azure/
+
+        # Clone openshift-azure by ourselves since it's not supported yet by the ci-operator
+        # https://github.com/openshift/ci-operator/issues/142
+        mkdir -p /go/src/github.com/openshift
+        cd /go/src/github.com/openshift
+        git clone https://github.com/openshift/openshift-azure
+        cd openshift-azure/
 
         # added timeout as this seems to loop infinitely awaiting cluster deployment
         timeout 30m ./hack/create.sh ${RESOURCE_GROUP}-e2e
@@ -268,10 +277,12 @@ objects:
 
     # Performs cleanup of all created resources
     - name: teardown
-      image: registry.svc.ci.openshift.org/azure/openshift-azure:latest
+      image: registry.svc.ci.openshift.org/azure/test-base:latest
       volumeMounts:
       - name: shared-tmp
         mountPath: /tmp/shared
+      - name: openshift-azure
+        mountPath: /go
       - name: cluster-secrets-azure
         mountPath: /etc/azure/credentials
       env:
