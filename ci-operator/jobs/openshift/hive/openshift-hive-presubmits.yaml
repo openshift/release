@@ -1,0 +1,64 @@
+presubmits:
+  openshift/hive:
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/images
+    decorate: true
+    name: pull-ci-openshift-hive-master-images
+    rerun_command: /test images
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=[images]
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-hive
+        image: ci-operator:latest
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| images),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/unit
+    decorate: true
+    name: pull-ci-openshift-hive-master-unit
+    rerun_command: /test unit
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=unit
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-hive
+        image: ci-operator:latest
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| unit),?(\s+|$))
