@@ -187,7 +187,7 @@ objects:
         export IMAGE_RESOURCENAME=$(az image list -g $IMAGE_RESOURCEGROUP -o json --query "[?starts_with(name, '${DEPLOY_OS:-rhel7}-${DEPLOY_VERSION//v}') && tags.valid=='true'].name | sort(@) | [-1]" | tr -d '"')
         # create cluster for test
         cd /go/src/github.com/openshift/openshift-azure/
-        ./hack/create.sh ${INSTANCE_PREFIX}
+        timeout 30m ./hack/create.sh ${INSTANCE_PREFIX}
 
     # Performs cleanup of all created resources
     - name: teardown
@@ -229,9 +229,6 @@ objects:
           oc get no -o wide > /tmp/artifacts/nodes
           oc get events --all-namespaces > /tmp/artifacts/events
           ./hack/delete.sh ${INSTANCE_PREFIX}
-  
-          trap 'teardown' EXIT
-          trap 'kill $(jobs -p); exit 0' TERM
         }
 
         trap 'teardown' EXIT
