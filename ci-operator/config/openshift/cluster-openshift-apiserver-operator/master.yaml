@@ -1,0 +1,55 @@
+base_images:
+  os:
+    cluster: https://api.ci.openshift.org
+    name: centos
+    namespace: openshift
+    tag: '7'
+
+test_base_image:
+  cluster: https://api.ci.openshift.org
+  name: release
+  namespace: openshift
+  tag: golang-1.10
+
+canonical_go_repository: github.com/openshift/cluster-openshift-apiserver-operator
+
+binary_build_commands: make build
+test_binary_build_commands: make build GOFLAGS='-race'
+
+images:
+- dockerfile_path: Dockerfile
+  from: os
+  inputs:
+    bin:
+      as:
+      - "0"
+  to: cluster-openshift-apiserver-operator
+
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: origin-v4.0
+  namespace: openshift
+  tag: ''
+  tag_overrides: {}
+
+tests:
+- as: verify
+  from: bin
+  commands: ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1 KUBERNETES_SERVICE_HOST= make verify -k
+  artifact_dir: /tmp/artifacts
+
+- as: unit
+  from: test-bin
+  commands: ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1 TEST_KUBE=true KUBERNETES_SERVICE_HOST= make test-unit
+  artifact_dir: /tmp/artifacts
+
+resources:
+  resources:
+    resources:
+      '*':
+        limits:
+          cpu: '6'
+          memory: 3Gi
+        requests:
+          cpu: '3'
+          memory: 1Gi
