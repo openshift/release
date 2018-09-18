@@ -1,0 +1,34 @@
+base_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: origin-v4.0
+    namespace: openshift
+    tag: base
+canonical_go_repository: github.com/operator-framework/operator-lifecycle-manager
+images:
+- from: base
+  to: operator-lifecycle-manager
+resources:
+  '*':
+    limits:
+      cpu: '2'
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: origin-v4.0
+  namespace: openshift
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+tests:
+- as: unit
+  commands: go test -v -race ./...
+  from: pkg
+- as: schema-check
+  commands: go run ./cmd/validator/main.go ./deploy/chart/catalog_resources
