@@ -1,0 +1,25 @@
+binary_build_commands: make
+canonical_go_repository: github.com/containers/libpod
+resources:
+  '*':
+    limits:
+      cpu: '2'
+      memory: 6Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_base_image:
+  cluster: https://api.ci.openshift.org
+  name: release
+  namespace: openshift
+  tag: golang-1.10
+tests:
+- artifact_dir: /tmp/artifacts
+  as: validate
+  commands: ARTIFACT_DIR=/tmp/artifacts make validate
+  from: test-bin
+- artifact_dir: /tmp/artifacts
+  as: lint
+  commands: ARTIFACT_DIR=/tmp/artifacts make lint
+  from: test-bin
+test_binary_build_commands: make install.tools
