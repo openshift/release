@@ -295,8 +295,6 @@ azure:
 	oc create secret generic hmac-token --from-literal=hmac=${HMAC_TOKEN} -o yaml --dry-run | oc apply -n azure -f -
 	oc create secret generic oauth-token --from-literal=oauth=${OAUTH_TOKEN} -o yaml --dry-run | oc apply -n azure -f -
 	# the rest of the config
-	$(MAKE) apply WHAT=projects/azure/acs-engine/binary-build.yaml
-	$(MAKE) apply WHAT=projects/azure/acs-engine/test-image-builds/
 	$(MAKE) apply WHAT=projects/azure/azure-purge/
 	$(MAKE) apply WHAT=projects/azure/base-images/
 	$(MAKE) apply WHAT=projects/azure/config-updater/
