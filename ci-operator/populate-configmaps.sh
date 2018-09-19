@@ -10,14 +10,34 @@ set -o pipefail
 
 config="$( dirname "${BASH_SOURCE[0]}" )/config"
 
+function populate_configmap() {
+	local org=$1
+	local repo=$2
+
+	files=()
+	for config_file in $( find "${config}/${org}/${repo}" -mindepth 1 -maxdepth 1 -type f -name "*.yaml" ); do
+		files+=( "--from-file=$( basename "${config_file}" )=${config_file}" )
+	done
+	oc create configmap "ci-operator-${org}-${repo}" "${files[@]}" -o yaml --dry-run | oc apply -f -
+}
+
+if [[ -n "${ORG:-}" && -n "${REPO:-}" ]]; then
+	populate_configmap "${ORG}" "${REPO}"
+	exit
+fi
+
+if [[ -n "${ORG:-}" && -z "${REPO:-}" ]]; then
+	for repo_dir in $( find "${config}/${ORG}" -mindepth 1 -maxdepth 1 -type d ); do
+		repo="$( basename "${repo_dir}" )"
+		populate_configmap "${ORG}" "${repo}"
+	done
+	exit
+fi
+
 for org_dir in $( find "${config}" -mindepth 1 -maxdepth 1 -type d ); do
 	org="$( basename "${org_dir}" )"
 	for repo_dir in $( find "${config}/${org}" -mindepth 1 -maxdepth 1 -type d ); do
 		repo="$( basename "${repo_dir}" )"
-		files=()
-		for config_file in $( find "${config}/${org}/${repo}" -mindepth 1 -maxdepth 1 -type f -name "*.yaml" ); do
-			files+=( "--from-file=$( basename "${config_file}" )=${config_file}" )
-		done
-		oc create configmap "ci-operator-${org}-${repo}" "${files[@]}" -o yaml --dry-run | oc apply -f -
+		populate_configmap "${org}" "${repo}"
 	done
 done
