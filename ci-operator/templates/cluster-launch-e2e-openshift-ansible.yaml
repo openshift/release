@@ -96,7 +96,7 @@ objects:
       - -c
       - |
         #!/bin/bash
-        set -euxo pipefail
+        set -euo pipefail
 
         trap 'touch /tmp/shared/exit' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
@@ -213,11 +213,11 @@ objects:
         cp -f /usr/local/e2e-aws-cluster-profile/.awscred /etc/boto.cfg
 
         cd /usr/share/ansible/openshift-ansible
-        ansible-playbook -vv \
+        ansible-playbook -vvv \
           -i test/ci/inventory \
           test/ci/launch.yml | tee -a /tmp/artifacts/ansible.log
 
-        ansible -vv \
+        ansible -vvv \
           -i test/ci/inventory masters \
           -m fetch -a 'src=/etc/origin/master/admin.kubeconfig dest=/tmp/shared/ flat=true'
 
@@ -300,7 +300,7 @@ objects:
           cd /usr/share/ansible/openshift-ansible/
           echo "localhost ansible_connection=local" > test/ci/inventory/hosts
           cp -f /usr/local/e2e-aws-cluster-profile/vars.yaml test/ci/vars.yml
-          ansible-playbook -vv -i test/ci/inventory test/ci/deprovision.yml
+          ansible-playbook -vvv -i test/ci/inventory test/ci/deprovision.yml
         }
 
         trap 'teardown' EXIT
