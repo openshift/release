@@ -53,6 +53,8 @@ objects:
     activeDeadlineSeconds: 10800
     terminationGracePeriodSeconds: 600
     volumes:
+    - name: artifacts
+      emptyDir: {}
     - name: shared-tmp
       emptyDir: {}
     - name: shared-data
@@ -280,6 +282,8 @@ objects:
     - name: teardown
       image: registry.svc.ci.openshift.org/azure/test-base:latest
       volumeMounts:
+      - name: artifacts
+        mountPath: /tmp/artifacts
       - name: shared-tmp
         mountPath: /tmp/shared
       - name: openshift-azure
@@ -302,12 +306,27 @@ objects:
           export HOME=/tmp/shared
           export DNS_DOMAIN=osadev.cloud
           export DNS_RESOURCEGROUP=dns
+          export KUBECONFIG=/tmp/shared/_data/_out/admin.kubeconfig
 
           cp -r /tmp/shared/_data /go/src/github.com/openshift/openshift-azure/
           cd /go/src/github.com/openshift/openshift-azure/
           source /etc/azure/credentials/secret
           az login --service-principal -u ${AZURE_CLIENT_ID} -p ${AZURE_CLIENT_SECRET} --tenant ${AZURE_TENANT_ID} &>/dev/null
-          
+
+          # Gather artifacts
+          oc get po --all-namespaces -o wide > /tmp/artifacts/pods
+          oc get no -o wide > /tmp/artifacts/nodes
+          oc get events --all-namespaces > /tmp/artifacts/events
+          oc logs sync-master-000000 -n kube-system > /tmp/artifacts/sync.log
+          oc logs api-master-000000 -n kube-system > /tmp/artifacts/api-master-000000.log
+          oc logs api-master-000001 -n kube-system > /tmp/artifacts/api-master-000001.log
+          oc logs api-master-000002 -n kube-system > /tmp/artifacts/api-master-000002.log
+          oc logs etcd-master-000000 -n kube-system > /tmp/artifacts/etcd-master-000000.log
+          oc logs etcd-master-000001 -n kube-system > /tmp/artifacts/etcd-master-000001.log
+          oc logs etcd-master-000002 -n kube-system > /tmp/artifacts/etcd-master-000002.log
+          cm_leader=$(oc get cm -n kube-system kube-controller-manager -o yaml | grep -o 00000[0-3])
+          oc logs controllers-master-$cm_leader -n kube-system > /tmp/artifacts/controller-manager.log
+
           source /tmp/shared/environment
           ./hack/delete.sh ${RESOURCE_GROUP}-e2e
           # Clean up the resource group used to build the image
