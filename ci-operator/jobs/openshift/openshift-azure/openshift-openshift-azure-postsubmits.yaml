@@ -10,8 +10,7 @@ postsubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --secret-dir=/usr/local/e2e-azure-secret
-        - --template=/usr/local/e2e-azure
+        - --target=[images]
         - --promote
         command:
         - ci-operator
@@ -21,33 +20,14 @@ postsubmits:
             configMapKeyRef:
               key: master.yaml
               name: ci-operator-openshift-openshift-azure
-        - name: JOB_NAME_SAFE
-          value: e2e-azure
-        - name: CLUSTER_TYPE
-          value: azure
-        image: registry.svc.ci.openshift.org/azure/ci-operator:latest
+        image: ci-operator:latest
         name: test
         resources:
           limits:
             cpu: 500m
           requests:
             cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/e2e-azure
-          name: job-definition
-          subPath: cluster-launch-e2e-azure.yaml
-        - mountPath: /usr/local/e2e-azure-secret
-          name: cluster-secrets-azure-file
       serviceAccountName: ci-operator
-      volumes:
-      - configMap:
-          name: prow-job-cluster-launch-e2e-azure
-        name: job-definition
-      - name: cluster-secrets-azure-file
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-azure-file
   - agent: kubernetes
     branches:
     - master
