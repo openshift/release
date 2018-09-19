@@ -26,7 +26,7 @@ parameters:
   value: "\\[local\\]"
 - name: TEST_COMMAND
 - name: PREPARE_COMMAND
-- name: IMAGE_PREPARE  
+- name: IMAGE_PREPARE
 - name: IMAGE_NODEJS_AGENT
 - name: IMAGE_MAVEN_AGENT
 
@@ -134,12 +134,12 @@ objects:
         mkdir -p /tmp/output
         cd /tmp/output
 
-        # run the specified command to modify/prepare the cluster for the tests 
+        # run the specified command to modify/prepare the cluster for the tests
         if [[ -n "${PREPARE_COMMAND-}" ]]; then
           ${PREPARE_COMMAND}
         fi
         exit 0
-        
+
 
     # Once admin.kubeconfig exists, executes shared tests
     - name: test
@@ -201,7 +201,7 @@ objects:
           break
         done
         echo "Preparation job deemed completed"
-        
+
 
         # don't let clients impact the global kubeconfig
         cp /tmp/shared/admin.kubeconfig /tmp/admin.kubeconfig
@@ -232,7 +232,7 @@ objects:
         # TODO: bump nodes up to 40 again
         set -x
         if [[ -n "${TEST_FOCUS}" ]]; then
-          ginkgo -v -noColor -nodes=30 $( which extended.test ) -- \
+          ginkgo -v -noColor -nodes=10 $( which extended.test ) -- \
             -ginkgo.focus="${TEST_FOCUS}" -ginkgo.skip="${TEST_SKIP}" \
             -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit \
             -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
