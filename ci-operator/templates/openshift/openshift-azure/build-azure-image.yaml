@@ -168,11 +168,13 @@ objects:
       - -c
       - |
        #!/bin/bash
-        # error handling and sync code
         set -euo pipefail
-        echo "starting buildcluster"
 
-        trap '[ "$?" == 0 ] || touch /tmp/shared/exit' EXIT
+        trap 'rc=$?; if [[ $rc -ne 0 ]]; then
+          touch /tmp/shared/exit;
+        fi;
+        cp -r /go/src/github.com/openshift/openshift-azure/_data /tmp/shared &>/dev/null
+        exit $rc' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
 
         # Cluster creation specific configuration.
@@ -211,9 +213,6 @@ objects:
         # added timeout as this seems to loop infinitely awaiting cluster deployment
         timeout 30m ./hack/create.sh ${RESOURCE_GROUP}-e2e
         make e2e
-
-        # if completed pass generated data to other stage
-        cp -r /go/src/github.com/openshift/openshift-azure/_data /tmp/shared/
 
         touch /tmp/shared/e2e_tests
 
