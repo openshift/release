@@ -176,6 +176,10 @@ prow-jobs: prow-cluster-jobs prow-rpm-mirrors
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/ci-operator/roles.yaml
 .PHONY: prow-jobs
 
+prow-release-controller:
+	$(MAKE) apply WHAT=ci-operator/infra/openshift/release/deploy.yaml
+	oc annotate -n openshift is/origin-v4.0 "release.openshift.io/config=$( cat ci-operator/infra/openshift/release-controller/origin-v4.0.json )" --overwrite
+
 projects: gcsweb kube-state-metrics oauth-proxy origin origin-stable origin-release prometheus test-bases image-mirror-setup image-pruner-setup node-problem-detector publishing-bot image-registry-publishing-bot content-mirror service-idler azure
 .PHONY: projects
 
