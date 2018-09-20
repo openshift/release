@@ -39,6 +39,8 @@ presubmits:
     decorate: true
     name: pull-ci-openshift-installer-e2e-aws
     rerun_command: /test e2e-aws
+    # The abomination below is equivalent to `^((?!Documentation).)*$`. Since
+    # Go doesn't support negative lookaheads, we are stuck with the following.
     run_if_changed: ^([^D]|D(D|oD|ocD|ocuD|ocum(D|e(D|n(D|t(D|aD|atD|atiD|atioD)))))*([^Do]|o[^Dc]|oc[^Du]|ocu[^Dm]|ocum([^De]|e([^Dn]|n([^Dt]|t([^Da]|a[^Dt]|at[^Di]|ati[^Do]|atio[^Dn]))))))*(D(D|oD|ocD|ocuD|ocum(D|e(D|n(D|t(D|aD|atD|atiD|atioD)))))*(o|oc|ocu|ocum(e(n(t(a|at|ati|atio)?)?)?)?)?)?$
     skip_cloning: true
     spec:
@@ -51,6 +53,9 @@ presubmits:
         - --target=e2e-aws
         - --give-pr-author-access-to-namespace
         env:
+        - name: TEST_FOCUS
+          value: Secrets should be consumable from pods in volume with defaultMode
+            set
         - name: JOB_NAME_SAFE
           value: e2e-aws
         - name: CLUSTER_TYPE
@@ -60,9 +65,6 @@ presubmits:
             configMapKeyRef:
               key: master.yaml
               name: ci-operator-openshift-installer
-        - name: TEST_COMMAND
-          value: TEST_FOCUS='Secrets should be consumable from pods in volume with
-            defaultMode set' run-tests
         image: ci-operator:latest
         name: test
         resources:
@@ -97,6 +99,8 @@ presubmits:
     decorate: true
     name: pull-ci-openshift-installer-e2e-aws-smoke
     rerun_command: /test e2e-aws-smoke
+    # The abomination below is equivalent to `^((?!Documentation).)*$`. Since
+    # Go doesn't support negative lookaheads, we are stuck with the following.
     run_if_changed: ^([^D]|D(D|oD|ocD|ocuD|ocum(D|e(D|n(D|t(D|aD|atD|atiD|atioD)))))*([^Do]|o[^Dc]|oc[^Du]|ocu[^Dm]|ocum([^De]|e([^Dn]|n([^Dt]|t([^Da]|a[^Dt]|at[^Di]|ati[^Do]|atio[^Dn]))))))*(D(D|oD|ocD|ocuD|ocum(D|e(D|n(D|t(D|aD|atD|atiD|atioD)))))*(o|oc|ocu|ocum(e(n(t(a|at|ati|atio)?)?)?)?)?)?$
     skip_cloning: true
     spec:
@@ -163,6 +167,10 @@ presubmits:
         - --target=e2e-aws-all
         - --give-pr-author-access-to-namespace
         env:
+        - name: TEST_FOCUS
+          value: Suite:openshift/conformance/parallel
+        - name: TEST_FOCUS_SERIAL
+          value: Suite:openshift/conformance/serial
         - name: JOB_NAME_SAFE
           value: e2e-aws-all
         - name: CLUSTER_TYPE
@@ -172,9 +180,6 @@ presubmits:
             configMapKeyRef:
               key: master.yaml
               name: ci-operator-openshift-installer
-        - name: TEST_COMMAND
-          value: TEST_FOCUS='Suite:openshift/conformance/parallel' TEST_FOCUS_SERIAL='Suite:openshift/conformance/serial'
-            run-tests
         image: ci-operator:latest
         name: test
         resources:
