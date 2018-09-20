@@ -1,0 +1,30 @@
+postsubmits:
+  openshift/release-controller:
+  - agent: kubernetes
+    branches:
+    - master
+    decorate: true
+    name: branch-ci-openshift-release-controller-master-images
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=[images]
+        - --promote
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-release-controller
+        image: ci-operator:latest
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
