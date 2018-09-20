@@ -4,65 +4,77 @@ presubmits:
     always_run: true
     context: ci/prow/go-fmt
     decorate: true
-    name: pull-ci-openshift-cluster-api-provider-libvirt-go-fmt
+    name: pull-ci-openshift-cluster-api-provider-libvirt-master-gofmt
     rerun_command: /test go-fmt
     spec:
       containers:
       - args:
-        - ./hack/go-fmt.sh
-        - .
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=gofmt
         command:
-        - sh
+        - ci-operator
         env:
-        - name: IS_CONTAINER
-          value: "TRUE"
-        image: openshift/origin-release:golang-1.10
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-cluster-api-provider-libvirt
+        image: ci-operator:latest
         imagePullPolicy: Always
-        name: ""
+        name: test
         resources: {}
+      serviceAccountName: ci-operator
     trigger: ((?m)^/test(all| go-fmt),?(\s+|$))
-  - agent: kubernetes
-    always_run: true
-    context: ci/prow/go-vet
-    decorate: true
-    name: pull-ci-openshift-cluster-api-provider-libvirt-go-vet
-    rerun_command: /test go-vet
-    spec:
-      containers:
-      - args:
-        - ./hack/go-vet.sh
-        - ./...
-        command:
-        - sh
-        env:
-        - name: IS_CONTAINER
-          value: "TRUE"
-        image: openshift/origin-release:golang-1.10
-        imagePullPolicy: Always
-        name: ""
-        resources: {}
-    trigger: ((?m)^/test(all| go-vet),?(\s+|$))
   - agent: kubernetes
     always_run: true
     context: ci/prow/golint
     decorate: true
-    name: pull-ci-openshift-cluster-api-provider-libvirt-golint
+    name: pull-ci-openshift-cluster-api-provider-libvirt-master-golint
     rerun_command: /test golint
     spec:
       containers:
       - args:
-        - -c
-        - ./hack/go-lint.sh $(go list -f '{{ .ImportPath }}' ./...)
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=golint
         command:
-        - sh
+        - ci-operator
         env:
-        - name: IS_CONTAINER
-          value: "TRUE"
-        image: openshift/origin-release:golang-1.10
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-cluster-api-provider-libvirt
+        image: ci-operator:latest
         imagePullPolicy: Always
-        name: ""
+        name: test
         resources: {}
+      serviceAccountName: ci-operator
     trigger: ((?m)^/test(all| golint),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    context: ci/prow/go-vet
+    decorate: true
+    name: pull-ci-openshift-cluster-api-provider-libvirt-master-govet
+    rerun_command: /test go-vet
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=govet
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-cluster-api-provider-libvirt
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: test
+        resources: {}
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test(all| go-vet),?(\s+|$))
   - agent: kubernetes
     always_run: true
     branches:
