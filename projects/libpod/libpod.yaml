@@ -19,16 +19,75 @@ items:
         kind: ImageStreamTag
         name: libpod-build-root:fedora
     source:
-      git:
-        uri: https://github.com/containers/libpod.git
-        ref: master
+      dockerfile: |
+        FROM registry.fedoraproject.org/fedora:28
+
+        # This Dockerfile is only for building libpod and running
+        # validation and gofmt tests.
+
+        RUN dnf -y install btrfs-progs-devel \
+                      bzip2 \
+                      findutils \
+                      git \
+                      glib2-devel \
+                      glibc-static \
+                      gnupg \
+                      golang \
+                      golang-github-cpuguy83-go-md2man \
+                      gpgme-devel \
+                      libassuan-devel \
+                      libseccomp-devel \
+                      libselinux-devel \
+                      skopeo-containers \
+                      make \
+                      ostree-devel \
+                      python \
+                      python3-dateutil \
+                      python3-devel \
+                      python3-psutil \
+                      python3-pytoml \
+                      python3-varlink \
+                      golang-github-cpuguy83-go-md2man \
+                      rpm-build \
+                      slirp4netns \
+                      iptables && dnf -y clean all
     strategy:
       dockerStrategy:
+        from:
+          kind: DockerImage
+          name: registry.fedoraproject.org/fedora:28
         imageOptimizationPolicy: SkipLayers
-        dockerfilePath: Dockerfile.Fedora.openshift
     triggers:
     - type: ConfigChange
-    - type: GitHub
-      github:
-        secretReference:
-          name: github-deploymentconfig-trigger
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    name: libpod-build-root-centos
+    labels:
+      ci.openshift.io/source-repo: libpod
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: libpod-build-root:centos
+    source:
+      dockerfile: |
+        FROM registry.svc.ci.openshift.org/openshift/release:golang-1.10
+
+        # This Dockerfile is only for building libpod and running
+        # validation and gofmt tests.
+
+        RUN yum -y install btrfs-progs-devel \
+                      glib2-devel \
+                      go-md2man \
+                      ostree-devel && yum -y clean all
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: registry.svc.ci.openshift.org/openshift/release:golang-1.10
+        imageOptimizationPolicy: SkipLayers
+    triggers:
+    - type: ConfigChange
