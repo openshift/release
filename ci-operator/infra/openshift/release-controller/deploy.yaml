@@ -22,12 +22,22 @@ items:
     - delete
     - update
     - patch
+  - apiGroups:
+    - ""
+    resources:
+    - events
+    verbs:
+    - create
+    - patch
+    - update
+
 - kind: RoleBinding
-  apiVersion: authorization.openshift.io/v1
+  apiVersion: rbac.authorization.k8s.io/v1
   metadata:
     name: release-controller-binding
     namespace: openshift
   roleRef:
+    kind: Role
     name: release-controller-modify
   subjects:
   - kind: ServiceAccount
@@ -40,16 +50,31 @@ items:
   metadata:
     name: ci-release
 - kind: RoleBinding
-  apiVersion: authorization.openshift.io/v1
+  apiVersion: rbac.authorization.k8s.io/v1
   metadata:
     name: release-controller-binding
     namespace: ci-release
   roleRef:
+    kind: ClusterRole
     name: edit
   subjects:
   - kind: ServiceAccount
     namespace: ci
     name: release-controller
+# give jobs in the work namespace authority to push to the
+# release namespace
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: release-controller-binding
+    namespace: openshift
+  roleRef:
+    kind: ClusterRole
+    name: system:image-builder
+  subjects:
+  - kind: ServiceAccount
+    namespace: ci-release
+    name: builder
 
 # deploy the controller
 - kind: ServiceAccount
@@ -94,9 +119,10 @@ items:
             mountPath: /etc/jobs/
           command:
           - /usr/bin/release-controller
+          - --to=origin-release
           - --prow-config=/etc/prow/config.yaml
           - --job-config=/etc/jobs/openshift-release-periodics.yaml
           - --prow-namespace=ci
-          - --job-namespace=clayton-test-2
-          - --release-namespace=clayton-test-1
-          - -v=5
+          - --job-namespace=ci-release
+          - --release-namespace=openshift
+          - -v=4
