@@ -17,12 +17,6 @@ parameters:
 - name: CLUSTER_TYPE
   value: "azure"
   required: true
-- name: TEST_FOCUS
-- name: TEST_SKIP
-  value: "\\[local\\]"
-- name: TEST_FOCUS_SERIAL
-- name: TEST_SKIP_SERIAL
-  value: "\\[local\\]"
 
 objects:
 
@@ -103,7 +97,7 @@ objects:
             sleep 15 & wait
             continue
           fi
-          # if we got admin kubeconfig file with failure marker, ignore. Teardown is in progress. 
+          # if we got admin kubeconfig file with failure marker, ignore. Teardown is in progress.
           if [[ -f  /tmp/shared/exit ]]; then
              exit 1
           fi
@@ -121,20 +115,23 @@ objects:
         #       autodetected from the running cluster.
         # TODO: bump nodes up to 40 again
         source /tmp/shared/overrides
-        set -x
-        if [[ -n "${TEST_FOCUS}" ]]; then
-          ginkgo -v -noColor -nodes=30 $( which extended.test ) -- \
-            -ginkgo.focus="${TEST_FOCUS}" -ginkgo.skip="${TEST_SKIP}" \
-            -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit \
-            -test.timeout=2h || rc=$?
-        fi
-        if [[ -n "${TEST_FOCUS_SERIAL}" ]]; then
-          ginkgo -v -noColor -nodes=1 $( which extended.test ) -- \
-            -ginkgo.focus="${TEST_FOCUS_SERIAL}" -ginkgo.skip="${TEST_SKIP_SERIAL}" \
-            -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit/serial \
-            -test.timeout=2h || rc=$?
-        fi
-        exit ${rc:-0}
+        function run-tests() {
+          if [[ -n "${TEST_FOCUS}" ]]; then
+            ginkgo -v -noColor -nodes=30 $( which extended.test ) -- \
+              -ginkgo.focus="${TEST_FOCUS}" -ginkgo.skip="${TEST_SKIP:-"\\[local\\]"}" \
+              -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit \
+              -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
+          fi
+          if [[ -n "${TEST_FOCUS_SERIAL}" ]]; then
+            ginkgo -v -noColor -nodes=1 $( which extended.test ) -- \
+              -ginkgo.focus="${TEST_FOCUS_SERIAL}" -ginkgo.skip="${TEST_SKIP_SERIAL:-"\\[local\\]"}" \
+              -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit/serial \
+              -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
+          fi
+          exit ${rc:-0}
+        }
+
+        ${TEST_COMMAND}
 
     # Runs an install
     - name: setup
@@ -164,7 +161,8 @@ objects:
        #!/bin/bash
         set -euo pipefail
 
-        trap 'rc=$?; if [[ $rc -ne 0 ]]; then 
+        # trap acts as a switch/router for the next phases
+        trap 'rc=$?; if [[ $rc -ne 0 ]]; then
           touch /tmp/shared/exit;
         fi;
         cp -r /go/src/github.com/openshift/openshift-azure/_data /tmp/shared &>/dev/null
@@ -221,7 +219,7 @@ objects:
           export DNS_DOMAIN=osadev.cloud
           export DNS_RESOURCEGROUP=dns
           export KUBECONFIG=/tmp/shared/_data/_out/admin.kubeconfig
-  
+
           cp -r /tmp/shared/_data /go/src/github.com/openshift/openshift-azure/
           cd /go/src/github.com/openshift/openshift-azure/
           source /etc/azure/credentials/secret
