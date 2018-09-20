@@ -315,17 +315,21 @@ presubmits:
     spec:
       containers:
       - args:
-        - ./hack/go-fmt.sh
-        - .
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=gofmt
         command:
-        - sh
+        - ci-operator
         env:
-        - name: IS_CONTAINER
-          value: "TRUE"
-        image: openshift/origin-release:golang-1.10
-        name: ""
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-installer
+        image: ci-operator:latest
+        name: test
         resources: {}
-    trigger: (?m)^/test go-fmt
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test(all| go-fmt),?(\s+|$))
   - agent: kubernetes
     always_run: true
     context: ci/prow/go-vet
@@ -335,17 +339,21 @@ presubmits:
     spec:
       containers:
       - args:
-        - ./hack/go-vet.sh
-        - ./...
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=govet
         command:
-        - sh
+        - ci-operator
         env:
-        - name: IS_CONTAINER
-          value: "TRUE"
-        image: openshift/origin-release:golang-1.10
-        name: ""
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-installer
+        image: ci-operator:latest
+        name: test
         resources: {}
-    trigger: (?m)^/test go-vet
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test(all| go-vet),?(\s+|$))
   - agent: kubernetes
     always_run: true
     context: ci/prow/golint
@@ -355,14 +363,18 @@ presubmits:
     spec:
       containers:
       - args:
-        - -c
-        - ./hack/go-lint.sh -min_confidence 0.3 $(go list -f '{{ .ImportPath }}' ./...)
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=golint
         command:
-        - sh
+        - ci-operator
         env:
-        - name: IS_CONTAINER
-          value: "TRUE"
-        image: openshift/origin-release:golang-1.10
-        name: ""
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-installer
+        image: ci-operator:latest
+        name: test
         resources: {}
-    trigger: (?m)^/test golint
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test(all| golint),?(\s+|$))
