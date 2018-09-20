@@ -19,6 +19,14 @@ parameters:
   required: true
 - name: CLUSTER_TYPE
   required: true
+- name: TEST_SUITE
+- name: TEST_FOCUS
+- name: TEST_SKIP
+  value: "\\[local\\]"
+- name: TEST_SUITE_SERIAL
+- name: TEST_FOCUS_SERIAL
+- name: TEST_SKIP_SERIAL
+  value: "\\[local\\]"
 - name: TEST_COMMAND
 
 objects:
@@ -60,100 +68,6 @@ objects:
         secretName: ${JOB_NAME_SAFE}-cluster-profile
 
     containers:
-
-    # Once admin.kubeconfig exists, executes shared tests
-    - name: test
-      image: ${IMAGE_TESTS}
-      resources:
-        requests:
-          cpu: 1
-          memory: 300Mi
-        limits:
-          cpu: 3
-          memory: 4Gi
-      volumeMounts:
-      - name: shared-tmp
-        mountPath: /tmp/shared
-      - name: cluster-profile
-        mountPath: /tmp/cluster
-      - name: artifacts
-        mountPath: /tmp/artifacts
-      env:
-      - name: HOME
-        value: /tmp/home
-      - name: TEST_COMMAND
-        value: "${TEST_COMMAND}"
-      command:
-      - /bin/bash
-      - -c
-      - |
-        #!/bin/bash
-        set -euxo pipefail
-
-        trap 'touch /tmp/shared/exit' EXIT
-        trap 'kill $(jobs -p); exit 0' TERM
-
-        cp "$(which oc)" /tmp/shared/
-
-        mkdir -p "${HOME}"
-
-        # wait until the setup job creates admin.kubeconfig
-        while true; do
-          if [[ ! -f /tmp/shared/admin.kubeconfig ]]; then
-            sleep 15 & wait
-            continue
-          fi
-          break
-        done
-        echo "Found shared kubeconfig"
-
-        # don't let clients impact the global kubeconfig
-        cp /tmp/shared/admin.kubeconfig /tmp/admin.kubeconfig
-        export KUBECONFIG=/tmp/admin.kubeconfig
-
-        PATH=/usr/libexec/origin:$PATH
-
-        # set up cloud provider specific env vars
-        if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
-          export GOOGLE_APPLICATION_CREDENTIALS="/tmp/cluster/gce.json"
-          export KUBE_SSH_USER=cloud-user
-          mkdir -p ~/.ssh
-          cp /tmp/cluster/ssh-privatekey ~/.ssh/google_compute_engine || true
-          export PROVIDER_ARGS='-provider=gce -gce-zone=us-east1-c -gce-project=openshift-gce-devel-ci'
-        fi
-
-        mkdir -p /tmp/output
-        cd /tmp/output
-
-        # install telemetry client (TEMPORARY)
-        set +e
-        curl https://raw.githubusercontent.com/openshift/telemeter/master/deploy/default-rules > /tmp/rules
-        oc create ns openshift-telemetry
-        oc adm policy add-cluster-role-to-user cluster-reader -z default -n openshift-telemetry
-        oc create secret generic telemeter-client --from-literal=to=https://telemeter.svc.ci.openshift.org --from-literal=id=${NAMESPACE}-${JOB_NAME_HASH} --from-literal=token=token-for-ci-test-job --from-literal=salt=random-salt --from-file=rules=/tmp/rules --dry-run -o yaml | oc apply -n openshift-telemetry -f -
-        oc create -f https://raw.githubusercontent.com/openshift/telemeter/master/deploy/telemeter-client-openshift.yaml -n openshift-telemetry
-        set -e
-
-        # TODO: the test binary should really be a more structured command - most of these flags should be
-        #       autodetected from the running cluster.
-        # TODO: bump nodes up to 40 again
-        function run-tests() {
-          if [[ -n "${TEST_FOCUS}" ]]; then
-            ginkgo -v -noColor -nodes=30 $( which extended.test ) -- \
-              -ginkgo.focus="${TEST_FOCUS}" -ginkgo.skip="${TEST_SKIP:-"\\[local\\]"}" \
-              -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit \
-              -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
-          fi
-          if [[ -n "${TEST_FOCUS_SERIAL}" ]]; then
-            ginkgo -v -noColor -nodes=1 $( which extended.test ) -- \
-              -ginkgo.focus="${TEST_FOCUS_SERIAL}" -ginkgo.skip="${TEST_SKIP_SERIAL:-"\\[local\\]"}" \
-              -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit/serial \
-              -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
-          fi
-          exit ${rc:-0}
-        }
-
-        ${TEST_COMMAND}
 
     # Runs an install
     - name: setup

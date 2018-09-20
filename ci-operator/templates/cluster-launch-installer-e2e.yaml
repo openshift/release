@@ -16,6 +16,10 @@ parameters:
   required: true
 - name: CLUSTER_TYPE
   required: true
+- name: TEST_FOCUS
+- name: TEST_SKIP
+- name: TEST_FOCUS_SERIAL
+- name: TEST_SKIP_SERIAL
 # Ensures the release image is created and tested
 - name: RELEASE_IMAGE_LATEST
 
@@ -141,23 +145,20 @@ objects:
         # TODO: the test binary should really be a more structured command - most of these flags should be
         #       autodetected from the running cluster.
         # TODO: bump nodes up to 40 again
-        function run-tests() {
-          if [[ -n "${TEST_FOCUS}" ]]; then
-            ginkgo -v -noColor -nodes=30 $( which extended.test ) -- \
-              -ginkgo.focus="${TEST_FOCUS}" -ginkgo.skip="${TEST_SKIP:-"\\[local\\]"}" \
-              -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit \
-              -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
-          fi
-          if [[ -n "${TEST_FOCUS_SERIAL}" ]]; then
-            ginkgo -v -noColor -nodes=1 $( which extended.test ) -- \
-              -ginkgo.focus="${TEST_FOCUS_SERIAL}" -ginkgo.skip="${TEST_SKIP_SERIAL:-"\\[local\\]"}" \
-              -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit/serial \
-              -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
-          fi
-          exit ${rc:-0}
-        }
-
-        ${TEST_COMMAND}
+        set -x
+        if [[ -n "${TEST_FOCUS}" ]]; then
+          ginkgo -v -noColor -nodes=30 $( which extended.test ) -- \
+            -ginkgo.focus="${TEST_FOCUS}" -ginkgo.skip="${TEST_SKIP}" \
+            -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit \
+            -test.timeout=10m ${PROVIDER_ARGS-} || rc=$?
+        fi
+        if [[ -n "${TEST_FOCUS_SERIAL}" ]]; then
+          ginkgo -v -noColor -nodes=1 $( which extended.test ) -- \
+            -ginkgo.focus="${TEST_FOCUS_SERIAL}" -ginkgo.skip="${TEST_SKIP_SERIAL}" \
+            -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit/serial \
+            -test.timeout=20m ${PROVIDER_ARGS-} || rc=$?
+        fi
+        exit ${rc:-0}
 
     # Runs an install
     - name: setup
@@ -203,7 +204,7 @@ objects:
         cp /tmp/cluster/inputs.yaml /tmp/artifacts/installer/
 
         echo "Invoking installer ..."
-
+        
         cd /tmp/cluster
         tectonic init --config=inputs.yaml
         mv -f ${NAME}/* /tmp/cluster/
