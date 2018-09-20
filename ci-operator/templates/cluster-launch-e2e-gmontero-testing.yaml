@@ -18,12 +18,6 @@ parameters:
   required: true
 - name: CLUSTER_TYPE
   required: true
-- name: TEST_FOCUS
-- name: TEST_SKIP
-  value: "\\[local\\]"
-- name: TEST_FOCUS_SERIAL
-- name: TEST_SKIP_SERIAL
-  value: "\\[local\\]"
 - name: TEST_COMMAND
 - name: PREPARE_COMMAND
 - name: IMAGE_PREPARE
@@ -221,29 +215,26 @@ objects:
         mkdir -p /tmp/output
         cd /tmp/output
 
-        # create the environment, but exit before we run tests
-        if [[ -n "${TEST_COMMAND-}" ]]; then
-          ${TEST_COMMAND}
-          exit 0
-        fi
-
         # TODO: the test binary should really be a more structured command - most of these flags should be
         #       autodetected from the running cluster.
         # TODO: bump nodes up to 40 again
-        set -x
-        if [[ -n "${TEST_FOCUS}" ]]; then
-          ginkgo -v -noColor -nodes=10 $( which extended.test ) -- \
-            -ginkgo.focus="${TEST_FOCUS}" -ginkgo.skip="${TEST_SKIP}" \
-            -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit \
-            -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
-        fi
-        if [[ -n "${TEST_FOCUS_SERIAL}" ]]; then
-          ginkgo -v -noColor -nodes=1 $( which extended.test ) -- \
-            -ginkgo.focus="${TEST_FOCUS_SERIAL}" -ginkgo.skip="${TEST_SKIP_SERIAL}" \
-            -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit/serial \
-            -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
-        fi
-        exit ${rc:-0}
+        function run-tests() {
+          if [[ -n "${TEST_FOCUS}" ]]; then
+            ginkgo -v -noColor -nodes=10 $( which extended.test ) -- \
+              -ginkgo.focus="${TEST_FOCUS}" -ginkgo.skip="${TEST_SKIP:-"\\[local\\]"}" \
+              -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit \
+              -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
+          fi
+          if [[ -n "${TEST_FOCUS_SERIAL}" ]]; then
+            ginkgo -v -noColor -nodes=1 $( which extended.test ) -- \
+              -ginkgo.focus="${TEST_FOCUS_SERIAL}" -ginkgo.skip="${TEST_SKIP_SERIAL:-"\\[local\\]"}" \
+              -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit/serial \
+              -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
+          fi
+          exit ${rc:-0}
+        }
+
+        ${TEST_COMMAND}
 
     # Runs an install
     - name: setup
