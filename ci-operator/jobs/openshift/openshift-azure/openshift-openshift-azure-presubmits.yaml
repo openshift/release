@@ -201,12 +201,18 @@ presubmits:
         command:
         - ci-operator
         env:
-        - name: TEST_FOCUS
-          value: Suite:openshift/conformance/parallel
-        - name: TEST_FOCUS_SERIAL
-          value: Suite:openshift/conformance/serial/minimal
-        - name: TEST_SKIP
-          value: .*((The HAProxy router should set Forwarded headers appropriately)|(oc
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-openshift-azure
+        - name: JOB_NAME_SAFE
+          value: e2e-azure-conformance
+        - name: CLUSTER_TYPE
+          value: azure
+        - name: TEST_COMMAND
+          value: TEST_FOCUS='Suite:openshift/conformance/parallel' TEST_FOCUS_SERIAL='Suite:openshift/conformance/serial/minimal'
+            TEST_SKIP='.*((The HAProxy router should set Forwarded headers appropriately)|(oc
             new-app should succeed with a --name of 58 characters)|(process valueFrom
             in build strategy environment variables should successfully resolve valueFrom
             in docker build environment variables)|(prune builds based on settings
@@ -218,16 +224,7 @@ presubmits:
             deployment with multiple triggers)|(templateinstance readiness test should
             report failed soon after an annotated objects has failed)|(s2i build with
             a root user image should create a root build and pass with a privileged
-            SCC)).*
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: master.yaml
-              name: ci-operator-openshift-openshift-azure
-        - name: JOB_NAME_SAFE
-          value: e2e-azure-conformance
-        - name: CLUSTER_TYPE
-          value: azure
+            SCC)).*' run-tests
         image: ci-operator:latest
         name: test
         resources:
