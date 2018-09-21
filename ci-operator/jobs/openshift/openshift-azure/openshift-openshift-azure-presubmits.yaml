@@ -57,128 +57,6 @@ presubmits:
               name: cluster-secrets-azure-file
     trigger: ((?m)^/test( all| e2e),?(\s+|$))
   - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    context: ci/prow/unit
-    decorate: true
-    labels:
-      artifacts: images
-    name: pull-ci-openshift-openshift-azure-master-unit
-    rerun_command: /test unit
-    skip_cloning: true
-    spec:
-      containers:
-      - args:
-        - --give-pr-author-access-to-namespace=true
-        - --target=unit
-        command:
-        - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: master.yaml
-              name: ci-operator-openshift-openshift-azure
-        image: ci-operator:latest
-        name: test
-        resources:
-          limits:
-            cpu: 500m
-          requests:
-            cpu: 10m
-      serviceAccountName: ci-operator
-    trigger: ((?m)^/test( all| unit),?(\s+|$))
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    context: ci/prow/verify
-    decorate: true
-    labels:
-      artifacts: images
-    name: pull-ci-openshift-openshift-azure-master-verify
-    rerun_command: /test verify
-    skip_cloning: true
-    spec:
-      containers:
-      - args:
-        - --give-pr-author-access-to-namespace=true
-        - --target=verify
-        command:
-        - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: master.yaml
-              name: ci-operator-openshift-openshift-azure
-        image: ci-operator:latest
-        name: test
-        resources:
-          limits:
-            cpu: 500m
-          requests:
-            cpu: 10m
-      serviceAccountName: ci-operator
-    trigger: ((?m)^/test( all| verify),?(\s+|$))
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - master
-    context: ci/prow/upgrade
-    decorate: true
-    labels:
-      artifacts: images
-    name: pull-ci-openshift-openshift-azure-master-e2e-azure-upgrade
-    rerun_command: /test upgrade
-    skip_cloning: true
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/e2e-azure-secret
-        - --template=/usr/local/e2e-azure-upgrade
-        - --target=e2e-azure-upgrade
-        - --target=[output:stable:sync]
-        command:
-        - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: master.yaml
-              name: ci-operator-openshift-openshift-azure
-        - name: JOB_NAME_SAFE
-          value: e2e-azure-upgrade
-        - name: CLUSTER_TYPE
-          value: azure
-        image: ci-operator:latest
-        name: test
-        resources:
-          limits:
-            cpu: 500m
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/e2e-azure-upgrade
-          name: job-definition
-          subPath: cluster-launch-e2e-azure-upgrade.yaml
-        - mountPath: /usr/local/e2e-azure-secret
-          name: cluster-secrets-azure-file
-      serviceAccountName: ci-operator
-      volumes:
-      - configMap:
-          name: prow-job-cluster-launch-e2e-azure-upgrade
-        name: job-definition
-      - name: cluster-secrets-azure-file
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-azure-file
-    trigger: ((?m)^/test upgrade,?(\s+|$))
-  - agent: kubernetes
     always_run: false
     branches:
     - master
@@ -252,3 +130,125 @@ presubmits:
           - secret:
               name: cluster-secrets-azure-file
     trigger: ((?m)^/test conformance,?(\s+|$))
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - master
+    context: ci/prow/upgrade
+    decorate: true
+    labels:
+      artifacts: images
+    name: pull-ci-openshift-openshift-azure-master-e2e-azure-upgrade
+    rerun_command: /test upgrade
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --secret-dir=/usr/local/e2e-azure-secret
+        - --template=/usr/local/e2e-azure-upgrade
+        - --target=e2e-azure-upgrade
+        - --target=[output:stable:sync]
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-openshift-azure
+        - name: JOB_NAME_SAFE
+          value: e2e-azure-upgrade
+        - name: CLUSTER_TYPE
+          value: azure
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-azure-upgrade
+          name: job-definition
+          subPath: cluster-launch-e2e-azure-upgrade.yaml
+        - mountPath: /usr/local/e2e-azure-secret
+          name: cluster-secrets-azure-file
+      serviceAccountName: ci-operator
+      volumes:
+      - configMap:
+          name: prow-job-cluster-launch-e2e-azure-upgrade
+        name: job-definition
+      - name: cluster-secrets-azure-file
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-azure-file
+    trigger: ((?m)^/test upgrade,?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/unit
+    decorate: true
+    labels:
+      artifacts: images
+    name: pull-ci-openshift-openshift-azure-master-unit
+    rerun_command: /test unit
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --give-pr-author-access-to-namespace=true
+        - --target=unit
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-openshift-azure
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| unit),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/verify
+    decorate: true
+    labels:
+      artifacts: images
+    name: pull-ci-openshift-openshift-azure-master-verify
+    rerun_command: /test verify
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --give-pr-author-access-to-namespace=true
+        - --target=verify
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-openshift-azure
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| verify),?(\s+|$))

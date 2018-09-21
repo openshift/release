@@ -4,80 +4,6 @@ presubmits:
     always_run: true
     branches:
     - release-3.11
-    context: ci/prow/unit
-    decorate: true
-    name: pull-ci-openshift-image-registry-master-unit
-    rerun_command: /test unit
-    skip_cloning: true
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --target=unit
-        command:
-        - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: release-3.11.yaml
-              name: ci-operator-openshift-image-registry
-        image: ci-operator:latest
-        name: test
-        resources:
-          limits:
-            cpu: 500m
-          requests:
-            cpu: 10m
-      serviceAccountName: ci-operator
-    trigger: ((?m)^/test( all| unit),?(\s+|$))
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-3.11
-    context: ci/prow/integration
-    decorate: true
-    name: pull-ci-openshift-image-registry-master-integration
-    rerun_command: /test integration
-    skip_cloning: true
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --template=/usr/local/integration
-        - --target=integration
-        command:
-        - ci-operator
-        env:
-        - name: COMMAND
-          value: TEST_KUBECONFIG=${KUBECONFIG} ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=true
-            make test-integration
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: release-3.11.yaml
-              name: ci-operator-openshift-image-registry
-        image: ci-operator:latest
-        name: test
-        resources:
-          limits:
-            cpu: 500m
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/integration
-          name: job-definition
-          subPath: master-sidecar.yaml
-      serviceAccountName: ci-operator
-      volumes:
-      - configMap:
-          name: prow-job-master-sidecar
-        name: job-definition
-    trigger: ((?m)^/test( all| integration),?(\s+|$))
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-3.11
     context: ci/prow/e2e
     decorate: true
     name: pull-ci-openshift-image-registry-master-e2e-gcp
@@ -133,3 +59,77 @@ presubmits:
           - configMap:
               name: cluster-profile-gcp
     trigger: ((?m)^/test( all| e2e),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-3.11
+    context: ci/prow/integration
+    decorate: true
+    name: pull-ci-openshift-image-registry-master-integration
+    rerun_command: /test integration
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --template=/usr/local/integration
+        - --target=integration
+        command:
+        - ci-operator
+        env:
+        - name: COMMAND
+          value: TEST_KUBECONFIG=${KUBECONFIG} ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=true
+            make test-integration
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: release-3.11.yaml
+              name: ci-operator-openshift-image-registry
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/integration
+          name: job-definition
+          subPath: master-sidecar.yaml
+      serviceAccountName: ci-operator
+      volumes:
+      - configMap:
+          name: prow-job-master-sidecar
+        name: job-definition
+    trigger: ((?m)^/test( all| integration),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-3.11
+    context: ci/prow/unit
+    decorate: true
+    name: pull-ci-openshift-image-registry-master-unit
+    rerun_command: /test unit
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=unit
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: release-3.11.yaml
+              name: ci-operator-openshift-image-registry
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| unit),?(\s+|$))
