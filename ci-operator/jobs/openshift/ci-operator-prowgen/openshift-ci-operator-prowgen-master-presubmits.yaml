@@ -4,6 +4,37 @@ presubmits:
     always_run: true
     branches:
     - master
+    context: ci/prow/format
+    decorate: true
+    name: pull-ci-openshift-ci-operator-prowgen-master-format
+    rerun_command: /test format
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=format
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-ci-operator-prowgen
+        image: ci-operator:latest
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| format),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
     context: ci/prow/images
     decorate: true
     name: pull-ci-openshift-ci-operator-prowgen-master-images
@@ -31,6 +62,37 @@ presubmits:
             cpu: 10m
       serviceAccountName: ci-operator
     trigger: ((?m)^/test( all| images),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/integration
+    decorate: true
+    name: pull-ci-openshift-ci-operator-prowgen-master-integration
+    rerun_command: /test integration
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=integration
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-ci-operator-prowgen
+        image: ci-operator:latest
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| integration),?(\s+|$))
   - agent: kubernetes
     always_run: true
     branches:
