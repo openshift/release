@@ -236,7 +236,7 @@ objects:
       - name: shared-tmp
         mountPath: /tmp/shared
       - name: cluster-secrets-azure
-        mountPath: /usr/share/ansible/openshift-ansible/inventory/dynamic/injected
+        mountPath: /etc/azure/credentials
       env:
       - name: HOME
         value: /usr/share/ansible/openshift-ansible
@@ -272,7 +272,8 @@ objects:
         source /tmp/shared/environment
 
         # Source azure creds
-        source /tmp/shared/credentials
+        source /etc/azure/credentials/secret
+        az login --service-principal -u ${AZURE_CLIENT_ID} -p ${AZURE_CLIENT_SECRET} --tenant ${AZURE_TENANT_ID} &>/dev/null
 
         ansible-playbook \
           -e openshift_azure_input_image_ns=images \
