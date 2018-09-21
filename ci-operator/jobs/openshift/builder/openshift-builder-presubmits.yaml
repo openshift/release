@@ -4,37 +4,6 @@ presubmits:
     always_run: true
     branches:
     - master
-    context: ci/prow/unit
-    decorate: true
-    name: pull-ci-openshift-builder-master-unit
-    rerun_command: /test unit
-    skip_cloning: true
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --target=unit
-        command:
-        - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: master.yaml
-              name: ci-operator-openshift-builder
-        image: ci-operator:latest
-        name: ""
-        resources:
-          limits:
-            cpu: 500m
-          requests:
-            cpu: 10m
-      serviceAccountName: ci-operator
-    trigger: ((?m)^/test( all| unit),?(\s+|$))
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
     context: ci/prow/gcp
     decorate: true
     name: pull-ci-openshift-builder-master-e2e-gcp
@@ -265,3 +234,34 @@ presubmits:
           - configMap:
               name: cluster-profile-gcp
     trigger: ((?m)^/test( all| extended-image-ecosystem),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/unit
+    decorate: true
+    name: pull-ci-openshift-builder-master-unit
+    rerun_command: /test unit
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=unit
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-builder
+        image: ci-operator:latest
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| unit),?(\s+|$))

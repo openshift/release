@@ -2,87 +2,6 @@ presubmits:
   openshift/cluster-api-provider-libvirt:
   - agent: kubernetes
     always_run: true
-    branches:
-    - master
-    context: ci/prow/unit
-    decorate: true
-    name: pull-ci-openshift-cluster-api-provider-libvirt-master-unit
-    rerun_command: /test unit
-    skip_cloning: true
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --target=unit
-        command:
-        - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: master.yaml
-              name: ci-operator-openshift-cluster-api-provider-libvirt
-        image: ci-operator:latest
-        name: test
-        resources:
-          limits:
-            cpu: 500m
-          requests:
-            cpu: 10m
-      serviceAccountName: ci-operator
-    trigger: ((?m)^/test( all| unit),?(\s+|$))
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    context: ci/prow/images
-    decorate: true
-    name: pull-ci-openshift-cluster-api-provider-libvirt-master-images
-    rerun_command: /test images
-    skip_cloning: true
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --target=[images]
-        command:
-        - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: master.yaml
-              name: ci-operator-openshift-cluster-api-provider-libvirt
-        image: ci-operator:latest
-        name: test
-        resources:
-          limits:
-            cpu: 500m
-          requests:
-            cpu: 10m
-      serviceAccountName: ci-operator
-    trigger: ((?m)^/test( all| images),?(\s+|$))
-  - agent: kubernetes
-    always_run: true
-    context: ci/prow/yaml-lint
-    decorate: true
-    name: pull-ci-openshift-cluster-api-provider-libvirt-yaml-lint
-    rerun_command: /test yaml-lint
-    spec:
-      containers:
-      - args:
-        - ./hack/yaml-lint.sh
-        command:
-        - sh
-        env:
-        - name: IS_CONTAINER
-          value: "TRUE"
-        image: quay.io/coreos/yamllint
-        name: ""
-        resources: {}
-    trigger: ((?m)^/test(all| yaml-lint),?(\s+|$))
-  - agent: kubernetes
-    always_run: true
     context: ci/prow/go-fmt
     decorate: true
     name: pull-ci-openshift-cluster-api-provider-libvirt-go-fmt
@@ -141,3 +60,84 @@ presubmits:
         name: ""
         resources: {}
     trigger: ((?m)^/test(all| golint),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/images
+    decorate: true
+    name: pull-ci-openshift-cluster-api-provider-libvirt-master-images
+    rerun_command: /test images
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=[images]
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-cluster-api-provider-libvirt
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| images),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/unit
+    decorate: true
+    name: pull-ci-openshift-cluster-api-provider-libvirt-master-unit
+    rerun_command: /test unit
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=unit
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-cluster-api-provider-libvirt
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| unit),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    context: ci/prow/yaml-lint
+    decorate: true
+    name: pull-ci-openshift-cluster-api-provider-libvirt-yaml-lint
+    rerun_command: /test yaml-lint
+    spec:
+      containers:
+      - args:
+        - ./hack/yaml-lint.sh
+        command:
+        - sh
+        env:
+        - name: IS_CONTAINER
+          value: "TRUE"
+        image: quay.io/coreos/yamllint
+        name: ""
+        resources: {}
+    trigger: ((?m)^/test(all| yaml-lint),?(\s+|$))
