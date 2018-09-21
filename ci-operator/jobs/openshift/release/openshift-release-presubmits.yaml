@@ -20,6 +20,25 @@ presubmits:
     always_run: true
     branches:
     - master
+    context: ci/prow/ci-operator-config
+    decorate: true
+    name: pull-ci-openshift-release-master-ci-operator-config
+    rerun_command: /test ci-operator-config
+    spec:
+      containers:
+      - args:
+        - --config-dir
+        - ./ci-operator/config/
+        command:
+        - ci-operator-checkconfig
+        image: ci-operator-checkconfig:latest
+        name: ""
+        resources: {}
+    trigger: ((?m)^/test( all| ci-operator-config),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
     context: ci/prow/config
     decorate: true
     name: pull-ci-openshift-release-master-config
@@ -40,25 +59,6 @@ presubmits:
         name: ""
         resources: {}
     trigger: ((?m)^/test( all| config),?(\s+|$))
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    context: ci/prow/ci-operator-config
-    decorate: true
-    name: pull-ci-openshift-release-master-ci-operator-config
-    rerun_command: /test ci-operator-config
-    spec:
-      containers:
-      - args:
-        - --config-dir
-        - ./ci-operator/config/
-        command:
-        - ci-operator-checkconfig
-        image: ci-operator-checkconfig:latest
-        name: ""
-        resources: {}
-    trigger: ((?m)^/test( all| ci-operator-config),?(\s+|$))
   - agent: kubernetes
     always_run: false
     branches:
