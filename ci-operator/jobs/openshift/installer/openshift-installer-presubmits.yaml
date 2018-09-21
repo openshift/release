@@ -2,35 +2,28 @@ presubmits:
   openshift/installer:
   - agent: kubernetes
     always_run: true
-    branches:
-    - master
-    context: ci/prow/unit
+    context: ci/prow/build-tarball
     decorate: true
-    name: pull-ci-openshift-installer-master-unit
-    rerun_command: /test unit
-    skip_cloning: true
+    name: pull-ci-openshift-installer-bazel-build-tarball
+    rerun_command: /test build-tarball
     spec:
       containers:
       - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --target=unit
+        - ./hack/test-bazel-build-tarball.sh
+        - --action_env=HOME=/tmp
         command:
-        - ci-operator
+        - sh
         env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: master.yaml
-              name: ci-operator-openshift-installer
-        image: ci-operator:latest
-        name: test
-        resources:
-          limits:
-            cpu: 500m
-          requests:
-            cpu: 10m
-      serviceAccountName: ci-operator
-    trigger: ((?m)^/test( all| unit),?(\s+|$))
+        - name: HOME
+          value: /tmp
+        - name: IS_CONTAINER
+          value: "TRUE"
+        - name: USER
+          value: bazel
+        image: quay.io/coreos/tectonic-builder:bazel-v0.3
+        name: ""
+        resources: {}
+    trigger: (?m)^/test build-tarball
   - agent: kubernetes
     always_run: false
     branches:
@@ -93,61 +86,6 @@ presubmits:
     always_run: false
     branches:
     - master
-    context: ci/prow/e2e-aws-smoke
-    decorate: true
-    name: pull-ci-openshift-installer-master-e2e-aws-smoke
-    rerun_command: /test e2e-aws-smoke
-    run_if_changed: ^([^D]|D(D|oD|ocD|ocuD|ocum(D|e(D|n(D|t(D|aD|atD|atiD|atioD)))))*([^Do]|o[^Dc]|oc[^Du]|ocu[^Dm]|ocum([^De]|e([^Dn]|n([^Dt]|t([^Da]|a[^Dt]|at[^Di]|ati[^Do]|atio[^Dn]))))))*(D(D|oD|ocD|ocuD|ocum(D|e(D|n(D|t(D|aD|atD|atiD|atioD)))))*(o|oc|ocu|ocum(e(n(t(a|at|ati|atio)?)?)?)?)?)?$
-    skip_cloning: true
-    spec:
-      containers:
-      - command:
-        - ci-operator
-        - --artifact-dir=$(ARTIFACTS)
-        - --secret-dir=/usr/local/e2e-aws-smoke-cluster-profile
-        - --template=/usr/local/e2e-aws-smoke
-        - --target=e2e-aws-smoke
-        - --give-pr-author-access-to-namespace
-        env:
-        - name: JOB_NAME_SAFE
-          value: e2e-aws-smoke
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: master.yaml
-              name: ci-operator-openshift-installer
-        image: ci-operator:latest
-        name: test
-        resources:
-          limits:
-            cpu: 500m
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/e2e-aws-smoke
-          name: job-definition
-          subPath: cluster-launch-installer-e2e-smoke.yaml
-        - mountPath: /usr/local/e2e-aws-smoke-cluster-profile
-          name: cluster-profile
-      serviceAccountName: ci-operator
-      volumes:
-      - configMap:
-          name: prow-job-cluster-launch-installer-e2e-smoke
-        name: job-definition
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-          - configMap:
-              name: cluster-profile-aws
-    trigger: ((?m)^/test( all| e2e-aws-smoke),?(\s+|$))
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - master
     context: ci/prow/e2e-aws-all
     decorate: true
     name: pull-ci-openshift-installer-master-e2e-aws-all
@@ -203,43 +141,163 @@ presubmits:
               name: cluster-profile-aws
     trigger: ((?m)^/test( e2e-aws-all),?(\s+|$))
   - agent: kubernetes
-    always_run: true
-    context: ci/prow/yaml-lint
+    always_run: false
+    branches:
+    - master
+    context: ci/prow/e2e-aws-smoke
     decorate: true
-    name: pull-ci-openshift-installer-yaml-lint
-    rerun_command: /test yaml-lint
+    name: pull-ci-openshift-installer-master-e2e-aws-smoke
+    rerun_command: /test e2e-aws-smoke
+    run_if_changed: ^([^D]|D(D|oD|ocD|ocuD|ocum(D|e(D|n(D|t(D|aD|atD|atiD|atioD)))))*([^Do]|o[^Dc]|oc[^Du]|ocu[^Dm]|ocum([^De]|e([^Dn]|n([^Dt]|t([^Da]|a[^Dt]|at[^Di]|ati[^Do]|atio[^Dn]))))))*(D(D|oD|ocD|ocuD|ocum(D|e(D|n(D|t(D|aD|atD|atiD|atioD)))))*(o|oc|ocu|ocum(e(n(t(a|at|ati|atio)?)?)?)?)?)?$
+    skip_cloning: true
     spec:
       containers:
-      - args:
-        - ./hack/yaml-lint.sh
-        command:
-        - sh
+      - command:
+        - ci-operator
+        - --artifact-dir=$(ARTIFACTS)
+        - --secret-dir=/usr/local/e2e-aws-smoke-cluster-profile
+        - --template=/usr/local/e2e-aws-smoke
+        - --target=e2e-aws-smoke
+        - --give-pr-author-access-to-namespace
         env:
-        - name: IS_CONTAINER
-          value: "TRUE"
-        image: quay.io/coreos/yamllint
-        name: ""
-        resources: {}
-    trigger: (?m)^/test yaml-lint
+        - name: JOB_NAME_SAFE
+          value: e2e-aws-smoke
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-installer
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-aws-smoke
+          name: job-definition
+          subPath: cluster-launch-installer-e2e-smoke.yaml
+        - mountPath: /usr/local/e2e-aws-smoke-cluster-profile
+          name: cluster-profile
+      serviceAccountName: ci-operator
+      volumes:
+      - configMap:
+          name: prow-job-cluster-launch-installer-e2e-smoke
+        name: job-definition
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+          - configMap:
+              name: cluster-profile-aws
+    trigger: ((?m)^/test( all| e2e-aws-smoke),?(\s+|$))
   - agent: kubernetes
     always_run: true
-    context: ci/prow/tf-lint
+    context: ci/prow/go-fmt
     decorate: true
-    name: pull-ci-openshift-installer-tf-lint
-    rerun_command: /test tf-lint
+    name: pull-ci-openshift-installer-master-gofmt
+    rerun_command: /test go-fmt
     spec:
       containers:
       - args:
-        - ./hack/tf-lint.sh
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=gofmt
         command:
-        - sh
+        - ci-operator
         env:
-        - name: IS_CONTAINER
-          value: "TRUE"
-        image: quay.io/coreos/tflint
-        name: ""
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-installer
+        image: ci-operator:latest
+        name: test
         resources: {}
-    trigger: (?m)^/test tf-lint
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test(all| go-fmt),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    context: ci/prow/golint
+    decorate: true
+    name: pull-ci-openshift-installer-master-golint
+    rerun_command: /test golint
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=golint
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-installer
+        image: ci-operator:latest
+        name: test
+        resources: {}
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test(all| golint),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    context: ci/prow/go-vet
+    decorate: true
+    name: pull-ci-openshift-installer-master-govet
+    rerun_command: /test go-vet
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=govet
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-installer
+        image: ci-operator:latest
+        name: test
+        resources: {}
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test(all| go-vet),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/unit
+    decorate: true
+    name: pull-ci-openshift-installer-master-unit
+    rerun_command: /test unit
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=unit
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-installer
+        image: ci-operator:latest
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| unit),?(\s+|$))
   - agent: kubernetes
     always_run: true
     context: ci/prow/shellcheck
@@ -280,97 +338,39 @@ presubmits:
     trigger: ((?m)^/test( all| tf-fmt),?(\s+|$))
   - agent: kubernetes
     always_run: true
-    context: ci/prow/build-tarball
+    context: ci/prow/tf-lint
     decorate: true
-    name: pull-ci-openshift-installer-bazel-build-tarball
-    rerun_command: /test build-tarball
+    name: pull-ci-openshift-installer-tf-lint
+    rerun_command: /test tf-lint
     spec:
       containers:
       - args:
-        - ./hack/test-bazel-build-tarball.sh
-        - --action_env=HOME=/tmp
+        - ./hack/tf-lint.sh
         command:
         - sh
         env:
-        - name: HOME
-          value: /tmp
         - name: IS_CONTAINER
           value: "TRUE"
-        - name: USER
-          value: bazel
-        image: quay.io/coreos/tectonic-builder:bazel-v0.3
+        image: quay.io/coreos/tflint
         name: ""
         resources: {}
-    trigger: (?m)^/test build-tarball
+    trigger: (?m)^/test tf-lint
   - agent: kubernetes
     always_run: true
-    context: ci/prow/go-fmt
+    context: ci/prow/yaml-lint
     decorate: true
-    name: pull-ci-openshift-installer-master-gofmt
-    rerun_command: /test go-fmt
+    name: pull-ci-openshift-installer-yaml-lint
+    rerun_command: /test yaml-lint
     spec:
       containers:
       - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --target=gofmt
+        - ./hack/yaml-lint.sh
         command:
-        - ci-operator
+        - sh
         env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: master.yaml
-              name: ci-operator-openshift-installer
-        image: ci-operator:latest
-        name: test
+        - name: IS_CONTAINER
+          value: "TRUE"
+        image: quay.io/coreos/yamllint
+        name: ""
         resources: {}
-      serviceAccountName: ci-operator
-    trigger: ((?m)^/test(all| go-fmt),?(\s+|$))
-  - agent: kubernetes
-    always_run: true
-    context: ci/prow/go-vet
-    decorate: true
-    name: pull-ci-openshift-installer-master-govet
-    rerun_command: /test go-vet
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --target=govet
-        command:
-        - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: master.yaml
-              name: ci-operator-openshift-installer
-        image: ci-operator:latest
-        name: test
-        resources: {}
-      serviceAccountName: ci-operator
-    trigger: ((?m)^/test(all| go-vet),?(\s+|$))
-  - agent: kubernetes
-    always_run: true
-    context: ci/prow/golint
-    decorate: true
-    name: pull-ci-openshift-installer-master-golint
-    rerun_command: /test golint
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --target=golint
-        command:
-        - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: master.yaml
-              name: ci-operator-openshift-installer
-        image: ci-operator:latest
-        name: test
-        resources: {}
-      serviceAccountName: ci-operator
-    trigger: ((?m)^/test(all| golint),?(\s+|$))
+    trigger: (?m)^/test yaml-lint

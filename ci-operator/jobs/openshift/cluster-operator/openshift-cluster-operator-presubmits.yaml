@@ -4,16 +4,16 @@ presubmits:
     always_run: true
     branches:
     - master
-    context: ci/prow/verify
+    context: ci/prow/images
     decorate: true
-    name: pull-ci-openshift-cluster-operator-master-verify
-    rerun_command: /test verify
+    name: pull-ci-openshift-cluster-operator-master-images
+    rerun_command: /test images
     skip_cloning: true
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --target=verify
+        - --target=[images]
         command:
         - ci-operator
         env:
@@ -30,38 +30,7 @@ presubmits:
           requests:
             cpu: 10m
       serviceAccountName: ci-operator
-    trigger: ((?m)^/test( all| verify),?(\s+|$))
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    context: ci/prow/unit
-    decorate: true
-    name: pull-ci-openshift-cluster-operator-master-unit
-    rerun_command: /test unit
-    skip_cloning: true
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --target=unit
-        command:
-        - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: master.yaml
-              name: ci-operator-openshift-cluster-operator
-        image: ci-operator:latest
-        name: ""
-        resources:
-          limits:
-            cpu: 500m
-          requests:
-            cpu: 10m
-      serviceAccountName: ci-operator
-    trigger: ((?m)^/test( all| unit),?(\s+|$))
+    trigger: ((?m)^/test( all| images),?(\s+|$))
   - agent: kubernetes
     always_run: true
     branches:
@@ -97,16 +66,16 @@ presubmits:
     always_run: true
     branches:
     - master
-    context: ci/prow/images
+    context: ci/prow/unit
     decorate: true
-    name: pull-ci-openshift-cluster-operator-master-images
-    rerun_command: /test images
+    name: pull-ci-openshift-cluster-operator-master-unit
+    rerun_command: /test unit
     skip_cloning: true
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --target=[images]
+        - --target=unit
         command:
         - ci-operator
         env:
@@ -123,7 +92,38 @@ presubmits:
           requests:
             cpu: 10m
       serviceAccountName: ci-operator
-    trigger: ((?m)^/test( all| images),?(\s+|$))
+    trigger: ((?m)^/test( all| unit),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/verify
+    decorate: true
+    name: pull-ci-openshift-cluster-operator-master-verify
+    rerun_command: /test verify
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=verify
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-cluster-operator
+        image: ci-operator:latest
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| verify),?(\s+|$))
   - agent: jenkins
     always_run: true
     context: ci/openshift-jenkins/e2e
