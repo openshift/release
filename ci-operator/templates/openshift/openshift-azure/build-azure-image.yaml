@@ -107,12 +107,16 @@ objects:
         # error handling and sync code
         set -euo pipefail
 
-        trap '[ $? == 0 ] || touch /tmp/shared/exit' EXIT
-        trap 'kill $(jobs -p); exit 0' TERM
-
         # We need to persist this variable so that we can clean it up when we exit
         echo "RESOURCE_GROUP=${INSTANCE_PREFIX}-$(TZ=Etc/UTC date +%Y%m%d%H%M)" >>/tmp/shared/environment
         echo "IMAGE_NAME=${DEPLOY_OS}-$OPENSHIFT_RELEASE-$(TZ=Etc/UTC date +%Y%m%d%H%M)" >>/tmp/shared/environment
+
+        trap 'rc=$?; if [[ $rc -ne 0 ]]; then
+          touch /tmp/shared/exit;
+        fi;
+        az group delete -n ${RESOURCE_GROUP} -y --no-wait
+        exit $rc' EXIT
+        trap 'kill $(jobs -p); exit 0' TERM
 
         # Get resource group and image name
         source /tmp/shared/environment
@@ -333,8 +337,6 @@ objects:
 
           source /tmp/shared/environment
           ./hack/delete.sh ${RESOURCE_GROUP}-e2e
-          # Clean up the resource group used to build the image
-          az group delete -n ${RESOURCE_GROUP} -y --no-wait
         }
 
         trap 'teardown' EXIT
