@@ -155,6 +155,8 @@ objects:
         mountPath: /tmp
       - name: cluster-profile
         mountPath: /usr/share/ansible/openshift-ansible/inventory/dynamic/injected
+      - name: artifacts
+        mountPath: /tmp/artifacts
       env:
       - name: INSTANCE_PREFIX
         value: ${NAMESPACE}-${JOB_NAME_HASH}
@@ -169,12 +171,13 @@ objects:
         #!/bin/bash
         set -euo pipefail
 
-        trap 'rc=$?; if [[ $rc -ne 0 ]]; then touch /tmp/exit; fi; exit $rc' EXIT
+        trap 'rc=$?; gzip /tmp/artifacts/ansible.log; if [[ $rc -ne 0 ]]; then touch /tmp/exit; fi; exit $rc' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
 
+        touch /tmp/artifacts/ansible.log
         ansible-playbook -vv \
           -e openshift_test_repo=${RPM_REPO} -e 'oreg_url=${IMAGE_FORMAT}' \
-          playbooks/${CLUSTER_TYPE}/openshift-cluster/launch.yml
+          playbooks/${CLUSTER_TYPE}/openshift-cluster/launch.yml | tee -a /tmp/artifacts/ansible.log
 
     # Performs cleanup of all created resources
     - name: teardown
