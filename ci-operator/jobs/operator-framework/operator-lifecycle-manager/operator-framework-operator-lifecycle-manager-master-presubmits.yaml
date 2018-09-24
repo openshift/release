@@ -1,12 +1,12 @@
 presubmits:
-  tnozicka/openshift-acme:
+  operator-framework/operator-lifecycle-manager:
   - agent: kubernetes
     always_run: true
     branches:
     - master
     context: ci/prow/images
     decorate: true
-    name: pull-ci-tnozicka-openshift-acme-master-images
+    name: pull-ci-operator-framework-operator-lifecycle-manager-master-images
     rerun_command: /test images
     skip_cloning: true
     spec:
@@ -21,7 +21,7 @@ presubmits:
           valueFrom:
             configMapKeyRef:
               key: master.yaml
-              name: ci-operator-tnozicka-openshift-acme
+              name: ci-operator-operator-framework-operator-lifecycle-manager
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -36,9 +36,41 @@ presubmits:
     always_run: true
     branches:
     - master
+    context: ci/prow/schema-check
+    decorate: true
+    name: pull-ci-operator-framework-operator-lifecycle-manager-master-schema-check
+    rerun_command: /test schema-check
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=schema-check
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-operator-framework-operator-lifecycle-manager
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| schema-check),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
     context: ci/prow/unit
     decorate: true
-    name: pull-ci-tnozicka-openshift-acme-master-unit
+    name: pull-ci-operator-framework-operator-lifecycle-manager-master-unit
     rerun_command: /test unit
     skip_cloning: true
     spec:
@@ -53,7 +85,7 @@ presubmits:
           valueFrom:
             configMapKeyRef:
               key: master.yaml
-              name: ci-operator-tnozicka-openshift-acme
+              name: ci-operator-operator-framework-operator-lifecycle-manager
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -70,7 +102,7 @@ presubmits:
     - master
     context: ci/prow/verify
     decorate: true
-    name: pull-ci-tnozicka-openshift-acme-master-verify
+    name: pull-ci-operator-framework-operator-lifecycle-manager-master-verify
     rerun_command: /test verify
     skip_cloning: true
     spec:
@@ -85,7 +117,7 @@ presubmits:
           valueFrom:
             configMapKeyRef:
               key: master.yaml
-              name: ci-operator-tnozicka-openshift-acme
+              name: ci-operator-operator-framework-operator-lifecycle-manager
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""

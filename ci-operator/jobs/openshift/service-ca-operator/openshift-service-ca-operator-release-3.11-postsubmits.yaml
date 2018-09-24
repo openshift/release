@@ -1,0 +1,32 @@
+postsubmits:
+  openshift/service-ca-operator:
+  - agent: kubernetes
+    branches:
+    - release-3.11
+    decorate: true
+    labels:
+      artifacts: images
+    name: branch-ci-openshift-service-ca-operator-release-3.11-images
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=[images]
+        - --promote
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: release-3.11.yaml
+              name: ci-operator-openshift-service-ca-operator
+        image: ci-operator:latest
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
