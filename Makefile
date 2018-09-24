@@ -290,7 +290,7 @@ azure:
 	$(MAKE) apply WHAT=projects/azure/cluster-wide.yaml
 	$(MAKE) apply WHAT=projects/azure/rbac.yaml
 	# ci namespace objects
-	oc create secret generic cluster-secrets-azure-file --from-file=cluster/test-deploy/azure/secret --from-file=cluster/test-deploy/azure/ssh-privatekey -o yaml --dry-run | oc apply -n ci -f -
+	oc create secret generic cluster-secrets-azure-file --from-file=cluster/test-deploy/azure/secret --from-file=cluster/test-deploy/azure/ssh-privatekey --from-file=cluster/test-deploy/azure/certs.yaml -o yaml --dry-run | oc apply -n ci -f -
 	oc create configmap prow-job-cluster-launch-e2e-azure --from-file=ci-operator/templates/cluster-launch-e2e-azure.yaml -o yaml --dry-run | oc apply -n ci -f -
 
 	# azure namespace objects
