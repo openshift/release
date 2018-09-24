@@ -17,6 +17,7 @@ parameters:
   required: true
 - name: RPM_REPO
   required: true
+- name: RPM_REPO_OPENSHIFT_ORIGIN
 - name: CLUSTER_TYPE
   required: true
 - name: TEST_SUITE
@@ -103,6 +104,10 @@ objects:
 
         trap 'rc=$?; gzip /tmp/artifacts/*.log; if [[ $rc -ne 0 ]]; then touch /tmp/shared/exit; fi; exit $rc' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
+
+        if [[ -n "${RPM_REPO_OPENSHIFT_ORIGIN-}" ]]; then
+          RPM_REPO="${RPM_REPO_OPENSHIFT_ORIGIN}"
+        fi
 
         cd /usr/share/ansible/openshift-ansible/
         mkdir -p test/ci/inventory/group_vars/OSEv3

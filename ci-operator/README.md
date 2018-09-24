@@ -183,7 +183,7 @@ complexity and duplication, which should be cleared in the future.
       - name: TEST_COMMAND
         value: "cp /tmp/admin.kubeconfig /tmp/admin.conf && make test-e2e"
       # required for jobs that use openshift-ansible to create a cluster
-      - name: RPM_REPO
+      - name: RPM_REPO_OPENSHIFT_ORIGIN
         value: https://rpms.svc.ci.openshift.org/openshift-origin-v4.0/
       # actual ci-operator call
       command:
