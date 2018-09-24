@@ -18,6 +18,7 @@ parameters:
   required: true
 - name: RPM_REPO
   required: true
+- name: RPM_REPO_OPENSHIFT_ORIGIN
 - name: CLUSTER_TYPE
   required: true
 - name: PREVIOUS_RPM_REPO
@@ -228,6 +229,10 @@ objects:
 
         trap 'rc=$?; if [[ $rc -ne 0 ]]; then touch /tmp/shared/exit; else touch /tmp/shared/test; fi; exit $rc' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
+
+        if [[ -n "${RPM_REPO_OPENSHIFT_ORIGIN-}" ]]; then
+          RPM_REPO="${RPM_REPO_OPENSHIFT_ORIGIN}"
+        fi
 
         while true; do
           if [[ ! -f /tmp/shared/install ]]; then

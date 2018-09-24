@@ -16,6 +16,7 @@ parameters:
   required: true
 - name: RPM_REPO
   required: true
+- name: RPM_REPO_OPENSHIFT_ORIGIN
 - name: CLUSTER_TYPE
   required: true
 - name: TEST_FOCUS
@@ -187,6 +188,10 @@ objects:
 
         trap 'rc=$?; if [[ $rc -ne 0 ]]; then touch /tmp/exit; fi; exit $rc' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
+
+        if [[ -n "${RPM_REPO_OPENSHIFT_ORIGIN-}" ]]; then
+          RPM_REPO="${RPM_REPO_OPENSHIFT_ORIGIN}"
+        fi
 
         ansible-playbook -vv \
           -e openshift_test_repo=${RPM_REPO} -e 'oreg_url=${IMAGE_FORMAT}' \
