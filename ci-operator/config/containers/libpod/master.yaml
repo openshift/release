@@ -8,12 +8,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-build_root:
-  image_stream_tag:
-    cluster: https://api.ci.openshift.org
-    name: release
-    namespace: openshift
-    tag: golang-1.10
 tests:
 - artifact_dir: /tmp/artifacts
   as: validate
@@ -23,6 +17,14 @@ tests:
   as: lint
   commands: ARTIFACT_DIR=/tmp/artifacts make lint
   from: test-bin
+- artifact_dir: /tmp/artifacts
+  as: buildrpmverification 
+  commands: ARTIFACT_DIR=/tmp/artifacts make -f .copr/Makefile srpm outdir=rpms && make -f .copr/Makefile build_binary outdir=rpms && dnf install -y rpms/noarch/* rpms/x86_64/*
+  from: src
+- artifact_dir: /tmp/artifacts
+  from: centos-src
+  as: centosbuildrpmverification
+  commands: ARTIFACT_DIR=/tmp/artifacts make -f .copr/Makefile srpm outdir=rpms && make -f .copr/Makefile build_binary outdir=rpms
 test_binary_build_commands: make install.tools
 build_root:
   image_stream_tag:
@@ -30,3 +32,19 @@ build_root:
     namespace: ci
     name: libpod-build-root
     tag: fedora
+base_images:
+  centos-build-root:
+    cluster: https://api.ci.openshift.org
+    name: libpod-build-root
+    namespace: ci
+    tag: centos
+raw_steps:
+- source_step:
+    from: centos-build-root
+    to: centos-src
+    clonerefs_image:
+      cluster: https://api.ci.openshift.org
+      name: clonerefs
+      namespace: ci
+      tag: latest
+    clonerefs_path: /clonerefs
