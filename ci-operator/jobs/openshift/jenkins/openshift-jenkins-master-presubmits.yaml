@@ -1,0 +1,70 @@
+presubmits:
+  openshift/jenkins:
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/e2e
+    decorate: true
+    name: pull-ci-openshift-jenkins-master-e2e-gcp
+    rerun_command: /test e2e
+    spec:
+      containers:
+      - command:
+        - ci-operator
+        - --artifact-dir=$(ARTIFACTS)
+        - --secret-dir=/usr/local/e2e-gcp-cluster-profile
+        - --template=/usr/local/e2e-gcp
+        - --target=e2e-gcp
+        - --give-pr-author-access-to-namespace=true
+        env:
+        - name: PREPARE_COMMAND
+          value: tag-in-image.sh
+        - name: TEST_FOCUS
+          value: openshift pipeline
+        - name: JOB_NAME_SAFE
+          value: e2e-gcp
+        - name: CLUSTER_TYPE
+          value: gcp
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-jenkins-canary
+        - name: RPM_REPO_OPENSHIFT_ORIGIN
+          value: https://rpms.svc.ci.openshift.org/openshift-origin-v4.0/
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: test
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-gcp
+          name: job-definition
+          subPath: cluster-launch-e2e-gmontero-testing.yaml
+        - mountPath: /usr/local/e2e-gcp-cluster-profile
+          name: cluster-profile
+      serviceAccountName: ci-operator
+      volumes:
+      - configMap:
+          name: prow-job-cluster-launch-e2e-gmontero-testing
+        name: job-definition
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+    trigger: ((?m)^/test( all| e2e),?(\s+|$))
+  - agent: jenkins
+    always_run: true
+    context: ci/openshift-jenkins
+    labels:
+      master: ci.openshift.redhat.com
+    name: test_pull_request_jenkins_images
+    rerun_command: /test
+    trigger: ((?m)^/test,?(\s+|$))
