@@ -3,21 +3,25 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
-    - dockerless-build-temporary
+    - release-3.10
     context: ci/prow/e2e
     decorate: true
-    name: pull-ci-openshift-image-registry-master-e2e-gcp
+    name: pull-ci-image-registry-e2e-3.10
     rerun_command: /test e2e
     skip_cloning: true
     spec:
       containers:
       - command:
-        - ci-operator
-        - --artifact-dir=$(ARTIFACTS)
-        - --secret-dir=/usr/local/e2e-gcp-cluster-profile
-        - --template=/usr/local/e2e-gcp
-        - --target=e2e-gcp
+        - /bin/bash
+        - -c
+        - |-
+          #!/bin/bash
+          set -e
+          export RPM_REPO_OPENSHIFT_ORIGIN="$( curl -q "${RPM_REPO_BASEURL_REF}" 2>/dev/null)"
+          ci-operator \
+            --artifact-dir=$(ARTIFACTS) \
+            --secret-dir=/usr/local/e2e-gcp-cluster-profile --template=/usr/local/e2e-gcp \
+            --target=e2e-gcp
         env:
         - name: TEST_FOCUS
           value: Suite:openshift/conformance/parallel
@@ -30,10 +34,10 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: master.yaml
+              key: release-3.10.yaml
               name: ci-operator-openshift-image-registry
-        - name: RPM_REPO_OPENSHIFT_ORIGIN
-          value: https://rpms.svc.ci.openshift.org/openshift-origin-v4.0/
+        - name: RPM_REPO_BASEURL_REF
+          value: https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/release-3.10/.latest-rpms
         image: ci-operator:latest
         imagePullPolicy: Always
         name: test
@@ -64,11 +68,10 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
-    - dockerless-build-temporary
+    - release-3.10
     context: ci/prow/integration
     decorate: true
-    name: pull-ci-openshift-image-registry-master-integration
+    name: pull-ci-openshift-image-registry-release-3.10-integration
     rerun_command: /test integration
     skip_cloning: true
     spec:
@@ -86,7 +89,7 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: master.yaml
+              key: release-3.10.yaml
               name: ci-operator-openshift-image-registry
         image: ci-operator:latest
         imagePullPolicy: Always
@@ -109,11 +112,10 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
-    - dockerless-build-temporary
+    - release-3.10
     context: ci/prow/unit
     decorate: true
-    name: pull-ci-openshift-image-registry-master-unit
+    name: pull-ci-openshift-image-registry-release-3.10-unit
     rerun_command: /test unit
     skip_cloning: true
     spec:
@@ -127,7 +129,7 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: master.yaml
+              key: release-3.10.yaml
               name: ci-operator-openshift-image-registry
         image: ci-operator:latest
         imagePullPolicy: Always

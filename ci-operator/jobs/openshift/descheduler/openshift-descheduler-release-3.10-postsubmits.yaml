@@ -1,27 +1,26 @@
-presubmits:
+postsubmits:
   openshift/descheduler:
   - agent: kubernetes
-    always_run: true
     branches:
-    - master
-    context: ci/prow/unit
+    - release-3.10
     decorate: true
-    name: pull-ci-openshift-descheduler-master-unit
-    rerun_command: /test unit
+    labels:
+      artifacts: images
+    name: branch-ci-openshift-descheduler-release-3.10-images
     skip_cloning: true
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --target=unit
         - --target=[images]
+        - --promote
         command:
         - ci-operator
         env:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: master.yaml
+              key: release-3.10.yaml
               name: ci-operator-openshift-descheduler
         image: ci-operator:latest
         imagePullPolicy: Always
@@ -32,4 +31,3 @@ presubmits:
           requests:
             cpu: 10m
       serviceAccountName: ci-operator
-    trigger: ((?m)^/test( all| unit),?(\s+|$))
