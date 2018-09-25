@@ -230,8 +230,9 @@ objects:
         trap 'rc=$?; if [[ $rc -ne 0 ]]; then touch /tmp/shared/exit; else touch /tmp/shared/test; fi; exit $rc' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
 
+        repo="${RPM_REPO}"
         if [[ -n "${RPM_REPO_OPENSHIFT_ORIGIN}" ]]; then
-          RPM_REPO="${RPM_REPO_OPENSHIFT_ORIGIN}"
+          repo="${RPM_REPO_OPENSHIFT_ORIGIN}"
         fi
 
         while true; do
@@ -244,7 +245,7 @@ objects:
         echo "Cluster installed"
 
         ansible-playbook -vv \
-          -e openshift_test_repo="${RPM_REPO}" \
+          -e openshift_test_repo="${repo}" \
           -e 'oreg_url=${IMAGE_FORMAT}' \
           playbooks/"${TYPE}"/openshift-cluster/upgrade.yml
 
