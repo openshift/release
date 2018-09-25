@@ -4,7 +4,7 @@ base_images:
     name: plugin-base
     namespace: azure
     tag: latest
-binary_build_commands: make build sync
+binary_build_commands: make all
 canonical_go_repository: github.com/openshift/openshift-azure
 images:
 - dockerfile_path: Dockerfile.sync
@@ -18,6 +18,17 @@ images:
       as:
       - sync
   to: sync
+- dockerfile_path: Dockerfile.e2e
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/openshift-azure/e2e.test
+    root:
+      as:
+      - e2e-tests
+  to: e2e-tests
 promotion:
   cluster: https://api.ci.openshift.org
   name: azure-plugins
