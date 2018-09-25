@@ -271,12 +271,13 @@ objects:
         trap 'rc=$?; if [[ $rc -ne 0 ]]; then touch /tmp/exit; fi; exit $rc' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
 
+        repo="${RPM_REPO}"
         if [[ -n "${RPM_REPO_OPENSHIFT_ORIGIN}" ]]; then
-          RPM_REPO="${RPM_REPO_OPENSHIFT_ORIGIN}"
+          repo="${RPM_REPO_OPENSHIFT_ORIGIN}"
         fi
 
         ansible-playbook -vv \
-          -e openshift_test_repo=${RPM_REPO} -e 'oreg_url=${IMAGE_FORMAT}' \
+          -e openshift_test_repo=${repo} -e 'oreg_url=${IMAGE_FORMAT}' \
           playbooks/${CLUSTER_TYPE}/openshift-cluster/launch.yml
 
     # Performs cleanup of all created resources
