@@ -60,7 +60,7 @@ def validate_file_structure(path):
             print("[ERROR] {}: file contains more than one type of job".format(path))
             return False
         if next(iter(data.keys())) == 'periodics':
-            return
+            return True
         data = next(iter(data.values()))
         if len(data) != 1:
             print("[ERROR] {}: file contains jobs for more than one repo".format(path))
