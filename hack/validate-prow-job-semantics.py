@@ -132,12 +132,6 @@ def validate_sharding(path):
 
             for repo in data[job_type]:
                 for job in data[job_type][repo]:
-                    if job["agent"] != "kubernetes":
-                        continue
-
-                    if job["spec"]["containers"][0]["command"][0] != "ci-operator":
-                        continue
-
                     branch = "master"
                     if "branches" in job:
                         branch = job["branches"][0]
