@@ -29,7 +29,6 @@ blacklist=(
 	"openshift/origin"
 	"openshift/origin-web-console"
 	"openshift/prometheus-operator"
-	"openshift/release-controller"
 )
 
 failed="false"
