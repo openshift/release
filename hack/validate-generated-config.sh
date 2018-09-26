@@ -30,7 +30,6 @@ blacklist=(
 	"openshift/kube-rbac-proxy"
 	"openshift/kubernetes-metrics-server"
 	"openshift/kube-state-metrics"
-	"openshift/machine-api-operator"
 	"openshift/openshift-ansible"
 	"openshift/openshift-azure"
 	"openshift/origin"
