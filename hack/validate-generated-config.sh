@@ -53,7 +53,6 @@ blacklist=(
 	"openshift/release-controller"
 	"openshift/service-catalog"
 	"openshift/service-serving-cert-signer"
-	"openshift/telemeter"
 )
 
 failed="false"
