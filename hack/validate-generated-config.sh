@@ -18,7 +18,6 @@ ci-operator-prowgen --from-dir "${ci_operator_dir}/config" --to-dir "${workdir}/
 
 blacklist=(
 	"openshift/api"
-	"openshift/azure-misc"
 	"openshift/builder"
 	"openshift/cluster-api-provider-aws"
 	"openshift/cluster-api-provider-libvirt"
