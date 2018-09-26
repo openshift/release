@@ -26,7 +26,6 @@ blacklist=(
 	"openshift/cluster-kube-apiserver-operator"
 	"openshift/cluster-kube-controller-manager-operator"
 	"openshift/cluster-kube-scheduler-operator"
-	"openshift/cluster-logging-operator"
 	"openshift/cluster-monitoring-operator"
 	"openshift/cluster-openshift-apiserver-operator"
 	"openshift/cluster-openshift-controller-manager-operator"
