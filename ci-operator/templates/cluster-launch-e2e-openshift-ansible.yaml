@@ -15,8 +15,8 @@ parameters:
   required: true
 - name: IMAGE_TESTS
   required: true
-- name: RPM_REPO
 - name: RPM_REPO_OPENSHIFT_ORIGIN
+  required: true
 - name: CLUSTER_TYPE
   required: true
 - name: TEST_SUITE
@@ -188,8 +188,8 @@ objects:
         value: yaml
       - name: HOME
         value: /tmp
-      - name: RPM_REPO
-        value: ${RPM_REPO}
+      - name: RPM_REPO_OPENSHIFT_ORIGIN
+        value: ${RPM_REPO_OPENSHIFT_ORIGIN}
       command:
       - /usr/local/bin/entrypoint-provider
       args:
@@ -201,10 +201,6 @@ objects:
 
         trap 'rc=$?; gzip /tmp/artifacts/*.log; if [[ $rc -ne 0 ]]; then touch /tmp/shared/exit; fi; exit $rc' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
-
-        if [[ -n "${RPM_REPO_OPENSHIFT_ORIGIN}" ]]; then
-          RPM_REPO="${RPM_REPO_OPENSHIFT_ORIGIN}"
-        fi
 
         cd /usr/share/ansible/openshift-ansible/
         mkdir -p test/ci/inventory/group_vars/OSEv3
@@ -219,6 +215,7 @@ objects:
 
         cd /usr/share/ansible/openshift-ansible
         ansible-playbook -vvv \
+          -e "openshift_test_repo=${RPM_REPO_OPENSHIFT_ORIGIN}" \
           -i test/ci/inventory \
           test/ci/launch.yml | tee -a /tmp/artifacts/ansible.log
 
