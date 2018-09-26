@@ -28,7 +28,6 @@ blacklist=(
 	"openshift/jenkins"
 	"openshift/kube-rbac-proxy"
 	"openshift/kube-state-metrics"
-	"openshift/machine-api-operator"
 	"openshift/openshift-ansible"
 	"openshift/origin"
 	"openshift/origin-web-console"
