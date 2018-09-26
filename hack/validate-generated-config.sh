@@ -20,7 +20,6 @@ blacklist=(
 	"openshift/api"
 	"openshift/builder"
 	"openshift/cluster-api-provider-libvirt"
-	"openshift/cluster-capacity"
 	"openshift/cluster-kube-controller-manager-operator"
 	"openshift/cluster-kube-scheduler-operator"
 	"openshift/cluster-monitoring-operator"
