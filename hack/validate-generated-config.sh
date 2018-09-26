@@ -31,7 +31,6 @@ blacklist=(
 	"openshift/origin-web-console"
 	"openshift/prometheus-operator"
 	"openshift/release-controller"
-	"openshift/service-serving-cert-signer"
 )
 
 failed="false"
