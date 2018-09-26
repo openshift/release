@@ -33,7 +33,6 @@ blacklist=(
 	"openshift/kubernetes-metrics-server"
 	"openshift/kube-state-metrics"
 	"openshift/machine-api-operator"
-	"openshift/machine-config-operator"
 	"openshift/openshift-ansible"
 	"openshift/openshift-azure"
 	"openshift/origin"
