@@ -9,4 +9,4 @@ set -o pipefail
 
 ci_operator_dir="$( dirname "${BASH_SOURCE[0]}" )/../ci-operator"
 
-ci-operator-prowgen --config-dir "${ci_operator_dir}/config" --prow-jobs-dir "${ci_operator_dir}/jobs"
+ci-operator-prowgen --from-dir "${ci_operator_dir}/config" --to-dir "${ci_operator_dir}/jobs"
