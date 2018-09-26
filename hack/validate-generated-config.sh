@@ -61,7 +61,6 @@ blacklist=(
 	"openshift/service-catalog"
 	"openshift/service-serving-cert-signer"
 	"openshift/telemeter"
-	"operator-framework/operator-lifecycle-manager"
 )
 
 failed="false"
