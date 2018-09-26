@@ -69,6 +69,39 @@ presubmits:
     always_run: true
     branches:
     - release-3.10
+    context: ci/prow/images
+    decorate: true
+    name: pull-ci-openshift-image-registry-release-3.10-images
+    rerun_command: /test images
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --give-pr-author-access-to-namespace=true
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=[images]
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: release-3.10.yaml
+              name: ci-operator-openshift-image-registry
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| images),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-3.10
     context: ci/prow/integration
     decorate: true
     name: pull-ci-openshift-image-registry-release-3.10-integration

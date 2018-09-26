@@ -1,0 +1,34 @@
+postsubmits:
+  openshift/configmap-reload:
+  - agent: kubernetes
+    branches:
+    - release-3.11
+    decorate: true
+    labels:
+      artifacts: images
+    name: branch-ci-openshift-configmap-reload-release-3.11-images
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --give-pr-author-access-to-namespace=true
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=[images]
+        - --promote
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: release-3.11.yaml
+              name: ci-operator-openshift-configmap-reload
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
