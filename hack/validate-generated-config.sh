@@ -36,7 +36,6 @@ blacklist=(
 	"openshift/origin"
 	"openshift/origin-aggregated-logging"
 	"openshift/origin-web-console"
-	"openshift/origin-web-console-server"
 	"openshift/prometheus-operator"
 	"openshift/release-controller"
 	"openshift/service-serving-cert-signer"
