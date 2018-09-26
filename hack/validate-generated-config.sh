@@ -26,7 +26,6 @@ blacklist=(
 	"openshift/configmap-reload"
 	"openshift/console"
 	"openshift/coredns"
-	"openshift/descheduler"
 	"openshift/image-registry"
 	"openshift/installer"
 	"openshift/jenkins"
