@@ -34,7 +34,6 @@ blacklist=(
 	"openshift/openshift-ansible"
 	"openshift/openshift-azure"
 	"openshift/origin"
-	"openshift/origin-aggregated-logging"
 	"openshift/origin-web-console"
 	"openshift/prometheus-operator"
 	"openshift/release-controller"
