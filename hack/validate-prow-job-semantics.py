@@ -193,4 +193,22 @@ def validate_access(path, data):
 
     return out
 
+def validate_image_pull(path, data):
+    out = True
+    for job_type in data:
+        if job_type == "periodics":
+            continue
+
+        for repo in data[job_type]:
+            for job in data[job_type][repo]:
+                if job["agent"] != "kubernetes":
+                    continue
+
+                if job["spec"]["containers"][0]["imagePullPolicy"] != "Always":
+                    print("[ERROR] {}: ci-operator job {} should set the pod's image pull policy to always".format(path, job["name"]))
+                    out = False
+                    continue
+
+    return out
+
 main()
