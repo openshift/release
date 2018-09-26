@@ -50,7 +50,6 @@ blacklist=(
 	"openshift/machine-config-operator"
 	"openshift/openshift-ansible"
 	"openshift/openshift-azure"
-	"openshift/openshift-network-operator"
 	"openshift/origin"
 	"openshift/origin-aggregated-logging"
 	"openshift/origin-metrics"
