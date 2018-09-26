@@ -25,7 +25,7 @@ def main():
                 if not failed:
                     with open(path) as f:
                         data = yaml.load(f)
-                        for check in [validate_job_repo, validate_names, validate_sharding, validate_access, validate_pod_name]:
+                        for check in [validate_job_repo, validate_names, validate_sharding, validate_access, validate_pod_name, validate_resources]:
                             check(path, data)
 
     if failed:
@@ -206,6 +206,28 @@ def validate_image_pull(path, data):
 
                 if job["spec"]["containers"][0]["imagePullPolicy"] != "Always":
                     print("[ERROR] {}: ci-operator job {} should set the pod's image pull policy to always".format(path, job["name"]))
+                    out = False
+                    continue
+
+    return out
+
+def validate_resources(path, data):
+    out = True
+    for job_type in data:
+        if job_type == "periodics":
+            continue
+
+        for repo in data[job_type]:
+            for job in data[job_type][repo]:
+                if job["agent"] != "kubernetes":
+                    continue
+
+                if job["spec"]["containers"][0]["command"][0] != "ci-operator":
+                    continue
+
+                resources = {"limits":{"cpu":"500m"},"requests":{"cpu":"10m"}}
+                if "resources" not in job["spec"]["containers"][0] or job["spec"]["containers"][0]["resources"] != resources:
+                    print("[ERROR] {}: ci-operator job {} should set the pod's CPU resources to {}".format(path, job["name"], resources))
                     out = False
                     continue
 
