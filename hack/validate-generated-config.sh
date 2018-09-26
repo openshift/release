@@ -27,7 +27,6 @@ blacklist=(
 	"openshift/kube-state-metrics"
 	"openshift/openshift-ansible"
 	"openshift/origin"
-	"openshift/origin-web-console"
 	"openshift/prometheus-operator"
 )
 
