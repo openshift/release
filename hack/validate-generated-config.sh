@@ -19,7 +19,6 @@ ci-operator-prowgen --from-dir "${ci_operator_dir}/config" --to-dir "${workdir}/
 blacklist=(
 	"openshift/api"
 	"openshift/builder"
-	"openshift/cluster-kube-controller-manager-operator"
 	"openshift/cluster-openshift-controller-manager-operator"
 	"openshift/cluster-operator"
 	"openshift/configmap-reload"
