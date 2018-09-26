@@ -204,10 +204,13 @@ presubmits:
     trigger: ((?m)^/test( all| e2e-aws-smoke),?(\s+|$))
   - agent: kubernetes
     always_run: true
-    context: ci/prow/go-fmt
+    branches:
+    - master
+    context: ci/prow/gofmt
     decorate: true
     name: pull-ci-openshift-installer-master-gofmt
-    rerun_command: /test go-fmt
+    rerun_command: /test gofmt
+    skip_cloning: true
     spec:
       containers:
       - args:
@@ -231,13 +234,16 @@ presubmits:
           requests:
             cpu: 10m
       serviceAccountName: ci-operator
-    trigger: ((?m)^/test(all| go-fmt),?(\s+|$))
+    trigger: ((?m)^/test( all| gofmt),?(\s+|$))
   - agent: kubernetes
     always_run: true
+    branches:
+    - master
     context: ci/prow/golint
     decorate: true
     name: pull-ci-openshift-installer-master-golint
     rerun_command: /test golint
+    skip_cloning: true
     spec:
       containers:
       - args:
@@ -261,13 +267,16 @@ presubmits:
           requests:
             cpu: 10m
       serviceAccountName: ci-operator
-    trigger: ((?m)^/test(all| golint),?(\s+|$))
+    trigger: ((?m)^/test( all| golint),?(\s+|$))
   - agent: kubernetes
     always_run: true
-    context: ci/prow/go-vet
+    branches:
+    - master
+    context: ci/prow/govet
     decorate: true
     name: pull-ci-openshift-installer-master-govet
-    rerun_command: /test go-vet
+    rerun_command: /test govet
+    skip_cloning: true
     spec:
       containers:
       - args:
@@ -291,7 +300,41 @@ presubmits:
           requests:
             cpu: 10m
       serviceAccountName: ci-operator
-    trigger: ((?m)^/test(all| go-vet),?(\s+|$))
+    trigger: ((?m)^/test( all| govet),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/images
+    decorate: true
+    name: pull-ci-openshift-installer-master-images
+    rerun_command: /test images
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --give-pr-author-access-to-namespace=true
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=[images]
+        - --target=[release:latest]
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-installer
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| images),?(\s+|$))
   - agent: kubernetes
     always_run: true
     branches:
