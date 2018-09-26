@@ -17,9 +17,16 @@ def main():
                 continue
             if os.path.basename(filename) == "infra-periodics.yaml":
                 continue
-            for check in [validate_filename, validate_file_structure, validate_job_repo, validate_names, validate_sharding, validate_access]:
-                if not check(os.path.join(root, filename)):
+            path = os.path.join(root, filename)
+            for check in [validate_filename, validate_file_structure]:
+                if not check(path):
                     failed = True
+
+                if not failed:
+                    with open(path) as f:
+                        data = yaml.load(f)
+                        for check in [validate_job_repo, validate_names, validate_sharding, validate_access, validate_pod_name]:
+                            check(path, data)
 
     if failed:
         sys.exit(1)
@@ -68,111 +75,139 @@ def validate_file_structure(path):
 
     return True
 
-def validate_job_repo(path):
+def validate_job_repo(path, data):
     org, repo = parse_org_repo(path)
-    with open(path) as f:
-        data = yaml.load(f)
-        if "presubmits" in data:
-            for org_repo in data["presubmits"]:
-                if org_repo != "{}/{}".format(org,repo):
-                    print("[ERROR] {}: file defines jobs for {}, but is only allowed to contain jobs for {}/{}".format(org_repo, org, repo))
-                    return False
-        if "postsubmits" in data:
-            for org_repo in data["postsubmits"]:
-                if org_repo != "{}/{}".format(org,repo):
-                    print("[ERROR] {}: file defines jobs for {}, but is only allowed to contain jobs for {}/{}".format(org_repo, org, repo))
-                    return False
+    if "presubmits" in data:
+        for org_repo in data["presubmits"]:
+            if org_repo != "{}/{}".format(org,repo):
+                print("[ERROR] {}: file defines jobs for {}, but is only allowed to contain jobs for {}/{}".format(org_repo, org, repo))
+                return False
+    if "postsubmits" in data:
+        for org_repo in data["postsubmits"]:
+            if org_repo != "{}/{}".format(org,repo):
+                print("[ERROR] {}: file defines jobs for {}, but is only allowed to contain jobs for {}/{}".format(org_repo, org, repo))
+                return False
 
     return True
 
-def validate_names(path):
+def validate_names(path, data):
     out = True
-    with open(path) as f:
-        data = yaml.load(f)
-        for job_type in data:
-            if job_type == "periodics":
-                continue
+    for job_type in data:
+        if job_type == "periodics":
+            continue
 
-            for repo in data[job_type]:
-                for job in data[job_type][repo]:
-                    if job["agent"] != "kubernetes":
-                        continue
+        for repo in data[job_type]:
+            for job in data[job_type][repo]:
+                if job["agent"] != "kubernetes":
+                    continue
 
-                    if job["spec"]["containers"][0]["command"][0] != "ci-operator":
-                        continue
+                if job["spec"]["containers"][0]["command"][0] != "ci-operator":
+                    continue
 
-                    target = "all"
-                    for arg in job["spec"]["containers"][0].get("args", []) + job["spec"]["containers"][0]["command"]:
-                        if arg.startswith("--target="):
-                            target = arg[len("--target="):].strip("[]")
-                            break
+                target = "all"
+                for arg in job["spec"]["containers"][0].get("args", []) + job["spec"]["containers"][0]["command"]:
+                    if arg.startswith("--target="):
+                        target = arg[len("--target="):].strip("[]")
+                        break
 
-                    branch = "master"
-                    if "branches" in job:
-                        branch = job["branches"][0]
+                branch = "master"
+                if "branches" in job:
+                    branch = job["branches"][0]
 
-                    prefix = "pull"
-                    if job_type == "postsubmits":
-                        prefix = "branch"
+                prefix = "pull"
+                if job_type == "postsubmits":
+                    prefix = "branch"
 
-                    name = "{}-ci-{}-{}-{}".format(prefix, repo.replace("/", "-"), branch, target)
-                    if job["name"] != name:
-                        print("[ERROR] {}: ci-operator job {} should have name {}".format(path, job["name"], name))
-                        out = False
+                name = "{}-ci-{}-{}-{}".format(prefix, repo.replace("/", "-"), branch, target)
+                if job["name"] != name:
+                    print("[ERROR] {}: ci-operator job {} should have name {}".format(path, job["name"], name))
+                    out = False
 
     return out
 
-def validate_sharding(path):
+def validate_sharding(path, data):
     out = True
-    with open(path) as f:
-        data = yaml.load(f)
-        for job_type in data:
-            if job_type == "periodics":
-                continue
+    for job_type in data:
+        if job_type == "periodics":
+            continue
 
-            for repo in data[job_type]:
-                for job in data[job_type][repo]:
-                    branch = "master"
-                    if "branches" in job:
-                        branch = job["branches"][0]
+        for repo in data[job_type]:
+            for job in data[job_type][repo]:
+                branch = "master"
+                if "branches" in job:
+                    branch = job["branches"][0]
 
-                    file_branch = os.path.basename(path)[len("{}-".format(repo.replace("/","-"))):-len("-{}.yaml".format(job_type))]
-                    if file_branch != branch:
-                        print("[ERROR] {}: job {} runs on branch {}, not {} so it should be in file {}".format(path, job["name"], branch, file_branch, path.replace(file_branch, branch)))
-                        out = False
+                file_branch = os.path.basename(path)[len("{}-".format(repo.replace("/","-"))):-len("-{}.yaml".format(job_type))]
+                if file_branch != branch:
+                    print("[ERROR] {}: job {} runs on branch {}, not {} so it should be in file {}".format(path, job["name"], branch, file_branch, path.replace(file_branch, branch)))
+                    out = False
 
     return out
 
-def validate_access(path):
+def validate_pod_name(path, data):
     out = True
-    with open(path) as f:
-        data = yaml.load(f)
-        for job_type in data:
-            if job_type == "periodics":
-                continue
+    for job_type in data:
+        if job_type == "periodics":
+            continue
 
-            for repo in data[job_type]:
-                for job in data[job_type][repo]:
-                    if job["agent"] != "kubernetes":
-                        continue
+        for repo in data[job_type]:
+            for job in data[job_type][repo]:
+                if job["agent"] != "kubernetes":
+                    continue
 
-                    if job["spec"]["containers"][0]["command"][0] != "ci-operator":
-                        continue
+                if job["spec"]["containers"][0]["name"] != "":
+                    print("[ERROR] {}: ci-operator job {} should not set a pod name".format(path, job["name"]))
+                    out = False
+                    continue
 
-                    found = False
-                    if "args" in job["spec"]["containers"][0]:
-                        for arg in job["spec"]["containers"][0]["args"]:
-                            if arg == "--give-pr-author-access-to-namespace=true":
-                                found = True
+    return out
 
-                    else:
-                        for arg in job["spec"]["containers"][0]["command"][1:]:
-                            if arg == "--give-pr-author-access-to-namespace=true":
-                                found = True
+def validate_access(path, data):
+    out = True
+    for job_type in data:
+        if job_type == "periodics":
+            continue
 
-                    if not found:
-                        print("[ERROR] {}: job {} needs to set the --give-pr-author-access-to-namespace=true flag for ci-operator".format(path, job["name"]))
-                        out = False
+        for repo in data[job_type]:
+            for job in data[job_type][repo]:
+                if job["agent"] != "kubernetes":
+                    continue
+
+                if job["spec"]["containers"][0]["command"][0] != "ci-operator":
+                    continue
+
+                found = False
+                if "args" in job["spec"]["containers"][0]:
+                    for arg in job["spec"]["containers"][0]["args"]:
+                        if arg == "--give-pr-author-access-to-namespace=true":
+                            found = True
+
+                else:
+                    for arg in job["spec"]["containers"][0]["command"][1:]:
+                        if arg == "--give-pr-author-access-to-namespace=true":
+                            found = True
+
+                if not found:
+                    print("[ERROR] {}: job {} needs to set the --give-pr-author-access-to-namespace=true flag for ci-operator".format(path, job["name"]))
+                    out = False
+
+    return out
+
+def validate_image_pull(path, data):
+    out = True
+    for job_type in data:
+        if job_type == "periodics":
+            continue
+
+        for repo in data[job_type]:
+            for job in data[job_type][repo]:
+                if job["agent"] != "kubernetes":
+                    continue
+
+                if job["spec"]["containers"][0]["imagePullPolicy"] != "Always":
+                    print("[ERROR] {}: ci-operator job {} should set the pod's image pull policy to always".format(path, job["name"]))
+                    out = False
+                    continue
 
     return out
 
