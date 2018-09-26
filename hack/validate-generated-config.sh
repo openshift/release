@@ -31,7 +31,6 @@ blacklist=(
 	"openshift/cluster-version-operator"
 	"openshift/configmap-reload"
 	"openshift/console"
-	"openshift/console-operator"
 	"openshift/coredns"
 	"openshift/descheduler"
 	"openshift/elasticsearch-operator"
