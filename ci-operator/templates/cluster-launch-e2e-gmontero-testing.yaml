@@ -14,8 +14,8 @@ parameters:
   required: true
 - name: IMAGE_TESTS
   required: true
-- name: RPM_REPO
 - name: RPM_REPO_OPENSHIFT_ORIGIN
+  required: true
 - name: CLUSTER_TYPE
   required: true
 - name: TEST_FOCUS
@@ -272,13 +272,8 @@ objects:
         trap 'rc=$?; if [[ $rc -ne 0 ]]; then touch /tmp/exit; fi; exit $rc' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
 
-        repo="${RPM_REPO}"
-        if [[ -n "${RPM_REPO_OPENSHIFT_ORIGIN}" ]]; then
-          repo="${RPM_REPO_OPENSHIFT_ORIGIN}"
-        fi
-
         ansible-playbook -vv \
-          -e openshift_test_repo=${repo} -e 'oreg_url=${IMAGE_FORMAT}' \
+          -e openshift_test_repo=${RPM_REPO_OPENSHIFT_ORIGIN} -e 'oreg_url=${IMAGE_FORMAT}' \
           playbooks/${CLUSTER_TYPE}/openshift-cluster/launch.yml
 
     # Performs cleanup of all created resources
