@@ -17,7 +17,6 @@ cp -r "${ci_operator_dir}" "${workdir}"
 ci-operator-prowgen --from-dir "${ci_operator_dir}/config" --to-dir "${workdir}/ci-operator/jobs"
 
 blacklist=(
-	"openshift/api"
 	"openshift/builder"
 	"openshift/cluster-kube-controller-manager-operator"
 	"openshift/cluster-openshift-controller-manager-operator"
