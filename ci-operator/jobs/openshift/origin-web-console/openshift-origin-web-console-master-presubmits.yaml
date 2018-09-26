@@ -1,5 +1,38 @@
 presubmits:
   openshift/origin-web-console:
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/unit
+    decorate: true
+    name: pull-ci-openshift-origin-web-console-master-unit
+    rerun_command: /test unit
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --give-pr-author-access-to-namespace=true
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=unit
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-origin-web-console
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| unit),?(\s+|$))
   - agent: jenkins
     always_run: true
     branches:

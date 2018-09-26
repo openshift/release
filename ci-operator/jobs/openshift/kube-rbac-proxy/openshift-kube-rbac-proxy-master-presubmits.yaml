@@ -1,18 +1,13 @@
-postsubmits:
-  openshift/origin:
-  - agent: jenkins
-    branches:
-    - master
-    labels:
-      master: ci.openshift.redhat.com
-    name: ami_build_origin_int_rhel_build
+presubmits:
+  openshift/kube-rbac-proxy:
   - agent: kubernetes
+    always_run: true
     branches:
     - master
+    context: ci/prow/images
     decorate: true
-    labels:
-      artifacts: images
-    name: branch-ci-openshift-origin-master-images
+    name: pull-ci-openshift-kube-rbac-proxy-master-images
+    rerun_command: /test images
     skip_cloning: true
     spec:
       containers:
@@ -20,7 +15,7 @@ postsubmits:
         - --give-pr-author-access-to-namespace=true
         - --artifact-dir=$(ARTIFACTS)
         - --target=[images]
-        - --promote
+        - --target=[release:latest]
         command:
         - ci-operator
         env:
@@ -28,7 +23,7 @@ postsubmits:
           valueFrom:
             configMapKeyRef:
               key: master.yaml
-              name: ci-operator-openshift-origin
+              name: ci-operator-openshift-kube-rbac-proxy
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -38,9 +33,4 @@ postsubmits:
           requests:
             cpu: 10m
       serviceAccountName: ci-operator
-  - agent: jenkins
-    branches:
-    - master
-    labels:
-      master: ci.openshift.redhat.com
-    name: test_branch_origin_extended_conformance_azure
+    trigger: ((?m)^/test( all| images),?(\s+|$))
