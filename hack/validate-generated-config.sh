@@ -38,7 +38,6 @@ blacklist=(
 	"openshift/coredns"
 	"openshift/descheduler"
 	"openshift/elasticsearch-operator"
-	"openshift/hive"
 	"openshift/image-registry"
 	"openshift/installer"
 	"openshift/jenkins"
