@@ -28,7 +28,6 @@ blacklist=(
 	"openshift/image-registry"
 	"openshift/jenkins"
 	"openshift/kube-rbac-proxy"
-	"openshift/kubernetes-metrics-server"
 	"openshift/kube-state-metrics"
 	"openshift/machine-api-operator"
 	"openshift/openshift-ansible"
