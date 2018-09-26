@@ -38,7 +38,6 @@ blacklist=(
 	"openshift/openshift-azure"
 	"openshift/openshift-network-operator"
 	"openshift/origin"
-	"openshift/origin-aggregated-logging"
 	"openshift/origin-web-console"
 	"openshift/origin-web-console-server"
 	"openshift/prometheus-operator"
