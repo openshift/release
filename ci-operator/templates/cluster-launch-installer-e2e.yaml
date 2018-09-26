@@ -10,7 +10,7 @@ parameters:
   required: true
 - name: IMAGE_FORMAT
   required: true
-- name: IMAGE_INSTALLER
+- name: LOCAL_IMAGE_INSTALLER
   required: true
 - name: IMAGE_TESTS
   required: true
@@ -64,7 +64,7 @@ objects:
 
     containers:
 
-    # Once admin.kubeconfig exists, executes shared tests
+    # Once the cluster is up, executes shared tests
     - name: test
       image: ${IMAGE_TESTS}
       resources:
@@ -85,7 +85,7 @@ objects:
       - name: HOME
         value: /tmp/home
       - name: KUBECONFIG
-        value: /tmp/admin.kubeconfig
+        value: /tmp/artifacts/installer/auth/kubeconfig
       command:
       - /bin/bash
       - -c
@@ -96,30 +96,61 @@ objects:
         trap 'touch /tmp/shared/exit' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
 
-        cp "$(which oc)" /tmp/shared/
-
         mkdir -p "${HOME}"
 
-        # wait until the setup job creates admin.kubeconfig
+        # wait for the router namespace
+        FOUND_KUBECONFIG=
+        API_UP=
+        ROUTER_NAMESPACE=
         while true; do
           if [[ -f /tmp/shared/exit ]]; then
             echo "Another process exited" 2>&1
             exit 1
           fi
-          if [[ ! -f /tmp/shared/admin.kubeconfig ]]; then
+          if [[ ! -f "${KUBECONFIG}" ]]; then
             sleep 15 & wait
             continue
+          elif [[ -z "${FOUND_KUBECONFIG}" ]]; then
+            echo "Found shared kubeconfig"
+            FOUND_KUBECONFIG=1
+
+            # don't let clients impact the global kubeconfig
+            cp "${KUBECONFIG}" /tmp/admin.kubeconfig
+            export KUBECONFIG=/tmp/admin.kubeconfig
+          fi
+          if ! oc get nodes 2>/dev/null; then
+            echo "Waiting for API at $(oc whoami --show-server) to respond ..."
+            sleep 15 & wait
+            continue
+          elif [[ -z "${API_UP}" ]]; then
+            echo "API at $(oc whoami --show-server) has responded"
+            API_UP=1
+          fi
+          if [[ -z "${ROUTER_NAMESPACE}" ]]; then
+            # check multiple namespaces while we are transitioning to the new locations
+            if oc get deploy/router -n tectonic-ingress 2>/dev/null; then
+              ROUTER_NAMESPACE=tectonic-ingress
+            elif oc get deploy/router -n openshift-ingress 2>/dev/null; then
+              ROUTER_NAMESPACE=openshift-ingress
+            elif oc get deploy/router -n default 2>/dev/null; then
+              ROUTER_NAMESPACE=default
+            else
+              echo "Waiting for router to be created ..."
+              sleep 15 & wait
+              continue
+            fi
+            echo "Found router in ${ROUTER_NAMESPACE}"
           fi
           break
         done
-        echo "Found shared kubeconfig"
 
-        # don't let clients impact the global kubeconfig
-        cp /tmp/shared/admin.kubeconfig /tmp/admin.kubeconfig
+        if ! oc wait deploy/router -n "${ROUTER_NAMESPACE}" --for condition=available --timeout=20m; then
+          echo "Installation failed"
+          cp $KUBECONFIG /tmp/admin.kubeconfig
+          exit 1
+        fi
 
-        PATH=/usr/libexec/origin:$PATH
-
-        # set up cloud provider specific env vars
+        # set up cloud-provider-specific env vars
         if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
           export GOOGLE_APPLICATION_CREDENTIALS="/tmp/cluster/gce.json"
           export KUBE_SSH_USER=cloud-user
@@ -127,8 +158,7 @@ objects:
           cp /tmp/cluster/ssh-privatekey ~/.ssh/google_compute_engine || true
           export PROVIDER_ARGS='-provider=gce -gce-zone=us-east1-c -gce-project=openshift-gce-devel-ci'
         elif [[ "${CLUSTER_TYPE}" == "aws" ]]; then
-          region="$( python -c 'import sys, json; print json.load(sys.stdin)["tectonic_aws_region"]' </tmp/shared/cluster/terraform.tfvars )"
-          export PROVIDER_ARGS="-provider=aws -gce-zone=${region}"
+          export PROVIDER_ARGS="-provider=aws -gce-zone=us-east-1"
           mkdir -p ~/.ssh
           cp /tmp/cluster/ssh-privatekey ~/.ssh/kube_aws_rsa || true
         fi
@@ -148,6 +178,7 @@ objects:
         # TODO: the test binary should really be a more structured command - most of these flags should be
         #       autodetected from the running cluster.
         # TODO: bump nodes up to 40 again
+        PATH="/usr/libexec/origin:${PATH}"
         set -x
         if [[ -n "${TEST_FOCUS}" ]]; then
           ginkgo -v -noColor -nodes=${TEST_PARALLELISM} $( which extended.test ) -- \
@@ -165,7 +196,7 @@ objects:
 
     # Runs an install
     - name: setup
-      image: ${IMAGE_INSTALLER}
+      image: ${LOCAL_IMAGE_INSTALLER}
       volumeMounts:
       - name: shared-tmp
         mountPath: /tmp
@@ -174,90 +205,35 @@ objects:
       - name: artifacts
         mountPath: /tmp/artifacts
       env:
-      - name: INSTANCE_PREFIX
-        value: ${NAMESPACE}-${JOB_NAME_HASH}
       - name: TYPE
         value: ${CLUSTER_TYPE}
       - name: AWS_SHARED_CREDENTIALS_FILE
         value: /etc/openshift-installer/.awscred
-      - name: KUBECONFIG
-        value: /tmp/cluster/generated/auth/kubeconfig
+      - name: OPENSHIFT_INSTALL_CLUSTER_NAME
+        value: ${NAMESPACE}-${JOB_NAME_HASH}
+      - name: OPENSHIFT_INSTALL_BASE_DOMAIN
+        value: origin-ci-int-aws.dev.rhcloud.com
+      - name: OPENSHIFT_INSTALL_EMAIL_ADDRESS
+        value: test@ci.openshift.io
+      - name: OPENSHIFT_INSTALL_PASSWORD
+        value: verysecure
+      - name: OPENSHIFT_INSTALL_SSH_PUB_KEY_PATH
+        value: /etc/openshift-installer/ssh-publickey
+      - name: OPENSHIFT_INSTALL_PULL_SECRET_PATH
+        value: /etc/openshift-installer/pull-secret
+      - name: OPENSHIFT_INSTALL_PLATFORM
+        value: aws
+      - name: OPENSHIFT_INSTALL_AWS_REGION
+        value: us-east-1
       command:
-      - /bin/bash
-      - -c
-      - |
-        #!/bin/bash
-        set -euo pipefail
-
-        trap 'rc=$?; if [[ $rc -ne 0 ]]; then touch /tmp/exit; fi; exit $rc' EXIT
-        trap 'kill $(jobs -p); exit 0' TERM
-
-        mkdir /tmp/cluster
-        cp /etc/openshift-installer/* /tmp/cluster/
-
-        export NAME=${INSTANCE_PREFIX}
-        (
-          export EMAIL=test@ci.openshift.io
-          export PASSWORD=$( date +%s | sha256sum | base64 | head -c 32 ; echo )
-          export SSH_KEY="$( cat /etc/openshift-installer/ssh-publickey )"
-          export EXPIRATION_DATE=$( date -d '4 hours' --iso=minutes --utc )
-          envsubst </etc/openshift-installer/openshift.yaml >/tmp/cluster/inputs.yaml
-        )
-        mkdir /tmp/artifacts/installer
-        cp /tmp/cluster/inputs.yaml /tmp/artifacts/installer/
-
-        echo "Invoking installer ..."
-        
-        cd /tmp/cluster
-        tectonic init --config=inputs.yaml
-        mv -f ${NAME}/* /tmp/cluster/
-        cp config.yaml internal.yaml /tmp/artifacts/installer/
-
-        tectonic install --dir=. --log-level=debug
-        cp terraform.tfvars /tmp/artifacts/installer/
-
-        # wait until oc shows up
-        while true; do
-          if [[ -f /tmp/exit ]]; then
-            echo "Interrupted"
-            cp $KUBECONFIG /tmp/admin.kubeconfig
-            exit 1
-          fi
-          if [[ ! -f /tmp/oc ]]; then
-            echo "Waiting for oc binary to show up ..."
-            sleep 15 & wait
-            continue
-          fi
-          if ! /tmp/oc get nodes 2>/dev/null; then
-            echo "Waiting for API at $(/tmp/oc whoami --show-server) to respond ..."
-            sleep 15 & wait
-            continue
-          fi
-          # check multiple namespaces while we are transitioning to the new locations
-          if /tmp/oc get deploy/router -n tectonic-ingress 2>/dev/null; then
-            router_namespace=tectonic-ingress
-          elif /tmp/oc get deploy/router -n openshift-ingress 2>/dev/null; then
-            router_namespace=openshift-ingress
-          elif /tmp/oc get deploy/router -n default 2>/dev/null; then
-            router_namespace=default
-          else
-            echo "Waiting for router to be created ..."
-            sleep 15 & wait
-            continue
-          fi
-          break
-        done
-        if ! /tmp/oc wait deploy/router -n "${router_namespace}" --for condition=available --timeout=20m; then
-          echo "Installation failed"
-          cp $KUBECONFIG /tmp/admin.kubeconfig
-          exit 1
-        fi
-        cp $KUBECONFIG /tmp/admin.kubeconfig
-        echo "Installation successful"
+      - /bin/openshift-install
+      - --dir=/tmp/artifacts/installer
+      - --log-level=debug
+      - cluster
 
     # Performs cleanup of all created resources
     - name: teardown
-      image: ${IMAGE_INSTALLER}
+      image: ${LOCAL_IMAGE_INSTALLER}
       volumeMounts:
       - name: shared-tmp
         mountPath: /tmp/shared
@@ -271,7 +247,7 @@ objects:
       - name: TYPE
         value: ${CLUSTER_TYPE}
       - name: KUBECONFIG
-        value: /tmp/shared/admin.kubeconfig
+        value: /tmp/artifacts/installer/auth/kubeconfig
       command:
       - /bin/bash
       - -c
@@ -326,8 +302,7 @@ objects:
 
           echo "Deprovisioning cluster ..."
           export AWS_SHARED_CREDENTIALS_FILE=/etc/openshift-installer/.awscred
-          cd /tmp/shared/cluster
-          tectonic destroy --dir=. --log-level=debug --continue-on-error
+          openshift-install --dir /tmp/artifacts/installer --log-level debug destroy-cluster
         }
 
         trap 'teardown' EXIT
