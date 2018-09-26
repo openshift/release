@@ -82,6 +82,28 @@ items:
   metadata:
     name: release-controller
     namespace: ci
+- kind: Service
+  apiVersion: v1
+  metadata:
+    name: release-controller
+  spec:
+    selector:
+      app: release-controller
+    ports:
+    - port: 80
+      targetPort: 8080
+- kind: Route
+  apiVersion: v1
+  metadata:
+    name: release-controller
+  spec:
+    host: origin-release.svc.ci.openshift.org
+    tls:
+      termination: Edge
+      insecureEdgeTerminationPolicy: Redirect
+    to:
+      kind: Service
+      name: release-controller
 - kind: Deployment
   apiVersion: apps/v1
   metadata:
