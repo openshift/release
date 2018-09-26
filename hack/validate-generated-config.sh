@@ -43,7 +43,6 @@ blacklist=(
 	"openshift/installer"
 	"openshift/jenkins"
 	"openshift/kube-rbac-proxy"
-	"openshift/kubernetes-autoscaler"
 	"openshift/kubernetes-metrics-server"
 	"openshift/kube-state-metrics"
 	"openshift/machine-api-operator"
