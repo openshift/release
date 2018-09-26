@@ -43,7 +43,6 @@ blacklist=(
 	"openshift/origin-web-console-server"
 	"openshift/prometheus-operator"
 	"openshift/release-controller"
-	"openshift/service-catalog"
 	"openshift/service-serving-cert-signer"
 )
 
