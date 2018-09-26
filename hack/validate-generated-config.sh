@@ -26,7 +26,6 @@ blacklist=(
 	"openshift/console"
 	"openshift/coredns"
 	"openshift/image-registry"
-	"openshift/installer"
 	"openshift/jenkins"
 	"openshift/kube-rbac-proxy"
 	"openshift/kubernetes-metrics-server"
