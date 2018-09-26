@@ -31,7 +31,6 @@ blacklist=(
 	"openshift/cluster-openshift-apiserver-operator"
 	"openshift/cluster-openshift-controller-manager-operator"
 	"openshift/cluster-operator"
-	"openshift/cluster-version-operator"
 	"openshift/configmap-reload"
 	"openshift/console"
 	"openshift/console-operator"
