@@ -24,7 +24,6 @@ blacklist=(
 	"openshift/cluster-operator"
 	"openshift/configmap-reload"
 	"openshift/console"
-	"openshift/coredns"
 	"openshift/image-registry"
 	"openshift/jenkins"
 	"openshift/kube-rbac-proxy"
