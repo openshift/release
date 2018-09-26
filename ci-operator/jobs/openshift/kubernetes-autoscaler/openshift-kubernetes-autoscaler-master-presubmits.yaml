@@ -4,6 +4,40 @@ presubmits:
     always_run: true
     branches:
     - master
+    context: ci/prow/images
+    decorate: true
+    name: pull-ci-openshift-kubernetes-autoscaler-master-images
+    rerun_command: /test images
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --give-pr-author-access-to-namespace=true
+        - --artifact-dir=$(ARTIFACTS)
+        - --target=[images]
+        - --target=[release:latest]
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-kubernetes-autoscaler
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| images),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
     context: ci/prow/unit
     decorate: true
     name: pull-ci-openshift-kubernetes-autoscaler-master-unit
@@ -15,7 +49,6 @@ presubmits:
         - --give-pr-author-access-to-namespace=true
         - --artifact-dir=$(ARTIFACTS)
         - --target=unit
-        - --target=[images]
         command:
         - ci-operator
         env:
