@@ -201,10 +201,11 @@ objects:
           export PASSWORD=$( date +%s | sha256sum | base64 | head -c 32 ; echo )
           export SSH_KEY="$( cat /etc/openshift-installer/ssh-publickey )"
           export EXPIRATION_DATE=$( date -d '4 hours' --iso=minutes --utc )
+          export PULL_SECRET="$(jq -c </etc/openshift-installer/pull-secret)"
           envsubst </etc/openshift-installer/openshift.yaml >/tmp/cluster/inputs.yaml
         )
         mkdir /tmp/artifacts/installer
-        cp /tmp/cluster/inputs.yaml /tmp/artifacts/installer/
+        sed 's/pullSecret: .*/pullSecret: '{"REDACTED": {}}/' </tmp/cluster/inputs.yaml >/tmp/artifacts/installer/inputs.yaml
 
         echo "Invoking installer ..."
         
