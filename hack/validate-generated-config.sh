@@ -20,7 +20,6 @@ blacklist=(
 	"openshift/api"
 	"openshift/builder"
 	"openshift/cluster-kube-controller-manager-operator"
-	"openshift/cluster-kube-scheduler-operator"
 	"openshift/cluster-openshift-controller-manager-operator"
 	"openshift/cluster-operator"
 	"openshift/configmap-reload"
