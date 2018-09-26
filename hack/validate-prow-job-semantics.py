@@ -25,7 +25,7 @@ def main():
                 if not failed:
                     with open(path) as f:
                         data = yaml.load(f)
-                        for check in [validate_job_repo, validate_names, validate_sharding, validate_access, validate_pod_name, validate_resources]:
+                        for check in [validate_job_repo, validate_names, validate_sharding, validate_ci_op_args, validate_pod_name, validate_resources]:
                             check(path, data)
 
     if failed:
@@ -162,7 +162,7 @@ def validate_pod_name(path, data):
 
     return out
 
-def validate_access(path, data):
+def validate_ci_op_args(path, data):
     out = True
     for job_type in data:
         if job_type == "periodics":
@@ -176,20 +176,21 @@ def validate_access(path, data):
                 if job["spec"]["containers"][0]["command"][0] != "ci-operator":
                     continue
 
-                found = False
-                if "args" in job["spec"]["containers"][0]:
-                    for arg in job["spec"]["containers"][0]["args"]:
-                        if arg == "--give-pr-author-access-to-namespace=true":
-                            found = True
+                for needed_arg in ["--give-pr-author-access-to-namespace=true", "--artifact-dir=$(ARTIFACTS)"]:
+                    found = False
+                    if "args" in job["spec"]["containers"][0]:
+                        for arg in job["spec"]["containers"][0]["args"]:
+                            if arg == needed_arg:
+                                found = True
 
-                else:
-                    for arg in job["spec"]["containers"][0]["command"][1:]:
-                        if arg == "--give-pr-author-access-to-namespace=true":
-                            found = True
+                    else:
+                        for arg in job["spec"]["containers"][0]["command"][1:]:
+                            if arg == needed_arg:
+                                found = True
 
-                if not found:
-                    print("[ERROR] {}: job {} needs to set the --give-pr-author-access-to-namespace=true flag for ci-operator".format(path, job["name"]))
-                    out = False
+                    if not found:
+                        print("[ERROR] {}: job {} needs to set the {} flag for ci-operator".format(path, job["name"], needed_arg))
+                        out = False
 
     return out
 
