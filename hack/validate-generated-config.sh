@@ -50,7 +50,7 @@ for config_dir in $( find "${ci_operator_dir}/jobs/" -mindepth 2 -maxdepth 2 -ty
 [ERROR] new changes to these job configurations should occur from a re-generation.
 
 [ERROR] Run the following command to re-generate the Prow jobs:
-[ERROR] $ docker run -it -v \$(pwd)/ci-operator:/ci-operator:z registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest --from-dir /ci-operator/config/${config_dir#*ci-operator\/jobs\/} --prow-jobs-dir /ci-operator/jobs
+[ERROR] $ docker run -it -v \$(pwd)/ci-operator:/ci-operator:z registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest --from-dir /ci-operator/config/${config_dir#*ci-operator\/jobs\/} --to-dir /ci-operator/jobs
 
 [ERROR] The following errors were found:
 
