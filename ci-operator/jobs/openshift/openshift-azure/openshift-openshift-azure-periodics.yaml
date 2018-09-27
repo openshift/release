@@ -25,54 +25,48 @@ periodics:
     master: ci.openshift.redhat.com
   name: azure_build_base_image_rhel
   run_after_success:
-  - agent: jenkins
+  - agent: kubernetes
     cron: ""
-    interval: ""
-    labels:
-      master: ci.openshift.redhat.com
-    name: azure_build_node_image_rhel_310
-- agent: kubernetes
-  cron: ""
-  decorate: true
-  interval: 24h
-  name: azure-build-node-image-rhel-310
-  skip_cloning: true
-  spec:
-    containers:
-    - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --secret-dir=/usr/local/e2e-azure-secret
-      - --template=/usr/local/build-azure-image
-      - --target=build-azure-image
-      command:
-      - ci-operator
-      env:
-      - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: release-3.10.yaml
-            name: ci-operator-openshift-openshift-ansible
-      - name: JOB_NAME_SAFE
-        value: build-azure-image
-      - name: CLUSTER_TYPE
-        value: azure
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources: {}
-      volumeMounts:
-      - mountPath: /usr/local/build-azure-image
+    decorate: true
+    interval: 24h
+    name: azure-build-node-image-rhel-310
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --secret-dir=/usr/local/e2e-azure-secret
+        - --template=/usr/local/build-azure-image
+        - --target=build-azure-image
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: release-3.10.yaml
+              name: ci-operator-openshift-openshift-ansible
+        - name: JOB_NAME_SAFE
+          value: build-azure-image
+        - name: CLUSTER_TYPE
+          value: azure
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources: {}
+        volumeMounts:
+        - mountPath: /usr/local/build-azure-image
+          name: job-definition
+          subPath: build-azure-image.yaml
+        - mountPath: /usr/local/e2e-azure-secret
+          name: cluster-secrets-azure-file
+      serviceAccountName: ci-operator
+      volumes:
+      - configMap:
+          name: prow-job-build-azure-image
         name: job-definition
-        subPath: build-azure-image.yaml
-      - mountPath: /usr/local/e2e-azure-secret
-        name: cluster-secrets-azure-file
-    serviceAccountName: ci-operator
-    volumes:
-    - configMap:
-        name: prow-job-build-azure-image
-      name: job-definition
-    - name: cluster-secrets-azure-file
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-azure-file
+      - name: cluster-secrets-azure-file
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-azure-file
