@@ -151,7 +151,7 @@ prow-cluster-jobs:
 	oc create configmap prow-job-cluster-launch-e2e --from-file=ci-operator/templates/cluster-launch-e2e.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap prow-job-cluster-launch-e2e-gmontero-testing --from-file=ci-operator/templates/cluster-launch-e2e-gmontero-testing.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap prow-job-cluster-launch-src --from-file=ci-operator/templates/cluster-launch-src.yaml -o yaml --dry-run | oc apply -f -
-	oc create configmap prow-job-cluster-launch-installer-e2e --from-file=ci-operator/templates/cluster-launch-installer-e2e.yaml -o yaml --dry-run | oc apply -f -
+	oc create configmap prow-job-cluster-launch-installer-e2e --from-file=ci-operator/templates/openshift/installer/cluster-launch-installer-e2e.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap prow-job-master-sidecar --from-file=ci-operator/templates/master-sidecar.yaml -o yaml --dry-run | oc apply -f -
 .PHONY: prow-cluster-jobs
 
