@@ -92,7 +92,7 @@ func TestOrgRepos(t *testing.T) {
 	assertEqual(t, orgRepos, expected)
 }
 
-func TestGetConfig(t *testing.T) {
+func TestGetDirectories(t *testing.T) {
 	dir, err := ioutil.TempDir("", "populate-owners-")
 	if err != nil {
 		t.Fatal(err)
@@ -105,7 +105,7 @@ func TestGetConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, test := range []struct{
+	for _, test := range []struct {
 		name     string
 		input    *orgRepo
 		expected *orgRepo
@@ -139,8 +139,8 @@ func TestGetConfig(t *testing.T) {
 			error: regexp.MustCompile("^stat .*/c/d: no such file or directory"),
 		},
 	} {
-		t.Run(test.name, func (t *testing.T) {
-			err := test.input.getConfig(dir)
+		t.Run(test.name, func(t *testing.T) {
+			err := test.input.getDirectories(dir)
 			if test.error == nil {
 				if err != nil {
 					t.Fatal(err)
