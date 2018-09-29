@@ -23,7 +23,7 @@ For example, if [openshift/origin][] and [openshift/installer][] both defined an
 After namespacing aliases, the utility writes `OWNERS_ALIASES` to the root of this repository.
 If no upstreams define aliases, then the utility removes `OWNER_ALIASES` from the root of this repository.
 
-The utility also iterates through the `ci-operator/jobs/{organization}/{repository}` and `ci-operator/config/{organization}/{repository}` directories, writing `OWNERS` to reflect the upstream configuration.
+The utility also iterates through the `ci-operator/{type}/{organization}/{repository}` for `{type}` in `config`, `jobs`, and `templates`, writing `OWNERS` to reflect the upstream configuration.
 If the upstream did not have an `OWNERS` file, the utility removes the associated `ci-operator/*/{organization}/{repository}/OWNERS`.
 
 [openshift/origin]: https://github.com/openshift/origin
