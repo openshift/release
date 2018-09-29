@@ -232,10 +232,12 @@ objects:
       - name: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
         value: ${RELEASE_IMAGE_LATEST}
       command:
-      - /bin/openshift-install
-      - --dir=/tmp/artifacts/installer
-      - --log-level=debug
-      - cluster
+      - /bin/sh
+      - -c
+      - |
+        #!/bin/sh
+        export _CI_ONLY_STAY_AWAY_OPENSHIFT_INSTALL_AWS_USER_TAGS="{\"expirationDate\": \"$(date -d '4 hours' --iso=minutes --utc)\"}"
+        exec /bin/openshift-install --dir=/tmp/artifacts/installer --log-level=debug cluster
 
     # Performs cleanup of all created resources
     - name: teardown
