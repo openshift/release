@@ -20,7 +20,6 @@ blacklist=(
 	"openshift/builder"
 	"openshift/cluster-operator"
 	"openshift/configmap-reload"
-	"openshift/console"
 	"openshift/jenkins"
 	"openshift/kube-rbac-proxy"
 	"openshift/kube-state-metrics"
