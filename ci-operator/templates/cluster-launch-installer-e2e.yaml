@@ -144,17 +144,14 @@ objects:
           break
         done
 
-        if ! oc wait deploy/router -n "${ROUTER_NAMESPACE}" --for condition=available --timeout=10m; then
-          # BUG: wait is exiting with an error that implies the structure of the object is not correct from
-          #   the server - add more debugging info here until we know why
-          echo "error: Deployment did not come up"
-          oc get deploy/router -o yaml || true
-          sleep 30
-          if ! oc wait deploy/router -n "${ROUTER_NAMESPACE}" --for condition=available --timeout=5m; then
-            echo "Installation failed"
-            exit 1
-          fi
-        fi
+        i=0
+        MAX_RETRIES=10
+        until oc wait deploy/router -n "${ROUTER_NAMESPACE}" --for condition=available --timeout=10m || [ $i -eq $MAX_RETRIES ]; do
+            i=$((i+1))
+            [ $i -eq $MAX_RETRIES ] && echo "timeout waiting for router to be available" && exit 1
+            echo "error deploy/router did not come up"
+            sleep 60
+        done
 
         # set up cloud-provider-specific env vars
         if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
