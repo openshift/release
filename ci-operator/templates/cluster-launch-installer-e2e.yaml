@@ -100,6 +100,8 @@ objects:
 
         # wait for the router namespace
         FOUND_KUBECONFIG=
+        API_UP=
+        ROUTER_NAMESPACE=
         while true; do
           if [[ -f /tmp/shared/exit ]]; then
             echo "Another process exited" 2>&1
@@ -120,10 +122,33 @@ objects:
             echo "Waiting for API at $(oc whoami --show-server) to respond ..."
             sleep 15 & wait
             continue
+          elif [[ -z "${API_UP}" ]]; then
+            echo "API at $(oc whoami --show-server) has responded"
+            API_UP=1
           fi
-          echo "API at $(oc whoami --show-server) has responded"
+          if [[ -z "${ROUTER_NAMESPACE}" ]]; then
+            # check multiple namespaces while we are transitioning to the new locations
+            if oc get deploy/router -n tectonic-ingress 2>/dev/null; then
+              ROUTER_NAMESPACE=tectonic-ingress
+            elif oc get deploy/router -n openshift-ingress 2>/dev/null; then
+              ROUTER_NAMESPACE=openshift-ingress
+            elif oc get deploy/router -n default 2>/dev/null; then
+              ROUTER_NAMESPACE=default
+            else
+              echo "Waiting for router to be created ..."
+              sleep 15 & wait
+              continue
+            fi
+            echo "Found router in ${ROUTER_NAMESPACE}"
+          fi
           break
         done
+
+        if ! oc wait deploy/router -n "${ROUTER_NAMESPACE}" --for condition=available --timeout=20m; then
+          echo "Installation failed"
+          cp $KUBECONFIG /tmp/admin.kubeconfig
+          exit 1
+        fi
 
         # set up cloud-provider-specific env vars
         if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
