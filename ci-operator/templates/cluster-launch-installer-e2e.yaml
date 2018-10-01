@@ -144,10 +144,16 @@ objects:
           break
         done
 
-        if ! oc wait deploy/router -n "${ROUTER_NAMESPACE}" --for condition=available --timeout=20m; then
-          echo "Installation failed"
-          cp $KUBECONFIG /tmp/admin.kubeconfig
-          exit 1
+        if ! oc wait deploy/router -n "${ROUTER_NAMESPACE}" --for condition=available --timeout=10m; then
+          # BUG: wait is exiting with an error that implies the structure of the object is not correct from
+          #   the server - add more debugging info here until we know why
+          echo "error: Deployment did not come up"
+          oc get deploy/router -o yaml || true
+          sleep 30
+          if ! oc wait deploy/router -n "${ROUTER_NAMESPACE}" --for condition=available --timeout=5m; then
+            echo "Installation failed"
+            exit 1
+          fi
         fi
 
         # set up cloud-provider-specific env vars
