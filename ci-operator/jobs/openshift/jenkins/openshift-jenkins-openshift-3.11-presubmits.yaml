@@ -18,6 +18,12 @@ presubmits:
         - --target=e2e-gcp
         - --give-pr-author-access-to-namespace=true
         env:
+        - name: PREPARE_COMMAND
+          value: tag-in-image.sh
+        - name: TEST_FOCUS
+          value: openshift pipeline
+        - name: JOB_NAME_SAFE
+          value: e2e-gcp
         - name: CLUSTER_TYPE
           value: gcp
         - name: CONFIG_SPEC
@@ -25,14 +31,8 @@ presubmits:
             configMapKeyRef:
               key: openshift-3.11.yaml
               name: ci-operator-openshift-jenkins-canary
-        - name: JOB_NAME_SAFE
-          value: e2e-gcp
-        - name: PREPARE_COMMAND
-          value: tag-in-image.sh
         - name: RPM_REPO_OPENSHIFT_ORIGIN
           value: https://rpms.svc.ci.openshift.org/openshift-origin-v3.11/
-        - name: TEST_FOCUS
-          value: openshift pipeline
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -42,13 +42,16 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/e2e-gcp-cluster-profile
-          name: cluster-profile
         - mountPath: /usr/local/e2e-gcp
           name: job-definition
           subPath: cluster-launch-e2e-gmontero-testing.yaml
+        - mountPath: /usr/local/e2e-gcp-cluster-profile
+          name: cluster-profile
       serviceAccountName: ci-operator
       volumes:
+      - configMap:
+          name: prow-job-cluster-launch-e2e-gmontero-testing
+        name: job-definition
       - name: cluster-profile
         projected:
           sources:
@@ -56,7 +59,4 @@ presubmits:
               name: cluster-secrets-gcp
           - configMap:
               name: cluster-profile-gcp
-      - configMap:
-          name: prow-job-cluster-launch-e2e-gmontero-testing
-        name: job-definition
     trigger: ((?m)^/test( all| e2e),?(\s+|$))

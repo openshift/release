@@ -24,6 +24,10 @@ presubmits:
         - /bin/bash
         - -c
         env:
+        - name: TEST_FOCUS
+          value: Suite:openshift/conformance/parallel
+        - name: JOB_NAME_SAFE
+          value: e2e-gcp-major-upgrade-311
         - name: CLUSTER_TYPE
           value: gcp
         - name: CONFIG_SPEC
@@ -31,20 +35,16 @@ presubmits:
             configMapKeyRef:
               key: release-3.11.yaml
               name: ci-operator-openshift-openshift-ansible
-        - name: JOB_NAME_SAFE
-          value: e2e-gcp-major-upgrade-311
-        - name: PREVIOUS_ANSIBLE_VERSION
-          value: "3.10"
-        - name: PREVIOUS_IMAGE_ANSIBLE
-          value: docker.io/openshift/origin-ansible:v3.10
-        - name: PREVIOUS_RPM_DEPENDENCIES_REPO
-          value: http://mirror.centos.org/centos/7/paas/x86_64/openshift-origin310/
         - name: PREVIOUS_RPM_REPO_BASEREF
           value: https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/release-3.10/.latest-rpms
         - name: RPM_REPO_OPENSHIFT_ORIGIN
           value: https://rpms.svc.ci.openshift.org/openshift-origin-v3.11/
-        - name: TEST_FOCUS
-          value: Suite:openshift/conformance/parallel
+        - name: PREVIOUS_IMAGE_ANSIBLE
+          value: docker.io/openshift/origin-ansible:v3.10
+        - name: PREVIOUS_ANSIBLE_VERSION
+          value: "3.10"
+        - name: PREVIOUS_RPM_DEPENDENCIES_REPO
+          value: http://mirror.centos.org/centos/7/paas/x86_64/openshift-origin310/
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -54,13 +54,16 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/e2e-gcp-cluster-profile
-          name: e2e-gcp-major-upgrade-311
         - mountPath: /usr/local/e2e-gcp-major-upgrade-311
           name: job-definition
           subPath: cluster-launch-e2e-upgrade.yaml
+        - mountPath: /usr/local/e2e-gcp-cluster-profile
+          name: e2e-gcp-major-upgrade-311
       serviceAccountName: ci-operator
       volumes:
+      - configMap:
+          name: prow-job-cluster-launch-e2e-upgrade
+        name: job-definition
       - name: e2e-gcp-major-upgrade-311
         projected:
           sources:
@@ -68,9 +71,6 @@ presubmits:
               name: cluster-secrets-gcp
           - configMap:
               name: cluster-profile-gcp
-      - configMap:
-          name: prow-job-cluster-launch-e2e-upgrade
-        name: job-definition
     trigger: ((?m)^/test( all| gcp-major-upgrade),?(\s+|$))
   - agent: kubernetes
     always_run: false
@@ -85,13 +85,17 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
         - --secret-dir=/usr/local/e2e-atomic-cluster-profile
-        - --target=e2e-atomic
         - --template=/usr/local/e2e-atomic
+        - --target=e2e-atomic
+        - --give-pr-author-access-to-namespace=true
         command:
         - ci-operator
         env:
+        - name: TEST_FOCUS
+          value: Suite:openshift/conformance/parallel/minimal
+        - name: JOB_NAME_SAFE
+          value: e2e-atomic
         - name: CLUSTER_TYPE
           value: atomic
         - name: CONFIG_SPEC
@@ -99,23 +103,22 @@ presubmits:
             configMapKeyRef:
               key: release-3.11.yaml
               name: ci-operator-openshift-openshift-ansible
-        - name: JOB_NAME_SAFE
-          value: e2e-atomic
         - name: RPM_REPO_OPENSHIFT_ORIGIN
           value: https://rpms.svc.ci.openshift.org/openshift-origin-v3.11/
-        - name: TEST_FOCUS
-          value: Suite:openshift/conformance/parallel/minimal
         image: ci-operator:latest
         name: test
         resources: {}
         volumeMounts:
-        - mountPath: /usr/local/e2e-atomic-cluster-profile
-          name: cluster-profile
         - mountPath: /usr/local/e2e-atomic
           name: job-definition
           subPath: cluster-launch-e2e-openshift-ansible.yaml
+        - mountPath: /usr/local/e2e-atomic-cluster-profile
+          name: cluster-profile
       serviceAccountName: ci-operator
       volumes:
+      - configMap:
+          name: prow-job-cluster-launch-e2e-openshift-ansible
+        name: job-definition
       - name: cluster-profile
         projected:
           sources:
@@ -123,9 +126,6 @@ presubmits:
               name: cluster-secrets-atomic
           - configMap:
               name: cluster-profile-atomic-centos
-      - configMap:
-          name: prow-job-cluster-launch-e2e-openshift-ansible
-        name: job-definition
     trigger: ((?m)^/test( all| e2e-atomic),?(\s+|$))
   - agent: kubernetes
     always_run: false
@@ -140,13 +140,17 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
         - --secret-dir=/usr/local/e2e-aws-cluster-profile
-        - --target=e2e-aws
         - --template=/usr/local/e2e-aws
+        - --target=e2e-aws
+        - --give-pr-author-access-to-namespace=true
         command:
         - ci-operator
         env:
+        - name: TEST_FOCUS
+          value: Suite:openshift/conformance/parallel/minimal
+        - name: JOB_NAME_SAFE
+          value: e2e-aws
         - name: CLUSTER_TYPE
           value: aws
         - name: CONFIG_SPEC
@@ -154,23 +158,22 @@ presubmits:
             configMapKeyRef:
               key: release-3.11.yaml
               name: ci-operator-openshift-openshift-ansible
-        - name: JOB_NAME_SAFE
-          value: e2e-aws
         - name: RPM_REPO_OPENSHIFT_ORIGIN
           value: https://rpms.svc.ci.openshift.org/openshift-origin-v3.11/
-        - name: TEST_FOCUS
-          value: Suite:openshift/conformance/parallel/minimal
         image: ci-operator:latest
         name: test
         resources: {}
         volumeMounts:
-        - mountPath: /usr/local/e2e-aws-cluster-profile
-          name: cluster-profile
         - mountPath: /usr/local/e2e-aws
           name: job-definition
           subPath: cluster-launch-e2e-openshift-ansible.yaml
+        - mountPath: /usr/local/e2e-aws-cluster-profile
+          name: cluster-profile
       serviceAccountName: ci-operator
       volumes:
+      - configMap:
+          name: prow-job-cluster-launch-e2e-openshift-ansible
+        name: job-definition
       - name: cluster-profile
         projected:
           sources:
@@ -178,9 +181,6 @@ presubmits:
               name: cluster-secrets-aws
           - configMap:
               name: cluster-profile-aws-centos
-      - configMap:
-          name: prow-job-cluster-launch-e2e-openshift-ansible
-        name: job-definition
     trigger: ((?m)^/test( all| e2e-aws),?(\s+|$))
   - agent: kubernetes
     always_run: true
@@ -201,6 +201,10 @@ presubmits:
         - --template=/usr/local/e2e-gcp
         - --target=e2e-gcp
         env:
+        - name: TEST_FOCUS
+          value: Suite:openshift/conformance/parallel
+        - name: JOB_NAME_SAFE
+          value: e2e-gcp
         - name: CLUSTER_TYPE
           value: gcp
         - name: CONFIG_SPEC
@@ -208,12 +212,8 @@ presubmits:
             configMapKeyRef:
               key: release-3.11.yaml
               name: ci-operator-openshift-openshift-ansible
-        - name: JOB_NAME_SAFE
-          value: e2e-gcp
         - name: RPM_REPO_OPENSHIFT_ORIGIN
           value: https://rpms.svc.ci.openshift.org/openshift-origin-v3.11/
-        - name: TEST_FOCUS
-          value: Suite:openshift/conformance/parallel
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -223,13 +223,16 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/e2e-gcp-cluster-profile
-          name: cluster-profile
         - mountPath: /usr/local/e2e-gcp
           name: job-definition
           subPath: cluster-launch-e2e.yaml
+        - mountPath: /usr/local/e2e-gcp-cluster-profile
+          name: cluster-profile
       serviceAccountName: ci-operator
       volumes:
+      - configMap:
+          name: prow-job-cluster-launch-e2e
+        name: job-definition
       - name: cluster-profile
         projected:
           sources:
@@ -237,9 +240,6 @@ presubmits:
               name: cluster-secrets-gcp
           - configMap:
               name: cluster-profile-gcp
-      - configMap:
-          name: prow-job-cluster-launch-e2e
-        name: job-definition
     trigger: ((?m)^/test( all| gcp),?(\s+|$))
   - agent: kubernetes
     always_run: false
@@ -261,6 +261,10 @@ presubmits:
         - --template=/usr/local/e2e-gcp-crio
         - --target=e2e-gcp-crio
         env:
+        - name: TEST_FOCUS
+          value: Suite:openshift/conformance/parallel/minimal
+        - name: JOB_NAME_SAFE
+          value: e2e-gcp-crio
         - name: CLUSTER_TYPE
           value: gcp
         - name: CONFIG_SPEC
@@ -268,12 +272,8 @@ presubmits:
             configMapKeyRef:
               key: release-3.11.yaml
               name: ci-operator-openshift-openshift-ansible
-        - name: JOB_NAME_SAFE
-          value: e2e-gcp-crio
         - name: RPM_REPO_OPENSHIFT_ORIGIN
           value: https://rpms.svc.ci.openshift.org/openshift-origin-v3.11/
-        - name: TEST_FOCUS
-          value: Suite:openshift/conformance/parallel/minimal
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -283,13 +283,16 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/e2e-gcp-crio-cluster-profile
-          name: cluster-profile
         - mountPath: /usr/local/e2e-gcp-crio
           name: job-definition
           subPath: cluster-launch-e2e.yaml
+        - mountPath: /usr/local/e2e-gcp-crio-cluster-profile
+          name: cluster-profile
       serviceAccountName: ci-operator
       volumes:
+      - configMap:
+          name: prow-job-cluster-launch-e2e
+        name: job-definition
       - name: cluster-profile
         projected:
           sources:
@@ -297,9 +300,6 @@ presubmits:
               name: cluster-secrets-gcp
           - configMap:
               name: cluster-profile-gcp-crio
-      - configMap:
-          name: prow-job-cluster-launch-e2e
-        name: job-definition
     trigger: ((?m)^/test( gcp-crio),?(\s+|$))
   - agent: kubernetes
     always_run: false
@@ -320,6 +320,10 @@ presubmits:
         - --template=/usr/local/e2e-gcp-ha
         - --target=e2e-gcp-ha
         env:
+        - name: TEST_FOCUS
+          value: Suite:openshift/conformance/parallel
+        - name: JOB_NAME_SAFE
+          value: e2e-gcp-ha
         - name: CLUSTER_TYPE
           value: gcp
         - name: CONFIG_SPEC
@@ -327,12 +331,8 @@ presubmits:
             configMapKeyRef:
               key: release-3.11.yaml
               name: ci-operator-openshift-openshift-ansible
-        - name: JOB_NAME_SAFE
-          value: e2e-gcp-ha
         - name: RPM_REPO_OPENSHIFT_ORIGIN
           value: https://rpms.svc.ci.openshift.org/openshift-origin-v3.11/
-        - name: TEST_FOCUS
-          value: Suite:openshift/conformance/parallel
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -342,13 +342,16 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/e2e-gcp-ha-cluster-profile
-          name: cluster-profile
         - mountPath: /usr/local/e2e-gcp-ha
           name: job-definition
           subPath: cluster-launch-e2e.yaml
+        - mountPath: /usr/local/e2e-gcp-ha-cluster-profile
+          name: cluster-profile
       serviceAccountName: ci-operator
       volumes:
+      - configMap:
+          name: prow-job-cluster-launch-e2e
+        name: job-definition
       - name: cluster-profile
         projected:
           sources:
@@ -356,9 +359,6 @@ presubmits:
               name: cluster-secrets-gcp
           - configMap:
               name: cluster-profile-gcp-ha
-      - configMap:
-          name: prow-job-cluster-launch-e2e
-        name: job-definition
     trigger: ((?m)^/test( all| gcp-ha),?(\s+|$))
   - agent: kubernetes
     always_run: false
@@ -379,6 +379,10 @@ presubmits:
         - --template=/usr/local/e2e-gcp-launch
         - --target=e2e-gcp-launch
         env:
+        - name: TEST_COMMAND
+          value: sleep 7200 & wait
+        - name: JOB_NAME_SAFE
+          value: e2e-gcp-launch
         - name: CLUSTER_TYPE
           value: gcp
         - name: CONFIG_SPEC
@@ -386,12 +390,8 @@ presubmits:
             configMapKeyRef:
               key: release-3.11.yaml
               name: ci-operator-openshift-openshift-ansible
-        - name: JOB_NAME_SAFE
-          value: e2e-gcp-launch
         - name: RPM_REPO_OPENSHIFT_ORIGIN
           value: https://rpms.svc.ci.openshift.org/openshift-origin-v3.11/
-        - name: TEST_COMMAND
-          value: sleep 7200 & wait
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -401,13 +401,16 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/e2e-gcp-launch-cluster-profile
-          name: cluster-profile
         - mountPath: /usr/local/e2e-gcp-launch
           name: job-definition
           subPath: cluster-launch-e2e.yaml
+        - mountPath: /usr/local/e2e-gcp-launch-cluster-profile
+          name: cluster-profile
       serviceAccountName: ci-operator
       volumes:
+      - configMap:
+          name: prow-job-cluster-launch-e2e
+        name: job-definition
       - name: cluster-profile
         projected:
           sources:
@@ -415,9 +418,6 @@ presubmits:
               name: cluster-secrets-gcp
           - configMap:
               name: cluster-profile-gcp
-      - configMap:
-          name: prow-job-cluster-launch-e2e
-        name: job-definition
     trigger: ((?m)^/test( launch-gcp),?(\s+|$))
   - agent: kubernetes
     always_run: true
@@ -431,10 +431,10 @@ presubmits:
     spec:
       containers:
       - args:
-        - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
-        - --target=[images]
+        - --artifact-dir=$(ARTIFACTS)
         - --target=unit
+        - --target=[images]
         command:
         - ci-operator
         env:
