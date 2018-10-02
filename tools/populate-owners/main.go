@@ -93,15 +93,17 @@ func orgRepos(dir string) (orgRepos []*orgRepo, err error) {
 	return orgRepos, err
 }
 
-func (orgRepo *orgRepo) getConfig(dir string) (err error) {
-	path := filepath.Join(dir, orgRepo.Organization, orgRepo.Repository)
-	info, err := os.Stat(path)
-	if err != nil {
-		return err
-	}
+func (orgRepo *orgRepo) getDirectories(dirs ...string) (err error) {
+	for _, dir := range dirs {
+		path := filepath.Join(dir, orgRepo.Organization, orgRepo.Repository)
+		info, err := os.Stat(path)
+		if err != nil {
+			return err
+		}
 
-	if info.IsDir() {
-		orgRepo.Directories = append(orgRepo.Directories, path)
+		if info.IsDir() {
+			orgRepo.Directories = append(orgRepo.Directories, path)
+		}
 	}
 
 	return nil
@@ -305,14 +307,16 @@ func pullOwners(directory string) (err error) {
 		return err
 	}
 
-	orgRepos, err := orgRepos(filepath.Join(repoRoot, "ci-operator", "jobs"))
+	operatorRoot := filepath.Join(repoRoot, "ci-operator")
+	orgRepos, err := orgRepos(filepath.Join(operatorRoot, "jobs"))
 	if err != nil {
 		return err
 	}
 
-	config := filepath.Join(repoRoot, "ci-operator", "config")
+	config := filepath.Join(operatorRoot, "config")
+	templates := filepath.Join(operatorRoot, "templates")
 	for _, orgRepo := range orgRepos {
-		err = orgRepo.getConfig(config)
+		err = orgRepo.getDirectories(config, templates)
 		if err != nil && !os.IsNotExist(err) {
 			return err
 		}
