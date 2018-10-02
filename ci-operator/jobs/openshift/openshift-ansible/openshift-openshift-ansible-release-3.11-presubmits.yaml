@@ -76,6 +76,61 @@ presubmits:
     always_run: false
     branches:
     - release-3.11
+    context: ci/prow/e2e-atomic
+    decorate: true
+    name: pull-ci-openshift-openshift-ansible-release-3.11-e2e-atomic
+    rerun_command: /test e2e-atomic
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --secret-dir=/usr/local/e2e-atomic-cluster-profile
+        - --template=/usr/local/e2e-atomic
+        - --target=e2e-atomic
+        - --give-pr-author-access-to-namespace=true
+        command:
+        - ci-operator
+        env:
+        - name: TEST_FOCUS
+          value: Suite:openshift/conformance/parallel/minimal
+        - name: JOB_NAME_SAFE
+          value: e2e-atomic
+        - name: CLUSTER_TYPE
+          value: atomic
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: release-3.11.yaml
+              name: ci-operator-openshift-openshift-ansible
+        - name: RPM_REPO_OPENSHIFT_ORIGIN
+          value: https://rpms.svc.ci.openshift.org/openshift-origin-v3.11/
+        image: ci-operator:latest
+        name: test
+        resources: {}
+        volumeMounts:
+        - mountPath: /usr/local/e2e-atomic
+          name: job-definition
+          subPath: cluster-launch-e2e-openshift-ansible.yaml
+        - mountPath: /usr/local/e2e-atomic-cluster-profile
+          name: cluster-profile
+      serviceAccountName: ci-operator
+      volumes:
+      - configMap:
+          name: prow-job-cluster-launch-e2e-openshift-ansible
+        name: job-definition
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-atomic
+          - configMap:
+              name: cluster-profile-atomic-centos
+    trigger: ((?m)^/test( all| e2e-atomic),?(\s+|$))
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - release-3.11
     context: ci/prow/e2e-aws
     decorate: true
     name: pull-ci-openshift-openshift-ansible-release-3.11-e2e-aws
@@ -101,7 +156,7 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: master.yaml
+              key: release-3.11.yaml
               name: ci-operator-openshift-openshift-ansible
         - name: RPM_REPO_OPENSHIFT_ORIGIN
           value: https://rpms.svc.ci.openshift.org/openshift-origin-v3.11/
