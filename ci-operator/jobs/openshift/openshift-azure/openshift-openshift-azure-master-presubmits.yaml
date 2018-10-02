@@ -17,14 +17,12 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
         - --secret-dir=/usr/local/e2e-azure-secret
-        - --target=[output:stable:sync]
-        - --target=e2e-azure
         - --template=/usr/local/e2e-azure
+        - --target=e2e-azure
+        - --target=[output:stable:sync]
         command:
         - ci-operator
         env:
-        - name: CLUSTER_TYPE
-          value: azure
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
@@ -32,6 +30,8 @@ presubmits:
               name: ci-operator-openshift-openshift-azure
         - name: JOB_NAME_SAFE
           value: e2e-azure
+        - name: CLUSTER_TYPE
+          value: azure
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -41,21 +41,21 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/e2e-azure-secret
-          name: cluster-secrets-azure-file
         - mountPath: /usr/local/e2e-azure
           name: job-definition
           subPath: cluster-launch-e2e-azure.yaml
+        - mountPath: /usr/local/e2e-azure-secret
+          name: cluster-secrets-azure-file
       serviceAccountName: ci-operator
       volumes:
+      - configMap:
+          name: prow-job-cluster-launch-e2e-azure
+        name: job-definition
       - name: cluster-secrets-azure-file
         projected:
           sources:
           - secret:
               name: cluster-secrets-azure-file
-      - configMap:
-          name: prow-job-cluster-launch-e2e-azure
-        name: job-definition
     trigger: ((?m)^/test( all| e2e),?(\s+|$))
   - agent: kubernetes
     always_run: false
@@ -74,14 +74,14 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
         - --secret-dir=/usr/local/e2e-azure-secret
-        - --target=[output:stable:sync]
-        - --target=e2e-azure-conformance
         - --template=/usr/local/e2e-azure-conformance
+        - --target=e2e-azure-conformance
+        - --target=[output:stable:sync]
         command:
         - ci-operator
         env:
-        - name: CLUSTER_TYPE
-          value: azure
+        - name: TEST_FOCUS
+          value: Suite:openshift/conformance/parallel
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
@@ -89,8 +89,8 @@ presubmits:
               name: ci-operator-openshift-openshift-azure
         - name: JOB_NAME_SAFE
           value: e2e-azure-conformance
-        - name: TEST_FOCUS
-          value: Suite:openshift/conformance/parallel
+        - name: CLUSTER_TYPE
+          value: azure
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -100,21 +100,21 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/e2e-azure-secret
-          name: cluster-secrets-azure-file
         - mountPath: /usr/local/e2e-azure-conformance
           name: job-definition
           subPath: cluster-launch-e2e-azure-conformance.yaml
+        - mountPath: /usr/local/e2e-azure-secret
+          name: cluster-secrets-azure-file
       serviceAccountName: ci-operator
       volumes:
+      - configMap:
+          name: prow-job-cluster-launch-e2e-azure-conformance
+        name: job-definition
       - name: cluster-secrets-azure-file
         projected:
           sources:
           - secret:
               name: cluster-secrets-azure-file
-      - configMap:
-          name: prow-job-cluster-launch-e2e-azure-conformance
-        name: job-definition
     trigger: ((?m)^/test conformance,?(\s+|$))
   - agent: kubernetes
     always_run: false
@@ -133,14 +133,12 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
         - --secret-dir=/usr/local/e2e-azure-secret
-        - --target=[output:stable:sync]
-        - --target=e2e-azure-upgrade
         - --template=/usr/local/e2e-azure-upgrade
+        - --target=e2e-azure-upgrade
+        - --target=[output:stable:sync]
         command:
         - ci-operator
         env:
-        - name: CLUSTER_TYPE
-          value: azure
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
@@ -148,6 +146,8 @@ presubmits:
               name: ci-operator-openshift-openshift-azure
         - name: JOB_NAME_SAFE
           value: e2e-azure-upgrade
+        - name: CLUSTER_TYPE
+          value: azure
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -157,21 +157,21 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/e2e-azure-secret
-          name: cluster-secrets-azure-file
         - mountPath: /usr/local/e2e-azure-upgrade
           name: job-definition
           subPath: cluster-launch-e2e-azure-upgrade.yaml
+        - mountPath: /usr/local/e2e-azure-secret
+          name: cluster-secrets-azure-file
       serviceAccountName: ci-operator
       volumes:
+      - configMap:
+          name: prow-job-cluster-launch-e2e-azure-upgrade
+        name: job-definition
       - name: cluster-secrets-azure-file
         projected:
           sources:
           - secret:
               name: cluster-secrets-azure-file
-      - configMap:
-          name: prow-job-cluster-launch-e2e-azure-upgrade
-        name: job-definition
     trigger: ((?m)^/test upgrade,?(\s+|$))
   - agent: kubernetes
     always_run: true
@@ -185,8 +185,8 @@ presubmits:
     spec:
       containers:
       - args:
-        - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --artifact-dir=$(ARTIFACTS)
         - --target=[images]
         command:
         - ci-operator
@@ -218,8 +218,8 @@ presubmits:
     spec:
       containers:
       - args:
-        - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --artifact-dir=$(ARTIFACTS)
         - --target=unit
         command:
         - ci-operator
@@ -251,8 +251,8 @@ presubmits:
     spec:
       containers:
       - args:
-        - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --artifact-dir=$(ARTIFACTS)
         - --target=verify
         command:
         - ci-operator

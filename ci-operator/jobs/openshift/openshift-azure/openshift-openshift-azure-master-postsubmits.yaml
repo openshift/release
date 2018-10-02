@@ -9,17 +9,15 @@ postsubmits:
     spec:
       containers:
       - args:
-        - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --artifact-dir=$(ARTIFACTS)
         - --secret-dir=/usr/local/e2e-azure-secret
-        - --target=[output:stable:sync]
-        - --target=e2e-azure-upgrade
         - --template=/usr/local/e2e-azure-upgrade
+        - --target=e2e-azure-upgrade
+        - --target=[output:stable:sync]
         command:
         - ci-operator
         env:
-        - name: CLUSTER_TYPE
-          value: azure
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
@@ -27,6 +25,8 @@ postsubmits:
               name: ci-operator-openshift-openshift-azure
         - name: JOB_NAME_SAFE
           value: e2e-azure-upgrade
+        - name: CLUSTER_TYPE
+          value: azure
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -36,21 +36,21 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/e2e-azure-secret
-          name: cluster-secrets-azure-file
         - mountPath: /usr/local/e2e-azure-upgrade
           name: job-definition
           subPath: cluster-launch-e2e-azure-upgrade.yaml
+        - mountPath: /usr/local/e2e-azure-secret
+          name: cluster-secrets-azure-file
       serviceAccountName: ci-operator
       volumes:
+      - configMap:
+          name: prow-job-cluster-launch-e2e-azure-upgrade
+        name: job-definition
       - name: cluster-secrets-azure-file
         projected:
           sources:
           - secret:
               name: cluster-secrets-azure-file
-      - configMap:
-          name: prow-job-cluster-launch-e2e-azure-upgrade
-        name: job-definition
   - agent: kubernetes
     branches:
     - master
@@ -60,10 +60,10 @@ postsubmits:
     spec:
       containers:
       - args:
-        - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
-        - --promote
+        - --artifact-dir=$(ARTIFACTS)
         - --target=[images]
+        - --promote
         command:
         - ci-operator
         env:

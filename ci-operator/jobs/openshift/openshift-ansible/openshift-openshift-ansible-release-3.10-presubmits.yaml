@@ -25,6 +25,10 @@ presubmits:
         - /bin/bash
         - -c
         env:
+        - name: TEST_FOCUS
+          value: Suite:openshift/conformance/parallel
+        - name: JOB_NAME_SAFE
+          value: e2e-gcp-major-upgrade-310
         - name: CLUSTER_TYPE
           value: gcp
         - name: CONFIG_SPEC
@@ -32,20 +36,16 @@ presubmits:
             configMapKeyRef:
               key: release-3.10.yaml
               name: ci-operator-openshift-openshift-ansible
-        - name: JOB_NAME_SAFE
-          value: e2e-gcp-major-upgrade-310
-        - name: PREVIOUS_ANSIBLE_VERSION
-          value: "3.9"
-        - name: PREVIOUS_IMAGE_ANSIBLE
-          value: docker.io/openshift/origin-ansible:v3.9
-        - name: PREVIOUS_RPM_DEPENDENCIES_REPO
-          value: http://mirror.centos.org/centos/7/paas/x86_64/openshift-origin39/
-        - name: PREVIOUS_RPM_REPO_BASEREF
-          value: https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/release-3.9/.latest-rpms
         - name: RPM_REPO_BASEREF
           value: https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/release-3.10/.latest-rpms
-        - name: TEST_FOCUS
-          value: Suite:openshift/conformance/parallel
+        - name: PREVIOUS_RPM_REPO_BASEREF
+          value: https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/release-3.9/.latest-rpms
+        - name: PREVIOUS_IMAGE_ANSIBLE
+          value: docker.io/openshift/origin-ansible:v3.9
+        - name: PREVIOUS_ANSIBLE_VERSION
+          value: "3.9"
+        - name: PREVIOUS_RPM_DEPENDENCIES_REPO
+          value: http://mirror.centos.org/centos/7/paas/x86_64/openshift-origin39/
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -55,13 +55,16 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/e2e-gcp-cluster-profile
-          name: e2e-gcp-major-upgrade-310
         - mountPath: /usr/local/e2e-gcp-major-upgrade-310
           name: job-definition
           subPath: cluster-launch-e2e-upgrade.yaml
+        - mountPath: /usr/local/e2e-gcp-cluster-profile
+          name: e2e-gcp-major-upgrade-310
       serviceAccountName: ci-operator
       volumes:
+      - configMap:
+          name: prow-job-cluster-launch-e2e-upgrade
+        name: job-definition
       - name: e2e-gcp-major-upgrade-310
         projected:
           sources:
@@ -69,9 +72,6 @@ presubmits:
               name: cluster-secrets-gcp
           - configMap:
               name: cluster-profile-gcp
-      - configMap:
-          name: prow-job-cluster-launch-e2e-upgrade
-        name: job-definition
     trigger: ((?m)^/test( all| gcp-major-upgrade),?(\s+|$))
   - agent: kubernetes
     always_run: true
@@ -96,6 +96,10 @@ presubmits:
             --secret-dir=/usr/local/e2e-gcp-cluster-profile --template=/usr/local/e2e-gcp \
             --target=e2e-gcp
         env:
+        - name: TEST_FOCUS
+          value: Suite:openshift/conformance/parallel
+        - name: JOB_NAME_SAFE
+          value: e2e-gcp
         - name: CLUSTER_TYPE
           value: gcp
         - name: CONFIG_SPEC
@@ -103,12 +107,8 @@ presubmits:
             configMapKeyRef:
               key: release-3.10.yaml
               name: ci-operator-openshift-openshift-ansible
-        - name: JOB_NAME_SAFE
-          value: e2e-gcp
         - name: RPM_REPO_BASEURL_REF
           value: https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/release-3.10/.latest-rpms
-        - name: TEST_FOCUS
-          value: Suite:openshift/conformance/parallel
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -118,13 +118,16 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/e2e-gcp-cluster-profile
-          name: cluster-profile
         - mountPath: /usr/local/e2e-gcp
           name: job-definition
           subPath: cluster-launch-e2e.yaml
+        - mountPath: /usr/local/e2e-gcp-cluster-profile
+          name: cluster-profile
       serviceAccountName: ci-operator
       volumes:
+      - configMap:
+          name: prow-job-cluster-launch-e2e
+        name: job-definition
       - name: cluster-profile
         projected:
           sources:
@@ -132,9 +135,6 @@ presubmits:
               name: cluster-secrets-gcp
           - configMap:
               name: cluster-profile-gcp
-      - configMap:
-          name: prow-job-cluster-launch-e2e
-        name: job-definition
     trigger: ((?m)^/test( all| gcp),?(\s+|$))
   - agent: jenkins
     always_run: true
