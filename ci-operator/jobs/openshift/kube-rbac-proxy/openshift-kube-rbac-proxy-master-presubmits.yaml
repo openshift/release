@@ -1,27 +1,28 @@
-postsubmits:
-  openshift/cluster-image-registry-operator:
+presubmits:
+  openshift/kube-rbac-proxy:
   - agent: kubernetes
+    always_run: true
     branches:
     - master
+    context: ci/prow/images
     decorate: true
-    labels:
-      artifacts: images
-    name: branch-ci-openshift-cluster-image-registry-operator-master-images
+    name: pull-ci-openshift-kube-rbac-proxy-master-images
+    rerun_command: /test images
     skip_cloning: true
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
-        - --promote
         - --target=[images]
+        - --target=[release:latest]
         command:
         - ci-operator
         env:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-cluster-image-registry-operator-master.yaml
+              key: openshift-kube-rbac-proxy-master.yaml
               name: ci-operator-configs
         image: ci-operator:latest
         imagePullPolicy: Always
@@ -32,26 +33,31 @@ postsubmits:
           requests:
             cpu: 10m
       serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| images),?(\s+|$))
   - agent: kubernetes
+    always_run: true
     branches:
-    - master
+    - openshift-master
+    context: ci/prow/images
     decorate: true
-    name: branch-ci-openshift-cluster-image-registry-operator-master-unit
+    name: pull-ci-openshift-kube-rbac-proxy-openshift-master-images
+    rerun_command: /test images
     skip_cloning: true
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
-        - --target=unit
+        - --target=[images]
+        - --target=[release:latest]
         command:
         - ci-operator
         env:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-cluster-image-registry-operator-master.yaml
-              name: ci-operator-configs
+              key: openshift-master.yaml
+              name: ci-operator-openshift-kube-rbac-proxy
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -61,3 +67,4 @@ postsubmits:
           requests:
             cpu: 10m
       serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| images),?(\s+|$))
