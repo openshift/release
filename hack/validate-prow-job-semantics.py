@@ -131,6 +131,22 @@ def validate_names(path, data):
                     print("[ERROR] {}: ci-operator job {} should have be named {}".format(path, job["name"], valid_name))
                     out = False
 
+                if job_type == "presubmits":
+                    valid_context = "ci/prow/{}".format(filtered_targets[0])
+                    if job["context"] != valid_context:
+                        print("[ERROR] {}: ci-operator job {} should have context {}".format(path, job["name"], valid_context))
+                        out = False
+
+                    valid_rerun_command = "/test {}".format(filtered_targets[0])
+                    if job["rerun_command"] != valid_rerun_command:
+                        print("[ERROR] {}: ci-operator job {} should have rerun_command {}".format(path, job["name"], valid_rerun_command))
+                        out = False
+
+                    valid_trigger = "((?m)^/test( all| {}),?(\\s+|$))".format(filtered_targets[0])
+                    if job["trigger"] != valid_trigger:
+                        print("[ERROR] {}: ci-operator job {} should have trigger {}".format(path, job["name"], valid_trigger))
+                        out = False
+
     return out
 
 def validate_sharding(path, data):
