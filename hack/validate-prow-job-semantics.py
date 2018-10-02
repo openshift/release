@@ -21,12 +21,12 @@ def main():
             for check in [validate_filename, validate_file_structure]:
                 if not check(path):
                     failed = True
-
-                if not failed:
+                else:
                     with open(path) as f:
                         data = yaml.load(f)
                         for check in [validate_job_repo, validate_names, validate_sharding, validate_ci_op_args, validate_pod_name, validate_resources]:
-                            check(path, data)
+                            if not check(path, data):
+                                failed = True
 
     if failed:
         sys.exit(1)
@@ -104,11 +104,19 @@ def validate_names(path, data):
                 if job["spec"]["containers"][0]["command"][0] != "ci-operator":
                     continue
 
-                target = "all"
+                targets = []
                 for arg in job["spec"]["containers"][0].get("args", []) + job["spec"]["containers"][0]["command"]:
                     if arg.startswith("--target="):
-                        target = arg[len("--target="):].strip("[]")
-                        break
+                        targets.append(arg[len("--target="):].strip("[]"))
+
+                if len(targets) == 0:
+                    print("[WARNING] {}: ci-operator job {} should call a target".format(path, job["name"]))
+                    continue
+
+                filtered_targets = [target for target in targets if target not in ["release:latest"] ]
+                if len(filtered_targets) != 1:
+                    print("[WARNING] {}: ci-operator job {} should call no more than one target, calls {}".format(path, job["name"], targets))
+                    continue
 
                 branch = "master"
                 if "branches" in job:
@@ -118,9 +126,9 @@ def validate_names(path, data):
                 if job_type == "postsubmits":
                     prefix = "branch"
 
-                name = "{}-ci-{}-{}-{}".format(prefix, repo.replace("/", "-"), branch, target)
-                if job["name"] != name:
-                    print("[ERROR] {}: ci-operator job {} should have name {}".format(path, job["name"], name))
+                valid_name = "{}-ci-{}-{}-{}".format(prefix, repo.replace("/", "-"), branch, filtered_targets[0])
+                if job["name"] != valid_name:
+                    print("[ERROR] {}: ci-operator job {} should have be named {}".format(path, job["name"], valid_name))
                     out = False
 
     return out
