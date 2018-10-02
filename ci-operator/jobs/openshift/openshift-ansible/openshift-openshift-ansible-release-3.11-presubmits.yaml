@@ -73,6 +73,61 @@ presubmits:
               name: cluster-profile-gcp
     trigger: ((?m)^/test( all| gcp-major-upgrade),?(\s+|$))
   - agent: kubernetes
+    always_run: false
+    branches:
+    - release-3.11
+    context: ci/prow/e2e-aws
+    decorate: true
+    name: pull-ci-openshift-openshift-ansible-release-3.11-e2e-aws
+    rerun_command: /test e2e-aws
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --secret-dir=/usr/local/e2e-aws-cluster-profile
+        - --template=/usr/local/e2e-aws
+        - --target=e2e-aws
+        - --give-pr-author-access-to-namespace=true
+        command:
+        - ci-operator
+        env:
+        - name: TEST_FOCUS
+          value: Suite:openshift/conformance/parallel/minimal
+        - name: JOB_NAME_SAFE
+          value: e2e-aws
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-openshift-ansible
+        - name: RPM_REPO_OPENSHIFT_ORIGIN
+          value: https://rpms.svc.ci.openshift.org/openshift-origin-v3.11/
+        image: ci-operator:latest
+        name: test
+        resources: {}
+        volumeMounts:
+        - mountPath: /usr/local/e2e-aws
+          name: job-definition
+          subPath: cluster-launch-e2e-openshift-ansible.yaml
+        - mountPath: /usr/local/e2e-aws-cluster-profile
+          name: cluster-profile
+      serviceAccountName: ci-operator
+      volumes:
+      - configMap:
+          name: prow-job-cluster-launch-e2e-openshift-ansible
+        name: job-definition
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+          - configMap:
+              name: cluster-profile-aws-centos
+    trigger: ((?m)^/test( all| e2e-aws),?(\s+|$))
+  - agent: kubernetes
     always_run: true
     branches:
     - release-3.11
