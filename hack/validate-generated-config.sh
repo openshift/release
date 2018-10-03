@@ -21,7 +21,6 @@ blacklist=(
 	"openshift/cluster-operator"
 	"openshift/jenkins"
 	"openshift/kube-rbac-proxy"
-	"openshift/kube-state-metrics"
 	"openshift/openshift-ansible"
 	"openshift/origin"
 	"openshift/prometheus-operator"
