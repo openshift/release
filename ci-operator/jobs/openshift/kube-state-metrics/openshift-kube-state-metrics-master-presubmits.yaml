@@ -1,28 +1,29 @@
-postsubmits:
-  openshift/kube-rbac-proxy:
+presubmits:
+  openshift/kube-state-metrics:
   - agent: kubernetes
+    always_run: true
     branches:
-    - openshift-master
+    - master
+    context: ci/prow/images
     decorate: true
-    labels:
-      artifacts: images
-    name: branch-ci-openshift-kube-rbac-proxy-openshift-master-images
+    name: pull-ci-openshift-kube-state-metrics-master-images
+    rerun_command: /test images
     skip_cloning: true
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
-        - --promote
         - --target=[images]
+        - --target=[release:latest]
         command:
         - ci-operator
         env:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-master.yaml
-              name: ci-operator-openshift-kube-rbac-proxy
+              key: openshift-kube-state-metrics-master.yaml
+              name: ci-operator-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -32,3 +33,4 @@ postsubmits:
           requests:
             cpu: 10m
       serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| images),?(\s+|$))

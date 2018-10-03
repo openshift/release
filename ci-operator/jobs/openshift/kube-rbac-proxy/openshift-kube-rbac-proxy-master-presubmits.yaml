@@ -1,12 +1,12 @@
 presubmits:
-  openshift/kubernetes-autoscaler:
+  openshift/kube-rbac-proxy:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-3.10
+    - master
     context: ci/prow/images
     decorate: true
-    name: pull-ci-openshift-kubernetes-autoscaler-release-3.10-images
+    name: pull-ci-openshift-kube-rbac-proxy-master-images
     rerun_command: /test images
     skip_cloning: true
     spec:
@@ -15,13 +15,14 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
         - --target=[images]
+        - --target=[release:latest]
         command:
         - ci-operator
         env:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-kubernetes-autoscaler-release-3.10.yaml
+              key: openshift-kube-rbac-proxy-master.yaml
               name: ci-operator-configs
         image: ci-operator:latest
         imagePullPolicy: Always
@@ -36,26 +37,27 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-3.10
-    context: ci/prow/unit
+    - openshift-master
+    context: ci/prow/images
     decorate: true
-    name: pull-ci-openshift-kubernetes-autoscaler-release-3.10-unit
-    rerun_command: /test unit
+    name: pull-ci-openshift-kube-rbac-proxy-openshift-master-images
+    rerun_command: /test images
     skip_cloning: true
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
-        - --target=unit
+        - --target=[images]
+        - --target=[release:latest]
         command:
         - ci-operator
         env:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-kubernetes-autoscaler-release-3.10.yaml
-              name: ci-operator-configs
+              key: openshift-master.yaml
+              name: ci-operator-openshift-kube-rbac-proxy
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -65,4 +67,4 @@ presubmits:
           requests:
             cpu: 10m
       serviceAccountName: ci-operator
-    trigger: ((?m)^/test( all| unit),?(\s+|$))
+    trigger: ((?m)^/test( all| images),?(\s+|$))
