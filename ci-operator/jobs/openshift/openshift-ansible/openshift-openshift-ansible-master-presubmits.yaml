@@ -370,6 +370,40 @@ presubmits:
     always_run: true
     branches:
     - master
+    context: ci/prow/images
+    decorate: true
+    name: pull-ci-openshift-openshift-ansible-master-images
+    rerun_command: /test images
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --target=[images]
+        - --target=[release:latest]
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: master.yaml
+              name: ci-operator-openshift-openshift-ansible
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| images),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
     context: ci/prow/unit
     decorate: true
     name: pull-ci-openshift-openshift-ansible-master-unit
@@ -380,7 +414,6 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
-        - --target=[images]
         - --target=unit
         command:
         - ci-operator
@@ -390,8 +423,6 @@ presubmits:
             configMapKeyRef:
               key: master.yaml
               name: ci-operator-openshift-openshift-ansible
-        - name: HOME
-          value: /tmp/home
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -401,7 +432,7 @@ presubmits:
           requests:
             cpu: 10m
       serviceAccountName: ci-operator
-    trigger: ((?m)^/test( all| unit| tox),?(\s+|$))
+    trigger: ((?m)^/test( all| unit),?(\s+|$))
   - agent: jenkins
     always_run: true
     branches:
