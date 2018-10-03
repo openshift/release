@@ -23,7 +23,6 @@ blacklist=(
 	"openshift/kube-rbac-proxy"
 	"openshift/openshift-ansible"
 	"openshift/origin"
-	"openshift/prometheus-operator"
 )
 
 failed="false"
