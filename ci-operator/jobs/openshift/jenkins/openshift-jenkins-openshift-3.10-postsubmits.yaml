@@ -1,5 +1,35 @@
 postsubmits:
   openshift/jenkins:
+  - agent: kubernetes
+    branches:
+    - openshift-3.10
+    decorate: true
+    name: branch-ci-openshift-jenkins-openshift-3.10-images
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --promote
+        - --target=[images]
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-3.10.yaml
+              name: ci-operator-openshift-jenkins
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
   - agent: jenkins
     branches:
     - openshift-3.10
