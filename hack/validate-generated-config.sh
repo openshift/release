@@ -20,7 +20,6 @@ blacklist=(
 	"openshift/builder"
 	"openshift/cluster-operator"
 	"openshift/jenkins"
-	"openshift/openshift-ansible"
 	"openshift/origin"
 )
 
