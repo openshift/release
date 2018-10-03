@@ -76,19 +76,22 @@ func orgRepos(dir string) (orgRepos []*orgRepo, err error) {
 	}
 	sort.Strings(matches)
 
-	orgRepos = make([]*orgRepo, len(matches))
-	for i, path := range matches {
+	orgRepos = make([]*orgRepo, 0, len(matches))
+	for _, path := range matches {
 		relpath, err := filepath.Rel(dir, path)
 		if err != nil {
 			return nil, err
 		}
 		org, repo := filepath.Split(relpath)
 		org = strings.TrimSuffix(org, string(filepath.Separator))
-		orgRepos[i] = &orgRepo{
+		if org == "openshift" && repo == "release" {
+			continue
+		}
+		orgRepos = append(orgRepos, &orgRepo{
 			Directories:  []string{path},
 			Organization: org,
 			Repository:   repo,
-		}
+		})
 	}
 
 	return orgRepos, err
