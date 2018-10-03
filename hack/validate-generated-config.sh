@@ -18,7 +18,6 @@ ci-operator-prowgen --from-dir "${ci_operator_dir}/config" --to-dir "${workdir}/
 
 blacklist=(
 	"openshift/builder"
-	"openshift/cluster-operator"
 	"openshift/jenkins"
 	"openshift/origin"
 )
