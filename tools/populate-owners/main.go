@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -75,22 +76,29 @@ func orgRepos(dir string) (orgRepos []*orgRepo, err error) {
 	}
 	sort.Strings(matches)
 
-	orgRepos = make([]*orgRepo, len(matches))
-	for i, path := range matches {
+	orgRepos = make([]*orgRepo, 0, len(matches))
+	for _, path := range matches {
 		relpath, err := filepath.Rel(dir, path)
 		if err != nil {
 			return nil, err
 		}
 		org, repo := filepath.Split(relpath)
 		org = strings.TrimSuffix(org, string(filepath.Separator))
-		orgRepos[i] = &orgRepo{
+		if org == "openshift" && repo == "release" {
+			continue
+		}
+		orgRepos = append(orgRepos, &orgRepo{
 			Directories:  []string{path},
 			Organization: org,
 			Repository:   repo,
-		}
+		})
 	}
 
 	return orgRepos, err
+}
+
+func (orgRepo *orgRepo) String() string {
+	return fmt.Sprintf("%s/%s", orgRepo.Organization, orgRepo.Repository)
 }
 
 func (orgRepo *orgRepo) getDirectories(dirs ...string) (err error) {
@@ -110,6 +118,107 @@ func (orgRepo *orgRepo) getDirectories(dirs ...string) (err error) {
 }
 
 func (orgRepo *orgRepo) getOwners() (err error) {
+	err = orgRepo.getOwnersHTTP()
+	if err == nil {
+		return nil
+	}
+	fmt.Fprintf(os.Stderr, "%v\n", err)
+
+	return orgRepo.getOwnersGit()
+}
+
+// getOwnersHTTP is fast (just the two files we need), but only works
+// on public repos unless you have an auth token.
+func (orgRepo *orgRepo) getOwnersHTTP() (err error) {
+	commitURI := fmt.Sprintf("https://api.github.com/repos/%s/%s/commits/HEAD", orgRepo.Organization, orgRepo.Repository)
+	commitAccept := "application/vnd.github.VERSION.sha"
+	data, _, err := get(commitURI, commitAccept)
+	if err != nil {
+		return err
+	}
+	initialCommit := string(data)
+
+	for _, filename := range []string{"OWNERS", "OWNERS_ALIASES"} {
+		uri := fmt.Sprintf("https://raw.githubusercontent.com/%s/%s/HEAD/%s", orgRepo.Organization, orgRepo.Repository, filename)
+		data, status, err := get(uri, "")
+		if err != nil {
+			if status == 404 {
+				continue
+			}
+			return err
+		}
+
+		var target interface{}
+		switch filename {
+		case "OWNERS":
+			target = &orgRepo.Owners
+		case "OWNERS_ALIASES":
+			target = &orgRepo.Aliases
+		default:
+			return fmt.Errorf("unrecognized filename %q", target)
+		}
+		err = yaml.Unmarshal(data, target)
+		if err != nil {
+			return fmt.Errorf("failed to parse %s: %v", uri, err)
+		}
+	}
+
+	if orgRepo.Owners == nil && orgRepo.Aliases == nil {
+		return nil
+	}
+
+	data, _, err = get(commitURI, commitAccept)
+	if err != nil {
+		return err
+	}
+	finalCommit := string(data)
+	if initialCommit == finalCommit {
+		orgRepo.Commit = initialCommit
+		return nil
+	}
+
+	fmt.Fprintf(
+		os.Stderr,
+		"%s changed from %s to %s, trying again",
+		orgRepo.String(),
+		initialCommit,
+		finalCommit,
+	)
+	return orgRepo.getOwnersHTTP()
+}
+
+func get(uri, accept string) (data []byte, status int, err error) {
+	request, err := http.NewRequest("GET", uri, nil)
+	if err != nil {
+		return data, 0, err
+	}
+
+	if accept != "" {
+		request.Header.Add("Accept", accept)
+	}
+
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return data, 0, err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != 200 {
+		return data, response.StatusCode, fmt.Errorf("failed to fetch %s: %s", uri, response.StatusCode, response.Status)
+	}
+
+	data, err = ioutil.ReadAll(response.Body)
+	if err != nil {
+		return data, response.StatusCode, fmt.Errorf("failed to read %s: %v", uri, err)
+	}
+
+	return data, response.StatusCode, nil
+}
+
+// getOwnersGit is slow (the full HEAD tree), but it works for any
+// private repository you have access to, assuming you've told GitHub
+// about your SSH key(s).
+func (orgRepo *orgRepo) getOwnersGit() (err error) {
 	dir, err := ioutil.TempDir("", "populate-owners-")
 	if err != nil {
 		return err
@@ -325,6 +434,7 @@ func pullOwners(directory string) (err error) {
 		if err != nil && !os.IsNotExist(err) {
 			return err
 		}
+		fmt.Fprintf(os.Stderr, "got owners for %s\n", orgRepo.String())
 	}
 
 	aliases, err := namespaceAliases(orgRepos)
