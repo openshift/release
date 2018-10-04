@@ -70,3 +70,48 @@ periodics:
           sources:
           - secret:
               name: cluster-secrets-azure-file
+- agent: kubernetes
+  cron: ""
+  decorate: true
+  interval: 24h
+  labels:
+    master: ci.openshift.redhat.com
+  name: azure-build-base-image-rhel
+  skip_cloning: true
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --secret-dir=/usr/local/e2e-azure-secret
+      - --template=/usr/local/build-base-image
+      - --target=build-base-image
+      command:
+      - ci-operator
+      env:
+      - name: CONFIG_SPEC
+        valueFrom:
+          configMapKeyRef:
+            key: openshift-openshift-ansible-release-3.10.yaml
+            name: ci-operator-configs
+      - name: JOB_NAME_SAFE
+        value: build-base-image
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources: {}
+      volumeMounts:
+      - mountPath: /usr/local/build-base-image
+        name: job-definition
+        subPath: build-base-image.yaml
+      - mountPath: /usr/local/e2e-azure-secret
+        name: cluster-secrets-azure-file
+    serviceAccountName: ci-operator
+    volumes:
+    - configMap:
+        name: prow-job-build-base-image
+      name: job-definition
+    - name: cluster-secrets-azure-file
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-azure-file
