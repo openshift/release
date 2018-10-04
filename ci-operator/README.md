@@ -10,14 +10,14 @@ Conventions
 
 Under this directory, we have three main directories:
 
-*  `config/$org/$repo/$branch.yaml`
+*  `config/$org/$repo/$org-$repo-$branch.yaml`
    Contains your ci-operator definition which describes how the images and tests
    in your repo works. These files are copied into config maps on the CI cluster
    and referenced by Prow jobs. If you are building branches within a fork of a
    repo in another organization, $repo should point to the fork that holds the
    branch (for example github.com/openshift/kubernetes-metrics-server instead of
    k8s.io/metrics-server).
-*  `jobs/$org/$repo/$org-$repo-(presubmit|postsubmit|periodic)-$branch.yaml`
+*  `jobs/$org/$repo/$org-$repo-$branch-(presubmit|postsubmit|periodic).yaml`
    Contains Prow job definitions for each repository that are run on PRs, on merges,
    or periodically. When we branch jobs, we will copy the current master jobs into
    a release branch specific job. Each prow job calls into the appropriate subset
