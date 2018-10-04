@@ -24,17 +24,8 @@ parameters:
 - name: PREVIOUS_RPM_DEPENDENCIES_REPO
 - name: PREVIOUS_ANSIBLE_VERSION
   required: true
-- name: TEST_SUITE
-- name: TEST_FOCUS
-- name: TEST_SKIP
-  value: "\\[local\\]"
-- name: TEST_SUITE_SERIAL
-- name: TEST_FOCUS_SERIAL
-- name: TEST_SKIP_SERIAL
-  value: "\\[local\\]"
-- name: TEST_PARALLELISM
-  value: "30"
 - name: TEST_COMMAND
+  required: true
 # Ensures the release image is created and tested
 - name: RELEASE_IMAGE_LATEST
 
@@ -96,8 +87,6 @@ objects:
       env:
       - name: HOME
         value: /tmp/home
-      - name: TEST_COMMAND
-        value: "${TEST_COMMAND}"
       command:
       - /bin/bash
       - -c
@@ -149,29 +138,26 @@ objects:
         oc create -f https://raw.githubusercontent.com/openshift/telemeter/master/deploy/telemeter-client-openshift.yaml -n openshift-telemetry
         set -e
 
-        # create the environment, but exit before we run tests
-        if [[ -n "${TEST_COMMAND-}" ]]; then
-          ${TEST_COMMAND}
-          exit 0
-        fi
-
         # TODO: the test binary should really be a more structured command - most of these flags should be
         #       autodetected from the running cluster.
         # TODO: bump nodes up to 40 again
-        set -x
-        if [[ -n "${TEST_SUITE}" || -n "${TEST_FOCUS}" ]]; then
-          ginkgo -v -noColor -nodes=${TEST_PARALLELISM} $( which extended.test ) -- \
-            -suite "${TEST_SUITE}" -ginkgo.focus="${TEST_FOCUS}" -ginkgo.skip="${TEST_SKIP}" \
-            -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit \
-            -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
-        fi
-        if [[ -n "${TEST_SUITE_SERIAL}" || -n "${TEST_FOCUS_SERIAL}" ]]; then
-          ginkgo -v -noColor -nodes=1 $( which extended.test ) -- \
-            -suite "${TEST_SUITE_SERIAL}" -ginkgo.focus="${TEST_FOCUS_SERIAL}" -ginkgo.skip="${TEST_SKIP_SERIAL}" \
-            -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit/serial \
-            -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
-        fi
-        exit ${rc:-0}
+        function run-tests() {
+          if [[ -n "${TEST_FOCUS:-}" ]]; then
+            ginkgo -v -noColor -nodes="${TEST_PARALLELISM:-30}" $( which extended.test ) -- \
+              -ginkgo.focus="${TEST_FOCUS}" -ginkgo.skip="${TEST_SKIP:-"\\[local\\]"}" \
+              -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit \
+              -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
+          fi
+          if [[ -n "${TEST_FOCUS_SERIAL:-}" ]]; then
+            ginkgo -v -noColor -nodes=1 $( which extended.test ) -- \
+              -ginkgo.focus="${TEST_FOCUS_SERIAL}" -ginkgo.skip="${TEST_SKIP_SERIAL:-"\\[local\\]"}" \
+              -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit/serial \
+              -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
+          fi
+          exit ${rc:-0}
+        }
+
+        ${TEST_COMMAND}
 
     # Runs an install of a previous release
     - name: setup
