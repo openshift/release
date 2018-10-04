@@ -23,7 +23,8 @@ def main():
     errors = []
 
     if not os.path.isdir(args.config_dir):
-        errors.append("[ERROR] {} directory doesn't exist.".format(args.config_dir))
+        errors.append(
+            "[ERROR] {} directory doesn't exist.".format(args.config_dir))
 
     for root, _, files in os.walk(args.config_dir):
         for name in files:
@@ -38,12 +39,12 @@ def main():
                         "[ERROR] Folder structure is not in $config_dir/$org/$repo/ format for file {}/{}".format(root_path, name))
                     exit(1)
 
-                branch = filename.replace(org + "-" + repo + "-", "")
-                expected_filename = org + "-" + repo + "-" + branch
-                if not filename == expected_filename:
+                branch = filename.replace("{}-{}-".format(org,repo), "")
+                expected_filename = "{}-{}-{}".format(org,repo,branch)
+                if filename != expected_filename:
                     errors.append(
                         "[ERROR] File {} should be in {}-{}-$branch.yaml format".format(filename, org, repo))
-    if len(errors) > 0:
+    if errors:
         print(errors)
         sys.exit(1)
 
