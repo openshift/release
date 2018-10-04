@@ -94,12 +94,16 @@ objects:
       env:
       - name: HOME
         value: /tmp/home
+      - name: KUBECONFIG
+        value: /tmp/admin.kubeconfig
       command:
       - /bin/bash
       - -c
       - |
         #!/bin/bash
         set -euo pipefail
+
+        export PATH=/tmp/shared:$PATH
 
         trap 'touch /tmp/shared/exit' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
@@ -118,9 +122,7 @@ objects:
 
         # don't let clients impact the global kubeconfig
         cp /tmp/shared/admin.kubeconfig /tmp/admin.kubeconfig
-        export KUBECONFIG=/tmp/admin.kubeconfig
         export ARTIFACT_DIR=/tmp/artifacts
-        export PATH=/tmp/shared:$PATH
 
         # set up cloud provider specific env vars
         if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
