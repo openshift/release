@@ -194,6 +194,9 @@ objects:
               -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit/serial \
               -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
           fi
+          if [[ "${rc:-0}" -eq 0 ]]; then
+            touch /tmp/shared/success
+          fi
           exit ${rc:-0}
         }
 
@@ -292,19 +295,21 @@ objects:
             ) &
           done < /tmp/nodes
 
-          while IFS= read -r i; do
-            file="$( echo "$i" | cut -d ' ' -f 3 | tr -s ' ' '_' )"
-            oc exec $i -- /bin/bash -c 'oc get --raw /debug/pprof/heap --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig' > /tmp/artifacts/metrics/${file}-heap
-            oc exec $i -- /bin/bash -c 'oc get --raw /metrics --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig' | gzip -c > /tmp/artifacts/metrics/${file}-api.gz
-            oc exec $i -- /bin/bash -c 'oc get --raw /debug/pprof/heap --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig' > /tmp/artifacts/metrics/${file}-controllers-heap
-            oc exec $i -- /bin/bash -c 'oc get --raw /metrics --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig' | gzip -c > /tmp/artifacts/metrics/${file}-controllers.gz
-          done < /tmp/pods-api
+          if [[ ! -f /tmp/shared/success ]]; then
+            while IFS= read -r i; do
+              file="$( echo "$i" | cut -d ' ' -f 3 | tr -s ' ' '_' )"
+              oc exec $i -- /bin/bash -c 'oc get --raw /debug/pprof/heap --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig' > /tmp/artifacts/metrics/${file}-heap
+              oc exec $i -- /bin/bash -c 'oc get --raw /metrics --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig' | gzip -c > /tmp/artifacts/metrics/${file}-api.gz
+              oc exec $i -- /bin/bash -c 'oc get --raw /debug/pprof/heap --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig' > /tmp/artifacts/metrics/${file}-controllers-heap
+              oc exec $i -- /bin/bash -c 'oc get --raw /metrics --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig' | gzip -c > /tmp/artifacts/metrics/${file}-controllers.gz
+            done < /tmp/pods-api
 
-          while IFS= read -r i; do
-            file="$( echo "$i" | cut -d ' ' -f 2,3,5 | tr -s ' ' '_' )"
-            oc logs --request-timeout=20s $i | gzip -c > /tmp/artifacts/pods/${file}.log.gz
-            oc logs --request-timeout=20s -p $i | gzip -c > /tmp/artifacts/pods/${file}_previous.log.gz
-          done < /tmp/containers
+            while IFS= read -r i; do
+              file="$( echo "$i" | cut -d ' ' -f 2,3,5 | tr -s ' ' '_' )"
+              oc logs --request-timeout=20s $i | gzip -c > /tmp/artifacts/pods/${file}.log.gz
+              oc logs --request-timeout=20s -p $i | gzip -c > /tmp/artifacts/pods/${file}_previous.log.gz
+            done < /tmp/containers
+          fi
 
           echo "Waiting for node logs to finish ..."
           wait
