@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
+
 import os
-import re
-import subprocess
 import sys
 import yaml
 
@@ -11,21 +10,21 @@ JOBS_DIR = 'ci-operator/jobs'
 
 def main():
     failed = False
-    for root, dirs, files in os.walk(JOBS_DIR):
+    for root, _, files in os.walk(JOBS_DIR):
         for filename in files:
             if not filename.endswith('.yaml'):
                 continue
             if os.path.basename(filename) == "infra-periodics.yaml":
                 continue
             path = os.path.join(root, filename)
-            for check in [validate_filename, validate_file_structure]:
-                if not check(path):
+            for file_check in [validate_filename, validate_file_structure]:
+                if not file_check(path):
                     failed = True
                 else:
                     with open(path) as f:
                         data = yaml.load(f)
-                        for check in [validate_job_repo, validate_names, validate_sharding, validate_ci_op_args, validate_pod_name, validate_resources]:
-                            if not check(path, data):
+                        for content_check in [validate_job_repo, validate_names, validate_sharding, validate_ci_op_args, validate_pod_name, validate_resources]:
+                            if not content_check(path, data):
                                 failed = True
 
     if failed:
@@ -35,12 +34,10 @@ def parse_org_repo(path):
     return os.path.basename(os.path.dirname(os.path.dirname(path))), os.path.basename(os.path.dirname(path))
 
 def validate_filename(path):
-    errors = []
-
     org_dir, repo_dir = parse_org_repo(path)
     base = os.path.basename(path)
-    if not base.startswith("{}-{}-".format(org_dir,repo_dir)):
-        print("[ERROR] {}: expected filename to start with {}-{}".format(path,org_dir,repo_dir))
+    if not base.startswith("{}-{}-".format(org_dir, repo_dir)):
+        print("[ERROR] {}: expected filename to start with {}-{}".format(path, org_dir, repo_dir))
         return False
 
     job_type = base[base.rfind("-")+1:-len(".yaml")]
@@ -49,11 +46,11 @@ def validate_filename(path):
         return False
 
     if job_type == "periodics":
-        if base != "{}-{}-{}.yaml".format(org_dir,repo_dir,job_type):
+        if base != "{}-{}-{}.yaml".format(org_dir, repo_dir, job_type):
             print("[ERROR] {}: Invalid formatting in filename: expected filename format $org-$repo-periodics.yaml".format(path))
             return False
     else:
-        branch = base[len("{}-{}-".format(org_dir,repo_dir)):-len("-{}.yaml".format(job_type))]
+        branch = base[len("{}-{}-".format(org_dir, repo_dir)):-len("-{}.yaml".format(job_type))]
         if branch == "":
             print("[ERROR] {}: Invalid formatting in filename: expected filename format org-repo-branch-(pre|post)submits.yaml".format(path))
             return False
@@ -79,13 +76,13 @@ def validate_job_repo(path, data):
     org, repo = parse_org_repo(path)
     if "presubmits" in data:
         for org_repo in data["presubmits"]:
-            if org_repo != "{}/{}".format(org,repo):
-                print("[ERROR] {}: file defines jobs for {}, but is only allowed to contain jobs for {}/{}".format(org_repo, org, repo))
+            if org_repo != "{}/{}".format(org, repo):
+                print("[ERROR] {}: file defines jobs for {}, but is only allowed to contain jobs for {}/{}".format(path, org_repo, org, repo))
                 return False
     if "postsubmits" in data:
         for org_repo in data["postsubmits"]:
-            if org_repo != "{}/{}".format(org,repo):
-                print("[ERROR] {}: file defines jobs for {}, but is only allowed to contain jobs for {}/{}".format(org_repo, org, repo))
+            if org_repo != "{}/{}".format(org, repo):
+                print("[ERROR] {}: file defines jobs for {}, but is only allowed to contain jobs for {}/{}".format(path, org_repo, org, repo))
                 return False
 
     return True
@@ -109,11 +106,11 @@ def validate_names(path, data):
                     if arg.startswith("--target="):
                         targets.append(arg[len("--target="):].strip("[]"))
 
-                if len(targets) == 0:
+                if not targets:
                     print("[WARNING] {}: ci-operator job {} should call a target".format(path, job["name"]))
                     continue
 
-                filtered_targets = [target for target in targets if target not in ["release:latest"] ]
+                filtered_targets = [target for target in targets if target not in ["release:latest"]]
                 if len(filtered_targets) != 1:
                     print("[WARNING] {}: ci-operator job {} should call no more than one target, calls {}".format(path, job["name"], targets))
                     continue
@@ -161,7 +158,7 @@ def validate_sharding(path, data):
                 if "branches" in job:
                     branch = job["branches"][0]
 
-                file_branch = os.path.basename(path)[len("{}-".format(repo.replace("/","-"))):-len("-{}.yaml".format(job_type))]
+                file_branch = os.path.basename(path)[len("{}-".format(repo.replace("/", "-"))):-len("-{}.yaml".format(job_type))]
                 if file_branch != branch:
                     print("[ERROR] {}: job {} runs on branch {}, not {} so it should be in file {}".format(path, job["name"], branch, file_branch, path.replace(file_branch, branch)))
                     out = False
@@ -250,7 +247,7 @@ def validate_resources(path, data):
                 if job["spec"]["containers"][0]["command"][0] != "ci-operator":
                     continue
 
-                resources = {"limits":{"cpu":"500m"},"requests":{"cpu":"10m"}}
+                resources = {"limits": {"cpu": "500m"}, "requests": {"cpu": "10m"}}
                 if "resources" not in job["spec"]["containers"][0] or job["spec"]["containers"][0]["resources"] != resources:
                     print("[ERROR] {}: ci-operator job {} should set the pod's CPU resources to {}".format(path, job["name"], resources))
                     out = False
