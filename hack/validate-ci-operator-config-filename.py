@@ -39,8 +39,8 @@ def main():
                         "[ERROR] Folder structure is not in $config_dir/$org/$repo/ format for file {}/{}".format(root_path, name))
                     exit(1)
 
-                branch = filename.replace("{}-{}-".format(org,repo), "")
-                expected_filename = "{}-{}-{}".format(org,repo,branch)
+                branch = filename.replace("{}-{}-".format(org, repo), "")
+                expected_filename = "{}-{}-{}".format(org, repo, branch)
                 if filename != expected_filename:
                     errors.append(
                         "[ERROR] File {} should be in {}-{}-$branch.yaml format".format(filename, org, repo))
