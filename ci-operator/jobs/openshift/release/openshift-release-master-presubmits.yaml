@@ -130,3 +130,28 @@ presubmits:
         name: ""
         resources: {}
     trigger: ((?m)^/test( all| prow-config-semantics),?(\s+|$))
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - master
+    context: ci/prow/pylint
+    decorate: true
+    name: pull-ci-openshift-release-pylint
+    rerun_command: /test pylint
+    run_if_changed: ^hack/.*\.py$
+    spec:
+      containers:
+      - args:
+        - --rcfile=hack/.pylintrc
+        - hack/*.py
+        command:
+        - pylint
+        image: registry.svc.ci.openshift.org/ci/python-validation
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+    trigger: ((?m)^/test( all| pylint),?(\s+|$))

@@ -18,3 +18,4 @@ ENV LC_ALL "en_US.UTF-8"
 ENV LD_LIBRARY_PATH "$LD_LIBRARY_PATH:/usr/local/lib"
 
 RUN pip3 install pyyaml
+RUN pip3 install pylint
