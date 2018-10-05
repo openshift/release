@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 '''
 This script validates the ci-operator's config filename, to be
@@ -23,29 +23,24 @@ def main():
     errors = []
 
     if not os.path.isdir(args.config_dir):
-        errors.append(
-            "[ERROR] {} directory doesn't exist.".format(args.config_dir))
+        errors.append(f"[ERROR] {args.config_dir} directory doesn't exist.")
 
     for root, _, files in os.walk(args.config_dir):
         for name in files:
             if name.endswith(".yaml"):
-                root_path = root.replace(args.config_dir, "")
-                filename = os.path.splitext(os.path.basename(name))[0]
+                root_path = os.path.relpath(root, args.config_dir)
+                filename, _ = os.path.splitext(name)
                 try:
-                    org = root_path.split("/")[1]
-                    repo = root_path.split("/")[2]
-                except IndexError:
-                    print(
-                        "[ERROR] Folder structure is not in $config_dir/$org/$repo/ format for file {}/{}".format(root_path, name))
-                    exit(1)
+                    org, repo = os.path.split(root_path)
+                except ValueError:
+                    print(f"[ERROR] Folder structure is not in $config_dir/$org/$repo/ format for file {root_path}/{name}")
+                    sys.exit(1)
 
-                branch = filename.replace("{}-{}-".format(org, repo), "")
-                expected_filename = "{}-{}-{}".format(org, repo, branch)
-                if filename != expected_filename:
-                    errors.append(
-                        "[ERROR] File {} should be in {}-{}-$branch.yaml format".format(filename, org, repo))
+                if not filename.startswith(f"{org}-{repo}-"):
+                    errors.append(f"[ERROR] File '{args.config_dir}/{root}/{name}' name should have '{org}-{repo}-$branch.yaml' format")
+
     if errors:
-        print(errors)
+        print("\n".join(errors))
         sys.exit(1)
 
 
