@@ -171,6 +171,9 @@ objects:
           export PROVIDER_ARGS="-provider=aws -gce-zone=us-east-1"
           mkdir -p ~/.ssh
           cp /tmp/cluster/ssh-privatekey ~/.ssh/kube_aws_rsa || true
+        elif [[ "${CLUSTER_TYPE}" == "openstack" ]]; then
+          mkdir -p ~/.ssh
+          cp /tmp/cluster/ssh-privatekey ~/.ssh/kube_openstack_rsa || true
         fi
 
         mkdir -p /tmp/output
@@ -234,11 +237,23 @@ objects:
       - name: OPENSHIFT_INSTALL_PULL_SECRET_PATH
         value: /etc/openshift-installer/pull-secret
       - name: OPENSHIFT_INSTALL_PLATFORM
-        value: aws
+        value: ${CLUSTER_TYPE}
       - name: OPENSHIFT_INSTALL_AWS_REGION
         value: us-east-1
       - name: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
         value: ${RELEASE_IMAGE_LATEST}
+      - name: OPENSHIFT_INSTALL_OPENSTACK_IMAGE
+        value: rhcos
+      - name: OPENSHIFT_INSTALL_OPENSTACK_CLOUD
+        value: openstack-cloud
+      - name: OPENSHIFT_INSTALL_OPENSTACK_REGION
+        value: RegionOne
+      - name: OPENSHIFT_INSTALL_OPENSTACK_EXTERNAL_NETWORK
+        value: public
+      - name: OS_CLOUD
+        value: openstack-cloud
+      - name: OS_CLIENT_CONFIG_FILE
+        value: /etc/openshift-installer/clouds.yaml
       command:
       - /bin/sh
       - -c
