@@ -53,3 +53,13 @@ tests:
 - as: golint
   commands: IS_CONTAINER=TRUE ./hack/go-lint.sh -min_confidence 0.3 $(go list -f '{{ .ImportPath }}' ./...)
   from: src
+- as: e2e-aws
+  commands: TEST_FOCUS='Secrets should be consumable from pods in volume with defaultMode
+    set' run-tests
+  openshift_installer:
+    target_cloud: aws
+- as: e2e-aws-all
+  commands: TEST_FOCUS=Suite:openshift/conformance/parallel TEST_FOCUS_SERIAL=Suite:openshift/conformance/serial
+    run-tests
+  openshift_installer:
+    target_cloud: aws
