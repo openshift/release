@@ -156,6 +156,8 @@ objects:
       env:
       - name: HOME
         value: /tmp/home
+      - name: KUBECONFIG
+        value: /tmp/admin.kubeconfig
       - name: IMAGE_MAVEN_AGENT
         value: "${IMAGE_MAVEN_AGENT}"
       - name: IMAGE_NODEJS_AGENT
@@ -166,6 +168,8 @@ objects:
       - |
         #!/bin/bash
         set -euo pipefail
+
+        export PATH=/usr/libexec/origin:$PATH
 
         trap 'touch /tmp/shared/exit' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
@@ -198,9 +202,6 @@ objects:
 
         # don't let clients impact the global kubeconfig
         cp /tmp/shared/admin.kubeconfig /tmp/admin.kubeconfig
-        export KUBECONFIG=/tmp/admin.kubeconfig
-
-        PATH=/usr/libexec/origin:$PATH
 
         # set up cloud provider specific env vars
         if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
@@ -214,9 +215,17 @@ objects:
         mkdir -p /tmp/output
         cd /tmp/output
 
+        # install telemetry client (TEMPORARY)
+        set +e
+        curl https://raw.githubusercontent.com/openshift/telemeter/master/deploy/default-rules > /tmp/rules
+        oc create ns openshift-telemetry
+        oc adm policy add-cluster-role-to-user cluster-reader -z default -n openshift-telemetry
+        oc create secret generic telemeter-client --from-literal=to=https://telemeter.svc.ci.openshift.org --from-literal=id=${NAMESPACE}-${JOB_NAME_HASH} --from-file=token=/tmp/cluster/telemeter-token --from-literal=salt=random-salt --from-file=rules=/tmp/rules --dry-run -o yaml | oc apply -n openshift-telemetry -f -
+        oc create -f https://raw.githubusercontent.com/openshift/telemeter/master/deploy/telemeter-client-openshift.yaml -n openshift-telemetry
+        set -e
+
         # TODO: the test binary should really be a more structured command - most of these flags should be
         #       autodetected from the running cluster.
-        # TODO: bump nodes up to 40 again
         function run-tests() {
           if [[ -n "${TEST_FOCUS:-}" ]]; then
             ginkgo -v -noColor -nodes="${TEST_PARALLELISM:-30}" $( which extended.test ) -- \
