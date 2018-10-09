@@ -24,12 +24,59 @@ periodics:
   labels:
     master: ci.openshift.redhat.com
   name: azure_build_base_image_rhel
+- agent: kubernetes
+  cron: ""
+  decorate: true
+  interval: 24h
+  labels:
+    master: ci.openshift.redhat.com
+  name: azure-build-base-image-centos
+  skip_cloning: true
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --secret-dir=/usr/local/e2e-secrets/azure
+      - --template=/usr/local/build-base-image
+      - --target=build-base-image
+      command:
+      - ci-operator
+      env:
+      - name: CONFIG_SPEC
+        valueFrom:
+          configMapKeyRef:
+            key: openshift-openshift-ansible-release-3.10.yaml
+            name: ci-operator-configs
+      - name: JOB_NAME_SAFE
+        value: build-base-image
+      - name: DEPLOY_OS
+        value: centos
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources: {}
+      volumeMounts:
+      - mountPath: /usr/local/build-base-image
+        name: job-definition
+        subPath: build-base-image.yaml
+      - mountPath: /usr/local/e2e-secrets/azure
+        name: cluster-secrets-azure-file
+    serviceAccountName: ci-operator
+    volumes:
+    - configMap:
+        name: prow-job-build-base-image
+      name: job-definition
+    - name: cluster-secrets-azure-file
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-azure-file
   run_after_success:
   - agent: kubernetes
     cron: ""
     decorate: true
     interval: 24h
-    name: azure-build-node-image-rhel-310
+    name: azure-build-node-image-centos-310
     skip_cloning: true
     spec:
       containers:
@@ -50,6 +97,10 @@ periodics:
           value: build-node-image
         - name: CLUSTER_TYPE
           value: azure
+        - name: DEPLOY_OS
+          value: centos
+        - name: OPENSHIFT_RELEASE
+          value: "3.10"
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -81,6 +132,7 @@ periodics:
   spec:
     containers:
     - args:
+      - --artifact-dir=$(ARTIFACTS)
       - --secret-dir=/usr/local/e2e-secrets/azure
       - --template=/usr/local/build-base-image
       - --target=build-base-image
@@ -94,6 +146,8 @@ periodics:
             name: ci-operator-configs
       - name: JOB_NAME_SAFE
         value: build-base-image
+      - name: DEPLOY_OS
+        value: rhel7
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -114,3 +168,53 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-azure-file
+  run_after_success:
+  - agent: kubernetes
+    cron: ""
+    decorate: true
+    interval: 24h
+    name: azure-build-node-image-rhel-310
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --secret-dir=/usr/local/e2e-secrets/azure
+        - --template=/usr/local/build-node-image
+        - --target=build-node-image
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-openshift-ansible-release-3.10.yaml
+              name: ci-operator-configs
+        - name: JOB_NAME_SAFE
+          value: build-node-image
+        - name: CLUSTER_TYPE
+          value: azure
+        - name: DEPLOY_OS
+          value: rhel7
+        - name: OPENSHIFT_RELEASE
+          value: "3.10"
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources: {}
+        volumeMounts:
+        - mountPath: /usr/local/build-node-image
+          name: job-definition
+          subPath: build-node-image.yaml
+        - mountPath: /usr/local/e2e-secrets/azure
+          name: cluster-secrets-azure-file
+      serviceAccountName: ci-operator
+      volumes:
+      - configMap:
+          name: prow-job-build-node-image
+        name: job-definition
+      - name: cluster-secrets-azure-file
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-azure-file
