@@ -21,10 +21,10 @@ items:
         kind: ImageStreamTag
         name: test-base:latest
     source:
-      git: 
+      git:
         uri: "https://github.com/openshift/release"
         ref: "master"
-      contextDir: "projects/azure/base-images/test-base" 
+      contextDir: "projects/azure/base-images/test-base"
       dockerfile: |
         FROM docker.io/centos:7
         # install golang-1.10
@@ -53,11 +53,13 @@ items:
         RUN go get github.com/go-bindata/go-bindata && \
             go get golang.org/x/tools/cmd/goyacc && \
             go get golang.org/x/tools/cmd/goimports && \
+            go get github.com/golang/mock/gomock && \
+            go install github.com/golang/mock/mockgen && \
             chmod 777 -R /go/bin
         RUN yum clean all
         # Add image scripts and files for running as non priv container
         COPY root /
-        RUN /usr/local/bin/user_setup 
+        RUN /usr/local/bin/user_setup
         USER ${USER_UID}
         ENTRYPOINT [ "/usr/local/bin/entrypoint" ]
       type: Dockerfile
