@@ -5,23 +5,183 @@ Main code repository is located in [Openshift Azure](https://github.com/openshif
 
 # Test CI-operator jobs 
 
-CI-Operator jobs are being triggered using [prow](https://github.com/kubernetes/test-infra/tree/master/prow)
-Prow configuration is located in this repository `ci-operator/jobs/openshift/openshift-azure/*.yaml`
+CI-Operator jobs are being triggered using [prow](https://github.com/kubernetes/test-infra/tree/master/prow).
+The Prow configuration is located in files within this repository at `ci-operator/jobs/openshift/openshift-azure/*.yaml`
 
-To run CI-Operator job manually you need to have to have [CI-Operator](https://github.com/openshift/ci-operator) installed in your path.
-Modify secret location in file `cluster-launch-e2e-azure.yaml` as below. This is because `ci-operator` set secret based on path where files are located and they are different in local development and CI server.
-``` - name: cluster-secrets-azure-file
-      secret:
-         secretName: azure
+To run a CI-Operator job manually it is recommended to use the [CI-Operator](https://github.com/openshift/ci-operator) container image
+```
+docker pull registry.svc.ci.openshift.org/ci/ci-operator:latest
 ```
 
-Populate secret file in `cluster/test-deploy/azure/secret` using `cluster/test-deploy/azure/secret_example` as template.
-If you are running this job not in CI cluster development namespace, but on other OpenShift cluster you will need to pre-populate base images in `azure` namespaces.
+The templates used to run all of our ci-operator jobs (vm image builds and e2e tests) are located in 
 
-Run job:
 ```
-ci-operator --config ci-operator/config/openshift/openshift-azure/master.yaml --namespace=namespace-name --git-ref=openshift/openshift-azure@master --template ci-operator/templates/cluster-launch-e2e-azure.yaml --secret-dir $(pwd)/cluster/test-deploy/azure/
+ci-operator/templates/openshift/openshift-azure/
 ```
+
+Obtain the `oc login` command from the OpenShift CI WebConsole and perform a login in your terminal
+
+Note: all further instructions assume you are currently in the root directory of this repository
+
+Create a `secret` file for storing azure-related secrets using `cluster/test-deploy/azure/secret_example` as a template.
+
+```
+cp cluster/test-deploy/azure/secret_example cluster/test-deploy/azure/secret
+# insert/update credentials in cluster/test-deploy/azure/secret
+```
+
+Set the location of the namespace you wish to use for the ci-operator jobs
+```
+export CI_OPERATOR_NAMESPACE=your-chosen-namespace
+```
+
+#### Testing vm image builds
+
+Generate a new ssh keypair making sure to set the name of the keypair file as `ssh-privatekey`
+
+```
+ssh-keygen -t rsa -b 4096 -f cluster/test-deploy/azure/ssh-privatekey 
+```
+
+Checkout the repository containing the yum client certificates required by openshift-ansible to update the packages on the root VM.
+```
+git clone git@github.com:openshift/aos-ansible.git ../aos-ansible
+```
+
+Create `cluster/test-deploy/azure/certs.yaml` with the following format making sure to replace the `<contents of *>` placeholders
+```
+yum_client_cert_contents: |
+	<contents of ../aos-ansible/playbooks/roles/ops_mirror_bootstrap/files/client-cert.pem>
+
+yum_client_key_contents: |
+	<contents of ../aos-ansible/playbooks/roles/ops_mirror_bootstrap/files/client-key.pem>
+```
+
+Example: Build a rhel base vm image
+```
+docker run \
+--rm \
+-it \
+--env DEPLOY_OS=rhel7 \
+--volume $HOME/.kube/config:/root/.kube/config \
+--volume $(pwd):/release \
+registry.svc.ci.openshift.org/ci/ci-operator:latest \
+--config /release/ci-operator/config/openshift/openshift-azure/openshift-openshift-azure-master.yaml \
+--git-ref=openshift/openshift-azure@master \
+--namespace=${CI_OPERATOR_NAMESPACE} \
+--template /release/ci-operator/templates/openshift/openshift-azure/build-base-image.yaml \
+--secret-dir /release/cluster/test-deploy/azure/ \
+--target build-base-image
+```
+
+Example: Build a centos base vm image
+```
+docker run \
+--rm \
+-it \
+--env DEPLOY_OS=centos \
+--volume $HOME/.kube/config:/root/.kube/config \
+--volume $(pwd):/release \
+registry.svc.ci.openshift.org/ci/ci-operator:latest \
+--config /release/ci-operator/config/openshift/openshift-azure/openshift-openshift-azure-master.yaml \
+--git-ref=openshift/openshift-azure@master \
+--namespace=${CI_OPERATOR_NAMESPACE} \
+--template /release/ci-operator/templates/openshift/openshift-azure/build-base-image.yaml \
+--secret-dir /release/cluster/test-deploy/azure/ \
+--target build-base-image
+```
+
+Example: Build a rhel node vm image with openshift 3.10
+```
+docker run \
+--rm \
+-it \
+--env DEPLOY_OS=rhel7 \
+--env OPENSHIFT_RELEASE="3.10" \
+--volume $HOME/.kube/config:/root/.kube/config \
+--volume $(pwd):/release \
+registry.svc.ci.openshift.org/ci/ci-operator:latest \
+--config /release/ci-operator/config/openshift/openshift-azure/openshift-openshift-azure-master.yaml \
+--git-ref=openshift/openshift-azure@master \
+--namespace=${CI_OPERATOR_NAMESPACE} \
+--template /release/ci-operator/templates/openshift/openshift-azure/build-node-image.yaml \
+--secret-dir /release/cluster/test-deploy/azure/ \
+--target build-node-image
+```
+
+Example: Build a centos node vm image with openshift 3.10
+```
+docker run \
+--rm \
+-it \
+--env DEPLOY_OS=centos \
+--env OPENSHIFT_RELEASE="3.10" \
+--volume $HOME/.kube/config:/root/.kube/config \
+--volume $(pwd):/release \
+registry.svc.ci.openshift.org/ci/ci-operator:latest \
+--config /release/ci-operator/config/openshift/openshift-azure/openshift-openshift-azure-master.yaml \
+--git-ref=openshift/openshift-azure@master \
+--namespace=${CI_OPERATOR_NAMESPACE} \
+--template /release/ci-operator/templates/openshift/openshift-azure/build-node-image.yaml \
+--secret-dir /release/cluster/test-deploy/azure/ \
+--target build-node-image
+```
+
+#### Running e2e tests
+
+Example: Run e2e tests
+```
+docker run \
+--rm \
+-it \
+--volume $HOME/.kube/config:/root/.kube/config \
+--volume $(pwd):/release \
+registry.svc.ci.openshift.org/ci/ci-operator:latest \
+--config ci-operator/config/openshift/openshift-azure/openshift-openshift-azure-master.yaml \
+--git-ref=openshift/openshift-azure@master \
+--namespace=${CI_OPERATOR_NAMESPACE} \
+--template ci-operator/templates/openshift/openshift-azure/cluster-launch-e2e-azure.yaml \
+--secret-dir /release/cluster/test-deploy/azure/
+```
+
+Example: Run an upgrade and then perform e2e tests
+```
+docker run \
+--rm \
+-it \
+--volume $HOME/.kube/config:/root/.kube/config \
+--volume $(pwd):/release \
+registry.svc.ci.openshift.org/ci/ci-operator:latest \
+--config ci-operator/config/openshift/openshift-azure/openshift-openshift-azure-master.yaml \
+--git-ref=openshift/openshift-azure@master \
+--namespace=${CI_OPERATOR_NAMESPACE} \
+--template ci-operator/templates/openshift/openshift-azure/cluster-launch-e2e-azure-upgrade.yaml \
+--secret-dir /release/cluster/test-deploy/azure/
+```
+
+Example: Run origin conformance tests
+```
+docker run \
+--rm \
+-it \
+--env TEST_COMMAND="TEST_FOCUS=Suite:openshift/conformance/parallel run-tests" \
+--volume $HOME/.kube/config:/root/.kube/config \
+--volume $(pwd):/release \
+registry.svc.ci.openshift.org/ci/ci-operator:latest \
+--config ci-operator/config/openshift/openshift-azure/openshift-openshift-azure-master.yaml \
+--git-ref=openshift/openshift-azure@master \
+--namespace=${CI_OPERATOR_NAMESPACE} \
+--template ci-operator/templates/openshift/openshift-azure/cluster-launch-e2e-azure-conformance.yaml \
+--secret-dir /release/cluster/test-deploy/azure/
+```
+
+#### Cleanup
+
+Delete the `aos-ansible` repository if desired
+```
+rm -rf ../aos-ansible
+```
+
 
 # Secret rotation
 
