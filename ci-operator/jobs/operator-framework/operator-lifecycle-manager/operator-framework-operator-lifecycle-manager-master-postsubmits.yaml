@@ -32,3 +32,35 @@ postsubmits:
           requests:
             cpu: 10m
       serviceAccountName: ci-operator
+  - agent: kubernetes
+    branches:
+    - operator-framework-operator-lifecycle-manager-master
+    decorate: true
+    labels:
+      artifacts: images
+    name: branch-ci-operator-framework-operator-lifecycle-manager-operator-framework-operator-lifecycle-manager-master-images
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --promote
+        - --target=[images]
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: operator-framework-operator-lifecycle-manager-master.yaml
+              name: ci-operator-operator-framework-operator-lifecycle-manager
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
