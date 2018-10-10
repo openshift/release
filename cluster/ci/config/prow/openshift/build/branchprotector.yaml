@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: List
+items:
+- kind: ImageStream
+  apiVersion: v1
+  metadata:
+    name: branchprotector
+  spec:
+    lookupPolicy:
+      local: true
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    name: branchprotector
+    labels:
+      ci.openshift.io/source-repo: test-infra
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: branchprotector:latest
+    source:
+      dockerfile: |
+        FROM gcr.io/k8s-prow/alpine:0.1
+        LABEL maintainer="skuznets@redhat.com"
+
+        COPY branchprotector /branchprotector
+        ENTRYPOINT ["/branchprotector"]
+      images:
+      - from:
+          kind: ImageStreamTag
+          name: test-infra:binaries
+        paths:
+        - destinationDir: .
+          sourcePath: /go/bin/branchprotector
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: gcr.io/k8s-prow/alpine:0.1
+        imageOptimizationPolicy: SkipLayers
+    triggers:
+    - imageChange:
+        from:
+          kind: ImageStreamTag
+          name: test-infra:binaries
+      type: ImageChange
