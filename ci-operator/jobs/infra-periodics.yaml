@@ -199,3 +199,42 @@ periodics:
     - configMap:
         name: labels
       name: config
+- agent: kubernetes
+  cron: ""
+  decorate: true
+  interval: 24h
+  name: periodic-branch-protector
+  skip_cloning: true
+  spec:
+    containers:
+    - args:
+      - --config-path=/etc/config/config.yaml
+      - --job-config-path=/etc/job-config
+      - --confirm=true
+      - --token=/etc/github/oauth
+      command:
+      - /branchprotector
+      image: branchprotector:latest
+      imagePullPolicy: Always
+      name: ""
+      resources: {}
+      volumeMounts:
+      - mountPath: /etc/github
+        name: token
+        readOnly: true
+      - mountPath: /etc/config
+        name: config
+        readOnly: true
+      - name: job-config
+        mountPath: /etc/job-config
+        readOnly: true
+    volumes:
+    - name: token
+      secret:
+        secretName: repo-management-token
+    - name: config
+      configMap:
+        name: config
+    - name: job-config
+      configMap:
+        name: job-config
