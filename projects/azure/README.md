@@ -3,7 +3,7 @@
 Azure project is a flavor of OpenShift dedicated hosted, on Microsoft Azure. This repository contains code for building release artifacts, testing, and life-cycle.
 Main code repository is located in [Openshift Azure](https://github.com/openshift/openshift-azure/) project
 
-# Test CI-operator jobs 
+# Test CI-operator jobs
 
 CI-Operator jobs are being triggered using [prow](https://github.com/kubernetes/test-infra/tree/master/prow).
 The Prow configuration is located in files within this repository at `ci-operator/jobs/openshift/openshift-azure/*.yaml`
@@ -13,7 +13,7 @@ To run a CI-Operator job manually it is recommended to use the [CI-Operator](htt
 docker pull registry.svc.ci.openshift.org/ci/ci-operator:latest
 ```
 
-The templates used to run all of our ci-operator jobs (vm image builds and e2e tests) are located in 
+The templates used to run all of our ci-operator jobs (vm image builds and e2e tests) are located in
 
 ```
 ci-operator/templates/openshift/openshift-azure/
@@ -79,7 +79,7 @@ Example: Build a centos base vm image
 docker run \
 --rm \
 -it \
---env DEPLOY_OS=centos \
+--env DEPLOY_OS=centos7 \
 --volume $HOME/.kube/config:/root/.kube/config \
 --volume $(pwd):/release \
 registry.svc.ci.openshift.org/ci/ci-operator:latest \
@@ -114,7 +114,7 @@ Example: Build a centos node vm image with openshift 3.10
 docker run \
 --rm \
 -it \
---env DEPLOY_OS=centos \
+--env DEPLOY_OS=centos7 \
 --env OPENSHIFT_RELEASE="3.10" \
 --volume $HOME/.kube/config:/root/.kube/config \
 --volume $(pwd):/release \
@@ -185,7 +185,7 @@ rm -rf ../aos-ansible
 
 # Secret rotation
 
-We use 2 types of secrets. Both of them contain the same data but in a different formats. 
+We use 2 types of secrets. Both of them contain the same data but in a different formats.
 
 ```
 -file - file based secret. It can be sourced by script (see ci-operator jobs code)
