@@ -303,6 +303,65 @@ presubmits:
         name: job-definition
     trigger: ((?m)^/test( all| e2e-gcp-launch),?(\s+|$))
   - agent: kubernetes
+    always_run: false
+    branches:
+    - master
+    context: ci/prow/e2e-gcp-logging
+    decorate: true
+    name: pull-ci-openshift-openshift-ansible-master-e2e-gcp-logging
+    rerun_command: /test e2e-gcp-logging
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --secret-dir=/usr/local/e2e-gcp-logging-cluster-profile
+        - --target=e2e-gcp-logging
+        - --template=/usr/local/e2e-gcp-logging
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-openshift-ansible-master.yaml
+              name: ci-operator-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-gcp-logging
+        - name: RPM_REPO_OPENSHIFT_ORIGIN
+          value: https://rpms.svc.ci.openshift.org/openshift-origin-v4.0/
+        - name: TEST_COMMAND
+          value: TEST_FOCUS=Suite:openshift/conformance/parallel run-tests
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-gcp-logging-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-gcp-logging
+          name: job-definition
+          subPath: cluster-launch-e2e.yaml
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-
+          - configMap:
+              name: cluster-profile-gcp-logging
+      - configMap:
+          name: prow-job-cluster-launch-e2e
+        name: job-definition
+    trigger: ((?m)^/test( all| e2e-gcp-logging),?(\s+|$))
+  - agent: kubernetes
     always_run: true
     branches:
     - master
