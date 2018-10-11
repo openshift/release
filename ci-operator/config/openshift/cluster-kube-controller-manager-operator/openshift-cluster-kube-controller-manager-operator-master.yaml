@@ -35,18 +35,20 @@ tag_specification:
 
 tests:
 - as: verify
-  from: bin
   commands: |
     go get -u golang.org/x/tools/imports
     make verify -k
+  container:
+    from: bin
 
 - as: unit
-  from: test-bin
   commands: |
     mkdir -p /tmp/artifacts
     go get -u github.com/openshift/release/tools/gotest2junit
     make test-unit JUNITFILE=/tmp/artifacts/unit_report.xml
   artifact_dir: /tmp/artifacts
+  container:
+    from: test-bin
 
 - as: e2e-aws
   commands: TEST_FOCUS='Secrets should be consumable from pods in volume with

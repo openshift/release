@@ -43,16 +43,20 @@ build_root:
 tests:
 - as: unit
   commands: go test ./pkg/...
-  from: src
+  container:
+    from: src
 - as: gofmt
   commands: IS_CONTAINER=TRUE ./hack/go-fmt.sh .
-  from: src
+  container:
+    from: src
 - as: govet
   commands: IS_CONTAINER=TRUE ./hack/go-vet.sh ./...
-  from: src
+  container:
+    from: src
 - as: golint
   commands: IS_CONTAINER=TRUE ./hack/go-lint.sh -min_confidence 0.3 $(go list -f '{{ .ImportPath }}' ./...)
-  from: src
+  container:
+    from: src
 - as: e2e-aws
   commands: TEST_FOCUS='Secrets should be consumable from pods in volume with defaultMode
     set' run-tests
