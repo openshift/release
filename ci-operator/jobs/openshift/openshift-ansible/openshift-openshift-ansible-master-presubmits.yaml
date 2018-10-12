@@ -367,20 +367,21 @@ presubmits:
     always_run: true
     branches:
     - master
-    context: ci/prow/e2e-gcp-major-upgrade-master
+    context: ci/prow/e2e-gcp-major-upgrade
     decorate: true
-    name: pull-ci-openshift-openshift-ansible-master-e2e-gcp-major-upgrade-master
-    rerun_command: /test e2e-gcp-major-upgrade-master
+    name: pull-ci-openshift-openshift-ansible-master-e2e-gcp-major-upgrade
+    rerun_command: /test e2e-gcp-major-upgrade
     skip_cloning: true
     spec:
       containers:
-      - command:
-        - ci-operator
+      - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --secret-dir=/usr/local/e2e-gcp-cluster-profile
-        - --template=/usr/local/e2e-gcp-major-upgrade-master
-        - --target=e2e-gcp-major-upgrade-master
         - --give-pr-author-access-to-namespace=true
+        - --secret-dir=/usr/local/e2e-gcp-major-upgrade-cluster-profile
+        - --target=e2e-gcp-major-upgrade
+        - --template=/usr/local/e2e-gcp-major-upgrade
+        command:
+        - ci-operator
         env:
         - name: CLUSTER_TYPE
           value: gcp
@@ -390,7 +391,7 @@ presubmits:
               key: openshift-openshift-ansible-master.yaml
               name: ci-operator-configs
         - name: JOB_NAME_SAFE
-          value: e2e-gcp-major-upgrade-master
+          value: e2e-gcp-major-upgrade
         - name: PREVIOUS_ANSIBLE_VERSION
           value: "3.11"
         - name: PREVIOUS_IMAGE_ANSIBLE
@@ -412,14 +413,14 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/e2e-gcp-cluster-profile
-          name: e2e-gcp-major-upgrade-master
-        - mountPath: /usr/local/e2e-gcp-major-upgrade-master
+        - mountPath: /usr/local/e2e-gcp-major-upgrade-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-gcp-major-upgrade
           name: job-definition
           subPath: cluster-launch-e2e-upgrade.yaml
       serviceAccountName: ci-operator
       volumes:
-      - name: e2e-gcp-major-upgrade-master
+      - name: cluster-profile
         projected:
           sources:
           - secret:
@@ -429,7 +430,7 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-e2e-upgrade
         name: job-definition
-    trigger: ((?m)^/test( all| e2e-gcp-major-upgrade-master),?(\s+|$))
+    trigger: ((?m)^/test( all| e2e-gcp-major-upgrade),?(\s+|$))
   - agent: kubernetes
     always_run: true
     branches:
