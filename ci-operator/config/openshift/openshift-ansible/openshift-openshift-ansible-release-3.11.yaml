@@ -5,7 +5,7 @@ base_rpm_images:
     namespace: openshift
     tag: base
 images:
-- dockerfile_path: images/installer/Dockerfile
+- dockerfile_path: images/installer/Dockerfile.ci
   from: base
   to: ansible
 resources:
@@ -23,9 +23,7 @@ resources:
     requests:
       cpu: '1'
       memory: 1.5Gi
-rpm_build_commands: tito tag --offline --accept-auto-changelog --use-release '9999%{?dist}';
-  tito build --output="_output/local/releases" --rpm --test --offline --quiet; mkdir -p _output/local/releases/rpms; mv
-  _output/local/releases/noarch/* _output/local/releases/rpms; createrepo _output/local/releases/rpms
+rpm_build_commands: ./hack/ci-build-rpm.sh
 tag_specification:
   cluster: https://api.ci.openshift.org
   name: origin-v3.11
@@ -38,13 +36,11 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.10
-test_binary_build_commands: yum install -y gcc libffi-devel python-devel openssl-devel
-  python-pip; pip install tox; chmod uga+w /etc/passwd
+test_binary_build_commands: ./hack/ci-build-unittests.sh
 tests:
 - artifact_dir: /tmp/artifacts
   as: unit
-  commands: echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin"
-    >> /etc/passwd; tox 2>&1 | tee /tmp/artifacts/output.log
+  commands: ./hack/ci-run-unittests.sh
   container:
     from: test-bin
 - as: e2e-gcp
