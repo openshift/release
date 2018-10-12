@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import re
 import sys
 import yaml
 
@@ -117,7 +118,7 @@ def validate_names(path, data):
 
                 branch = "master"
                 if "branches" in job:
-                    branch = job["branches"][0]
+                    branch = make_regex_filename_label(job["branches"][0])
 
                 prefix = "pull"
                 if job_type == "postsubmits":
@@ -146,6 +147,11 @@ def validate_names(path, data):
 
     return out
 
+def make_regex_filename_label(name):
+    name = re.sub(r"[^\w\-\.]+", "", name)
+    name = name.strip("-._")
+    return name
+
 def validate_sharding(path, data):
     out = True
     for job_type in data:
@@ -156,7 +162,7 @@ def validate_sharding(path, data):
             for job in data[job_type][repo]:
                 branch = "master"
                 if "branches" in job:
-                    branch = job["branches"][0]
+                    branch = make_regex_filename_label(job["branches"][0])
 
                 file_branch = os.path.basename(path)[len("{}-".format(repo.replace("/", "-"))):-len("-{}.yaml".format(job_type))]
                 if file_branch != branch:
