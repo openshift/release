@@ -1,30 +1,48 @@
-# OpenShift Release Tools
+# OKD Release Tooling
 
-This repository contains the process tooling for OpenShift releases, implemented
-with an [OpenShift cluster](https://api.ci.openshift.org/console/), plus a
-Jenkins instance.
+This repository holds OpenShift cluster manifests, component build manifests and
+CI workflow configuration for OpenShift component repositories.
 
-## Openshift CI infra
+## CI Workflow Configuration
 
-Prerequisites:
-* various credentials need to be present in your environment
-  - required prow credentials can be found in the [prow-secrets](https://github.com/openshift/release/blob/17fb58ec3c10a407f8b895b5fdba6a0796bc2677/Makefile#L42-L55) target
-* ensure you run as `system:admin`
+Configuration files for CI workflows live under [`ci-operator/`](./ci-operator/)
+and are split into the following categories:
 
-`make all` then will deploy all the necessary CI components.
+ - [`ci-operator/config`](./ci-operator/config/) contains configuration for the
+   `ci-operator`, detailing builds and tests for component repositories. See the
+   [contributing guide](./ci-operator/README.md) for details on how to configure
+   new repositories or tests.
+ - [`ci-operator/jobs`](./ci-operator/jobs/) contains configuration for `prow`,
+   detailing job triggers. In almost all cases, this configuration can be
+   generated automatically from the `ci-operator` config. For manual edits, see
+   the [upstream configuration document](https://github.com/kubernetes/test-infra/blob/master/prow/README.md#how-to-add-new-jobs)
+   for details on how to configure a job, but prefer the `ci-operator` config
+   whenever possible.
+ - [`ci-operator/templates`](./ci-operator/templates/) contains black-box test
+   workflows for use by the `ci-operator`. See the [template document](https://github.com/openshift/ci-operator/blob/master/TEMPLATES.md)
+   for information on how to use these.
+ - [`ci-operator/infra`](./ci-operator/infra/) contains manifests for infrastructure
+   components used by the `ci-operator`. Contact a CI Administrator if you feel
+   like one of these should be edited.
 
-For more information on prow, see the upstream [documentation](https://github.com/kubernetes/test-infra/tree/master/prow#prow).
+## Cluster Configuration Manifests
 
-## More information on OpenShift CI
+Manifests for cluster provisioning and installation live under [`cluster/`](./cluster/).
+The [OpenShift CI cluster](https://api.ci.openshift.org/) is configured with the
+manifests under [`cluster/ci/`](./cluster/ci/); clusters that are created by the
+testing infrastructure for validating OpenShift are configured with the profiles
+under [`cluster/test-deploy/`](./cluster/test-deploy/). For directions on how to
+set up clusters for development, see the [README](./cluster/test-deploy/README.md).
 
-See [aos-cd-jobs](https://github.com/openshift/aos-cd-jobs/) for more
-information about the OpenShift Jenkins instance, which many Prow
-jobs in this repository trigger.
+## Component Project Build Manifests
 
-Red Hat employees should also consult the [CI Overview](https://mojo.redhat.com/docs/DOC-1165629).
+Manifests for building container images for component repositories live under
+[`projects/`](./projects/). This directory is deprecated; authors of components
+built by manifests in this directory should remove them and ensure that their
+component is appropriately built by the `ci-operator` instead.
 
-## Contributing changes
+## Tooling Build Manifests
 
-Looking at [the active pull requests](https://github.com/openshift/release/pulls) should
-give some examples of how things work.  After your change to the git repository is merged, the
-`config-updater` app will automatically apply changes to the live cluster.
+Manifests for building container images for tools live under [`tools/`](./tools/).
+These tools are either useful in managing this repository or are otherwise useful
+commonly across component repositories.
