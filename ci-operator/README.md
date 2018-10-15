@@ -5,6 +5,22 @@ This document describes how to create CI jobs for Openshift components using
 ci-operator and is intended for component developers who want to add tests to
 their CI process.
 
+After editing the files under this directory, make sure to run the generator to
+ensure that your changes are compliant to our conventions and pass the CI tests
+that will run when you submit your changes as a PR:
+
+```
+docker pull registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest
+docker run -it -v $(pwd)/ci-operator:/ci-operator:z           \
+  registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest \
+  --from-dir /ci-operator/config/ --to-dir /ci-operator/jobs
+```
+
+Make sure to pull the latest image to ensure that you do not use a stale version
+of the generator. Pre-submit tests on this repository will ensure that a run of
+the latest generator does not error on proposed configuration changes and also
+does not generate any new configuration.
+
 Conventions
 -----------
 
