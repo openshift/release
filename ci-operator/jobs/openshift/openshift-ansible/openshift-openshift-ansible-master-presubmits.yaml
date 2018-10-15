@@ -463,7 +463,8 @@ presubmits:
         - name: RPM_REPO_OPENSHIFT_ORIGIN
           value: https://rpms.svc.ci.openshift.org/openshift-origin-v4.0/
         - name: TEST_COMMAND
-          value: TEST_FOCUS=Suite:openshift/conformance/parallel/minimal run-tests
+          value: TEST_FOCUS=Suite:openshift/conformance/parallel/minimal TEST_SKIP='(\[local\]|\[templates\]|\[Feature:Router\]|Kubectl
+            logs)' run-tests
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -477,7 +478,7 @@ presubmits:
           name: cluster-profile
         - mountPath: /usr/local/e2e-gluster
           name: job-definition
-          subPath: cluster-launch-openshift-ansible.yaml
+          subPath: cluster-launch-e2e-openshift-ansible.yaml
       serviceAccountName: ci-operator
       volumes:
       - name: cluster-profile
@@ -488,7 +489,7 @@ presubmits:
           - configMap:
               name: cluster-profile-aws-gluster
       - configMap:
-          name: prow-job-cluster-launch-openshift-ansible
+          name: prow-job-cluster-launch-e2e-openshift-ansible
         name: job-definition
     trigger: ((?m)^/test( all| e2e-gluster),?(\s+|$))
   - agent: kubernetes
