@@ -45,6 +45,11 @@ tests:
     >> /etc/passwd; tox 2>&1 | tee /tmp/artifacts/output.log
   container:
     from: test-bin
+- as: e2e-aws
+  commands: TEST_FOCUS=Suite:openshift/conformance/parallel/minimal TEST_SKIP='(\[local\]|\[templates\]|\[Feature:Router\]|Kubectl
+    logs)' run-tests
+  openshift_ansible_custom:
+    cluster_profile: aws-centos
 - as: e2e-gcp
   commands: TEST_FOCUS=Suite:openshift/conformance/parallel run-tests
   openshift_ansible:
@@ -65,13 +70,14 @@ tests:
   commands: TEST_FOCUS=Suite:openshift/conformance/parallel run-tests
   openshift_ansible:
     cluster_profile: gcp-logging
-- as: e2e-gluster
-  commands: TEST_FOCUS=Suite:openshift/conformance/parallel/minimal run-tests
-  openshift_ansible_custom:
-    cluster_profile: aws-gluster
 - as: e2e-gcp-major-upgrade
   commands: TEST_FOCUS=Suite:openshift/conformance/parallel run-tests
   openshift_ansible_upgrade:
     cluster_profile: gcp
     previous_version: 3.11
     previous_rpm_deps: http://mirror.centos.org/centos/7/paas/x86_64/openshift-origin/
+- as: e2e-gluster
+  commands: TEST_FOCUS=Suite:openshift/conformance/parallel/minimal TEST_SKIP='(\[local\]|\[templates\]|\[Feature:Router\]|Kubectl
+    logs)' run-tests
+  openshift_ansible_custom:
+    cluster_profile: aws-gluster
