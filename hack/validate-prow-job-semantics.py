@@ -77,7 +77,7 @@ def validate_job_repo(path, data):
     org, repo = parse_org_repo(path)
     if "presubmits" in data:
         for org_repo in data["presubmits"]:
-            if org_repo != "{}/{}".format(org, repo):
+            if org_repo != f"{org}/{repo}":
                 print("[ERROR] {}: file defines jobs for {}, but is only allowed to contain jobs for {}/{}".format(path, org_repo, org, repo))
                 return False
     if "postsubmits" in data:
