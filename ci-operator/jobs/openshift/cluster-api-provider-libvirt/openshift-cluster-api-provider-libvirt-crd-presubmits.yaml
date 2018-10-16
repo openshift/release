@@ -3,21 +3,21 @@ presubmits:
   - agent: jenkins
     always_run: true
     branches:
-    - ^master$
+    - ^crd$
     context: ci/jenkins/e2e
     labels:
       master: ci.openshift.redhat.com
-    name: pull-ci-openshift-cluster-api-provider-libvirt-master-e2e
+    name: pull-ci-openshift-cluster-api-provider-libvirt-crd-e2e
     optional: true
     rerun_command: /test e2e
     trigger: ((?m)^/test( all| e2e),?(\s+|$))
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - crd
     context: ci/prow/gofmt
     decorate: true
-    name: pull-ci-openshift-cluster-api-provider-libvirt-master-gofmt
+    name: pull-ci-openshift-cluster-api-provider-libvirt-crd-gofmt
     rerun_command: /test gofmt
     skip_cloning: true
     spec:
@@ -32,7 +32,7 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-cluster-api-provider-libvirt-master.yaml
+              key: openshift-cluster-api-provider-libvirt-crd.yaml
               name: ci-operator-configs
         image: ci-operator:latest
         imagePullPolicy: Always
@@ -47,10 +47,10 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - crd
     context: ci/prow/golint
     decorate: true
-    name: pull-ci-openshift-cluster-api-provider-libvirt-master-golint
+    name: pull-ci-openshift-cluster-api-provider-libvirt-crd-golint
     rerun_command: /test golint
     skip_cloning: true
     spec:
@@ -65,7 +65,7 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-cluster-api-provider-libvirt-master.yaml
+              key: openshift-cluster-api-provider-libvirt-crd.yaml
               name: ci-operator-configs
         image: ci-operator:latest
         imagePullPolicy: Always
@@ -80,10 +80,10 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - crd
     context: ci/prow/govet
     decorate: true
-    name: pull-ci-openshift-cluster-api-provider-libvirt-master-govet
+    name: pull-ci-openshift-cluster-api-provider-libvirt-crd-govet
     rerun_command: /test govet
     skip_cloning: true
     spec:
@@ -98,7 +98,7 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-cluster-api-provider-libvirt-master.yaml
+              key: openshift-cluster-api-provider-libvirt-crd.yaml
               name: ci-operator-configs
         image: ci-operator:latest
         imagePullPolicy: Always
@@ -113,10 +113,10 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - crd
     context: ci/prow/images
     decorate: true
-    name: pull-ci-openshift-cluster-api-provider-libvirt-master-images
+    name: pull-ci-openshift-cluster-api-provider-libvirt-crd-images
     rerun_command: /test images
     skip_cloning: true
     spec:
@@ -132,7 +132,7 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-cluster-api-provider-libvirt-master.yaml
+              key: openshift-cluster-api-provider-libvirt-crd.yaml
               name: ci-operator-configs
         image: ci-operator:latest
         imagePullPolicy: Always
@@ -147,10 +147,10 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - crd
     context: ci/prow/unit
     decorate: true
-    name: pull-ci-openshift-cluster-api-provider-libvirt-master-unit
+    name: pull-ci-openshift-cluster-api-provider-libvirt-crd-unit
     rerun_command: /test unit
     skip_cloning: true
     spec:
@@ -165,7 +165,7 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-cluster-api-provider-libvirt-master.yaml
+              key: openshift-cluster-api-provider-libvirt-crd.yaml
               name: ci-operator-configs
         image: ci-operator:latest
         imagePullPolicy: Always
@@ -177,23 +177,3 @@ presubmits:
             cpu: 10m
       serviceAccountName: ci-operator
     trigger: ((?m)^/test( all| unit),?(\s+|$))
-  - agent: kubernetes
-    always_run: true
-    context: ci/prow/yaml-lint
-    decorate: true
-    name: pull-ci-openshift-cluster-api-provider-libvirt-yaml-lint
-    rerun_command: /test yaml-lint
-    spec:
-      containers:
-      - args:
-        - ./hack/yaml-lint.sh
-        command:
-        - sh
-        env:
-        - name: IS_CONTAINER
-          value: "TRUE"
-        image: quay.io/coreos/yamllint
-        imagePullPolicy: Always
-        name: ""
-        resources: {}
-    trigger: ((?m)^/test(all| yaml-lint),?(\s+|$))
