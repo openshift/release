@@ -222,6 +222,17 @@ gcsweb:
 	$(MAKE) applyTemplate WHAT=projects/gcsweb/pipeline.yaml
 .PHONY: gcsweb
 
+rhcos:
+	$(MAKE) applyTemplate WHAT=projects/rhcos/roles.yaml
+	$(MAKE) applyTemplate WHAT=projects/rhcos/coreos-assembler-alpha-bc.yml
+	$(MAKE) applyTemplate WHAT=projects/rhcos/coreos-assembler-bc.yml
+	$(MAKE) applyTemplate WHAT=projects/rhcos/coreos-assembler-testing-bc.yml
+.PHONY: rhcos
+
+rhcos-roles:
+	$(MAKE) applyTemplate WHAT=projects/rhcos/roles.yaml
+.PHONY: rhcos-roles
+
 kube-state-metrics:
 	$(MAKE) apply WHAT=projects/kube-state-metrics/pipeline.yaml
 .PHONY: kube-state-metrics
