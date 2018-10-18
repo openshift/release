@@ -31,7 +31,7 @@ RUN yum install -y /tmp/origin-rpm/*.rpm && \
     go get golang.org/x/tools/cmd/cover \
         golang.org/x/tools/cmd/goimports \
         github.com/tools/godep \
-        github.com/golang/lint/golint \
+        golang.org/x/lint/golint \
         github.com/openshift/imagebuilder/cmd/imagebuilder \
         k8s.io/test-infra/prow/cmd/clonerefs && \
     mv $GOPATH/bin/* /usr/bin/ && \
