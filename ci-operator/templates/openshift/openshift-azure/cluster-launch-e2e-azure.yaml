@@ -17,6 +17,7 @@ parameters:
 - name: CLUSTER_TYPE
   value: "azure"
   required: true
+- name: TEST_IN_PRODUCTION
 
 objects:
 
@@ -74,6 +75,8 @@ objects:
       env:
       - name: HOME
         value: /tmp/shared/home
+      - name: TEST_IN_PRODUCTION
+        value: ${TEST_IN_PRODUCTION}
       command:
       - /bin/bash
       - -c
@@ -81,6 +84,12 @@ objects:
         #!/bin/bash
         # error handling and sync code
         set -euo pipefail
+
+        if [[ -n ${TEST_IN_PRODUCTION} ]]; then
+          # If we are testing in production then currently
+          # we don't have any _data locally to run openshift e2es.
+          exit 0
+        fi
 
         trap 'touch /tmp/shared/exit' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
@@ -134,6 +143,8 @@ objects:
         value: "true"
       - name: RESOURCEGROUP_TTL
         value: 4h
+      - name: TEST_IN_PRODUCTION
+        value: ${TEST_IN_PRODUCTION}
       command:
       - /bin/bash
       - -c
@@ -184,11 +195,19 @@ objects:
         value: ${CLUSTER_TYPE}
       - name: HOME
         value: /tmp/shared/home
+      - name: TEST_IN_PRODUCTION
+        value: ${TEST_IN_PRODUCTION}
       command:
       - /bin/bash
       - -c
       - |
         #!/bin/bash
+
+        if [[ -n ${TEST_IN_PRODUCTION} ]]; then
+          # If we are testing in production then teardown
+          # happens as part of the e2e framework.
+          exit 0
+        fi
 
         # teardown is collecting debug data and deleting all used resources
         function teardown() {
