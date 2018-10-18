@@ -110,7 +110,7 @@ openshift_gcp_iam_service_account_keyfile: "{{ files_dir }}/gce.json"
 
 openshift_gcp_ssh_private_key: "{{ files_dir + '/ssh-privatekey' }}"
 
-openshift_gcp_infra_network_instance_group: ig-m
+openshift_gcp_infra_network_instance_group: ig-n
 
 openshift_gcp_build_image: true
 openshift_gcp_image: '{{ openshift_gcp_prefix }}images'
@@ -118,12 +118,12 @@ openshift_gcp_base_image: 'origin-node-centos-7'
 openshift_gcp_root_image: 'centos-7'
 
 openshift_gcp_registry_bucket_keyfile: "{{ files_dir }}/gce.json"
-openshift_gcp_registry_bucket_name: openshift-gce-devel-origin-ci-registry-bucket
+openshift_gcp_registry_bucket_name: openshift-gce-devel-origin-ci-registry
 
 osm_controller_args: {"experimental-cluster-signing-duration": ["1h"]}
 openshift_master_bootstrap_enabled: true
 openshift_master_bootstrap_auto_approve: true
-openshift_master_bootstrap_auto_approver_node_selector: {"role": "infra"}
+openshift_master_bootstrap_auto_approver_node_selector: {"node-role.kubernetes.io/master": "true"}
 
 openshift_gcp_node_group_config:
   - name: master
@@ -131,7 +131,7 @@ openshift_gcp_node_group_config:
     tags: ocp-master,ocp-infra-node,ocp-node,preserve
     machine_type: n1-standard-2
     boot_disk_size: 150
-    scale: 1
+    scale: 3
     bootstrap: true
     wait_for_stable: true
   - name: node
@@ -153,12 +153,10 @@ openshift_node_groups:
 - name: node-config-master
   labels:
   - 'node-role.kubernetes.io/master=true'
-  - 'node-role.kubernetes.io/infra=true'
-  - 'role=infra'
 - name: node-config-node
   labels:
   - 'node-role.kubernetes.io/compute=true'
-  - 'role=app'
+  - 'node-role.kubernetes.io/infra=true'
   edits:
   - key: kubeletArguments.pods-per-core
-    value: ['20']
+    value: ['30']

@@ -15,7 +15,7 @@ function populate_configmap() {
 	local repo=$2
 
 	for config_file in $( find "${config}/${org}/${repo}" -mindepth 1 -maxdepth 1 -type f -name "*.yaml" ); do
-		files+=( "--from-file=${org}-${repo}-$( basename "${config_file%.*}" )=${config_file}" )
+		files+=( "--from-file=${config_file}" )
 	done
 }
 
