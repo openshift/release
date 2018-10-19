@@ -93,7 +93,6 @@ prow-builds:
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/tot.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/tracer.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/config-updater/build.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/ci-operator/build.yaml
 	$(MAKE) apply WHAT=tools/pod-utils/artifact-uploader.yaml
 	$(MAKE) apply WHAT=tools/pod-utils/clonerefs.yaml
 	$(MAKE) apply WHAT=tools/pod-utils/entrypoint.yaml
