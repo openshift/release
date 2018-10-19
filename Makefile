@@ -302,6 +302,7 @@ azure:
 	$(MAKE) apply WHAT=projects/azure/azure-purge/
 	$(MAKE) apply WHAT=projects/azure/base-images/
 	$(MAKE) apply WHAT=projects/azure/config-updater/
+	$(MAKE) apply WHAT=projects/azure/image-mirror/
 	$(MAKE) apply WHAT=projects/azure/token-refresh/
 .PHONY: azure
 
