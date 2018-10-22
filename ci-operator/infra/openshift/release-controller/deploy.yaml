@@ -30,6 +30,24 @@ items:
     - create
     - patch
     - update
+- kind: Role
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: release-controller-prowjob
+    namespace: ci
+  rules:
+  - apiGroups:
+    - prow.k8s.io
+    resources:
+    - prowjobs
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - delete
+    - update
+    - patch
 
 - kind: RoleBinding
   apiVersion: rbac.authorization.k8s.io/v1
@@ -39,6 +57,30 @@ items:
   roleRef:
     kind: Role
     name: release-controller-modify
+  subjects:
+  - kind: ServiceAccount
+    namespace: ci
+    name: release-controller
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: release-controller-binding-view
+    namespace: openshift
+  roleRef:
+    kind: ClusterRole
+    name: view
+  subjects:
+  - kind: ServiceAccount
+    namespace: ci
+    name: release-controller
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: release-controller-binding-prowjob
+    namespace: ci
+  roleRef:
+    kind: Role
+    name: release-controller-prowjob
   subjects:
   - kind: ServiceAccount
     namespace: ci
@@ -66,7 +108,7 @@ items:
 - kind: RoleBinding
   apiVersion: rbac.authorization.k8s.io/v1
   metadata:
-    name: release-controller-binding
+    name: release-controller-binding-promote
     namespace: openshift
   roleRef:
     kind: ClusterRole

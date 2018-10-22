@@ -17,7 +17,7 @@ roles: cluster-operator-roles
 	$(MAKE) apply WHAT=cluster/ci/config/roles.yaml
 .PHONY: roles
 
-prow: ci-ns prow-crd prow-config prow-secrets prow-builds prow-rbac prow-services prow-jobs
+prow: ci-ns prow-crd prow-config prow-builds prow-rbac prow-services prow-jobs prow-scaling #prow-secrets 
 .PHONY: prow
 
 ci-ns:
@@ -28,6 +28,10 @@ prow-crd:
 	$(MAKE) apply WHAT=cluster/ci/config/prow/prow_crd.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/prowjob_access.yaml
 .PHONY: prow-crd
+
+prow-scaling:
+	oc apply -n kube-system -f cluster/ci/config/cluster-autoscaler.yaml
+.PHONY: prow-scaling
 
 prow-config:
 	oc create cm config --from-file=config.yaml=cluster/ci/config/prow/config.yaml
@@ -112,7 +116,6 @@ endif
 .PHONY: prow-update
 
 prow-rbac:
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/artifact-operator_rbac.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/deck_rbac.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/hook_rbac.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/horologium_rbac.yaml
@@ -123,8 +126,7 @@ prow-rbac:
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tracer_rbac.yaml
 .PHONY: prow-rbac
 
-prow-services:
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/artifact-operator.yaml
+prow-services: prow-config-updater pod-utils
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/cherrypick.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/deck.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/hook.yaml
@@ -137,10 +139,14 @@ prow-services:
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tide.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tot.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tracer.yaml
+.PHONY: prow-services
+
+prow-config-updater:
 	oc create serviceaccount config-updater -o yaml --dry-run | oc apply -f -
 	oc adm policy add-role-to-user edit -z config-updater
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/config-updater/deployment.yaml
-.PHONY: prow-services
+	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/config-updater/build.yaml
+.PHONY: prow-config-updater
 
 prow-cluster-jobs:
 	oc create configmap cluster-profile-gcp --from-file=cluster/test-deploy/gcp/vars.yaml --from-file=cluster/test-deploy/gcp/vars-origin.yaml -o yaml --dry-run | oc apply -f -
@@ -166,18 +172,30 @@ prow-rpm-mirrors-secrets:
 		-o yaml --dry-run | oc apply -f -
 .PHONY: prow-rpm-mirrors-secrets
 
-prow-jobs: prow-cluster-jobs prow-rpm-mirrors
+prow-jobs: prow-cluster-jobs prow-rpm-mirrors prow-artifacts
 	$(MAKE) applyTemplate WHAT=cluster/ci/jobs/commenter.yaml
 	$(MAKE) apply WHAT=projects/prometheus/test/build.yaml
 	$(MAKE) apply WHAT=ci-operator/templates/os.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/ci-operator/roles.yaml
 .PHONY: prow-jobs
 
-prow-release-controller:
-	$(MAKE) apply WHAT=ci-operator/infra/openshift/release/deploy.yaml
-	oc annotate -n openshift is/origin-v4.0 "release.openshift.io/config=$( cat ci-operator/infra/openshift/release-controller/origin-v4.0.json )" --overwrite
+prow-artifacts:
+	oc create ns ci-pr-images -o yaml --dry-run | oc apply -f -
+	oc policy add-role-to-group system:image-puller system:unauthenticated -n ci-pr-images
+	oc policy add-role-to-group system:image-puller system:authenticated -n ci-pr-images
+	oc tag --source=docker centos:7 openshift/centos:7 --scheduled
+	oc create ns ci-rpms -o yaml --dry-run | oc apply -f -
+	oc apply -n ci-rpms -f ci-operator/infra/openshift/origin/
+	oc apply -n ci -f ci-operator/infra/src-cache-origin.yaml
+.PHONY: prow-artifacts
 
-projects: gcsweb kube-state-metrics oauth-proxy origin origin-stable origin-release prometheus test-bases image-mirror-setup image-pruner-setup node-problem-detector publishing-bot image-registry-publishing-bot content-mirror service-idler azure python-validation
+prow-release-controller:
+	oc create imagestream origin-release -o yaml --dry-run | oc apply -f - -n openshift
+	oc create imagestream origin-v4.0 -o yaml --dry-run | oc apply -f - -n openshift
+	oc annotate -n openshift is/origin-v4.0 "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/origin-v4.0.json)" --overwrite
+	$(MAKE) apply WHAT=ci-operator/infra/openshift/release-controller/deploy.yaml
+
+projects: gcsweb origin origin-stable origin-release test-bases image-mirror-setup image-pruner-setup publishing-bot image-registry-publishing-bot content-mirror azure python-validation
 .PHONY: projects
 
 ci-operator-config:
@@ -262,6 +280,12 @@ image-pruner-setup:
 	$(MAKE) apply WHAT=cluster/ci/jobs/image-pruner.yaml
 .PHONY: image-pruner-setup
 
+# Regenerate the on cluster image streams from the authoritative mirror
+image-restore-from-mirror:
+	cat cluster/ci/config/mirroring/origin_v3_11 | cut -d ' ' -f 1 | cut -d ':' -f 2 | xargs -L1 -I {} oc tag docker.io/openshift/origin-{}:v3.11 openshift/origin-v3.11:{}
+	cat cluster/ci/config/mirroring/origin_v4_0 | cut -d ' ' -f 1 | cut -d ':' -f 2 | xargs -L1 -I {} oc tag docker.io/openshift/origin-{}:v4.0 openshift/origin-v4.0:{}
+.PHONY: image-restore-from-mirror
+
 # Regenerate the mirror files by looking at what we are publishing to the image stream.
 image-mirror-files:
 	VERSION=v3.10 hack/mirror-file > cluster/ci/config/mirroring/origin_v3_10
@@ -277,6 +301,7 @@ image-mirror-setup:
 .PHONY: image-mirror-setup
 
 cluster-operator-roles:
+	oc create ns openshift-cluster-operator --dry-run -o yaml | oc apply -f -
 	$(MAKE) apply WHAT=projects/cluster-operator/cluster-operator-team-roles.yaml
 	$(MAKE) applyTemplate WHAT=projects/cluster-operator/cluster-operator-roles-template.yaml
 .PHONY: cluster-operator-roles

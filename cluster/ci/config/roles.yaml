@@ -1,23 +1,18 @@
 kind: List
 apiVersion: v1
 items:
-- kind: ProjectRequest
+- kind: Namespace
   apiVersion: v1
   metadata:
     name: ci
-  displayName: OpenShift CI
-  description: Test infrastructure that supports the OpenShift Github organization
-- kind: ProjectRequest
+- kind: Namespace
   apiVersion: v1
   metadata:
     name: origin-web-console
-  displayName: OpenShift Web Console Development
-  description: Contains latest web console revisions
-- kind: ProjectRequest
+- kind: Namespace
   apiVersion: v1
   metadata:
     name: image-registry-publishing-bot
-  displayName: Publishing bot for OpenShift Image Registry
 
 - kind: Group
   apiVersion: v1
@@ -145,7 +140,7 @@ items:
     name: system:unauthenticated
   - kind: Group
     apiGroup: rbac.authorization.k8s.io
-    name: system:anonymous
+    name: system:authenticated
   roleRef:
     kind: ClusterRole
     apiGroup: rbac.authorization.k8s.io
@@ -172,6 +167,27 @@ items:
   - kind: Group
     apiGroup: rbac.authorization.k8s.io
     name: image-registry-dev
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: admin
+
+- kind: Group
+  apiVersion: v1
+  metadata:
+    name: ci-monitoring-admins
+  users:
+  - smarterclayton
+  - brancz
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: admin
+    namespace: openshift-monitoring
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: ci-monitoring-admins
   roleRef:
     kind: ClusterRole
     apiGroup: rbac.authorization.k8s.io
