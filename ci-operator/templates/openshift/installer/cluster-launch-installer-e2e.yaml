@@ -151,12 +151,26 @@ objects:
           break
         done
 
+        function isRouterReady() {
+          local deployment
+          deployment=${1:-"router/deploy"}
+          local ns
+          ns=${2:-"openshift-ingress"}
+          if [[ "${deployment}" == "ds/router-default" ]]; then
+            ready=$(oc get "${deployment}" -n "${ns}" -o go-template='{{ne "0" (print .status.numberReady)}}')
+            [[ "${ready}" == "true" ]]
+            return
+          fi
+
+          oc wait "${deployment}" -n "${ns}" --for condition=available --timeout=10m
+        }
+
         i=0
         MAX_RETRIES=10
-        until oc wait "${ROUTER_DEPLOYMENT}" -n "${ROUTER_NAMESPACE}" --for condition=available --timeout=10m || [ $i -eq $MAX_RETRIES ]; do
+        until isRouterReady "${ROUTER_DEPLOYMENT}" "${ROUTER_NAMESPACE}" || [ $i -eq $MAX_RETRIES ]; do
             i=$((i+1))
-            [ $i -eq $MAX_RETRIES ] && echo "timeout waiting for router to be available" && exit 1
-            echo "error deploy/router did not come up"
+            [ $i -eq $MAX_RETRIES ] && echo "timeout waiting for ${ROUTER_NAMESPACE}/${ROUTER_DEPLOYMENT} to be available" && exit 1
+            echo "error ${ROUTER_NAMESPACE}/${ROUTER_DEPLOYMENT} did not come up"
             sleep 60
         done
 
