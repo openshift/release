@@ -123,7 +123,7 @@ objects:
       - name: cluster-secrets-azure
         mountPath: /etc/azure/credentials
       env:
-      - name: INSTANCE_PREFIX
+      - name: RESOURCEGROUP
         value: ${NAMESPACE}-${JOB_NAME_HASH}
       - name: TYPE
         value: ${CLUSTER_TYPE}
@@ -146,7 +146,7 @@ objects:
        #!/bin/bash
         set -euo pipefail
         
-        trap 'rc=$?; if [[ $rc -ne 0 ]]; then 
+        trap 'rc=$?; if [[ $rc -ne 0 || -n "$TEST_IN_PRODUCTION" ]]; then
           touch /tmp/shared/exit;
         fi;
         cp -r /go/src/github.com/openshift/openshift-azure/_data /tmp/shared &>/dev/null
@@ -170,7 +170,10 @@ objects:
         export IMAGE_RESOURCENAME=$(az image list -g $IMAGE_RESOURCEGROUP -o json --query "[?starts_with(name, '${DEPLOY_OS:-rhel7}-${DEPLOY_VERSION//v}') && tags.valid=='true'].name | sort(@) | [-1]" | tr -d '"')
         # create cluster for test
         cd /go/src/github.com/openshift/openshift-azure/
-        timeout 1h ./hack/create.sh ${INSTANCE_PREFIX}
+        timeout 1h ./hack/create.sh ${RESOURCEGROUP}
+        if [[ -n "$TEST_IN_PRODUCTION" ]]; then
+          make e2e-prod
+        fi
 
     # Performs cleanup of all created resources
     - name: teardown
@@ -183,7 +186,7 @@ objects:
       - name: artifacts
         mountPath: /tmp/artifacts
       env:
-      - name: INSTANCE_PREFIX
+      - name: RESOURCEGROUP
         value: ${NAMESPACE}-${JOB_NAME_HASH}
       - name: TYPE
         value: ${CLUSTER_TYPE}
@@ -197,12 +200,6 @@ objects:
       - |
         #!/bin/bash
 
-        if [[ -n "${TEST_IN_PRODUCTION}" ]]; then
-          # If we are testing in production then teardown
-          # happens as part of the e2e framework.
-          exit 0
-        fi
-
         # teardown is collecting debug data and deleting all used resources
         function teardown() {
           set +e
@@ -210,28 +207,30 @@ objects:
           export HOME=/tmp/shared
           export DNS_DOMAIN=osadev.cloud
           export DNS_RESOURCEGROUP=dns
-          export KUBECONFIG=/tmp/shared/_data/_out/admin.kubeconfig
 
-          cp -r /tmp/shared/_data /go/src/github.com/openshift/openshift-azure/
           cd /go/src/github.com/openshift/openshift-azure/
           source /etc/azure/credentials/secret
           az login --service-principal -u ${AZURE_CLIENT_ID} -p ${AZURE_CLIENT_SECRET} --tenant ${AZURE_TENANT_ID} &>/dev/null
 
           # Gather artifacts
-          oc get po --all-namespaces -o wide > /tmp/artifacts/pods
-          oc get no -o wide > /tmp/artifacts/nodes
-          oc get events --all-namespaces > /tmp/artifacts/events
-          oc logs sync-master-000000 -n kube-system > /tmp/artifacts/sync.log
-          oc logs api-master-000000 -n kube-system > /tmp/artifacts/api-master-000000.log
-          oc logs api-master-000001 -n kube-system > /tmp/artifacts/api-master-000001.log
-          oc logs api-master-000002 -n kube-system > /tmp/artifacts/api-master-000002.log
-          oc logs etcd-master-000000 -n kube-system > /tmp/artifacts/etcd-master-000000.log
-          oc logs etcd-master-000001 -n kube-system > /tmp/artifacts/etcd-master-000001.log
-          oc logs etcd-master-000002 -n kube-system > /tmp/artifacts/etcd-master-000002.log
-          cm_leader=$(oc get cm -n kube-system kube-controller-manager -o yaml | grep -o 00000[0-3])
-          oc logs controllers-master-$cm_leader -n kube-system > /tmp/artifacts/controller-manager.log
+          if [[ -z "$TEST_IN_PRODUCTION" ]]; then
+            export KUBECONFIG=/tmp/shared/_data/_out/admin.kubeconfig
+            cp -r /tmp/shared/_data /go/src/github.com/openshift/openshift-azure/
+            oc get po --all-namespaces -o wide > /tmp/artifacts/pods
+            oc get no -o wide > /tmp/artifacts/nodes
+            oc get events --all-namespaces > /tmp/artifacts/events
+            oc logs sync-master-000000 -n kube-system > /tmp/artifacts/sync.log
+            oc logs api-master-000000 -n kube-system > /tmp/artifacts/api-master-000000.log
+            oc logs api-master-000001 -n kube-system > /tmp/artifacts/api-master-000001.log
+            oc logs api-master-000002 -n kube-system > /tmp/artifacts/api-master-000002.log
+            oc logs etcd-master-000000 -n kube-system > /tmp/artifacts/etcd-master-000000.log
+            oc logs etcd-master-000001 -n kube-system > /tmp/artifacts/etcd-master-000001.log
+            oc logs etcd-master-000002 -n kube-system > /tmp/artifacts/etcd-master-000002.log
+            cm_leader=$(oc get cm -n kube-system kube-controller-manager -o yaml | grep -o 00000[0-3])
+            oc logs controllers-master-$cm_leader -n kube-system > /tmp/artifacts/controller-manager.log
+          fi
 
-          ./hack/delete.sh ${INSTANCE_PREFIX}
+          ./hack/delete.sh ${RESOURCEGROUP}
         }
 
         trap 'teardown' EXIT
