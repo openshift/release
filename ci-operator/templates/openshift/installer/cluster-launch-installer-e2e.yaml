@@ -303,7 +303,7 @@ objects:
           oc --request-timeout=5s get pods -l openshift.io/component=api --all-namespaces --template '{{ range .items }}-n {{ .metadata.namespace }} {{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/pods-api
 
           queue /tmp/artifacts/nodes.json oc --request-timeout=5s get nodes -o json
-          queue /tmp/artifacts/pods.json oc --request-timeout=5s get pods --all-namespaces -o json
+          oc --request-timeout=5s get pods --all-namespaces -o json >/tmp/artifacts/pods.json
           queue /tmp/artifacts/events.json oc --request-timeout=5s get events --all-namespaces -o json
 
           # gather nodes first in parallel since they may contain the most relevant debugging info
@@ -333,6 +333,17 @@ objects:
             FILTER=gzip queue /tmp/artifacts/pods/${file}.log.gz oc logs --request-timeout=20s $i
             FILTER=gzip queue /tmp/artifacts/pods/${file}_previous.log.gz oc logs --request-timeout=20s -p $i
           done < /tmp/containers
+
+          mkdir -p /tmp/artifacts/images
+          for FULLY_QUALIFIED_IMAGE in $(jq -r '.items[].status.containerStatuses[].imageID' /tmp/artifacts/pods.json | sort | uniq); do
+            NAMESPACED_IMAGE="${FULLY_QUALIFIED_IMAGE#docker-pullable*//registry.svc.ci.openshift.org/}"
+            if [[ "${NAMESPACED_IMAGE}" = "${FULLY_QUALIFIED_IMAGE}" ]]; then
+              continue
+            fi
+            NAMESPACE="${NAMESPACED_IMAGE%/*}"
+            IMAGE="${NAMESPACED_IMAGE#*/}"
+            KUBECONFIG=FIXME queue "/tmp/artifacts/images/${IMAGE}" oc -s https://api.ci.openshift.org --request-timeout=5s get imagestreamimage -n "${NAMESPACE}" "${IMAGE}" -o json
+          done
 
           echo "Waiting for logs ..."
           wait
