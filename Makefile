@@ -84,6 +84,7 @@ prow-secrets:
 
 prow-builds:
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/binaries.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/branchprotector.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/cherrypick.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/checkconfig.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/deck.yaml
@@ -97,7 +98,6 @@ prow-builds:
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/tide.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/tot.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/tracer.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/config-updater/build.yaml
 	$(MAKE) apply WHAT=tools/pod-utils/artifact-uploader.yaml
 	$(MAKE) apply WHAT=tools/pod-utils/clonerefs.yaml
 	$(MAKE) apply WHAT=tools/pod-utils/entrypoint.yaml
@@ -108,7 +108,7 @@ prow-builds:
 
 prow-update:
 ifeq ($(WHAT),)
-	for name in deck hook horologium jenkins-operator plank sinker tide tot artifact-uploader cherrypick config-updater needs-rebase refresh; do \
+	for name in deck hook horologium jenkins-operator plank sinker tide tot artifact-uploader cherrypick config-updater needs-rebase refresh branchprotector; do \
 		oc start-build bc/$$name-binaries ; \
 	done
 else
