@@ -134,3 +134,61 @@ postsubmits:
           requests:
             cpu: 10m
       serviceAccountName: ci-operator
+  - agent: kubernetes
+    branches:
+    - ^master$
+    decorate: true
+    name: branch-ci-openshift-openshift-azure-master-unit
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --target=unit
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-openshift-azure-master.yaml
+              name: ci-operator-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+  - agent: kubernetes
+    branches:
+    - ^master$
+    decorate: true
+    name: branch-ci-openshift-openshift-azure-master-verify
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --target=verify
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-openshift-azure-master.yaml
+              name: ci-operator-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator

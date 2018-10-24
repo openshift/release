@@ -134,3 +134,61 @@ postsubmits:
           requests:
             cpu: 10m
       serviceAccountName: ci-operator
+  - agent: kubernetes
+    branches:
+    - ^private-preview-1$
+    decorate: true
+    name: branch-ci-openshift-openshift-azure-private-preview-1-unit
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --target=unit
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-openshift-azure-private-preview-1.yaml
+              name: ci-operator-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+  - agent: kubernetes
+    branches:
+    - ^private-preview-1$
+    decorate: true
+    name: branch-ci-openshift-openshift-azure-private-preview-1-verify
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --target=verify
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-openshift-azure-private-preview-1.yaml
+              name: ci-operator-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
