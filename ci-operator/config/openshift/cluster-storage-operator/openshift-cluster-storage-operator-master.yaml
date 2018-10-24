@@ -1,0 +1,41 @@
+base_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: origin-v4.0
+    namespace: openshift
+    tag: base
+canonical_go_repository: github.com/openshift/cluster-storage-operator
+images:
+- from: base
+  to: cluster-storage-operator
+resources:
+  '*':
+    limits:
+      cpu: '2'
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: origin-v4.0
+  namespace: openshift
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    namespace: openshift
+    name: release
+    tag: golang-1.10
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
+- as: verify
+  commands: make verify
+  container:
+    from: src
+- as: e2e-aws
+  commands: TEST_SUITE=openshift/smoke-4 run-tests
+  openshift_installer:
+    cluster_profile: aws
