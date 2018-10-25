@@ -166,14 +166,15 @@ prow-cluster-jobs:
 .PHONY: prow-cluster-jobs
 
 prow-rpm-mirrors:
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/rpm-mirrors/deployment.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/rpm-mirrors/ocp-4.0.yaml
 .PHONY: prow-rpm-mirrors
 
 prow-rpm-mirrors-secrets:
-	oc create secret generic rpm-mirror-repos \
+	oc create secret generic rpm-ocp-4-0-repos \
 		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
 		--from-file=cluster/ci/config/prow/openshift/rpm-mirrors/docker.repo \
 		--from-file=cluster/ci/config/prow/openshift/rpm-mirrors/rhel.repo \
+		--from-file=cluster/ci/config/prow/openshift/rpm-mirrors/ocp-4.0.repo \
 		-o yaml --dry-run | oc apply -f -
 .PHONY: prow-rpm-mirrors-secrets
 
