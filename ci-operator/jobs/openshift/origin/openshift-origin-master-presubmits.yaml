@@ -211,6 +211,65 @@ presubmits:
     always_run: false
     branches:
     - master
+    context: ci/prow/e2e-gcp-builds
+    decorate: true
+    name: pull-ci-openshift-origin-master-e2e-gcp-builds
+    rerun_command: /test e2e-gcp-builds
+    run_if_changed: ^(pkg/oc/cli/startbuild/startbuild.go)|^(pkg/build)|^(pkg/cmd/infra/builder)|^(test/extended/builds)|^(test/extended/testdata/builds)|^(test/extended/util)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --secret-dir=/usr/local/e2e-gcp-builds-cluster-profile
+        - --target=e2e-gcp-builds
+        - --template=/usr/local/e2e-gcp-builds
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: gcp
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-origin-master.yaml
+              name: ci-operator-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-gcp-builds
+        - name: TEST_COMMAND
+          value: TEST_FOCUS='\[Feature:Builds\]' TEST_PARALLELISM=5 run-tests
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-gcp-builds-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-gcp-builds
+          name: job-definition
+          subPath: cluster-launch-e2e.yaml
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - configMap:
+          name: prow-job-cluster-launch-e2e
+        name: job-definition
+    trigger: ((?m)^/test( all| e2e-gcp-builds),?(\s+|$))
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - master
     context: ci/prow/e2e-gcp-crio
     decorate: true
     name: pull-ci-openshift-origin-master-e2e-gcp-crio
@@ -267,6 +326,125 @@ presubmits:
           name: prow-job-cluster-launch-e2e
         name: job-definition
     trigger: ((?m)^/test( all| e2e-gcp-crio),?(\s+|$))
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - master
+    context: ci/prow/e2e-gcp-image-ecosystem
+    decorate: true
+    name: pull-ci-openshift-origin-master-e2e-gcp-image-ecosystem
+    rerun_command: /test e2e-gcp-image-ecosystem
+    run_if_changed: ^(test/extended/image_ecosystem)|^(examples/db-templates)|^(examples/quickstarts)|^(examples/image-streams)|^(examples/jenkins)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --secret-dir=/usr/local/e2e-gcp-image-ecosystem-cluster-profile
+        - --target=e2e-gcp-image-ecosystem
+        - --template=/usr/local/e2e-gcp-image-ecosystem
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: gcp
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-origin-master.yaml
+              name: ci-operator-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-gcp-image-ecosystem
+        - name: TEST_COMMAND
+          value: TEST_FOCUS='\[image_ecosystem\]' run-tests
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-gcp-image-ecosystem-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-gcp-image-ecosystem
+          name: job-definition
+          subPath: cluster-launch-e2e.yaml
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - configMap:
+          name: prow-job-cluster-launch-e2e
+        name: job-definition
+    trigger: ((?m)^/test( all| e2e-gcp-image-ecosystem),?(\s+|$))
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - master
+    context: ci/prow/e2e-gcp-image-registry
+    decorate: true
+    name: pull-ci-openshift-origin-master-e2e-gcp-image-registry
+    rerun_command: /test e2e-gcp-image-registry
+    run_if_changed: ^(pkg/image)|^(test/extended/registry)|^(test/extended/images)|^(test/extended/imageapis)|^(vendor/github.com/docker/distribution)
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --secret-dir=/usr/local/e2e-gcp-image-registry-cluster-profile
+        - --target=e2e-gcp-image-registry
+        - --template=/usr/local/e2e-gcp-image-registry
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: gcp
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-origin-master.yaml
+              name: ci-operator-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-gcp-image-registry
+        - name: TEST_COMMAND
+          value: TEST_FOCUS='\[registry\]' TEST_SKIP='\[Serial\]' TEST_FOCUS_SERIAL=Suite:openshift/registry/serial
+            run-tests
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-gcp-image-registry-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-gcp-image-registry
+          name: job-definition
+          subPath: cluster-launch-e2e.yaml
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - configMap:
+          name: prow-job-cluster-launch-e2e
+        name: job-definition
+    trigger: ((?m)^/test( all| e2e-gcp-image-registry),?(\s+|$))
   - agent: kubernetes
     always_run: false
     branches:
@@ -535,17 +713,6 @@ presubmits:
     rerun_command: /test end_to_end
     trigger: ((?m)^/test( all| end_to_end),?(\s+|$))
   - agent: jenkins
-    always_run: false
-    branches:
-    - master
-    context: ci/openshift-jenkins/extended_builds
-    labels:
-      master: ci.openshift.redhat.com
-    name: test_pull_request_origin_extended_builds
-    rerun_command: /test extended_builds
-    run_if_changed: ^(pkg/oc/cli/startbuild/startbuild.go)|^(pkg/build)|^(pkg/cmd/infra/builder)|^(test/extended/builds)|^(test/extended/testdata/builds)|^(test/extended/util)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)
-    trigger: ((?m)^/test extended_builds,?(\s+|$))
-  - agent: jenkins
     always_run: true
     branches:
     - master
@@ -566,28 +733,6 @@ presubmits:
     name: test_pull_request_origin_extended_gssapi
     rerun_command: /test extended_gssapi
     trigger: ((?m)^/test extended_gssapi,?(\s+|$))
-  - agent: jenkins
-    always_run: false
-    branches:
-    - master
-    context: ci/openshift-jenkins/extended_image_ecosystem
-    labels:
-      master: ci.openshift.redhat.com
-    name: test_pull_request_origin_extended_image_ecosystem
-    rerun_command: /test extended_image_ecosystem
-    run_if_changed: ^(test/extended/image_ecosystem)|^(examples/db-templates)|^(examples/quickstarts)|^(examples/image-streams)|^(examples/jenkins)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)
-    trigger: ((?m)^/test extended_image_ecosystem,?(\s+|$))
-  - agent: jenkins
-    always_run: false
-    branches:
-    - master
-    context: ci/openshift-jenkins/extended_image_registry
-    labels:
-      master: ci.openshift.redhat.com
-    name: test_pull_request_origin_extended_image_registry
-    rerun_command: /test extended_image_registry
-    run_if_changed: ^(pkg/image)|^(test/extended/registry)|^(test/extended/images)|^(test/extended/imageapis)|^(vendor/github.com/docker/distribution)
-    trigger: ((?m)^/test extended_image_registry,?(\s+|$))
   - agent: jenkins
     always_run: false
     branches:
