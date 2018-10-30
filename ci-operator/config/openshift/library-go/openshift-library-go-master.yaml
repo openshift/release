@@ -14,8 +14,8 @@ build_root:
 
 canonical_go_repository: github.com/openshift/library-go
 
-binary_build_commands: make build
-test_binary_build_commands: make build GOFLAGS='-race'
+binary_build_commands: make build --warn-undefined-variables
+test_binary_build_commands: make build GOFLAGS='-race' --warn-undefined-variables
 
 
 tag_specification:
@@ -27,13 +27,13 @@ tests:
 - as: verify
   commands: |
     go get -u golang.org/x/tools/imports
-    make verify -k
+    make verify -k --warn-undefined-variables
   container:
     from: bin
 
-- as: verify-build-machinery
+- as: verify-alpha-build-machinery
   commands: |
-    make -C build-machinery/ verify -k
+    make -C alpha-build-machinery/ verify -k --warn-undefined-variables
   container:
     from: src
 
@@ -41,7 +41,7 @@ tests:
   commands: |
     mkdir -p /tmp/artifacts
     go get -u github.com/openshift/release/tools/gotest2junit
-    make test-unit JUNITFILE=/tmp/artifacts/unit_report.xml
+    make test-unit JUNITFILE=/tmp/artifacts/unit_report.xml --warn-undefined-variables
   artifact_dir: /tmp/artifacts
   container:
     from: test-bin
