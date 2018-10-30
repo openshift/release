@@ -24,6 +24,8 @@ periodics:
   labels:
     master: ci.openshift.redhat.com
   name: azure_build_base_image_rhel
+# Azure node image build jobs
+# Centos-base, centos-ocp-3.10, centos-ocp-3.11
 - agent: kubernetes
   cron: ""
   decorate: true
@@ -45,7 +47,7 @@ periodics:
       - name: CONFIG_SPEC
         valueFrom:
           configMapKeyRef:
-            key: openshift-openshift-ansible-release-3.10.yaml
+            key: openshift-openshift-ansible-release-3.11.yaml
             name: ci-operator-configs
       - name: JOB_NAME_SAFE
         value: build-base-image
@@ -121,6 +123,56 @@ periodics:
           sources:
           - secret:
               name: cluster-secrets-azure-file
+  - agent: kubernetes
+    cron: ""
+    decorate: true
+    interval: 24h
+    name: azure-build-node-image-centos-311
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --secret-dir=/usr/local/e2e-secrets/azure
+        - --template=/usr/local/build-node-image
+        - --target=build-node-image
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-openshift-ansible-release-3.11.yaml
+              name: ci-operator-configs
+        - name: JOB_NAME_SAFE
+          value: build-node-image
+        - name: CLUSTER_TYPE
+          value: azure
+        - name: DEPLOY_OS
+          value: centos7
+        - name: OPENSHIFT_RELEASE
+          value: "3.11"
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources: {}
+        volumeMounts:
+        - mountPath: /usr/local/build-node-image
+          name: job-definition
+          subPath: build-node-image.yaml
+        - mountPath: /usr/local/e2e-secrets/azure
+          name: cluster-secrets-azure-file
+      serviceAccountName: ci-operator
+      volumes:
+      - configMap:
+          name: prow-job-build-node-image
+        name: job-definition
+      - name: cluster-secrets-azure-file
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-azure-file
+# RHEL-base, rhel-ocp-3.10, rhel-ocp-3.11
 - agent: kubernetes
   cron: ""
   decorate: true
@@ -142,7 +194,7 @@ periodics:
       - name: CONFIG_SPEC
         valueFrom:
           configMapKeyRef:
-            key: openshift-openshift-ansible-release-3.10.yaml
+            key: openshift-openshift-ansible-release-3.11.yaml
             name: ci-operator-configs
       - name: JOB_NAME_SAFE
         value: build-base-image
@@ -198,6 +250,55 @@ periodics:
           value: rhel7
         - name: OPENSHIFT_RELEASE
           value: "3.10"
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources: {}
+        volumeMounts:
+        - mountPath: /usr/local/build-node-image
+          name: job-definition
+          subPath: build-node-image.yaml
+        - mountPath: /usr/local/e2e-secrets/azure
+          name: cluster-secrets-azure-file
+      serviceAccountName: ci-operator
+      volumes:
+      - configMap:
+          name: prow-job-build-node-image
+        name: job-definition
+      - name: cluster-secrets-azure-file
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-azure-file
+  - agent: kubernetes
+    cron: ""
+    decorate: true
+    interval: 24h
+    name: azure-build-node-image-rhel-311
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --secret-dir=/usr/local/e2e-secrets/azure
+        - --template=/usr/local/build-node-image
+        - --target=build-node-image
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-openshift-ansible-release-3.11.yaml
+              name: ci-operator-configs
+        - name: JOB_NAME_SAFE
+          value: build-node-image
+        - name: CLUSTER_TYPE
+          value: azure
+        - name: DEPLOY_OS
+          value: rhel7
+        - name: OPENSHIFT_RELEASE
+          value: "3.11"
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
