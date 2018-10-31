@@ -17,7 +17,7 @@ roles: cluster-operator-roles
 	$(MAKE) apply WHAT=cluster/ci/config/roles.yaml
 .PHONY: roles
 
-prow: ci-ns prow-crd prow-config prow-builds prow-rbac prow-services prow-jobs prow-scaling #prow-secrets 
+prow: ci-ns prow-crd prow-config prow-builds prow-rbac prow-services prow-jobs prow-scaling #prow-secrets
 .PHONY: prow
 
 ci-ns:
@@ -45,48 +45,14 @@ prow-config-update:
 .PHONY: prow-config-update
 
 prow-secrets:
-	# DECK_COOKIE_FILE is used for encrypting payloads between deck frontend and backend
-	oc create secret generic cookie --from-file=secret="${DECK_COOKIE_FILE}"
-	# DECK_OAUTH_APP_FILE is used for serving the PR info page on deck
-	oc create secret generic github-oauth-config --from-file=secret="${DECK_OAUTH_APP_FILE}"
-	# CI_PASS is a token for openshift-ci-robot to authenticate in https://ci.openshift.redhat.com/jenkins/
-	oc create secret generic jenkins-tokens --from-literal=basic=${CI_PASS} -o yaml --dry-run | oc apply -f -
-	# KATA_CI_PASS is a token for katabuilder to authenticate in http://kata-jenkins-ci.westus2.cloudapp.azure.com/
-	oc create secret generic kata-jenkins-token --from-literal=basic=${KATA_CI_PASS} -o yaml --dry-run | oc apply -f -
-	# CONSOLE_CI_PASS is a token for tidebot to authenticate in http://jenkins-tectonic.prod.coreos.systems/
-	oc create secret generic console-jenkins-token --from-literal=basic=${CONSOLE_CI_PASS} -o yaml --dry-run | oc apply -f -
-	# HMAC_TOKEN is used for encrypting Github webhook payloads.
-	oc create secret generic hmac-token --from-literal=hmac=${HMAC_TOKEN} -o yaml --dry-run | oc apply -f -
-	# SQ_OAUTH_TOKEN is used for merging PRs
-	# TODO: Rename to something not related to SQ
-	oc create secret generic sq-oauth-token --from-literal=token=${SQ_OAUTH_TOKEN} -o yaml --dry-run | oc apply -f -
-	# OAUTH_TOKEN is used for manipulating Github PRs/issues (labels, comments, etc.).
-	oc create secret generic oauth-token --from-literal=oauth=${OAUTH_TOKEN} -o yaml --dry-run | oc apply -f -
-	# CHERRYPICK_TOKEN is used by the cherrypick bot for cherrypicking changes into new PRs.
-	oc create secret generic cherrypick-token --from-literal=oauth=${CHERRYPICK_TOKEN} -o yaml --dry-run | oc apply -f -
-	# CIDEV_PASS is a token for openshift-ci-robot to authenticate in https://ci.dev.openshift.redhat.com/jenkins/
-	oc create secret generic cidev-token --from-literal=basic=${CIDEV_PASS} -o yaml --dry-run | oc apply -f -
-	# cert.pem, key.pem, and ca_cert.pem are used for authenticating with https://ci.dev.openshift.redhat.com/jenkins/
-	oc create secret generic certificates --from-file=cert.pem --from-file=key.pem --from-file=ca_cert.pem -o yaml --dry-run | oc apply -f -
-	# OPENSHIFT_BOT_TOKEN is the token used by the retester periodic job to rerun tests for PRs
-	oc create secret generic openshift-bot-token --from-literal=oauth=${OPENSHIFT_BOT_TOKEN} -o yaml --dry-run | oc apply -f -
-	# REPO_MANAGEMENT_TOKEN is the token used by the mangement periodic job to manage repo configs
-	oc create secret generic repo-management-token --from-literal=oauth=${REPO_MANAGEMENT_TOKEN} -o yaml --dry-run | oc apply -f -
-	# gce.json is used by jobs operating against GCE
-	oc create secret generic cluster-secrets-gcp --from-file=cluster/test-deploy/gcp/gce.json --from-file=cluster/test-deploy/gcp/ssh-privatekey --from-file=cluster/test-deploy/gcp/ssh-publickey --from-file=cluster/test-deploy/gcp/ops-mirror.pem --from-file=cluster/test-deploy/gcp/telemeter-token -o yaml --dry-run | oc apply -f -
-	# .awscred is used by jobs operating against AWS
-	oc create secret generic cluster-secrets-aws --from-file=cluster/test-deploy/aws/.awscred --from-file=cluster/test-deploy/aws/pull-secret --from-file=cluster/test-deploy/aws/license --from-file=cluster/test-deploy/aws/ssh-privatekey --from-file=cluster/test-deploy/aws/ssh-publickey --from-file=cluster/test-deploy/aws/telemeter-token -o yaml --dry-run | oc apply -f -
-
-	# $DOCKERCONFIGJSON is the path to the json file
-	oc secrets new dockerhub ${DOCKERCONFIGJSON}
-	oc secrets link builder dockerhub
+	ci-operator/populate-secrets-from-bitwarden.sh
 .PHONY: prow-secrets
 
 prow-builds:
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/binaries.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/branchprotector.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/cherrypick.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/checkconfig.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/cherrypick.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/deck.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/hook.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/horologium.yaml
@@ -117,27 +83,29 @@ endif
 .PHONY: prow-update
 
 prow-rbac:
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/deck_rbac.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/hook_rbac.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/horologium_rbac.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/jenkins_operator_rbac.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/plank_rbac.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/sinker_rbac.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tide_rbac.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tracer_rbac.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/artifact-uploader_rbac.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/deck_rbac.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/hook_rbac.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/horologium_rbac.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/jenkins_operator_rbac.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/plank_rbac.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/sinker_rbac.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/tide_rbac.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/tracer_rbac.yaml
 .PHONY: prow-rbac
 
 prow-services: prow-config-updater pod-utils
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/cherrypick.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/artifact-uploader.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/cherrypick.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/deck.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/hook.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/horologium.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/jenkins_operator.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/needs_rebase.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/plank.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/refresh.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/sinker.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tide.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/hook.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/horologium.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/jenkins_operator.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/needs_rebase.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/plank.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/refresh.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/sinker.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/tide.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tot.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tracer.yaml
 .PHONY: prow-services
@@ -218,8 +186,6 @@ node-problem-detector:
 .PHONY: node-problem-detector
 
 projects-secrets:
-	# GITHUB_DEPLOYMENTCONFIG_TRIGGER is used to route github webhook deliveries
-	oc create secret generic github-deploymentconfig-trigger --from-literal=WebHookSecretKey="${GITHUB_DEPLOYMENTCONFIG_TRIGGER}"
 	# IMAGE_REGISTRY_PUBLISHER_BOT_GITHUB_TOKEN is used to push changes from github.com/openshift/image-registry/vendor to our forked repositories.
 	oc create secret generic -n image-registry-publishing-bot github-token --from-literal=token=$${IMAGE_REGISTRY_PUBLISHER_BOT_GITHUB_TOKEN?} --dry-run -o yaml | oc apply -f -
 .PHONY: projects-secrets

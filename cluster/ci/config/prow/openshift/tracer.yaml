@@ -1,9 +1,6 @@
 apiVersion: template.openshift.io/v1
 kind: Template
 parameters:
-- description: The name of the component.
-  name: NAME
-  value: tracer
 - description: The session secret for the proxy
   name: SESSION_SECRET
   generate: expression
@@ -12,7 +9,7 @@ objects:
 - apiVersion: v1
   kind: Route
   metadata:
-    name: "${NAME}"
+    name: "tracer"
     annotations:
       haproxy.router.openshift.io/timeout: 2m
   spec:
@@ -21,16 +18,16 @@ objects:
       insecureEdgeTerminationPolicy: Redirect
     to:
       kind: Service
-      name: "${NAME}"
+      name: "tracer"
 - apiVersion: v1
   kind: Service
   metadata:
-    name: "${NAME}"
+    name: "tracer"
     annotations:
-      service.alpha.openshift.io/serving-cert-secret-name: "${NAME}-tls"
+      service.alpha.openshift.io/serving-cert-secret-name: "tracer-tls"
   spec:
     selector:
-      app: "${NAME}"
+      app: "tracer"
     ports:
     - port: 443
       targetPort: 8443
@@ -38,17 +35,17 @@ objects:
 - apiVersion: apps.openshift.io/v1
   kind: DeploymentConfig
   metadata:
-    name: "${NAME}"
+    name: "tracer"
     labels:
-      app: "${NAME}"
+      app: "tracer"
   spec:
     replicas: 1
     template:
       metadata:
         labels:
-          app: "${NAME}"
+          app: "tracer"
       spec:
-        serviceAccountName: "${NAME}"
+        serviceAccountName: "tracer"
         containers:
         - name: oauth-proxy
           image: openshift/oauth-proxy:latest
@@ -62,7 +59,7 @@ objects:
           - -http-address=
           - -email-domain=*
           - -upstream=http://localhost:8080
-          - -client-id=system:serviceaccount:ci:${NAME}
+          - -client-id=system:serviceaccount:ci:tracer
           - -openshift-ca=/etc/pki/tls/cert.pem
           - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
           - '-openshift-sar={"resource": "configmaps", "verb": "get", "namespace": "ci"}'
@@ -73,11 +70,11 @@ objects:
           - -tls-key=/etc/tls/private/tls.key
           volumeMounts:
           - mountPath: /etc/tls/private
-            name: "${NAME}-tls"
+            name: "tracer-tls"
           - mountPath: /etc/proxy/secrets
             name: session-secret
         - image: " "
-          name: "${NAME}"
+          name: "tracer"
           args:
           - --label-selector=app=prow
           - --namespace=ci
@@ -87,18 +84,18 @@ objects:
         - name: session-secret
           secret:
             secretName: session-secret
-        - name: "${NAME}-tls"
+        - name: "tracer-tls"
           secret:
-            secretName: "${NAME}-tls"
+            secretName: "tracer-tls"
     triggers:
     - type: ConfigChange
     - imageChangeParams:
         automatic: true
         containerNames:
-        - "${NAME}"
+        - "tracer"
         from:
           kind: ImageStreamTag
-          name: "${NAME}:latest"
+          name: "tracer:latest"
       type: ImageChange
 - apiVersion: v1
   kind: Secret
