@@ -19,6 +19,7 @@ parameters:
 - name: OPENSHIFT_RELEASE
   value: "3.11"
   required: true
+- name: AZURE_OREG_URL
 - name: IMAGE_ANSIBLE
   required: true
 - name: DEPLOY_OS
@@ -92,6 +93,8 @@ objects:
         value: "${JOB_NAME_HASH}"
       - name: OPENSHIFT_RELEASE
         value: "${OPENSHIFT_RELEASE}"
+      - name: AZURE_OREG_URL
+        value: "${AZURE_OREG_URL}"
       - name: TYPE
         value: azure
       - name: DEPLOY_OS
@@ -133,6 +136,13 @@ objects:
         sed -i -e "s#TENANT_ID#TENANT#" /tmp/shared/credentials
         sed -i -e "s#CLIENT_SECRET#SECRET#" /tmp/shared/credentials
         source /tmp/shared/credentials
+        
+        # after 3.10 decommission 3.11 repository will become default
+        if [[ ${OPENSHIFT_RELEASE} == "3.11" ]] ; then
+            AZURE_REPO_URL="https://rpms.svc.ci.openshift.org/openshift-origin-v3.11/"
+        else
+            AZURE_REPO_URL=$(curl -qs https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/release-3.10/.latest-rpms)
+        fi
 
         ansible-playbook \
           -e openshift_azure_resource_group_name=$RESOURCE_GROUP \
@@ -146,8 +156,9 @@ objects:
           -e openshift_azure_container=images \
           -e openshift_azure_vm_ssh_public_key="~/.ssh/id_rsa.pub" \
           -e openshift_azure_vm_size=$AZURE_VM_SIZE \
+          -e oreg_url=$AZURE_OREG_URL \
           -e @/usr/share/ansible/openshift-ansible/inventory/dynamic/injected/certs.yaml \
-          -e openshift_azure_install_repo=$(curl -qs https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/release-${OPENSHIFT_RELEASE}/.latest-rpms) \
+          -e openshift_azure_install_repo=$AZURE_REPO_URL \
           playbooks/azure/openshift-cluster/build_node_image.yml
 
         touch /tmp/shared/image_create
