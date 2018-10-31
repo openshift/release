@@ -1,20 +1,14 @@
-# Needs the hmac-token secret for decrypting webhook payloads.
-# Needs the oauth-token secret for creating PRs.
-apiVersion: template.openshift.io/v1
-kind: Template
-parameters:
-- description: The name of the component.
-  name: NAME
-  value: cherrypick
-objects:
+kind: List
+apiVersion: v1
+items:
 - apiVersion: v1
   kind: Service
   metadata:
-    name: "${NAME}"
+    name: cherrypick
   spec:
     selector:
       app: prow
-      component: "${NAME}"
+      component: cherrypick
     ports:
     - port: 80
       targetPort: 8888
@@ -22,10 +16,10 @@ objects:
 - apiVersion: apps.openshift.io/v1
   kind: DeploymentConfig
   metadata:
-    name: "${NAME}"
+    name: cherrypick
     labels:
       app: prow
-      component: "${NAME}"
+      component: cherrypick
   spec:
     replicas: 1
     revisionHistoryLimit: 2
@@ -33,10 +27,10 @@ objects:
       metadata:
         labels:
           app: prow
-          component: "${NAME}"
+          component: cherrypick
       spec:
         containers:
-        - name: "${NAME}"
+        - name: cherrypick
           image: " "
           args:
           - --dry-run=false
@@ -66,8 +60,8 @@ objects:
     - imageChangeParams:
         automatic: true
         containerNames:
-        - "${NAME}"
+        - cherrypick
         from:
           kind: ImageStreamTag
-          name: "${NAME}:latest"
+          name: "cherrypick:latest"
       type: ImageChange

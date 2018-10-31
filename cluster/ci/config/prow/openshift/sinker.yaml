@@ -1,17 +1,13 @@
-apiVersion: template.openshift.io/v1
-kind: Template
-parameters:
-- description: The name of the component.
-  name: NAME
-  value: sinker
-objects:
+kind: List
+apiVersion: v1
+items:
 - apiVersion: apps.openshift.io/v1
   kind: DeploymentConfig
   metadata:
-    name: "${NAME}"
+    name: "sinker"
     labels:
       app: prow
-      component: "${NAME}"
+      component: "sinker"
   spec:
     replicas: 1
     revisionHistoryLimit: 2
@@ -19,11 +15,11 @@ objects:
       metadata:
         labels:
           app: prow
-          component: "${NAME}"
+          component: "sinker"
       spec:
-        serviceAccountName: "${NAME}"
+        serviceAccountName: "sinker"
         containers:
-        - name: "${NAME}"
+        - name: "sinker"
           image: " "
           args:
           - --job-config-path=/etc/job-config
@@ -46,8 +42,8 @@ objects:
     - imageChangeParams:
         automatic: true
         containerNames:
-        - "${NAME}"
+        - "sinker"
         from:
           kind: ImageStreamTag
-          name: "${NAME}:latest"
+          name: "sinker:latest"
       type: ImageChange

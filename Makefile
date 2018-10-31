@@ -51,8 +51,8 @@ prow-secrets:
 prow-builds:
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/binaries.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/branchprotector.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/cherrypick.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/checkconfig.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/cherrypick.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/deck.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/hook.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/horologium.yaml
@@ -83,27 +83,29 @@ endif
 .PHONY: prow-update
 
 prow-rbac:
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/deck_rbac.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/hook_rbac.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/horologium_rbac.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/jenkins_operator_rbac.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/plank_rbac.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/sinker_rbac.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tide_rbac.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tracer_rbac.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/artifact-uploader_rbac.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/deck_rbac.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/hook_rbac.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/horologium_rbac.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/jenkins_operator_rbac.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/plank_rbac.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/sinker_rbac.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/tide_rbac.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/tracer_rbac.yaml
 .PHONY: prow-rbac
 
 prow-services: prow-config-updater pod-utils
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/cherrypick.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/artifact-uploader.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/cherrypick.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/deck.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/hook.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/horologium.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/jenkins_operator.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/needs_rebase.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/plank.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/refresh.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/sinker.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tide.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/hook.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/horologium.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/jenkins_operator.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/needs_rebase.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/plank.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/refresh.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/sinker.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/tide.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tot.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tracer.yaml
 .PHONY: prow-services

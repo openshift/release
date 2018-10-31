@@ -1,18 +1,14 @@
-apiVersion: template.openshift.io/v1
-kind: Template
-parameters:
-- description: The name of the component.
-  name: NAME
-  value: tide
-objects:
+kind: List
+apiVersion: v1
+items:
 - apiVersion: v1
   kind: Service
   metadata:
-    name: "${NAME}"
+    name: "tide"
   spec:
     selector:
       app: prow
-      component: "${NAME}"
+      component: "tide"
     ports:
     - port: 80
       targetPort: 8888
@@ -20,10 +16,10 @@ objects:
 - apiVersion: apps.openshift.io/v1
   kind: DeploymentConfig
   metadata:
-    name: "${NAME}"
+    name: "tide"
     labels:
       app: prow
-      component: "${NAME}"
+      component: "tide"
   spec:
     # Do not scale up.
     replicas: 1
@@ -33,11 +29,11 @@ objects:
       metadata:
         labels:
           app: prow
-          component: "${NAME}"
+          component: "tide"
       spec:
-        serviceAccountName: "${NAME}"
+        serviceAccountName: "tide"
         containers:
-        - name: "${NAME}"
+        - name: "tide"
           image: " "
           args:
           - --dry-run=false
@@ -71,8 +67,8 @@ objects:
     - imageChangeParams:
         automatic: true
         containerNames:
-        - "${NAME}"
+        - "tide"
         from:
           kind: ImageStreamTag
-          name: "${NAME}:latest"
+          name: "tide:latest"
       type: ImageChange
