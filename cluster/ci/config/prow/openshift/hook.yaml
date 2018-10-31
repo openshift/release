@@ -1,16 +1,10 @@
-# Needs the hmac-token secret for decrypting webhook payloads.
-# Needs the oauth-token secret for manipulating Github PRs/issues.
-apiVersion: template.openshift.io/v1
-kind: Template
-parameters:
-- description: The name of the component.
-  name: NAME
-  value: hook
-objects:
+kind: List
+apiVersion: v1
+items:
 - apiVersion: v1
   kind: Route
   metadata:
-    name: "${NAME}"
+    name: hook
   spec:
     path: /hook
     tls:
@@ -18,28 +12,28 @@ objects:
       termination: edge
     to:
       kind: Service
-      name: "${NAME}"
+      name: hook
 - apiVersion: v1
   kind: Service
   metadata:
-    name: "${NAME}"
+    name: hook
     annotations:
       prometheus.io/scrape: "true"
       prometheus.io/port: "8888"
   spec:
     selector:
       app: prow
-      component: "${NAME}"
+      component: hook
     ports:
     - port: 8888
     type: ClusterIP
 - apiVersion: apps.openshift.io/v1
   kind: DeploymentConfig
   metadata:
-    name: "${NAME}"
+    name: hook
     labels:
       app: prow
-      component: "${NAME}"
+      component: hook
   spec:
     replicas: 2
     revisionHistoryLimit: 2
@@ -47,11 +41,11 @@ objects:
       metadata:
         labels:
           app: prow
-          component: "${NAME}"
+          component: hook
       spec:
-        serviceAccountName: "${NAME}"
+        serviceAccountName: hook
         containers:
-        - name: "${NAME}"
+        - name: hook
           image: " "
           args:
           - --github-token-file=/etc/github/oauth
@@ -102,8 +96,8 @@ objects:
     - imageChangeParams:
         automatic: true
         containerNames:
-        - "${NAME}"
+        - hook
         from:
           kind: ImageStreamTag
-          name: "${NAME}:latest"
+          name: "hook:latest"
       type: ImageChange

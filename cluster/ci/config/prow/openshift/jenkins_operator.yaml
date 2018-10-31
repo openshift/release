@@ -1,25 +1,16 @@
-# Needs the jenkins-tokens secret for authenticating with Jenkins.
-# Needs the oauth-token secret for commenting on Github and updating PR statuses.
-apiVersion: template.openshift.io/v1
-kind: Template
-parameters:
-- description: The name of the component.
-  name: NAME
-  value: jenkins-operator
-- description: The name of the component.
-  name: INTERNAL_NAME
-  value: jenkins-dev-operator
-objects:
+kind: List
+apiVersion: v1
+items:
 - apiVersion: v1
   kind: Service
   metadata:
-    name: "${NAME}"
+    name: "jenkins-operator"
     annotations:
       prometheus.io/scrape: "true"
   spec:
     selector:
       app: prow
-      component: "${NAME}"
+      component: "jenkins-operator"
     ports:
     - port: 80
       targetPort: 8080
@@ -27,10 +18,10 @@ objects:
 - apiVersion: apps.openshift.io/v1
   kind: DeploymentConfig
   metadata:
-    name: "${NAME}"
+    name: "jenkins-operator"
     labels:
       app: prow
-      component: "${NAME}"
+      component: "jenkins-operator"
   spec:
     # Do not scale up.
     replicas: 1
@@ -41,11 +32,11 @@ objects:
       metadata:
         labels:
           app: prow
-          component: "${NAME}"
+          component: "jenkins-operator"
       spec:
-        serviceAccountName: "${NAME}"
+        serviceAccountName: "jenkins-operator"
         containers:
-        - name: "${NAME}"
+        - name: "jenkins-operator"
           image: " "
           args:
           - --jenkins-url=https://ci.openshift.redhat.com/jenkins
@@ -91,22 +82,22 @@ objects:
     - imageChangeParams:
         automatic: true
         containerNames:
-        - "${NAME}"
+        - "jenkins-operator"
         from:
           kind: ImageStreamTag
-          name: "${NAME}:latest"
+          name: "jenkins-operator:latest"
       type: ImageChange
 
 - apiVersion: v1
   kind: Service
   metadata:
-    name: "${INTERNAL_NAME}"
+    name: "jenkins-dev-operator"
     annotations:
       prometheus.io/scrape: "true"
   spec:
     selector:
       app: prow
-      component: "${INTERNAL_NAME}"
+      component: "jenkins-dev-operator"
     ports:
     - port: 80
       targetPort: 8080
@@ -114,10 +105,10 @@ objects:
 - apiVersion: apps.openshift.io/v1
   kind: DeploymentConfig
   metadata:
-    name: "${INTERNAL_NAME}"
+    name: "jenkins-dev-operator"
     labels:
       app: prow
-      component: "${INTERNAL_NAME}"
+      component: "jenkins-dev-operator"
   spec:
     # Do not scale up.
     replicas: 1
@@ -128,11 +119,11 @@ objects:
       metadata:
         labels:
           app: prow
-          component: "${INTERNAL_NAME}"
+          component: "jenkins-dev-operator"
       spec:
-        serviceAccountName: "${NAME}"
+        serviceAccountName: "jenkins-operator"
         containers:
-        - name: "${NAME}"
+        - name: "jenkins-operator"
           image: " "
           args:
           - --jenkins-url=https://ci.dev.openshift.redhat.com:8443/jenkins
@@ -181,10 +172,10 @@ objects:
     - imageChangeParams:
         automatic: true
         containerNames:
-        - "${NAME}"
+        - "jenkins-operator"
         from:
           kind: ImageStreamTag
-          name: "${NAME}:latest"
+          name: "jenkins-operator:latest"
       type: ImageChange
 
 - apiVersion: v1
@@ -271,90 +262,5 @@ objects:
         - kata-jenkins-operator
         from:
           kind: ImageStreamTag
-          name: "${NAME}:latest"
-      type: ImageChange
-
-- apiVersion: v1
-  kind: Service
-  metadata:
-    name: console-jenkins-operator
-    annotations:
-      prometheus.io/scrape: "true"
-  spec:
-    selector:
-      app: prow
-      component: console-jenkins-operator
-    ports:
-    - port: 80
-      targetPort: 8080
-    type: ClusterIP
-- apiVersion: apps.openshift.io/v1
-  kind: DeploymentConfig
-  metadata:
-    name: console-jenkins-operator
-    labels:
-      app: prow
-      component: console-jenkins-operator
-  spec:
-    # Do not scale up.
-    replicas: 1
-    revisionHistoryLimit: 2
-    strategy:
-      type: Recreate
-    template:
-      metadata:
-        labels:
-          app: prow
-          component: console-jenkins-operator
-      spec:
-        serviceAccountName: jenkins-operator
-        containers:
-        - name: console-jenkins-operator
-          image: " "
-          args:
-          - --jenkins-url=https://jenkins-tectonic.prod.coreos.systems
-          - --jenkins-user=tidebot
-          - --jenkins-token-file=/etc/jenkins/basic
-          - --label-selector=master=jenkins-tectonic.prod.coreos.systems
-          - --dry-run=false
-          - --job-config-path=/etc/job-config
-          ports:
-          - name: logs
-            containerPort: 8080
-          volumeMounts:
-          - mountPath: /etc/jenkins
-            name: jenkins
-            readOnly: true
-          - name: oauth
-            mountPath: /etc/github
-            readOnly: true
-          - name: config
-            mountPath: /etc/config
-            readOnly: true
-          - name: job-config
-            mountPath: /etc/job-config
-            readOnly: true
-        volumes:
-        - name: jenkins
-          secret:
-            defaultMode: 420
-            secretName: console-jenkins-token
-        - name: oauth
-          secret:
-            secretName: oauth-token
-        - name: config
-          configMap:
-            name: config
-        - name: job-config
-          configMap:
-            name: job-config
-    triggers:
-    - type: ConfigChange
-    - imageChangeParams:
-        automatic: true
-        containerNames:
-        - console-jenkins-operator
-        from:
-          kind: ImageStreamTag
-          name: "${NAME}:latest"
+          name: "jenkins-operator:latest"
       type: ImageChange
