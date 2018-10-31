@@ -1,12 +1,6 @@
 apiVersion: template.openshift.io/v1
 kind: Template
 parameters:
-- description: The name of the component.
-  name: NAME
-  value: deck
-- description: The name of the internal component.
-  name: INTERNAL_NAME
-  value: deck-internal
 - description: The session secret for the component.
   name: SESSION_SECRET
   generate: expression
@@ -15,22 +9,22 @@ objects:
 - apiVersion: v1
   kind: Route
   metadata:
-    name: "${NAME}"
+    name: deck
   spec:
     tls:
       insecureEdgeTerminationPolicy: Redirect
       termination: edge
     to:
       kind: Service
-      name: "${NAME}"
+      name: deck
 - apiVersion: v1
   kind: Service
   metadata:
-    name: "${NAME}"
+    name: deck
   spec:
     selector:
       app: prow
-      component: "${NAME}"
+      component: deck
     ports:
     - port: 80
       targetPort: 8080
@@ -38,10 +32,10 @@ objects:
 - apiVersion: apps.openshift.io/v1
   kind: DeploymentConfig
   metadata:
-    name: "${NAME}"
+    name: deck
     labels:
       app: prow
-      component: "${NAME}"
+      component: deck
   spec:
     replicas: 1
     revisionHistoryLimit: 2
@@ -49,13 +43,15 @@ objects:
       metadata:
         labels:
           app: prow
-          component: "${NAME}"
+          component: deck
       spec:
-        serviceAccountName: "${NAME}"
+        serviceAccountName: deck
         containers:
-        - name: "${NAME}"
+        - name: deck
           image: " "
           args:
+          - --cookie-secret=/etc/cookie/cookie
+          - --github-oauth-config-file=/etc/github/config.json
           - --tide-url=http://tide/
           - --hook-url=http://hook:8888/plugin-help
           - --oauth-url=/github-login
@@ -83,7 +79,7 @@ objects:
             name: config
         - name: oauth-config
           secret:
-            secretName: github-oauth-config
+            secretName: github-app-credentials
         - name: cookie-secret
           secret:
             secretName: cookie
@@ -95,32 +91,32 @@ objects:
     - imageChangeParams:
         automatic: true
         containerNames:
-        - "${NAME}"
+        - deck
         from:
           kind: ImageStreamTag
-          name: "${NAME}:latest"
+          name: "deck:latest"
       type: ImageChange
 - apiVersion: v1
   kind: Route
   metadata:
-    name: "${INTERNAL_NAME}"
+    name: deck-internal
   spec:
     tls:
       insecureEdgeTerminationPolicy: Redirect
       termination: Reencrypt
     to:
       kind: Service
-      name: "${INTERNAL_NAME}"
+      name: deck-internal
 - apiVersion: v1
   kind: Service
   metadata:
-    name: "${INTERNAL_NAME}"
+    name: deck-internal
     annotations:
-      service.alpha.openshift.io/serving-cert-secret-name: "${INTERNAL_NAME}-tls"
+      service.alpha.openshift.io/serving-cert-secret-name: "deck-internal-tls"
   spec:
     selector:
       app: prow
-      component: "${INTERNAL_NAME}"
+      component: deck-internal
     ports:
     - port: 443
       targetPort: 8443
@@ -128,10 +124,10 @@ objects:
 - apiVersion: apps.openshift.io/v1
   kind: DeploymentConfig
   metadata:
-    name: "${INTERNAL_NAME}"
+    name: deck-internal
     labels:
       app: prow
-      component: "${INTERNAL_NAME}"
+      component: deck-internal
   spec:
     replicas: 1
     revisionHistoryLimit: 2
@@ -139,9 +135,9 @@ objects:
       metadata:
         labels:
           app: prow
-          component: "${INTERNAL_NAME}"
+          component: deck-internal
       spec:
-        serviceAccountName: "${NAME}"
+        serviceAccountName: deck
         containers:
         - name: oauth-proxy
           image: openshift/oauth-proxy:latest
@@ -155,7 +151,7 @@ objects:
           - -http-address=
           - -email-domain=*
           - -upstream=http://localhost:8080
-          - -client-id=system:serviceaccount:ci:${NAME}
+          - -client-id=system:serviceaccount:ci:deck
           - -openshift-ca=/etc/pki/tls/cert.pem
           - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
           - '-openshift-sar={"resource": "namespaces", "verb": "get", "resourceName": "kube-system", "namespace": "kube-system"}'
@@ -166,10 +162,10 @@ objects:
           - -tls-key=/etc/tls/private/tls.key
           volumeMounts:
           - mountPath: /etc/tls/private
-            name: "${INTERNAL_NAME}-tls"
+            name: "deck-internal-tls"
           - mountPath: /etc/proxy/secrets
             name: session-secret
-        - name: "${NAME}"
+        - name: deck
           image: " "
           args:
           - --tide-url=http://tide/
@@ -188,23 +184,23 @@ objects:
             name: config
         - name: session-secret
           secret:
-            secretName: "${INTERNAL_NAME}-session-secret"
-        - name: "${INTERNAL_NAME}-tls"
+            secretName: "deck-internal-session-secret"
+        - name: "deck-internal-tls"
           secret:
-            secretName: "${INTERNAL_NAME}-tls"
+            secretName: "deck-internal-tls"
     triggers:
     - type: ConfigChange
     - imageChangeParams:
         automatic: true
         containerNames:
-        - "${NAME}"
+        - deck
         from:
           kind: ImageStreamTag
-          name: "${NAME}:latest"
+          name: "deck:latest"
       type: ImageChange
 - apiVersion: v1
   kind: Secret
   metadata:
-    name: "${INTERNAL_NAME}-session-secret"
+    name: "deck-internal-session-secret"
   stringData:
     session_secret: "${SESSION_SECRET}="

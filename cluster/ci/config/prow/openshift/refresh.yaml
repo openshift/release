@@ -1,20 +1,14 @@
-# Needs the hmac-token secret for decrypting webhook payloads.
-# Needs the oauth-token secret for refreshing PR statuses.
-apiVersion: template.openshift.io/v1
-kind: Template
-parameters:
-- description: The name of the component.
-  name: NAME
-  value: refresh
-objects:
+kind: List
+apiVersion: v1
+items:
 - apiVersion: v1
   kind: Service
   metadata:
-    name: "${NAME}"
+    name: "refresh"
   spec:
     selector:
       app: prow
-      component: "${NAME}"
+      component: "refresh"
     ports:
     - port: 80
       targetPort: 8888
@@ -22,10 +16,10 @@ objects:
 - apiVersion: apps.openshift.io/v1
   kind: DeploymentConfig
   metadata:
-    name: "${NAME}"
+    name: "refresh"
     labels:
       app: prow
-      component: "${NAME}"
+      component: "refresh"
   spec:
     replicas: 1
     revisionHistoryLimit: 2
@@ -33,12 +27,14 @@ objects:
       metadata:
         labels:
           app: prow
-          component: "${NAME}"
+          component: "refresh"
       spec:
         containers:
-        - name: "${NAME}"
+        - name: "refresh"
           image: " "
           args:
+          - --github-token-file=/etc/github/oauth
+          - --hmac-secret-file=/etc/webhook/hmac
           - --dry-run=false
           - --prow-url=https://deck-ci.svc.ci.openshift.org
           ports:
@@ -57,10 +53,10 @@ objects:
         volumes:
         - name: hmac
           secret:
-            secretName: hmac-token
+            secretName: github-webhook-credentials
         - name: oauth
           secret:
-            secretName: oauth-token
+            secretName: github-credentials-openshift-ci-robot
         - name: config
           configMap:
             name: config
@@ -69,8 +65,8 @@ objects:
     - imageChangeParams:
         automatic: true
         containerNames:
-        - "${NAME}"
+        - "refresh"
         from:
           kind: ImageStreamTag
-          name: "${NAME}:latest"
+          name: "refresh:latest"
       type: ImageChange

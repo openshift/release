@@ -1,18 +1,13 @@
-# Needs an oauth-token secret for commenting on Github and updating PR statuses.
-apiVersion: template.openshift.io/v1
-kind: Template
-parameters:
-- description: The name of the component.
-  name: NAME
-  value: plank
-objects:
+kind: List
+apiVersion: v1
+items:
 - apiVersion: apps.openshift.io/v1
   kind: DeploymentConfig
   metadata:
-    name: "${NAME}"
+    name: "plank"
     labels:
       app: prow
-      component: "${NAME}"
+      component: "plank"
   spec:
     # Do not scale up.
     replicas: 1
@@ -23,17 +18,17 @@ objects:
       metadata:
         labels:
           app: prow
-          component: "${NAME}"
+          component: "plank"
       spec:
-        serviceAccountName: "${NAME}"
+        serviceAccountName: "plank"
         containers:
-        - name: "${NAME}"
+        - name: "plank"
           image: " "
           args:
           - --tot-url=http://tot
           - --dry-run=false
-          - --label-selector=decorate!=true
           - --job-config-path=/etc/job-config
+          - --github-token-file=/etc/github/oauth
           volumeMounts:
           - name: oauth
             mountPath: /etc/github
@@ -47,7 +42,7 @@ objects:
         volumes:
         - name: oauth
           secret:
-            secretName: oauth-token
+            secretName: github-credentials-openshift-ci-robot
         - name: config
           configMap:
             name: config
@@ -59,8 +54,8 @@ objects:
     - imageChangeParams:
         automatic: true
         containerNames:
-        - "${NAME}"
+        - "plank"
         from:
           kind: ImageStreamTag
-          name: "${NAME}:latest"
+          name: "plank:latest"
       type: ImageChange

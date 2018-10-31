@@ -1,20 +1,14 @@
-# Needs the hmac-token secret for decrypting webhook payloads.
-# Needs the oauth-token secret for adding comments/labels in PRs.
-apiVersion: template.openshift.io/v1
-kind: Template
-parameters:
-- description: The name of the component.
-  name: NAME
-  value: needs-rebase
-objects:
+kind: List
+apiVersion: v1
+items:
 - apiVersion: v1
   kind: Service
   metadata:
-    name: "${NAME}"
+    name: "needs-rebase"
   spec:
     selector:
       app: prow
-      component: "${NAME}"
+      component: "needs-rebase"
     ports:
     - port: 80
       targetPort: 8888
@@ -22,10 +16,10 @@ objects:
 - apiVersion: apps.openshift.io/v1
   kind: DeploymentConfig
   metadata:
-    name: "${NAME}"
+    name: "needs-rebase"
     labels:
       app: prow
-      component: "${NAME}"
+      component: "needs-rebase"
   spec:
     replicas: 1
     revisionHistoryLimit: 2
@@ -33,12 +27,15 @@ objects:
       metadata:
         labels:
           app: prow
-          component: "${NAME}"
+          component: "needs-rebase"
       spec:
         containers:
-        - name: "${NAME}"
+        - name: "needs-rebase"
           image: " "
           args:
+          - --github-token-file=/etc/github/oauth
+          - --hmac-secret-file=/etc/webhook/hmac
+          - --plugin-config=/etc/plugins/plugins.yaml
           - --dry-run=false
           ports:
             - name: http
@@ -56,10 +53,10 @@ objects:
         volumes:
         - name: hmac
           secret:
-            secretName: hmac-token
+            secretName: github-webhook-credentials
         - name: oauth
           secret:
-            secretName: openshift-bot-token
+            secretName: github-credentials-openshift-bot
         - name: plugins
           configMap:
             name: plugins
@@ -68,8 +65,8 @@ objects:
     - imageChangeParams:
         automatic: true
         containerNames:
-        - "${NAME}"
+        - "needs-rebase"
         from:
           kind: ImageStreamTag
-          name: "${NAME}:latest"
+          name: "needs-rebase:latest"
       type: ImageChange
