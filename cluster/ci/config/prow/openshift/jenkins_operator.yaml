@@ -50,7 +50,8 @@ objects:
           args:
           - --jenkins-url=https://ci.openshift.redhat.com/jenkins
           - --jenkins-user=openshift-ci-robot
-          - --jenkins-token-file=/etc/jenkins/basic
+          - --jenkins-token-file=/etc/jenkins/password
+          - --github-token-file=/etc/github/oauth
           - --label-selector=master=ci.openshift.redhat.com
           - --config-path=/etc/config/config.yaml
           - --job-config-path=/etc/job-config
@@ -75,10 +76,10 @@ objects:
         - name: jenkins
           secret:
             defaultMode: 420
-            secretName: jenkins-tokens
+            secretName: jenkins-credentials-ci.openshift.redhat.com
         - name: oauth
           secret:
-            secretName: oauth-token
+            secretName: github-credentials-openshift-ci-robot
         - name: config
           configMap:
             name: config
@@ -136,11 +137,12 @@ objects:
           args:
           - --jenkins-url=https://ci.dev.openshift.redhat.com:8443/jenkins
           - --jenkins-user=openshift-ci-robot
-          - --jenkins-token-file=/etc/jenkins/basic
+          - --jenkins-token-file=/etc/jenkins/password
+          - --github-token-file=/etc/github/oauth
           - --label-selector=master=ci.dev.openshift.redhat.com
-          - --cert-file=/etc/certificates/cert.pem
-          - --key-file=/etc/certificates/key.pem
-          - --ca-cert-file=/etc/certificates/ca_cert.pem
+          - --cert-file=/etc/jenkins/cert.pem
+          - --key-file=/etc/jenkins/key.pem
+          - --ca-cert-file=/etc/jenkins/ca.pem
           - --csrf-protect=true
           - --dry-run=false
           - --job-config-path=/etc/job-config
@@ -157,9 +159,6 @@ objects:
           - name: config
             mountPath: /etc/config
             readOnly: true
-          - name: certificates
-            mountPath: /etc/certificates
-            readOnly: true
           - name: job-config
             mountPath: /etc/job-config
             readOnly: true
@@ -167,16 +166,13 @@ objects:
         - name: jenkins
           secret:
             defaultMode: 420
-            secretName: cidev-token
+            secretName: jenkins-credentials-ci.dev.openshift.redhat.com
         - name: oauth
           secret:
-            secretName: oauth-token
+            secretName: github-credentials-openshift-ci-robot
         - name: config
           configMap:
             name: config
-        - name: certificates
-          secret:
-            secretName: certificates
         - name: job-config
           configMap:
             name: job-config
@@ -231,7 +227,8 @@ objects:
           args:
           - --jenkins-url=http://jenkins.katacontainers.io/
           - --jenkins-user=katabuilder
-          - --jenkins-token-file=/etc/jenkins/basic
+          - --jenkins-token-file=/etc/jenkins/password
+          - --github-token-file=/etc/github/oauth
           - --label-selector=master=jenkins.katacontainers.io
           - --csrf-protect=true
           - --dry-run=false
@@ -256,10 +253,10 @@ objects:
         - name: jenkins
           secret:
             defaultMode: 420
-            secretName: kata-jenkins-token
+            secretName: jenkins-credentials-kata-jenkins-ci.westus2.cloudapp.azure.com
         - name: oauth
           secret:
-            secretName: oauth-token
+            secretName: github-credentials-openshift-ci-robot
         - name: config
           configMap:
             name: config
