@@ -183,16 +183,16 @@ rm -rf ../aos-ansible
 ```
 
 
-# Secret rotation
+# Secrets
 
 We use 2 types of secrets. Both of them contain the same data but in a different formats.
 
 ```
--file - file based secret. It can be sourced by script (see ci-operator jobs code)
--env - environment based secret. It can be injected to pod using pod spec (see azure-purge code)
+cluster-secrets-azure: file based secret. It can be sourced by script (see ci-operator jobs)
+cluster-secrets-azure-env: environment based secret. It can be injected to pod using pod spec (see azure-purge)
 ```
 
-## File secret
+## cluster-secrets-azure
 
 OSA jobs are using `Web API App` credentials on Azure to run jobs. If for some reason you need to rotate secret, follow this process:
 
@@ -209,25 +209,30 @@ export AZURE_SUBSCRIPTION_ID=<subscription id>
 
 4. Create a secret
 
+You need to make sure you also have the required certificates in place in order to allow our
+build VM process to download the OpenShift RPMs from the ops mirror.
+
 ```
-oc create secret generic cluster-secrets-azure-file --from-file=cluster/test-deploy/azure/secret -o yaml --dry-run | oc apply -n ci -f -	
+oc create secret generic cluster-secrets-azure --from-file=cluster/test-deploy/azure/secret --from-file=cluster/test-deploy/azure/ssh-privatekey --from-file=cluster/test-deploy/azure/certs.yaml -o yaml --dry-run | oc apply -n ci -f -
 ```
 
 5. (Optional, if you dont have access to CI namespace)
 
 ```
-oc apply secret generic cluster-secrets-azure-file --from-file=cluster/test-deploy/azure/secret -o yaml --dry-run | oc apply -n azure -f -
+oc create secret generic cluster-secrets-azure --from-file=cluster/test-deploy/azure/secret --from-file=cluster/test-deploy/azure/ssh-privatekey --from-file=cluster/test-deploy/azure/certs.yaml -o yaml --dry-run | oc apply -n azure -f -
 ```
 
 and ask somebody, who has access to execute:
 
 ```
-oc get secret cluster-secrets-azure-file --export -n azure -o yaml | oc apply -f - -n ci
+oc get secret cluster-secrets-azure --export -n azure -o yaml | oc apply -n ci -f -
 ```
 
-## Env secret
+## cluster-secrets-azure-env
 
-Rotate azure env secret:
+This secret is used by the azure-purge job to authenticate in Azure when garbage-collecting stale resources.
+
+To rorate this secret:
 
 ```
 source ./cluster/test-deploy/azure/secret

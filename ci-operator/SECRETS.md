@@ -35,13 +35,13 @@ secrets currently exist:
 | `ssh-publickey`   | Public half of the SSH key, for connecting to GCE VMs. |
 | `telemeter-token` | Token to push telemetry data on CI clusters. |
 
-#### `cluster-secrets-azure-file`
+#### `cluster-secrets-azure`
 
 |       Key        | Description |
 | ---------------- | ----------- |
 | `secret`         | Credentials for the Azure API. See the [upstream credentials doc](https://docs.microsoft.com/en-us/rest/api/apimanagement/apimanagementrest/azure-api-management-rest-api-authentication). |
-| `certs.yaml`     | TODO: @kargakis fill this in |
-| `ssh-privatekey` | Private half of the SSH key, for connecting to Azure VMs. |
+| `certs.yaml`     | Certificate and key for downloading OpenShift RPMs from the ops mirrors |
+| `ssh-privatekey` | Private half of the SSH key, for connecting to Azure VMs when the VM image is built. |
 
 ### GCE ServiceAccount Credentials
 
