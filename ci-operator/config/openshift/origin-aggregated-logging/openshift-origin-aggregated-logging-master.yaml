@@ -57,8 +57,21 @@ tag_specification:
   tag: ''
   tag_overrides: {}
 build_root:
-  image_stream_tag:
-    cluster: https://api.ci.openshift.org
-    name: release
-    namespace: openshift
-    tag: golang-1.10
+  project_image:
+    dockerfile_path: openshift/ci-operator/build-image/Dockerfile
+tests:
+- as: e2e-gcp-journald
+  commands: |
+    . openshift/ci-operator/build-image/launch-e2e-test.sh
+  openshift_ansible_src:
+    cluster_profile: gcp-logging-journald
+- as: e2e-gcp-json-file
+  commands: |
+    . openshift/ci-operator/build-image/launch-e2e-test.sh
+  openshift_ansible_src:
+    cluster_profile: gcp-logging-json-file
+- as: e2e-gcp-crio
+  commands: |
+    . openshift/ci-operator/build-image/launch-e2e-test.sh
+  openshift_ansible_src:
+    cluster_profile: gcp-logging-crio

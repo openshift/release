@@ -1,0 +1,113 @@
+# Package and target versions
+
+deployment_type: origin
+ansible_pkg_mgr: yum
+inventory_ip_type: external
+
+openshift_disable_check: disk_availability,docker_image_availability,memory_availability,docker_storage
+openshift_additional_repos: [
+  {"name": "origin-pr", "baseurl": "{{ openshift_test_repo }}", "enabled": 1, "gpgcheck": 0},
+  {"name": "origin-pr-dependencies", "baseurl": "{{ openshift_dependencies_repo | default('http://mirror.centos.org/centos/7/paas/x86_64/openshift-origin/') }}", "enabled": 1, "gpgcheck": 0}
+  ]
+
+# URLs and certs
+
+openshift_master_cluster_public_hostname: api.{{ lookup('env', 'INSTANCE_PREFIX') | mandatory }}.{{ public_hosted_zone }}
+openshift_master_cluster_hostname: internal-api.{{ lookup('env', 'INSTANCE_PREFIX') | mandatory }}.{{ public_hosted_zone }}
+wildcard_zone: apps.{{ lookup('env', 'INSTANCE_PREFIX') | mandatory }}.{{ public_hosted_zone }}
+openshift_master_public_api_url: "https://api.{{ lookup('env', 'INSTANCE_PREFIX') | mandatory }}.{{ public_hosted_zone }}"
+openshift_master_public_console_url: "https://api.{{ lookup('env', 'INSTANCE_PREFIX') | mandatory }}.{{ public_hosted_zone }}/console"
+
+openshift_template_service_broker_namespaces: [ "openshift" ]
+# Disabled until bootstrapping is fixed
+ansible_service_broker_install: false
+openshift_enable_service_catalog: false
+template_service_broker_install: false
+
+console_port: 443
+internal_console_port: 8443
+openshift_master_api_port: "8443"
+openshift_master_console_port: "8443"
+openshift_node_port_range: 30000-32767
+openshift_node_open_ports: [{"service":"Master health check port","port":"8080/tcp"},{"service":"Router stats port","port":"1936/tcp"},{"service":"Allowed open host ports","port":"9000-10000/tcp"},{"service":"Allowed open host ports","port":"9000-10000/udp"}]
+
+# Authentication and authorization
+
+openshift_master_identity_providers: [{"name": "allow_all", "login": "true", "challenge": "true", "kind": "AllowAllPasswordIdentityProvider"}]
+
+# Post config setting sizes
+
+openshift_hosted_router_replicas: 1
+openshift_hosted_registry_replicas: 1
+openshift_schedulable: True
+
+openshift_hosted_registry_storage_gcs_keyfile: "{{ files_dir }}/gce.json"
+openshift_hosted_registry_storage_kind: object
+openshift_hosted_registry_storage_provider: gcs
+openshift_hosted_registry_storage_gcs_bucket: origin-ci-test-{{ lookup('env', 'INSTANCE_PREFIX') | mandatory }}
+
+container_runtime_docker_storage_type: overlay2
+
+provision_custom_repositories: [
+  {
+    "name": "dockertested",
+    "baseurl": "https://mirror.ops.rhcloud.com/enterprise/rhel/dockertested/x86_64/os/
+        https://use-mirror1.ops.rhcloud.com/enterprise/rhel/dockertested/x86_64/os/
+        https://use-mirror2.ops.rhcloud.com/enterprise/rhel/dockertested/x86_64/os/
+        https://euw-mirror1.ops.rhcloud.com/enterprise/rhel/dockertested/x86_64/os/
+        https://gce-mirror1.ops.rhcloud.com/enterprise/rhel/dockertested/x86_64/os/
+        https://gce-mirror2.ops.rhcloud.com/enterprise/rhel/dockertested/x86_64/os/",
+    "sslverify": "false",
+    "sslclientkey": "ops-mirror.pem",
+    "sslclientcert": "ops-mirror.pem",
+    "failovermethod": "priority",
+    "gpgcheck": 0,
+    "gpgkey": "https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-release https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-beta https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-openshifthosted"
+  },
+  {
+  "name": "criotested",
+  "baseurl": "https://mirror.ops.rhcloud.com/enterprise/rhel/cri-o-tested/3.11/x86_64/os/
+      https://use-mirror1.ops.rhcloud.com/enterprise/rhel/cri-o-tested/3.11/x86_64/os/
+      https://use-mirror2.ops.rhcloud.com/enterprise/rhel/cri-o-tested/3.11/x86_64/os/
+      https://euw-mirror1.ops.rhcloud.com/enterprise/rhel/cri-o-tested/3.11/x86_64/os/
+      https://gce-mirror1.ops.rhcloud.com/enterprise/rhel/cri-o-tested/3.11/x86_64/os/
+      https://gce-mirror2.ops.rhcloud.com/enterprise/rhel/cri-o-tested/3.11/x86_64/os/",
+  "sslverify": "false",
+  "sslclientkey": "ops-mirror.pem",
+  "sslclientcert": "ops-mirror.pem",
+  "failovermethod": "priority",
+  "gpgcheck": 0,
+  "enabled": 1,
+  "gpgkey": "https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-release https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-beta https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-openshifthosted"
+  }
+]
+
+openshift_gcp_prefix: "{{ lookup('env', 'INSTANCE_PREFIX') | mandatory }}-"
+
+openshift_gcp_region: us-east1
+openshift_gcp_zone: us-east1-c
+
+openshift_gcp_network_name: "{{ openshift_gcp_prefix }}network"
+
+openshift_gcp_iam_service_account_keyfile: "{{ files_dir }}/gce.json"
+
+openshift_gcp_ssh_private_key: "{{ files_dir + '/ssh-privatekey' }}"
+
+openshift_gcp_infra_network_instance_group: ig-i
+
+# Instructs the launch job to build an AMI prior to cluster provisioning and then use that image
+openshift_gcp_build_image: true
+openshift_gcp_image: '{{ openshift_gcp_prefix }}images'
+openshift_gcp_base_image: 'rhel-7'
+openshift_gcp_root_image: 'centos-7'
+
+# TODO: remove when https://github.com/openshift/openshift-ansible/issues/9340 is fixed
+openshift_storageclass_reclaim_policy: Delete
+
+openshift_gcp_registry_bucket_keyfile: "{{ files_dir }}/gce.json"
+openshift_gcp_registry_bucket_name: "origin-ci-test-{{ lookup('env', 'INSTANCE_PREFIX') | mandatory }}"
+
+osm_controller_args: {"experimental-cluster-signing-duration": ["20m"]}
+openshift_master_bootstrap_enabled: true
+openshift_master_bootstrap_auto_approve: true
+openshift_master_bootstrap_auto_approver_node_selector: {"role": "infra"}
