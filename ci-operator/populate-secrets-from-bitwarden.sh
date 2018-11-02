@@ -3,6 +3,7 @@
 set -o errexit
 set -o nounset
 set -o pipefail
+set -o xtrace
 
 # This script uses a connection to Bitwarden to populate k8s secrets used for
 # the OKD CI infrastructure. To use this script, first get the BitWarden CLI at:
@@ -48,7 +49,7 @@ function format_field() {
 	local item="$1"
 	local field="$2"
 	local name="${3:-"${item}"}"
-	echo "--from-literal=${item}=$( jq ".[] | select(.name == \"${item}\") | ${field}" --raw-output <"${secrets}" )"
+	echo "--from-literal=${name}=$( jq ".[] | select(.name == \"${item}\") | ${field}" --raw-output <"${secrets}" )"
 }
 
 # retrieve the value of a field from an item in BitWarden
@@ -57,7 +58,7 @@ function format_field_value() {
 	local item="$1"
 	local field="$2"
 	local name="${3:-"${item}"}"
-	echo "--from-literal=${item}=$( jq ".[] | select(.name == \"${item}\") | .fields[] | select(.name == \"${field}\") | .value" --raw-output <"${secrets}")"
+	echo "--from-literal=${name}=$( jq ".[] | select(.name == \"${item}\") | .fields[] | select(.name == \"${field}\") | .value" --raw-output <"${secrets}")"
 }
 
 
@@ -69,7 +70,7 @@ function format_attachment() {
 	local name="${3:-"${attachment}"}"
 	local item_id="$( jq ".[] | select(.name == \"${item}\") | .id" --raw-output <"${secrets}" )"
 	local attachment_id="$( jq ".[] | select(.name == \"${item}\") | .attachments[] | select(.fileName == \"${attachment}\") | .id" --raw-output <"${secrets}" )"
-	echo "--from-file=${attachment}=$( bw --session "${BW_SESSION}" get attachment "${attachment_id}" --itemid "${item_id}" --raw )"
+	echo "--from-file=${name}=$( bw --session "${BW_SESSION}" get attachment "${attachment_id}" --itemid "${item_id}" --raw )"
 }
 
 # Jenkins credentials are stored as separate items in Bitwarden,
@@ -119,14 +120,14 @@ oc label secret "github-deploymentconfig-trigger" "ci.openshift.io/managed=true"
 # Credentials for GCE service accounts are stored
 # as an attachment on each distinct credential
 for account in "aos-pubsub-subscriber" "ci-vm-operator" "gcs-publisher"; do
-	oc create secret generic "gce-sa-credentials-${account}" "$( format_attachment "${account}" credentials.json )"
+	oc create secret generic "gce-sa-credentials-${account}" "$( format_attachment "${account}" credentials.json service-account.json )"
 	oc label secret "gce-sa-credentials-${account}" "ci.openshift.io/managed=true"
 done
 
 # Some GCE serviceaccounts also have SSH keys
 for account in "aos-serviceaccount" "jenkins-ci-provisioner"; do
 	oc create secret generic "gce-sa-credentials-${account}"   \
-		"$( format_attachment "${account}" credentials.json )" \
+		"$( format_attachment "${account}" credentials.json service-account.json )" \
 		"$( format_attachment "${account}" ssh-privatekey )"   \
 		"$( format_attachment "${account}" ssh-publickey )"
 	oc label secret "gce-sa-credentials-${account}" "ci.openshift.io/managed=true"
