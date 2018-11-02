@@ -48,7 +48,7 @@ prow-secrets:
 	ci-operator/populate-secrets-from-bitwarden.sh
 .PHONY: prow-secrets
 
-prow-builds:
+prow-builds: pod-utils
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/binaries.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/branchprotector.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/checkconfig.yaml
@@ -64,12 +64,6 @@ prow-builds:
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/tide.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/tot.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/tracer.yaml
-	$(MAKE) apply WHAT=tools/pod-utils/artifact-uploader.yaml
-	$(MAKE) apply WHAT=tools/pod-utils/clonerefs.yaml
-	$(MAKE) apply WHAT=tools/pod-utils/entrypoint.yaml
-	$(MAKE) apply WHAT=tools/pod-utils/gcsupload.yaml
-	$(MAKE) apply WHAT=tools/pod-utils/initupload.yaml
-	$(MAKE) apply WHAT=tools/pod-utils/sidecar.yaml
 .PHONY: prow-builds
 
 prow-update:
@@ -94,7 +88,7 @@ prow-rbac:
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/tracer_rbac.yaml
 .PHONY: prow-rbac
 
-prow-services: prow-config-updater pod-utils
+prow-services: prow-config-updater
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/artifact-uploader.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/cherrypick.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/deck.yaml
@@ -106,7 +100,7 @@ prow-services: prow-config-updater pod-utils
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/refresh.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/sinker.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/tide.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tot.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/tot.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tracer.yaml
 .PHONY: prow-services
 
