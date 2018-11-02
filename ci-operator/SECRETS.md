@@ -105,7 +105,7 @@ secret holds push credentials also in a `config.json` key.
 ### Jenkins Credentials
 
 The following Jenkins masters have their credentials stored in secrets on the
-cluster
+cluster:
 
  - openshift-ci-robot@ci.dev.openshift.redhat.com
  - openshift-ci-robot@ci.openshift.redhat.com
@@ -115,7 +115,7 @@ For each master, the `jenkins-credentials-${master_url}` secret holds the
 password for the Jenkins user in the `password` key. For the `ci.dev` master,
 a client cert, key and CA cert are also present for client authentication.
 
-## Secret Regneration
+## Secret Regeneration
 
 In order to regenerate the secrets in the case of an emergency, a CI admin can
 recreate all of the above secrets by running:
@@ -124,7 +124,7 @@ recreate all of the above secrets by running:
 $ BW_SESSION="$( bw login username@company.com password --raw )" ci-operator/populate-secrets-from-bitwarden.sh
 ```
 
-This requries the appropriate access in BitWarden and will create a new session
+This requires the appropriate access in BitWarden and will create a new session
 that can be closed with:
 
 ```
