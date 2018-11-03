@@ -99,7 +99,7 @@ objects:
         mkdir -p "${HOME}"
 
         # wait for the router namespace
-        FOUND_KUBECONFIG=
+        SETUP_SUCCESS=
         API_UP=
         ROUTER_NAMESPACE=
         ROUTER_DEPLOYMENT=
@@ -108,12 +108,12 @@ objects:
             echo "Another process exited" 2>&1
             exit 1
           fi
-          if [[ ! -f "${KUBECONFIG}" ]]; then
+          if [[ ! -f /tmp/shared/setup-success ]]; then
             sleep 15 & wait
             continue
-          elif [[ -z "${FOUND_KUBECONFIG}" ]]; then
-            echo "Found shared kubeconfig"
-            FOUND_KUBECONFIG=1
+          elif [[ -z "${SETUP_SUCCESS}" ]]; then
+            echo "Setup success"
+            SETUP_SUCCESS=1
 
             # don't let clients impact the global kubeconfig
             cp "${KUBECONFIG}" /tmp/admin.kubeconfig
@@ -265,7 +265,7 @@ objects:
       - -c
       - |
         #!/bin/sh
-        trap 'rc=$?; if test "${rc}" -ne 0; then touch /tmp/exit; fi; exit "${rc}"' EXIT
+        trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/setup-success; else touch /tmp/exit; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN}; fi' TERM
 
         mkdir /tmp/artifacts/installer &&
