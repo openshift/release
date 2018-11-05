@@ -368,6 +368,77 @@ objects:
         /bin/openshift-install --dir=/tmp/artifacts/installer create cluster &
         wait "$!"
 
+    # Stream "journalctl -u bootkube" and "kubectl get all -a --all-namespaces -w" into artifact
+    - name: stream-bootstrapping
+      image: ${IMAGE_INSTALLER}
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      - name: cluster-profile
+        mountPath: /etc/openshift-installer
+      - name: artifacts
+        mountPath: /tmp/artifacts
+      command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        trap 'kill $(jobs -p); exit 0' TERM
+
+        mkdir -p .ssh
+        chmod 700 .ssh
+        cp /etc/openshift-installer/ssh-privatekey .ssh/id_rsa
+        cp /etc/openshift-installer/ssh-publickey .ssh/id_rsa.pub
+
+        function stream-bootkube () {
+          ip=${1}
+          while true; do
+            ssh -o "StrictHostKeyChecking=no" core@${ip} sudo journalctl -u bootkube.service -f --no-tail 2>&1
+            echo "=================== journalctl terminated ==================="
+            date
+            sleep 5
+          done > /tmp/artifacts/bootstrap/bootkube.log
+        }
+
+        function stream-kubectl-get-all () {
+          ip=${1}
+          while true; do
+            ssh -o "StrictHostKeyChecking=no" core@${ip} sudo kubectl get all --kubeconfig=/var/opt/tectonic/auth/kubeconfig -a --all-namespaces -w 2>&1
+            echo "=================== kubectl get all ... -w terminated ==================="
+            date
+            sleep 5
+          done > /tmp/artifacts/bootstrap/kubectl-get-all.log
+        }
+
+        function start-streams () {
+          # wait for terraform to start up
+          while [ ! -f /tmp/artifacts/installer/terraform.tfstate ]; do sleep 5; done
+
+          # wait for the bootstrap node to show up with an IP
+          ip=""
+          while [ -z "${ip}" ]; do
+            ip=$(terraform state show -state=terraform.tfstate module.bootstrap.aws_instance.bootstrap | sed -n 's/^public_ip *= *//p')
+          done
+
+          # try to login
+          while ! ssh -o "StrictHostKeyChecking=no" core@${ip} /bin/true; do
+            sleep 5
+          done
+
+          # start streaming
+          mkdir -p /tmp/artifacts/bootstrap
+          stream-bootkube ${ip} &
+          stream-kubectl-get-all ${ip} &
+        }
+
+        start-streams
+        for i in `seq 1 180`; do
+          if [[ -f /tmp/shared/exit ]]; then
+            exit 0
+          fi
+          sleep 60 & wait
+        done
+
     # Performs cleanup of all created resources
     - name: teardown
       image: ${IMAGE_INSTALLER}
