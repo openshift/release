@@ -1,0 +1,34 @@
+postsubmits:
+  openshift/prometheus-alertmanager:
+  - agent: kubernetes
+    branches:
+    - ^release-3\.11$
+    decorate: true
+    labels:
+      artifacts: images
+    name: branch-ci-openshift-prometheus-alertmanager-release-3.11-images
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --promote
+        - --target=[images]
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-prometheus-alertmanager-release-3.11.yaml
+              name: ci-operator-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
