@@ -18,6 +18,8 @@ parameters:
   value: "azure"
   required: true
 - name: TEST_IN_PRODUCTION
+- name: DEPLOY_VERSION
+  value: "v3.10"
 
 objects:
 
@@ -143,6 +145,8 @@ objects:
         value: 4h
       - name: TEST_IN_PRODUCTION
         value: ${TEST_IN_PRODUCTION}
+      - name: DEPLOY_VERSION
+        value: ${DEPLOY_VERSION}
       command:
       - /bin/bash
       - -c
@@ -169,7 +173,7 @@ objects:
         echo "Using logbridge image ${LOGBRIDGE_IMAGE}"
         export DNS_DOMAIN=osadev.cloud
         export DNS_RESOURCEGROUP=dns
-        export DEPLOY_VERSION=v3.10
+        export DEPLOY_VERSION=${DEPLOY_VERSION}
         export IMAGE_RESOURCEGROUP=images
         export IMAGE_RESOURCENAME=$(az image list -g $IMAGE_RESOURCEGROUP -o json --query "[?starts_with(name, '${DEPLOY_OS:-rhel7}-${DEPLOY_VERSION//v}') && tags.valid=='true'].name | sort(@) | [-1]" | tr -d '"')
         # create cluster for test
