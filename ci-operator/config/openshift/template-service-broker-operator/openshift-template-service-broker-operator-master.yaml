@@ -1,0 +1,29 @@
+test_binary_build_commands: make openshift-ci-test-container
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+tests:
+- as: lint
+  commands: make openshift-ci-operator-lint
+  container:
+    from: test-bin
+base_images:
+  ansible_operator:
+    cluster: https://api.ci.openshift.org
+    namespace: openshift
+    name: ansible-operator
+    tag: latest
+images:
+- from: ansible_operator
+  to: tsb-operator
+resources:
+  '*':
+    limits:
+      cpu: '2'
+      memory: 4Gi
+    requests:
+      cpu: 200m
+      memory: 200Mi
