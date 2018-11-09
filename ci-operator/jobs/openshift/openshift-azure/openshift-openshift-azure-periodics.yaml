@@ -279,3 +279,52 @@ periodics:
         requests:
           cpu: 10m
     serviceAccountName: ci-operator
+- agent: kubernetes
+  cron: ""
+  decorate: true
+  interval: 24h
+  name: azure-test-no-rut
+  skip_cloning: true
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --secret-dir=/usr/local/e2e-secrets/azure
+      - --target=e2e-azure
+      - --template=/usr/local/e2e-azure
+      command:
+      - ci-operator
+      env:
+      - name: CONFIG_SPEC
+        valueFrom:
+          configMapKeyRef:
+            key: openshift-openshift-azure-master.yaml
+            name: ci-operator-configs
+      - name: JOB_NAME_SAFE
+        value: cluster-build-no-rut
+      - name: CLUSTER_TYPE
+        value: azure
+      - name: DEPLOY_OS
+        value: rhel7
+      - name: RUNNING_UNDER_TEST
+        value: ""
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources: {}
+      volumeMounts:
+      - mountPath: /usr/local/e2e-secrets/azure
+        name: cluster-secrets-azure
+      - mountPath: /usr/local/e2e-azure
+        name: job-definition
+        subPath: cluster-launch-e2e-azure.yaml
+    serviceAccountName: ci-operator
+    volumes:
+    - name: cluster-secrets-azure
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-azure
+    - configMap:
+        name: prow-job-cluster-launch-e2e-azure
+      name: job-definition

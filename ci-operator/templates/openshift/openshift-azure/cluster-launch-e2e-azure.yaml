@@ -20,6 +20,8 @@ parameters:
 - name: TEST_IN_PRODUCTION
 - name: DEPLOY_VERSION
   value: "v3.11"
+- name: RUNNING_UNDER_TEST
+  value: "true"
 
 objects:
 
@@ -106,7 +108,7 @@ objects:
             sleep 15 & wait
             continue
           fi
-          # if we got admin kubeconfig file with failure marker, ignore. Teardown is in progress. 
+          # if we got admin kubeconfig file with failure marker, ignore. Teardown is in progress.
           if [[ -f  /tmp/shared/exit ]]; then
              exit 1
           fi
@@ -140,7 +142,7 @@ objects:
       - name: LOGBRIDGE_IMAGE
         value: ${IMAGE_LOGBRIDGE}
       - name: RUNNING_UNDER_TEST
-        value: "true"
+        value: ${RUNNING_UNDER_TEST}
       - name: RESOURCEGROUP_TTL
         value: 4h
       - name: TEST_IN_PRODUCTION
@@ -153,7 +155,7 @@ objects:
       - |
        #!/bin/bash
         set -euo pipefail
-        
+
         trap 'rc=$?; if [[ $rc -ne 0 || -n "$TEST_IN_PRODUCTION" ]]; then
           touch /tmp/shared/exit;
         fi;
@@ -179,7 +181,7 @@ objects:
         # create cluster for test
         cd /go/src/github.com/openshift/openshift-azure/
         timeout 1h ./hack/create.sh ${RESOURCEGROUP}
-        if [[ -n "$TEST_IN_PRODUCTION" ]]; then
+        if [[ -n "$TEST_IN_PRODUCTION" ]] || [[ "${RUNNING_UNDER_TEST}" == "" ]]; then
           make e2e-prod
         fi
 
