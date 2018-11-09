@@ -1,0 +1,138 @@
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: origin-v3.11
+  namespace: openshift
+base_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: origin-v3.11
+    namespace: openshift
+    tag: base
+build_root:
+  project_image:
+    dockerfile_path: openshift/ci-operator/build-image/Dockerfile
+canonical_go_repository: github.com/knative/serving
+binary_build_commands: make install
+test_binary_build_commands: make test-install
+images:
+- dockerfile_path: openshift/ci-operator/knative-images/activator/Dockerfile
+  from: bin
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/activator
+  to: activator
+- dockerfile_path: openshift/ci-operator/knative-images/autoscaler/Dockerfile
+  from: bin
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/autoscaler
+  to: autoscaler
+- dockerfile_path: openshift/ci-operator/knative-images/controller/Dockerfile
+  from: bin
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/controller
+  to: controller
+- dockerfile_path: openshift/ci-operator/knative-images/queue/Dockerfile
+  from: bin
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/queue
+  to: queue
+- dockerfile_path: openshift/ci-operator/knative-images/webhook/Dockerfile
+  from: bin
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/webhook
+  to: webhook
+- dockerfile_path: openshift/ci-operator/knative-test-images/autoscale/Dockerfile
+  from: test-bin
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/autoscale
+  to: test-autoscale
+- dockerfile_path: openshift/ci-operator/knative-test-images/controller/Dockerfile
+  from: test-bin
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/test-controller
+  to: test-controller
+- dockerfile_path: openshift/ci-operator/knative-test-images/envvars/Dockerfile
+  from: test-bin
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/envvars
+  to: test-envvars
+- dockerfile_path: openshift/ci-operator/knative-test-images/helloworld/Dockerfile
+  from: test-bin
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/helloworld
+  to: test-helloworld
+- dockerfile_path: openshift/ci-operator/knative-test-images/httpproxy/Dockerfile
+  from: test-bin
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/httpproxy
+  to: test-httpproxy
+- dockerfile_path: openshift/ci-operator/knative-test-images/pizzaplanetv1/Dockerfile
+  from: test-bin
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/pizzaplanetv1
+  to: test-pizzaplanetv1
+- dockerfile_path: openshift/ci-operator/knative-test-images/pizzaplanetv2/Dockerfile
+  from: test-bin
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/pizzaplanetv2
+  to: test-pizzaplanetv2
+- dockerfile_path: openshift/ci-operator/knative-test-images/singlethreaded/Dockerfile
+  from: test-bin
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/singlethreaded
+  to: test-singlethreaded
+promotion:
+  cluster: https://api.ci.openshift.org
+  namespace: openshift
+  name: knative
+tests:
+- as: e2e
+  commands: "make test-e2e"
+  openshift_ansible_src:
+    cluster_profile: gcp
+resources:
+  '*':
+    limits:
+      cpu: '2'
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
