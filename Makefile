@@ -129,20 +129,22 @@ prow-cluster-jobs:
 	oc create configmap prow-job-master-sidecar --from-file=ci-operator/templates/master-sidecar.yaml -o yaml --dry-run | oc apply -f -
 .PHONY: prow-cluster-jobs
 
-prow-rpm-mirrors:
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/rpm-mirrors/ocp-4.0.yaml
-.PHONY: prow-rpm-mirrors
+prow-ocp-rpms:
+	$(MAKE) apply WHAT=ci-operator/infra/openshift/origin/images-ocp-base.yaml
+	$(MAKE) apply WHAT=ci-operator/infra/openshift/origin/images-ocp-rpms.yaml
+	$(MAKE) apply WHAT=ci-operator/infra/openshift/origin/images-ocp-images.yaml
+.PHONY: prow-ocp-rpms
 
-prow-rpm-mirrors-secrets:
-	oc create secret generic rpm-ocp-4-0-repos \
+prow-ocp-rpm-secrets:
+	oc create secret generic base-4-0-repos \
 		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
 		--from-file=cluster/ci/config/prow/openshift/rpm-mirrors/docker.repo \
 		--from-file=cluster/ci/config/prow/openshift/rpm-mirrors/rhel.repo \
 		--from-file=cluster/ci/config/prow/openshift/rpm-mirrors/ocp-4.0.repo \
-		-o yaml --dry-run | oc apply -f -
-.PHONY: prow-rpm-mirrors-secrets
+		-o yaml --dry-run | oc apply -n ocp -f -
+.PHONY: prow-ocp-rpms-secrets
 
-prow-jobs: prow-cluster-jobs prow-rpm-mirrors prow-artifacts
+prow-jobs: prow-cluster-jobs prow-artifacts prow-ocp-rpms 
 	$(MAKE) applyTemplate WHAT=cluster/ci/jobs/commenter.yaml
 	$(MAKE) apply WHAT=projects/prometheus/test/build.yaml
 	$(MAKE) apply WHAT=ci-operator/templates/os.yaml
@@ -269,6 +271,7 @@ image-mirror-files:
 	#VERSION=v4.0 TAG=v4.0,v4.0.0,latest hack/mirror-file > cluster/ci/config/mirroring/origin_v4_0
 	BASE=quay.io/openshift/origin- VERSION=v3.11 TAG=v3.11,v3.11.0 hack/mirror-file > cluster/ci/config/mirroring/origin_v3_11_quay
 	BASE=quay.io/openshift/origin- VERSION=v4.0 TAG=v4.0,v4.0.0,latest hack/mirror-file > cluster/ci/config/mirroring/origin_v4_0_quay
+	VERSION=4.0 hack/mirror-in > cluster/ci/config/mirroring/ocp_v4_0_internal
 .PHONY: image-mirror-files
 
 image-mirror-setup:
