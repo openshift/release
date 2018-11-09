@@ -93,11 +93,13 @@ as a reference:
 
 - `cluster-launch-e2e.yaml`: launches a cluster in GCP using openshift-ansible
   and runs Origin e2e tests on it, parameterized by test focus.
-- `cluster-launch-installer-e2e.yaml`: same as `cluster-launch-e2e.yaml`, but
-  uses `openshift-installer` instead of `openshift-ansible`.
 - `cluster-launch-src.yaml`: launches a cluster in GCP using openshift-ansible
   and runs a script from the repository being tested with the resulting
   `$KUBECONFIG`, parameterized by test script.
+- `cluster-launch-installer-e2e.yaml`: same as `cluster-launch-e2e.yaml`, but
+  uses `openshift-installer` instead of `openshift-ansible`.
+- `cluster-launch-installer-src.yaml`: same as `cluster-launch-src.yaml`, but
+  uses `openshift-installer` instead of `openshift-ansible`.
 - `master-sidecar.yaml`: spins up a simple openshift control plane as a sidecar
   and waits for the `COMMAND` specified to the template to be executed, before
   itself exiting. The test container is given access to the generated
