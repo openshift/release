@@ -113,101 +113,252 @@ https://kubernetes.io/docs/tasks/administer-cluster/access-cluster-api
 
 ### Using a template
 
-Normally, ci-operator executes all steps defined in its configuration file or,
-with the `--target` argument, only a single step and its dependencies.  A
-template can be added as a step at runtime with the `--template` option and can
-also be used as a target.  The step is named after the name of the template, if
-it has one, or the `basename` of the file path passed to the `--template`
-option, without the extension.
+The preferred way to add a test that uses a template is to add it to the
+`ci-operator` configuration file and use the configuration generator to
+[generate the job](https://github.com/openshift/ci-operator/blob/master/ONBOARD.md#add-prow-jobs).
+The list of supported test types can be found in the
+[configuration documentation](https://github.com/openshift/ci-operator/blob/master/CONFIGURATION.md#tests).
 
-Several parameters are provided by ci-operator when it instantiates the
-template that contain information about the test: the job name, which namespace
-it's operating into, URLs for images, etc.  Run `ci-operator --help` for a
-comprehensive list of parameters that can be supplied to a template.
+The process for adding jobs manually is significantly more complex. For
+templates that are expected to be used by many jobs, it may be easier to add
+support for automatic generation. The example job in the next section can be
+used as a reference for jobs that are not in that category.
 
-When artifact collection is enabled (using the `--artifacts-dir
-/path/to/artifacts` option, see the ci-operator documentation linked at the top
-of this document for details), logs from pods that fail will be fetched and
-stored.  If part of the output is necessary even in case of success, it can be
-written to the artifact directory.
 
-Below is a sample job extracted from the
-[jobs directory](jobs/openshift/descheduler/) with comments added to describe
-the relevant sections.  For a complete description of the fields, see prow's
-documentation:
+### Writing a template
 
-https://github.com/kubernetes/test-infra/tree/master/prow
+This section covers the process of creating a new template when none of the
+existing ones provide the workflow required for a particular type of test — e.g.
+when a new installer needs to be supported. It supplements the `ci-operator`
+[template documentation](https://github.com/openshift/ci-operator/blob/master/TEMPLATES.md).
 
-This job uses the `cluster-launch-src.yaml` template to provision a GCP cluster
-and run an e2e test script.  Note that there currently is a lot of unnecessary
-complexity and duplication, which should be cleared in the future.
+From the perspective of an end-to-end test, a `ci-operator` template is simply
+a way to create one or more pods and auxiliary objects to setup and clean up
+the environment and execute the test.
 
+While users should deal mostly with the `ci-operator` configuration file and
+generate Prow jobs automatically from it, the structure of the Prow jobs has to
+be taken into consideration when writing a template. The `e2e-conformance-k8s`
+job in `openshift/origin`, which uses the `cluster-launch-src.yaml` will be
+used as an example:
+
+https://github.com/openshift/release/blob/master/ci-operator/config/openshift/origin/openshift-origin-master.yaml
+https://github.com/openshift/release/blob/master/ci-operator/jobs/openshift/origin/openshift-origin-master-presubmits.yaml
+https://github.com/openshift/release/blob/master/ci-operator/templates/cluster-launch-src.yaml
+
+The CI process begins when a webhook from Github triggers the creation of one
+or more Prow jobs. For a complete description of Prow jobs, see the
+[upstream documentation](https://github.com/kubernetes/test-infra/blob/master/prow/jobs.md).
 
 ```yaml
-- name: pull-ci-openshift-descheduler-e2e-gce-release-3.10
-  agent: kubernetes
-  always_run: true
-  context: ci/prow/e2e
-  # each branch needs its own ci-operator config
-  branches:
-  - release-3.10
-  rerun_command: "/test e2e"
-  trigger: "((?m)^/test( all| e2e),?(\\s+|$))"
-  decorate: true
-  skip_cloning: true
-  spec:
-    serviceAccountName: ci-operator
-    volumes:
-    # ci-operator template, loaded into a configmap in the ci cluster from the
-    # files in ci-operator/templates
-    - name: job-definition
-      configMap:
-        name: prow-job-cluster-launch-src
-    # configuration for gcp clusters, shared by all jobs
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-gcp
-        - configMap:
-            name: cluster-profile-gcp
-    # the actual ci-operator container
-    containers:
-    - name: test
-      image: ci-operator:latest
-      resources: {"requests": {"cpu": "10m"},"limits":{"cpu":"500m"}}
-      volumeMounts:
-      - name: job-definition
-        mountPath: /usr/local/e2e-gcp
-        subPath: cluster-launch-src.yaml
+# ci-operator/jobs/openshift/origin/openshift-origin-master-presubmits.yaml
+presubmits:
+  openshift/origin:
+  # …
+  - agent: kubernetes
+    always_run: true
+    # Each branch needs its own ci-operator configuration file.
+    branches:
+    - master
+    context: ci/prow/e2e-conformance-k8s
+    decorate: true
+    # The name should follow the format used for auto-generated jobs:
+    # pull-ci-$org-$repo-$branch-$name or branch-ci-$org-$repo-$branch-$name.
+    # "e2e-conformance-k8s" is used as a unique identifier for for this job
+    # thoughout the job definition (e.g. in `context` above).
+    name: pull-ci-openshift-origin-master-e2e-conformance-k8s
+    rerun_command: /test e2e-conformance-k8s
+    # ci-operator doesn't require the source code of the repository, it will
+    # be cloned in a separate container.
+    skip_cloning: true
+    spec:
+      containers:
+      # The names passed to `--secret-dir`, `--target`, and `--template` are
+      # important and should follow the format presented here.
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        # `--secret-dir` references a directory that is volume-mounted in the
+        # container by combining secrets and configmaps from the cluster. This
+        # is one way of passing extra configuration as input to the template.
+        - --secret-dir=/usr/local/e2e-conformance-k8s-cluster-profile
+        - --target=e2e-conformance-k8s
+        # The template is stored in a configmap in the cluster and
+        # volume-mounted in the container.
+        - --template=/usr/local/e2e-conformance-k8s
+        command:
+        - ci-operator
+        # Other than CONFIG_SPEC, these are specific to the template being
+        # used.
+        env:
+        - name: CLUSTER_TYPE
+          value: gcp
+        # The ci-operator configuration stored in a configmap in the cluster.
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-origin-master.yaml
+              name: ci-operator-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-conformance-k8s
+        - name: TEST_COMMAND
+          value: test/extended/conformance-k8s.sh
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-conformance-k8s-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-conformance-k8s
+          name: job-definition
+          subPath: cluster-launch-src.yaml
+      serviceAccountName: ci-operator
+      # Specific to the template being used. Combine a secret and a configmap
+      # into a directory that will be copied to the namespace created by
+      # ci-operator using the `--secret-dir` option.
+      volumes:
       - name: cluster-profile
-        mountPath: /usr/local/e2e-gcp-cluster-profile
-      env:
-      # unique identifier: names gcp instances, etc.
-      - name: JOB_NAME_SAFE
-        value: e2e-gcp
-      - name: CLUSTER_TYPE
-        value: gcp
-      # ci-operator configuration file, loaded into a configmap in the cluster
-      # from the files in ci-operator/config
-      - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            name: ci-operator-configs
-            key: openshift-descheduler-release-3.10.yaml
-      # the actual test command (the variable name and format is specific to
-      # the template being used (cluster-launch-src.yaml, in this case), see
-      # the definition for more details)
-      - name: TEST_COMMAND
-        value: "cp /tmp/admin.kubeconfig /tmp/admin.conf && make test-e2e"
-      # required for jobs that use openshift-ansible to create a cluster
-      - name: RPM_REPO_OPENSHIFT_ORIGIN
-        value: https://rpms.svc.ci.openshift.org/openshift-origin-v4.0/
-      # actual ci-operator call
-      command:
-      - ci-operator
-      - --artifact-dir=$(ARTIFACTS)
-      - --secret-dir=/usr/local/e2e-gcp-cluster-profile
-      - --template=/usr/local/e2e-gcp
-      - --target=e2e-gcp
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      # The template stored in a configmap in the cluster.
+      - configMap:
+          name: prow-job-cluster-launch-src
+        name: job-definition
+    trigger: ((?m)^/test( all| e2e-conformance-k8s),?(\s+|$))
+```
+
+The `Secret`s and `ConfigMap`s referenced by the job reside in the `ci`
+namespace. `cluster-profile-*` are `ConfigMap`s that contain the cluster
+profiles in [this repository](../cluster/test-deploy/). `cluster-secrets-*` are
+`Secret`s that contain credentials to provision and access clusters in a
+specific cloud provider (the contents can be seen in the
+[script that populates them](./populate-secrets-from-bitwarden.sh).
+
+
+#### Inputs
+
+When instantiating the template, data about the pipeline is provided as
+[parameters](https://github.com/openshift/ci-operator/blob/master/TEMPLATES.md#parameters-available-to-templates).
+The location of images and RPMs from both the release and the CI pipeline is
+available this way. Extra parameters can be provided via environment variables,
+which will have to be set by the Prow job.
+
+External access to the images that were built in the test namespace is required by most
+end-to-end tests, so templates often create this role binding:
+
+```yaml
+- kind: RoleBinding
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: ${JOB_NAME_SAFE}-image-puller
+    namespace: ${NAMESPACE}
+  roleRef:
+    name: system:image-puller
+  subjects:
+  - kind: SystemGroup
+    name: system:unauthenticated
+```
+
+The template can reference objects from any namespace, but Kubernetes requires
+them to be in the same namespace to be used as volume mounts.  As described in
+the section above, the Prow job definition and `ci-operator`'s `--secret-dir`
+can be used to combine objects into a volume mount and make them available in
+the test namespace.
+
+
+#### Outputs
+
+The outputs of a template test are:
+
+- Success/failure status, determined from the test pod.
+- The pod's `stdout` and `stderr`, reflected in ci-operator's output in case of
+  failure.
+- Artifacts.
+
+These are described in more detail in the
+[`ci-operator` documentation](https://github.com/openshift/ci-operator/blob/master/TEMPLATES.md#expected-output-from-templates).
+
+
+### Adding a template
+
+With the template file ready, the steps required to add it to the repository
+and make it available for CI jobs are:
+
+1. Create the yaml file in the `templates/` directory.
+2. Add the files to the `config-updater` section of Prow's configuration file
+   to ensure they are added to a `ConfigMap` in the CI cluster.
+3. Optional: add a test type to `ci-operator` to enable automatic generation of
+   jobs that use this template.
+4. Add necessary secrets (if any) to the deployment configuration in this
+   repository and apply it to the cluster.
+
+Because the configuration updater configuration has to be updated before a PR
+with the files is merged, those changes have to be merged previously in a
+separate PR.
+
+
+### Testing a template
+
+`ci-operator` tests can be executed locally with little effort, but the setting
+up the dependencies for template tests is more involved. The typical
+end-to-end test requires:
+
+- A kubeconfig pointing to a cluster with external access.
+- The `ci-operator` configuration file.
+- The template file.
+- The secrets required for the `--secret-dir` option, if applicable.
+- The environment variables required, if applicable.
+
+The simplest way to get started is to create a personal namespace in the
+[CI cluster](https://api.ci.openshift.org). Substitute `mynamespace` below with
+the name of that namespace.
+
+The secrets and environment variables are very specific to the template in use,
+but the `e2e-conformance-k8s` can be used as a general example. The template it
+uses (`cluster-launch-src`) requires two parameters (the others are all
+provided by `ci-operator`): `CLUSTER_TYPE` determines the cloud provider used
+to provision the cluster, and `TEST_COMMAND` is the command that executes the
+test.
+
+This template also requires a secret containing the cluster profile and
+credentials. In the CI cluster, it is created using a volume that combines the
+projection of a `Secret` and a `ConfigMap`. Locally, it has to be assembled
+into a directory manually. How these objects are composed is described in the
+["writing a template" section](#writing-a-template) above. One final note:
+because the name of the secret is determined by the argument passed to
+`--secret-dir`, the directory has to be named in a way that reflects the secret
+name expected by the template.
+
+Putting this all together, to execute the `e2e-conformance-k8s` test the
+following command can be used:
+
+```sh
+name=mytestname
+CLUSTER_TYPE=gcp
+mkdir artifacts/ "$name-cluster-profile"/
+ln -s "$PWD/cluster/test-deploy/$CLUSTER_TYPE/"* "$name-cluster-profile"/
+# populate the following files in the $name-cluster-profile directory:
+# - gce.json
+# - ops-mirror.pem
+# - ssh-privatekey
+# - ssh-publickey
+# - telemeter-token
+export CLUSTER_TYPE JOB_NAME_SAFE=$name TEST_COMMAND=test/extended/conformance-k8s.sh
+ci-operator \
+    --artifact-dir artifacts/ \
+    --config ci-operator/config/openshift/origin/openshift-origin-master.yaml \
+    --git-ref openshift/origin@master \
+    --template ci-operator/templates/cluster-launch-src.yaml \
+    --target cluster-launch-src \
+    --secret-dir "$name-cluster-profile/" \
+    --namespace mynamespace
 ```
