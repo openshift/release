@@ -78,55 +78,6 @@ periodics:
     cron: ""
     decorate: true
     interval: 24h
-    name: azure-build-node-image-centos-310
-    skip_cloning: true
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --secret-dir=/usr/local/e2e-secrets/azure
-        - --template=/usr/local/build-node-image
-        - --target=build-node-image
-        command:
-        - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-openshift-ansible-release-3.10.yaml
-              name: ci-operator-configs
-        - name: JOB_NAME_SAFE
-          value: build-node-image
-        - name: CLUSTER_TYPE
-          value: azure
-        - name: DEPLOY_OS
-          value: centos7
-        - name: OPENSHIFT_RELEASE
-          value: "3.10"
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources: {}
-        volumeMounts:
-        - mountPath: /usr/local/build-node-image
-          name: job-definition
-          subPath: build-node-image.yaml
-        - mountPath: /usr/local/e2e-secrets/azure
-          name: cluster-secrets-azure
-      serviceAccountName: ci-operator
-      volumes:
-      - configMap:
-          name: prow-job-build-node-image
-        name: job-definition
-      - name: cluster-secrets-azure
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-azure
-  - agent: kubernetes
-    cron: ""
-    decorate: true
-    interval: 24h
     name: azure-build-node-image-centos-311
     skip_cloning: true
     spec:
@@ -172,7 +123,7 @@ periodics:
           sources:
           - secret:
               name: cluster-secrets-azure
-# RHEL-base, rhel-ocp-3.10, rhel-ocp-3.11
+# RHEL-base, rhel-ocp-3.11
 - agent: kubernetes
   cron: ""
   decorate: true
@@ -221,55 +172,6 @@ periodics:
         - secret:
             name: cluster-secrets-azure
   run_after_success:
-  - agent: kubernetes
-    cron: ""
-    decorate: true
-    interval: 24h
-    name: azure-build-node-image-rhel-310
-    skip_cloning: true
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --secret-dir=/usr/local/e2e-secrets/azure
-        - --template=/usr/local/build-node-image
-        - --target=build-node-image
-        command:
-        - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-openshift-ansible-release-3.10.yaml
-              name: ci-operator-configs
-        - name: JOB_NAME_SAFE
-          value: build-node-image
-        - name: CLUSTER_TYPE
-          value: azure
-        - name: DEPLOY_OS
-          value: rhel7
-        - name: OPENSHIFT_RELEASE
-          value: "3.10"
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources: {}
-        volumeMounts:
-        - mountPath: /usr/local/build-node-image
-          name: job-definition
-          subPath: build-node-image.yaml
-        - mountPath: /usr/local/e2e-secrets/azure
-          name: cluster-secrets-azure
-      serviceAccountName: ci-operator
-      volumes:
-      - configMap:
-          name: prow-job-build-node-image
-        name: job-definition
-      - name: cluster-secrets-azure
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-azure
   - agent: kubernetes
     cron: ""
     decorate: true
