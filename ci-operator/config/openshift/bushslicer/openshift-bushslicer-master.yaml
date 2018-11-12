@@ -1,0 +1,51 @@
+base_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: plugin-base
+    namespace: bushslicer
+    tag: latest
+binary_build_commands: make all
+canonical_go_repository: github.com/openshift/bushslicer
+images:
+- dockerfile_path: tools/jenkins/slaves/Dockerfile.centos
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: tools/jenkins/slaves/Dockerfile.centos
+  to: bushslicer
+promotion:
+  cluster: https://api.ci.openshift.org
+  name: bushslicer-plugins
+  namespace: bushslicer
+resources:
+  '*':
+    limits:
+      cpu: '2'
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: origin-v3.11
+  namespace: openshift
+  tag: ''
+  tag_overrides: {}
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: test-base
+    namespace: bushslicer
+    tag: latest
+tests:
+- as: verify
+  commands: make verify
+  container:
+    from: src
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: ARTIFACT_DIR=/tmp/artifacts make unit
+  container:
+    from: src
