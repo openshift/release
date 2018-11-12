@@ -8,31 +8,32 @@ items:
     name: image-mirror
     namespace: azure
   data:
-    openshift-azure_v3_10_quay: |
-      registry.svc.ci.openshift.org/azure/azure-plugins:sync quay.io/openshift-on-azure/sync:v3.10 quay.io/openshift-on-azure/sync:v3.10.0 quay.io/openshift-on-azure/sync:latest
-      registry.svc.ci.openshift.org/azure/azure-plugins:e2e-tests quay.io/openshift-on-azure/e2e-tests:v3.10 quay.io/openshift-on-azure/e2e-tests:v3.10.0 quay.io/openshift-on-azure/e2e-tests:latest
+    openshift-azure_v3_11_quay: |
+      registry.svc.ci.openshift.org/azure/azure-plugins:sync quay.io/openshift-on-azure/sync:v3.11 quay.io/openshift-on-azure/sync:v3.11.0 quay.io/openshift-on-azure/sync:latest
+      registry.svc.ci.openshift.org/azure/azure-plugins:e2e-tests quay.io/openshift-on-azure/e2e-tests:v3.11 quay.io/openshift-on-azure/e2e-tests:v3.11.0 quay.io/openshift-on-azure/e2e-tests:latest
       registry.svc.ci.openshift.org/azure/azure-plugins:logbridge quay.io/openshift-on-azure/logbridge:latest
       registry.svc.ci.openshift.org/azure/azure-misc:prometheus-sidecar quay.io/openshift-on-azure/prometheus-sidecar:latest
 
 - apiVersion: batch/v1beta1
   kind: CronJob
   metadata:
-    name: "image-mirror-openshift-azure-v3.10-quay"
+    name: "image-mirror-openshift-azure-v3.11-quay"
     namespace: azure
     labels:
-      app: "image-mirror-openshift-azure-v3.10-quay"
+      app: "image-mirror-openshift-azure-v3.11-quay"
   spec:
     schedule: "0 * * * *"
     concurrencyPolicy: Forbid
     successfulJobsHistoryLimit: 1
     failedJobsHistoryLimit: 2
+    startingDeadlineSeconds: 60
     jobTemplate:
       spec:
         template:
           metadata:
-            name: "image-mirror-openshift-azure-v3.10-quay"
+            name: "image-mirror-openshift-azure-v3.11-quay"
             labels:
-              app: "image-mirror-openshift-azure-v3.10-quay"
+              app: "image-mirror-openshift-azure-v3.11-quay"
           spec:
             restartPolicy: OnFailure
             volumes:
@@ -44,7 +45,7 @@ items:
                 name: image-mirror
             containers:
             - name: "mirror"
-              image: "openshift/origin-cli:v3.10"
+              image: "openshift/origin-cli:v3.11"
               volumeMounts:
               - name: push
                 mountPath: /home/mirror/.docker/config.json
@@ -59,5 +60,5 @@ items:
               args:
               - image
               - mirror
-              - -f=/etc/imagemirror/openshift-azure_v3_10_quay
+              - -f=/etc/imagemirror/openshift-azure_v3_11_quay
               - --skip-multiple-scopes # quay chokes when requesting multiple

@@ -83,7 +83,7 @@ docker run \
 --volume $HOME/.kube/config:/root/.kube/config \
 --volume $(pwd):/release \
 registry.svc.ci.openshift.org/ci/ci-operator:latest \
---config /release/ci-operator/config/openshift/openshift-azure/openshift-openshift-azure-master.yaml \
+--config /release/ci-operator/config/openshift/openshift-ansible/openshift-openshift-ansible-release-3.11.yaml \
 --git-ref=openshift/openshift-azure@master \
 --namespace=${CI_OPERATOR_NAMESPACE} \
 --template /release/ci-operator/templates/openshift/openshift-azure/build-base-image.yaml \
@@ -101,7 +101,7 @@ docker run \
 --volume $HOME/.kube/config:/root/.kube/config \
 --volume $(pwd):/release \
 registry.svc.ci.openshift.org/ci/ci-operator:latest \
---config /release/ci-operator/config/openshift/openshift-azure/openshift-openshift-azure-master.yaml \
+--config /release/ci-operator/config/openshift/openshift-ansible/openshift-openshift-ansible-release-3.11.yaml \
 --git-ref=openshift/openshift-azure@master \
 --namespace=${CI_OPERATOR_NAMESPACE} \
 --template /release/ci-operator/templates/openshift/openshift-azure/build-node-image.yaml \
@@ -119,7 +119,7 @@ docker run \
 --volume $HOME/.kube/config:/root/.kube/config \
 --volume $(pwd):/release \
 registry.svc.ci.openshift.org/ci/ci-operator:latest \
---config /release/ci-operator/config/openshift/openshift-azure/openshift-openshift-azure-master.yaml \
+--config /release/ci-operator/config/openshift/openshift-ansible/openshift-openshift-ansible-release-3.11.yaml \
 --git-ref=openshift/openshift-azure@master \
 --namespace=${CI_OPERATOR_NAMESPACE} \
 --template /release/ci-operator/templates/openshift/openshift-azure/build-node-image.yaml \
