@@ -91,13 +91,13 @@ registry.svc.ci.openshift.org/ci/ci-operator:latest \
 --target build-base-image
 ```
 
-Example: Build a rhel node vm image with openshift 3.10
+Example: Build a rhel node vm image with openshift 3.11
 ```
 docker run \
 --rm \
 -it \
 --env DEPLOY_OS=rhel7 \
---env OPENSHIFT_RELEASE="3.10" \
+--env OPENSHIFT_RELEASE="3.11" \
 --volume $HOME/.kube/config:/root/.kube/config \
 --volume $(pwd):/release \
 registry.svc.ci.openshift.org/ci/ci-operator:latest \
@@ -109,13 +109,13 @@ registry.svc.ci.openshift.org/ci/ci-operator:latest \
 --target build-node-image
 ```
 
-Example: Build a centos node vm image with openshift 3.10
+Example: Build a centos node vm image with openshift 3.11
 ```
 docker run \
 --rm \
 -it \
 --env DEPLOY_OS=centos7 \
---env OPENSHIFT_RELEASE="3.10" \
+--env OPENSHIFT_RELEASE="3.11" \
 --volume $HOME/.kube/config:/root/.kube/config \
 --volume $(pwd):/release \
 registry.svc.ci.openshift.org/ci/ci-operator:latest \
