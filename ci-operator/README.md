@@ -191,8 +191,8 @@ complexity and duplication, which should be cleared in the future.
       - name: CONFIG_SPEC
         valueFrom:
           configMapKeyRef:
-            name: ci-operator-openshift-descheduler
-            key: release-3.10.yaml
+            name: ci-operator-configs
+            key: openshift-descheduler-release-3.10.yaml
       # the actual test command (the variable name and format is specific to
       # the template being used (cluster-launch-src.yaml, in this case), see
       # the definition for more details)
