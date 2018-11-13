@@ -122,6 +122,15 @@ objects:
         # TODO: bump nodes up to 40 again
         source /tmp/shared/overrides
         function run-tests() {
+          if which openshift-tests && [[ -n "${TEST_SUITE-}" ]]; then
+            openshift-tests run "${TEST_SUITE}" --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
+            exit 0
+          fi
+          # TODO: remove everything after this point once we fork templates by release - starting with 4.0
+          if ! which extended.test; then
+            echo "must provide TEST_SUITE variable"
+            exit 1
+          fi
           if [[ -n "${TEST_FOCUS:-}" ]]; then
             ginkgo -v -noColor -nodes="${TEST_PARALLELISM:-30}" $( which extended.test ) -- \
               -ginkgo.focus="${TEST_FOCUS}" -ginkgo.skip="${TEST_SKIP:-"\\[local\\]"}" \
