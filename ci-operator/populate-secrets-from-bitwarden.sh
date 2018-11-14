@@ -43,6 +43,11 @@ trap cleanup EXIT
 secrets="${work_dir}/secrets.json"
 bw --session "${BW_SESSION}" list items > "${secrets}"
 
+if [[ "$( jq ". | length" <"${secrets}" )" == 0 ]]; then
+	echo "[WARNING] Your active BitWarden session does not have access to secrets. If you created your session before you got access, refresh it by logging out and in again."
+	exit 1
+fi
+
 # retrieve the value of a top-level field from an item in BitWarden
 # and format it in a key-value pair for a k8s secret
 function format_field() {
