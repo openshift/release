@@ -1,0 +1,69 @@
+binary_build_commands: make openshift-ci-make-rpm
+test_binary_build_commands: make openshift-ci-test-container
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    namespace: openshift
+    name: release
+    tag: golang-1.10
+tests:
+- as: fmt
+  commands: make fmt
+  container:
+    from: test-bin
+- as: fmtcheck
+  commands: make fmtcheck
+  container:
+    from: test-bin
+- as: vet
+  commands: make vet
+  container:
+    from: test-bin
+- as: lint
+  commands: make lint
+  container:
+    from: test-bin
+- as: test
+  commands: make test
+  container:
+    from: test-bin
+- as: build
+  commands: make build
+  container:
+    from: test-bin
+- as: operator-lint
+  commands: make openshift-ci-operator-lint
+  container:
+    from: test-bin
+base_images:
+  ansible_operator:
+    cluster: https://api.ci.openshift.org
+    namespace: openshift
+    name: ansible-operator
+    tag: latest
+  centos7:
+    cluster: https://api.ci.openshift.org
+    namespace: openshift
+    name: centos
+    tag: '7'
+images:
+- from: ansible_operator
+  dockerfile_path: operator/Dockerfile
+  context_dir: ansible_role
+  to: oab-operator
+- from: centos7
+  dockerfile_path: build/Dockerfile-openshift
+  to: oab
+  inputs:
+    bin:
+      paths:
+      - destination_dir: rpms
+        source_path: /tmp/rpms
+resources:
+  '*':
+    limits:
+      cpu: '2'
+      memory: 4Gi
+    requests:
+      cpu: 200m
+      memory: 200Mi
