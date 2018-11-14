@@ -32,8 +32,7 @@ presubmits:
         - name: RPM_REPO_OPENSHIFT_ORIGIN
           value: https://rpms.svc.ci.openshift.org/openshift-origin-v4.0/
         - name: TEST_COMMAND
-          value: TEST_FOCUS=Suite:openshift/conformance/parallel/minimal TEST_SKIP='(\[local\]|\[templates\]|\[Feature:Router\]|Kubectl
-            logs)' run-tests
+          value: TEST_FOCUS=Suite:openshift/conformance/parallel run-tests
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -47,7 +46,7 @@ presubmits:
           name: cluster-profile
         - mountPath: /usr/local/e2e-aws
           name: job-definition
-          subPath: cluster-launch-e2e-openshift-ansible.yaml
+          subPath: cluster-launch-e2e-40.yaml
       serviceAccountName: ci-operator
       volumes:
       - name: cluster-profile
@@ -56,9 +55,9 @@ presubmits:
           - secret:
               name: cluster-secrets-aws
           - configMap:
-              name: cluster-profile-aws-centos
+              name: cluster-profile-aws-centos-40
       - configMap:
-          name: prow-job-cluster-launch-e2e-openshift-ansible
+          name: prow-job-cluster-launch-e2e-40
         name: job-definition
     trigger: ((?m)^/test( all| e2e-aws),?(\s+|$))
   - agent: kubernetes
@@ -93,8 +92,7 @@ presubmits:
         - name: RPM_REPO_OPENSHIFT_ORIGIN
           value: https://rpms.svc.ci.openshift.org/openshift-origin-v4.0/
         - name: TEST_COMMAND
-          value: TEST_FOCUS=Suite:openshift/conformance/parallel TEST_SUITE=openshift/conformance/parallel
-            run-tests
+          value: TEST_FOCUS=Suite:openshift/conformance/parallel run-tests
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -108,7 +106,7 @@ presubmits:
           name: cluster-profile
         - mountPath: /usr/local/e2e-gcp
           name: job-definition
-          subPath: cluster-launch-e2e.yaml
+          subPath: cluster-launch-e2e-40.yaml
       serviceAccountName: ci-operator
       volumes:
       - name: cluster-profile
@@ -117,316 +115,11 @@ presubmits:
           - secret:
               name: cluster-secrets-gcp
           - configMap:
-              name: cluster-profile-gcp
+              name: cluster-profile-gcp-40
       - configMap:
-          name: prow-job-cluster-launch-e2e
+          name: prow-job-cluster-launch-e2e-40
         name: job-definition
     trigger: ((?m)^/test( all| e2e-gcp),?(\s+|$))
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - master
-    context: ci/prow/e2e-gcp-crio
-    decorate: true
-    name: pull-ci-openshift-openshift-ansible-master-e2e-gcp-crio
-    optional: true
-    rerun_command: /test e2e-gcp-crio
-    run_if_changed: ^roles/(container_runtime|openshift_node|openshift_node_group)|^(playbooks/prerequisites)
-    skip_cloning: true
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/e2e-gcp-crio-cluster-profile
-        - --target=e2e-gcp-crio
-        - --template=/usr/local/e2e-gcp-crio
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: gcp
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-openshift-ansible-master.yaml
-              name: ci-operator-configs
-        - name: JOB_NAME_SAFE
-          value: e2e-gcp-crio
-        - name: RPM_REPO_OPENSHIFT_ORIGIN
-          value: https://rpms.svc.ci.openshift.org/openshift-origin-v4.0/
-        - name: TEST_COMMAND
-          value: TEST_FOCUS=Suite:openshift/conformance/parallel/minimal run-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          limits:
-            cpu: 500m
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/e2e-gcp-crio-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-gcp-crio
-          name: job-definition
-          subPath: cluster-launch-e2e.yaml
-      serviceAccountName: ci-operator
-      volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp-crio
-      - configMap:
-          name: prow-job-cluster-launch-e2e
-        name: job-definition
-    trigger: ((?m)^/test( all| e2e-gcp-crio),?(\s+|$))
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - master
-    context: ci/prow/e2e-gcp-ha
-    decorate: true
-    name: pull-ci-openshift-openshift-ansible-master-e2e-gcp-ha
-    rerun_command: /test e2e-gcp-ha
-    skip_cloning: true
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/e2e-gcp-ha-cluster-profile
-        - --target=e2e-gcp-ha
-        - --template=/usr/local/e2e-gcp-ha
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: gcp
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-openshift-ansible-master.yaml
-              name: ci-operator-configs
-        - name: JOB_NAME_SAFE
-          value: e2e-gcp-ha
-        - name: RPM_REPO_OPENSHIFT_ORIGIN
-          value: https://rpms.svc.ci.openshift.org/openshift-origin-v4.0/
-        - name: TEST_COMMAND
-          value: TEST_FOCUS=Suite:openshift/conformance/parallel TEST_SUITE=openshift/conformance/parallel
-            run-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          limits:
-            cpu: 500m
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/e2e-gcp-ha-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-gcp-ha
-          name: job-definition
-          subPath: cluster-launch-e2e.yaml
-      serviceAccountName: ci-operator
-      volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp-ha
-      - configMap:
-          name: prow-job-cluster-launch-e2e
-        name: job-definition
-    trigger: ((?m)^/test( all| e2e-gcp-ha),?(\s+|$))
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - master
-    context: ci/prow/e2e-gcp-launch
-    decorate: true
-    name: pull-ci-openshift-openshift-ansible-master-e2e-gcp-launch
-    rerun_command: /test e2e-gcp-launch
-    skip_cloning: true
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/e2e-gcp-launch-cluster-profile
-        - --target=e2e-gcp-launch
-        - --template=/usr/local/e2e-gcp-launch
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: gcp
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-openshift-ansible-master.yaml
-              name: ci-operator-configs
-        - name: JOB_NAME_SAFE
-          value: e2e-gcp-launch
-        - name: RPM_REPO_OPENSHIFT_ORIGIN
-          value: https://rpms.svc.ci.openshift.org/openshift-origin-v4.0/
-        - name: TEST_COMMAND
-          value: sleep 7200 & wait
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          limits:
-            cpu: 500m
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/e2e-gcp-launch-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-gcp-launch
-          name: job-definition
-          subPath: cluster-launch-e2e.yaml
-      serviceAccountName: ci-operator
-      volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
-      - configMap:
-          name: prow-job-cluster-launch-e2e
-        name: job-definition
-    trigger: ((?m)^/test( all| e2e-gcp-launch),?(\s+|$))
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - master
-    context: ci/prow/e2e-gcp-logging
-    decorate: true
-    name: pull-ci-openshift-openshift-ansible-master-e2e-gcp-logging
-    rerun_command: /test e2e-gcp-logging
-    skip_cloning: true
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/e2e-gcp-logging-cluster-profile
-        - --target=e2e-gcp-logging
-        - --template=/usr/local/e2e-gcp-logging
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: gcp
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-openshift-ansible-master.yaml
-              name: ci-operator-configs
-        - name: JOB_NAME_SAFE
-          value: e2e-gcp-logging
-        - name: RPM_REPO_OPENSHIFT_ORIGIN
-          value: https://rpms.svc.ci.openshift.org/openshift-origin-v4.0/
-        - name: TEST_COMMAND
-          value: TEST_FOCUS=Suite:openshift/conformance/parallel TEST_SUITE=openshift/conformance/parallel
-            run-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          limits:
-            cpu: 500m
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/e2e-gcp-logging-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-gcp-logging
-          name: job-definition
-          subPath: cluster-launch-e2e.yaml
-      serviceAccountName: ci-operator
-      volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp-logging
-      - configMap:
-          name: prow-job-cluster-launch-e2e
-        name: job-definition
-    trigger: ((?m)^/test( all| e2e-gcp-logging),?(\s+|$))
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - master
-    context: ci/prow/e2e-gluster
-    decorate: true
-    name: pull-ci-openshift-openshift-ansible-master-e2e-gluster
-    rerun_command: /test e2e-gluster
-    skip_cloning: true
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/e2e-gluster-cluster-profile
-        - --target=e2e-gluster
-        - --template=/usr/local/e2e-gluster
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-openshift-ansible-master.yaml
-              name: ci-operator-configs
-        - name: JOB_NAME_SAFE
-          value: e2e-gluster
-        - name: RPM_REPO_OPENSHIFT_ORIGIN
-          value: https://rpms.svc.ci.openshift.org/openshift-origin-v4.0/
-        - name: TEST_COMMAND
-          value: TEST_FOCUS=Suite:openshift/conformance/parallel/minimal TEST_SKIP='(\[local\]|\[templates\]|\[Feature:Router\]|Kubectl
-            logs)' run-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          limits:
-            cpu: 500m
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/e2e-gluster-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-gluster
-          name: job-definition
-          subPath: cluster-launch-e2e-openshift-ansible.yaml
-      serviceAccountName: ci-operator
-      volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-          - configMap:
-              name: cluster-profile-aws-gluster
-      - configMap:
-          name: prow-job-cluster-launch-e2e-openshift-ansible
-        name: job-definition
-    trigger: ((?m)^/test( all| e2e-gluster),?(\s+|$))
   - agent: kubernetes
     always_run: true
     branches:
@@ -494,46 +187,3 @@ presubmits:
             cpu: 10m
       serviceAccountName: ci-operator
     trigger: ((?m)^/test( all| unit),?(\s+|$))
-  - agent: jenkins
-    always_run: true
-    branches:
-    - master
-    context: ci/openshift-jenkins/azure
-    labels:
-      master: ci.openshift.redhat.com
-    name: test_pull_request_openshift_ansible_extended_conformance_azure
-    rerun_command: /test azure
-    skip_report: true
-    trigger: ((?m)^/test( all| azure),?(\s+|$))
-  - agent: jenkins
-    always_run: false
-    branches:
-    - master
-    context: ci/openshift-jenkins/install
-    labels:
-      master: ci.openshift.redhat.com
-    name: test_pull_request_openshift_ansible_extended_conformance_install
-    rerun_command: /test install
-    trigger: ((?m)^/test( all| install),?(\s+|$))
-  - agent: jenkins
-    always_run: false
-    context: ci/openshift-jenkins/install_in_tree
-    labels:
-      master: ci.openshift.redhat.com
-    name: test_pull_request_openshift_ansible_extended_conformance_install_in_tree
-    rerun_command: /test install-in-tree
-    skip_report: true
-    trigger: ((?m)^/test install-in-tree,?(\s+|$))
-  - agent: jenkins
-    always_run: false
-    branches:
-    - master
-    - stage
-    - es5.x
-    context: ci/openshift-jenkins/logging
-    labels:
-      master: ci.openshift.redhat.com
-    name: test_pull_request_openshift_ansible_logging
-    rerun_command: /test logging
-    run_if_changed: ^roles/openshift_logging.*|playbooks/openshift-logging/.*
-    trigger: ((?m)^/test( all| logging),?(\s+|$))
