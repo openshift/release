@@ -3,6 +3,11 @@
 This document overviews the secrets that are available and the means by which
 they should be deployed to the cluster.
 
+## Access to secrets
+
+We store secrets in bitwarden. To get access, you will need to ask in #forum-testplatform 
+on the OpenShift Slack, or open a Jira ticket to the DPTP team.
+
 ## Secrets Listing
 
 The following secrets exist in the `ci` Namespace and are used by the infra. If
@@ -21,7 +26,7 @@ secrets currently exist:
 |       Key        | Description |
 | ---------------- | ----------- |
 | `.awscred`       | Credentials for the AWS EC2 API. See the [upstream credentials doc](https://docs.aws.amazon.com/cli/latest/userguide/cli-multiple-profiles.html). |
-| `pull-secret`    | Credentials for pulling tectonic images from Quay.  In future will be the credentials used for pulling openshift origin images from a protected repo. |
+| `pull-secret`    | Credentials for pulling OpenShift images from Quay. |
 | `ssh-privatekey` | Private half of the SSH key, for connecting to AWS EC2 VMs. |
 | `ssh-publickey`  | Public half of the SSH key, for connecting to AWS EC2 VMs. |
 
@@ -34,6 +39,7 @@ secrets currently exist:
 | `ssh-privatekey`  | Private half of the SSH key, for connecting to GCE VMs. |
 | `ssh-publickey`   | Public half of the SSH key, for connecting to GCE VMs. |
 | `telemeter-token` | Token to push telemetry data on CI clusters. |
+| `pull-secret`    | Credentials for pulling OpenShift images from Quay. |
 
 #### `cluster-secrets-azure`
 
@@ -42,6 +48,7 @@ secrets currently exist:
 | `secret`         | Credentials for the Azure API. See the [upstream credentials doc](https://docs.microsoft.com/en-us/rest/api/apimanagement/apimanagementrest/azure-api-management-rest-api-authentication). |
 | `certs.yaml`     | Certificate and key for downloading OpenShift RPMs from the ops mirrors |
 | `ssh-privatekey` | Private half of the SSH key, for connecting to Azure VMs when the VM image is built. |
+| `pull-secret`    | Credentials for pulling OpenShift images from Quay. |
 
 ### GCE ServiceAccount Credentials
 
