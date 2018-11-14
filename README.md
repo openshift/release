@@ -19,8 +19,10 @@ and are split into the following categories:
    for details on how to configure a job, but prefer the `ci-operator` config
    whenever possible.
  - [`ci-operator/templates`](./ci-operator/templates/) contains black-box test
-   workflows for use by the `ci-operator`. See the [template document](https://github.com/openshift/ci-operator/blob/master/TEMPLATES.md)
-   for information on how to use these.
+   workflows for use by the `ci-operator`. The parent directory's
+   [README](./ci-operator#end-to-end-tests) documents how to use them. See the
+   [template document](https://github.com/openshift/ci-operator/blob/master/TEMPLATES.md)
+   for general information on template tests.
  - [`ci-operator/infra`](./ci-operator/infra/) contains manifests for infrastructure
    components used by the `ci-operator`. Contact a CI Administrator if you feel
    like one of these should be edited.
