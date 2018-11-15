@@ -129,6 +129,7 @@ for account in "aos-pubsub-subscriber" "ci-vm-operator" "gcs-publisher"; do
 	oc label secret "gce-sa-credentials-${account}" "ci.openshift.io/managed=true"
 done
 
+
 # Some GCE serviceaccounts also have SSH keys
 for account in "aos-serviceaccount" "jenkins-ci-provisioner"; do
 	oc create secret generic "gce-sa-credentials-${account}"   \
@@ -137,7 +138,6 @@ for account in "aos-serviceaccount" "jenkins-ci-provisioner"; do
 		"$( format_attachment "${account}" ssh-publickey )"
 	oc label secret "gce-sa-credentials-${account}" "ci.openshift.io/managed=true"
 done
-
 
 # Credentials for registries are stored as
 # separate fields on individual items
@@ -155,7 +155,7 @@ oc label secret "registry-pull-credentials-${registry}" "ci.openshift.io/managed
 # Cluster credentials aggregate multiple items
 # of information for easy consumption by tests
 target_cloud="aws"
-oc create secret generic "cluster-secrets-${target_cloud}"               \
+oc create secret generic "cluster-secrets-${target_cloud}"             \
 	"$( format_field_value "quay.io" "Pull Credentials" "pull-secret" )" \
 	"$( format_attachment "jenkins-ci-iam" .awscred )"                   \
 	"$( format_attachment "jenkins-ci-iam" ssh-privatekey )"             \
@@ -163,7 +163,8 @@ oc create secret generic "cluster-secrets-${target_cloud}"               \
 oc label secret "cluster-secrets-${target_cloud}" "ci.openshift.io/managed=true"
 
 target_cloud="gcp"
-oc create secret generic "cluster-secrets-${target_cloud}"                      \
+oc create secret generic "cluster-secrets-${target_cloud}"                    \
+	"$( format_field_value "quay.io" "Pull Credentials" "pull-secret" )"        \
 	"$( format_attachment "jenkins-ci-provisioner" credentials.json gce.json )" \
 	"$( format_attachment "jenkins-ci-provisioner" ssh-privatekey )"            \
 	"$( format_attachment "jenkins-ci-provisioner" ssh-publickey )"             \
