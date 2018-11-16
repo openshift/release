@@ -1,27 +1,28 @@
-postsubmits:
-  openshift/kube-state-metrics:
+presubmits:
+  openshift/prometheus-operator:
   - agent: kubernetes
+    always_run: true
     branches:
-    - ^openshift-master$
+    - master
+    context: ci/prow/images
     decorate: true
-    labels:
-      artifacts: images
-    name: branch-ci-openshift-kube-state-metrics-openshift-master-images
+    name: pull-ci-openshift-prometheus-operator-master-images
+    rerun_command: /test images
     skip_cloning: true
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
-        - --promote
         - --target=[images]
+        - --target=[release:latest]
         command:
         - ci-operator
         env:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-kube-state-metrics-openshift-master.yaml
+              key: openshift-prometheus-operator-master.yaml
               name: ci-operator-configs
         image: ci-operator:latest
         imagePullPolicy: Always
@@ -32,3 +33,4 @@ postsubmits:
           requests:
             cpu: 10m
       serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| images),?(\s+|$))
