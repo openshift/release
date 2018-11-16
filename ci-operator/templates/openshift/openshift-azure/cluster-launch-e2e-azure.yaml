@@ -18,6 +18,10 @@ parameters:
 - name: TEST_IN_PRODUCTION
 - name: DEPLOY_VERSION
   value: "v3.11"
+- name: TEST_IMAGE
+  value: "registry.svc.ci.openshift.org/azure/test-base:latest"
+- name: TEST_COMMAND
+  value: "make e2e"
 
 objects:
 
@@ -59,7 +63,7 @@ objects:
 
     # Once admin.kubeconfig exists, executes shared tests
     - name: test
-      image: ${LOCAL_IMAGE_BIN}
+      image: ${TEST_IMAGE}
       imagePullPolicy: Always
       resources:
         requests:
@@ -101,7 +105,7 @@ objects:
 
         # wait until the setup job creates admin.kubeconfig
         while true; do
-          if [[ ! -f  /tmp/shared/_data/_out/admin.kubeconfig ]]; then
+          if [[ ! -f  /tmp/shared/openshift-azure/_data/_out/admin.kubeconfig ]]; then
             sleep 15 & wait
             continue
           fi
@@ -115,9 +119,10 @@ objects:
 
         # test specific code
         # don't let clients impact the global kubeconfig
-        cp -r /tmp/shared/_data /go/src/github.com/openshift/openshift-azure/
+        mkdir -p /go/src/github.com/openshift/
+        cp -r /tmp/shared/openshift-azure /go/src/github.com/openshift/
         cd /go/src/github.com/openshift/openshift-azure/
-        make e2e
+        ${TEST_COMMAND}
 
     # Runs an install
     - name: setup
@@ -155,7 +160,7 @@ objects:
         trap 'rc=$?; if [[ $rc -ne 0 || -n "$TEST_IN_PRODUCTION" ]]; then
           touch /tmp/shared/exit;
         fi;
-        cp -r /go/src/github.com/openshift/openshift-azure/_data /tmp/shared &>/dev/null
+        cp -r /go/src/github.com/openshift/openshift-azure /tmp/shared &>/dev/null
         exit $rc' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
 
@@ -220,8 +225,8 @@ objects:
 
           # Gather artifacts
           if [[ -z "$TEST_IN_PRODUCTION" ]]; then
-            export KUBECONFIG=/tmp/shared/_data/_out/admin.kubeconfig
-            cp -r /tmp/shared/_data /go/src/github.com/openshift/openshift-azure/
+            export KUBECONFIG=/tmp/shared/openshift-azure/_data/_out/admin.kubeconfig
+            cp -r /tmp/shared/openshift-azure/_data /go/src/github.com/openshift/openshift-azure/
             oc get po --all-namespaces -o wide > /tmp/artifacts/pods
             oc get no -o wide > /tmp/artifacts/nodes
             oc get events --all-namespaces > /tmp/artifacts/events
