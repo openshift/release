@@ -23,8 +23,6 @@ parameters:
   required: true
 - name: RELEASE_IMAGE_LATEST
   required: true
-- name: INSTALL_PLATFORM
-  value: libvirt
 
 objects:
 
@@ -231,8 +229,6 @@ objects:
         value: ${CLUSTER_TYPE}
       - name: OPENSHIFT_INSTALL_CLUSTER_NAME
         value: ${NAMESPACE}-${JOB_NAME_HASH}
-      - name: OPENSHIFT_INSTALL_BASE_DOMAIN
-        value: origin-ci-int-gce.dev.openshift.com
       - name: OPENSHIFT_INSTALL_EMAIL_ADDRESS
         value: test@ci.openshift.io
       - name: OPENSHIFT_INSTALL_PASSWORD
@@ -241,15 +237,8 @@ objects:
         value: /etc/openshift-installer/ssh-publickey
       - name: OPENSHIFT_INSTALL_PULL_SECRET_PATH
         value: /etc/openshift-installer/pull-secret
-      - name: OPENSHIFT_INSTALL_PLATFORM
-        value: ${INSTALL_PLATFORM}
       - name: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
         value: ${RELEASE_IMAGE_LATEST}
-      - name: OPENSHIFT_INSTALL_LIBVIRT_URI
-        value: "qemu+tcp://192.168.122.1/system"
-      - name: OPENSHIFT_INSTALL_LIBVIRT_IMAGE
-        value: "file:///unused"
-      - name: USER
         value: test
       - name: HOME
         value: /tmp
@@ -261,6 +250,7 @@ objects:
         trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/config-success; else touch /tmp/exit; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN}; fi' TERM
 
+        source /etc/openshift-installer/params
         mkdir /tmp/artifacts/installer &&
         /bin/openshift-install version >/tmp/artifacts/installer/version
 
