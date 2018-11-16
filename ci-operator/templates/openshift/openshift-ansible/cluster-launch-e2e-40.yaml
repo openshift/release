@@ -250,7 +250,18 @@ objects:
         trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/config-success; else touch /tmp/exit; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN}; fi' TERM
 
-        source /etc/openshift-installer/params
+        if [[ ${TYPE} == 'gcp' ]]; then
+          export OPENSHIFT_INSTALL_PLATFORM=libvirt
+          export OPENSHIFT_INSTALL_BASE_DOMAIN=origin-ci-int-gce.dev.rhcloud.com
+          export OPENSHIFT_INSTALL_LIBVIRT_URI="qemu+tcp://192.168.122.1/system"
+          export OPENSHIFT_INSTALL_LIBVIRT_IMAGE="file:///unused"
+        fi
+        if [[ ${TYPE} == 'aws' ]]; then
+          export OPENSHIFT_INSTALL_PLATFORM="aws"
+          export OPENSHIFT_INSTALL_BASE_DOMAIN="test.ose"
+          export AWS_SHARED_CREDENTIALS_FILE="/etc/openshift-installer/.awscred"
+          export OPENSHIFT_INSTALL_AWS_REGION="us-east-1"
+        fi
         mkdir /tmp/artifacts/installer &&
         /bin/openshift-install version >/tmp/artifacts/installer/version
 
