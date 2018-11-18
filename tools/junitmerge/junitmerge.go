@@ -1,13 +1,17 @@
 package main
 
 import (
+	"encoding/json"
 	"encoding/xml"
+	"flag"
+	"io"
 	"log"
 	"os"
 
 	"fmt"
-	"github.com/openshift/release/tools/junitreport/pkg/api"
 	"sort"
+
+	"github.com/openshift/release/tools/junitreport/pkg/api"
 )
 
 type uniqueSuites map[string]*suiteRuns
@@ -64,50 +68,69 @@ func (r *suiteRuns) Merge(testCases []*api.TestCase) {
 
 func main() {
 	log.SetFlags(0)
+	opt := struct {
+		JSONSummary bool
+	}{}
+	flag.BoolVar(&opt.JSONSummary, "json-summary", false, "Convert the result to a single JSON file that summarizes the output")
+	flag.Parse()
+
+	args := flag.Args()
+	if len(args) == 0 {
+		args = []string{"-"}
+	}
+
 	suites := make(uniqueSuites)
 
-	for _, arg := range os.Args[1:] {
-		f, err := os.Open(arg)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer f.Close()
-		d := xml.NewDecoder(f)
-
-		for {
-			t, err := d.Token()
-			if err != nil {
-				log.Fatal(err)
-			}
-			if t == nil {
-				log.Fatalf("input file %s does not appear to be a JUnit XML file", arg)
-			}
-			// Inspect the top level DOM element and perform the appropriate action
-			switch se := t.(type) {
-			case xml.StartElement:
-				switch se.Name.Local {
-				case "testsuites":
-					input := &api.TestSuites{}
-					if err := d.DecodeElement(input, &se); err != nil {
-						log.Fatal(err)
-					}
-					for _, suite := range input.Suites {
-						suites.Merge("", suite)
-					}
-				case "testsuite":
-					input := &api.TestSuite{}
-					if err := d.DecodeElement(input, &se); err != nil {
-						log.Fatal(err)
-					}
-					suites.Merge("", input)
-				default:
-					log.Fatal(fmt.Errorf("unexpected top level element in %s: %s", arg, se.Name.Local))
+	for _, arg := range args {
+		func() {
+			var f io.Reader
+			if arg == "-" {
+				f = os.Stdin
+			} else {
+				file, err := os.Open(arg)
+				if err != nil {
+					log.Fatal(err)
 				}
-			default:
-				continue
+				defer file.Close()
+				f = file
 			}
-			break
-		}
+			d := xml.NewDecoder(f)
+
+			for {
+				t, err := d.Token()
+				if err != nil {
+					log.Fatal(err)
+				}
+				if t == nil {
+					log.Fatalf("input file %s does not appear to be a JUnit XML file", arg)
+				}
+				// Inspect the top level DOM element and perform the appropriate action
+				switch se := t.(type) {
+				case xml.StartElement:
+					switch se.Name.Local {
+					case "testsuites":
+						input := &api.TestSuites{}
+						if err := d.DecodeElement(input, &se); err != nil {
+							log.Fatal(err)
+						}
+						for _, suite := range input.Suites {
+							suites.Merge("", suite)
+						}
+					case "testsuite":
+						input := &api.TestSuite{}
+						if err := d.DecodeElement(input, &se); err != nil {
+							log.Fatal(err)
+						}
+						suites.Merge("", input)
+					default:
+						log.Fatal(fmt.Errorf("unexpected top level element in %s: %s", arg, se.Name.Local))
+					}
+				default:
+					continue
+				}
+				break
+			}
+		}()
 	}
 
 	var suiteNames []string
@@ -145,11 +168,47 @@ func main() {
 		output.Suites = append(output.Suites, out)
 	}
 
-	e := xml.NewEncoder(os.Stdout)
-	e.Indent("", "\t")
-	if err := e.Encode(output); err != nil {
-		log.Fatal(err)
+	switch {
+	case opt.JSONSummary:
+		summary := summaryFor(output)
+		e := json.NewEncoder(os.Stdout)
+		e.SetIndent("", "  ")
+		e.Encode(summary)
+		fmt.Fprintln(os.Stdout)
+	default:
+		e := xml.NewEncoder(os.Stdout)
+		e.Indent("", "\t")
+		if err := e.Encode(output); err != nil {
+			log.Fatal(err)
+		}
+		e.Flush()
+		fmt.Fprintln(os.Stdout)
 	}
-	e.Flush()
-	fmt.Fprintln(os.Stdout)
+}
+
+func summaryFor(suites *api.TestSuites) *SuiteSummary {
+	s := &SuiteSummary{}
+	for _, testSuite := range suites.Suites {
+		for _, testCase := range testSuite.TestCases {
+			if testCase.SkipMessage != nil {
+				continue
+			}
+			s.Tests = append(s.Tests, TestCaseSummary{
+				Name:   testCase.Name,
+				Failed: testCase.FailureOutput != nil,
+				Time:   testCase.Duration,
+			})
+		}
+	}
+	return s
+}
+
+type SuiteSummary struct {
+	Tests []TestCaseSummary `json:"tests"`
+}
+
+type TestCaseSummary struct {
+	Name   string  `json:"name"`
+	Time   float64 `json:"time"`
+	Failed bool    `json:"failed"`
 }
