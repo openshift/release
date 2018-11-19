@@ -122,6 +122,17 @@ For each master, the `jenkins-credentials-${master_url}` secret holds the
 password for the Jenkins user in the `password` key. For the `ci.dev` master,
 a client cert, key and CA cert are also present for client authentication.
 
+
+### Slack Bot Credentials
+
+The following Slack bots have their Slack API tokens for the CoreOS Slack organization
+stored on the cluster
+
+ - cluster-bot as `ci-chat-bot-slack-token`
+
+This token is granted access to talk to the Slack API for automation purposes.
+
+
 ## Secret Regeneration
 
 In order to regenerate the secrets in the case of an emergency, a CI admin can
