@@ -102,6 +102,11 @@ for login in "openshift-bot" "openshift-build-robot" "openshift-cherrypick-robot
 	oc label secret "github-credentials-${login}" "ci.openshift.io/managed=true"
 done
 
+# Configuration for Slack ci-chat-bot is stored under "Token"
+# and the key value is "token" in the secret
+oc create secret generic ci-chat-bot-slack-token "$( format_field_value ci-chat-bot-slack-token "Token" "token" )"
+oc label secret "ci-chat-bot-slack-token" "ci.openshift.io/managed=true"
+
 # Configuration for GitHub OAuth Apps are stored
 # as an opaque field "Client Configuration"
 oc create secret generic github-app-credentials "$( format_field_value deck-ci.svc.ci.openshift.org "Client Configuration" "config.json" )"

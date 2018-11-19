@@ -158,6 +158,9 @@ prow-artifacts:
 	oc apply -n ci -f ci-operator/infra/src-cache-origin.yaml
 .PHONY: prow-artifacts
 
+prow-ci-chat-bot:
+	$(MAKE) apply WHAT=ci-operator/infra/openshift/ci-chat-bot/deploy.yaml
+
 prow-release-controller:
 	oc create imagestream origin-release -o yaml --dry-run | oc apply -f - -n openshift
 	oc create imagestream origin-v4.0 -o yaml --dry-run | oc apply -f - -n openshift
