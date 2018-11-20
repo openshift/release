@@ -239,6 +239,10 @@ objects:
         value: /etc/openshift-installer/pull-secret
       - name: HOME
         value: /tmp
+      - name: MASTERS
+        value: 3
+      - name: WORKERS
+        value: 3
       command:
       - /bin/sh
       - -c
@@ -262,7 +266,16 @@ objects:
         mkdir /tmp/artifacts/installer &&
         /bin/openshift-install version >/tmp/artifacts/installer/version
 
+
         export _CI_ONLY_STAY_AWAY_OPENSHIFT_INSTALL_AWS_USER_TAGS="{\"expirationDate\": \"$(date -d '4 hours' --iso=minutes --utc)\"}"
+        /bin/openshift-install --dir=/tmp/artifacts/installer --log-level=debug install-configs
+
+        # Update install configs to set desired number of masters and workers
+        sed -i "/master/{n;s/1/${MASTERS}/}" .openshift_install_state.json
+        sed -i "/worker/{n;s/1/${WORKERS}/}" .openshift_install_state.json
+        sed -i "/master/{n;n;s/1/${MASTERS}/}" install-config.yml
+        sed -i "/master/{n;n;s/1/${WORKERS}/}" install-config.yml
+
         /bin/openshift-install --dir=/tmp/artifacts/installer --log-level=debug ignition-configs &
         wait "$!"
 
