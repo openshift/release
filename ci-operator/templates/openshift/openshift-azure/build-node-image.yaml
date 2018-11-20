@@ -19,7 +19,6 @@ parameters:
 - name: OPENSHIFT_RELEASE
   value: "3.11"
   required: true
-- name: AZURE_OREG_URL
 - name: IMAGE_ANSIBLE
   required: true
 - name: DEPLOY_OS
@@ -94,8 +93,6 @@ objects:
         value: "${JOB_NAME_HASH}"
       - name: OPENSHIFT_RELEASE
         value: "${OPENSHIFT_RELEASE}"
-      - name: AZURE_OREG_URL
-        value: "${AZURE_OREG_URL}"
       - name: TYPE
         value: azure
       - name: DEPLOY_OS
@@ -127,7 +124,9 @@ objects:
         source /tmp/shared/environment
         echo "RESOURCE_GROUP=${RESOURCE_GROUP}"
         echo "IMAGE_NAME=${IMAGE_NAME}"
-        echo "AZURE_OREG_URL=${AZURE_OREG_URL}"
+        if [[ ${OPENSHIFT_RELEASE} = "3.11" ]]; then
+          export AZURE_OREG_URL='registry.access.redhat.com/openshift3/ose-${component}:${version}'
+        fi
 
         source /usr/share/ansible/openshift-ansible/inventory/dynamic/injected/secret
         az login --service-principal -u ${AZURE_CLIENT_ID} -p ${AZURE_CLIENT_SECRET} --tenant ${AZURE_TENANT_ID} &>/dev/null
@@ -223,7 +222,8 @@ objects:
         export IMAGE_RESOURCEGROUP=images
         source /tmp/shared/environment
         export IMAGE_RESOURCENAME=${IMAGE_NAME}
-        export AZURE_REGION=eastus  
+        export AZURE_REGION=eastus
+        export AZURE_AAD_CLIENT_ID=${AZURE_CLIENT_ID}
         # Clone openshift-azure by ourselves since it's not supported yet by the ci-operator
         # https://github.com/openshift/ci-operator/issues/142
         mkdir -p /go/src/github.com/openshift
