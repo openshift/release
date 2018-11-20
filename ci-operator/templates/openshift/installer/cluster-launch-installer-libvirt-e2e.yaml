@@ -1,0 +1,356 @@
+kind: Template
+apiVersion: template.openshift.io/v1
+
+parameters:
+- name: JOB_NAME_SAFE
+  required: true
+- name: JOB_NAME_HASH
+  required: true
+- name: NAMESPACE
+  required: true
+- name: IMAGE_FORMAT
+  required: true
+- name: IMAGE_INSTALLER
+  required: true
+- name: LOCAL_IMAGE_LIBVIRT_INSTALLER
+  required: true
+- name: IMAGE_TESTS
+  required: true
+- name: CLUSTER_TYPE
+  value: "libvirt"
+- name: TEST_COMMAND
+  required: true
+- name: RELEASE_IMAGE_LATEST
+  required: true
+
+objects:
+
+# We want the cluster to be able to access these images
+- kind: RoleBinding
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: ${JOB_NAME_SAFE}-image-puller
+    namespace: ${NAMESPACE}
+  roleRef:
+    name: system:image-puller
+  subjects:
+  - kind: SystemGroup
+    name: system:unauthenticated
+
+# The e2e pod spins up a cluster, runs e2e tests, and then cleans up the cluster.
+- kind: Pod
+  apiVersion: v1
+  metadata:
+    name: ${JOB_NAME_SAFE}
+    namespace: ${NAMESPACE}
+    annotations:
+      # we want to gather the teardown logs no matter what
+      ci-operator.openshift.io/wait-for-container-artifacts: teardown
+  spec:
+    restartPolicy: Never
+    activeDeadlineSeconds: 10800
+    terminationGracePeriodSeconds: 900
+    volumes:
+    - name: artifacts
+      emptyDir: {}
+    - name: shared-tmp
+      emptyDir: {}
+    - name: cluster-profile
+      secret:
+        secretName: ${JOB_NAME_SAFE}-cluster-profile
+    initContainers:
+    - name: openshift-tests
+      image: ${IMAGE_TESTS}
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      command:
+      - cp
+      - /usr/bin/openshift-tests
+      - /tmp/shared/openshift-tests
+
+    containers:
+
+    # Runs cluster tests
+    - name: test
+      image: ${LOCAL_IMAGE_LIBVIRT_INSTALLER}
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /home/packer
+      - name: cluster-profile
+        mountPath: /etc/openshift-installer
+      - name: artifacts
+        mountPath: /tmp/artifacts
+      env:
+      - name: HOME
+        value: /home/packer
+      - name: NSS_WRAPPER_PASSWD
+        value: /home/packer/passwd
+      - name: NSS_WRAPPER_GROUP
+        value: /home/packer/group
+      - name: NSS_USERNAME
+        value: packer
+      - name: NSS_GROUPNAME
+        value: packer
+      - name: GOOGLE_PROJECT_ID
+        value: openshift-gce-devel-ci
+      - name: GOOGLE_COMPUTE_ZONE
+        value: us-east1-c
+      - name: INSTANCE_PREFIX
+        value: ${NAMESPACE}-${JOB_NAME_HASH}
+      command:
+      - /bin/sh
+      - -c
+      - |
+        #!/bin/sh
+        set -euo pipefail
+        trap 'touch "${HOME}"/exit' EXIT
+        trap 'kill $(jobs -p); exit 0' TERM
+        mock-nss.sh
+        gcloud auth activate-service-account \
+          --quiet --key-file /etc/openshift-installer/gce.json
+        gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
+        gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
+        set -x
+        SETUP_SUCCESS=
+        while true; do
+          if [[ -f "${HOME}"/exit ]]; then
+            echo "Another process exited" 2>&1
+            exit 1
+          fi
+          if [[ ! -f "${HOME}"/setup-success ]]; then
+            sleep 15 & wait
+            continue
+          elif [[ -z "${SETUP_SUCCESS}" ]]; then
+            echo "Setup success"
+            SETUP_SUCCESS=1
+          fi
+          break
+        done
+        LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+          --zone "${GOOGLE_COMPUTE_ZONE}" \
+          packer@"${INSTANCE_PREFIX}" \
+          --command 'export KUBECONFIG=/home/packer/clusters/nested/auth/kubeconfig && /home/packer/router-check.sh'
+        LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+          --zone "${GOOGLE_COMPUTE_ZONE}" \
+          packer@"${INSTANCE_PREFIX}" \
+          --command 'export KUBECONFIG=/home/packer/clusters/nested/auth/kubeconfig && /home/packer/run-tests.sh'
+
+    # Runs an install
+    - name: setup
+      image: ${LOCAL_IMAGE_LIBVIRT_INSTALLER}
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /home/packer
+      - name: cluster-profile
+        mountPath: /etc/openshift-installer
+      - name: artifacts
+        mountPath: /tmp/artifacts
+      env:
+      - name: HOME
+        value: /home/packer
+      - name: NSS_WRAPPER_PASSWD
+        value: /home/packer/passwd
+      - name: NSS_WRAPPER_GROUP
+        value: /home/packer/group
+      - name: NSS_USERNAME
+        value: packer
+      - name: NSS_GROUPNAME
+        value: packer
+      - name: GOOGLE_PROJECT_ID
+        value: openshift-gce-devel-ci
+      - name: GOOGLE_COMPUTE_ZONE
+        value: us-east1-c
+      - name: INSTANCE_PREFIX
+        value: ${NAMESPACE}-${JOB_NAME_HASH}
+      command:
+      - /bin/sh
+      - -c
+      - |
+        #!/bin/sh
+        set -euo pipefail
+        trap 'rc=$?; if test "${rc}" -eq 0; then touch "${HOME}"/setup-success; else touch "${HOME}"/exit; fi; exit "${rc}"' EXIT
+        trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN}; fi' TERM
+        cat  > "${HOME}"/router-check.sh << 'EOF'
+        #!/bin/bash
+        set -euo pipefail
+
+        # wait for the router
+        API_UP=
+        ROUTER_NAMESPACE=
+        ROUTER_DEPLOYMENT=
+
+        find_router_deployment()
+        {
+          while true; do
+            if ! oc get nodes 2>/dev/null; then
+              echo "Waiting for API at $(oc whoami --show-server) to respond ..."
+              sleep 15 & wait
+              continue
+            elif [[ -z "${API_UP}" ]]; then
+              echo "API at $(oc whoami --show-server) has responded"
+              API_UP=1
+            fi
+            if [[ -z "${ROUTER_NAMESPACE}" ]]; then
+              # check multiple namespaces while we are transitioning to the new locations
+              if oc get ds/router-default -n openshift-ingress 2>/dev/null; then
+                ROUTER_NAMESPACE=openshift-ingress
+                ROUTER_DEPLOYMENT="ds/router-default"
+              elif oc get deploy/router -n openshift-ingress 2>/dev/null; then
+                ROUTER_NAMESPACE=openshift-ingress
+                ROUTER_DEPLOYMENT="deploy/router"
+              elif oc get deploy/router -n default 2>/dev/null; then
+                ROUTER_NAMESPACE=default
+                ROUTER_DEPLOYMENT="deploy/router"
+              else
+                echo "Waiting for router to be created ..."
+                sleep 15 & wait
+                continue
+              fi
+              echo "Found router in ${ROUTER_NAMESPACE}"
+              break
+            fi
+          done
+          i=0
+          MAX_RETRIES=10
+          wait_expiry_ts="$(($(date +%s) + 90))"
+          until oc --request-timeout=80s rollout status "${ROUTER_DEPLOYMENT}" -n "${ROUTER_NAMESPACE}" -w; do
+            i=$((i+1))
+            [ $i -eq $MAX_RETRIES ] && echo "timeout waiting for ${ROUTER_NAMESPACE}/${ROUTER_DEPLOYMENT} to be available" && exit 1
+            echo "error ${ROUTER_NAMESPACE}/${ROUTER_DEPLOYMENT} did not come up"
+            sleep "$((wait_expiry_ts - $(date +%s)))"
+            wait_expiry_ts="$(($(date +%s) + 90))"
+          done
+        }
+
+        declare -fxr find_router_deployment
+        timeout 600 bash -ce 'find_router_deployment'
+        EOF
+        cat  > "${HOME}"/run-tests.sh << 'EOF'
+        #!/bin/bash
+        set -euo pipefail
+        export PATH=/home/packer:$PATH
+
+        function run-tests() {
+          mkdir -p /tmp/artifacts/junit/serial
+          if which openshift-tests && [[ -n "${TEST_SUITE-}" ]]; then
+            openshift-tests run "${TEST_SUITE}" --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
+            exit 0
+          fi
+          # TODO: remove everything after this point once we fork templates by release - starting with 4.0
+          if ! which extended.test; then
+            echo "must provide TEST_SUITE variable"
+            exit 1
+          fi
+          if [[ -n "${TEST_FOCUS:-}" ]]; then
+            ginkgo -v -noColor -nodes="${TEST_PARALLELISM:-30}" $( which extended.test ) -- \
+              -ginkgo.focus="${TEST_FOCUS}" -ginkgo.skip="${TEST_SKIP:-"\\[local\\]"}" \
+              -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit \
+              -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
+          fi
+          if [[ -n "${TEST_FOCUS_SERIAL:-}" ]]; then
+            ginkgo -v -noColor -nodes=1 $( which extended.test ) -- \
+              -ginkgo.focus="${TEST_FOCUS_SERIAL}" -ginkgo.skip="${TEST_SKIP_SERIAL:-"\\[local\\]"}" \
+              -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit/serial \
+              -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
+          fi
+          exit ${rc:-0}
+        }
+
+        ${TEST_COMMAND}
+        declare -fxr run_tests
+        timeout 1200 bash -ce 'run_tests'
+        EOF
+        chmod +x "${HOME}"/router-check.sh
+        chmod +x "${HOME}"/run-tests.sh
+        mock-nss.sh
+        mkdir "${HOME}"/.ssh
+        gcloud auth activate-service-account \
+          --quiet --key-file /etc/openshift-installer/gce.json
+        gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
+        gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
+        set -x
+
+        # image-family openshift4-libvirt must exist in ${GOOGLE_COMPUTE_ZONE} for this template
+        # to create the image-family see here: https://github.com/ironcladlou/openshift4-libvirt-gcp#images
+        gcloud compute instances create "${INSTANCE_PREFIX}" \
+          --image-family openshift4-libvirt \
+          --zone "${GOOGLE_COMPUTE_ZONE}" \
+          --machine-type n1-standard-8 \
+          --min-cpu-platform "Intel Haswell" \
+          --boot-disk-type pd-ssd \
+          --boot-disk-size 256GB \
+          --metadata-from-file openshift-pull-secret=/etc/openshift-installer/pull-secret
+        LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+          --quiet \
+          --project "${GOOGLE_PROJECT_ID}" \
+          --zone "${GOOGLE_COMPUTE_ZONE}" \
+          --recurse /bin/openshift-install packer@"${INSTANCE_PREFIX}":/usr/local/bin/openshift-install
+        LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+          --quiet \
+          --project "${GOOGLE_PROJECT_ID}" \
+          --zone "${GOOGLE_COMPUTE_ZONE}" \
+          --recurse "${HOME}"/router-check.sh packer@"${INSTANCE_PREFIX}":~/router-check.sh
+        LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+          --quiet \
+          --project "${GOOGLE_PROJECT_ID}" \
+          --zone "${GOOGLE_COMPUTE_ZONE}" \
+          --recurse "${HOME}"/run-tests.sh packer@"${INSTANCE_PREFIX}":~/run-tests.sh
+        LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+          --quiet \
+          --project "${GOOGLE_PROJECT_ID}" \
+          --zone "${GOOGLE_COMPUTE_ZONE}" \
+          --recurse "${HOME}"/openshift-tests packer@"${INSTANCE_PREFIX}":~/openshift-tests
+        set +x
+        echo 'Will now launch libvirt cluster in the gce instance with "${RELEASE_IMAGE_LATEST}"'
+        LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+          --zone "${GOOGLE_COMPUTE_ZONE}" \
+          packer@"${INSTANCE_PREFIX}" \
+          --command 'export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_LATEST}" && timeout 1800 bash -ce "create-cluster nested 2>&1 | tee output"' | tee /tmp/artifacts/output-e2e-libvirt
+
+   # Performs cleanup of all created resources
+    - name: teardown
+      image: ${LOCAL_IMAGE_LIBVIRT_INSTALLER}
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      - name: cluster-profile
+        mountPath: /etc/openshift-installer
+      - name: artifacts
+        mountPath: /tmp/artifacts
+      env:
+      - name: USER
+        value: packer
+      - name: HOME
+        value: /tmp/shared
+      - name: INSTANCE_PREFIX
+        value: ${NAMESPACE}-${JOB_NAME_HASH}
+      - name: GOOGLE_PROJECT_ID
+        value: openshift-gce-devel-ci
+      - name: GOOGLE_COMPUTE_ZONE
+        value: us-east1-c
+      command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        function teardown() {
+          set +e
+          touch /tmp/shared/exit
+          echo "Deprovisioning cluster ..."
+          set -x
+          gcloud auth activate-service-account \
+            --quiet --key-file /etc/openshift-installer/gce.json
+          gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
+          gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
+          gcloud compute instances delete "${INSTANCE_PREFIX}" --quiet
+        }
+        trap 'teardown' EXIT
+        trap 'kill $(jobs -p); exit 0' TERM
+
+        for i in `seq 1 120`; do
+          if [[ -f /tmp/shared/exit ]]; then
+            exit 0
+          fi
+          sleep 60 & wait
+        done
