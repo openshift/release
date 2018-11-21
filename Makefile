@@ -17,7 +17,7 @@ roles: cluster-operator-roles
 	$(MAKE) apply WHAT=cluster/ci/config/roles.yaml
 .PHONY: roles
 
-prow: ci-ns prow-crd prow-config prow-rbac prow-services prow-jobs prow-scaling #prow-secrets
+prow: ci-ns prow-crd prow-config prow-rbac prow-services prow-jobs prow-scaling prow-secrets ci-operator-config
 .PHONY: prow
 
 ci-ns:
@@ -148,7 +148,7 @@ prow-release-controller:
 	$(MAKE) apply WHAT=ci-operator/infra/openshift/release-controller/deploy-origin-4.0.yaml
 	$(MAKE) apply WHAT=ci-operator/infra/openshift/release-controller/deploy-ocp-4.0.yaml
 
-projects: gcsweb origin origin-stable origin-release test-bases image-mirror-setup image-pruner-setup publishing-bot image-registry-publishing-bot content-mirror azure python-validation
+projects: ci-ns gcsweb origin origin-stable origin-release test-bases image-mirror-setup image-pruner-setup publishing-bot image-registry-publishing-bot content-mirror azure python-validation
 .PHONY: projects
 
 ci-operator-config:
