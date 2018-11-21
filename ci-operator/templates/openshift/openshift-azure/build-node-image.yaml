@@ -201,6 +201,7 @@ objects:
         mkdir -p "${HOME}"
 
         # wait until the setup job creates admin.kubeconfig
+        echo "Waiting for image build to complete"
         while true; do
           if [[ -f /tmp/shared/image_create ]]; then
             break
@@ -209,10 +210,9 @@ objects:
              echo "Exiting.  Found /tmp/shared/exit."
              exit 1
           fi
-          echo "sleeping waiting for image_create"
           sleep 15 & wait
         done
-        echo "Found image create marker file."
+        echo "Image build complete, proceeding with e2e testing"
 
         source /etc/azure/credentials/secret
         az login --service-principal -u ${AZURE_CLIENT_ID} -p ${AZURE_CLIENT_SECRET} --tenant ${AZURE_TENANT_ID} &>/dev/null
@@ -221,6 +221,7 @@ objects:
         export DEPLOY_VERSION=v${OPENSHIFT_RELEASE}
         export IMAGE_RESOURCEGROUP=images
         source /tmp/shared/environment
+        echo "Using built image $IMAGE_NAME"
         export IMAGE_RESOURCENAME=${IMAGE_NAME}
         export AZURE_REGION=eastus
         export AZURE_AAD_CLIENT_ID=${AZURE_CLIENT_ID}
