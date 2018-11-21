@@ -118,29 +118,37 @@ def validate_names(path, data):
 
                 branch = "master"
                 if "branches" in job:
+                    for branch_name in job["branches"]:
+                        if "_" in branch_name:
+                            print("[ERROR] {}: job {} branches with underscores are not allowed: {}".format(path, job["name"], branch_name))
                     branch = make_regex_filename_label(job["branches"][0])
 
                 prefix = "pull"
                 if job_type == "postsubmits":
                     prefix = "branch"
 
-                valid_name = "{}-ci-{}-{}-{}".format(prefix, repo.replace("/", "-"), branch, filtered_targets[0])
+                variant = job.get("labels", {}).get("ci-operator.openshift.io/variant", "")
+                target = filtered_targets[0]
+                if variant:
+                    target = variant + "-" + target
+
+                valid_name = "{}-ci-{}-{}-{}".format(prefix, repo.replace("/", "-"), branch, target)
                 if job["name"] != valid_name:
-                    print("[ERROR] {}: ci-operator job {} should have be named {}".format(path, job["name"], valid_name))
+                    print("[ERROR] {}: ci-operator job {} should be named {}".format(path, job["name"], valid_name))
                     out = False
 
                 if job_type == "presubmits":
-                    valid_context = "ci/prow/{}".format(filtered_targets[0])
+                    valid_context = "ci/prow/{}".format(target)
                     if job["context"] != valid_context:
                         print("[ERROR] {}: ci-operator job {} should have context {}".format(path, job["name"], valid_context))
                         out = False
 
-                    valid_rerun_command = "/test {}".format(filtered_targets[0])
+                    valid_rerun_command = "/test {}".format(target)
                     if job["rerun_command"] != valid_rerun_command:
                         print("[ERROR] {}: ci-operator job {} should have rerun_command {}".format(path, job["name"], valid_rerun_command))
                         out = False
 
-                    valid_trigger = "((?m)^/test( all| {}),?(\\s+|$))".format(filtered_targets[0])
+                    valid_trigger = "((?m)^/test( all| {}),?(\\s+|$))".format(target)
                     if job["trigger"] != valid_trigger:
                         print("[ERROR] {}: ci-operator job {} should have trigger {}".format(path, job["name"], valid_trigger))
                         out = False
