@@ -26,6 +26,9 @@ parameters:
   value: "registry.svc.ci.openshift.org/azure/test-base:latest"
 - name: TEST_COMMAND
   value: "make e2e"
+- name: RESOURCEGROUP_SUFFIX
+  generate: expression
+  from: "[a-z]{8}"
 
 objects:
 
@@ -139,7 +142,7 @@ objects:
         mountPath: /etc/azure/credentials
       env:
       - name: RESOURCEGROUP
-        value: ${NAMESPACE}-${JOB_NAME_HASH}
+        value: e2e-${RESOURCEGROUP_SUFFIX}
       - name: TYPE
         value: ${CLUSTER_TYPE}
       - name: HOME
@@ -208,7 +211,7 @@ objects:
         mountPath: /tmp/artifacts
       env:
       - name: RESOURCEGROUP
-        value: ${NAMESPACE}-${JOB_NAME_HASH}
+        value: e2e-${RESOURCEGROUP_SUFFIX}
       - name: TYPE
         value: ${CLUSTER_TYPE}
       - name: HOME
