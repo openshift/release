@@ -1,0 +1,28 @@
+#!/bin/sh
+
+set -euo pipefail
+
+base=$( dirname "${BASH_SOURCE[0]}")
+
+if ! ci=$( which ci-operator 2>/dev/null ); then
+  ci="${base}/../ci-operator/ci-operator"
+fi
+
+arg1=(${1//\// })
+org=${arg1[0]}
+repo=${arg1[1]}
+branch=master
+variant=
+if [[ -n "${arg1[2]-}" ]]; then
+  branch=${arg1[2]}
+fi
+if [[ -n "${arg1[3]-}" ]]; then
+  variant=__${arg1[3]}
+fi
+
+ref=$org/$repo@$branch
+if [[ -n "${2-}" ]]; then
+  ref=$2
+fi
+
+${ci} --config "${base}/../ci-operator/config/$org/$repo/$org-$repo-$branch$variant.yaml" --git-ref $ref --target [images]
