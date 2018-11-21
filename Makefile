@@ -172,7 +172,7 @@ projects: gcsweb origin origin-stable origin-release test-bases image-mirror-set
 
 ci-operator-config:
 	$(MAKE) apply WHAT=ci-operator/infra/src-cache-origin.yaml
-	ci-operator/populate-configmaps.sh
+	ci-operator/populate-ci-operator-configs.sh
 .PHONY: ci-operator-config
 
 content-mirror:
