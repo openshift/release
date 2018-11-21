@@ -103,13 +103,6 @@ objects:
         export RESOURCE_GROUP=${INSTANCE_PREFIX}-${BUILD_DATE_TIME}
         export IMAGE_NAME=${DEPLOY_OS}-base-${BUILD_DATE_TIME}
 
-        # We need to persist the resource group for use in the teardown container
-        # This is necessary because it is composed of time components whose
-        # computation would vary if the teardown container runs a couple of
-        # minutes after the buildimage container was first started
-        echo "RESOURCE_GROUP=${RESOURCE_GROUP}" >>/tmp/shared/environment
-
-        trap 'touch /tmp/shared/exit' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
 
         source /usr/share/ansible/openshift-ansible/inventory/dynamic/injected/secret
@@ -141,44 +134,5 @@ objects:
           -e openshift_azure_input_image_name=$IMAGE_NAME \
           playbooks/azure/openshift-cluster/tag_image_as_valid.yml
 
-    # Performs cleanup of all created resources
-    - name: teardown
-      image: registry.svc.ci.openshift.org/azure/test-base:latest
-      imagePullPolicy: Always
-      volumeMounts:
-      - name: artifacts
-        mountPath: /tmp/artifacts
-      - name: shared-tmp
-        mountPath: /tmp/shared
-      - name: cluster-secrets-azure
-        mountPath: /etc/azure/credentials
-      env:
-      - name: HOME
-        value: /tmp/shared/home
-      command:
-      - /bin/bash
-      - -c
-      - |
-        #!/bin/bash
-        function teardown() {
-          set +e
-
-          # Get resource group which was persisted by the buildimage container
-          source /tmp/shared/environment
-
-          # Login to azure
-          source /etc/azure/credentials/secret
-          az login --service-principal -u ${AZURE_CLIENT_ID} -p ${AZURE_CLIENT_SECRET} --tenant ${AZURE_TENANT_ID} &>/dev/null
-
-          az group delete -n ${RESOURCE_GROUP} -y --no-wait
-        }
-
-        trap 'teardown' EXIT
-        trap 'kill $(jobs -p); exit 0' TERM
-
-        for i in `seq 1 120`; do
-          if [[ -f /tmp/shared/exit ]]; then
-            exit 0
-          fi
-          sleep 60 & wait
-        done
+        # Cleanup
+        az group delete -n ${RESOURCE_GROUP} -y --no-wait
