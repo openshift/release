@@ -21,6 +21,7 @@ prow: ci-ns prow-crd prow-config prow-rbac prow-services prow-jobs prow-scaling 
 .PHONY: prow
 
 prow-stg: ci-stg-ns
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/ci-operator/stage.yaml
 .PHONY: prow-stg
 
 ci-ns:
