@@ -21,6 +21,8 @@ parameters:
   required: true
 - name: IMAGE_ANSIBLE
   required: true
+- name: OPENSHIFT_USE_CRIO
+  value: False
 - name: DEPLOY_OS
   value: "rhel7"
   required: true
@@ -99,6 +101,8 @@ objects:
         value: "${DEPLOY_OS}"
       - name: INSTANCE_PREFIX
         value: ${NAMESPACE}-${JOB_NAME_HASH}
+      - name: OPENSHIFT_USE_CRIO
+        value: ${OPENSHIFT_USE_CRIO}
       command:
       - /usr/local/bin/entrypoint-provider
       args:
@@ -111,7 +115,12 @@ objects:
 
         # We need to persist this variable so that we can clean it up when we exit
         echo "RESOURCE_GROUP=${INSTANCE_PREFIX}-$(TZ=Etc/UTC date +%Y%m%d%H%M)" >>/tmp/shared/environment
-        echo "IMAGE_NAME=${DEPLOY_OS}-$OPENSHIFT_RELEASE-$(TZ=Etc/UTC date +%Y%m%d%H%M)" >>/tmp/shared/environment
+        # TODO: Remove me after CRI-O becomes default
+        if [[ ${OPENSHIFT_USE_CRIO} = "True" ]]; then
+          echo "IMAGE_NAME=${DEPLOY_OS}-$OPENSHIFT_RELEASE-crio-$(TZ=Etc/UTC date +%Y%m%d%H%M)" >>/tmp/shared/environment
+        else
+          echo "IMAGE_NAME=${DEPLOY_OS}-$OPENSHIFT_RELEASE-$(TZ=Etc/UTC date +%Y%m%d%H%M)" >>/tmp/shared/environment
+        fi
 
         trap 'rc=$?; if [[ $rc -ne 0 ]]; then
           touch /tmp/shared/exit;
@@ -124,9 +133,7 @@ objects:
         source /tmp/shared/environment
         echo "RESOURCE_GROUP=${RESOURCE_GROUP}"
         echo "IMAGE_NAME=${IMAGE_NAME}"
-        if [[ ${OPENSHIFT_RELEASE} = "3.11" ]]; then
-          export AZURE_OREG_URL='registry.access.redhat.com/openshift3/ose-${component}:${version}'
-        fi
+        export AZURE_OREG_URL='registry.access.redhat.com/openshift3/ose-${component}:${version}'
 
         source /usr/share/ansible/openshift-ansible/inventory/dynamic/injected/secret
         az login --service-principal -u ${AZURE_CLIENT_ID} -p ${AZURE_CLIENT_SECRET} --tenant ${AZURE_TENANT_ID} &>/dev/null
@@ -152,6 +159,7 @@ objects:
           -e openshift_azure_container=images \
           -e openshift_azure_vm_ssh_public_key="~/.ssh/id_rsa.pub" \
           -e openshift_azure_vm_size=$AZURE_VM_SIZE \
+          -e openshift_use_crio=${OPENSHIFT_USE_CRIO}
           -e oreg_url=$AZURE_OREG_URL \
           -e @/usr/share/ansible/openshift-ansible/inventory/dynamic/injected/certs.yaml \
           -e openshift_azure_install_repo=$AZURE_REPO_URL \
