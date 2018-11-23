@@ -10,7 +10,7 @@ applyTemplate:
 	oc process -f $(WHAT) | oc apply -f -
 .PHONY: applyTemplate
 
-all: roles prow projects
+all: roles prow prow-stg projects
 .PHONY: all
 
 roles: cluster-operator-roles
@@ -20,9 +20,16 @@ roles: cluster-operator-roles
 prow: ci-ns prow-crd prow-config prow-rbac prow-services prow-jobs prow-scaling prow-secrets ci-operator-config
 .PHONY: prow
 
+prow-stg: ci-stg-ns
+.PHONY: prow-stg
+
 ci-ns:
 	oc project ci
 .PHONY: ci-ns
+
+ci-stg-ns:
+	oc project ci-stg
+.PHONY: ci-stg-ns
 
 prow-crd:
 	$(MAKE) apply WHAT=cluster/ci/config/prow/prow_crd.yaml
