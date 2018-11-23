@@ -43,12 +43,14 @@ secrets currently exist:
 
 #### `cluster-secrets-azure`
 
-|       Key        | Description |
-| ---------------- | ----------- |
-| `secret`         | Credentials for the Azure API. See the [upstream credentials doc](https://docs.microsoft.com/en-us/rest/api/apimanagement/apimanagementrest/azure-api-management-rest-api-authentication). |
-| `certs.yaml`     | Certificate and key for downloading OpenShift RPMs from the ops mirrors |
-| `ssh-privatekey` | Private half of the SSH key, for connecting to Azure VMs when the VM image is built. |
-| `pull-secret`    | Credentials for pulling OpenShift images from Quay. |
+|       Key           | Description |
+| ------------------- | ----------- |
+| `secret`            | Credentials for the Azure API. See the [upstream credentials doc](https://docs.microsoft.com/en-us/rest/api/apimanagement/apimanagementrest/azure-api-management-rest-api-authentication). |
+| `certs.yaml`        | Certificate and key for downloading OpenShift RPMs from the ops mirrors |
+| `ssh-privatekey`    | Private half of the SSH key, for connecting to Azure VMs when the VM image is built. |
+| `.dockerconfigjson` | Azure private registry pull secret |
+| `logging-int.cert`  | Azure Geneva logging authentication certificate |
+| `logging-int.key`   | Azure Geneva logging authentication key |
 
 ### GCE ServiceAccount Credentials
 

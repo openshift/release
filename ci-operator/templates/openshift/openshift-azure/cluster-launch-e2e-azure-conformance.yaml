@@ -215,6 +215,8 @@ objects:
         export IMAGE_RESOURCENAME=$(az image list -g $IMAGE_RESOURCEGROUP -o json --query "[?starts_with(name, '${DEPLOY_OS:-rhel7}-${DEPLOY_VERSION//v}') && tags.valid=='true'].name | sort(@) | [-1]" | tr -d '"')
         # create cluster for test
         cd /go/src/github.com/openshift/openshift-azure/
+        mkdir -p /go/src/github.com/openshift/openshift-azure/secrets
+        cp /etc/azure/credentials/logging-int.cert /etc/azure/credentials/logging-int.key /etc/azure/credentials/.dockerconfigjson /go/src/github.com/openshift/openshift-azure/secrets/
         timeout 1h ./hack/create.sh ${RESOURCEGROUP}
         # disable sync pod
         ./hack/ssh.sh -c "sudo rm /etc/origin/node/pods/sync.yaml" ${RESOURCEGROUP}
