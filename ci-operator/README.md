@@ -308,9 +308,41 @@ separate PR.
 
 ### Testing a template
 
-`ci-operator` tests can be executed locally with little effort, but the setting
-up the dependencies for template tests is more involved. The typical
-end-to-end test requires:
+A job that uses a template can be tested in two different ways. The `mkpj` and
+`mkpod` tools can be used to create a pod that will reproduce the setup used in
+CI, although some customization is still possible by editing the job locally.
+For complete control of the execution, the more manual process of assembling
+the `ci-operator` call can be used.
+
+#### Testing with `mkpj` and `mkpod`
+
+Prow has a utility to generate a ProwJob from its configuration files and
+another to turn that into a Pod ready to be executed. These utilities are
+available in the `registry.svc.ci.openshift.org/ci/test-infra:binaries` image
+or in the [upstream repository](https://github.com/kubernetes/test-infra/tree/master/prow/cmd#dev-tools).
+
+The [`mkpjpod.sh`](../hack/mkpjpod.sh) script can be used to streamline that
+process. It expects information about the base and pull request git references
+to be passed via environment variables, which can be set manually or using the
+[`pj_env.py`](../hack/pj_env.py) helper script (check the script files for
+detailed information).
+
+The output of the script is a regular Pod that can be executed in the staging
+namespace in the [CI cluster](https://api.ci.openshift.org) and will report the
+results in the pull request, e.g.:
+
+```sh
+hack/pj_env.py \
+    openshift/origin master 21526 'Pull Request Author' \
+    hack/mkpjpod.sh pull-ci-openshift-origin-master-e2e-aws \
+    | oc -n ci-stg create -f -
+```
+
+#### Testing manually
+
+`ci-operator` tests can be executed locally with little effort, but setting up
+the dependencies for template tests is more involved. The typical end-to-end
+test requires:
 
 - A kubeconfig pointing to a cluster with external access.
 - The `ci-operator` configuration file.
