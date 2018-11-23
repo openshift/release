@@ -20,7 +20,7 @@ roles: cluster-operator-roles
 prow: ci-ns prow-crd prow-config prow-rbac prow-services prow-jobs prow-scaling prow-secrets ci-operator-config
 .PHONY: prow
 
-prow-stg: ci-stg-ns
+prow-stg: ci-stg-ns prow-cluster-jobs ci-operator-config
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/ci-operator/stage.yaml
 .PHONY: prow-stg
 
