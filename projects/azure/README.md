@@ -137,10 +137,10 @@ docker run \
 --volume $HOME/.kube/config:/root/.kube/config \
 --volume $(pwd):/release \
 registry.svc.ci.openshift.org/ci/ci-operator:latest \
---config ci-operator/config/openshift/openshift-azure/openshift-openshift-azure-master.yaml \
+--config /release/ci-operator/config/openshift/openshift-azure/openshift-openshift-azure-master.yaml \
 --git-ref=openshift/openshift-azure@master \
 --namespace=${CI_OPERATOR_NAMESPACE} \
---template ci-operator/templates/openshift/openshift-azure/cluster-launch-e2e-azure.yaml \
+--template /release/ci-operator/templates/openshift/openshift-azure/cluster-launch-e2e-azure.yaml \
 --secret-dir /release/cluster/test-deploy/azure/
 ```
 
@@ -152,10 +152,10 @@ docker run \
 --volume $HOME/.kube/config:/root/.kube/config \
 --volume $(pwd):/release \
 registry.svc.ci.openshift.org/ci/ci-operator:latest \
---config ci-operator/config/openshift/openshift-azure/openshift-openshift-azure-master.yaml \
+--config /release/ci-operator/config/openshift/openshift-azure/openshift-openshift-azure-master.yaml \
 --git-ref=openshift/openshift-azure@master \
 --namespace=${CI_OPERATOR_NAMESPACE} \
---template ci-operator/templates/openshift/openshift-azure/cluster-launch-e2e-azure-upgrade.yaml \
+--template /release/ci-operator/templates/openshift/openshift-azure/cluster-launch-e2e-azure-upgrade.yaml \
 --secret-dir /release/cluster/test-deploy/azure/
 ```
 
@@ -168,10 +168,10 @@ docker run \
 --volume $HOME/.kube/config:/root/.kube/config \
 --volume $(pwd):/release \
 registry.svc.ci.openshift.org/ci/ci-operator:latest \
---config ci-operator/config/openshift/openshift-azure/openshift-openshift-azure-master.yaml \
+--config /release/ci-operator/config/openshift/openshift-azure/openshift-openshift-azure-master.yaml \
 --git-ref=openshift/openshift-azure@master \
 --namespace=${CI_OPERATOR_NAMESPACE} \
---template ci-operator/templates/openshift/openshift-azure/cluster-launch-e2e-azure-conformance.yaml \
+--template /release/ci-operator/templates/openshift/openshift-azure/cluster-launch-e2e-azure-conformance.yaml \
 --secret-dir /release/cluster/test-deploy/azure/
 ```
 
