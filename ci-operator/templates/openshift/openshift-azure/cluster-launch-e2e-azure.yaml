@@ -33,6 +33,12 @@ parameters:
 - name: TEST_IMAGE
   value: "registry.svc.ci.openshift.org/azure/test-base:latest"
 - name: TEST_IN_PRODUCTION
+- name: BUSHSLICER_TEST_ENVIRONMENT
+- name: BUSHSLICER_TEST_CONFIG
+- name: BUSHSLICER_USER
+- name: BUSHSLICER_USER_PW_STRING
+- name: BUSHSLICER_TEST_RESULTS
+- name: BUSHSLICER_TEST_FORMAT
 
 objects:
 
@@ -100,6 +106,18 @@ objects:
         value: ${RUNNING_UNDER_TEST}
       - name: TEST_IN_PRODUCTION
         value: ${TEST_IN_PRODUCTION}
+      - name: BUSHSLICER_TEST_ENVIRONMENT
+        value: ${BUSHSLICER_TEST_ENVIRONMENT}
+      - name: BUSHSLICER_TEST_CONFIG
+        value: ${BUSHSLICER_TEST_CONFIG}
+      - name: BUSHSLICER_TEST_RESULTS
+        value: ${BUSHSLICER_TEST_RESULTS}
+      - name: BUSHSLICER_TEST_FORMAT
+        value: ${BUSHSLICER_TEST_FORMAT}
+      - name: BUSHSLICER_USER
+        value: ${BUSHSLICER_USER}
+      - name: BUSHSLICER_USER_PW_STRING
+        value: ${BUSHSLICER_USER_PW_STRING}
       command:
       - /bin/bash
       - -c
@@ -157,9 +175,20 @@ objects:
 
         # test specific code
         # don't let clients impact the global kubeconfig
-        mkdir -p /go/src/github.com/openshift/
-        cp -r /tmp/shared/openshift-azure /go/src/github.com/openshift/
-        cd /go/src/github.com/openshift/openshift-azure/
+        if [[ "${TEST_IMAGE}" == *"/bushslicer"* ]]; then
+          # BUSHSLICER_TEST_CLUSTER will be picked up in run script
+          export BUSHSLICER_TEST_CLUSTER=$(awk '/^  fqdn:/{ print $2}' /tmp/shared/openshift-azure/_data/containerservice.yaml)
+          # login to cluster as $BUSHSLICER_USER
+          PASSWD=$(awk "/${BUSHSLICER_USER_PW_STRING}:/{ print \$2 }" /tmp/shared/openshift-azure/_data/containerservice.yaml)
+          oc login -u "${BUSHSLICER_USER}" -p "${PASSWD}" --server=https://${BUSHSLICER_TEST_CLUSTER} --insecure-skip-tls-verify=true
+          export BUSHSLICER_TEST_TOKEN=$(oc whoami -t)
+          export BUSHSLICER_TEST_RESULTS
+          export BUSHSLICER_TEST_FORMAT
+        else
+          mkdir -p /go/src/github.com/openshift/
+          cp -r /tmp/shared/openshift-azure /go/src/github.com/openshift/
+          cd /go/src/github.com/openshift/openshift-azure/
+        fi
         ${TEST_COMMAND}
 
     # Runs an install
