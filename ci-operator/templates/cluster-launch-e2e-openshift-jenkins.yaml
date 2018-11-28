@@ -21,7 +21,7 @@ parameters:
 - name: TEST_COMMAND
   required: true
 - name: PREPARE_COMMAND
-- name: IMAGE_PREPARE
+- name: IMAGE_2_CENTOS
 - name: IMAGE_NODEJS_AGENT
 - name: IMAGE_MAVEN_AGENT
 
@@ -66,7 +66,7 @@ objects:
 
     # Runs any needed pre-test modifications of the installed cluster
     - name: prepare
-      image: ${IMAGE_JENKINS_E2E_TESTS}
+      image: ${IMAGE_TESTS}
       resources:
         requests:
           cpu: 1
@@ -86,8 +86,8 @@ objects:
         value: /tmp/home
       - name: PREPARE_COMMAND
         value: "${PREPARE_COMMAND}"
-      - name: IMAGE_PREPARE
-        value: "${IMAGE_PREPARE}"
+      - name: IMAGE_2_CENTOS
+        value: "${IMAGE_2_CENTOS}"
       command:
       - /bin/bash
       - -c
@@ -138,6 +138,9 @@ objects:
 
 
     # Once admin.kubeconfig exists, executes shared tests
+    # the IMAGE_MAVEN_AGENT and IMAGE_NODEJS_AGENT are accessed in the jenkins extended
+    # tests and are used to adjust the images used in those extended tests to the ones built as
+    # part of the test run
     - name: test
       image: ${IMAGE_TESTS}
       resources:
