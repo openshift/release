@@ -251,6 +251,60 @@ periodics:
   cron: ""
   decorate: true
   interval: 24h
+  name: periodic-ci-azure-scaleoutin-e2e
+  skip_cloning: true
+  spec:
+    containers:
+    - args:
+      - --git-ref=charlesakalugwu/openshift-azure@scale-out-in-e2e-tests
+      - --secret-dir=/usr/local/e2e-secrets/azure
+      - --target=[output:stable:azure-controllers]
+      - --target=[output:stable:etcdbackup]
+      - --target=[output:stable:sync]
+      - --target=e2e-azure-scaleoutin
+      - --template=/usr/local/e2e-azure-scaleoutin
+      command:
+      - ci-operator
+      env:
+      - name: CLUSTER_TYPE
+        value: azure
+      - name: CONFIG_SPEC
+        valueFrom:
+          configMapKeyRef:
+            key: openshift-openshift-azure-master.yaml
+            name: ci-operator-configs
+      - name: JOB_NAME_SAFE
+        value: e2e-azure-scaleoutin
+      - name: TEST_COMMAND
+        value: make e2e-scaleoutin
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        limits:
+          cpu: 500m
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/e2e-secrets/azure
+        name: cluster-secrets-azure
+      - mountPath: /usr/local/e2e-azure-scaleoutin
+        name: job-definition
+        subPath: cluster-launch-e2e-azure.yaml
+    serviceAccountName: ci-operator
+    volumes:
+    - name: cluster-secrets-azure
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-azure
+    - configMap:
+        name: prow-job-cluster-launch-e2e-azure
+      name: job-definition
+- agent: kubernetes
+  cron: ""
+  decorate: true
+  interval: 24h
   name: periodic-ci-azure-node-image-rhel-311-crio
   skip_cloning: true
   spec:
