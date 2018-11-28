@@ -296,6 +296,8 @@ azure:
 	--from-file=cluster/test-deploy/azure/.dockerconfigjson \
 	--from-file=cluster/test-deploy/azure/logging-int.cert \
 	--from-file=cluster/test-deploy/azure/logging-int.key \
+	--from-file=cluster/test-deploy/azure/metrics-int.cert \
+	--from-file=cluster/test-deploy/azure/metrics-int.key \
 	-o yaml --dry-run | oc apply -n ci -f -
 	# azure namespace objects
 	oc create secret generic cluster-secrets-azure-env --from-literal=azure_client_id=${AZURE_CLIENT_ID} --from-literal=azure_client_secret=${AZURE_CLIENT_SECRET} --from-literal=azure_tenant_id=${AZURE_TENANT_ID} --from-literal=azure_subscription_id=${AZURE_SUBSCRIPTION_ID} -o yaml --dry-run | oc apply -n azure -f -
