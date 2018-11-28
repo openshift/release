@@ -108,13 +108,13 @@ objects:
 
         # wait until the setup job completes successfully
         while true; do
+          # exit if teardown is in progress
+          if [[ -f  /tmp/shared/exit ]]; then
+             exit 1
+          fi
           if [[ ! -f  /tmp/shared/created ]]; then
             sleep 15 & wait
             continue
-          fi
-          # if we got admin kubeconfig file with failure marker, ignore. Teardown is in progress.
-          if [[ -f  /tmp/shared/exit ]]; then
-             exit 1
           fi
           break
         done
