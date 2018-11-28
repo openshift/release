@@ -51,6 +51,8 @@ secrets currently exist:
 | `.dockerconfigjson` | Azure private registry pull secret |
 | `logging-int.cert`  | Azure Geneva logging authentication certificate |
 | `logging-int.key`   | Azure Geneva logging authentication key |
+| `metrics-int.cert`  | Azure Geneva metrics authentication certificate |
+| `metrics-int.key`   | Azure Geneva metrics authentication key |
 
 ### GCE ServiceAccount Credentials
 
