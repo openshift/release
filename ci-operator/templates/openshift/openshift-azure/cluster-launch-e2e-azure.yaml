@@ -99,20 +99,14 @@ objects:
         # error handling and sync code
         set -euo pipefail
 
-        if [[ -n "${TEST_IN_PRODUCTION}" ]]; then
-          # If we are testing in production then currently
-          # we don't have any _data locally to run openshift e2es.
-          exit 0
-        fi
-
         trap 'touch /tmp/shared/exit' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
 
         mkdir -p "${HOME}"
 
-        # wait until the setup job creates admin.kubeconfig
+        # wait until the setup job completes successfully
         while true; do
-          if [[ ! -f  /tmp/shared/openshift-azure/_data/_out/admin.kubeconfig ]]; then
+          if [[ ! -f  /tmp/shared/created ]]; then
             sleep 15 & wait
             continue
           fi
@@ -122,7 +116,7 @@ objects:
           fi
           break
         done
-        echo "Found shared kubeconfig"
+        echo "Cluster created, starting tests"
 
         # test specific code
         # don't let clients impact the global kubeconfig
@@ -196,9 +190,7 @@ objects:
         mkdir -p /go/src/github.com/openshift/openshift-azure/secrets
         cp /etc/azure/credentials/logging-int.cert /etc/azure/credentials/logging-int.key /etc/azure/credentials/.dockerconfigjson /go/src/github.com/openshift/openshift-azure/secrets/
         timeout 1h ./hack/create.sh ${RESOURCEGROUP}
-        if [[ -n "$TEST_IN_PRODUCTION" ]]; then
-          make e2e-prod
-        fi
+        touch /tmp/shared/created
 
     # Performs cleanup of all created resources
     - name: teardown
