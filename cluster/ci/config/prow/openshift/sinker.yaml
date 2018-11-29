@@ -1,8 +1,8 @@
 kind: List
 apiVersion: v1
 items:
-- apiVersion: apps.openshift.io/v1
-  kind: DeploymentConfig
+- apiVersion: extensions/v1beta1
+  kind: Deployment
   metadata:
     name: "sinker"
     labels:
@@ -11,6 +11,10 @@ items:
   spec:
     replicas: 1
     revisionHistoryLimit: 2
+    selector:
+      matchLabels:
+        app: prow
+        component: "sinker"
     template:
       metadata:
         labels:
@@ -20,7 +24,7 @@ items:
         serviceAccountName: "sinker"
         containers:
         - name: "sinker"
-          image: " "
+          image: gcr.io/k8s-prow/sinker:v20181129-73f6f3c
           args:
           - --job-config-path=/etc/job-config
           volumeMounts:
@@ -37,13 +41,3 @@ items:
         - name: job-config
           configMap:
             name: job-config
-    triggers:
-    - type: ConfigChange
-    - imageChangeParams:
-        automatic: true
-        containerNames:
-        - "sinker"
-        from:
-          kind: ImageStreamTag
-          name: "sinker:latest"
-      type: ImageChange

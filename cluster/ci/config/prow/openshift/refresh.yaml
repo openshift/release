@@ -13,8 +13,8 @@ items:
     - port: 80
       targetPort: 8888
     type: ClusterIP
-- apiVersion: apps.openshift.io/v1
-  kind: DeploymentConfig
+- apiVersion: extensions/v1beta1
+  kind: Deployment
   metadata:
     name: "refresh"
     labels:
@@ -23,6 +23,10 @@ items:
   spec:
     replicas: 1
     revisionHistoryLimit: 2
+    selector:
+      matchLabels:
+        app: prow
+        component: "refresh"
     template:
       metadata:
         labels:
@@ -31,7 +35,7 @@ items:
       spec:
         containers:
         - name: "refresh"
-          image: " "
+          image: gcr.io/k8s-prow/refresh:v20181129-73f6f3c
           args:
           - --github-token-path=/etc/github/oauth
           - --hmac-secret-file=/etc/webhook/hmac
@@ -60,13 +64,3 @@ items:
         - name: config
           configMap:
             name: config
-    triggers:
-    - type: ConfigChange
-    - imageChangeParams:
-        automatic: true
-        containerNames:
-        - "refresh"
-        from:
-          kind: ImageStreamTag
-          name: "refresh:latest"
-      type: ImageChange

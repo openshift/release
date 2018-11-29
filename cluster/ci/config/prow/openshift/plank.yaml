@@ -1,8 +1,8 @@
 kind: List
 apiVersion: v1
 items:
-- apiVersion: apps.openshift.io/v1
-  kind: DeploymentConfig
+- apiVersion: extensions/v1beta1
+  kind: Deployment
   metadata:
     name: "plank"
     labels:
@@ -14,6 +14,10 @@ items:
     revisionHistoryLimit: 2
     strategy:
       type: Recreate
+    selector:
+      matchLabels:
+        app: prow
+        component: "plank"
     template:
       metadata:
         labels:
@@ -23,7 +27,7 @@ items:
         serviceAccountName: "plank"
         containers:
         - name: "plank"
-          image: " "
+          image: gcr.io/k8s-prow/plank:v20181129-73f6f3c
           args:
           - --tot-url=http://tot
           - --dry-run=false
@@ -49,13 +53,3 @@ items:
         - name: job-config
           configMap:
             name: job-config
-    triggers:
-    - type: ConfigChange
-    - imageChangeParams:
-        automatic: true
-        containerNames:
-        - "plank"
-        from:
-          kind: ImageStreamTag
-          name: "plank:latest"
-      type: ImageChange
