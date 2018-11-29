@@ -9,7 +9,7 @@ objects:
 - apiVersion: v1
   kind: Route
   metadata:
-    name: "tracer"
+    name: tracer
     annotations:
       haproxy.router.openshift.io/timeout: 2m
   spec:
@@ -18,16 +18,16 @@ objects:
       insecureEdgeTerminationPolicy: Redirect
     to:
       kind: Service
-      name: "tracer"
+      name: tracer
 - apiVersion: v1
   kind: Service
   metadata:
-    name: "tracer"
+    name: tracer
     annotations:
-      service.alpha.openshift.io/serving-cert-secret-name: "tracer-tls"
+      service.alpha.openshift.io/serving-cert-secret-name: tracer-tls
   spec:
     selector:
-      app: "tracer"
+      app: tracer
     ports:
     - port: 443
       targetPort: 8443
@@ -35,17 +35,17 @@ objects:
 - apiVersion: apps.openshift.io/v1
   kind: DeploymentConfig
   metadata:
-    name: "tracer"
+    name: tracer
     labels:
-      app: "tracer"
+      app: tracer
   spec:
     replicas: 1
     template:
       metadata:
         labels:
-          app: "tracer"
+          app: tracer
       spec:
-        serviceAccountName: "tracer"
+        serviceAccountName: tracer
         containers:
         - name: oauth-proxy
           image: openshift/oauth-proxy:latest
@@ -70,11 +70,11 @@ objects:
           - -tls-key=/etc/tls/private/tls.key
           volumeMounts:
           - mountPath: /etc/tls/private
-            name: "tracer-tls"
+            name: tracer-tls
           - mountPath: /etc/proxy/secrets
             name: session-secret
-        - image: " "
-          name: "tracer"
+        - image: gcr.io/k8s-prow/refresh:v20181129-73f6f3c
+          name: tracer
           args:
           - --label-selector=app=prow
           - --namespace=ci
@@ -84,19 +84,9 @@ objects:
         - name: session-secret
           secret:
             secretName: session-secret
-        - name: "tracer-tls"
+        - name: tracer-tls
           secret:
-            secretName: "tracer-tls"
-    triggers:
-    - type: ConfigChange
-    - imageChangeParams:
-        automatic: true
-        containerNames:
-        - "tracer"
-        from:
-          kind: ImageStreamTag
-          name: "tracer:latest"
-      type: ImageChange
+            secretName: tracer-tls
 - apiVersion: v1
   kind: Secret
   metadata:
