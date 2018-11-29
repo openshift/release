@@ -13,8 +13,8 @@ items:
     - port: 80
       targetPort: 8888
     type: ClusterIP
-- apiVersion: apps.openshift.io/v1
-  kind: DeploymentConfig
+- apiVersion: extensions/v1beta1
+  kind: Deployment
   metadata:
     name: "tide"
     labels:
@@ -25,6 +25,10 @@ items:
     replicas: 1
     strategy:
       type: Recreate
+    selector:
+      matchLabels:
+        app: prow
+        component: "tide"
     template:
       metadata:
         labels:
@@ -34,7 +38,7 @@ items:
         serviceAccountName: "tide"
         containers:
         - name: "tide"
-          image: " "
+          image: gcr.io/k8s-prow/tide:v20181129-73f6f3c
           args:
           - --dry-run=false
           - --github-token-path=/etc/github/oauth
@@ -62,13 +66,3 @@ items:
         - name: job-config
           configMap:
             name: job-config
-    triggers:
-    - type: ConfigChange
-    - imageChangeParams:
-        automatic: true
-        containerNames:
-        - "tide"
-        from:
-          kind: ImageStreamTag
-          name: "tide:latest"
-      type: ImageChange
