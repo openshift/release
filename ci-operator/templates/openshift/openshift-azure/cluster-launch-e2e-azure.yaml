@@ -122,6 +122,33 @@ objects:
 
         source /etc/azure/credentials/secret
 
+        PATH=/usr/libexec/origin:$PATH
+        source /tmp/shared/overrides
+        function run-tests() {
+          if which openshift-tests && [[ -n "${TEST_SUITE-}" ]]; then
+            openshift-tests run "${TEST_SUITE}" --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
+            exit 0
+          fi
+          # TODO: remove everything after this point once we fork templates by release - starting with 4.0
+          if ! which extended.test; then
+            echo "must provide TEST_SUITE variable"
+            exit 1
+          fi
+          if [[ -n "${TEST_FOCUS:-}" ]]; then
+            ginkgo -v -noColor -nodes="${TEST_PARALLELISM:-30}" $( which extended.test ) -- \
+              -ginkgo.focus="${TEST_FOCUS}" -ginkgo.skip="${TEST_SKIP:-"\\[local\\]"}" \
+              -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit \
+              -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
+          fi
+          if [[ -n "${TEST_FOCUS_SERIAL:-}" ]]; then
+            ginkgo -v -noColor -nodes=1 $( which extended.test ) -- \
+              -ginkgo.focus="${TEST_FOCUS_SERIAL}" -ginkgo.skip="${TEST_SKIP_SERIAL:-"\\[local\\]"}" \
+              -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit/serial \
+              -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
+          fi
+          exit ${rc:-0}
+        }
+
         # test specific code
         # don't let clients impact the global kubeconfig
         mkdir -p /go/src/github.com/openshift/
@@ -200,6 +227,10 @@ objects:
         /etc/azure/credentials/metrics-int.cert /etc/azure/credentials/metrics-int.key \
         /etc/azure/credentials/.dockerconfigjson /go/src/github.com/openshift/openshift-azure/secrets/
         timeout 1h ./hack/create.sh ${RESOURCEGROUP}
+        if [[ "${TEST_IMAGE}" =~ "origin-v3.11:tests" ]]; then
+          # disable sync pod
+          ./hack/ssh.sh -c "sudo rm /etc/origin/node/pods/sync.yaml" ${RESOURCEGROUP}
+        fi
         touch /tmp/shared/created
 
     # Performs cleanup of all created resources

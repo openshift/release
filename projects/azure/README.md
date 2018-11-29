@@ -165,13 +165,14 @@ docker run \
 --rm \
 -it \
 --env TEST_COMMAND="TEST_FOCUS=Suite:openshift/conformance/parallel run-tests" \
+--env TEST_IMAGE="registry.svc.ci.openshift.org/openshift/origin-v3.11:tests" \
 --volume $HOME/.kube/config:/root/.kube/config \
 --volume $(pwd):/release \
 registry.svc.ci.openshift.org/ci/ci-operator:latest \
 --config /release/ci-operator/config/openshift/openshift-azure/openshift-openshift-azure-master.yaml \
 --git-ref=openshift/openshift-azure@master \
 --namespace=${CI_OPERATOR_NAMESPACE} \
---template /release/ci-operator/templates/openshift/openshift-azure/cluster-launch-e2e-azure-conformance.yaml \
+--template /release/ci-operator/templates/openshift/openshift-azure/cluster-launch-e2e-azure.yaml \
 --secret-dir /release/cluster/test-deploy/azure/
 ```
 
