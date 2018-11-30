@@ -175,6 +175,15 @@ objects:
             wait_expiry_ts="$(($(date +%s) + 90))"
         done
 
+        # wait until the image registry changes propogate to the apiserver to avoid
+        # unnecessary restarts
+        until oc get is -n openshift php 2>/dev/null; do
+          sleep 10
+        done
+        until [[ -n "$( oc get is -n openshift php --template '{{ .status.dockerImageRepository }}' 2>/dev/null )" ]]; do
+          sleep 10
+        done
+
         # set up cloud-provider-specific env vars
         if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
           export GOOGLE_APPLICATION_CREDENTIALS="/tmp/cluster/gce.json"
