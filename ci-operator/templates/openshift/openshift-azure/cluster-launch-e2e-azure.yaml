@@ -51,7 +51,7 @@ objects:
     namespace: ${NAMESPACE}
     annotations:
       # we want to gather the teardown logs no matter what
-      ci-operator.openshift.io/wait-for-container-artifacts: teardown,test,setup
+      ci-operator.openshift.io/wait-for-container-artifacts: teardown,test
       ci-operator.openshift.io/save-container-logs: "true"
   spec:
     restartPolicy: Never
@@ -164,8 +164,6 @@ objects:
       image: ${LOCAL_IMAGE_BIN}
       imagePullPolicy: Always
       volumeMounts:
-      - name: ARTIFACT_DIR
-        value: /tmp/artifacts
       - name: shared-tmp
         mountPath: /tmp/shared
       - name: cluster-secrets-azure
@@ -201,7 +199,7 @@ objects:
         trap 'rc=$?; if [[ $rc -ne 0 || -n "$TEST_IN_PRODUCTION" ]]; then
           touch /tmp/shared/exit;
         fi;
-        cp -rv /go/src/github.com/openshift/openshift-azure /tmp/shared &> /tmp/artifacts/copy-repo.log
+        cp -r /go/src/github.com/openshift/openshift-azure /tmp/shared &>/dev/null
         exit $rc' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
 
