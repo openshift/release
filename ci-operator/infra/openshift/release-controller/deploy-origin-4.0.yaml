@@ -1,0 +1,192 @@
+kind: List
+apiVersion: v1
+items:
+# grant release-controller image modification in the
+# release namespace
+- kind: Role
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: release-controller-modify
+    namespace: openshift
+  rules:
+  - apiGroups:
+    - image.openshift.io
+    resources:
+    - imagestreams
+    - imagestreamtags
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - delete
+    - update
+    - patch
+  - apiGroups:
+    - ""
+    resources:
+    - events
+    verbs:
+    - create
+    - patch
+    - update
+- kind: Role
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: release-controller-prowjob
+    namespace: ci
+  rules:
+  - apiGroups:
+    - prow.k8s.io
+    resources:
+    - prowjobs
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - delete
+    - update
+    - patch
+
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: release-controller-binding
+    namespace: openshift
+  roleRef:
+    kind: Role
+    name: release-controller-modify
+  subjects:
+  - kind: ServiceAccount
+    namespace: ci
+    name: release-controller
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: release-controller-binding-view
+    namespace: openshift
+  roleRef:
+    kind: ClusterRole
+    name: view
+  subjects:
+  - kind: ServiceAccount
+    namespace: ci
+    name: release-controller
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: release-controller-binding-prowjob
+    namespace: ci
+  roleRef:
+    kind: Role
+    name: release-controller-prowjob
+  subjects:
+  - kind: ServiceAccount
+    namespace: ci
+    name: release-controller
+
+# grant release-controller edit on its work namespace
+- kind: Namespace
+  apiVersion: v1
+  metadata:
+    name: ci-release
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: release-controller-binding
+    namespace: ci-release
+  roleRef:
+    kind: ClusterRole
+    name: edit
+  subjects:
+  - kind: ServiceAccount
+    namespace: ci
+    name: release-controller
+# give jobs in the work namespace authority to push to the
+# release namespace
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: release-controller-binding-promote
+    namespace: openshift
+  roleRef:
+    kind: ClusterRole
+    name: system:image-builder
+  subjects:
+  - kind: ServiceAccount
+    namespace: ci-release
+    name: builder
+
+# deploy the controller
+- kind: ServiceAccount
+  apiVersion: v1
+  metadata:
+    name: release-controller
+    namespace: ci
+- kind: Service
+  apiVersion: v1
+  metadata:
+    name: release-controller
+  spec:
+    selector:
+      app: release-controller
+    ports:
+    - port: 80
+      targetPort: 8080
+- kind: Route
+  apiVersion: v1
+  metadata:
+    name: release-controller
+  spec:
+    host: origin-release.svc.ci.openshift.org
+    tls:
+      termination: Edge
+      insecureEdgeTerminationPolicy: Redirect
+    to:
+      kind: Service
+      name: release-controller
+- kind: Deployment
+  apiVersion: apps/v1
+  metadata:
+    name: release-controller
+    namespace: ci
+    annotations:
+      image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"release-controller:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"controller\")].image"}]'
+  spec:
+    selector:
+      matchLabels:
+        app: release-controller
+    template:
+      metadata:
+        labels:
+          app: release-controller
+      spec:
+        serviceAccountName: release-controller
+        volumes:
+        - name: prow-config
+          configMap:
+            name: config
+        - name: job-config
+          configMap:
+            name: job-config
+            items: 
+            - key: openshift-release-periodics.yaml
+              path: openshift-release-periodics.yaml
+        containers:
+        - name: controller
+          image: release-controller:latest
+          volumeMounts:
+          - name: prow-config
+            mountPath: /etc/prow/
+          - name: job-config
+            mountPath: /etc/jobs/
+          command:
+          - /usr/bin/release-controller
+          - --to=origin-release
+          - --release-namespace=openshift
+          - --prow-config=/etc/prow/config.yaml
+          - --job-config=/etc/jobs/openshift-release-periodics.yaml
+          - --prow-namespace=ci
+          - --job-namespace=ci-release
+          - -v=4
