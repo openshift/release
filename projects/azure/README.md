@@ -239,3 +239,20 @@ To rorate this secret:
 source ./cluster/test-deploy/azure/secret
 oc create secret generic cluster-secrets-azure-env --from-literal=azure_client_id=${AZURE_CLIENT_ID} --from-literal=azure_client_secret=${AZURE_CLIENT_SECRET} --from-literal=azure_tenant_id=${AZURE_TENANT_ID} --from-literal=azure_subscription_id=${AZURE_SUBSCRIPTION_ID} -o yaml --dry-run | oc apply -n azure -f -
 ```
+
+## Other cron jobs
+
+Apart from the ci-operator jobs, we run some cron jobs in the CI cluster for various tasks.
+```console
+$ oc get cj -n azure
+NAME                                      SCHEDULE    SUSPEND   ACTIVE    LAST SCHEDULE   AGE
+azure-purge                               0 * * * *   False     0         56m             45d
+image-mirror-openshift-azure-v3.11-quay   0 * * * *   False     0         56m             21d
+token-refresh                             0 0 * * *   False     1         44d             45d
+```
+
+* _azure-purge_ is responsible for cleaning up long-lived resource groups in our subscription (created either by our CI tests or for development purposes)
+* _image-mirror-openshift-azure-v3.11-quay_ mirrors images from the azure namespace to quay.io/openshift-on-azure that both MSFT uses for running the sync pod in customer clusters and SRE tooling we use in our SRE cluster
+* _token-refresh_ refreshes a token from the AWS registry that we put inside node images built from Origin master to pull images for the cluster
+
+We need to check whether the above jobs are in a working state. Access to the cluster is granted to every member of the openshift github organization. Access to the azure namespace is controlled by the [azure-team group](./cluster-wide.yaml).
