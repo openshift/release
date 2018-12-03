@@ -17,7 +17,7 @@ roles: cluster-operator-roles
 	$(MAKE) apply WHAT=cluster/ci/config/roles.yaml
 .PHONY: roles
 
-prow: ci-ns prow-crd prow-config prow-builds prow-rbac prow-services prow-jobs prow-scaling #prow-secrets
+prow: ci-ns prow-crd prow-config prow-rbac prow-services prow-jobs prow-scaling #prow-secrets
 .PHONY: prow
 
 ci-ns:
@@ -48,34 +48,6 @@ prow-secrets:
 	ci-operator/populate-secrets-from-bitwarden.sh
 .PHONY: prow-secrets
 
-prow-builds: pod-utils
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/binaries.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/branchprotector.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/checkconfig.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/cherrypick.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/deck.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/hook.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/horologium.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/jenkins_operator.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/needs_rebase.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/plank.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/refresh.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/sinker.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/tide.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/tot.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/build/tracer.yaml
-.PHONY: prow-builds
-
-prow-update:
-ifeq ($(WHAT),)
-	for name in deck hook horologium jenkins-operator plank sinker tide tot artifact-uploader cherrypick config-updater needs-rebase refresh branchprotector; do \
-		oc start-build bc/$$name-binaries ; \
-	done
-else
-	oc start-build bc/$(WHAT)-binaries
-endif
-.PHONY: prow-update
-
 prow-rbac:
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/artifact-uploader_rbac.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/deck_rbac.yaml
@@ -89,9 +61,11 @@ prow-rbac:
 .PHONY: prow-rbac
 
 prow-services: prow-config-updater
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/adapter_imagestreams.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/artifact-uploader.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/cherrypick.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/deck.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/ghproxy.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/hook.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/horologium.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/jenkins_operator.yaml
@@ -278,17 +252,11 @@ cluster-operator-roles:
 	$(MAKE) applyTemplate WHAT=projects/cluster-operator/cluster-operator-roles-template.yaml
 .PHONY: cluster-operator-roles
 
-pod-utils:
-	for name in prow-test artifact-uploader clonerefs entrypoint gcsupload initupload sidecar; do \
-		$(MAKE) apply WHAT=tools/pod-utils/$$name.yaml ; \
-	done
-.PHONY: pod-utils
-
 azure:
 	# set up azure namespace and policies
 	$(MAKE) apply WHAT=projects/azure/cluster-wide.yaml
 	$(MAKE) apply WHAT=projects/azure/rbac.yaml
-	# ci namespace objects 
+	# ci namespace objects
 	oc create secret generic cluster-secrets-azure \
 	--from-file=cluster/test-deploy/azure/secret \
 	--from-file=cluster/test-deploy/azure/ssh-privatekey \
