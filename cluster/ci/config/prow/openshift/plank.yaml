@@ -1,34 +1,39 @@
 kind: List
 apiVersion: v1
 items:
-- apiVersion: apps.openshift.io/v1
-  kind: DeploymentConfig
+- apiVersion: apps/v1
+  kind: Deployment
   metadata:
-    name: "plank"
+    name: plank
     labels:
       app: prow
-      component: "plank"
+      component: plank
   spec:
     # Do not scale up.
     replicas: 1
     revisionHistoryLimit: 2
     strategy:
       type: Recreate
+    selector:
+      matchLabels:
+        app: prow
+        component: plank
     template:
       metadata:
         labels:
           app: prow
-          component: "plank"
+          component: plank
       spec:
-        serviceAccountName: "plank"
+        serviceAccountName: plank
         containers:
-        - name: "plank"
-          image: " "
+        - name: plank
+          image: gcr.io/k8s-prow/plank:v20181203-eb9f3f8
           args:
           - --tot-url=http://tot
           - --dry-run=false
           - --job-config-path=/etc/job-config
-          - --github-token-file=/etc/github/oauth
+          - --github-token-path=/etc/github/oauth
+          - --github-endpoint=http://ghproxy
           volumeMounts:
           - name: oauth
             mountPath: /etc/github
@@ -49,13 +54,3 @@ items:
         - name: job-config
           configMap:
             name: job-config
-    triggers:
-    - type: ConfigChange
-    - imageChangeParams:
-        automatic: true
-        containerNames:
-        - "plank"
-        from:
-          kind: ImageStreamTag
-          name: "plank:latest"
-      type: ImageChange

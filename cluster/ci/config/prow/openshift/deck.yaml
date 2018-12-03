@@ -29,8 +29,8 @@ objects:
     - port: 80
       targetPort: 8080
     type: ClusterIP
-- apiVersion: apps.openshift.io/v1
-  kind: DeploymentConfig
+- apiVersion: apps/v1
+  kind: Deployment
   metadata:
     name: deck
     labels:
@@ -39,6 +39,10 @@ objects:
   spec:
     replicas: 1
     revisionHistoryLimit: 2
+    selector:
+      matchLabels:
+        app: prow
+        component: deck
     template:
       metadata:
         labels:
@@ -48,7 +52,7 @@ objects:
         serviceAccountName: deck
         containers:
         - name: deck
-          image: " "
+          image: gcr.io/k8s-prow/deck:v20181203-eb9f3f8
           args:
           - --cookie-secret=/etc/cookie/cookie
           - --github-oauth-config-file=/etc/github/config.json
@@ -86,16 +90,6 @@ objects:
         - name: job-config
           configMap:
             name: job-config
-    triggers:
-    - type: ConfigChange
-    - imageChangeParams:
-        automatic: true
-        containerNames:
-        - deck
-        from:
-          kind: ImageStreamTag
-          name: "deck:latest"
-      type: ImageChange
 - apiVersion: v1
   kind: Route
   metadata:
@@ -112,7 +106,7 @@ objects:
   metadata:
     name: deck-internal
     annotations:
-      service.alpha.openshift.io/serving-cert-secret-name: "deck-internal-tls"
+      service.alpha.openshift.io/serving-cert-secret-name: deck-internal-tls
   spec:
     selector:
       app: prow
@@ -121,8 +115,8 @@ objects:
     - port: 443
       targetPort: 8443
     type: ClusterIP
-- apiVersion: apps.openshift.io/v1
-  kind: DeploymentConfig
+- apiVersion: apps/v1
+  kind: Deployment
   metadata:
     name: deck-internal
     labels:
@@ -131,6 +125,10 @@ objects:
   spec:
     replicas: 1
     revisionHistoryLimit: 2
+    selector:
+      matchLabels:
+        app: prow
+        component: deck-internal
     template:
       metadata:
         labels:
@@ -162,11 +160,11 @@ objects:
           - -tls-key=/etc/tls/private/tls.key
           volumeMounts:
           - mountPath: /etc/tls/private
-            name: "deck-internal-tls"
+            name: deck-internal-tls
           - mountPath: /etc/proxy/secrets
             name: session-secret
         - name: deck
-          image: " "
+          image: gcr.io/k8s-prow/deck:v20181203-eb9f3f8
           args:
           - --tide-url=http://tide/
           - --hook-url=http://hook:8888/plugin-help
@@ -184,23 +182,13 @@ objects:
             name: config
         - name: session-secret
           secret:
-            secretName: "deck-internal-session-secret"
-        - name: "deck-internal-tls"
+            secretName: deck-internal-session-secret
+        - name: deck-internal-tls
           secret:
-            secretName: "deck-internal-tls"
-    triggers:
-    - type: ConfigChange
-    - imageChangeParams:
-        automatic: true
-        containerNames:
-        - deck
-        from:
-          kind: ImageStreamTag
-          name: "deck:latest"
-      type: ImageChange
+            secretName: deck-internal-tls
 - apiVersion: v1
   kind: Secret
   metadata:
-    name: "deck-internal-session-secret"
+    name: deck-internal-session-secret
   stringData:
     session_secret: "${SESSION_SECRET}="

@@ -4,36 +4,40 @@ items:
 - apiVersion: v1
   kind: Service
   metadata:
-    name: "refresh"
+    name: refresh
   spec:
     selector:
       app: prow
-      component: "refresh"
+      component: refresh
     ports:
     - port: 80
       targetPort: 8888
     type: ClusterIP
-- apiVersion: apps.openshift.io/v1
-  kind: DeploymentConfig
+- apiVersion: apps/v1
+  kind: Deployment
   metadata:
-    name: "refresh"
+    name: refresh
     labels:
       app: prow
-      component: "refresh"
+      component: refresh
   spec:
     replicas: 1
     revisionHistoryLimit: 2
+    selector:
+      matchLabels:
+        app: prow
+        component: refresh
     template:
       metadata:
         labels:
           app: prow
-          component: "refresh"
+          component: refresh
       spec:
         containers:
-        - name: "refresh"
-          image: " "
+        - name: refresh
+          image: gcr.io/k8s-prow/refresh:v20181203-eb9f3f8
           args:
-          - --github-token-file=/etc/github/oauth
+          - --github-token-path=/etc/github/oauth
           - --hmac-secret-file=/etc/webhook/hmac
           - --dry-run=false
           - --prow-url=https://deck-ci.svc.ci.openshift.org
@@ -60,13 +64,3 @@ items:
         - name: config
           configMap:
             name: config
-    triggers:
-    - type: ConfigChange
-    - imageChangeParams:
-        automatic: true
-        containerNames:
-        - "refresh"
-        from:
-          kind: ImageStreamTag
-          name: "refresh:latest"
-      type: ImageChange
