@@ -1,0 +1,64 @@
+kind: List
+apiVersion: v1
+items:
+- kind: PersistentVolumeClaim
+  apiVersion: v1
+  metadata:
+    labels:
+      app: prow
+      component: ghproxy
+    name: ghproxy
+  spec:
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 20Gi
+    storageClassName: ssd
+- apiVersion: v1
+  kind: Service
+  metadata:
+    labels:
+      app: prow
+      component: ghproxy
+    name: ghproxy
+  spec:
+    ports:
+    - port: 80
+      protocol: TCP
+      targetPort: 8888
+    selector:
+      app: prow
+      component: ghproxy
+    type: NodePort
+- apiVersion: extensions/v1beta1
+  kind: Deployment
+  metadata:
+    name: ghproxy
+    labels:
+      app: prow
+      component: ghproxy
+  spec:
+    replicas: 1
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: ghproxy
+      spec:
+        containers:
+        - name: ghproxy
+          image: gcr.io/k8s-testimages/ghproxy:v20181203-5d221e6a2
+          imagePullPolicy: Always
+          args:
+          - --cache-dir=/cache
+          - --cache-sizeGB=19
+          ports:
+          - containerPort: 8888
+          volumeMounts:
+          - name: cache
+            mountPath: /cache
+        volumes:
+        - name: cache
+          persistentVolumeClaim:
+            claimName: ghproxy

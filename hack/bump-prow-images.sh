@@ -14,7 +14,7 @@ sed -i "s|\(gcr\.io/k8s-prow/[a-z-]*:\)v[0-9][0-9]*-[a-z0-9][a-z0-9]*|\1${latest
 
 # some images are in a different bucket and are pushed in a different cadence
 # and are not necessarily in order, so we need to do some silliness
-for image in 'label_sync' 'commenter'; do
+for image in 'label_sync' 'commenter' 'ghproxy'; do
 	latest_label_sync_tag="$( gcloud container images list-tags gcr.io/k8s-testimages/${image} --format='value(tags)' --limit 10 | grep "latest," | grep -Po "v[0-9]+\-[a-z0-9]+" )"
 	sed -i "s|\(gcr\.io/k8s-testimages/${image}:\)v[0-9][0-9]*-[a-z0-9][a-z0-9]*|\1${latest_tag}|g" ci-operator/jobs/infra-periodics.yaml
 done
