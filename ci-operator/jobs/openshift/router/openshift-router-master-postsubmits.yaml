@@ -1,0 +1,32 @@
+postsubmits:
+  openshift/router:
+  - agent: kubernetes
+    branches:
+    - ^master$
+    decorate: true
+    name: branch-ci-openshift-router-master-images
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --promote
+        - --target=[images]
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-router-master.yaml
+              name: ci-operator-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
