@@ -1,8 +1,8 @@
 kind: List
 apiVersion: v1
 items:
-- apiVersion: apps.openshift.io/v1
-  kind: DeploymentConfig
+- apiVersion: apps/v1
+  kind: Deployment
   metadata:
     name: artifact-uploader
     labels:
@@ -11,6 +11,10 @@ items:
   spec:
     replicas: 1
     revisionHistoryLimit: 2
+    selector:
+      matchLabels:
+        app: prow
+        component: artifact-uploader
     template:
       metadata:
         labels:
@@ -20,7 +24,7 @@ items:
         serviceAccountName: artifact-uploader
         containers:
         - name: artifact-uploader
-          image: " "
+          image: gcr.io/k8s-prow/artifact-uploader:v20181203-eb9f3f8
           args:
           - --num-workers=20
           - --prow-job-ns=ci
@@ -38,13 +42,3 @@ items:
         - name: gcs-credentials
           secret:
             secretName: gce-sa-credentials-gcs-publisher
-    triggers:
-    - type: ConfigChange
-    - imageChangeParams:
-        automatic: true
-        containerNames:
-        - artifact-uploader
-        from:
-          kind: ImageStreamTag
-          name: artifact-uploader:latest
-      type: ImageChange

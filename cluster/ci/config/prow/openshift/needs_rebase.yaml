@@ -4,39 +4,44 @@ items:
 - apiVersion: v1
   kind: Service
   metadata:
-    name: "needs-rebase"
+    name: needs-rebase
   spec:
     selector:
       app: prow
-      component: "needs-rebase"
+      component: needs-rebase
     ports:
     - port: 80
       targetPort: 8888
     type: ClusterIP
-- apiVersion: apps.openshift.io/v1
-  kind: DeploymentConfig
+- apiVersion: apps/v1
+  kind: Deployment
   metadata:
-    name: "needs-rebase"
+    name: needs-rebase
     labels:
       app: prow
-      component: "needs-rebase"
+      component: needs-rebase
   spec:
     replicas: 1
     revisionHistoryLimit: 2
+    selector:
+      matchLabels:
+        app: prow
+        component: needs-rebase
     template:
       metadata:
         labels:
           app: prow
-          component: "needs-rebase"
+          component: needs-rebase
       spec:
         containers:
-        - name: "needs-rebase"
-          image: " "
+        - name: needs-rebase
+          image: gcr.io/k8s-prow/needs-rebase:v20181203-eb9f3f8
           args:
-          - --github-token-file=/etc/github/oauth
+          - --github-token-path=/etc/github/oauth
           - --hmac-secret-file=/etc/webhook/hmac
           - --plugin-config=/etc/plugins/plugins.yaml
           - --dry-run=false
+          - --github-endpoint=http://ghproxy
           ports:
             - name: http
               containerPort: 8888
@@ -56,17 +61,7 @@ items:
             secretName: github-webhook-credentials
         - name: oauth
           secret:
-            secretName: github-credentials-openshift-bot
+            secretName: github-credentials-openshift-ci-robot
         - name: plugins
           configMap:
             name: plugins
-    triggers:
-    - type: ConfigChange
-    - imageChangeParams:
-        automatic: true
-        containerNames:
-        - "needs-rebase"
-        from:
-          kind: ImageStreamTag
-          name: "needs-rebase:latest"
-      type: ImageChange

@@ -4,41 +4,46 @@ items:
 - apiVersion: v1
   kind: Service
   metadata:
-    name: "tide"
+    name: tide
   spec:
     selector:
       app: prow
-      component: "tide"
+      component: tide
     ports:
     - port: 80
       targetPort: 8888
     type: ClusterIP
-- apiVersion: apps.openshift.io/v1
-  kind: DeploymentConfig
+- apiVersion: apps/v1
+  kind: Deployment
   metadata:
-    name: "tide"
+    name: tide
     labels:
       app: prow
-      component: "tide"
+      component: tide
   spec:
     # Do not scale up.
     replicas: 1
     strategy:
       type: Recreate
+    selector:
+      matchLabels:
+        app: prow
+        component: tide
     template:
       metadata:
         labels:
           app: prow
-          component: "tide"
+          component: tide
       spec:
-        serviceAccountName: "tide"
+        serviceAccountName: tide
         containers:
-        - name: "tide"
-          image: " "
+        - name: tide
+          image: gcr.io/k8s-prow/tide:v20181203-eb9f3f8
           args:
           - --dry-run=false
-          - --github-token-file=/etc/github/oauth
+          - --github-token-path=/etc/github/oauth
           - --job-config-path=/etc/job-config
+          - --github-endpoint=http://ghproxy
           ports:
           - name: http
             containerPort: 8888
@@ -62,13 +67,3 @@ items:
         - name: job-config
           configMap:
             name: job-config
-    triggers:
-    - type: ConfigChange
-    - imageChangeParams:
-        automatic: true
-        containerNames:
-        - "tide"
-        from:
-          kind: ImageStreamTag
-          name: "tide:latest"
-      type: ImageChange

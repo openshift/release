@@ -4,45 +4,49 @@ items:
 - apiVersion: v1
   kind: Service
   metadata:
-    name: "jenkins-operator"
+    name: jenkins-operator
     annotations:
       prometheus.io/scrape: "true"
   spec:
     selector:
       app: prow
-      component: "jenkins-operator"
+      component: jenkins-operator
     ports:
     - port: 80
       targetPort: 8080
     type: ClusterIP
-- apiVersion: apps.openshift.io/v1
-  kind: DeploymentConfig
+- apiVersion: apps/v1
+  kind: Deployment
   metadata:
-    name: "jenkins-operator"
+    name: jenkins-operator
     labels:
       app: prow
-      component: "jenkins-operator"
+      component: jenkins-operator
   spec:
     # Do not scale up.
     replicas: 1
     revisionHistoryLimit: 2
     strategy:
       type: Recreate
+    selector:
+      matchLabels:
+        app: prow
+        component: jenkins-operator
     template:
       metadata:
         labels:
           app: prow
-          component: "jenkins-operator"
+          component: jenkins-operator
       spec:
-        serviceAccountName: "jenkins-operator"
+        serviceAccountName: jenkins-operator
         containers:
-        - name: "jenkins-operator"
-          image: " "
+        - name: jenkins-operator
+          image: gcr.io/k8s-prow/jenkins-operator:v20181203-eb9f3f8
           args:
           - --jenkins-url=https://ci.openshift.redhat.com/jenkins
           - --jenkins-user=openshift-ci-robot
           - --jenkins-token-file=/etc/jenkins/password
-          - --github-token-file=/etc/github/oauth
+          - --github-token-path=/etc/github/oauth
           - --label-selector=master=ci.openshift.redhat.com
           - --config-path=/etc/config/config.yaml
           - --job-config-path=/etc/job-config
@@ -77,59 +81,53 @@ items:
         - name: job-config
           configMap:
             name: job-config
-    triggers:
-    - type: ConfigChange
-    - imageChangeParams:
-        automatic: true
-        containerNames:
-        - "jenkins-operator"
-        from:
-          kind: ImageStreamTag
-          name: "jenkins-operator:latest"
-      type: ImageChange
 
 - apiVersion: v1
   kind: Service
   metadata:
-    name: "jenkins-dev-operator"
+    name: jenkins-dev-operator
     annotations:
       prometheus.io/scrape: "true"
   spec:
     selector:
       app: prow
-      component: "jenkins-dev-operator"
+      component: jenkins-dev-operator
     ports:
     - port: 80
       targetPort: 8080
     type: ClusterIP
-- apiVersion: apps.openshift.io/v1
-  kind: DeploymentConfig
+- apiVersion: apps/v1
+  kind: Deployment
   metadata:
-    name: "jenkins-dev-operator"
+    name: jenkins-dev-operator
     labels:
       app: prow
-      component: "jenkins-dev-operator"
+      component: jenkins-dev-operator
   spec:
     # Do not scale up.
     replicas: 1
     revisionHistoryLimit: 2
     strategy:
       type: Recreate
+    selector:
+      matchLabels:
+        app: prow
+        component: jenkins-dev-operator
     template:
       metadata:
         labels:
           app: prow
-          component: "jenkins-dev-operator"
+          component: jenkins-dev-operator
       spec:
-        serviceAccountName: "jenkins-operator"
+        serviceAccountName: jenkins-operator
         containers:
-        - name: "jenkins-operator"
-          image: " "
+        - name: jenkins-operator
+          image: gcr.io/k8s-prow/jenkins-operator:v20181203-eb9f3f8
           args:
           - --jenkins-url=https://ci.dev.openshift.redhat.com:8443/jenkins
           - --jenkins-user=openshift-ci-robot
           - --jenkins-token-file=/etc/jenkins/password
-          - --github-token-file=/etc/github/oauth
+          - --github-token-path=/etc/github/oauth
           - --label-selector=master=ci.dev.openshift.redhat.com
           - --cert-file=/etc/jenkins/cert.pem
           - --key-file=/etc/jenkins/key.pem
@@ -167,16 +165,6 @@ items:
         - name: job-config
           configMap:
             name: job-config
-    triggers:
-    - type: ConfigChange
-    - imageChangeParams:
-        automatic: true
-        containerNames:
-        - "jenkins-operator"
-        from:
-          kind: ImageStreamTag
-          name: "jenkins-operator:latest"
-      type: ImageChange
 
 - apiVersion: v1
   kind: Service
@@ -192,8 +180,8 @@ items:
     - port: 80
       targetPort: 8080
     type: ClusterIP
-- apiVersion: apps.openshift.io/v1
-  kind: DeploymentConfig
+- apiVersion: apps/v1
+  kind: Deployment
   metadata:
     name: kata-jenkins-operator
     labels:
@@ -205,6 +193,10 @@ items:
     revisionHistoryLimit: 2
     strategy:
       type: Recreate
+    selector:
+      matchLabels:
+        app: prow
+        component: kata-jenkins-operator
     template:
       metadata:
         labels:
@@ -214,12 +206,12 @@ items:
         serviceAccountName: jenkins-operator
         containers:
         - name: kata-jenkins-operator
-          image: " "
+          image: gcr.io/k8s-prow/jenkins-operator:v20181203-eb9f3f8
           args:
           - --jenkins-url=http://jenkins.katacontainers.io/
           - --jenkins-user=katabuilder
           - --jenkins-token-file=/etc/jenkins/password
-          - --github-token-file=/etc/github/oauth
+          - --github-token-path=/etc/github/oauth
           - --label-selector=master=jenkins.katacontainers.io
           - --csrf-protect=true
           - --dry-run=false
@@ -254,13 +246,3 @@ items:
         - name: job-config
           configMap:
             name: job-config
-    triggers:
-    - type: ConfigChange
-    - imageChangeParams:
-        automatic: true
-        containerNames:
-        - kata-jenkins-operator
-        from:
-          kind: ImageStreamTag
-          name: "jenkins-operator:latest"
-      type: ImageChange

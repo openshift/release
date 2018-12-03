@@ -1,28 +1,32 @@
 kind: List
 apiVersion: v1
 items:
-- apiVersion: apps.openshift.io/v1
-  kind: DeploymentConfig
+- apiVersion: apps/v1
+  kind: Deployment
   metadata:
-    name: "horologium"
+    name: horologium
     labels:
       app: prow
-      component: "horologium"
+      component: horologium
   spec:
     replicas: 1
     revisionHistoryLimit: 2
+    selector:
+      matchLabels:
+        app: prow
+        component: horologium
     template:
       metadata:
         labels:
           app: prow
-          component: "horologium"
+          component: horologium
       spec:
-        serviceAccountName: "horologium"
+        serviceAccountName: horologium
         containers:
-        - name: "horologium"
+        - name: horologium
           args:
           - --job-config-path=/etc/job-config
-          image: " "
+          image: gcr.io/k8s-prow/horologium:v20181203-eb9f3f8
           volumeMounts:
           - name: config
             mountPath: /etc/config
@@ -37,13 +41,3 @@ items:
         - name: job-config
           configMap:
             name: job-config
-    triggers:
-    - type: ConfigChange
-    - imageChangeParams:
-        automatic: true
-        containerNames:
-        - "horologium"
-        from:
-          kind: ImageStreamTag
-          name: "horologium:latest"
-      type: ImageChange
