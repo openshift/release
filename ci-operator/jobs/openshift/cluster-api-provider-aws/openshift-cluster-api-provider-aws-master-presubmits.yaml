@@ -67,23 +67,22 @@ presubmits:
         name: job-definition
     trigger: ((?m)^/test( all| e2e-aws),?(\s+|$))
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
-    context: ci/prow/e2e-aws-operator
+    context: ci/prow/e2e-aws-gate
     decorate: true
-    name: pull-ci-openshift-cluster-api-provider-aws-master-e2e-aws-operator
-    optional: true
-    rerun_command: /test e2e-aws-operator
+    name: pull-ci-openshift-cluster-api-provider-aws-master-e2e-aws-gate
+    rerun_command: /test e2e-aws-gate
     skip_cloning: true
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/e2e-aws-operator-cluster-profile
-        - --target=e2e-aws-operator
-        - --template=/usr/local/e2e-aws-operator
+        - --secret-dir=/usr/local/e2e-aws-gate-cluster-profile
+        - --target=e2e-aws-gate
+        - --template=/usr/local/e2e-aws-gate
         command:
         - ci-operator
         env:
@@ -95,7 +94,7 @@ presubmits:
               key: openshift-cluster-api-provider-aws-master.yaml
               name: ci-operator-configs
         - name: JOB_NAME_SAFE
-          value: e2e-aws-operator
+          value: e2e-aws-gate
         - name: TEST_COMMAND
           value: make test-e2e
         image: ci-operator:latest
@@ -107,9 +106,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/e2e-aws-operator-cluster-profile
+        - mountPath: /usr/local/e2e-aws-gate-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-aws-operator
+        - mountPath: /usr/local/e2e-aws-gate
           name: job-definition
           subPath: cluster-launch-installer-src.yaml
       serviceAccountName: ci-operator
@@ -122,7 +121,7 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-src
         name: job-definition
-    trigger: ((?m)^/test( all| e2e-aws-operator),?(\s+|$))
+    trigger: ((?m)^/test( all| e2e-aws-gate),?(\s+|$))
   - agent: kubernetes
     always_run: true
     branches:
