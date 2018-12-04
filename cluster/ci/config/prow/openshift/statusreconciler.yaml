@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: statusreconciler
+  labels:
+    app: prow
+    component: statusreconciler
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: prow
+        component: statusreconciler
+    spec:
+      serviceAccountName: statusreconciler
+      terminationGracePeriodSeconds: 180
+      containers:
+      - name: statusreconciler
+        image: gcr.io/k8s-prow/status-reconciler:v20181204-041ada1
+        imagePullPolicy: Always
+        args:
+        - --dry-run=false
+        - --continue-on-error=true
+        - --plugin-config=/etc/plugins/plugins.yaml
+        - --config-path=/etc/config/config.yaml
+        - --github-token-path=/etc/github/oauth
+        - --job-config-path=/etc/job-config
+        ports:
+          - name: http
+            containerPort: 8888
+        volumeMounts:
+        - name: oauth
+          mountPath: /etc/github
+          readOnly: true
+        - name: config
+          mountPath: /etc/config
+          readOnly: true
+        - name: job-config
+          mountPath: /etc/job-config
+          readOnly: true
+        - name: plugins
+          mountPath: /etc/plugins
+          readOnly: true
+      volumes:
+      - name: oauth
+        secret:
+          secretName: github-credentials-openshift-ci-robot
+      - name: config
+        configMap:
+          name: config
+      - name: job-config
+        configMap:
+          name: job-config
+      - name: plugins
+        configMap:
+          name: plugins
