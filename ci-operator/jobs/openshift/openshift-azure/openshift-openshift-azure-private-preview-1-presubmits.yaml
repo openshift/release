@@ -30,6 +30,8 @@ presubmits:
             configMapKeyRef:
               key: openshift-openshift-azure-private-preview-1.yaml
               name: ci-operator-configs
+        - name: DEPLOY_VERSION
+          value: v3.10
         - name: JOB_NAME_SAFE
           value: e2e-azure
         image: ci-operator:latest
@@ -57,123 +59,6 @@ presubmits:
           name: prow-job-cluster-launch-e2e-azure
         name: job-definition
     trigger: ((?m)^/test( all| e2e),?(\s+|$))
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - private-preview-1
-    context: ci/prow/conformance
-    decorate: true
-    labels:
-      artifacts: images
-    name: pull-ci-openshift-openshift-azure-private-preview-1-e2e-azure-conformance
-    rerun_command: /test conformance
-    skip_cloning: true
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/e2e-secrets/azure
-        - --target=[output:stable:sync]
-        - --target=e2e-azure-conformance
-        - --template=/usr/local/e2e-azure-conformance
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: azure
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-openshift-azure-private-preview-1.yaml
-              name: ci-operator-configs
-        - name: JOB_NAME_SAFE
-          value: e2e-azure-conformance
-        - name: TEST_COMMAND
-          value: TEST_FOCUS=Suite:openshift/conformance/parallel TEST_SUITE=openshift/conformance/parallel
-            run-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          limits:
-            cpu: 500m
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/e2e-secrets/azure
-          name: cluster-secrets-azure
-        - mountPath: /usr/local/e2e-azure-conformance
-          name: job-definition
-          subPath: cluster-launch-e2e-azure-conformance.yaml
-      serviceAccountName: ci-operator
-      volumes:
-      - name: cluster-secrets-azure
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-azure
-      - configMap:
-          name: prow-job-cluster-launch-e2e-azure-conformance
-        name: job-definition
-    trigger: ((?m)^/test conformance,?(\s+|$))
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - private-preview-1
-    context: ci/prow/upgrade
-    decorate: true
-    labels:
-      artifacts: images
-    name: pull-ci-openshift-openshift-azure-private-preview-1-e2e-azure-upgrade
-    rerun_command: /test upgrade
-    skip_cloning: true
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/e2e-secrets/azure
-        - --target=[output:stable:sync]
-        - --target=e2e-azure-upgrade
-        - --template=/usr/local/e2e-azure-upgrade
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: azure
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-openshift-azure-private-preview-1.yaml
-              name: ci-operator-configs
-        - name: JOB_NAME_SAFE
-          value: e2e-azure-upgrade
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          limits:
-            cpu: 500m
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/e2e-secrets/azure
-          name: cluster-secrets-azure
-        - mountPath: /usr/local/e2e-azure-upgrade
-          name: job-definition
-          subPath: cluster-launch-e2e-azure-upgrade.yaml
-      serviceAccountName: ci-operator
-      volumes:
-      - name: cluster-secrets-azure
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-azure
-      - configMap:
-          name: prow-job-cluster-launch-e2e-azure-upgrade
-        name: job-definition
-    trigger: ((?m)^/test upgrade,?(\s+|$))
   - agent: kubernetes
     always_run: true
     branches:
