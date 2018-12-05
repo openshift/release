@@ -120,6 +120,27 @@ presubmits:
     always_run: true
     branches:
     - master
+    context: ci/prow/owners
+    decorate: true
+    name: pull-ci-openshift-release-master-owners
+    rerun_command: /test owners
+    spec:
+      containers:
+      - command:
+        - hack/validate-owners.sh
+        image: centos:7
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+    trigger: ((?m)^/test( all| owners),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
     context: ci/prow/prow-config-filenames
     decorate: true
     name: pull-ci-openshift-release-master-prow-config-filenames
