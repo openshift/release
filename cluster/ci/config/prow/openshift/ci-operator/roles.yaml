@@ -72,6 +72,38 @@ items:
     name: ci-operator
     namespace: ci
 
+- kind: Role
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: image-tagger
+    namespace: ocp
+  rules:
+  - apiGroups:
+    - ""
+    - image.openshift.io
+    attributeRestrictions: null
+    resources:
+    - imagestreamtags
+    - imagestreams
+    verbs:
+    - update
+    - patch
+    - get
+    - create
+
+- kind: RoleBinding
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: image-tagger-ci-operator
+    namespace: ocp
+  roleRef:
+    name: image-tagger
+    namespace: ocp
+  subjects:
+  - kind: ServiceAccount
+    name: ci-operator
+    namespace: ci
+
 - kind: ClusterRoleBinding
   apiVersion: authorization.openshift.io/v1
   metadata:
