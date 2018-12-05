@@ -60,15 +60,14 @@ objects:
     volumes:
     - name: artifacts
       emptyDir: {}
-    - name: shared-tmp
-      emptyDir: {}
     - name: cluster-secrets-azure
       secret:
         secretName: azure
+    - name: shared-tmp
+      emptyDir: {}
 
     containers:
 
-    # Once admin.kubeconfig exists, executes shared tests
     - name: test
       image: ${TEST_IMAGE}
       imagePullPolicy: Always
@@ -171,26 +170,27 @@ objects:
       - name: cluster-secrets-azure
         mountPath: /etc/azure/credentials
       env:
-      - name: RESOURCEGROUP
-        value: e2e-${RESOURCEGROUP_SUFFIX}
-      - name: TYPE
-        value: ${CLUSTER_TYPE}
-      - name: HOME
-        value: /tmp/shared/home
-      - name: SYNC_IMAGE
-        value: ${IMAGE_SYNC}
-      - name: ETCDBACKUP_IMAGE
-        value: ${IMAGE_ETCDBACKUP}
       - name: AZURE_CONTROLLERS_IMAGE
         value: ${IMAGE_AZURE_CONTROLLERS}
-      - name: RUNNING_UNDER_TEST
-        value: "true"
-      - name: RESOURCEGROUP_TTL
-        value: 4h
-      - name: TEST_IN_PRODUCTION
-        value: ${TEST_IN_PRODUCTION}
       - name: DEPLOY_VERSION
         value: ${DEPLOY_VERSION}
+      - name: ETCDBACKUP_IMAGE
+        value: ${IMAGE_ETCDBACKUP}
+      - name: HOME
+        value: /tmp/shared/home
+      - name: RESOURCEGROUP
+        value: e2e-${RESOURCEGROUP_SUFFIX}
+      - name: RESOURCEGROUP_TTL
+        value: 4h
+      - name: RUNNING_UNDER_TEST
+        value: "true"
+      - name: SYNC_IMAGE
+        value: ${IMAGE_SYNC}
+      - name: TEST_IN_PRODUCTION
+        value: ${TEST_IN_PRODUCTION}
+      - name: TYPE
+        value: ${CLUSTER_TYPE}
+
       command:
       - /bin/bash
       - -c
@@ -239,23 +239,23 @@ objects:
       image: ${LOCAL_IMAGE_BIN}
       imagePullPolicy: Always
       volumeMounts:
-      - name: shared-tmp
-        mountPath: /tmp/shared
-      - name: cluster-secrets-azure
-        mountPath: /etc/azure/credentials
       - name: artifacts
         mountPath: /tmp/artifacts
+      - name: cluster-secrets-azure
+        mountPath: /etc/azure/credentials
+      - name: shared-tmp
+        mountPath: /tmp/shared
       env:
-      - name: RESOURCEGROUP
-        value: e2e-${RESOURCEGROUP_SUFFIX}
-      - name: TYPE
-        value: ${CLUSTER_TYPE}
       - name: HOME
         value: /tmp/shared/home
-      - name: TEST_IN_PRODUCTION
-        value: ${TEST_IN_PRODUCTION}
       - name: NO_WAIT
         value: "true"
+      - name: RESOURCEGROUP
+        value: e2e-${RESOURCEGROUP_SUFFIX}
+      - name: TEST_IN_PRODUCTION
+        value: ${TEST_IN_PRODUCTION}
+      - name: TYPE
+        value: ${CLUSTER_TYPE}
       command:
       - /bin/bash
       - -c
