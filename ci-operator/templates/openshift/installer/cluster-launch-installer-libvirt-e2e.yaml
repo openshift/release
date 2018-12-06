@@ -212,16 +212,18 @@ objects:
               break
             fi
           done
-          i=0
-          MAX_RETRIES=10
-          wait_expiry_ts="$(($(date +%s) + 90))"
-          until oc --request-timeout=80s rollout status "${ROUTER_DEPLOYMENT}" -n "${ROUTER_NAMESPACE}" -w; do
-            i=$((i+1))
-            [ $i -eq $MAX_RETRIES ] && echo "timeout waiting for ${ROUTER_NAMESPACE}/${ROUTER_DEPLOYMENT} to be available" && exit 1
-            echo "error ${ROUTER_NAMESPACE}/${ROUTER_DEPLOYMENT} did not come up"
-            sleep "$((wait_expiry_ts - $(date +%s)))"
-            wait_expiry_ts="$(($(date +%s) + 90))"
+
+          TARGET="$(date -d '10 minutes' +%s)"
+          NOW="$(date +%s)"
+          while [[ "${NOW}" -lt "${TARGET}" ]]; do
+            REMAINING="$((TARGET - NOW))"
+            if oc --request-timeout="${REMAINING}s" oc rollout status "${ROUTER_DEPLOYMENT}" -n "${ROUTER_NAMESPACE}" -w; then
+              break
+            fi
+            sleep 2
+            NOW="$(date +%s)"
           done
+          [[ "${NOW}" -ge "${TARGET}" ]] && echo "timeout waiting for ${ROUTER_NAMESPACE}/${ROUTER_DEPLOYMENT} to be available" && exit 1
         }
 
         declare -fxr find_router_deployment
