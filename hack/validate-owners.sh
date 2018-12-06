@@ -2,23 +2,29 @@
 
 # This script ensures that all component config files are accompanied by OWNERS file
 
-set -o errexit
-set -o nounset
-set -o pipefail
+#!/bin/bash
+set -euo pipefail
 
-NO_OWNERS="$(mktemp)"
-trap 'rm -f $NO_OWNERS' EXIT
+WHITELIST=$(sort <<'EOF'
+ci-operator/config/openshift/console
+ci-operator/jobs/openshift/console
+ci-operator/config/openshift/kubernetes-metrics-server
+ci-operator/jobs/openshift/kubernetes-metrics-server
+ci-operator/config/openshift/origin-metrics
+ci-operator/jobs/openshift/origin-metrics
+ci-operator/config/openshift/origin-web-console
+ci-operator/jobs/openshift/origin-web-console
+ci-operator/config/openshift/origin-web-console-server
+ci-operator/jobs/openshift/origin-web-console-server
+ci-operator/jobs/openvswitch/ovn-kubernetes
+EOF
+)
 
-REPOROOT="$( dirname "${BASH_SOURCE[0]}" )/.."
+no_owners=$(find ci-operator/config/ ci-operator/jobs/ -mindepth 2 -type d ! -exec test -e '{}/OWNERS' \; -print | sort)
+false_neg=$(comm -13 <(echo "$WHITELIST") <(echo "$no_owners"))
+false_pos=$(comm -23 <(echo "$WHITELIST") <(echo "$no_owners"))
 
-pushd "$REPOROOT" > /dev/null
-
-find ci-operator/config -mindepth 2  -type d '!' -exec test -e "{}/OWNERS" ';' -print > "$NO_OWNERS"
-find ci-operator/jobs -mindepth 2  -type d '!' -exec test -e "{}/OWNERS" ';' -print >> "$NO_OWNERS"
-
-popd > /dev/null
-
-if test -s "$NO_OWNERS"; then
+if [[ "$false_neg" ]]; then
   cat << EOF
 [ERROR] This check enforces that component configuration files are accompanied by OWNERS
 [ERROR] files so that the appropriate team is able to self-service further configuration
@@ -33,6 +39,24 @@ if test -s "$NO_OWNERS"; then
 [ERROR] contain an OWNERS file, it will need to be created manually.
 
 [ERROR] The following component config directories do not have OWNERS files:
+
+$false_neg
+
 EOF
-  cat "$NO_OWNERS"
 fi
+
+
+if [[ "$false_pos" ]]; then
+  cat << EOF
+[ERROR] Directory that was previously whitelisted as not containing
+[ERROR] an OWNERS file is now containing the file, so it no longer
+[ERROR] needs to be whitelisted. Please remove the appropriate line
+[ERROR] from hack/validate-owners.sh script.
+
+[ERROR] Directories to be removed from whitelist:
+
+$false_pos
+EOF
+fi
+
+[[ ! "$false_neg" &&  ! "$false_pos" ]]
