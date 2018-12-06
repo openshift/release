@@ -160,10 +160,6 @@ objects:
         mkdir -p /go/src/github.com/openshift/
         cp -r /tmp/shared/openshift-azure /go/src/github.com/openshift/
         cd /go/src/github.com/openshift/openshift-azure/
-        mkdir -p /go/src/github.com/openshift/openshift-azure/secrets
-        cp /etc/azure/credentials/logging-int.cert /etc/azure/credentials/logging-int.key \
-        /etc/azure/credentials/metrics-int.cert /etc/azure/credentials/metrics-int.key \
-        /etc/azure/credentials/.dockerconfigjson /go/src/github.com/openshift/openshift-azure/secrets/
         ${TEST_COMMAND}
 
     # Runs an install
@@ -214,17 +210,15 @@ objects:
         # Cluster creation specific configuration.
         mkdir -p "${HOME}"
         source /etc/azure/credentials/secret
-        az login --service-principal -u ${AZURE_CLIENT_ID} -p ${AZURE_CLIENT_SECRET} --tenant ${AZURE_TENANT_ID} &>/dev/null
         # aad integration configuration - we dont test aad so populate as dummy
         export AZURE_AAD_CLIENT_ID=$AZURE_CLIENT_ID
         export AZURE_AAD_CLIENT_SECRET=$AZURE_CLIENT_SECRET
-        export AZURE_REGION=eastus
         echo "Using sync image ${SYNC_IMAGE}"
         echo "Using etcdbackup image ${ETCDBACKUP_IMAGE}"
         echo "Using azure-controllers image ${AZURE_CONTROLLERS_IMAGE}"
         export DNS_DOMAIN=osadev.cloud
         export DNS_RESOURCEGROUP=dns
-        export DEPLOY_VERSION=${DEPLOY_VERSION}
+
         # create cluster for test
         cd /go/src/github.com/openshift/openshift-azure/
         mkdir -p /go/src/github.com/openshift/openshift-azure/secrets
@@ -232,6 +226,7 @@ objects:
         /etc/azure/credentials/metrics-int.cert /etc/azure/credentials/metrics-int.key \
         /etc/azure/credentials/.dockerconfigjson /go/src/github.com/openshift/openshift-azure/secrets/
         timeout 1h ./hack/create.sh ${RESOURCEGROUP}
+
         if [[ "${TEST_IMAGE}" =~ "origin-v3.11:tests" ]]; then
           # disable sync pod
           ./hack/ssh.sh -c "sudo rm /etc/origin/node/pods/sync.yaml" ${RESOURCEGROUP}
@@ -276,7 +271,6 @@ objects:
 
           cd /go/src/github.com/openshift/openshift-azure/
           source /etc/azure/credentials/secret
-          az login --service-principal -u ${AZURE_CLIENT_ID} -p ${AZURE_CLIENT_SECRET} --tenant ${AZURE_TENANT_ID} &>/dev/null
 
           # Gather artifacts
           if [[ -z "$TEST_IN_PRODUCTION" ]]; then
