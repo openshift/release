@@ -605,3 +605,70 @@ periodics:
     - configMap:
         name: prow-job-cluster-launch-e2e-azure
       name: job-definition
+- agent: kubernetes
+  cron: ""
+  decorate: true
+  interval: 24h
+  name: periodic-ci-openshift-openshift-master-azure-e2e-bushslicer
+  skip_cloning: true
+  spec:
+    containers:
+    - args:
+      - --git-ref=openshift/openshift-azure@master
+      - --secret-dir=/usr/local/e2e-secrets/azure
+      - --target=e2e-azure-bushslicer
+      - --template=/usr/local/e2e-azure-bushslicer
+      - --target=[output:stable:azure-controllers]
+      - --target=[output:stable:sync]
+      command:
+      - ci-operator
+      env:
+      - name: CLUSTER_TYPE
+        value: azure
+      - name: CONFIG_SPEC
+        valueFrom:
+          configMapKeyRef:
+            key: openshift-openshift-azure-master.yaml
+            name: ci-operator-configs
+      - name: JOB_NAME_SAFE
+        value: e2e-azure-bushslicer
+      - name: TEST_IMAGE
+        value: quay.io/kwoodson/bushslicer
+      - name: TEST_COMMAND
+        value: tools/openshift-ci/verification_tests_ci_entrypoint.sh
+      - name: BUSHSLICER_TEST_ENVIRONMENT
+        value: online_starter
+      - name: BUSHSLICER_TEST_CONFIG
+        value: '{"global": {"browser": "firefox_marionette"}}'
+      - name: BUSHSLICER_TEST_FORMAT
+        value: html
+      - name: BUSHSLICER_TEST_RESULTS
+        value: /tmp/artifacts/bushslicer-report.html
+      - name: BUSHSLICER_USER
+        value: customer-cluster-admin
+      - name: BUSHSLICER_USER_PW_STRING
+        value: customerAdminPasswd
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        limits:
+          cpu: 500m
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/e2e-secrets/azure
+        name: cluster-secrets-azure
+      - mountPath: /usr/local/e2e-azure-bushslicer
+        name: job-definition
+        subPath: cluster-launch-e2e-azure.yaml
+    serviceAccountName: ci-operator
+    volumes:
+    - name: cluster-secrets-azure
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-azure
+    - configMap:
+        name: prow-job-cluster-launch-e2e-azure
+      name: job-definition
