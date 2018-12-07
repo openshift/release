@@ -230,9 +230,9 @@ objects:
         set -euo pipefail
 
         trap 'rc=$?; if [[ $rc -ne 0 ]]; then
-          touch /tmp/shared/exit;
-        fi;
-        cp -r /go/src/github.com/openshift/openshift-azure /tmp/shared &>/dev/null
+          cp -r /go/src/github.com/openshift/openshift-azure /tmp/shared
+          touch /tmp/shared/exit
+        fi
         exit $rc' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
 
@@ -260,6 +260,7 @@ objects:
           # disable sync pod
           ./hack/ssh.sh -c "sudo rm /etc/origin/node/pods/sync.yaml" ${RESOURCEGROUP}
         fi
+        cp -r /go/src/github.com/openshift/openshift-azure /tmp/shared
         touch /tmp/shared/created
 
     # Performs cleanup of all created resources
