@@ -189,6 +189,8 @@ objects:
           cp -r /tmp/shared/openshift-azure /go/src/github.com/openshift/
           cd /go/src/github.com/openshift/openshift-azure/
         fi
+        # Get shared environment variables; AZURE_REGION at the moment
+        source /tmp/shared/environment
         ${TEST_COMMAND}
 
     # Runs an install
@@ -255,6 +257,7 @@ objects:
         /etc/azure/credentials/metrics-int.cert /etc/azure/credentials/metrics-int.key \
         /etc/azure/credentials/.dockerconfigjson /go/src/github.com/openshift/openshift-azure/secrets/
         timeout 1h ./hack/create.sh ${RESOURCEGROUP}
+        echo "AZURE_REGION=${AZURE_REGION}" >>/tmp/shared/environment
 
         if [[ "${TEST_IMAGE}" =~ "origin-v3.11:tests" ]]; then
           az login --service-principal -u ${AZURE_CLIENT_ID} -p ${AZURE_CLIENT_SECRET} --tenant ${AZURE_TENANT_ID} &>/dev/null
