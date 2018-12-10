@@ -61,11 +61,18 @@ items:
 
         RUN go get github.com/go-bindata/go-bindata && \
             go get golang.org/x/tools/cmd/goyacc && \
-            go get golang.org/x/tools/cmd/goimports && \
             go get github.com/golang/mock/gomock && \
             go install github.com/golang/mock/mockgen && \
-            mv $GOPATH/bin/* /usr/bin/ && \
-            rm -rf $GOPATH/* $GOPATH/.cache
+            mv $GOPATH/bin/* /usr/bin/
+
+        #pin goimports to 04b5d21e commit, see discussion https://github.com/openshift/openshift-azure/pull/862
+        RUN go get golang.org/x/tools/cmd/goimports && \
+            pushd $GOPATH/src/golang.org/x/tools/cmd/goimports/ && \
+            git checkout -q 04b5d21e && \
+            go build && \
+            cp ./goimports /usr/bin/goimports && \
+            rm -rf $GOPATH/* $GOPATH/.cache && \
+            popd
 
         # Add image scripts and files for running as non priv container
         RUN chown -R $USER_UID:$USER_UID $HOME && \
