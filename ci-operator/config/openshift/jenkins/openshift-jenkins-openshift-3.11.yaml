@@ -16,8 +16,7 @@ images:
       paths:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/jenkins/test-e2e/.
-  optional: true
-  to: jenkins-e2e-tests
+  to: tests
 - dockerfile_path: Dockerfile
   from: base
   inputs:
@@ -25,8 +24,7 @@ images:
       paths:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/jenkins/2/.
-  optional: true
-  to: bin-2-centos
+  to: 2-centos
 - dockerfile_path: Dockerfile
   from: base
   inputs:
@@ -35,54 +33,23 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/jenkins/slave-base/.
   optional: true
-  to: bin-slave-base-centos
+  to: slave-base-centos
 - dockerfile_path: Dockerfile
-  from: bin-slave-base-centos
+  from: slave-base-centos
   inputs:
     src:
       paths:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/jenkins/agent-maven-3.5/.
-  optional: true
-  to: bin-agent-maven-35-centos
+  to: maven-agent
 - dockerfile_path: Dockerfile
-  from: bin-slave-base-centos
+  from: slave-base-centos
   inputs:
     src:
       paths:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/jenkins/agent-nodejs-8/.
-  optional: true
-  to: bin-agent-nodejs-8-centos
-raw_steps:
-- output_image_tag_step:
-    from: bin-2-centos
-    optional: true
-    to:
-      as: prepare
-      name: stable
-      tag: prepare
-- output_image_tag_step:
-    from: bin-agent-maven-35-centos
-    optional: true
-    to:
-      as: maven_agent
-      name: stable
-      tag: maven_agent
-- output_image_tag_step:
-    from: bin-agent-nodejs-8-centos
-    optional: true
-    to:
-      as: nodejs_agent
-      name: stable
-      tag: nodejs_agent
-- output_image_tag_step:
-    from: jenkins-e2e-tests
-    optional: true
-    to:
-      as: tests
-      name: stable
-      tag: tests
+  to: nodejs-agent
 resources:
   '*':
     limits:
