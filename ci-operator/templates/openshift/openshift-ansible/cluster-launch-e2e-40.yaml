@@ -104,8 +104,6 @@ objects:
         # wait for the router namespace
         SETUP_SUCCESS=
         API_UP=
-        ROUTER_NAMESPACE=
-        ROUTER_DEPLOYMENT=
         while true; do
           if [[ -f /tmp/shared/exit ]]; then
             echo "Another process exited" 2>&1
@@ -130,30 +128,6 @@ objects:
             echo "API at $(oc whoami --show-server) has responded"
             API_UP=1
           fi
-          if [[ -z "${ROUTER_NAMESPACE}" ]]; then
-            # check multiple namespaces while we are transitioning to the new locations
-            if oc get deploy/router-default -n openshift-ingress 2>/dev/null; then
-              ROUTER_NAMESPACE=openshift-ingress
-              ROUTER_DEPLOYMENT="deploy/router-default"
-            elif oc get deploy/router -n tectonic-ingress 2>/dev/null; then
-              ROUTER_NAMESPACE=tectonic-ingress
-              ROUTER_DEPLOYMENT="deploy/router"
-            elif oc get ds/router-default -n openshift-ingress 2>/dev/null; then
-              ROUTER_NAMESPACE=openshift-ingress
-              ROUTER_DEPLOYMENT="ds/router-default"
-            elif oc get deploy/router -n openshift-ingress 2>/dev/null; then
-              ROUTER_NAMESPACE=openshift-ingress
-              ROUTER_DEPLOYMENT="deploy/router"
-            elif oc get deploy/router -n default 2>/dev/null; then
-              ROUTER_NAMESPACE=default
-              ROUTER_DEPLOYMENT="deploy/router"
-            else
-              echo "Waiting for router to be created ..."
-              sleep 15 & wait
-              continue
-            fi
-            echo "Found router in ${ROUTER_NAMESPACE}"
-          fi
           break
         done
 
@@ -161,13 +135,13 @@ objects:
         NOW="$(date +%s)"
         while [[ "${NOW}" -lt "${TARGET}" ]]; do
           REMAINING="$((TARGET - NOW))"
-          if oc --request-timeout="${REMAINING}s" rollout status "${ROUTER_DEPLOYMENT}" -n "${ROUTER_NAMESPACE}" -w; then
+          if [ $(oc --request-timeout="${REMAINING}s" get ClusterOperator openshift-ingress-operator -o jsonpath='{range @.status.conditions[*]}{@.status};{end}') == "False;False;True;" ]; then
             break
           fi
           sleep 2
           NOW="$(date +%s)"
         done
-        [[ "${NOW}" -ge "${TARGET}" ]] && echo "timeout waiting for ${ROUTER_NAMESPACE}/${ROUTER_DEPLOYMENT} to be available" && exit 1
+        [[ "${NOW}" -ge "${TARGET}" ]] && echo "timeout waiting for ingress operator to be available" && exit 1
 
         # set up cloud-provider-specific env vars
         if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
