@@ -251,33 +251,79 @@ objects:
         trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/config-success; else touch /tmp/exit; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN}; fi' TERM
 
-        if [[ ${TYPE} == 'gcp' ]]; then
-          export OPENSHIFT_INSTALL_PLATFORM=libvirt
-          export OPENSHIFT_INSTALL_BASE_DOMAIN=origin-ci-int-gce.dev.rhcloud.com
-          export OPENSHIFT_INSTALL_LIBVIRT_URI="qemu+tcp://192.168.122.1/system"
-          export OPENSHIFT_INSTALL_LIBVIRT_IMAGE="file:///unused"
-        fi
-        if [[ ${TYPE} == 'aws' ]]; then
-          export OPENSHIFT_INSTALL_PLATFORM="aws"
-          export OPENSHIFT_INSTALL_BASE_DOMAIN="test.ose"
-          export AWS_SHARED_CREDENTIALS_FILE="/etc/openshift-installer/.awscred"
-          export OPENSHIFT_INSTALL_AWS_REGION="us-east-1"
-        fi
         mkdir /tmp/artifacts/installer &&
         /bin/openshift-install version >/tmp/artifacts/installer/version
 
-        export _CI_ONLY_STAY_AWAY_OPENSHIFT_INSTALL_AWS_USER_TAGS="{\"expirationDate\": \"$(date -d '4 hours' --iso=minutes --utc)\"}"
-        /bin/openshift-install --dir=/tmp/artifacts/installer --log-level=debug create install-config
+        export CLUSTER_ID=$(uuidgen --random)
 
-        # Update install configs to set desired number of masters and workers
-        sed -i "/master/{n;s/1/${MASTERS}/}" /tmp/artifacts/installer/.openshift_install_state.json
-        sed -i "/worker/{n;s/1/${WORKERS}/}" /tmp/artifacts/installer/.openshift_install_state.json
-        sed -i "/master/{n;n;s/1/${MASTERS}/}" /tmp/artifacts/installer/install-config.yml
-        sed -i "/worker/{n;n;s/1/${WORKERS}/}" /tmp/artifacts/installer/install-config.yml
+        if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
+          cat > /tmp/artifacts/installer/install-config.yml << EOF
+        baseDomain: origin-ci-int-gce.dev.rhcloud.com
+        clusterID:  ${CLUSTER_ID}
+        machines:
+        - name: master
+          replicas: ${MASTERS}
+        - name: worker
+          replicas: ${WORKERS}
+        metadata:
+          name: ${CLUSTER_NAME}
+        networking:
+          clusterNetworks:
+          - cidr:             10.128.0.0/14
+            hostSubnetLength: 9
+          serviceCIDR: 172.30.0.0/16
+          type:        OpenshiftSDN
+        platform:
+          libvirt:
+            URI: qemu+tcp://192.168.122.1/system
+            defaultMachinePlatform:
+              image: file:///unused
+            masterIPs: null
+            network:
+              if: tt0
+              ipRange: 192.168.126.0/24
+        pullSecret: |
+          ${PULL_SECRET}
+        sshKey: |
+          ${SSH_PUB_KEY}
+        EOF
+        elif [[ "${CLUSTER_TYPE}" == "aws" ]]; then
+          export AWS_SHARED_CREDENTIALS_FILE="/etc/openshift-installer/.awscred"
+          export EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
+          cat > /tmp/artifacts/installer/install-config.yml << EOF
+        baseDomain: test.ose
+        clusterID:  ${CLUSTER_ID}
+        machines:
+        - name:     master
+          replicas: ${MASTERS}
+        - name:     worker
+          replicas: ${WORKERS}
+        metadata:
+          name: ${CLUSTER_NAME}
+        networking:
+          clusterNetworks:
+          - cidr:             10.128.0.0/14
+            hostSubnetLength: 9
+          serviceCIDR: 172.30.0.0/16
+          type:        OpenshiftSDN
+        platform:
+          aws:
+            region:       us-east-1
+            vpcCIDRBlock: 10.0.0.0/16
+            userTags:
+              expirationDate: ${EXPIRATION_DATE}
+        pullSecret: |
+          ${PULL_SECRET}
+        sshKey: |
+          ${SSH_PUB_KEY}
+        EOF
+        else
+            echo "Unsupported cluster type '${CLUSTER_NAME}'"
+            exit 1
+        fi
 
         /bin/openshift-install --dir=/tmp/artifacts/installer --log-level=debug create ignition-configs &
         wait "$!"
-
 
     # Runs an install
     - name: setup
