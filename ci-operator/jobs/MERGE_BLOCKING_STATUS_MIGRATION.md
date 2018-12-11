@@ -1,4 +1,11 @@
+**Attention:** These instructions should no longer be routinely needed because the
+[status-reconciler](https://github.com/kubernetes/test-infra/tree/master/prow/cmd/status-reconciler)
+now performs the necessary actions automatically and the queue should never become blocked.
+
+This document is kept here in case of need for a manual intervention.
+
 ## Merge Blocking
+
 Adding, removing or renaming merge-blocking status in a test configuration may result in a merge queue that is stuck unless manual steps with the [migratestatus](https://github.com/kubernetes/test-infra/tree/master/maintenance/migratestatus) or [commenter](https://github.com/kubernetes/test-infra/tree/master/robots/commenter) tools are taken.
 Only the pull requests that are already opened will be affected.
 
