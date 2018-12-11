@@ -2,11 +2,24 @@ kind: Template
 apiVersion: template.openshift.io/v1
 
 parameters:
+- name: BUSHSLICER_TEST_CONFIG
+- name: BUSHSLICER_TEST_ENVIRONMENT
+- name: BUSHSLICER_TEST_FORMAT
+- name: BUSHSLICER_TEST_RESULTS
+- name: BUSHSLICER_USER
+- name: BUSHSLICER_USER_PW_STRING
 - name: CLUSTER_TYPE
   value: "azure"
   required: true
 - name: DEPLOY_VERSION
   value: "v3.11"
+  required: true
+- name: DNS_DOMAIN
+  value: osadev.cloud
+  required: true
+- name: DNS_RESOURCEGROUP
+  value: dns
+  required: true
 - name: JOB_NAME_HASH
   required: true
 - name: JOB_NAME_SAFE
@@ -32,15 +45,10 @@ parameters:
   value: "true"
 - name: TEST_COMMAND
   value: "make e2e"
+  required: true
 - name: TEST_IMAGE
   value: "registry.svc.ci.openshift.org/azure/test-base:latest"
 - name: TEST_IN_PRODUCTION
-- name: BUSHSLICER_TEST_ENVIRONMENT
-- name: BUSHSLICER_TEST_CONFIG
-- name: BUSHSLICER_USER
-- name: BUSHSLICER_USER_PW_STRING
-- name: BUSHSLICER_TEST_RESULTS
-- name: BUSHSLICER_TEST_FORMAT
 
 objects:
 
@@ -100,6 +108,22 @@ objects:
       env:
       - name: ARTIFACT_DIR
         value: /tmp/artifacts
+      - name: BUSHSLICER_TEST_CONFIG
+        value: ${BUSHSLICER_TEST_CONFIG}
+      - name: BUSHSLICER_TEST_ENVIRONMENT
+        value: ${BUSHSLICER_TEST_ENVIRONMENT}
+      - name: BUSHSLICER_TEST_FORMAT
+        value: ${BUSHSLICER_TEST_FORMAT}
+      - name: BUSHSLICER_TEST_RESULTS
+        value: ${BUSHSLICER_TEST_RESULTS}
+      - name: BUSHSLICER_USER
+        value: ${BUSHSLICER_USER}
+      - name: BUSHSLICER_USER_PW_STRING
+        value: ${BUSHSLICER_USER_PW_STRING}
+      - name: DNS_DOMAIN
+        value: ${DNS_DOMAIN}
+      - name: DNS_RESOURCEGROUP
+        value: ${DNS_RESOURCEGROUP}
       - name: HOME
         value: /tmp/shared/home
       - name: RESOURCEGROUP
@@ -108,18 +132,6 @@ objects:
         value: ${RUNNING_UNDER_TEST}
       - name: TEST_IN_PRODUCTION
         value: ${TEST_IN_PRODUCTION}
-      - name: BUSHSLICER_TEST_ENVIRONMENT
-        value: ${BUSHSLICER_TEST_ENVIRONMENT}
-      - name: BUSHSLICER_TEST_CONFIG
-        value: ${BUSHSLICER_TEST_CONFIG}
-      - name: BUSHSLICER_TEST_RESULTS
-        value: ${BUSHSLICER_TEST_RESULTS}
-      - name: BUSHSLICER_TEST_FORMAT
-        value: ${BUSHSLICER_TEST_FORMAT}
-      - name: BUSHSLICER_USER
-        value: ${BUSHSLICER_USER}
-      - name: BUSHSLICER_USER_PW_STRING
-        value: ${BUSHSLICER_USER_PW_STRING}
       command:
       - /bin/bash
       - -c
@@ -207,6 +219,10 @@ objects:
         value: ${IMAGE_AZURE_CONTROLLERS}
       - name: DEPLOY_VERSION
         value: ${DEPLOY_VERSION}
+      - name: DNS_DOMAIN
+        value: ${DNS_DOMAIN}
+      - name: DNS_RESOURCEGROUP
+        value: ${DNS_RESOURCEGROUP}
       - name: ETCDBACKUP_IMAGE
         value: ${IMAGE_ETCDBACKUP}
       - name: HOME
@@ -250,8 +266,6 @@ objects:
         echo "Using etcdbackup image ${ETCDBACKUP_IMAGE}"
         echo "Using azure-controllers image ${AZURE_CONTROLLERS_IMAGE}"
         echo "Using metricsbridge image ${METRICSBRIDGE_IMAGE}"
-        export DNS_DOMAIN=osadev.cloud
-        export DNS_RESOURCEGROUP=dns
 
         # create cluster for test
         cd /go/src/github.com/openshift/openshift-azure/
@@ -281,6 +295,10 @@ objects:
       - name: shared-tmp
         mountPath: /tmp/shared
       env:
+      - name: DNS_DOMAIN
+        value: ${DNS_DOMAIN}
+      - name: DNS_RESOURCEGROUP
+        value: ${DNS_RESOURCEGROUP}
       - name: HOME
         value: /tmp/shared/home
       - name: NO_WAIT
@@ -302,8 +320,6 @@ objects:
           set +e
           mkdir -p "${HOME}"
           export HOME=/tmp/shared
-          export DNS_DOMAIN=osadev.cloud
-          export DNS_RESOURCEGROUP=dns
 
           cd /go/src/github.com/openshift/openshift-azure/
           source /etc/azure/credentials/secret
