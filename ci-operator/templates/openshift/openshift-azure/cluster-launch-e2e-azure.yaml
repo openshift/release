@@ -161,6 +161,7 @@ objects:
 
         source /etc/azure/credentials/secret
 
+        # origin conformance specific code
         PATH=/usr/libexec/origin:$PATH
         function run-tests() {
           if which openshift-tests && [[ -n "${TEST_SUITE-}" ]]; then
@@ -187,17 +188,12 @@ objects:
           exit ${rc:-0}
         }
 
-        # test specific code
-        # don't let clients impact the global kubeconfig
+        # bushslicer specific code
         if [[ "${TEST_IMAGE}" == *"/bushslicer"* ]]; then
-          # BUSHSLICER_TEST_CLUSTER will be picked up in run script
           export BUSHSLICER_TEST_CLUSTER=$(awk '/^  fqdn:/{ print $2}' /tmp/shared/openshift-azure/_data/containerservice.yaml)
-          # login to cluster as $BUSHSLICER_USER
           PASSWD=$(awk "/${BUSHSLICER_USER_PW_STRING}:/{ print \$2 }" /tmp/shared/openshift-azure/_data/containerservice.yaml)
           oc login -u "${BUSHSLICER_USER}" -p "${PASSWD}" --server=https://${BUSHSLICER_TEST_CLUSTER} --insecure-skip-tls-verify=true
           export BUSHSLICER_TEST_TOKEN=$(oc whoami -t)
-          export BUSHSLICER_TEST_RESULTS
-          export BUSHSLICER_TEST_FORMAT
         else
           mkdir -p /go/src/github.com/openshift/
           cp -r /tmp/shared/openshift-azure /go/src/github.com/openshift/
@@ -280,6 +276,9 @@ objects:
           # disable sync pod
           ./hack/ssh.sh -c "sudo rm /etc/origin/node/pods/sync.yaml" ${RESOURCEGROUP}
         fi
+        # Share openshift-azure code with the test container since
+        # the test container image may not include it
+        # eg. origin-tests or bushslicer
         cp -r /go/src/github.com/openshift/openshift-azure /tmp/shared
         touch /tmp/shared/created
 
@@ -317,17 +316,12 @@ objects:
 
         # teardown is collecting debug data and deleting all used resources
         function teardown() {
-          set +e
           mkdir -p "${HOME}"
           export HOME=/tmp/shared
-
-          cd /go/src/github.com/openshift/openshift-azure/
-          source /etc/azure/credentials/secret
 
           # Gather artifacts
           if [[ -z "$TEST_IN_PRODUCTION" ]]; then
             export KUBECONFIG=/tmp/shared/openshift-azure/_data/_out/admin.kubeconfig
-            cp -r /tmp/shared/openshift-azure/_data /go/src/github.com/openshift/openshift-azure/
             oc get po --all-namespaces -o wide > /tmp/artifacts/pods
             oc get deployments --all-namespaces -o wide > /tmp/artifacts/deployments
             oc get statefulsets --all-namespaces -o wide > /tmp/artifacts/statefulsets
@@ -345,6 +339,10 @@ objects:
             oc logs controllers-master-$cm_leader -n kube-system > /tmp/artifacts/controller-manager.log
             oc logs deploy/prometheus-operator -n openshift-monitoring > /tmp/artifacts/prometheus-operator.log
           fi
+
+          cp -r /tmp/shared/openshift-azure/_data /go/src/github.com/openshift/openshift-azure/
+          cd /go/src/github.com/openshift/openshift-azure/
+          source /etc/azure/credentials/secret
 
           ./hack/delete.sh ${RESOURCEGROUP}
         }
