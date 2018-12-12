@@ -1,6 +1,8 @@
 package main
 
 import (
+	"errors"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -69,8 +71,14 @@ func getRepoRoot(directory string) (root string, err error) {
 	return path, nil
 }
 
-func orgRepos(dir string) (orgRepos []*orgRepo, err error) {
-	matches, err := filepath.Glob(filepath.Join(dir, "*", "*"))
+func orgRepos(dir, org, repo string) (orgRepos []*orgRepo, err error) {
+	if org == "" {
+		org = "*"
+	}
+	if repo == "" {
+		repo = "*"
+	}
+	matches, err := filepath.Glob(filepath.Join(dir, org, repo))
 	if err != nil {
 		return nil, err
 	}
@@ -204,7 +212,7 @@ func get(uri, accept string) (data []byte, status int, err error) {
 	defer response.Body.Close()
 
 	if response.StatusCode != 200 {
-		return data, response.StatusCode, fmt.Errorf("failed to fetch %s: %s", uri, response.StatusCode, response.Status)
+		return data, response.StatusCode, fmt.Errorf("failed to fetch %s: %s", uri, response.Status)
 	}
 
 	data, err = ioutil.ReadAll(response.Body)
@@ -410,14 +418,14 @@ func writeOwnerAliases(repoRoot string, aliases *aliases) (err error) {
 	})
 }
 
-func pullOwners(directory string) (err error) {
+func pullOwners(directory, org, repo string) (err error) {
 	repoRoot, err := getRepoRoot(directory)
 	if err != nil {
 		return err
 	}
 
 	operatorRoot := filepath.Join(repoRoot, "ci-operator")
-	orgRepos, err := orgRepos(filepath.Join(operatorRoot, "jobs"))
+	orgRepos, err := orgRepos(filepath.Join(operatorRoot, "jobs"), org, repo)
 	if err != nil {
 		return err
 	}
@@ -442,9 +450,11 @@ func pullOwners(directory string) (err error) {
 		return err
 	}
 
-	err = writeOwnerAliases(repoRoot, aliases)
-	if err != nil {
-		return err
+	if aliases != nil {
+		err = writeOwnerAliases(repoRoot, aliases)
+		if err != nil {
+			return err
+		}
 	}
 
 	for _, orgRepo := range orgRepos {
@@ -457,8 +467,28 @@ func pullOwners(directory string) (err error) {
 	return nil
 }
 
+var (
+	org  = flag.String("org", "", "Organization to use for updating OWNERS")
+	repo = flag.String("repo", "", "Repository to use for updating OWNERS")
+)
+
+func validate() error {
+	if (*org == "" && *repo != "") ||
+		(*org != "" && *repo == "") {
+		return errors.New("both -org and -repo need to be provided")
+	}
+	return nil
+}
+
 func main() {
-	err := pullOwners(".")
+	flag.Parse()
+
+	if err := validate(); err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(1)
+	}
+
+	err := pullOwners(".", *org, *repo)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
