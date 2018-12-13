@@ -72,12 +72,6 @@ func getRepoRoot(directory string) (root string, err error) {
 }
 
 func orgRepos(dir, org, repo string) (orgRepos []*orgRepo, err error) {
-	if org == "" {
-		org = "*"
-	}
-	if repo == "" {
-		repo = "*"
-	}
 	matches, err := filepath.Glob(filepath.Join(dir, org, repo))
 	if err != nil {
 		return nil, err
@@ -468,13 +462,13 @@ func pullOwners(directory, org, repo string) (err error) {
 }
 
 var (
-	org  = flag.String("org", "", "Organization to use for updating OWNERS")
-	repo = flag.String("repo", "", "Repository to use for updating OWNERS")
+	org  = flag.String("org", "*", "Organization to use for updating OWNERS")
+	repo = flag.String("repo", "*", "Repository to use for updating OWNERS")
 )
 
 func validate() error {
-	if (*org == "" && *repo != "") ||
-		(*org != "" && *repo == "") {
+	if (*org == "*" && *repo != "*") ||
+		(*org != "*" && *repo == "*") {
 		return errors.New("both -org and -repo need to be provided")
 	}
 	return nil
