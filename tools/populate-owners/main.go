@@ -439,15 +439,19 @@ func pullOwners(directory, org, repo string) (err error) {
 		fmt.Fprintf(os.Stderr, "got owners for %s\n", orgRepo.String())
 	}
 
-	aliases, err := namespaceAliases(orgRepos)
-	if err != nil {
-		return err
-	}
-
-	if aliases != nil {
-		err = writeOwnerAliases(repoRoot, aliases)
+	// update aliases only when running globally to avoid
+	// alias collisions.
+	if org == "*" && repo == "*" {
+		aliases, err := namespaceAliases(orgRepos)
 		if err != nil {
 			return err
+		}
+
+		if aliases != nil {
+			err = writeOwnerAliases(repoRoot, aliases)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
