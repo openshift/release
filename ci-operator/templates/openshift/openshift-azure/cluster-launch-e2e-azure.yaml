@@ -150,8 +150,6 @@ objects:
         value: ${DNS_RESOURCEGROUP}
       - name: ETCDBACKUP_IMAGE
         value: ${IMAGE_ETCDBACKUP}
-      - name: HOME
-        value: /tmp/shared/home
       - name: METRICSBRIDGE_IMAGE
         value: ${IMAGE_METRICSBRIDGE}
       - name: RESOURCEGROUP
@@ -172,8 +170,6 @@ objects:
 
         trap 'touch /tmp/shared/exit' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
-
-        mkdir -p "${HOME}"
 
         # wait until the setup job completes successfully
         while true; do
@@ -219,11 +215,13 @@ objects:
         }
 
         # bushslicer specific code
-        if [[ "${TEST_IMAGE}" == *"/bushslicer"* ]]; then
+        if [[ "${TEST_IMAGE}" =~ "bushslicer" ]]; then
           export BUSHSLICER_TEST_CLUSTER=$(awk '/^  fqdn:/{ print $2}' /tmp/shared/openshift-azure/_data/containerservice.yaml)
           PASSWD=$(awk "/${BUSHSLICER_USER_PW_STRING}:/{ print \$2 }" /tmp/shared/openshift-azure/_data/containerservice.yaml)
           oc login -u "${BUSHSLICER_USER}" -p "${PASSWD}" --server=https://${BUSHSLICER_TEST_CLUSTER} --insecure-skip-tls-verify=true
           export BUSHSLICER_TEST_TOKEN=$(oc whoami -t)
+        elif [[ "${TEST_IMAGE}" =~ "origin-v3.11:tests" ]]; then
+          export KUBECONFIG=/tmp/shared/openshift-azure/_data/_out/admin.kubeconfig
         else
           mkdir -p /go/src/github.com/openshift/
           cp -r /tmp/shared/openshift-azure /go/src/github.com/openshift/
@@ -298,14 +296,18 @@ objects:
         /etc/azure/credentials/.dockerconfigjson /go/src/github.com/openshift/openshift-azure/secrets/
         timeout 1h ./hack/create.sh ${RESOURCEGROUP}
 
+        # disable sync pod
         if [[ "${TEST_IMAGE}" =~ "origin-v3.11:tests" ]]; then
           az login --service-principal -u ${AZURE_CLIENT_ID} -p ${AZURE_CLIENT_SECRET} --tenant ${AZURE_TENANT_ID} &>/dev/null
-          # disable sync pod
+          echo "default:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
           ./hack/ssh.sh -c "sudo rm /etc/origin/node/pods/sync.yaml" ${RESOURCEGROUP}
         fi
+
         # Share openshift-azure code with the test container since
-        # the test container image may not include it
-        # eg. origin-tests or bushslicer
+        # the test container will not include it because we have made
+        # the test image configurable for origin-tests or bushslicer
+        # and instead of LOCAL_IMAGE_BIN we can only use the azure test-base
+        # for openshift-azure tests.
         cp -r /go/src/github.com/openshift/openshift-azure /tmp/shared
         touch /tmp/shared/created
 
