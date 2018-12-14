@@ -2,28 +2,32 @@ kind: Template
 apiVersion: template.openshift.io/v1
 
 parameters:
+# Bushslicer-specific variables
 - name: BUSHSLICER_TEST_CONFIG
 - name: BUSHSLICER_TEST_ENVIRONMENT
 - name: BUSHSLICER_TEST_FORMAT
 - name: BUSHSLICER_TEST_RESULTS
 - name: BUSHSLICER_USER
 - name: BUSHSLICER_USER_PW_STRING
-- name: CLUSTER_TYPE
-  value: "azure"
-  required: true
+# OSA cluster version that is going to be deployed.
 - name: DEPLOY_VERSION
   value: "v3.11"
   required: true
+# DNS domain that is going to be used by the cluster.
+# Needs to be a DNS zone created in Azure.
 - name: DNS_DOMAIN
   value: osadev.cloud
   required: true
+# Resource group of the DNS zone.
 - name: DNS_RESOURCEGROUP
   value: dns
   required: true
+# ci-operator specific variables
 - name: JOB_NAME_HASH
   required: true
 - name: JOB_NAME_SAFE
   required: true
+# OSA-specific images
 - name: IMAGE_AZURE_CONTROLLERS
   required: true
 - name: IMAGE_ETCDBACKUP
@@ -32,22 +36,38 @@ parameters:
   required: true
 - name: IMAGE_SYNC
   required: true
+# The binary image built by ci-operator
 - name: LOCAL_IMAGE_BIN
   required: true
+# Temporary namespace created by ci-operator to run the template.
 - name: NAMESPACE
   required: true
+# Configure whether the test needs to wait for cluster deletion to complete.
+# Most tests shouldn't care about it, useful for tests using the production OSA
+# to measure cluster deletion times.
 - name: NO_WAIT
   value: "true"
+# Each test gets its own unique resource group for a couple of different reasons
+# See https://github.com/openshift/openshift-azure/issues/651 for more info.
 - name: RESOURCEGROUP_SUFFIX
   generate: expression
   from: "[a-z]{8}"
+# OSA deployments can be configured to run under testing (control plane loglevel
+# is higher, htpasswd access is enabled for e2e tests, etc.).
 - name: RUNNING_UNDER_TEST
   value: "true"
+# Test command to run.
 - name: TEST_COMMAND
   value: "make e2e"
   required: true
+# The image used by tests needs to be configurable to enable different types
+# of tests to reuse the same template. So far we have:
+# 1. OSA-specific tests
+# 2. Origin conformance suite
+# 3. Bushslicer
 - name: TEST_IMAGE
   value: "registry.svc.ci.openshift.org/azure/test-base:latest"
+# If set to "true", it means the production OSA RP is going to be used.
 - name: TEST_IN_PRODUCTION
 
 objects:
@@ -130,8 +150,6 @@ objects:
         value: ${DNS_RESOURCEGROUP}
       - name: ETCDBACKUP_IMAGE
         value: ${IMAGE_ETCDBACKUP}
-      - name: HOME
-        value: /tmp/shared/home
       - name: METRICSBRIDGE_IMAGE
         value: ${IMAGE_METRICSBRIDGE}
       - name: RESOURCEGROUP
@@ -152,8 +170,6 @@ objects:
 
         trap 'touch /tmp/shared/exit' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
-
-        mkdir -p "${HOME}"
 
         # wait until the setup job completes successfully
         while true; do
@@ -199,11 +215,13 @@ objects:
         }
 
         # bushslicer specific code
-        if [[ "${TEST_IMAGE}" == *"/bushslicer"* ]]; then
+        if [[ "${TEST_IMAGE}" =~ "bushslicer" ]]; then
           export BUSHSLICER_TEST_CLUSTER=$(awk '/^  fqdn:/{ print $2}' /tmp/shared/openshift-azure/_data/containerservice.yaml)
           PASSWD=$(awk "/${BUSHSLICER_USER_PW_STRING}:/{ print \$2 }" /tmp/shared/openshift-azure/_data/containerservice.yaml)
           oc login -u "${BUSHSLICER_USER}" -p "${PASSWD}" --server=https://${BUSHSLICER_TEST_CLUSTER} --insecure-skip-tls-verify=true
           export BUSHSLICER_TEST_TOKEN=$(oc whoami -t)
+        elif [[ "${TEST_IMAGE}" =~ "origin-v3.11:tests" ]]; then
+          export KUBECONFIG=/tmp/shared/openshift-azure/_data/_out/admin.kubeconfig
         else
           mkdir -p /go/src/github.com/openshift/
           cp -r /tmp/shared/openshift-azure /go/src/github.com/openshift/
@@ -245,9 +263,6 @@ objects:
         value: ${IMAGE_SYNC}
       - name: TEST_IN_PRODUCTION
         value: ${TEST_IN_PRODUCTION}
-      - name: TYPE
-        value: ${CLUSTER_TYPE}
-
       command:
       - /bin/bash
       - -c
@@ -281,14 +296,18 @@ objects:
         /etc/azure/credentials/.dockerconfigjson /go/src/github.com/openshift/openshift-azure/secrets/
         timeout 1h ./hack/create.sh ${RESOURCEGROUP}
 
+        # disable sync pod
         if [[ "${TEST_IMAGE}" =~ "origin-v3.11:tests" ]]; then
           az login --service-principal -u ${AZURE_CLIENT_ID} -p ${AZURE_CLIENT_SECRET} --tenant ${AZURE_TENANT_ID} &>/dev/null
-          # disable sync pod
+          echo "default:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
           ./hack/ssh.sh -c "sudo rm /etc/origin/node/pods/sync.yaml" ${RESOURCEGROUP}
         fi
+
         # Share openshift-azure code with the test container since
-        # the test container image may not include it
-        # eg. origin-tests or bushslicer
+        # the test container will not include it because we have made
+        # the test image configurable for origin-tests or bushslicer
+        # and instead of LOCAL_IMAGE_BIN we can only use the azure test-base
+        # for openshift-azure tests.
         cp -r /go/src/github.com/openshift/openshift-azure /tmp/shared
         touch /tmp/shared/created
 
@@ -316,8 +335,6 @@ objects:
         value: e2e-${RESOURCEGROUP_SUFFIX}
       - name: TEST_IN_PRODUCTION
         value: ${TEST_IN_PRODUCTION}
-      - name: TYPE
-        value: ${CLUSTER_TYPE}
       command:
       - /bin/bash
       - -c
