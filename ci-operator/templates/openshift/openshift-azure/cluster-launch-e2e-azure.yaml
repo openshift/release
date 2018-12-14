@@ -277,29 +277,30 @@ objects:
         exit $rc' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
 
-        # Cluster creation specific configuration.
-        mkdir -p "${HOME}"
-        source /etc/azure/credentials/secret
         # aad integration configuration - we dont test aad so populate as dummy
+        source /etc/azure/credentials/secret
         export AZURE_AAD_CLIENT_ID=$AZURE_CLIENT_ID
         export AZURE_AAD_CLIENT_SECRET=$AZURE_CLIENT_SECRET
+
         echo "Using sync image ${SYNC_IMAGE}"
         echo "Using etcdbackup image ${ETCDBACKUP_IMAGE}"
         echo "Using azure-controllers image ${AZURE_CONTROLLERS_IMAGE}"
         echo "Using metricsbridge image ${METRICSBRIDGE_IMAGE}"
 
-        # create cluster for test
+        # copy over geneva secrets
         cd /go/src/github.com/openshift/openshift-azure/
         mkdir -p /go/src/github.com/openshift/openshift-azure/secrets
         cp /etc/azure/credentials/logging-int.cert /etc/azure/credentials/logging-int.key \
         /etc/azure/credentials/metrics-int.cert /etc/azure/credentials/metrics-int.key \
         /etc/azure/credentials/.dockerconfigjson /go/src/github.com/openshift/openshift-azure/secrets/
+
+        # start cluster
         timeout 1h ./hack/create.sh ${RESOURCEGROUP}
 
         # disable sync pod
         if [[ "${TEST_IMAGE}" =~ "origin-v3.11:tests" ]]; then
           az login --service-principal -u ${AZURE_CLIENT_ID} -p ${AZURE_CLIENT_SECRET} --tenant ${AZURE_TENANT_ID} &>/dev/null
-          echo "default:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
+          mkdir -p "${HOME}" && echo "default:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
           ./hack/ssh.sh -c "sudo rm /etc/origin/node/pods/sync.yaml" ${RESOURCEGROUP}
         fi
 
@@ -309,6 +310,8 @@ objects:
         # and instead of LOCAL_IMAGE_BIN we can only use the azure test-base
         # for openshift-azure tests.
         cp -r /go/src/github.com/openshift/openshift-azure /tmp/shared
+
+        # notify other containers that the cluster was created
         touch /tmp/shared/created
 
     # Performs cleanup of all created resources
@@ -327,8 +330,6 @@ objects:
         value: ${DNS_DOMAIN}
       - name: DNS_RESOURCEGROUP
         value: ${DNS_RESOURCEGROUP}
-      - name: HOME
-        value: /tmp/shared/home
       - name: NO_WAIT
         value: ${NO_WAIT}
       - name: RESOURCEGROUP
@@ -343,9 +344,6 @@ objects:
 
         # teardown is collecting debug data and deleting all used resources
         function teardown() {
-          mkdir -p "${HOME}"
-          export HOME=/tmp/shared
-
           # Gather artifacts
           if [[ -z "$TEST_IN_PRODUCTION" ]]; then
             export KUBECONFIG=/tmp/shared/openshift-azure/_data/_out/admin.kubeconfig
