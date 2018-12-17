@@ -186,6 +186,14 @@ objects:
         done
         # oh god the blood
         sleep 180
+        # can remove this check once a proper test is added to origin e2e
+        PASSWORD=$(cat /tmp/artifacts/installer/auth/kubeadmin-password)
+        SYSADMIN=$(oc config --config="${KUBECONFIG}" current-context)
+        oc config --config="${KUBECONFIG}" set-context "${SYSADMIN}"
+        until oc --config="${KUBECONFIG}" login -u kubeadmin -p "${PASSWORD}"; do
+          sleep 10
+        done
+        oc config --config="${KUBECONFIG}" use-context "${SYSADMIN}"
 
         export KUBE_SSH_BASTION="$( oc get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
         export KUBE_SSH_KEY_PATH=/tmp/cluster/ssh-privatekey
