@@ -189,22 +189,6 @@ objects:
         done
         # oh god the blood
         sleep 180
-        # temporary - remove this check once a proper test is added to origin e2e
-        password=$(cat /tmp/artifacts/installer/auth/kubeadmin-password)
-        TARGET="$(date -d '5 minutes' +%s)"
-        NOW="$(date +%s)"
-        while [[ "${NOW}" -lt "${TARGET}" ]]; do
-          # wait until oc login -n kubeadmin succeeds
-          if oc login -u kubeadmin -p "${password}"; then
-            if ! oc login -u system:admin; then
-              echo "failed to login as system:admin" && exit 1
-            fi
-            break
-          fi
-          sleep 5
-          NOW="$(date +%s)"
-        done
-        [[ "${NOW}" -ge "${TARGET}" ]] && echo "timeout waiting for oc login -u kubeadmin -p ${password} to succeed" && exit 1
 
         # set up cloud-provider-specific env vars
         if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
