@@ -1,0 +1,95 @@
+kind: List
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    name: config-upater
+- kind: Role
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: config-upater
+  rules:
+    - apiGroups:
+        - authorization.openshift.io
+      resources:
+        - roles
+        - rolebindings
+        - clusterroles
+        - clusterrolebindings
+      verbs:
+        - get
+        - create
+        - update
+        - patch
+    - apiGroups:
+        - apps
+      resources:
+        - deployments
+        - statefulsets
+      verbs:
+        - get
+        - create
+        - update
+        - patch
+    - apiGroups:
+        - ""
+      resources:
+        - serviceaccounts
+        - services
+        - routes
+        - secrets
+        - configmaps
+        - persistentvolumeclaims
+      verbs:
+        - get
+        - create
+        - update
+        - patch
+    - apiGroups:
+        - image.openshift.io
+      resources:
+        - imagestreams
+      verbs:
+        - get
+        - create
+        - update
+        - patch
+- kind: RoleBinding
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: config-upater
+  roleRef:
+    apiGroup: authorization.openshift.io
+    kind: Role
+    name: config-upater
+  subjects:
+  - kind: ServiceAccount
+    name: config-upater
+- kind: ClusterRole
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: config-upater
+  rules:
+    - apiGroups:
+        - authorization.openshift.io
+      resources:
+        - clusterroles
+        - clusterrolebindings
+      verbs:
+        - get
+        - create
+        - update
+        - patch
+- kind: ClusterRoleBinding
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: config-upater
+  roleRef:
+    apiGroup: authorization.openshift.io
+    kind: ClusterRole
+    name: config-upater
+  subjects:
+  - kind: ServiceAccount
+    name: config-upater
+    namespace: ci
