@@ -10,7 +10,7 @@ applyTemplate:
 	oc process -f $(WHAT) | oc apply -f -
 .PHONY: applyTemplate
 
-postsubmit-update: prow-rbac prow-services projects
+postsubmit-update: prow-services
 .PHONY: postsubmit-update
 
 all: roles prow prow-stg projects
