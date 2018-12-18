@@ -69,6 +69,9 @@ parameters:
   value: "registry.svc.ci.openshift.org/azure/test-base:latest"
 # If set to "true", it means the production OSA RP is going to be used.
 - name: TEST_IN_PRODUCTION
+# If set to "true", will skip the setup container and proceed to the tests
+- name: SKIP_SETUP
+  value: "false"
 
 objects:
 
@@ -266,6 +269,8 @@ objects:
         value: ${IMAGE_SYNC}
       - name: TEST_IN_PRODUCTION
         value: ${TEST_IN_PRODUCTION}
+      - name: SKIP_SETUP
+        value: ${SKIP_SETUP}
       command:
       - /bin/bash
       - -c
@@ -296,6 +301,13 @@ objects:
         cp /etc/azure/credentials/logging-int.cert /etc/azure/credentials/logging-int.key \
         /etc/azure/credentials/metrics-int.cert /etc/azure/credentials/metrics-int.key \
         /etc/azure/credentials/.dockerconfigjson /go/src/github.com/openshift/openshift-azure/secrets/
+
+        # SKIP_SETUP allows us to skip cluster creation and proceed to the test container
+        if [[ "${SKIP_SETUP}" == "true" ]]; then
+            # proceed as if cluster create occured
+            touch /tmp/shared/created
+            exit 0
+        fi
 
         # start cluster
         timeout 1h ./hack/create.sh ${RESOURCEGROUP}
