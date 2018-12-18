@@ -10,19 +10,27 @@ applyTemplate:
 	oc process -f $(WHAT) | oc apply -f -
 .PHONY: applyTemplate
 
-all: roles prow projects
+all: roles prow prow-stg projects
 .PHONY: all
 
 roles: cluster-operator-roles
 	$(MAKE) apply WHAT=cluster/ci/config/roles.yaml
 .PHONY: roles
 
-prow: ci-ns prow-crd prow-config prow-rbac prow-services prow-jobs prow-scaling #prow-secrets
+prow: ci-ns prow-crd prow-config prow-rbac prow-services prow-jobs prow-scaling prow-secrets ci-operator-config
 .PHONY: prow
+
+prow-stg: ci-stg-ns prow-cluster-jobs ci-operator-config
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/ci-operator/stage.yaml
+.PHONY: prow-stg
 
 ci-ns:
 	oc project ci
 .PHONY: ci-ns
+
+ci-stg-ns:
+	oc project ci-stg
+.PHONY: ci-stg-ns
 
 prow-crd:
 	$(MAKE) apply WHAT=cluster/ci/config/prow/prow_crd.yaml
@@ -148,7 +156,7 @@ prow-release-controller:
 	$(MAKE) apply WHAT=ci-operator/infra/openshift/release-controller/deploy-origin-4.0.yaml
 	$(MAKE) apply WHAT=ci-operator/infra/openshift/release-controller/deploy-ocp-4.0.yaml
 
-projects: gcsweb origin origin-stable origin-release test-bases image-mirror-setup image-pruner-setup publishing-bot image-registry-publishing-bot content-mirror azure python-validation
+projects: ci-ns gcsweb origin origin-stable origin-release test-bases image-mirror-setup image-pruner-setup publishing-bot image-registry-publishing-bot content-mirror azure python-validation
 .PHONY: projects
 
 ci-operator-config:
