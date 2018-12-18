@@ -1,0 +1,114 @@
+kind: List
+apiVersion: v1
+items:
+- kind: ServiceAccount
+  apiVersion: v1
+  metadata:
+    name: ci-operator
+- kind: ClusterRoleBinding
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: self-provisioner-ci-operator-stg
+  roleRef:
+    name: self-provisioner
+  subjects:
+  - kind: ServiceAccount
+    name: ci-operator
+    namespace: ci-stg
+- kind: ClusterRoleBinding
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: namespace-annotator-ci-operator-stg
+  roleRef:
+    name: namespace-annotator
+  subjects:
+  - kind: ServiceAccount
+    name: ci-operator
+    namespace: ci-stg
+- kind: ClusterRoleBinding
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: manage-events-ci-operator-stg
+  roleRef:
+    name: manage-events
+  subjects:
+  - kind: ServiceAccount
+    name: ci-operator
+    namespace: ci-stg
+- kind: Role
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: ci-stg-user
+  rules:
+  - apiGroups:
+    - ""
+    resources:
+    - configmaps
+    - pods
+    verbs:
+    - create
+    - get
+    - list
+    - watch
+- kind: RoleBinding
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: ci-stg-user
+  roleRef:
+    kind: Role
+    name: ci-stg-user
+  subjects:
+  - kind: Group
+    name: system:authenticated
+- apiVersion: v1
+  kind: ImageStream
+  metadata:
+    name: entrypoint
+  spec:
+    lookupPolicy:
+      local: true
+    tags:
+    - name: latest
+      from:
+        kind: DockerImage
+        name: gcr.io/k8s-prow/entrypoint:v20181206-da5a5e4
+- apiVersion: v1
+  kind: ImageStream
+  metadata:
+    name: initupload
+  spec:
+    lookupPolicy:
+      local: true
+    tags:
+    - name: latest
+      from:
+        kind: DockerImage
+        name: gcr.io/k8s-prow/initupload:v20181206-da5a5e4
+- apiVersion: v1
+  kind: ImageStream
+  metadata:
+    name: sidecar
+  spec:
+    lookupPolicy:
+      local: true
+    tags:
+    - name: latest
+      from:
+        kind: DockerImage
+        name: gcr.io/k8s-prow/sidecar:v20181206-da5a5e4
+- apiVersion: image.openshift.io/v1
+  kind: ImageStream
+  metadata:
+    name: ci-operator
+  spec:
+    lookupPolicy:
+      local: true
+    tags:
+    - from:
+        kind: DockerImage
+        name: registry.svc.ci.openshift.org/ci/ci-operator:latest
+      importPolicy:
+        scheduled: true
+      name: latest
+      referencePolicy:
+        type: Source
