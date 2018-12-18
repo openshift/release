@@ -127,8 +127,7 @@ prow-ocp-rpm-secrets:
 		-o yaml --dry-run | oc apply -n ocp -f -
 .PHONY: prow-ocp-rpms-secrets
 
-prow-jobs: prow-cluster-jobs prow-artifacts prow-ocp-rpms 
-	$(MAKE) applyTemplate WHAT=cluster/ci/jobs/commenter.yaml
+prow-jobs: prow-cluster-jobs prow-artifacts prow-ocp-rpms
 	$(MAKE) apply WHAT=projects/prometheus/test/build.yaml
 	$(MAKE) apply WHAT=ci-operator/templates/os.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/ci-operator/roles.yaml
