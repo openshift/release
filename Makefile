@@ -10,6 +10,9 @@ applyTemplate:
 	oc process -f $(WHAT) | oc apply -f -
 .PHONY: applyTemplate
 
+postsubmit-update: prow-rbac prow-services projects
+.PHONY: postsubmit-update
+
 all: roles prow prow-stg projects
 .PHONY: all
 
@@ -59,6 +62,7 @@ prow-secrets:
 
 prow-rbac:
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/artifact-uploader_rbac.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/config_updater_rbac.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/deck_rbac.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/hook_rbac.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/horologium_rbac.yaml
@@ -69,7 +73,7 @@ prow-rbac:
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/tracer_rbac.yaml
 .PHONY: prow-rbac
 
-prow-services: prow-config-updater
+prow-services:
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/adapter_imagestreams.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/artifact-uploader.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/cherrypick.yaml
@@ -86,13 +90,6 @@ prow-services: prow-config-updater
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/tot.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tracer.yaml
 .PHONY: prow-services
-
-prow-config-updater:
-	oc create serviceaccount config-updater -o yaml --dry-run | oc apply -f -
-	oc adm policy add-role-to-user edit -z config-updater
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/config-updater/deployment.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/config-updater/build.yaml
-.PHONY: prow-config-updater
 
 prow-cluster-jobs:
 	oc create configmap cluster-profile-gcp --from-file=cluster/test-deploy/gcp/vars.yaml --from-file=cluster/test-deploy/gcp/vars-origin.yaml -o yaml --dry-run | oc apply -f -
@@ -235,7 +232,7 @@ test-bases:
 
 image-pruner-setup:
 	oc create serviceaccount image-pruner -o yaml --dry-run | oc apply -f -
-	oc adm policy --as=system:admin add-cluster-role-to-user system:image-pruner -z image-pruner
+	oc adm policy add-cluster-role-to-user system:image-pruner -z image-pruner
 	$(MAKE) apply WHAT=cluster/ci/jobs/image-pruner.yaml
 .PHONY: image-pruner-setup
 
@@ -271,6 +268,15 @@ azure:
 	# set up azure namespace and policies
 	$(MAKE) apply WHAT=projects/azure/cluster-wide.yaml
 	$(MAKE) apply WHAT=projects/azure/rbac.yaml
+	# the rest of the config
+	$(MAKE) apply WHAT=projects/azure/azure-purge/
+	$(MAKE) apply WHAT=projects/azure/base-images/
+	$(MAKE) apply WHAT=projects/azure/config-updater/
+	$(MAKE) apply WHAT=projects/azure/image-mirror/
+	$(MAKE) apply WHAT=projects/azure/token-refresh/
+.PHONY: azure
+
+azure-secrets: azure
 	# ci namespace objects
 	oc create secret generic cluster-secrets-azure \
 	--from-file=cluster/test-deploy/azure/secret \
@@ -287,12 +293,6 @@ azure:
 	oc create secret generic aws-reg-master --from-literal=username=${AWS_REG_USERNAME} --from-literal=password=${AWS_REG_PASSWORD} -o yaml --dry-run | oc apply -n azure -f -
 	oc create secret generic hmac-token --from-literal=hmac=${HMAC_TOKEN} -o yaml --dry-run | oc apply -n azure -f -
 	oc create secret generic oauth-token --from-literal=oauth=${AZURE_OAUTH_TOKEN} -o yaml --dry-run | oc apply -n azure -f -
-	# the rest of the config
-	$(MAKE) apply WHAT=projects/azure/azure-purge/
-	$(MAKE) apply WHAT=projects/azure/base-images/
-	$(MAKE) apply WHAT=projects/azure/config-updater/
-	$(MAKE) apply WHAT=projects/azure/image-mirror/
-	$(MAKE) apply WHAT=projects/azure/token-refresh/
 .PHONY: azure
 
 check:
