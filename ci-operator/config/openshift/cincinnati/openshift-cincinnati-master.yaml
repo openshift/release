@@ -1,0 +1,32 @@
+base_images:
+  centos7:
+    cluster: https://api.ci.openshift.org
+    name: centos
+    namespace: openshift
+    tag: '7'
+
+build_root:
+  project_image:
+    dockerfile_path: dist/openshift-release/Dockerfile.builder
+
+resources:
+  '*':
+    limits:
+      cpu: '4'
+      memory: 4Gi
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+  unit:
+    limits:
+      cpu: '7'
+      memory: 9Gi
+    requests:
+      cpu: '3'
+      memory: 5Gi
+
+tests:
+- as: cargo-test
+  commands: dist/pr_check.sh
+  container:
+    from: src
