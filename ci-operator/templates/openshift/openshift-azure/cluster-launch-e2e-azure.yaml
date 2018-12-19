@@ -229,7 +229,7 @@ objects:
           mkdir -p /go/src/github.com/openshift/
           cp -r /tmp/shared/openshift-azure /go/src/github.com/openshift/
           cd /go/src/github.com/openshift/openshift-azure/
-          if [[ -f hack/fakerp.sh ]]; then
+          if [[ -z $TEST_IN_PRODUCTION ]]; then
             ./hack/fakerp.sh ${RESOURCEGROUP} &
           fi
         fi
@@ -278,6 +278,13 @@ objects:
        #!/bin/bash
         set -euo pipefail
 
+        # SKIP_SETUP allows us to skip cluster creation and proceed to the test container
+        if [[ "${SKIP_SETUP}" == "true" ]]; then
+            cp -r /go/src/github.com/openshift/openshift-azure /tmp/shared
+            touch /tmp/shared/created
+            exit 0
+        fi
+
         trap 'rc=$?; if [[ $rc -ne 0 ]]; then
           cp -r /go/src/github.com/openshift/openshift-azure /tmp/shared
           touch /tmp/shared/exit
@@ -301,13 +308,6 @@ objects:
         cp /etc/azure/credentials/logging-int.cert /etc/azure/credentials/logging-int.key \
         /etc/azure/credentials/metrics-int.cert /etc/azure/credentials/metrics-int.key \
         /etc/azure/credentials/.dockerconfigjson /go/src/github.com/openshift/openshift-azure/secrets/
-
-        # SKIP_SETUP allows us to skip cluster creation and proceed to the test container
-        if [[ "${SKIP_SETUP}" == "true" ]]; then
-            # proceed as if cluster create occured
-            touch /tmp/shared/created
-            exit 0
-        fi
 
         # start cluster
         timeout 1h ./hack/create.sh ${RESOURCEGROUP}
