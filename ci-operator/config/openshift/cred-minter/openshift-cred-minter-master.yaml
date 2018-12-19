@@ -1,0 +1,52 @@
+base_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: origin-v4.0
+    namespace: openshift
+    tag: base
+binary_build_commands: make
+canonical_go_repository: github.com/openshift/cred-minter
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  to: cred-minter
+resources:
+  '*':
+    limits:
+      cpu: '2'
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: origin-v4.0
+  namespace: openshift
+  tag: ''
+  tag_overrides: {}
+build_root:
+  #  image_stream_tag:
+  #    cluster: https://api.ci.openshift.org
+  #    name: release
+  #    namespace: openshift
+  #    tag: golang-1.10
+  project_image:
+    dockerfile_path: build/build-image/Dockerfile
+    #context_dir: build/build-image/
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
+    #- as: gofmt
+    #  commands: make verify-gofmt
+    #  container:
+    #    from: src
+- as: govet
+  commands: make vet
+  container:
+    from: src
+    #- as: golint
+    #  commands: make lint
+    #  container:
+    #    from: src
