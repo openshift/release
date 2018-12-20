@@ -377,7 +377,7 @@ objects:
             cm_leader=$(oc get cm -n kube-system kube-controller-manager -o yaml | grep -o 00000[0-3])
             oc logs controllers-master-$cm_leader -n kube-system > /tmp/artifacts/controller-manager.log
             oc logs deploy/prometheus-operator -n openshift-monitoring > /tmp/artifacts/prometheus-operator.log
-            oc exec -it $(oc get po -l k8s-app=prometheus-operator --no-headers | awk '{print $1}') wget -- -O - localhost:8080/debug/pprof/goroutine?debug=2 >  /tmp/artifacts/prometheus-operator-pprof-goroutine
+            oc exec -n openshift-monitoring -it $(oc get po -n openshift-monitoring -l k8s-app=prometheus-operator --no-headers | awk '{print $1}') wget -- -O - localhost:8080/debug/pprof/goroutine?debug=2 >  /tmp/artifacts/prometheus-operator-pprof-goroutine
           fi
 
           cp -r /tmp/shared/openshift-azure/_data /go/src/github.com/openshift/openshift-azure/
