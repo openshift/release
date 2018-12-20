@@ -69,9 +69,6 @@ parameters:
   value: "registry.svc.ci.openshift.org/azure/test-base:latest"
 # If set to "true", it means the production OSA RP is going to be used.
 - name: TEST_IN_PRODUCTION
-# If set to "true", will skip the setup container and proceed to the tests
-- name: SKIP_SETUP
-  value: "false"
 
 objects:
 
@@ -271,8 +268,6 @@ objects:
         value: ${IMAGE_SYNC}
       - name: TEST_IN_PRODUCTION
         value: ${TEST_IN_PRODUCTION}
-      - name: SKIP_SETUP
-        value: ${SKIP_SETUP}
       command:
       - /bin/bash
       - -c
@@ -280,8 +275,8 @@ objects:
        #!/bin/bash
         set -euo pipefail
 
-        # SKIP_SETUP allows us to skip cluster creation and proceed to the test container
-        if [[ "${SKIP_SETUP}" == "true" ]]; then
+        # skip setting up the fake rp in case we are testing in production
+        if [[ -n $TEST_IN_PRODUCTION ]]; then
             cp -r /go/src/github.com/openshift/openshift-azure /tmp/shared
             touch /tmp/shared/created
             exit 0
