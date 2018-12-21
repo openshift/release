@@ -315,7 +315,7 @@ presubmits:
         - ci-operator
         env:
         - name: CLUSTER_TYPE
-          value: gcp
+          value: aws
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
@@ -338,18 +338,16 @@ presubmits:
           name: cluster-profile
         - mountPath: /usr/local/e2e-conformance-k8s
           name: job-definition
-          subPath: cluster-launch-src.yaml
+          subPath: cluster-launch-installer-src.yaml
       serviceAccountName: ci-operator
       volumes:
       - name: cluster-profile
         projected:
           sources:
           - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
+              name: cluster-secrets-aws
       - configMap:
-          name: prow-job-cluster-launch-src
+          name: prow-job-cluster-launch-installer-src
         name: job-definition
     trigger: ((?m)^/test( all| e2e-conformance-k8s),?(\s+|$))
   - agent: kubernetes
@@ -410,241 +408,6 @@ presubmits:
           name: prow-job-cluster-launch-e2e
         name: job-definition
     trigger: ((?m)^/test( all| e2e-gcp),?(\s+|$))
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - master
-    context: ci/prow/e2e-gcp-builds
-    decorate: true
-    name: pull-ci-openshift-origin-master-e2e-gcp-builds
-    rerun_command: /test e2e-gcp-builds
-    run_if_changed: ^(pkg/oc/cli/startbuild/startbuild.go)|^(pkg/build)|^(pkg/cmd/infra/builder)|^(test/extended/builds)|^(test/extended/testdata/builds)|^(test/extended/util)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)
-    skip_cloning: true
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/e2e-gcp-builds-cluster-profile
-        - --target=e2e-gcp-builds
-        - --template=/usr/local/e2e-gcp-builds
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: gcp
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-origin-master.yaml
-              name: ci-operator-configs
-        - name: JOB_NAME_SAFE
-          value: e2e-gcp-builds
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/build run-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          limits:
-            cpu: 500m
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/e2e-gcp-builds-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-gcp-builds
-          name: job-definition
-          subPath: cluster-launch-e2e.yaml
-      serviceAccountName: ci-operator
-      volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
-      - configMap:
-          name: prow-job-cluster-launch-e2e
-        name: job-definition
-    trigger: ((?m)^/test( all| e2e-gcp-builds),?(\s+|$))
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - master
-    context: ci/prow/e2e-gcp-crio
-    decorate: true
-    name: pull-ci-openshift-origin-master-e2e-gcp-crio
-    rerun_command: /test e2e-gcp-crio
-    run_if_changed: ^(vendor/k8s.io/kubernetes/pkg/kubelet)|^(pkg/build/builder)
-    skip_cloning: true
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/e2e-gcp-crio-cluster-profile
-        - --target=e2e-gcp-crio
-        - --template=/usr/local/e2e-gcp-crio
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: gcp
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-origin-master.yaml
-              name: ci-operator-configs
-        - name: JOB_NAME_SAFE
-          value: e2e-gcp-crio
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance run-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          limits:
-            cpu: 500m
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/e2e-gcp-crio-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-gcp-crio
-          name: job-definition
-          subPath: cluster-launch-e2e.yaml
-      serviceAccountName: ci-operator
-      volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp-crio
-      - configMap:
-          name: prow-job-cluster-launch-e2e
-        name: job-definition
-    trigger: ((?m)^/test( all| e2e-gcp-crio),?(\s+|$))
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - master
-    context: ci/prow/e2e-gcp-image-registry
-    decorate: true
-    name: pull-ci-openshift-origin-master-e2e-gcp-image-registry
-    rerun_command: /test e2e-gcp-image-registry
-    run_if_changed: ^(pkg/image)|^(test/extended/registry)|^(test/extended/images)|^(test/extended/imageapis)|^(vendor/github.com/docker/distribution)
-    skip_cloning: true
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/e2e-gcp-image-registry-cluster-profile
-        - --target=e2e-gcp-image-registry
-        - --template=/usr/local/e2e-gcp-image-registry
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: gcp
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-origin-master.yaml
-              name: ci-operator-configs
-        - name: JOB_NAME_SAFE
-          value: e2e-gcp-image-registry
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/image-registry run-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          limits:
-            cpu: 500m
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/e2e-gcp-image-registry-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-gcp-image-registry
-          name: job-definition
-          subPath: cluster-launch-e2e.yaml
-      serviceAccountName: ci-operator
-      volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
-      - configMap:
-          name: prow-job-cluster-launch-e2e
-        name: job-definition
-    trigger: ((?m)^/test( all| e2e-gcp-image-registry),?(\s+|$))
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - master
-    context: ci/prow/e2e-gcp-launch
-    decorate: true
-    name: pull-ci-openshift-origin-master-e2e-gcp-launch
-    rerun_command: /test e2e-gcp-launch
-    skip_cloning: true
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/e2e-gcp-launch-cluster-profile
-        - --target=e2e-gcp-launch
-        - --template=/usr/local/e2e-gcp-launch
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: gcp
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-origin-master.yaml
-              name: ci-operator-configs
-        - name: JOB_NAME_SAFE
-          value: e2e-gcp-launch
-        - name: TEST_COMMAND
-          value: sleep 7200 & wait
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          limits:
-            cpu: 500m
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/e2e-gcp-launch-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-gcp-launch
-          name: job-definition
-          subPath: cluster-launch-e2e.yaml
-      serviceAccountName: ci-operator
-      volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
-      - configMap:
-          name: prow-job-cluster-launch-e2e
-        name: job-definition
-    trigger: ((?m)^/test( all| e2e-gcp-launch),?(\s+|$))
   - agent: kubernetes
     always_run: true
     branches:
@@ -770,6 +533,62 @@ presubmits:
             cpu: 10m
       serviceAccountName: ci-operator
     trigger: ((?m)^/test( all| integration),?(\s+|$))
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - master
+    context: ci/prow/launch-aws
+    decorate: true
+    name: pull-ci-openshift-origin-master-launch-aws
+    rerun_command: /test launch-aws
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --secret-dir=/usr/local/launch-aws-cluster-profile
+        - --target=launch-aws
+        - --template=/usr/local/launch-aws
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-origin-master.yaml
+              name: ci-operator-configs
+        - name: JOB_NAME_SAFE
+          value: launch-aws
+        - name: TEST_COMMAND
+          value: sleep 7200 & wait
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/launch-aws-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/launch-aws
+          name: job-definition
+          subPath: cluster-launch-installer-e2e.yaml
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-e2e
+        name: job-definition
+    trigger: ((?m)^/test( all| launch-aws),?(\s+|$))
   - agent: kubernetes
     always_run: true
     branches:
