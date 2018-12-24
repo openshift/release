@@ -92,6 +92,8 @@ objects:
       - name: artifacts
         mountPath: /tmp/artifacts
       env:
+      - name: ARTIFACT_DIR
+        value: /tmp/artifacts
       - name: HOME
         value: /tmp/home
       - name: KUBECONFIG
@@ -190,6 +192,9 @@ objects:
         done
         # oh god the blood
         sleep 180
+
+        export KUBE_SSH_BASTION="$( oc get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
+        export KUBE_SSH_KEY_PATH=/tmp/cluster/ssh-privatekey
 
         # set up cloud-provider-specific env vars
         if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
