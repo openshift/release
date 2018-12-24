@@ -87,8 +87,8 @@ objects:
       - name: artifacts
         mountPath: /tmp/artifacts
       env:
-      - name: INSTANCE_PREFIX
-        value: ${NAMESPACE}-${JOB_NAME_HASH}
+      - name: ARTIFACT_DIR
+        value: /tmp/artifacts
       - name: HOME
         value: /tmp/home
       - name: KUBECONFIG
@@ -104,7 +104,9 @@ objects:
 
         trap 'touch /tmp/shared/exit' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
-        
+
+        cp "$(which oc)" /tmp/shared/
+
         mkdir -p "${HOME}"
 
         # wait for the router namespace
@@ -127,7 +129,6 @@ objects:
             # don't let clients impact the global kubeconfig
             cp "${KUBECONFIG}" /tmp/admin.kubeconfig
             export KUBECONFIG=/tmp/admin.kubeconfig
-            export ARTIFACT_DIR=/tmp/artifacts
           fi
           if ! oc get nodes 2>/dev/null; then
             echo "Waiting for API at $(oc whoami --show-server) to respond ..."
@@ -187,6 +188,9 @@ objects:
         # oh god the blood
         sleep 180
 
+        export KUBE_SSH_BASTION="$( oc get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
+        export KUBE_SSH_KEY_PATH=/tmp/cluster/ssh-privatekey
+
         # set up cloud-provider-specific env vars
         if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
           export GOOGLE_APPLICATION_CREDENTIALS="/tmp/cluster/gce.json"
@@ -205,7 +209,7 @@ objects:
           mkdir -p ~/.ssh
           cp /tmp/cluster/ssh-privatekey ~/.ssh/kube_openstack_rsa || true
         fi
-        
+
         ${TEST_COMMAND}
 
     # Runs an install
