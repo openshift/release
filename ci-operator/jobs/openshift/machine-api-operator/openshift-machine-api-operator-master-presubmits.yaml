@@ -68,19 +68,19 @@ presubmits:
     always_run: true
     branches:
     - master
-    context: ci/prow/e2e-aws-gate
+    context: ci/prow/e2e-aws-operator
     decorate: true
-    name: pull-ci-openshift-machine-api-operator-master-e2e-aws-gate
-    rerun_command: /test e2e-aws-gate
+    name: pull-ci-openshift-machine-api-operator-master-e2e-aws-operator
+    rerun_command: /test e2e-aws-operator
     skip_cloning: true
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/e2e-aws-gate-cluster-profile
-        - --target=e2e-aws-gate
-        - --template=/usr/local/e2e-aws-gate
+        - --secret-dir=/usr/local/e2e-aws-operator-cluster-profile
+        - --target=e2e-aws-operator
+        - --template=/usr/local/e2e-aws-operator
         command:
         - ci-operator
         env:
@@ -92,7 +92,7 @@ presubmits:
               key: openshift-machine-api-operator-master.yaml
               name: ci-operator-configs
         - name: JOB_NAME_SAFE
-          value: e2e-aws-gate
+          value: e2e-aws-operator
         - name: TEST_COMMAND
           value: make test-e2e
         image: ci-operator:latest
@@ -104,9 +104,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/e2e-aws-gate-cluster-profile
+        - mountPath: /usr/local/e2e-aws-operator-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-aws-gate
+        - mountPath: /usr/local/e2e-aws-operator
           name: job-definition
           subPath: cluster-launch-installer-src.yaml
       serviceAccountName: ci-operator
@@ -119,7 +119,7 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-src
         name: job-definition
-    trigger: ((?m)^/test( all| e2e-aws-gate),?(\s+|$))
+    trigger: ((?m)^/test( all| e2e-aws-operator),?(\s+|$))
   - agent: kubernetes
     always_run: true
     branches:
