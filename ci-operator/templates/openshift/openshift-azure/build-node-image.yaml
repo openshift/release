@@ -114,7 +114,7 @@ objects:
         set -euo pipefail
 
         # We need to persist this variable so that we can clean it up when we exit
-        echo "RESOURCEGROUP=${INSTANCE_PREFIX}-$(TZ=Etc/UTC date +%Y%m%d%H%M)" >>/tmp/shared/environment
+        echo "RESOURCEGROUP_PREFIX=${INSTANCE_PREFIX}-$(TZ=Etc/UTC date +%Y%m%d%H%M)" >>/tmp/shared/environment
         # TODO: Remove me after CRI-O becomes default
         if [[ ${OPENSHIFT_USE_CRIO} = "True" ]]; then
           echo "IMAGE_NAME=${DEPLOY_OS}-$OPENSHIFT_RELEASE-crio-$(TZ=Etc/UTC date +%Y%m%d%H%M)" >>/tmp/shared/environment
@@ -125,13 +125,13 @@ objects:
         trap 'rc=$?; if [[ $rc -ne 0 ]]; then
           touch /tmp/shared/exit;
         fi;
-        az group delete -n ${RESOURCEGROUP} -y --no-wait
+        az group delete -n ${RESOURCEGROUP_PREFIX}-image-build -y --no-wait
         exit $rc' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
 
         # Get resource group and image name
         source /tmp/shared/environment
-        echo "RESOURCEGROUP=${RESOURCEGROUP}"
+        echo "RESOURCEGROUP=${RESOURCEGROUP_PREFIX}-image-build"
         echo "IMAGE_NAME=${IMAGE_NAME}"
         export AZURE_OREG_URL='registry.access.redhat.com/openshift3/ose-${component}:${version}'
 
@@ -233,7 +233,7 @@ objects:
         export IMAGE_RESOURCENAME=${IMAGE_NAME}
         export AZURE_REGION=eastus
         export AZURE_AAD_CLIENT_ID=${AZURE_CLIENT_ID}
-        export RESOURCEGROUP=${RESOURCEGROUP}-e2e
+        export RESOURCEGROUP=${RESOURCEGROUP_PREFIX}-e2e
         # Clone openshift-azure by ourselves since it's not supported yet by the ci-operator
         # https://github.com/openshift/ci-operator/issues/142
         mkdir -p /go/src/github.com/openshift
