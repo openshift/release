@@ -233,7 +233,7 @@ oc get secret cluster-secrets-azure --export -n azure -o yaml | oc apply -n ci -
 
 This secret is used by the azure-purge job to authenticate in Azure when garbage-collecting stale resources.
 
-To rorate this secret:
+To rotate this secret:
 
 ```
 source ./cluster/test-deploy/azure/secret
@@ -256,3 +256,50 @@ token-refresh                             0 0 * * *   False     1         44d   
 * _token-refresh_ refreshes a token from the AWS registry that we put inside node images built from Origin master to pull images for the cluster
 
 We need to check whether the above jobs are in a working state. Access to the cluster is granted to every member of the openshift github organization. Access to the azure namespace is controlled by the [azure-team group](./cluster-wide.yaml).
+
+# Building container images
+
+To onboard a new container image into CI and possibly setup mirroring of the image to quay the following steps should be 
+performed:
+
+* Ensure there is a `Dockerfile.<image_name>` in the [openshift on azure repo](https://github.com/openshift/openshift-azure) 
+specifying how to build the new image
+* Create 3 new make targets in that repository for the various stages leading up to building the image
+  * one target for building the binary
+  * one target for building the container image
+  * one target for pushing the container image to the CI registry
+* Add the target for building the binary to the `make all` chain
+* Add the binary name to the `make clean` chain
+* Add the binary to `.gitignore`
+* Back in the [openshift release repo](https://github.com/openshift/openshift-azure) add the image specs to the 
+[ci-operator](https://github.com/openshift/release/blob/master/ci-operator/config/openshift/openshift-azure/openshift-openshift-azure-master.yaml) 
+config to onboard building the image in CI 
+  * Add a new entry to the `images` key of that file which looks as follows:
+  	```yaml
+	- dockerfile_path: Dockerfile.<image_name>
+      from: base
+      inputs:
+        bin:
+          paths:
+          - destination_dir: .
+            source_path: /go/src/github.com/openshift/openshift-azure/<image_source>
+      to: <image_name>
+	```
+* If you intend for the image to be mirrored from the CI registry to the public quay registry then you need to update the
+[image mirror config](https://github.com/openshift/release/blob/master/projects/azure/image-mirror/image-mirror.yaml) 
+in the release repo
+	* Add a new entry to the `items[0].data.openshift-azure_v3_11_quay` key of that file which looks as follows:
+	```yaml
+	registry.svc.ci.openshift.org/azure/azure-plugins:<image_name> quay.io/openshift-on-azure/<image_name>:v3.11 quay.io/openshift-on-azure/<image_name>:latest
+	```
+* Note: The new image and others configured as such are built for [every commit pushed to master](https://github.com/openshift/release/blob/03d68b76db023721990dd24aeddd9a03d6a02bc3/ci-operator/jobs/openshift/openshift-azure/openshift-openshift-azure-master-postsubmits.yaml#L57-L86) 
+and also on a 
+[daily basis](https://github.com/openshift/release/blob/03d68b76db023721990dd24aeddd9a03d6a02bc3/ci-operator/jobs/openshift/openshift-azure/openshift-openshift-azure-periodics.yaml#L476-L505).
+* Note: Since the image mirror job is unable to create repos in quay, an initial manual push of the new image using the 
+make target is required.
+* Note: In contrast, the [test-base](https://github.com/openshift/release/blob/master/projects/azure/base-images/test-base.yaml) 
+image build is not currently a prow job but only an OpenShift build at the moment. Changes to the `test-base` config
+therefore requires the build to be re-triggered manually via the CI cluster UI or using the oc CLI. For example:
+```yaml
+oc start-build bc/test-base -n azure
+```
