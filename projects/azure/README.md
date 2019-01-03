@@ -267,11 +267,11 @@ specifying how to build the new image
 * Create 3 new make targets in that repository for the various stages leading up to building the image
   * one target for building the binary
   * one target for building the container image
-  * one target for pushing the container image to the CI registry
+  * one target for pushing the container image to the public quay registry
 * Add the target for building the binary to the `make all` chain
 * Add the binary name to the `make clean` chain
 * Add the binary to `.gitignore`
-* Back in the [openshift release repo](https://github.com/openshift/openshift-azure) add the image specs to the 
+* Back in the [openshift release repo](https://github.com/openshift/release) add the image specs to the 
 [ci-operator](https://github.com/openshift/release/blob/master/ci-operator/config/openshift/openshift-azure/openshift-openshift-azure-master.yaml) 
 config to onboard building the image in CI 
   * Add a new entry to the `images` key of that file which looks as follows:
@@ -288,10 +288,13 @@ config to onboard building the image in CI
 * If you intend for the image to be mirrored from the CI registry to the public quay registry then you need to update the
 [image mirror config](https://github.com/openshift/release/blob/master/projects/azure/image-mirror/image-mirror.yaml) 
 in the release repo
-	* Add a new entry to the `items[0].data.openshift-azure_v3_11_quay` key of that file which looks as follows:
+	* Add a new entry to the `items[0].data.openshift-azure_<openshift_version>_quay` key of that file which looks as follows:
 	```yaml
-	registry.svc.ci.openshift.org/azure/azure-plugins:<image_name> quay.io/openshift-on-azure/<image_name>:v3.11 quay.io/openshift-on-azure/<image_name>:latest
+	registry.svc.ci.openshift.org/azure/azure-plugins:<image_name> quay.io/openshift-on-azure/<image_name>:<openshift_version> quay.io/openshift-on-azure/<image_name>:latest
 	```
+	where:
+	* `<image_name>` is the name of the image
+	* `<openshift_version>` is the currently supported openshift version e.g. v3.11
 * Note: The new image and others configured as such are built for [every commit pushed to master](https://github.com/openshift/release/blob/03d68b76db023721990dd24aeddd9a03d6a02bc3/ci-operator/jobs/openshift/openshift-azure/openshift-openshift-azure-master-postsubmits.yaml#L57-L86) 
 and also on a 
 [daily basis](https://github.com/openshift/release/blob/03d68b76db023721990dd24aeddd9a03d6a02bc3/ci-operator/jobs/openshift/openshift-azure/openshift-openshift-azure-periodics.yaml#L476-L505).
