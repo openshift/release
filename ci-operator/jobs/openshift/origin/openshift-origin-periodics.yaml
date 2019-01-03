@@ -15,24 +15,27 @@ periodics:
     containers:
     - args:
       - --artifact-dir=$(ARTIFACTS)
-      - --secret-dir=/usr/local/e2e-gcp-cluster-profile
-      - --template=/usr/local/e2e-gcp
-      - --target=e2e-gcp
-      - --git-ref=openshift/origin@master
+      - --give-pr-author-access-to-namespace=true
+      - --secret-dir=/usr/local/e2e-conformance-k8s-cluster-profile
+      - --target=e2e-conformance-k8s
+      - --template=/usr/local/e2e-conformance-k8s
       command:
       - ci-operator
       env:
-      - name: TEST_COMMAND
-        value: test/extended/conformance-k8s.sh
-      - name: JOB_NAME_SAFE
-        value: e2e-gcp
       - name: CLUSTER_TYPE
-        value: gcp
+        value: aws
       - name: CONFIG_SPEC
         valueFrom:
           configMapKeyRef:
             key: openshift-origin-master.yaml
             name: ci-operator-configs
+      - name: JOB_NAME_SAFE
+        value: e2e-conformance-k8s
+      - name: RESOURCES_TEST
+        value: '{"requests": {"cpu": 1, "memory": "300Mi"}, "limits": {"cpu": 3,
+          "memory": "9Gi"}}'
+      - name: TEST_COMMAND
+        value: test/extended/conformance-k8s.sh
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -42,23 +45,21 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /usr/local/e2e-gcp
-        name: job-definition
-        subPath: cluster-launch-src.yaml
-      - mountPath: /usr/local/e2e-gcp-cluster-profile
+      - mountPath: /usr/local/e2e-conformance-k8s-cluster-profile
         name: cluster-profile
+      - mountPath: /usr/local/e2e-conformance-k8s
+        name: job-definition
+        subPath: cluster-launch-installer-src.yaml
     serviceAccountName: ci-operator
     volumes:
-    - configMap:
-        name: prow-job-cluster-launch-src
-      name: job-definition
     - name: cluster-profile
       projected:
         sources:
         - secret:
-            name: cluster-secrets-gcp
-        - configMap:
-            name: cluster-profile-gcp
+            name: cluster-secrets-aws
+    - configMap:
+        name: prow-job-cluster-launch-installer-src
+      name: job-definition
 - agent: jenkins
   cron: ""
   interval: 24h
