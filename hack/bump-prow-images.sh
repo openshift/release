@@ -8,7 +8,7 @@ workspace="$( mktemp -d )"
 trap 'rm -rf "${workspace}"' EXIT
 
 cat <<EOF >>"${workspace}/commit.txt"
-[$(TZ=UTC date '+%d-%M-%Y %H:%M:%S')] Bumping Prow component images
+[$(TZ=UTC date '+%d-%m-%Y %H:%M:%S')] Bumping Prow component images
 
 $(printf '%-12s %-20s %-20s' component from to)
 EOF
