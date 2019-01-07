@@ -30,6 +30,13 @@ cp cluster/test-deploy/azure/secret_example cluster/test-deploy/azure/secret
 # insert/update credentials in cluster/test-deploy/azure/secret
 ```
 
+Create a `secret` file for storing codecov-related secrets using `cluster/test-deploy/azure/codecov_example` as a template.
+
+```
+cp cluster/test-deploy/azure/codecov_example cluster/test-deploy/azure/codecov
+# insert/update credentials in cluster/test-deploy/azure/codecov
+```
+
 Set the location of the namespace you wish to use for the ci-operator jobs
 ```
 export CI_OPERATOR_NAMESPACE=your-chosen-namespace
@@ -238,6 +245,22 @@ To rotate this secret:
 ```
 source ./cluster/test-deploy/azure/secret
 oc create secret generic cluster-secrets-azure-env --from-literal=azure_client_id=${AZURE_CLIENT_ID} --from-literal=azure_client_secret=${AZURE_CLIENT_SECRET} --from-literal=azure_tenant_id=${AZURE_TENANT_ID} --from-literal=azure_subscription_id=${AZURE_SUBSCRIPTION_ID} -o yaml --dry-run | oc apply -n azure -f -
+```
+
+## codecov-token
+
+This secret is used for pushing reports to [Codecov](https://codecov.io/)
+
+To rotate this secret:
+
+```
+source ./cluster/test-deploy/azure/codecov
+oc create secret generic codecov-token --from-literal=upload=${CODECOV_UPLOAD_TOKEN} --from-literal=graph=${CODECOV_GRAPH_TOKEN} -o yaml --dry-run | oc apply -n azure -f -
+```
+
+Copy the secret to the `CI` namespace
+```
+oc get secret codecov-token --export -n azure -o yaml | oc apply -n ci -f -
 ```
 
 ## Other cron jobs

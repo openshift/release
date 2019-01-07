@@ -293,6 +293,7 @@ azure-secrets: azure
 	oc create secret generic aws-reg-master --from-literal=username=${AWS_REG_USERNAME} --from-literal=password=${AWS_REG_PASSWORD} -o yaml --dry-run | oc apply -n azure -f -
 	oc create secret generic hmac-token --from-literal=hmac=${HMAC_TOKEN} -o yaml --dry-run | oc apply -n azure -f -
 	oc create secret generic oauth-token --from-literal=oauth=${AZURE_OAUTH_TOKEN} -o yaml --dry-run | oc apply -n azure -f -
+	oc create secret generic codecov-token --from-literal=upload=${CODECOV_UPLOAD_TOKEN} --from-literal=graph=${CODECOV_GRAPH_TOKEN} -o yaml --dry-run | oc apply -n azure -f -
 .PHONY: azure
 
 check:
