@@ -13,6 +13,9 @@ def main():
     failed = False
     for root, _, files in os.walk(JOBS_DIR):
         for filename in files:
+            if filename.endswith(".yml"):
+                print(f"[ERROR] Only .yaml extensions are allowed, not .yml as in {root}/{filename}")
+                failed = True
             if not filename.endswith('.yaml'):
                 continue
             if os.path.basename(filename) == "infra-periodics.yaml":
