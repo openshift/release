@@ -12,6 +12,7 @@ aws_subnet: "subnet-f93770d6" # Name: CI Subnet 1
 aws_image: "ami-9887c6e7" #official centos 7
 aws_use_auto_terminator: false
 aws_expiration_date: "{{ lookup('pipe','date -d \"4 hours\" --iso=minutes --utc') }}"
+aws_vpc_id: vpc-23966258 #global VPC on CI account
 
 aws_instances:
 - name: "{{ vm_prefix }}-master"
@@ -20,7 +21,7 @@ aws_instances:
     - etcd
     - nodes
   aws_flavor: t2.large
-  aws_security_group: openshift-ansible-public
+  aws_security_group: "{{ vm_prefix }}-sg"
   node_group: "node-config-master"
   aws_volumes:
     - device_name: /dev/sda1
@@ -30,7 +31,7 @@ aws_instances:
   ansible_groups:
     - nodes
   aws_flavor: t2.large
-  aws_security_group: openshift-ansible-public
+  aws_security_group: "{{ vm_prefix }}-sg"
   node_group: "node-config-infra"
   aws_volumes:
     - device_name: /dev/sda1
@@ -40,7 +41,7 @@ aws_instances:
   ansible_groups:
     - nodes
   aws_flavor: t2.large
-  aws_security_group: openshift-ansible-public
+  aws_security_group: "{{ vm_prefix }}-sg"
   node_group: "node-config-compute"
   aws_volumes:
     - device_name: /dev/sda1
