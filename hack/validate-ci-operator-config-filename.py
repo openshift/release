@@ -27,6 +27,9 @@ def main():
 
     for root, _, files in os.walk(args.config_dir):
         for name in files:
+            if name.endswith(".yml"):
+                print(f"[ERROR] Only .yaml extensions are allowed, not .yml as in {root_path}/{name}")
+                sys.exit(1)
             if name.endswith(".yaml"):
                 root_path = os.path.relpath(root, args.config_dir)
                 filename, _ = os.path.splitext(name)
