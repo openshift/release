@@ -141,6 +141,40 @@ presubmits:
     always_run: true
     branches:
     - master
+    context: ci/prow/pj-rehearse
+    decorate: true
+    name: pull-ci-openshift-release-master-pj-rehearse
+    optional: true
+    rerun_command: /test pj-rehearse
+    spec:
+      containers:
+      - args:
+        - --job-config-path=/etc/job-config/
+        command:
+        - /bin/pj-rehearse
+        image: pj-rehearse:latest
+        imagePullPolicy: Always
+        name: ""
+        resources: {}
+        volumeMounts:
+        - mountPath: /etc/config
+          name: config
+          readOnly: true
+        - mountPath: /etc/job-config
+          name: job-config
+          readOnly: true
+      volumes:
+      - configMap:
+          name: config
+        name: config
+      - configMap:
+          name: job-config
+        name: job-config
+    trigger: ((?m)^/test( all| pj-rehearse),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
     context: ci/prow/prow-config-filenames
     decorate: true
     name: pull-ci-openshift-release-master-prow-config-filenames
