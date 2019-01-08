@@ -1,0 +1,36 @@
+presubmits:
+  openshift/k8s-prometheus-adapter:
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/images
+    decorate: true
+    name: pull-ci-openshift-k8s-prometheus-adapter-master-images
+    rerun_command: /test images
+    skip_cloning: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --target=[images]
+        - --target=[release:latest]
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-k8s-prometheus-adapter-master.yaml
+              name: ci-operator-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| images),?(\s+|$))
