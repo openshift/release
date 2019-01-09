@@ -33,36 +33,3 @@ presubmits:
             cpu: 10m
       serviceAccountName: ci-operator
     trigger: ((?m)^/test( all| verify),?(\s+|$))
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    context: ci/prow/verify-client-go
-    decorate: true
-    name: pull-ci-openshift-api-master-verify-client-go
-    rerun_command: /test verify-client-go
-    skip_cloning: true
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --target=verify-client-go
-        command:
-        - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-api-master.yaml
-              name: ci-operator-configs
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          limits:
-            cpu: 500m
-          requests:
-            cpu: 10m
-      serviceAccountName: ci-operator
-    trigger: ((?m)^/test( all| verify-client-go),?(\s+|$))
