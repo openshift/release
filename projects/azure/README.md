@@ -15,7 +15,7 @@ OSA, from the Red Hat side, is comprised of a couple of different Github repos:
 In order to test and merge changes in these repositories, we use a couple of novel tools
 in our CI. Namely:
 * [ci-operator](https://github.com/openshift/ci-operator)
-  This tool is responsible for running [jobs](ci-operator-jobs) by using Openshift resources.
+  This tool is responsible for running [jobs](#ci-operator-jobs) by using Openshift resources.
   There are a bunch of useful docs in the ci-operator repo, it is suggested to
   go through at least [ONBOARD.md](https://github.com/openshift/ci-operator/blob/master/ONBOARD.md), [ARCHITECTURE.md](https://github.com/openshift/ci-operator/blob/master/ARCHITECTURE.md), and [CONFIGURATION.md](https://github.com/openshift/ci-operator/blob/master/CONFIGURATION.md).
   You should ensure you familiarize yourself with `ci-operator`.
