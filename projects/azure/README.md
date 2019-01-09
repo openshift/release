@@ -1,25 +1,92 @@
-# Azure project
+# OSA CI
 
-Azure project is a flavor of OpenShift dedicated hosted, on Microsoft Azure. This repository contains code for building release artifacts, testing, and life-cycle.
-Main code repository is located in [Openshift Azure](https://github.com/openshift/openshift-azure/) project
+The current directory contains CI configuration for the OSA project. The present document
+serves as documentation for anything CI-related to OSA.
 
-# Test CI-operator jobs
+OSA, from the Red Hat side, is comprised of a couple of different Github repos:
+* [openshift/openshift-azure](https://github.com/openshift/openshift-azure/)
+  This is the main code repository where all production code used by Microsoft
+  is developed.
+* [openshift/azure-misc](https://github.com/openshift/azure-misc/)
+  This repo contains various tools used either in our CI or by SRE processes.
+* [openshift/openshift-ansible](https://github.com/openshift/openshift-ansible/)
+  The VM image build process is currently maintained in this repo.
 
-CI-Operator jobs are being triggered using [prow](https://github.com/kubernetes/test-infra/tree/master/prow).
-The Prow configuration is located in files within this repository at `ci-operator/jobs/openshift/openshift-azure/*.yaml`
+In order to test and merge changes in these repositories, we use a couple of novel tools
+in our CI. Namely:
+* [ci-operator](https://github.com/openshift/ci-operator)
+  This tool is responsible for running [jobs](ci-operator-jobs) by using Openshift resources.
+  There are a bunch of useful docs in the ci-operator repo, it is suggested to
+  go through at least [ONBOARD.md](https://github.com/openshift/ci-operator/blob/master/ONBOARD.md), [ARCHITECTURE.md](https://github.com/openshift/ci-operator/blob/master/ARCHITECTURE.md), and [CONFIGURATION.md](https://github.com/openshift/ci-operator/blob/master/CONFIGURATION.md).
+  You should ensure you familiarize yourself with `ci-operator`.
+* [Prow](https://github.com/kubernetes/test-infra/blob/master/prow/README.md)
+  Prow is the CI system used in both Kubernetes and the Openshift Origin projects.
+  It is responsible for every user interaction in Github, scheduling of tests, and
+  reporting results. As an end user you shouldn't need to familiarize yourself with Prow.
 
-To run a CI-Operator job manually it is recommended to use the [CI-Operator](https://github.com/openshift/ci-operator) container image
+
+## ci-operator jobs
+
+There are three different places where we store ci-operator and Prow configuration:
+
+1. `ci-operator/config/openshift/openshift-azure/`
+  This is where the ci-operator config is stored and what is meant to be used
+  by end users. Here we are specifying what commands we want to run in order to
+  build and test our code, and optionally publish container images.
+2. `ci-operator/jobs/openshift/openshift-azure/`
+  In order to deploy the `ci-operator` config, we need to use prowjobs and this
+  is where we configure those. Prowjobs fall under three categories:
+  * presubmits: These jobs run in PRs
+  * postsubmits: These jobs run in merged commits
+  * periodics: These jobs run periodically
+3. `ci-operator/templates/openshift/openshift-azure`
+  Unfortunately, we cannot define all types of tests in `ci-operator/config/openshift/openshift-azure/`.
+  Hence, we use Openshift templates to do black-box testing with ci-operator.
+  This directory contains the templates used by our e2e tests and by our image
+  build processes. In order to learn more about writting tests using templates
+  refer to [TEMPLATES.md](https://github.com/openshift/ci-operator/blob/master/TEMPLATES.md)
+
+Similarly, you can find the CI configuration for `azure-misc` in `ci-operator/jobs/openshift/azure-misc/`
+and `ci-operator/config/openshift/azure-misc/`.
+
+## How to work with CI
+
+### Automated jobs
+
+The following CI jobs run automatically on every PR in `openshift-azure`:
+* `unit`: runs unit tests
+* `verify`: runs verification tests
+* `images`: builds all binaries and images
+* `e2e`: runs e2e tests
+
+When a test fails in your PR, you need to triage the failure, and compare it with the existing
+set of [open issues tracking test failures](https://github.com/openshift/openshift-azure/issues?q=is%3Aissue+is%3Aopen+label%3Akind%2Ftest-flake).
+If you don't find a match, you should open a new issue to track the failure and comment
+`/kind test-flake` in it in order for the github bot to label the issue appropriately.
+Then, you can `/retest` your PR.
+
+Optionally, you can request specific long-running tests to run that are not
+running in PRs by default. Namely:
+* `/test scaleupdown`: runs a test doing a scale up followed by a scale down of the cluster
+* `/test etcdrecovery`: runs a test that backups a cluster, mutates state, then restores from the backup
+* `/test keyrotation`: runs a test that rotates all the certificates in a cluster
+* `/test prod`: runs a test using the production OSA RP
+* `/test vnet`: runs a custom vnet test using the production OSA RP
+
+Note that the tests using the production RP are not any useful to run in PRs unless
+you update the tests themselves.
+
+### Run a job manually
+
+The point of using `ci-operator` is to minimize the differences between using the CI
+system and running tests manually. To run a ci-operator job manually it is recommended
+to use the [CI-Operator](https://github.com/openshift/ci-operator) container image.
 ```
 docker pull registry.svc.ci.openshift.org/ci/ci-operator:latest
 ```
 
-The templates used to run all of our ci-operator jobs (vm image builds and e2e tests) are located in
-
-```
-ci-operator/templates/openshift/openshift-azure/
-```
-
-Obtain the `oc login` command from the OpenShift CI WebConsole and perform a login in your terminal
+`ci-operator` needs a kubeconfig in place in order to use a running cluster to run the tests.
+Obtain the `oc login` command from the OpenShift CI WebConsole and perform a login in your terminal.
 
 Note: all further instructions assume you are currently in the root directory of this repository
 
@@ -33,6 +100,55 @@ cp cluster/test-deploy/azure/secret_example cluster/test-deploy/azure/secret
 Set the location of the namespace you wish to use for the ci-operator jobs
 ```
 export CI_OPERATOR_NAMESPACE=your-chosen-namespace
+```
+
+#### Running e2e tests
+
+Example: Run e2e tests
+```
+docker run \
+--rm \
+-it \
+--volume $HOME/.kube/config:/root/.kube/config \
+--volume $(pwd):/release \
+registry.svc.ci.openshift.org/ci/ci-operator:latest \
+--config /release/ci-operator/config/openshift/openshift-azure/openshift-openshift-azure-master.yaml \
+--git-ref=openshift/openshift-azure@master \
+--namespace=${CI_OPERATOR_NAMESPACE} \
+--template /release/ci-operator/templates/openshift/openshift-azure/cluster-launch-e2e-azure.yaml \
+--secret-dir /release/cluster/test-deploy/azure/
+```
+
+Example: Run an upgrade and then perform e2e tests
+```
+docker run \
+--rm \
+-it \
+--volume $HOME/.kube/config:/root/.kube/config \
+--volume $(pwd):/release \
+registry.svc.ci.openshift.org/ci/ci-operator:latest \
+--config /release/ci-operator/config/openshift/openshift-azure/openshift-openshift-azure-master.yaml \
+--git-ref=openshift/openshift-azure@master \
+--namespace=${CI_OPERATOR_NAMESPACE} \
+--template /release/ci-operator/templates/openshift/openshift-azure/cluster-launch-e2e-azure-upgrade.yaml \
+--secret-dir /release/cluster/test-deploy/azure/
+```
+
+Example: Run origin conformance tests
+```
+docker run \
+--rm \
+-it \
+--env TEST_COMMAND="TEST_FOCUS=Suite:openshift/conformance/parallel run-tests" \
+--env TEST_IMAGE="registry.svc.ci.openshift.org/openshift/origin-v3.11:tests" \
+--volume $HOME/.kube/config:/root/.kube/config \
+--volume $(pwd):/release \
+registry.svc.ci.openshift.org/ci/ci-operator:latest \
+--config /release/ci-operator/config/openshift/openshift-azure/openshift-openshift-azure-master.yaml \
+--git-ref=openshift/openshift-azure@master \
+--namespace=${CI_OPERATOR_NAMESPACE} \
+--template /release/ci-operator/templates/openshift/openshift-azure/cluster-launch-e2e-azure.yaml \
+--secret-dir /release/cluster/test-deploy/azure/
 ```
 
 #### Testing vm image builds
@@ -127,64 +243,7 @@ registry.svc.ci.openshift.org/ci/ci-operator:latest \
 --target build-node-image
 ```
 
-#### Running e2e tests
-
-Example: Run e2e tests
-```
-docker run \
---rm \
--it \
---volume $HOME/.kube/config:/root/.kube/config \
---volume $(pwd):/release \
-registry.svc.ci.openshift.org/ci/ci-operator:latest \
---config /release/ci-operator/config/openshift/openshift-azure/openshift-openshift-azure-master.yaml \
---git-ref=openshift/openshift-azure@master \
---namespace=${CI_OPERATOR_NAMESPACE} \
---template /release/ci-operator/templates/openshift/openshift-azure/cluster-launch-e2e-azure.yaml \
---secret-dir /release/cluster/test-deploy/azure/
-```
-
-Example: Run an upgrade and then perform e2e tests
-```
-docker run \
---rm \
--it \
---volume $HOME/.kube/config:/root/.kube/config \
---volume $(pwd):/release \
-registry.svc.ci.openshift.org/ci/ci-operator:latest \
---config /release/ci-operator/config/openshift/openshift-azure/openshift-openshift-azure-master.yaml \
---git-ref=openshift/openshift-azure@master \
---namespace=${CI_OPERATOR_NAMESPACE} \
---template /release/ci-operator/templates/openshift/openshift-azure/cluster-launch-e2e-azure-upgrade.yaml \
---secret-dir /release/cluster/test-deploy/azure/
-```
-
-Example: Run origin conformance tests
-```
-docker run \
---rm \
--it \
---env TEST_COMMAND="TEST_FOCUS=Suite:openshift/conformance/parallel run-tests" \
---env TEST_IMAGE="registry.svc.ci.openshift.org/openshift/origin-v3.11:tests" \
---volume $HOME/.kube/config:/root/.kube/config \
---volume $(pwd):/release \
-registry.svc.ci.openshift.org/ci/ci-operator:latest \
---config /release/ci-operator/config/openshift/openshift-azure/openshift-openshift-azure-master.yaml \
---git-ref=openshift/openshift-azure@master \
---namespace=${CI_OPERATOR_NAMESPACE} \
---template /release/ci-operator/templates/openshift/openshift-azure/cluster-launch-e2e-azure.yaml \
---secret-dir /release/cluster/test-deploy/azure/
-```
-
-#### Cleanup
-
-Delete the `aos-ansible` repository if desired
-```
-rm -rf ../aos-ansible
-```
-
-
-# Secrets
+## CI secrets
 
 We use 2 types of secrets. Both of them contain the same data but in a different formats.
 
@@ -193,7 +252,7 @@ cluster-secrets-azure: file based secret. It can be sourced by script (see ci-op
 cluster-secrets-azure-env: environment based secret. It can be injected to pod using pod spec (see azure-purge)
 ```
 
-## cluster-secrets-azure
+### cluster-secrets-azure
 
 OSA jobs are using `Web API App` credentials on Azure to run jobs. If for some reason you need to rotate secret, follow this process:
 
@@ -234,7 +293,7 @@ we will not need to have the rest of the secrets in place.
 
 
 
-## cluster-secrets-azure-env
+### cluster-secrets-azure-env
 
 This secret is used by the azure-purge job to authenticate in Azure when garbage-collecting stale resources.
 
@@ -262,7 +321,7 @@ token-refresh                             0 0 * * *   False     1         44d   
 
 We need to check whether the above jobs are in a working state. Access to the cluster is granted to every member of the openshift github organization. Access to the azure namespace is controlled by the [azure-team group](./cluster-wide.yaml).
 
-# Building container images
+## Building container images
 
 To onboard a new container image into CI and possibly setup mirroring of the image to quay the following steps should be 
 performed:
