@@ -208,26 +208,31 @@ export AZURE_TENANT_ID=<tenant id>
 export AZURE_SUBSCRIPTION_ID=<subscription id>
 ```
 
-4. Create a secret
+4. Create or udate the `cluster-secrets-azure` secret in the `azure` namespace.
 
 You need to make sure you also have the required certificates in place in order to allow our
-build VM process to download the OpenShift RPMs from the ops mirror.
+build VM process to download the OpenShift RPMs from the ops mirror. There are also the Geneva
+secrets (image pull secret, logging, and metrics certificates).
+
+TODO: In the future, split this into separate secrets so in case we need to rotate the CI credentials
+we will not need to have the rest of the secrets in place.
 
 ```
-oc create secret generic cluster-secrets-azure --from-file=cluster/test-deploy/azure/secret --from-file=cluster/test-deploy/azure/ssh-privatekey --from-file=cluster/test-deploy/azure/certs.yaml -o yaml --dry-run | oc apply -n ci -f -
+  oc create secret generic cluster-secrets-azure \
+  --from-file=cluster/test-deploy/azure/secret \
+  --from-file=cluster/test-deploy/azure/ssh-privatekey \
+  --from-file=cluster/test-deploy/azure/certs.yaml \
+  --from-file=cluster/test-deploy/azure/.dockerconfigjson \
+  --from-file=cluster/test-deploy/azure/logging-int.cert \
+  --from-file=cluster/test-deploy/azure/logging-int.key \
+  --from-file=cluster/test-deploy/azure/metrics-int.cert \
+  --from-file=cluster/test-deploy/azure/metrics-int.key \
+  -o yaml --dry-run | oc apply -n ci -f -
 ```
 
-5. (Optional, if you dont have access to CI namespace)
+5. Ensure the secret is placed in the [ci-secret-mirroring-controller config](https://github.com/openshift/release/blob/master/cluster/ci/config/secret-mirroring/mapping.yaml). The controller will make sure to keep the secret in sync between the `azure` and the `ci` namespace where all CI tests run.
 
-```
-oc create secret generic cluster-secrets-azure --from-file=cluster/test-deploy/azure/secret --from-file=cluster/test-deploy/azure/ssh-privatekey --from-file=cluster/test-deploy/azure/certs.yaml -o yaml --dry-run | oc apply -n azure -f -
-```
 
-and ask somebody, who has access to execute:
-
-```
-oc get secret cluster-secrets-azure --export -n azure -o yaml | oc apply -n ci -f -
-```
 
 ## cluster-secrets-azure-env
 
