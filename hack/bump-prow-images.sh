@@ -28,7 +28,7 @@ fi
 # and are not necessarily in order, so we need to do some silliness
 for image in 'label_sync' 'commenter' 'ghproxy'; do
 	current_tag="$( grep -Pho "(?<=${image}:)v[0-9]{8}-[a-z0-9]+" $( find cluster/ci/config/prow/openshift -type f ) ci-operator/jobs/infra-periodics.yaml | head -n 1 )"
-	latest_tag="$( gcloud container images list-tags gcr.io/k8s-testimages/${image} --format='value(tags)' --limit 10 | grep "latest," | grep -Po "v[0-9]+\-[a-z0-9]+" )"
+	latest_tag="$( gcloud container images list-tags gcr.io/k8s-testimages/${image} --format='value(tags)' --limit 100 | grep "latest," | grep -Po "v[0-9]+\-[a-z0-9]+" )"
 	if [[ "${current_tag}" != "${latest_tag}" ]]; then
 		printf '%-12s %-20s %-20s\n' "${image}" "${current_tag}" "${latest_tag}" | tee -a "${workspace}/commit.txt"
 		sed -i "s|\(gcr\.io/k8s-testimages/${image}:\)v[0-9][0-9]*-[a-z0-9][a-z0-9]*|\1${latest_tag}|g" $( find cluster/ci/config/prow/openshift -type f ) ci-operator/jobs/infra-periodics.yaml
