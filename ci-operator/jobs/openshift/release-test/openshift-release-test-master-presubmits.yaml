@@ -1,0 +1,208 @@
+presubmits:
+  openshift/release:
+  - agent: kubernetes
+    always_run: false
+    context: ci/openshift/promrules
+    decorate: true
+    name: check_prometheus_rules-test
+    rerun_command: /test promrules
+    run_if_changed: ^(projects/prometheus/prometheus.rules.yaml)$
+    skip_cloning: true
+    spec:
+      containers:
+      - command:
+        - /go/entrypoint.sh
+        image: registry.svc.ci.openshift.org/ci/promrules:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+    trigger: ((?m)^/test promrules,?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/ci-operator-config
+    decorate: true
+    name: pull-ci-openshift-release-test-master-ci-operator-config
+    rerun_command: /test ci-operator-config
+    spec:
+      containers:
+      - args:
+        - --config-dir
+        - ./ci-operator/config/
+        command:
+        - ci-operator-checkconfig
+        image: ci-operator-checkconfig:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+    trigger: ((?m)^/test( all| ci-operator-config),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/config
+    decorate: true
+    name: pull-ci-openshift-release-test-master-config
+    rerun_command: /test config
+    spec:
+      containers:
+      - args:
+        - --config-path
+        - ./cluster/ci/config/prow/config.yaml
+        - --job-config-path
+        - ./ci-operator/jobs/
+        - --plugin-config
+        - ./cluster/ci/config/prow/plugins.yaml
+        - --strict
+        command:
+        - /checkconfig
+        image: checkconfig:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+    trigger: ((?m)^/test( all| config),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/generated-config
+    decorate: true
+    name: pull-ci-openshift-release-test-master-generated-config
+    rerun_command: /test generated-config
+    spec:
+      containers:
+      - command:
+        - hack/validate-generated-config.sh
+        image: ci-operator-prowgen:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+    trigger: ((?m)^/test generated-config,?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/ordered-prow-config
+    decorate: true
+    name: pull-ci-openshift-release-test-master-ordered-prow-config
+    rerun_command: /test ordered-prow-config
+    spec:
+      containers:
+      - command:
+        - hack/validate-prow-job-ordering.sh
+        image: determinize-prow-jobs:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+    trigger: ((?m)^/test( all| ordered-prow-config),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/owners
+    decorate: true
+    name: pull-ci-openshift-release-test-master-owners
+    rerun_command: /test owners
+    spec:
+      containers:
+      - command:
+        - hack/validate-owners.sh
+        image: centos:7
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+    trigger: ((?m)^/test( all| owners),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/prow-config-filenames
+    decorate: true
+    name: pull-ci-openshift-release-test-master-prow-config-filenames
+    rerun_command: /test prow-config-filenames
+    spec:
+      containers:
+      - command:
+        - hack/validate-ci-operator-config-filename.py
+        image: registry.svc.ci.openshift.org/ci/python-validation
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+    trigger: ((?m)^/test( all| prow-config-filenames),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/prow-config-semantics
+    decorate: true
+    name: pull-ci-openshift-release-test-master-prow-config-semantics
+    rerun_command: /test prow-config-semantics
+    spec:
+      containers:
+      - command:
+        - hack/validate-prow-job-semantics.py
+        image: registry.svc.ci.openshift.org/ci/python-validation
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+    trigger: ((?m)^/test( all| prow-config-semantics),?(\s+|$))
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - master
+    context: ci/prow/pylint
+    decorate: true
+    name: pull-ci-openshift-release-test-pylint
+    rerun_command: /test pylint
+    run_if_changed: ^hack/.*\.py$
+    spec:
+      containers:
+      - args:
+        - --rcfile=hack/.pylintrc
+        - --ignore=lib
+        - --persistent=n
+        - hack
+        command:
+        - pylint
+        image: registry.svc.ci.openshift.org/ci/python-validation
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+    trigger: ((?m)^/test( all| pylint),?(\s+|$))
