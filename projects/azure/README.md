@@ -53,11 +53,14 @@ and `ci-operator/config/openshift/azure-misc/`.
 
 ### Automated jobs
 
-The following CI jobs run automatically on every PR in `openshift-azure`:
-* `unit`: runs unit tests
-* `verify`: runs verification tests
-* `images`: builds all binaries and images
-* `e2e`: runs e2e tests
+The following CI jobs run automatically on every PR in `openshift-azure`.
+
+| Job | Description |
+| --- | --- |
+| `ci/prow/unit` | runs unit tests |
+| `ci/prow/verify` | runs verification tests |
+| `ci/prow/images` | builds all binaries and images |
+| `ci/prow/e2e` | runs e2e tests |
 
 When a test fails in your PR, you need to triage the failure, and compare it with the existing
 set of [open issues tracking test failures](https://github.com/openshift/openshift-azure/issues?q=is%3Aissue+is%3Aopen+label%3Akind%2Ftest-flake).
@@ -66,12 +69,15 @@ If you don't find a match, you should open a new issue to track the failure and 
 Then, you can `/retest` your PR.
 
 Optionally, you can request specific long-running tests to run that are not
-running in PRs by default. Namely:
-* `/test scaleupdown`: runs a test doing a scale up followed by a scale down of the cluster
-* `/test etcdrecovery`: runs a test that backups a cluster, mutates state, then restores from the backup
-* `/test keyrotation`: runs a test that rotates all the certificates in a cluster
-* `/test prod`: runs a test using the production OSA RP
-* `/test vnet`: runs a custom vnet test using the production OSA RP
+running in PRs by default.
+
+| Command | Description |
+| --- | --- |
+| `/test scaleupdown` | runs a test doing a scale up followed by a scale down of the cluster |
+| `/test etcdrebackupcovery` | runs a test that backups a cluster, mutates state, then restores from the backup |
+| `/test keyrotation` | runs a test that rotates all the certificates in a cluster |
+| `/test prod` | runs a test using the production OSA RP |
+| `/test vnet` | runs a custom vnet test using the production OSA RP |
 
 Note that the tests using the production RP are not any useful to run in PRs unless
 you update the tests themselves.
