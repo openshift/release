@@ -276,8 +276,7 @@ azure:
 	$(MAKE) apply WHAT=projects/azure/token-refresh/
 .PHONY: azure
 
-azure-secrets: azure
-	# ci namespace objects
+azure-secrets:
 	oc create secret generic cluster-secrets-azure \
 	--from-file=cluster/test-deploy/azure/secret \
 	--from-file=cluster/test-deploy/azure/ssh-privatekey \
@@ -287,13 +286,13 @@ azure-secrets: azure
 	--from-file=cluster/test-deploy/azure/logging-int.key \
 	--from-file=cluster/test-deploy/azure/metrics-int.cert \
 	--from-file=cluster/test-deploy/azure/metrics-int.key \
-	-o yaml --dry-run | oc apply -n ci -f -
-	# azure namespace objects
+	-o yaml --dry-run | oc apply -n azure -f -
 	oc create secret generic cluster-secrets-azure-env --from-literal=azure_client_id=${AZURE_CLIENT_ID} --from-literal=azure_client_secret=${AZURE_CLIENT_SECRET} --from-literal=azure_tenant_id=${AZURE_TENANT_ID} --from-literal=azure_subscription_id=${AZURE_SUBSCRIPTION_ID} -o yaml --dry-run | oc apply -n azure -f -
 	oc create secret generic aws-reg-master --from-literal=username=${AWS_REG_USERNAME} --from-literal=password=${AWS_REG_PASSWORD} -o yaml --dry-run | oc apply -n azure -f -
+	# needs to be the same HMAC_TOKEN used by Prow
 	oc create secret generic hmac-token --from-literal=hmac=${HMAC_TOKEN} -o yaml --dry-run | oc apply -n azure -f -
 	oc create secret generic oauth-token --from-literal=oauth=${AZURE_OAUTH_TOKEN} -o yaml --dry-run | oc apply -n azure -f -
-.PHONY: azure
+.PHONY: azure-secrets
 
 check:
 	# test that the prow config is parseable
