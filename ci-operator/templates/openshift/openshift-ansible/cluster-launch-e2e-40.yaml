@@ -198,8 +198,12 @@ objects:
         # TODO: bump nodes up to 40 again
         function run-tests() {
           if which openshift-tests && [[ -n "${TEST_SUITE-}" ]]; then
-            openshift-tests run "${TEST_SUITE}" --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
-            exit 0
+            if [[ -n "${TEST_SKIP}" ]]; then
+              openshift-tests run "${TEST_SUITE}" --dry-run | grep -v "${TEST_SKIP}" | openshift-tests run -f - --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
+            else
+              openshift-tests run "${TEST_SUITE}" --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
+              exit 0
+            fi
           fi
           # TODO: remove everything after this point once we fork templates by release - starting with 4.0
           if ! which extended.test; then
