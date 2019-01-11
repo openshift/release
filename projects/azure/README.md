@@ -96,7 +96,7 @@ Obtain the `oc login` command from the [OpenShift CI WebConsole](https://api.ci.
 
 Note: all further instructions assume you are currently in the root directory of this repository
 
-Create a `secret` file for storing azure-related secrets using `cluster/test-deploy/azure/secret_example` as a template. You can read more about creating this secret [below](#ci-secrets).
+Create a `secret` file for storing azure-related secrets using `cluster/test-deploy/azure/secret_example` as a template.
 
 ```
 cp cluster/test-deploy/azure/secret_example cluster/test-deploy/azure/secret
@@ -109,6 +109,11 @@ export CI_OPERATOR_NAMESPACE=your-chosen-namespace
 ```
 
 #### Running e2e tests
+
+For the e2e tests you will also need to have the Geneva secrets in place.
+```$ ls cluster/test-deploy/azure/
+logging-int.cert  logging-int.key  metrics-int.cert  metrics-int.key  secret  secret_example vars.yaml
+```
 
 Example: Run e2e tests
 ```
@@ -243,7 +248,7 @@ we will not need to have the rest of the secrets in place.
   --from-file=cluster/test-deploy/azure/logging-int.key \
   --from-file=cluster/test-deploy/azure/metrics-int.cert \
   --from-file=cluster/test-deploy/azure/metrics-int.key \
-  -o yaml --dry-run | oc apply -n ci -f -
+  -o yaml --dry-run | oc apply -n azure -f -
 ```
 
 5. Ensure the secret is placed in the [ci-secret-mirroring-controller config](https://github.com/openshift/release/blob/master/cluster/ci/config/secret-mirroring/mapping.yaml). The controller will make sure to keep the secret in sync between the `azure` and the `ci` namespace where all CI tests run.
