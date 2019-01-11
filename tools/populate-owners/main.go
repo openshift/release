@@ -204,7 +204,7 @@ func get(uri, accept string) (data []byte, status int, err error) {
 	defer response.Body.Close()
 
 	if response.StatusCode != 200 {
-		return data, response.StatusCode, fmt.Errorf("failed to fetch %s: %s", uri, response.StatusCode, response.Status)
+		return data, response.StatusCode, fmt.Errorf("failed to fetch %s: %v %s", uri, response.StatusCode, response.Status)
 	}
 
 	data, err = ioutil.ReadAll(response.Body)
