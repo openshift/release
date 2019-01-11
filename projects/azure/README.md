@@ -111,7 +111,8 @@ export CI_OPERATOR_NAMESPACE=your-chosen-namespace
 #### Running e2e tests
 
 For the e2e tests you will also need to have the Geneva secrets in place.
-```$ ls cluster/test-deploy/azure/
+```
+$ ls cluster/test-deploy/azure/
 logging-int.cert  logging-int.key  metrics-int.cert  metrics-int.key  secret  secret_example vars.yaml
 ```
 
