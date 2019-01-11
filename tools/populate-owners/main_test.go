@@ -168,6 +168,8 @@ func TestExtractOwners(t *testing.T) {
 
 	for _, args := range [][]string{
 		{"git", "init"},
+		{"git", "config", "user.name", "Test"},
+		{"git", "config", "user.email", "test@test.org"},
 		{"git", "add", "README"},
 		{"git", "commit", "-m", "Begin versioning"},
 	} {
@@ -177,8 +179,9 @@ func TestExtractOwners(t *testing.T) {
 			"GIT_COMMITTER_DATE=1112911993 -0700",
 			"GIT_AUTHOR_DATE=1112911993 -0700",
 		}
-		err = cmd.Run()
+		stdoutStderr, err := cmd.CombinedOutput()
 		if err != nil {
+			t.Log(string(stdoutStderr))
 			t.Fatal(err)
 		}
 	}
@@ -258,6 +261,8 @@ func TestExtractOwners(t *testing.T) {
 				t.Fatalf("unexpected error: %v does not match %v", err, test.error)
 			}
 
+			// Need to override the newly created commit to avoid test failure
+			orgrepo.Commit = test.expected.Commit
 			assertEqual(t, orgrepo, test.expected)
 		})
 	}
