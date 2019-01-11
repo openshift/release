@@ -1,0 +1,34 @@
+base_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: origin-v4.0
+    namespace: openshift
+    tag: base
+canonical_go_repository: github.com/openshift/multus-cni
+images:
+- dockerfile_path: openshift/multus-cni/Dockerfile.openshift
+  from: base
+  to: multus-cni
+resources:
+  '*':
+    limits:
+      cpu: '2'
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: origin-v4.0
+  namespace: openshift
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+tests:
+- as: e2e-aws
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer:
+    cluster_profile: aws
