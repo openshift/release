@@ -373,8 +373,27 @@ objects:
             exit 1
         fi
 
-        /bin/openshift-install --dir=/tmp/artifacts/installer create cluster &
-        wait "$!"
+        if ! /bin/openshift-install --dir=/tmp/artifacts/installer create cluster
+        then
+            rc=$?
+
+            bootstrap_ip=$(jq \
+                '.modules[].resources."aws_instance.bootstrap".primary.attributes."public_ip" | select(.)' \
+                /tmp/artifacts/installer/terraform.tfstate)
+
+            for service in bootkube openshift kubelet crio
+            do
+                curl \
+                    --insecure \
+                    --silent \
+                    --cert=/tmp/artifacts/tls/journal-gatewayd.crt \
+                    --key=/tmp/artifacts/tls/journal-gatewayd.key \
+                    --url="https://${bootstrap_ip}:19531/entries?_SYSTEMD_UNIT=${service}.service" \
+                    --output="/tmp/artifacts/installer/${service}.service"
+            done
+
+            exit "${rc}"
+        fi
 
     # Performs cleanup of all created resources
     - name: teardown
