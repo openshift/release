@@ -121,12 +121,14 @@ Example: Run e2e tests
 docker run \
 --rm \
 -it \
+--security-opt label:disable \
 --volume $HOME/.kube/config:/root/.kube/config \
 --volume $(pwd):/release \
 registry.svc.ci.openshift.org/ci/ci-operator:latest \
 --config /release/ci-operator/config/openshift/openshift-azure/openshift-openshift-azure-master.yaml \
---git-ref=openshift/openshift-azure@master \
---namespace=${CI_OPERATOR_NAMESPACE} \
+--git-ref openshift/openshift-azure@master \
+--namespace ${CI_OPERATOR_NAMESPACE} \
+--target cluster-launch-e2e-azure \
 --template /release/ci-operator/templates/openshift/openshift-azure/cluster-launch-e2e-azure.yaml \
 --secret-dir /release/cluster/test-deploy/azure/
 ```
@@ -136,14 +138,16 @@ Example: Run origin conformance tests
 docker run \
 --rm \
 -it \
+--security-opt label:disable \
 --env TEST_COMMAND="TEST_FOCUS=Suite:openshift/conformance/parallel run-tests" \
 --env TEST_IMAGE="registry.svc.ci.openshift.org/openshift/origin-v3.11:tests" \
 --volume $HOME/.kube/config:/root/.kube/config \
 --volume $(pwd):/release \
 registry.svc.ci.openshift.org/ci/ci-operator:latest \
 --config /release/ci-operator/config/openshift/openshift-azure/openshift-openshift-azure-master.yaml \
---git-ref=openshift/openshift-azure@master \
---namespace=${CI_OPERATOR_NAMESPACE} \
+--git-ref openshift/openshift-azure@master \
+--namespace ${CI_OPERATOR_NAMESPACE} \
+--target cluster-launch-e2e-azure \
 --template /release/ci-operator/templates/openshift/openshift-azure/cluster-launch-e2e-azure.yaml \
 --secret-dir /release/cluster/test-deploy/azure/
 ```
@@ -176,15 +180,16 @@ docker run \
 --rm \
 -it \
 --env DEPLOY_OS=rhel7 \
+--security-opt label:disable \
 --volume $HOME/.kube/config:/root/.kube/config \
 --volume $(pwd):/release \
 registry.svc.ci.openshift.org/ci/ci-operator:latest \
 --config /release/ci-operator/config/openshift/openshift-azure/openshift-openshift-azure-master.yaml \
---git-ref=openshift/openshift-azure@master \
---namespace=${CI_OPERATOR_NAMESPACE} \
+--git-ref openshift/openshift-azure@master \
+--namespace ${CI_OPERATOR_NAMESPACE} \
+--target build-base-image \
 --template /release/ci-operator/templates/openshift/openshift-azure/build-base-image.yaml \
---secret-dir /release/cluster/test-deploy/azure/ \
---target build-base-image
+--secret-dir /release/cluster/test-deploy/azure/
 ```
 
 Example: Build a rhel node vm image with openshift 3.11
@@ -194,15 +199,16 @@ docker run \
 -it \
 --env DEPLOY_OS=rhel7 \
 --env OPENSHIFT_RELEASE="3.11" \
+--security-opt label:disable \
 --volume $HOME/.kube/config:/root/.kube/config \
 --volume $(pwd):/release \
 registry.svc.ci.openshift.org/ci/ci-operator:latest \
 --config /release/ci-operator/config/openshift/openshift-ansible/openshift-openshift-ansible-release-3.11.yaml \
---git-ref=openshift/openshift-azure@master \
---namespace=${CI_OPERATOR_NAMESPACE} \
+--git-ref openshift/openshift-azure@master \
+--namespace ${CI_OPERATOR_NAMESPACE} \
+--target build-node-image \
 --template /release/ci-operator/templates/openshift/openshift-azure/build-node-image.yaml \
---secret-dir /release/cluster/test-deploy/azure/ \
---target build-node-image
+--secret-dir /release/cluster/test-deploy/azure/
 ```
 
 
