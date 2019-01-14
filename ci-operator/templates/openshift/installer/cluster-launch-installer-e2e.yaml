@@ -373,8 +373,32 @@ objects:
             exit 1
         fi
 
-        /bin/openshift-install --dir=/tmp/artifacts/installer create cluster &
-        wait "$!"
+        if ! /bin/openshift-install --dir=/tmp/artifacts/installer create cluster
+        then
+            rc=$?
+
+            # we don't have jq, so the python equivalent of
+            # jq '.modules[].resources."aws_instance.bootstrap".primary.attributes."public_ip" | select(.)'
+            bootstrap_ip=$(python -c \
+                'import sys, json; d=reduce(lambda x,y: dict(x.items() + y.items()), map(lambda x: x["resources"], json.load(sys.stdin)["modules"])); k="aws_instance.bootstrap"; print d[k]["primary"]["attributes"]["public_ip"] if k in d else ""' \
+                /tmp/artifacts/installer/terraform.tfstate
+            )
+
+            if [ -n "${bootstrap_ip}" ]; then
+              for service in bootkube openshift kubelet crio
+              do
+                  curl \
+                      --insecure \
+                      --silent \
+                      --cert=/tmp/artifacts/tls/journal-gatewayd.crt \
+                      --key=/tmp/artifacts/tls/journal-gatewayd.key \
+                      --url="https://${bootstrap_ip}:19531/entries?_SYSTEMD_UNIT=${service}.service" \
+                      --output="/tmp/artifacts/installer/${service}.service"
+              done
+            fi
+
+            exit "${rc}"
+        fi
 
     # Performs cleanup of all created resources
     - name: teardown
