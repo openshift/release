@@ -19,7 +19,7 @@ in our CI. Namely:
   There are a bunch of useful docs in the ci-operator repo, it is suggested to
   go through at least [ONBOARD.md](https://github.com/openshift/ci-operator/blob/master/ONBOARD.md), [ARCHITECTURE.md](https://github.com/openshift/ci-operator/blob/master/ARCHITECTURE.md), and [CONFIGURATION.md](https://github.com/openshift/ci-operator/blob/master/CONFIGURATION.md).
   You should ensure you familiarize yourself with `ci-operator`.
-* [Prow](https://github.com/kubernetes/test-infra/blob/master/prow/README.md)
+* [Prow](https://github.com/kubernetes/test-infra/blob/master/prow/getting_started_deploy.md)
   Prow is the CI system used in both Kubernetes and the Openshift Origin projects.
   It is responsible for every user interaction in Github, scheduling of tests, and
   reporting results. As an end user you shouldn't need to familiarize yourself with Prow.
