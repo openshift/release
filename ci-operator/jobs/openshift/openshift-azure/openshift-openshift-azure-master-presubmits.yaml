@@ -4,6 +4,34 @@ presubmits:
     always_run: true
     branches:
     - master
+    context: ""
+    decorate: true
+    name: pull-ci-openshift-openshift-azure-master-codecov
+    rerun_command: /test codecov
+    skip_report: true
+    spec:
+      containers:
+      - command:
+        - make codecov
+        env:
+        - name: CODECOV_UPLOAD_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: upload
+              name: codecov-token
+        image: azure/test-base:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+    trigger: ((?m)^/test codecov,?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
     context: ci/prow/e2e
     decorate: true
     labels:

@@ -214,12 +214,14 @@ registry.svc.ci.openshift.org/ci/ci-operator:latest \
 
 ## CI secrets
 
-We use 2 types of secrets. Both of them contain the same data but in a different formats.
+We use various secrets in our CI.
 
-```
-cluster-secrets-azure: file based secret. It can be sourced by script (see ci-operator jobs)
-cluster-secrets-azure-env: environment based secret. It can be injected to pod using pod spec (see azure-purge)
-```
+| Secret name | Description |
+| --- | --- |
+| cluster-secrets-azure | file based secret. It can be sourced by script (see ci-operator jobs) |
+| cluster-secrets-azure-env | environment based secret. It can be injected to pod using pod spec (see azure-purge) |
+| codecov-token | used for pushing reports to Codecov |
+
 
 ### cluster-secrets-azure
 
@@ -236,7 +238,7 @@ export AZURE_TENANT_ID=<tenant id>
 export AZURE_SUBSCRIPTION_ID=<subscription id>
 ```
 
-4. Create or udate the `cluster-secrets-azure` secret in the `azure` namespace.
+4. Create or update the `cluster-secrets-azure` secret in the `azure` namespace.
 
 You need to make sure you also have the required certificates in place in order to allow our
 build VM process to download the OpenShift RPMs from the ops mirror. There are also the Geneva
@@ -272,6 +274,14 @@ To rotate this secret:
 source ./cluster/test-deploy/azure/secret
 oc create secret generic cluster-secrets-azure-env --from-literal=azure_client_id=${AZURE_CLIENT_ID} --from-literal=azure_client_secret=${AZURE_CLIENT_SECRET} --from-literal=azure_tenant_id=${AZURE_TENANT_ID} --from-literal=azure_subscription_id=${AZURE_SUBSCRIPTION_ID} -o yaml --dry-run | oc apply -n azure -f -
 ```
+
+### codecov-token
+
+This secret is used for pushing reports to [Codecov](https://codecov.io/).
+
+TODO: How to rotate this secret from Codecov?
+
+Ensure the secret is placed in the [ci-secret-mirroring-controller config](https://github.com/openshift/release/blob/master/cluster/ci/config/secret-mirroring/mapping.yaml). The controller will make sure to keep the secret in sync between the `azure` and the `ci` namespace where all CI tests run.
 
 ## Other cron jobs
 
