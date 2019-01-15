@@ -400,16 +400,25 @@ objects:
           # gather nodes first in parallel since they may contain the most relevant debugging info
           while IFS= read -r i; do
             mkdir -p /tmp/artifacts/nodes/$i
-            FILTER=gzip queue /tmp/artifacts/nodes/$i/messages.gz oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/messages
-            oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/journal | sed -e 's|.*href="\(.*\)".*|\1|;t;d' > /tmp/journals
-            while IFS= read -r j; do
-              FILTER=gzip queue /tmp/artifacts/nodes/$i/journal.gz oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/journal/${j}system.journal
-            done < /tmp/journals
             FILTER=gzip queue /tmp/artifacts/metrics/node-$i.gz oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/metrics
             queue /tmp/artifacts/nodes/$i/heap oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/debug/pprof/heap
-            FILTER=gzip queue /tmp/artifacts/nodes/$i/secure.gz oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/secure
-            FILTER=gzip queue /tmp/artifacts/nodes/$i/audit.gz oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/audit
           done < /tmp/nodes
+
+          if oc adm node-logs -h &>/dev/null; then
+            # starting in 4.0 we can query node logs directly
+            FILTER=gzip queue /tmp/artifacts/nodes/masters-journal.gz oc adm node-logs --role=master --unify=false
+            FILTER=gzip queue /tmp/artifacts/nodes/workers-journal.gz oc adm node-logs --role=worker --unify=false
+          else
+            while IFS= read -r i; do
+              FILTER=gzip queue /tmp/artifacts/nodes/$i/messages.gz oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/messages
+              oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/journal | sed -e 's|.*href="\(.*\)".*|\1|;t;d' > /tmp/journals
+              while IFS= read -r j; do
+                FILTER=gzip queue /tmp/artifacts/nodes/$i/journal.gz oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/journal/${j}system.journal
+              done < /tmp/journals
+              FILTER=gzip queue /tmp/artifacts/nodes/$i/secure.gz oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/secure
+              FILTER=gzip queue /tmp/artifacts/nodes/$i/audit.gz oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/audit
+            done < /tmp/nodes
+          fi
 
           while IFS= read -r i; do
             file="$( echo "$i" | cut -d ' ' -f 3 | tr -s ' ' '_' )"
