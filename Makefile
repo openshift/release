@@ -292,6 +292,7 @@ azure-secrets:
 	# needs to be the same HMAC_TOKEN used by Prow
 	oc create secret generic hmac-token --from-literal=hmac=${HMAC_TOKEN} -o yaml --dry-run | oc apply -n azure -f -
 	oc create secret generic oauth-token --from-literal=oauth=${AZURE_OAUTH_TOKEN} -o yaml --dry-run | oc apply -n azure -f -
+	oc create secret generic codecov-token --from-literal=upload=${CODECOV_UPLOAD_TOKEN} -o yaml --dry-run | oc apply -n azure -f -
 .PHONY: azure-secrets
 
 check:
