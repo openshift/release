@@ -45,15 +45,15 @@ secrets currently exist:
 
 |       Key                         | Description |
 | ----------------------------------| ----------- |
-| `secret`                          | Credentials for the Azure API. See the [upstream credentials doc](https://docs.microsoft.com/en-us/rest/api/apimanagement/apimanagementrest/azure-api-management-rest-api-authentication). |
-| `certs.yaml`                      | Certificate and key for downloading OpenShift RPMs from the ops mirrors |
-| `ssh-privatekey`                  | Private half of the SSH key, for connecting to Azure VMs when the VM image is built. |
-| `.dockerconfigjson`               | Azure private registry pull secret |
-| `logging-int.cert`                | Azure Geneva logging authentication certificate |
-| `logging-int.key`                 | Azure Geneva logging authentication key |
-| `metrics-int.cert`                | Azure Geneva metrics authentication certificate |
-| `metrics-int.key`                 | Azure Geneva metrics authentication key |
-| `redhat-io-docker-config.json`    | Root/node/system level docker config.json file, currently holding access registry.redhat.io |
+| `secret`                      | Credentials for the Azure API. See the [upstream credentials doc](https://docs.microsoft.com/en-us/rest/api/apimanagement/apimanagementrest/azure-api-management-rest-api-authentication). |
+| `certs.yaml`                  | Certificate and key for downloading OpenShift RPMs from the ops mirrors |
+| `ssh-privatekey`              | Private half of the SSH key, for connecting to Azure VMs when the VM image is built. |
+| `.dockerconfigjson`           | Azure private registry pull secret |
+| `logging-int.cert`            | Azure Geneva logging authentication certificate |
+| `logging-int.key`             | Azure Geneva logging authentication key |
+| `metrics-int.cert`            | Azure Geneva metrics authentication certificate |
+| `metrics-int.key`             | Azure Geneva metrics authentication key |
+| `system-docker-config.json`   | Root/node/system level docker config.json file, currently holding access registry.redhat.io |
 
 ### GCE ServiceAccount Credentials
 
