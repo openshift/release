@@ -282,6 +282,7 @@ azure-secrets:
 	--from-file=cluster/test-deploy/azure/ssh-privatekey \
 	--from-file=cluster/test-deploy/azure/certs.yaml \
 	--from-file=cluster/test-deploy/azure/.dockerconfigjson \
+	--from-file=cluster/test-deploy/azure/redhat-io-docker-config.json \
 	--from-file=cluster/test-deploy/azure/logging-int.cert \
 	--from-file=cluster/test-deploy/azure/logging-int.key \
 	--from-file=cluster/test-deploy/azure/metrics-int.cert \
