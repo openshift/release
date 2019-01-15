@@ -187,7 +187,20 @@ oauth-proxy:
 .PHONY: oauth-proxy
 
 publishing-bot:
+	oc create ns origin-publishing-bot -o yaml --dry-run | oc apply -f -
+	# github-token is used by publishing bots
+	oc create secret generic -n origin-publishing-bot github-token --from-literal=token=$${IMAGE_REGISTRY_PUBLISHER_BOT_GITHUB_TOKEN?} --dry-run -o yaml | oc apply -f -
 	$(MAKE) apply WHAT=projects/publishing-bot/storage-class.yaml
+	# kubernetes publishing-bot:
+	$(MAKE) apply WHAT=cluster/ci/config/publishingbots/kubernetes/openshift-kubernetes-gopath-pvc.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/publishingbots/kubernetes/openshift-kubernetes-bot-config.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/publishingbots/kubernetes/openshift-kubernetes-bot-svc.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/publishingbots/kubernetes/openshift-kubernetes-bot-deployment.yaml
+	# origin publishing-bot:
+	$(MAKE) apply WHAT=cluster/ci/config/publishingbots/origin/openshift-origin-gopath-pvc.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/publishingbots/origin/openshift-origin-bot-config.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/publishingbots/origin/openshift-origin-bot-svc.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/publishingbots/origin/openshift-origin-bot-deployment.yaml
 .PHONY: publishing-bot
 
 image-registry-publishing-bot:
