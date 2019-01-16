@@ -1,10 +1,15 @@
 # Populating `OWNERS` and `OWNERS_ALIASES`
 
-This utility pulls `OWNERS` and `OWNERS_ALIASES` from upstream OpenShift repositories.
+This utility updates the OWNERS files from remote Openshift repositories.
+
 Usage:
+  populate-owners [repo-name-regex]
+
+Args:
+  [repo-name-regex]    A go regex which which matches the repos to update, by default all repos are selected
 
 ```console
-$ go run main.go
+$ go run main.go [repo-name-regex]
 ```
 
 Or, equivalently, execute [`populate-owners.sh`](../../ci-operator/populate-owners.sh) from anywhere in this repository.
@@ -15,13 +20,9 @@ For example, the presence of [`ci-operator/jobs/openshift/origin`](../../ci-oper
 The `HEAD` branch for each upstream repository is pulled to extract its `OWNERS` and `OWNERS_ALIASES`.
 If `OWNERS` is missing, the utility will ignore `OWNERS_ALIASES`, even if it is present upstream.
 
-Once all the upstream content has been fetched, the utility namespaces any colliding upstream aliases.
-Collisions only occur if multiple upstreams define the same alias with different member sets.
-When that happens, the utility replaces the upstream alias with a `{organization}-{repository}-{upstream-alias}`.
-For example, if [openshift/origin][] and [openshift/installer][] both defined an alias for `security` with different member sets, the utility would rename them to `openshift-origin-security` and `openshift-installer-security` respectively.
-
-After namespacing aliases, the utility writes `OWNERS_ALIASES` to the root of this repository.
-If no upstreams define aliases, then the utility removes `OWNER_ALIASES` from the root of this repository.
+Any aliases present in the upstream `OWNERS` file will be resolved to the set of usernames they represent in the associated
+`OWNERS_ALIASES` file.  The local `OWNERS` files will therefore not contain any alias names.  This avoids any conflicts between 
+upstream alias names coming from  different repos.
 
 The utility also iterates through the `ci-operator/{type}/{organization}/{repository}` for `{type}` in `config`, `jobs`, and `templates`, writing `OWNERS` to reflect the upstream configuration.
 If the upstream did not have an `OWNERS` file, the utility removes the associated `ci-operator/*/{organization}/{repository}/OWNERS`.
