@@ -21,7 +21,7 @@ current_tag="$( grep -Po "(?<=clonerefs:)v[0-9]{8}-[a-z0-9]+" cluster/ci/config/
 latest_tag="$( gcloud container images list-tags gcr.io/k8s-prow/plank --format='value(tags)' --limit 1 | grep -Po "v[0-9]+\-[a-z0-9]+" )"
 if [[ "${current_tag}" != "${latest_tag}" ]]; then
 	printf '%-12s %-20s %-20s\n' prow "${current_tag}" "${latest_tag}" | tee -a "${workspace}/commit.txt"
-	sed -i "s|\(gcr\.io/k8s-prow/[a-z-]*:\)v[0-9][0-9]*-[a-z0-9][a-z0-9]*|\1${latest_tag}|g" $( find cluster/ci/config/prow/openshift -type f ) cluster/ci/config/prow/config.yaml ci-operator/jobs/infra-periodics.yaml
+	sed -i "s|\(gcr\.io/k8s-prow/[a-z-]*:\)v[0-9][0-9]*-[a-z0-9][a-z0-9]*|\1${latest_tag}|g" $( find cluster/ci/config/prow/openshift -type f ) cluster/ci/config/prow/config.yaml ci-operator/jobs/infra-periodics.yaml ci-operator/jobs/openshift/release/openshift-release-master-presubmits.yaml
 fi
 
 # some images are in a different bucket and are pushed in a different cadence
@@ -35,5 +35,5 @@ for image in 'label_sync' 'commenter' 'ghproxy'; do
 	fi
 done
 
-git add cluster/ci/config/prow/openshift cluster/ci/config/prow/config.yaml ci-operator/jobs/infra-periodics.yaml
+git add cluster/ci/config/prow/openshift cluster/ci/config/prow/config.yaml ci-operator/jobs/infra-periodics.yaml ci-operator/jobs/openshift/release/openshift-release-master-presubmits.yaml
 git commit -m "$( cat "${workspace}/commit.txt" )"
