@@ -300,13 +300,16 @@ func writeYAML(path string, data interface{}, prefix []string) (err error) {
 	return encoder.Encode(data)
 }
 
-// insertStringSlice inserts a string slice into a given index
-// in another string slice.  Returns a new slice with the insert
-// slice replacing the elements between begin and end index.
+// insertStringSlice inserts a string slice into another string slice
+// replacing the elements starting with the begin index up to the end
+// index.  The element at end index in the original slice will remain
+// in the resulting slice.  Returns a new slice with the elements
+// replaced. If the begin index is larger than the end, or either of the
+// indexes are out of range of the slice, the original slice is returned
+// unmodified.
 func insertStringSlice(insert []string, intoSlice []string,
 	begin int, end int) []string {
 	if begin > end || begin < 0 || end > len(intoSlice) {
-		fmt.Printf("invalid begin: %v, or end: %v \n", begin, end)
 		return intoSlice
 	}
 	firstPart := intoSlice[:begin]
@@ -419,10 +422,10 @@ const (
 	usage = `Update the OWNERS files from remote repositories.
 
 Usage:
-	%s [repo-name-regex]
+  %s [repo-name-regex]
 
 Args:
-  [repo-name-regex]    A go regex which which matches the repos to update
+  [repo-name-regex]    A go regex which which matches the repos to update, by default all repos are selected
 
 `
 )

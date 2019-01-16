@@ -2,7 +2,6 @@ package main
 
 import (
 	"io/ioutil"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -269,6 +268,27 @@ func TestExtractOwners(t *testing.T) {
 	}
 }
 
+func TestInsertSlice(t *testing.T) {
+	// test replacing two elements of a slice
+	given := []string{"alice", "bob", "carol", "david", "emily"}
+	expected := []string{"alice", "bob", "charlie", "debbie", "emily"}
+	actual := insertStringSlice([]string{"charlie", "debbie"}, given, 2, 4)
+	assertEqual(t, actual, expected)
+
+	// test replacing all elements after the first
+	expected = []string{"alice", "eddie"}
+	actual = insertStringSlice([]string{"eddie"}, given, 1, len(given))
+	assertEqual(t, actual, expected)
+
+	// test invalid begin and end indexes, should return the slice unmodified
+	actual = insertStringSlice([]string{}, given, 5, 2)
+	assertEqual(t, given, given)
+	actual = insertStringSlice([]string{}, given, -1, 2)
+	assertEqual(t, given, given)
+	actual = insertStringSlice([]string{}, given, 1, len(given)+1)
+	assertEqual(t, given, given)
+}
+
 func TestResolveAliases(t *testing.T) {
 	given := &orgRepo{
 		Owners: &owners{Approvers: []string{"alice", "sig-alias", "david"},
@@ -280,8 +300,6 @@ func TestResolveAliases(t *testing.T) {
 			Reviewers: []string{"adam", "bob", "carol"}},
 		Aliases: &aliases{Aliases: map[string][]string{"sig-alias": {"bob", "carol"}}},
 	}
-	log.Println("given:", given)
-	log.Println("expected:", expected)
 	assertEqual(t, given.resolveOwnerAliases(), expected.Owners)
 }
 
