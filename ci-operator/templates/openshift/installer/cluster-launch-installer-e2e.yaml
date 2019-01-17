@@ -175,6 +175,7 @@ objects:
           break
         done
 
+        echo "Waiting for router"
         TARGET="$(date -d '10 minutes' +%s)"
         NOW="$(date +%s)"
         while [[ "${NOW}" -lt "${TARGET}" ]]; do
@@ -189,6 +190,7 @@ objects:
 
         # wait until the image registry changes propogate to the apiserver to avoid
         # unnecessary restarts
+        echo "Waiting for imagestream/php"
         until oc get is -n openshift php 2>/dev/null; do
           sleep 10
         done
@@ -196,6 +198,7 @@ objects:
           sleep 10
         done
         # oh god the blood
+        echo "Waiting 3 minutes to hopefully reduce flakes..."
         sleep 180
 
         export KUBE_SSH_BASTION="$( oc get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
