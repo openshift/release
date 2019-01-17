@@ -435,7 +435,6 @@ objects:
           # gather nodes first in parallel since they may contain the most relevant debugging info
           while IFS= read -r i; do
             mkdir -p /tmp/artifacts/nodes/$i
-            FILTER=gzip queue /tmp/artifacts/metrics/node-$i.gz oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/metrics
             queue /tmp/artifacts/nodes/$i/heap oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/debug/pprof/heap
           done < /tmp/nodes
 
@@ -458,9 +457,7 @@ objects:
           while IFS= read -r i; do
             file="$( echo "$i" | cut -d ' ' -f 3 | tr -s ' ' '_' )"
             queue /tmp/artifacts/metrics/${file}-heap oc exec $i -- /bin/bash -c 'oc get --raw /debug/pprof/heap --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig'
-            FILTER=gzip queue /tmp/artifacts/metrics/${file}-api.gz oc exec $i -- /bin/bash -c 'oc get --raw /metrics --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig'
             queue /tmp/artifacts/metrics/${file}-controllers-heap oc exec $i -- /bin/bash -c 'oc get --raw /debug/pprof/heap --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig'
-            FILTER=gzip queue /tmp/artifacts/metrics/${file}-controllers.gz oc exec $i -- /bin/bash -c 'oc get --raw /metrics --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig'
           done < /tmp/pods-api
 
           while IFS= read -r i; do
@@ -468,6 +465,9 @@ objects:
             FILTER=gzip queue /tmp/artifacts/pods/${file}.log.gz oc logs --request-timeout=20s $i
             FILTER=gzip queue /tmp/artifacts/pods/${file}_previous.log.gz oc logs --request-timeout=20s -p $i
           done < /tmp/containers
+
+          echo "Snapshotting prometheus (may take 15s) ..."
+          oc exec -n openshift-monitoring prometheus-k8s-0 -- tar cvzf - -C /prometheus . > /tmp/artifacts/metrics/prometheus.tar.gz
 
           echo "Waiting for logs ..."
           wait
