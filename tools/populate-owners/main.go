@@ -1,13 +1,14 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -204,7 +205,7 @@ func get(uri, accept string) (data []byte, status int, err error) {
 	defer response.Body.Close()
 
 	if response.StatusCode != 200 {
-		return data, response.StatusCode, fmt.Errorf("failed to fetch %s: %s", uri, response.StatusCode, response.Status)
+		return data, response.StatusCode, fmt.Errorf("failed to fetch %s: %v %s", uri, response.StatusCode, response.Status)
 	}
 
 	data, err = ioutil.ReadAll(response.Body)
@@ -281,70 +282,6 @@ func (orgRepo *orgRepo) extractOwners(repoRoot string) (err error) {
 	return nil
 }
 
-// namespaceAliases collects a set of aliases including all upstream
-// aliases.  If multiple upstreams define the same alias with different
-// member sets, namespaceAliases renames the colliding aliases in both
-// the input 'orgRepos' and the output 'collected' to use
-// unique-to-each-upstream alias names.
-func namespaceAliases(orgRepos []*orgRepo) (collected *aliases, err error) {
-	consumerMap := map[string][]*orgRepo{}
-	for _, orgRepo := range orgRepos {
-		if orgRepo.Aliases == nil {
-			continue
-		}
-
-		for alias := range orgRepo.Aliases.Aliases {
-			consumerMap[alias] = append(consumerMap[alias], orgRepo)
-		}
-	}
-
-	if len(consumerMap) == 0 {
-		return nil, nil
-	}
-
-	collected = &aliases{
-		Aliases: map[string][]string{},
-	}
-
-	for alias, consumers := range consumerMap {
-		namespace := false
-		members := consumers[0].Aliases.Aliases[alias]
-		for _, consumer := range consumers[1:] {
-			otherMembers := consumer.Aliases.Aliases[alias]
-			if !reflect.DeepEqual(members, otherMembers) {
-				namespace = true
-				break
-			}
-		}
-
-		for i, consumer := range consumers {
-			newAlias := alias
-			if namespace {
-				newAlias = fmt.Sprintf("%s-%s-%s", consumer.Organization, consumer.Repository, alias)
-				consumer.Aliases.Aliases[newAlias] = consumer.Aliases.Aliases[alias]
-				delete(consumer.Aliases.Aliases, alias)
-			}
-			fmt.Fprintf(
-				os.Stderr,
-				"injecting alias %q from https://github.com/%s/%s/blob/%s/OWNERS_ALIASES\n",
-				alias,
-				consumer.Organization,
-				consumer.Repository,
-				consumer.Commit,
-			)
-			if i == 0 || namespace {
-				_, ok := collected.Aliases[newAlias]
-				if ok {
-					return nil, fmt.Errorf("namespaced alias collision: %q", newAlias)
-				}
-				collected.Aliases[newAlias] = consumer.Aliases.Aliases[newAlias]
-			}
-		}
-	}
-
-	return collected, nil
-}
-
 func writeYAML(path string, data interface{}, prefix []string) (err error) {
 	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 	if err != nil {
@@ -363,6 +300,55 @@ func writeYAML(path string, data interface{}, prefix []string) (err error) {
 	return encoder.Encode(data)
 }
 
+// insertStringSlice inserts a string slice into another string slice
+// replacing the elements starting with the begin index up to the end
+// index.  The element at end index in the original slice will remain
+// in the resulting slice.  Returns a new slice with the elements
+// replaced. If the begin index is larger than the end, or either of the
+// indexes are out of range of the slice, the original slice is returned
+// unmodified.
+func insertStringSlice(insert []string, intoSlice []string,
+	begin int, end int) []string {
+	if begin > end || begin < 0 || end > len(intoSlice) {
+		return intoSlice
+	}
+	firstPart := intoSlice[:begin]
+	secondPart := append(insert, intoSlice[end:]...)
+	return append(firstPart, secondPart...)
+}
+
+// resolveAliases resolves names in the list of owners that
+// match one of the given aliases.  Returns a list of owners
+// with each alias replaced by the list of owners it represents.
+func resolveAliases(aliases *aliases, owners []string) []string {
+	offset := 0 // Keeps track of how many new names we've inserted
+	for i, owner := range owners {
+		if aliasOwners, ok := aliases.Aliases[owner]; ok {
+			index := i + offset
+			owners = insertStringSlice(aliasOwners, owners, index, (index + 1))
+			offset += len(aliasOwners) - 1
+		}
+	}
+	return owners
+}
+
+// resolveOwnerAliases checks whether the orgRepo includes any
+// owner aliases, and attempts to resolve them to the appropriate
+// set of owners.  Returns an owners which replaces any
+// matching aliases with the set of owner names belonging to that alias.
+func (orgRepo *orgRepo) resolveOwnerAliases() *owners {
+	if orgRepo.Aliases == nil || len(orgRepo.Aliases.Aliases) == 0 {
+		return orgRepo.Owners
+	}
+
+	return &owners{
+		resolveAliases(orgRepo.Aliases, orgRepo.Owners.Approvers),
+		resolveAliases(orgRepo.Aliases, orgRepo.Owners.Reviewers),
+		orgRepo.Owners.RequiredReviewers,
+		orgRepo.Owners.Labels,
+	}
+}
+
 func (orgRepo *orgRepo) writeOwners() (err error) {
 	for _, directory := range orgRepo.Directories {
 		path := filepath.Join(directory, "OWNERS")
@@ -374,7 +360,7 @@ func (orgRepo *orgRepo) writeOwners() (err error) {
 			continue
 		}
 
-		err = writeYAML(path, orgRepo.Owners, []string{
+		err = writeYAML(path, orgRepo.resolveOwnerAliases(), []string{
 			doNotEdit,
 			fmt.Sprintf(
 				"# from https://github.com/%s/%s/blob/%s/OWNERS\n",
@@ -393,24 +379,7 @@ func (orgRepo *orgRepo) writeOwners() (err error) {
 	return nil
 }
 
-func writeOwnerAliases(repoRoot string, aliases *aliases) (err error) {
-	path := filepath.Join(repoRoot, "OWNERS_ALIASES")
-	if aliases == nil || len(aliases.Aliases) == 0 {
-		err = os.Remove(path)
-		if err != nil && !os.IsNotExist(err) {
-			return err
-		}
-		return nil
-	}
-
-	return writeYAML(path, aliases, []string{
-		doNotEdit,
-		ownersAliasesComment,
-		"\n",
-	})
-}
-
-func pullOwners(directory string) (err error) {
+func pullOwners(directory string, pattern string) (err error) {
 	repoRoot, err := getRepoRoot(directory)
 	if err != nil {
 		return err
@@ -425,6 +394,10 @@ func pullOwners(directory string) (err error) {
 	config := filepath.Join(operatorRoot, "config")
 	templates := filepath.Join(operatorRoot, "templates")
 	for _, orgRepo := range orgRepos {
+		matched, _ := regexp.MatchString(pattern, orgRepo.Repository)
+		if !matched {
+			continue
+		}
 		err = orgRepo.getDirectories(config, templates)
 		if err != nil && !os.IsNotExist(err) {
 			return err
@@ -434,31 +407,37 @@ func pullOwners(directory string) (err error) {
 		if err != nil && !os.IsNotExist(err) {
 			return err
 		}
-		fmt.Fprintf(os.Stderr, "got owners for %s\n", orgRepo.String())
-	}
 
-	aliases, err := namespaceAliases(orgRepos)
-	if err != nil {
-		return err
-	}
-
-	err = writeOwnerAliases(repoRoot, aliases)
-	if err != nil {
-		return err
-	}
-
-	for _, orgRepo := range orgRepos {
 		err = orgRepo.writeOwners()
 		if err != nil {
 			return err
 		}
+		fmt.Fprintf(os.Stderr, "updated owners for %s\n", orgRepo.String())
 	}
 
 	return nil
 }
 
+const (
+	usage = `Update the OWNERS files from remote repositories.
+
+Usage:
+  %s [repo-name-regex]
+
+Args:
+  [repo-name-regex]    A go regex which which matches the repos to update, by default all repos are selected
+
+`
+)
+
 func main() {
-	err := pullOwners(".")
+	flag.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(), usage, "populate-owners")
+	}
+	flag.Parse()
+	repoPattern := flag.Arg(0)
+
+	err := pullOwners(".", repoPattern)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)

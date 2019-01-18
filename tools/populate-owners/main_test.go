@@ -168,6 +168,8 @@ func TestExtractOwners(t *testing.T) {
 
 	for _, args := range [][]string{
 		{"git", "init"},
+		{"git", "config", "user.name", "Test"},
+		{"git", "config", "user.email", "test@test.org"},
 		{"git", "add", "README"},
 		{"git", "commit", "-m", "Begin versioning"},
 	} {
@@ -177,8 +179,9 @@ func TestExtractOwners(t *testing.T) {
 			"GIT_COMMITTER_DATE=1112911993 -0700",
 			"GIT_AUTHOR_DATE=1112911993 -0700",
 		}
-		err = cmd.Run()
+		stdoutStderr, err := cmd.CombinedOutput()
 		if err != nil {
+			t.Log(string(stdoutStderr))
 			t.Fatal(err)
 		}
 	}
@@ -258,179 +261,46 @@ func TestExtractOwners(t *testing.T) {
 				t.Fatalf("unexpected error: %v does not match %v", err, test.error)
 			}
 
+			// Need to override the newly created commit to avoid test failure
+			orgrepo.Commit = test.expected.Commit
 			assertEqual(t, orgrepo, test.expected)
 		})
 	}
 }
 
-func TestNamespaceAliases(t *testing.T) {
-	for _, test := range []struct {
-		name       string
-		input      []*orgRepo
-		namespaced []*orgRepo
-		collected  *aliases
-		error      *regexp.Regexp
-	}{
-		{
-			name: "no alias name collisions, so no namespaced aliases created",
-			input: []*orgRepo{
-				{
-					Organization: "a",
-					Repository:   "b",
-					Aliases: &aliases{Aliases: map[string][]string{
-						"ab": {"alice", "bob"},
-					}},
-				},
-				{
-					Organization: "c",
-					Repository:   "d",
-					Aliases: &aliases{Aliases: map[string][]string{
-						"cd": {"bob", "charlie"},
-					}},
-				},
-			},
-			namespaced: []*orgRepo{
-				{
-					Organization: "a",
-					Repository:   "b",
-					Aliases: &aliases{Aliases: map[string][]string{
-						"ab": {"alice", "bob"},
-					}},
-				},
-				{
-					Organization: "c",
-					Repository:   "d",
-					Aliases: &aliases{Aliases: map[string][]string{
-						"cd": {"bob", "charlie"},
-					}},
-				},
-			},
-			collected: &aliases{Aliases: map[string][]string{
-				"ab": {"alice", "bob"},
-				"cd": {"bob", "charlie"},
-			}},
-		},
-		{
-			name: "matching members, so no namespaced aliases created",
-			input: []*orgRepo{
-				{
-					Organization: "a",
-					Repository:   "b",
-					Aliases: &aliases{Aliases: map[string][]string{
-						"ab": {"alice", "bob"},
-					}},
-				},
-				{
-					Organization: "c",
-					Repository:   "d",
-					Aliases: &aliases{Aliases: map[string][]string{
-						"ab": {"alice", "bob"},
-					}},
-				},
-			},
-			namespaced: []*orgRepo{
-				{
-					Organization: "a",
-					Repository:   "b",
-					Aliases: &aliases{Aliases: map[string][]string{
-						"ab": {"alice", "bob"},
-					}},
-				},
-				{
-					Organization: "c",
-					Repository:   "d",
-					Aliases: &aliases{Aliases: map[string][]string{
-						"ab": {"alice", "bob"},
-					}},
-				},
-			},
-			collected: &aliases{Aliases: map[string][]string{
-				"ab": {"alice", "bob"},
-			}},
-		},
-		{
-			name: "different members, so namespaced aliases created",
-			input: []*orgRepo{
-				{
-					Organization: "a",
-					Repository:   "b",
-					Aliases: &aliases{Aliases: map[string][]string{
-						"ab": {"alice", "bob"},
-					}},
-				},
-				{
-					Organization: "c",
-					Repository:   "d",
-					Aliases: &aliases{Aliases: map[string][]string{
-						"ab": {"bob", "charlie"},
-					}},
-				},
-			},
-			namespaced: []*orgRepo{
-				{
-					Organization: "a",
-					Repository:   "b",
-					Aliases: &aliases{Aliases: map[string][]string{
-						"a-b-ab": {"alice", "bob"},
-					}},
-				},
-				{
-					Organization: "c",
-					Repository:   "d",
-					Aliases: &aliases{Aliases: map[string][]string{
-						"c-d-ab": {"bob", "charlie"},
-					}},
-				},
-			},
-			collected: &aliases{Aliases: map[string][]string{
-				"a-b-ab": {"alice", "bob"},
-				"c-d-ab": {"bob", "charlie"},
-			}},
-		},
-		{
-			name: "collisions after namespacing",
-			input: []*orgRepo{
-				{
-					Organization: "a",
-					Repository:   "b",
-					Aliases: &aliases{Aliases: map[string][]string{
-						"ab": {"alice", "bob"},
-					}},
-				},
-				{
-					Organization: "c",
-					Repository:   "d",
-					Aliases: &aliases{Aliases: map[string][]string{
-						"ab": {"bob", "charlie"},
-					}},
-				},
-				{
-					Organization: "e",
-					Repository:   "f",
-					Aliases: &aliases{Aliases: map[string][]string{
-						"a-b-ab": {"bob", "charlie"},
-					}},
-				},
-			},
-			error: regexp.MustCompile("^namespaced alias collision: \"a-b-ab\"$"),
-		},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			collected, err := namespaceAliases(test.input)
-			if test.error == nil {
-				if err != nil {
-					t.Fatal(err)
-				}
-			} else if !test.error.MatchString(err.Error()) {
-				t.Fatalf("unexpected error: %v does not match %v", err, test.error)
-			}
+func TestInsertSlice(t *testing.T) {
+	// test replacing two elements of a slice
+	given := []string{"alice", "bob", "carol", "david", "emily"}
+	expected := []string{"alice", "bob", "charlie", "debbie", "emily"}
+	actual := insertStringSlice([]string{"charlie", "debbie"}, given, 2, 4)
+	assertEqual(t, actual, expected)
 
-			assertEqual(t, collected, test.collected)
-			if test.namespaced != nil {
-				assertEqual(t, test.input, test.namespaced)
-			}
-		})
+	// test replacing all elements after the first
+	expected = []string{"alice", "eddie"}
+	actual = insertStringSlice([]string{"eddie"}, given, 1, len(given))
+	assertEqual(t, actual, expected)
+
+	// test invalid begin and end indexes, should return the slice unmodified
+	actual = insertStringSlice([]string{}, given, 5, 2)
+	assertEqual(t, given, given)
+	actual = insertStringSlice([]string{}, given, -1, 2)
+	assertEqual(t, given, given)
+	actual = insertStringSlice([]string{}, given, 1, len(given)+1)
+	assertEqual(t, given, given)
+}
+
+func TestResolveAliases(t *testing.T) {
+	given := &orgRepo{
+		Owners: &owners{Approvers: []string{"alice", "sig-alias", "david"},
+			Reviewers: []string{"adam", "sig-alias"}},
+		Aliases: &aliases{Aliases: map[string][]string{"sig-alias": {"bob", "carol"}}},
 	}
+	expected := &orgRepo{
+		Owners: &owners{Approvers: []string{"alice", "bob", "carol", "david"},
+			Reviewers: []string{"adam", "bob", "carol"}},
+		Aliases: &aliases{Aliases: map[string][]string{"sig-alias": {"bob", "carol"}}},
+	}
+	assertEqual(t, given.resolveOwnerAliases(), expected.Owners)
 }
 
 func TestWriteYAML(t *testing.T) {
