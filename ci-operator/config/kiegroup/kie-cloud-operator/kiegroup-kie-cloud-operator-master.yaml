@@ -1,14 +1,19 @@
 base_images:
-  base:
+  os:
     cluster: https://api.ci.openshift.org
-    name: origin-v4.0
+    name: centos
     namespace: openshift
-    tag: base
+    tag: '7'
 canonical_go_repository: github.com/kiegroup/kie-cloud-operator
 binary_build_commands: make build-ci
 images:
 - dockerfile_path: build/Dockerfile
-  from: base
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: /usr/local/bin/
+        source_path: /go/src/github.com/kiegroup/kie-cloud-operator/build/_output/bin/kie-cloud-operator
   to: kie-cloud-operator
 resources:
   '*':
@@ -18,10 +23,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  cluster: https://api.ci.openshift.org
-  name: origin-v4.0
-  namespace: openshift
 build_root:
   image_stream_tag:
     cluster: https://api.ci.openshift.org
