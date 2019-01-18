@@ -4,34 +4,89 @@ presubmits:
     always_run: true
     branches:
     - master
-    context: ci/prow/e2e-gcp
+    context: ci/prow/e2e-aws
     decorate: true
-    name: pull-ci-openshift-jenkins-master-e2e-gcp
-    rerun_command: /test e2e-gcp
+    decoration_config:
+      skip_cloning: true
+    name: pull-ci-openshift-jenkins-master-e2e-aws
+    rerun_command: /test e2e-aws
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/e2e-gcp-cluster-profile
-        - --target=e2e-gcp
-        - --template=/usr/local/e2e-gcp
+        - --secret-dir=/usr/local/e2e-aws-cluster-profile
+        - --target=e2e-aws
+        - --template=/usr/local/e2e-aws
         command:
         - ci-operator
         env:
         - name: CLUSTER_TYPE
-          value: gcp
+          value: aws
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
               key: openshift-jenkins-master.yaml
               name: ci-operator-configs
         - name: JOB_NAME_SAFE
-          value: e2e-gcp
-        - name: PREPARE_COMMAND
-          value: tag-in-image.sh
-        - name: RPM_REPO_OPENSHIFT_ORIGIN
-          value: https://rpms.svc.ci.openshift.org/openshift-origin-v4.0/
+          value: e2e-aws
+        - name: TEST_COMMAND
+          value: TEST_SUITE=openshift/conformance/parallel run-tests
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-aws-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-aws
+          name: job-definition
+          subPath: cluster-launch-installer-e2e.yaml
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-e2e
+        name: job-definition
+    trigger: ((?m)^/test( all| e2e-aws),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/e2e-aws-jenkins
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    name: pull-ci-openshift-jenkins-master-e2e-aws-jenkins
+    rerun_command: /test e2e-aws-jenkins
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --secret-dir=/usr/local/e2e-aws-jenkins-cluster-profile
+        - --target=e2e-aws-jenkins
+        - --template=/usr/local/e2e-aws-jenkins
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-jenkins-master.yaml
+              name: ci-operator-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-aws-jenkins
         - name: TEST_COMMAND
           value: TEST_SUITE=openshift/jenkins-e2e run-tests
         image: ci-operator:latest
@@ -43,24 +98,22 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/e2e-gcp-cluster-profile
+        - mountPath: /usr/local/e2e-aws-jenkins-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-gcp
+        - mountPath: /usr/local/e2e-aws-jenkins
           name: job-definition
-          subPath: cluster-launch-e2e-openshift-jenkins.yaml
+          subPath: cluster-launch-installer-e2e.yaml
       serviceAccountName: ci-operator
       volumes:
       - name: cluster-profile
         projected:
           sources:
           - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
+              name: cluster-secrets-aws
       - configMap:
-          name: prow-job-cluster-launch-e2e-openshift-jenkins
+          name: prow-job-cluster-launch-installer-e2e
         name: job-definition
-    trigger: ((?m)^/test( all| e2e-gcp),?(\s+|$))
+    trigger: ((?m)^/test( all| e2e-aws-jenkins),?(\s+|$))
   - agent: kubernetes
     always_run: true
     branches:
@@ -77,6 +130,7 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
         - --target=[images]
+        - --target=[release:latest]
         command:
         - ci-operator
         env:
@@ -95,11 +149,39 @@ presubmits:
             cpu: 10m
       serviceAccountName: ci-operator
     trigger: ((?m)^/test( all| images),?(\s+|$))
-  - agent: jenkins
+  - agent: kubernetes
     always_run: true
-    context: ci/openshift-jenkins
+    branches:
+    - master
+    context: ci/prow/rhel-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
     labels:
-      master: ci.openshift.redhat.com
-    name: test_pull_request_jenkins_images
-    rerun_command: /test
-    trigger: ((?m)^/test,?(\s+|$))
+      ci-operator.openshift.io/variant: rhel
+    name: pull-ci-openshift-jenkins-master-rhel-images
+    rerun_command: /test rhel-images
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --target=[images]
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-jenkins-master__rhel.yaml
+              name: ci-operator-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| rhel-images),?(\s+|$))
