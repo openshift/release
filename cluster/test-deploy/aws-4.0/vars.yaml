@@ -1,86 +1,13 @@
----
-vm_prefix: "{{ lookup('env', 'INSTANCE_PREFIX') }}"
+ansible_become: true
+ansible_become_sudo: true
 
-type: aws
+ansible_python_interpreter: "/usr/bin/python"
+ansible_user: "ec2-user"
 
-aws_key: "ci-key"
-aws_region: "us-east-1"
-aws_cluster_id: "{{ lookup('env', 'INSTANCE_PREFIX') }}"
-aws_subnet: "subnet-f93770d6" # Name: CI Subnet 1
-aws_image: "ami-9887c6e7" #official centos 7
-aws_use_auto_terminator: false
-aws_expiration_date: "{{ lookup('pipe','date -d \"4 hours\" --iso=minutes --utc') }}"
-aws_basedomain: "test.ose"
-aws_tag: "tag_kubernetes_io_cluster_{{ aws_cluster_id | replace('-', '_') }}_owned"
+openshift_additional_repos: [
+  {"name": "origin-pr", "baseurl": "{{ openshift_test_repo }}", "enabled": 1, "gpgcheck": 0},
+  {"name": "origin-pr-dependencies", "baseurl": "{{ openshift_dependencies_repo | default('http://mirror.centos.org/centos/7/paas/x86_64/openshift-origin/') }}", "enabled": 1, "gpgcheck": 0}
+  ]
 
-aws_instances:
-- name: "{{ vm_prefix }}-bootstrap"
-  ansible_groups:
-    - bootstrap
-    - nodes
-  aws_flavor: t2.large
-  aws_security_group: openshift-ansible-public
-  aws_volumes:
-    - device_name: /dev/sda1
-      volume_size: 50
-      delete_on_termination: yes
-- name: "{{ vm_prefix }}-master-1"
-  ansible_groups:
-    - masters
-    - nodes
-  aws_flavor: t2.large
-  aws_security_group: openshift-ansible-public
-  aws_volumes:
-    - device_name: /dev/sda1
-      volume_size: 50
-      delete_on_termination: yes
-- name: "{{ vm_prefix }}-master-2"
-  ansible_groups:
-    - masters
-    - nodes
-  aws_flavor: t2.large
-  aws_security_group: openshift-ansible-public
-  aws_volumes:
-    - device_name: /dev/sda1
-      volume_size: 50
-      delete_on_termination: yes
-- name: "{{ vm_prefix }}-master-3"
-  ansible_groups:
-    - masters
-    - nodes
-  aws_flavor: t2.large
-  aws_security_group: openshift-ansible-public
-  aws_volumes:
-    - device_name: /dev/sda1
-      volume_size: 50
-      delete_on_termination: yes
-- name: "{{ vm_prefix }}-worker-1"
-  ansible_groups:
-    - workers
-    - nodes
-  aws_flavor: t2.large
-  aws_security_group: openshift-ansible-public
-  aws_volumes:
-    - device_name: /dev/sda1
-      volume_size: 50
-      delete_on_termination: yes
-- name: "{{ vm_prefix }}-worker-2"
-  ansible_groups:
-    - workers
-    - nodes
-  aws_flavor: t2.large
-  aws_security_group: openshift-ansible-public
-  aws_volumes:
-    - device_name: /dev/sda1
-      volume_size: 50
-      delete_on_termination: yes
-- name: "{{ vm_prefix }}-worker-3"
-  ansible_groups:
-    - workers
-    - nodes
-  aws_flavor: t2.large
-  aws_security_group: openshift-ansible-public
-  aws_volumes:
-    - device_name: /dev/sda1
-      volume_size: 50
-      delete_on_termination: yes
+openshift_aws_scaleup_key: "libra"
+openshift_aws_scaleup_ami: "ami-0d8c186e89e19b0b3"  #us-east-1
