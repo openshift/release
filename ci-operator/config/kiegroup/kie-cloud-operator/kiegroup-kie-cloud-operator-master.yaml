@@ -5,10 +5,9 @@ base_images:
     namespace: openshift
     tag: '7'
 canonical_go_repository: github.com/kiegroup/kie-cloud-operator
-binary_build_commands: make build-ci
+binary_build_commands: CI=true make build
 images:
-- dockerfile_path: build/Dockerfile
-  from: os
+- from: os
   inputs:
     bin:
       paths:
@@ -31,6 +30,22 @@ build_root:
     tag: golang-1.10
 tests:
 - as: unit
-  commands: make test-ci
+  commands: CI=true make test
+  container:
+    from: src
+- as: format
+  commands: CI=true make format
+  container:
+    from: src
+- as: lint
+  commands: make lint
+  container:
+    from: src
+- as: vet
+  commands: CI=true make vet
+  container:
+    from: src
+- as: dep
+  commands: CI=true make dep
   container:
     from: src
