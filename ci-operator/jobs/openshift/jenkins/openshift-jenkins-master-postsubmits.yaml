@@ -6,6 +6,8 @@ postsubmits:
     decorate: true
     decoration_config:
       skip_cloning: true
+    labels:
+      artifacts: images
     name: branch-ci-openshift-jenkins-master-images
     spec:
       containers:
@@ -31,15 +33,36 @@ postsubmits:
           requests:
             cpu: 10m
       serviceAccountName: ci-operator
-  - agent: jenkins
+  - agent: kubernetes
     branches:
     - ^master$
+    decorate: true
+    decoration_config:
+      skip_cloning: true
     labels:
-      master: ci.openshift.redhat.com
-    name: push_jenkins_images
-  - agent: jenkins
-    branches:
-    - ^master$
-    labels:
-      master: ci.openshift.redhat.com
-    name: test_branch_jenkins_images
+      ci-operator.openshift.io/variant: rhel
+    name: branch-ci-openshift-jenkins-master-rhel-images
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --promote
+        - --target=[images]
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-jenkins-master__rhel.yaml
+              name: ci-operator-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
