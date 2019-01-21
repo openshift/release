@@ -240,22 +240,26 @@ registry.svc.ci.openshift.org/ci/ci-operator:latest \
 
 ## CI secrets
 
-We use various secrets in our CI.
+We use various OpenShift secrets in our CI. You can manage these secrets in the
+`azure` namespace in the CI cluster.
 
 | Secret name | Description |
 | --- | --- |
-| cluster-secrets-azure | file based secret. It can be sourced by script (see ci-operator jobs) |
+| cluster-secrets-azure | contains all the necessary credentials for e2e and image build jobs |
 | cluster-secrets-azure-env | environment based secret. It can be injected to pod using pod spec (see azure-purge) |
 | codecov-token | used for pushing reports to Codecov |
 
 
 ### cluster-secrets-azure
 
-OSA jobs are using `Web API App` credentials on Azure to run jobs. If for some reason you need to rotate secret, follow this process:
+Today we use `cluster-secrets-azure` as a grab bag of all the different secrets we
+need in place in order for the e2e and image build tests to work correctly. The OSA jobs are
+using `Web API App` credentials on Azure to create clusters. If for some reason you need to
+rotate the Azure credentials, follow this process:
 
 1. Go to `Azure Active Directory` -> `App Registrations` -> `ci-operator-jobs` -> `Settings` -> `Keys`
 2. Delete old key, and create new one.
-3. Create secret example file:
+3. Create a file named `secret` with the following format:
 
 ```
 export AZURE_CLIENT_ID=<web app id>
@@ -266,9 +270,20 @@ export AZURE_SUBSCRIPTION_ID=<subscription id>
 
 4. Create or update the `cluster-secrets-azure` secret in the `azure` namespace.
 
-You need to make sure you also have the required certificates in place in order to allow our
-build VM process to download the OpenShift RPMs from the ops mirror. There are also the Geneva
-secrets (image pull secret, logging, and metrics certificates).
+You need to make sure you also have the rest of the credentials in place in order to create or
+update `cluster-secrets-azure`
+
+| Name | Description |
+| --- | --- |
+| `secret` | Azure credentials |
+| `ssh-privatekey` | SSH key (used by image builds - can be any SSH key) |
+| `certs.yaml` | Ops mirror certificates (used by image builds) |
+| `.dockerconfigjson` | Geneva images pull secret |
+| `system-docker-config.json` | Red Hat registry image pull secret |
+| `logging-int.cert` | Geneva logging certificate |
+| `logging-int.key` | Geneva logging key |
+| `metrics-int.cert` | Geneva metrics certificate |
+| `metrics-int.key` | Geneva metrics key |
 
 TODO: In the future, split this into separate secrets so in case we need to rotate the CI credentials
 we will not need to have the rest of the secrets in place.
