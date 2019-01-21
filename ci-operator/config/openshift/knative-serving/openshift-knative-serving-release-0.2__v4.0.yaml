@@ -1,0 +1,138 @@
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: origin-v4.0
+  namespace: openshift
+base_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: origin-v4.0
+    namespace: openshift
+    tag: base
+build_root:
+  project_image:
+    dockerfile_path: openshift/ci-operator/build-image/Dockerfile
+canonical_go_repository: github.com/knative/serving
+binary_build_commands: make install
+test_binary_build_commands: make test-install
+images:
+- dockerfile_path: openshift/ci-operator/knative-images/activator/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/activator
+  to: knative-serving-activator
+- dockerfile_path: openshift/ci-operator/knative-images/autoscaler/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/autoscaler
+  to: knative-serving-autoscaler
+- dockerfile_path: openshift/ci-operator/knative-images/controller/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/controller
+  to: knative-serving-controller
+- dockerfile_path: openshift/ci-operator/knative-images/queue/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/queue
+  to: knative-serving-queue
+- dockerfile_path: openshift/ci-operator/knative-images/webhook/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/webhook
+  to: knative-serving-webhook
+- dockerfile_path: openshift/ci-operator/knative-test-images/autoscale/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/autoscale
+  to: knative-serving-test-autoscale
+- dockerfile_path: openshift/ci-operator/knative-test-images/controller/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/controller
+  to: knative-serving-test-controller
+- dockerfile_path: openshift/ci-operator/knative-test-images/envvars/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/envvars
+  to: knative-serving-test-envvars
+- dockerfile_path: openshift/ci-operator/knative-test-images/helloworld/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/helloworld
+  to: knative-serving-test-helloworld
+- dockerfile_path: openshift/ci-operator/knative-test-images/httpproxy/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/httpproxy
+  to: knative-serving-test-httpproxy
+- dockerfile_path: openshift/ci-operator/knative-test-images/pizzaplanetv1/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/pizzaplanetv1
+  to: knative-serving-test-pizzaplanetv1
+- dockerfile_path: openshift/ci-operator/knative-test-images/pizzaplanetv2/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/pizzaplanetv2
+  to: knative-serving-test-pizzaplanetv2
+- dockerfile_path: openshift/ci-operator/knative-test-images/singlethreaded/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/singlethreaded
+  to: knative-serving-test-singlethreaded
+promotion:
+  cluster: https://api.ci.openshift.org
+  namespace: openshift
+  name: origin-v4.0-knative-v0.2
+tests:
+- as: e2e
+  commands: "INTERNAL_REGISTRY=image-registry.openshift-image-registry.svc:5000 make test-e2e"
+  openshift_installer_src:
+    cluster_profile: aws
+resources:
+  '*':
+    limits:
+      cpu: '2'
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
