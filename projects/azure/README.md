@@ -82,6 +82,10 @@ If you don't find a match, you should open a new issue to track the new failure 
 `/kind test-flake` in it in order for the github bot to label the issue appropriately.
 Otherwise, link the existing issue in your PR. Then, you can `/retest` your PR.
 
+For any infrastructure-related issues, make sure to contact the Developer Productivity
+team who is responsible for managing the OpenShift CI Infrastructure at #forum-testplatform
+in [Slack](https://coreos.slack.com/).
+
 Optionally, you can request specific long-running tests to run that are not
 running in PRs by default.
 
