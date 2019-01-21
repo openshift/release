@@ -4,6 +4,7 @@ The current directory contains CI configuration for the OSA project. The present
 serves as documentation for anything CI-related to OSA.
 
 OSA, from the Red Hat side, is comprised of a couple of different Github repos:
+
 * [openshift/openshift-azure](https://github.com/openshift/openshift-azure/)
   This is the main code repository where all production code used by Microsoft
   is developed.
@@ -14,12 +15,16 @@ OSA, from the Red Hat side, is comprised of a couple of different Github repos:
 
 In order to test and merge changes in these repositories, we use a couple of novel tools
 in our CI. Namely:
+
 * [ci-operator](https://github.com/openshift/ci-operator)
+
   This tool is responsible for running [jobs](#ci-operator-jobs) by using Openshift resources.
-  There are a bunch of useful docs in the ci-operator repo, it is suggested to
+  There are a bunch of useful docs in the `ci-operator` repo, it is suggested to
   go through at least [ONBOARD.md](https://github.com/openshift/ci-operator/blob/master/ONBOARD.md), [ARCHITECTURE.md](https://github.com/openshift/ci-operator/blob/master/ARCHITECTURE.md), and [CONFIGURATION.md](https://github.com/openshift/ci-operator/blob/master/CONFIGURATION.md).
   You should ensure you familiarize yourself with `ci-operator`.
+
 * [Prow](https://github.com/kubernetes/test-infra/blob/master/prow/getting_started_deploy.md)
+
   Prow is the CI system used in both Kubernetes and the Openshift Origin projects.
   It is responsible for every user interaction in Github, scheduling of tests, and
   reporting results. As an end user you shouldn't need to familiarize yourself with Prow.
@@ -27,21 +32,29 @@ in our CI. Namely:
 
 ## ci-operator jobs
 
-There are three different places where we store ci-operator and Prow configuration:
+There are three different places where we store `ci-operator` and Prow configuration:
 
 1. `ci-operator/config/openshift/openshift-azure/`
+
   This is where the ci-operator config is stored and what is meant to be used
   by end users. Here we are specifying what commands we want to run in order to
   build and test our code, and optionally publish container images.
+
 2. `ci-operator/jobs/openshift/openshift-azure/`
+
   In order to deploy the `ci-operator` config, we need to use prowjobs and this
   is where we configure those. Prowjobs fall under three categories:
-  * presubmits: These jobs run in PRs
-  * postsubmits: These jobs run in merged commits
-  * periodics: These jobs run periodically
+
+  | Type | Description |
+  | --- | --- |
+  | presubmits | Pull request jobs |
+  | postsubmits | Branch jobs |
+  | periodics | Periodically-running jobs |
+
 3. `ci-operator/templates/openshift/openshift-azure`
+
   Unfortunately, we cannot define all types of tests in `ci-operator/config/openshift/openshift-azure/`.
-  Hence, we use Openshift templates to do black-box testing with ci-operator.
+  Hence, we use Openshift templates to do black-box testing with `ci-operator`.
   This directory contains the templates used by our e2e tests and by our image
   build processes. In order to learn more about writting tests using templates
   refer to [TEMPLATES.md](https://github.com/openshift/ci-operator/blob/master/TEMPLATES.md)
@@ -57,42 +70,47 @@ The following CI jobs run automatically on every PR in `openshift-azure`.
 
 | Job | Description |
 | --- | --- |
-| `ci/prow/unit` | runs unit tests |
-| `ci/prow/verify` | runs verification tests |
-| `ci/prow/images` | builds all binaries and images |
-| `ci/prow/e2e` | runs e2e tests |
+| `ci/prow/unit` | unit tests |
+| `ci/prow/verify` | verification tests |
+| `ci/prow/images` | binary and container image builds |
+| `ci/prow/e2e` | e2e tests |
 
-When a test fails in your PR, you need to triage the failure, and compare it with the existing
+When a test fails in your PR and the test failure is unrelated to your changes, you need to
+triage the failure, and compare it with the existing
 set of [open issues tracking test failures](https://github.com/openshift/openshift-azure/issues?q=is%3Aissue+is%3Aopen+label%3Akind%2Ftest-flake).
-If you don't find a match, you should open a new issue to track the failure and comment
+If you don't find a match, you should open a new issue to track the new failure and comment
 `/kind test-flake` in it in order for the github bot to label the issue appropriately.
-Then, you can `/retest` your PR.
+Otherwise, link the existing issue in your PR. Then, you can `/retest` your PR.
 
 Optionally, you can request specific long-running tests to run that are not
 running in PRs by default.
 
 | Command | Description |
 | --- | --- |
-| `/test scaleupdown` | runs a test doing a scale up followed by a scale down of the cluster |
-| `/test etcdrebackupcovery` | runs a test that backups a cluster, mutates state, then restores from the backup |
-| `/test keyrotation` | runs a test that rotates all the certificates in a cluster |
-| `/test prod` | runs a test using the production OSA RP |
-| `/test vnet` | runs a custom vnet test using the production OSA RP |
+| `/test scaleupdown` | scale up followed by a scale down of the cluster |
+| `/test etcdrebackupcovery` | backup a cluster, mutate state, then restore from the backup |
+| `/test keyrotation` | rotate all the certificates in a cluster |
+| `/test prod` | install a cluster using the production OSA RP |
+| `/test vnet` | install a cluster using a pre-existing vnet and the production OSA RP |
 
 Note that the tests using the production RP are not any useful to run in PRs unless
 you update the tests themselves.
 
 ### Run a job manually
 
-The point of using `ci-operator` is to minimize the differences between using the CI
-system and running tests manually. To run a ci-operator job manually it is recommended
-to use the [CI-Operator](https://github.com/openshift/ci-operator) container image.
+You should be able to run tests locally in `openshift-azure` by using the `make` targets
+directly. In this document, we are going to explain how to simulate running these tests
+similarly to how they run in CI. The point of using `ci-operator` is to minimize the
+differences between using the CI system and running tests manually. To run a `ci-operator`
+job manually, it is recommended to use the `ci-operator` container image.
 ```
 docker pull registry.svc.ci.openshift.org/ci/ci-operator:latest
 ```
 
 `ci-operator` needs a kubeconfig in place in order to use a running cluster to run the tests.
-Obtain the `oc login` command from the [OpenShift CI WebConsole](https://api.ci.openshift.org/console/) and perform a login in your terminal.
+Obtain the `oc login` command from the [OpenShift CI WebConsole](https://api.ci.openshift.org/console/)
+and perform a login in your terminal. You should be able to access the CI cluster simply
+by being a member of the [OpenShift Github organization](https://github.com/orgs/openshift/people).
 
 Note: all further instructions assume you are currently in the root directory of this repository
 
@@ -103,17 +121,21 @@ cp cluster/test-deploy/azure/secret_example cluster/test-deploy/azure/secret
 # insert/update credentials in cluster/test-deploy/azure/secret
 ```
 
-Set the location of the namespace you wish to use for the ci-operator jobs
+Set the location of the namespace you wish to use for the `ci-operator` jobs
 ```
 export CI_OPERATOR_NAMESPACE=your-chosen-namespace
 ```
 
 #### Running e2e tests
 
-For the e2e tests you will also need to have the Geneva secrets in place.
+For the e2e tests you will also need to have the Geneva secrets (`logging-int.cert`,
+`logging-int.key`, `metrics-int.cert`, `metrics-int.key`, `.dockerconfigjson`) and a
+Red Hat registry image pull secret (`system-docker-config.json`) in place.
 ```
-$ ls cluster/test-deploy/azure/
-logging-int.cert  logging-int.key  metrics-int.cert  metrics-int.key  secret  secret_example vars.yaml
+$ ls -A cluster/test-deploy/azure/
+.gitignore         logging-int.key   metrics-int.key   secret_example  .type
+.dockerconfigjson  logging-int.cert  metrics-int.cert  secret          system-docker-config.json
+vars.yaml
 ```
 
 Example: Run e2e tests
