@@ -1,8 +1,8 @@
 base_images:
   base:
     cluster: https://api.ci.openshift.org
-    name: origin-v4.0
-    namespace: openshift
+    name: '4.0'
+    namespace: ocp
     tag: cli
 build_root:
   image_stream_tag:
@@ -11,7 +11,7 @@ build_root:
     namespace: openshift
     tag: golang-1.10
 images:
-- dockerfile_path: Dockerfile
+- dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
     src:
@@ -19,7 +19,7 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/jenkins/2/.
   to: jenkins
-- dockerfile_path: Dockerfile
+- dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
     src:
@@ -28,7 +28,7 @@ images:
         source_path: /go/src/github.com/openshift/jenkins/slave-base/.
   optional: true
   to: jenkins-agent-base
-- dockerfile_path: Dockerfile
+- dockerfile_path: Dockerfile.rhel7
   from: jenkins-agent-base
   inputs:
     src:
@@ -36,7 +36,7 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/jenkins/agent-maven-3.5/.
   to: jenkins-maven-agent
-- dockerfile_path: Dockerfile
+- dockerfile_path: Dockerfile.rhel7
   from: jenkins-agent-base
   inputs:
     src:
@@ -53,15 +53,5 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  cluster: https://api.ci.openshift.org
-  name: origin-v4.0
-  namespace: openshift
-tests:
-- as: e2e-aws
-  commands: TEST_SUITE=openshift/conformance/parallel run-tests
-  openshift_installer:
-    cluster_profile: aws
-- as: e2e-aws-jenkins
-  commands: TEST_SUITE=openshift/jenkins-e2e run-tests
-  openshift_installer:
-    cluster_profile: aws
+  name: '4.0'
+  namespace: ocp
