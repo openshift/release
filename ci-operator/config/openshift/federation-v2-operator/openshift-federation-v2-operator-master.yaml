@@ -1,10 +1,6 @@
-base_images:
-  base:
-    cluster: https://api.ci.openshift.org
-    name: origin-v4.0
-    namespace: openshift
-    tag: base
 canonical_go_repository: github.com/openshift/federation-v2-operator
+# build_root establishes the origin of the image that is represented by the
+# 'root' tag elsewhere in this configuration
 build_root:
   image_stream_tag:
     cluster: https://api.ci.openshift.org
@@ -12,10 +8,14 @@ build_root:
     namespace: openshift
     tag: golang-1.10
 images:
+  # synthesized-fork-src is an image that is set up to be look like a fork of
+  # the upstream federation-v2 repository
 - from: root
   dockerfile_path: Dockerfile.fork
   to: synthesized-fork-src
 resources:
+  # '*' is evaluated over the the test or build name and therefore applies to
+  # all tests and builds.
   '*':
     limits:
       cpu: '2'
@@ -23,17 +23,23 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+# promotion configures how the main image (the one built by forking the
+# canonical go repository and doing the Dockerfile build) is promoted after a
+# successful build.
+promotion:
+  name: federation-v2
+  namespace: openshift
+# tag_specification controls how the resulting image is promoted into the
+# ImageStream with the name and namespace specified in promotion.
 tag_specification:
   cluster: https://api.ci.openshift.org
   name: origin-v4.0
   namespace: openshift
-promotion:
-  name: federation-v2
-  namespace: openshift
 tests:
 - as: unit
-  # workaround: one of the API packages relies on having an etcd binary for its
-  # test, so we avoid invoking 'make test' for now.
+  # The 'unit' test runs the upstream federation-v2 unit tests. This test does
+  # not call the upstream makefile because one of the API packages relies on
+  # having an etcd binary.
   commands: |
     go list ./pkg/... | grep -v v1alpha1 | xargs go test
   container:
