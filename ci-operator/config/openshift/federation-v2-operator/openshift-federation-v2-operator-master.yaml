@@ -50,3 +50,14 @@ tests:
     go list ./pkg/... | grep -v v1alpha1 | xargs go test
   container:
     from: synthesized-fork-src
+- as: managed-e2e
+  # The 'managed-e2e' test runs the upstream federation-v2 e2e tests in a
+  # 'managed' fashion, ie, against a self-deployed Kubernetes API server.
+  commands: |
+    ./scripts/download-binaries.sh
+    TEST_ASSET_PATH="/go/src/github.com/kubernetes-sigs/federation-v2/bin" \
+    TEST_ASSET_ETCD="/go/src/github.com/kubernetes-sigs/federation-v2/bin/etcd" \
+    TEST_ASSET_KUBE_APISERVER="/go/src/github.com/kubernetes-sigs/federation-v2/bin/kube-apiserver" \
+    go test -v ./test/e2e -args -ginkgo.v -single-call-timeout=1m -ginkgo.trace -ginkgo.randomizeAllSpecs
+  container:
+    from: synthesized-fork-src
