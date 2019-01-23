@@ -1,7 +1,7 @@
 # OSA CI
 
-The current directory contains CI configuration for the OSA project. The present document
-serves as documentation for anything CI-related to OSA.
+The current directory contains CI configuration for the OSA project, albeit it's not
+exhaustive. The present document serves as documentation for anything CI-related to OSA.
 
 OSA, from the Red Hat side, is comprised of a couple of different Github repos:
 
@@ -83,8 +83,7 @@ If you don't find a match, you should open a new issue to track the new failure 
 Otherwise, link the existing issue in your PR. Then, you can `/retest` your PR.
 
 For any infrastructure-related issues, make sure to contact the Developer Productivity
-team who is responsible for managing the OpenShift CI Infrastructure at #forum-testplatform
-in [Slack](https://coreos.slack.com/).
+team who is responsible for managing the OpenShift CI Infrastructure at [#forum-testplatform](https://coreos.slack.com/).
 
 Optionally, you can request specific long-running tests to run that are not
 running in PRs by default.
@@ -336,11 +335,14 @@ image-mirror-openshift-azure-v3.11-quay   0 * * * *   False     0         56m   
 token-refresh                             0 0 * * *   False     1         44d             45d
 ```
 
-* _azure-purge_ is responsible for cleaning up long-lived resource groups in our subscription (created either by our CI tests or for development purposes)
-* _image-mirror-openshift-azure-v3.11-quay_ mirrors images from the azure namespace to quay.io/openshift-on-azure that both MSFT uses for running the sync pod in customer clusters and SRE tooling we use in our SRE cluster
-* _token-refresh_ refreshes a token from the AWS registry that we put inside node images built from Origin master to pull images for the cluster
+* _`azure-purge`_ is responsible for cleaning up long-lived resource groups in our subscription (created either by our CI tests or for development purposes)
+* _`image-mirror-openshift-azure-v3.11-quay`_ mirrors images from the `azure` CI namespace to `quay.io/openshift-on-azure`, the latter being used by our customers and developers alike
+* _`token-refresh`_ refreshes a token from the AWS registry that we put inside node images built from Origin master to pull images for the cluster
 
-We need to check whether the above jobs are in a working state. Access to the cluster is granted to every member of the openshift github organization. Access to the azure namespace is controlled by the [azure-team group](./cluster-wide.yaml).
+We need to check whether the above jobs are in a working state. Access to the cluster is granted
+to every member of the openshift github organization. Access to the `azure` namespace is controlled
+by the [`azure-team` group](./cluster-wide.yaml). If you need to update group membership, you need to
+ask a CI admin at [#forum-testplatform](https://coreos.slack.com/) to apply the new changes in the cluster.
 
 ## Building container images
 
