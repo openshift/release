@@ -367,19 +367,16 @@ specifying how to build the new image.
         source_path: /go/src/github.com/openshift/openshift-azure/<image_source>
   to: <image_name>
 ```
-* If you intend for the image to be mirrored from the CI registry to [our public quay registry](https://quay.io/organization/openshift-on-azure/) then you need to update the
+* If the image needs to be mirrored from the CI registry to [our public quay account](https://quay.io/organization/openshift-on-azure/) then you need to update the
 [image mirror config](https://github.com/openshift/release/blob/master/projects/azure/image-mirror/image-mirror.yaml) 
 in the release repo:
 	* Add a new entry to the `items[0].data.openshift-azure_<openshift_version>_quay` key of that file which looks as follows:
 	```yaml
 	registry.svc.ci.openshift.org/azure/azure-plugins:<image_name> quay.io/openshift-on-azure/<image_name>:<openshift_version> quay.io/openshift-on-azure/<image_name>:latest
 	```
-	where:
-	* `<image_name>` is the name of the image
-	* `<openshift_version>` is the currently supported openshift version e.g. v3.11
-
-The image mirror job cannot create repos in quay, so an initial manual push of the new
-image using the make target is required (`make <image_name>-push`).
+	where: `<image_name>` is the name of the image and `<openshift_version>` is the currently supported openshift version e.g. `v3.11`
+  * The image mirror job cannot create repos in quay, so an initial manual push of the new image using the make target is required (`make <image_name>-push`).
+  * Once the image is pushed manually, you need to give write permissions to the `openshift-on-azure+openshiftci` robot account in quay.
 
 The new image and others configured as such are built for [every commit pushed to master](https://github.com/openshift/release/blob/03d68b76db023721990dd24aeddd9a03d6a02bc3/ci-operator/jobs/openshift/openshift-azure/openshift-openshift-azure-master-postsubmits.yaml#L57-L86) and also on a [daily basis](https://github.com/openshift/release/blob/03d68b76db023721990dd24aeddd9a03d6a02bc3/ci-operator/jobs/openshift/openshift-azure/openshift-openshift-azure-periodics.yaml#L476-L505).
 
