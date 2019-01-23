@@ -386,9 +386,12 @@ The new image and others configured as such are built for [every commit pushed t
 ## Test dependencies
 
 If you need to update the base image used by our tests, you should make changes to the [`test-base`](https://github.com/openshift/release/blob/master/projects/azure/base-images/test-base.yaml) 
-image build and once your PR is merged and the `openshift-azure-robot` successfully updates the build,
-you should trigger a build of your changes in the CI cluster either via the web console or using
-the command line:
+image build and once your PR is merged:
+* apply the build config in the cluster:
 ```console
-oc start-build bc/test-base -n azure
+$ oc apply -f projects/azure/base-images/test-base.yaml
+```
+* trigger a build of your changes:
+```console
+$ oc start-build bc/test-base -n azure
 ```
