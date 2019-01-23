@@ -38,6 +38,63 @@ presubmits:
     always_run: true
     branches:
     - master
+    context: ci/prow/console-e2e
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    name: pull-ci-openshift-console-master-console-e2e
+    rerun_command: /test console-e2e
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --secret-dir=/usr/local/console-e2e-cluster-profile
+        - --target=console-e2e
+        - --template=/usr/local/console-e2e
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-console-master.yaml
+              name: ci-operator-configs
+        - name: JOB_NAME_SAFE
+          value: console-e2e
+        - name: TEST_COMMAND
+          value: ./test-gui-e2e-setup.sh; ./test-gui.sh e2e
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/console-e2e-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/console-e2e
+          name: job-definition
+          subPath: cluster-launch-installer-src.yaml
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-src
+        name: job-definition
+    trigger: ((?m)^/test( all| console-e2e),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
     context: ci/prow/frontend
     decorate: true
     decoration_config:
