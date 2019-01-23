@@ -4,6 +4,7 @@ base_images:
     name: origin-v4.0
     namespace: openshift
     tag: base
+canonical_go_repository: github.com/openshift/console
 images:
 - from: base
   inputs:
@@ -43,3 +44,8 @@ tests:
   commands: export ARTIFACT_DIR=/tmp/artifacts; ./test-frontend.sh
   container:
     from: test-bin
+- artifact_dir: /tmp/artifacts
+  as: console-e2e
+  commands: ./test-gui-e2e-setup.sh; ./test-gui.sh e2e
+  openshift_installer_src:
+    cluster_profile: aws
