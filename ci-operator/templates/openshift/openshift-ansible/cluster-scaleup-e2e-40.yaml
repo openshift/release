@@ -1,0 +1,536 @@
+kind: Template
+apiVersion: template.openshift.io/v1
+
+parameters:
+- name: JOB_NAME_SAFE
+  required: true
+- name: JOB_NAME_HASH
+  required: true
+- name: NAMESPACE
+  required: true
+- name: IMAGE_FORMAT
+  required: true
+- name: IMAGE_INSTALLER
+  required: true
+- name: IMAGE_ANSIBLE
+  required: true
+- name: IMAGE_TESTS
+  required: true
+- name: CLUSTER_TYPE
+  required: true
+# Ensures the release image is created and tested
+- name: TEST_COMMAND
+  required: true
+- name: RELEASE_IMAGE_LATEST
+  required: true
+- name: RPM_REPO_OPENSHIFT_ORIGIN
+  required: true
+
+objects:
+
+# We want the cluster to be able to access these images
+- kind: RoleBinding
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: ${JOB_NAME_SAFE}-image-puller
+    namespace: ${NAMESPACE}
+  roleRef:
+    name: system:image-puller
+  subjects:
+  - kind: SystemGroup
+    name: system:unauthenticated
+  - kind: SystemGroup
+    name: system:authenticated
+
+# Give edit access to a known bot
+- kind: RoleBinding
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: ${JOB_NAME_SAFE}-namespace-editors
+    namespace: ${NAMESPACE}
+  roleRef:
+    name: edit
+  subjects:
+  - kind: ServiceAccount
+    namespace: ci
+    name: ci-chat-bot
+
+# The e2e pod spins up a cluster, runs e2e tests, and then cleans up the cluster.
+- kind: Pod
+  apiVersion: v1
+  metadata:
+    name: ${JOB_NAME_SAFE}
+    namespace: ${NAMESPACE}
+    annotations:
+      # we want to gather the teardown logs no matter what
+      ci-operator.openshift.io/wait-for-container-artifacts: teardown
+      ci-operator.openshift.io/save-container-logs: "true"
+  spec:
+    restartPolicy: Never
+    activeDeadlineSeconds: 10800
+    terminationGracePeriodSeconds: 900
+    volumes:
+    - name: artifacts
+      emptyDir: {}
+    - name: shared-tmp
+      emptyDir: {}
+    - name: cluster-profile
+      secret:
+        secretName: ${JOB_NAME_SAFE}-cluster-profile
+
+    containers:
+
+    # Once the cluster is up, executes shared tests
+    - name: test
+      image: ${IMAGE_TESTS}
+      terminationMessagePolicy: FallbackToLogsOnError
+      resources:
+        requests:
+          cpu: 1
+          memory: 300Mi
+        limits:
+          cpu: 3
+          memory: 2Gi
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      - name: cluster-profile
+        mountPath: /tmp/cluster
+      - name: artifacts
+        mountPath: /tmp/artifacts
+      env:
+      - name: AWS_SHARED_CREDENTIALS_FILE
+        value: /tmp/cluster/.awscred
+      - name: ARTIFACT_DIR
+        value: /tmp/artifacts
+      - name: HOME
+        value: /tmp/home
+      - name: KUBECONFIG
+        value: /tmp/artifacts/installer/auth/kubeconfig
+      command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -euo pipefail
+
+        export PATH=/usr/libexec/origin:$PATH
+
+        trap 'touch /tmp/shared/exit' EXIT
+        trap 'kill $(jobs -p); exit 0' TERM
+
+        cp "$(which oc)" /tmp/shared/
+
+        mkdir -p "${HOME}"
+
+        # wait for the router namespace
+        SCALEUP_SUCCESS=
+        API_UP=
+        ROUTER_NAMESPACE=
+        ROUTER_DEPLOYMENT=
+        while true; do
+          if [[ -f /tmp/shared/exit ]]; then
+            echo "Another process exited" 2>&1
+            exit 1
+          fi
+          if [[ ! -f /tmp/shared/scaleup-success ]]; then
+            sleep 15 & wait
+            continue
+          elif [[ -z "${SCALEUP_SUCCESS}" ]]; then
+            echo "Scale up success"
+            SCALEUP_SUCCESS=1
+
+            # don't let clients impact the global kubeconfig
+            cp "${KUBECONFIG}" /tmp/admin.kubeconfig
+            export KUBECONFIG=/tmp/admin.kubeconfig
+          fi
+          if ! oc get nodes 2>/dev/null; then
+            echo "Waiting for API at $(oc whoami --show-server) to respond ..."
+            sleep 15 & wait
+            continue
+          elif [[ -z "${API_UP}" ]]; then
+            echo "API at $(oc whoami --show-server) has responded"
+            API_UP=1
+          fi
+          if [[ -z "${ROUTER_NAMESPACE}" ]]; then
+            # check multiple namespaces while we are transitioning to the new locations
+            if oc get deploy/router-default -n openshift-ingress 2>/dev/null; then
+              ROUTER_NAMESPACE=openshift-ingress
+              ROUTER_DEPLOYMENT="deploy/router-default"
+            elif oc get deploy/router -n tectonic-ingress 2>/dev/null; then
+              ROUTER_NAMESPACE=tectonic-ingress
+              ROUTER_DEPLOYMENT="deploy/router"
+            elif oc get ds/router-default -n openshift-ingress 2>/dev/null; then
+              ROUTER_NAMESPACE=openshift-ingress
+              ROUTER_DEPLOYMENT="ds/router-default"
+            elif oc get deploy/router -n openshift-ingress 2>/dev/null; then
+              ROUTER_NAMESPACE=openshift-ingress
+              ROUTER_DEPLOYMENT="deploy/router"
+            elif oc get deploy/router -n default 2>/dev/null; then
+              ROUTER_NAMESPACE=default
+              ROUTER_DEPLOYMENT="deploy/router"
+            else
+              echo "Waiting for router to be created ..."
+              sleep 15 & wait
+              continue
+            fi
+            echo "Found router in ${ROUTER_NAMESPACE}"
+          fi
+          break
+        done
+
+        TARGET="$(date -d '10 minutes' +%s)"
+        NOW="$(date +%s)"
+        while [[ "${NOW}" -lt "${TARGET}" ]]; do
+          REMAINING="$((TARGET - NOW))"
+          if oc --request-timeout="${REMAINING}s" rollout status "${ROUTER_DEPLOYMENT}" -n "${ROUTER_NAMESPACE}" -w; then
+            break
+          fi
+          sleep 2
+          NOW="$(date +%s)"
+        done
+        [[ "${NOW}" -ge "${TARGET}" ]] && echo "timeout waiting for ${ROUTER_NAMESPACE}/${ROUTER_DEPLOYMENT} to be available" && exit 1
+
+        # wait until the image registry changes propogate to the apiserver to avoid
+        # unnecessary restarts
+        until oc get is -n openshift php 2>/dev/null; do
+          sleep 10
+        done
+        until [[ -n "$( oc get is -n openshift php --template '{{ .status.dockerImageRepository }}' 2>/dev/null )" ]]; do
+          sleep 10
+        done
+        # oh god the blood
+        sleep 180
+
+        export KUBE_SSH_BASTION="$( oc get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
+        export KUBE_SSH_KEY_PATH=/tmp/cluster/ssh-privatekey
+
+        # set up cloud-provider-specific env vars
+        if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
+          export GOOGLE_APPLICATION_CREDENTIALS="/tmp/cluster/gce.json"
+          export KUBE_SSH_USER=cloud-user
+          mkdir -p ~/.ssh
+          cp /tmp/cluster/ssh-privatekey ~/.ssh/google_compute_engine || true
+          export PROVIDER_ARGS='-provider=gce -gce-zone=us-east1-c -gce-project=openshift-gce-devel-ci'
+          export TEST_PROVIDER='{"type":"gce","zone":"us-east1-c","projectid":"openshift-gce-devel-ci"}'
+        elif [[ "${CLUSTER_TYPE}" == "aws" ]]; then
+          mkdir -p ~/.ssh
+          cp /tmp/cluster/ssh-privatekey ~/.ssh/kube_aws_rsa || true
+          export PROVIDER_ARGS="-provider=aws -gce-zone=us-east-1"
+          # TODO: make openshift-tests auto-discover this from cluster config
+          export TEST_PROVIDER='{"type":"aws","region":"us-east-1","zone":"us-east-1a","multizone":true,"multimaster":true}'
+          export KUBE_SSH_USER=ec2-user
+        elif [[ "${CLUSTER_TYPE}" == "openstack" ]]; then
+          mkdir -p ~/.ssh
+          cp /tmp/cluster/ssh-privatekey ~/.ssh/kube_openstack_rsa || true
+        fi
+
+        mkdir -p /tmp/output
+        cd /tmp/output
+
+        function run-tests() {
+          if which openshift-tests && [[ -n "${TEST_SUITE-}" ]]; then
+            openshift-tests run "${TEST_SUITE}" --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
+            exit 0
+          fi
+          # TODO: remove everything after this point once we fork templates by release - starting with 4.0
+          if ! which extended.test; then
+            echo "must provide TEST_SUITE variable"
+            exit 1
+          fi
+          if [[ -n "${TEST_FOCUS:-}" ]]; then
+            ginkgo -v -noColor -nodes="${TEST_PARALLELISM:-30}" $( which extended.test ) -- \
+              -ginkgo.focus="${TEST_FOCUS}" -ginkgo.skip="${TEST_SKIP:-"\\[local\\]"}" \
+              -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit \
+              -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
+          fi
+          if [[ -n "${TEST_FOCUS_SERIAL:-}" ]]; then
+            ginkgo -v -noColor -nodes=1 $( which extended.test ) -- \
+              -ginkgo.focus="${TEST_FOCUS_SERIAL}" -ginkgo.skip="${TEST_SKIP_SERIAL:-"\\[local\\]"}" \
+              -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit/serial \
+              -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
+          fi
+          exit ${rc:-0}
+        }
+
+        ${TEST_COMMAND}
+
+    # Runs an install
+    - name: setup
+      image: ${IMAGE_INSTALLER}
+      terminationMessagePolicy: FallbackToLogsOnError
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp
+      - name: cluster-profile
+        mountPath: /etc/openshift-installer
+      - name: artifacts
+        mountPath: /tmp/artifacts
+      env:
+      - name: TYPE
+        value: ${CLUSTER_TYPE}
+      - name: AWS_SHARED_CREDENTIALS_FILE
+        value: /etc/openshift-installer/.awscred
+      - name: AWS_REGION
+        value: us-east-1
+      - name: CLUSTER_NAME
+        value: ${NAMESPACE}-${JOB_NAME_HASH}
+      - name: BASE_DOMAIN
+        value: origin-ci-int-aws.dev.rhcloud.com
+      - name: SSH_PUB_KEY_PATH
+        value: /etc/openshift-installer/ssh-publickey
+      - name: PULL_SECRET_PATH
+        value: /etc/openshift-installer/pull-secret
+      - name: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+        value: ${RELEASE_IMAGE_LATEST}
+      - name: OPENSTACK_IMAGE
+        value: rhcos
+      - name: OPENSTACK_REGION
+        value: RegionOne
+      - name: OPENSTACK_EXTERNAL_NETWORK
+        value: public
+      - name: OS_CLOUD
+        value: openstack-cloud
+      - name: OS_CLIENT_CONFIG_FILE
+        value: /etc/openshift-installer/clouds.yaml
+      - name: USER
+        value: test
+      - name: HOME
+        value: /tmp
+      command:
+      - /bin/sh
+      - -c
+      - |
+        #!/bin/sh
+        trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/setup-success; else touch /tmp/exit; fi; exit "${rc}"' EXIT
+        trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN}; fi' TERM
+
+        mkdir /tmp/artifacts/installer &&
+        /bin/openshift-install version >/tmp/artifacts/installer/version
+
+        export EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
+        export CLUSTER_ID=$(uuidgen --random)
+        export SSH_PUB_KEY=$(cat "${SSH_PUB_KEY_PATH}")
+        export PULL_SECRET=$(cat "${PULL_SECRET_PATH}")
+
+        if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
+            cat > /tmp/artifacts/installer/install-config.yaml << EOF
+        apiVersion: v1beta1
+        baseDomain: ${BASE_DOMAIN}
+        clusterID:  ${CLUSTER_ID}
+        machines:
+        - name:     master
+          replicas: 3
+        - name:     worker
+          replicas: 3
+        metadata:
+          name: ${CLUSTER_NAME}
+        networking:
+          clusterNetworks:
+          - cidr:             10.128.0.0/14
+            hostSubnetLength: 9
+          machineCIDR: 10.0.0.0/16
+          serviceCIDR: 172.30.0.0/16
+          type:        OpenshiftSDN
+        platform:
+          aws:
+            region:       ${AWS_REGION}
+            userTags:
+              expirationDate: ${EXPIRATION_DATE}
+        pullSecret: |
+          ${PULL_SECRET}
+        sshKey: |
+          ${SSH_PUB_KEY}
+        EOF
+        elif [[ "${CLUSTER_TYPE}" == "openstack" ]]; then
+            cat > /tmp/artifacts/installer/install-config.yaml << EOF
+        apiVersion: v1beta1
+        baseDomain: ${BASE_DOMAIN}
+        clusterID:  ${CLUSTER_ID}
+        machines:
+        - name:     master
+          replicas: 3
+        - name:     worker
+          replicas: 3
+        metadata:
+          name: ${CLUSTER_NAME}
+        networking:
+          clusterNetworks:
+          - cidr:             10.128.0.0/14
+            hostSubnetLength: 9
+          machineCIDR: 10.0.0.0/16
+          serviceCIDR: 172.30.0.0/16
+          type:        OpenshiftSDN
+        platform:
+          openstack:
+            baseImage:        ${OPENSTACK_IMAGE}
+            cloud:            ${OS_CLOUD}
+            externalNetwork:  ${OPENSTACK_EXTERNAL_NETWORK}
+            region:           ${OPENSTACK_REGION}
+        pullSecret: |
+          ${PULL_SECRET}
+        sshKey: |
+          ${SSH_PUB_KEY}
+        EOF
+        else
+            echo "Unsupported cluster type '${CLUSTER_NAME}'"
+            exit 1
+        fi
+
+        # Need to copy install-config.yaml as it gets consumed.
+        cp /tmp/artifacts/installer/install-config.yaml /tmp/artifacts/installer/install-config-ansible.yaml
+
+        /bin/openshift-install --dir=/tmp/artifacts/installer create cluster --log-level=debug &
+        wait "$!"
+
+    # Runs scale up playbook
+    - name: scaleup
+      image: ${IMAGE_ANSIBLE}
+      terminationMessagePolicy: FallbackToLogsOnError
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp
+      - name: cluster-profile
+        mountPath: /usr/share/ansible/openshift-ansible/inventory/dynamic/injected
+      - name: artifacts
+        mountPath: /tmp/artifacts
+      env:
+      - name: INSTANCE_PREFIX
+        value: ${NAMESPACE}-${JOB_NAME_HASH}
+      - name: TYPE
+        value: ${CLUSTER_TYPE}
+      - name: ANSIBLE_STDOUT_CALLBACK
+        value: yaml
+      command:
+      - /usr/local/bin/entrypoint-provider
+      args:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -euo pipefail
+
+        trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/scaleup-success; else touch /tmp/exit; fi; exit "${rc}"' EXIT
+        trap 'kill $(jobs -p); exit 0' TERM
+
+        for i in `seq 1 360`; do
+          if [[ -f /tmp/setup-success ]]; then break; fi
+          sleep 15 & wait
+        done
+
+        ansible-playbook -vvv \
+          -e "openshift_test_repo=${RPM_REPO_OPENSHIFT_ORIGIN}" \
+          -e kubeconfig_path=/tmp/artifacts/installer/auth/kubeconfig \
+          -e openshift_install_config_path=/tmp/artifacts/installer/install-config-ansible.yaml \
+          test/${CLUSTER_TYPE}/scaleup.yml
+
+    # Performs cleanup of all created resources
+    - name: teardown
+      image: ${IMAGE_INSTALLER}
+      terminationMessagePolicy: FallbackToLogsOnError
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      - name: cluster-profile
+        mountPath: /etc/openshift-installer
+      - name: artifacts
+        mountPath: /tmp/artifacts
+      env:
+      - name: INSTANCE_PREFIX
+        value: ${NAMESPACE}-${JOB_NAME_HASH}
+      - name: TYPE
+        value: ${CLUSTER_TYPE}
+      - name: KUBECONFIG
+        value: /tmp/artifacts/installer/auth/kubeconfig
+      command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        function queue() {
+          local TARGET="${1}"
+          shift
+          local LIVE="$(jobs | wc -l)"
+          while [[ "${LIVE}" -ge 45 ]]; do
+            sleep 1
+            LIVE="$(jobs | wc -l)"
+          done
+          echo "${@}"
+          if [[ -n "${FILTER}" ]]; then
+            "${@}" | "${FILTER}" >"${TARGET}" &
+          else
+            "${@}" >"${TARGET}" &
+          fi
+        }
+
+        function teardown() {
+          set +e
+          touch /tmp/shared/exit
+          export PATH=$PATH:/tmp/shared
+
+          echo "Gathering artifacts ..."
+          mkdir -p /tmp/artifacts/pods /tmp/artifacts/nodes /tmp/artifacts/metrics
+
+          oc --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' > /tmp/nodes
+          oc --request-timeout=5s get pods --all-namespaces --template '{{ range .items }}{{ $name := .metadata.name }}{{ $ns := .metadata.namespace }}{{ range .spec.containers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ range .spec.initContainers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ end }}' > /tmp/containers
+          oc --request-timeout=5s get pods -l openshift.io/component=api --all-namespaces --template '{{ range .items }}-n {{ .metadata.namespace }} {{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/pods-api
+
+          queue /tmp/artifacts/nodes.json oc --request-timeout=5s get nodes -o json
+          queue /tmp/artifacts/pods.json oc --request-timeout=5s get pods --all-namespaces -o json
+          queue /tmp/artifacts/events.json oc --request-timeout=5s get events --all-namespaces -o json
+          queue /tmp/artifacts/clusteroperators.json oc --request-timeout=5s get clusteroperators -o json
+
+          # gather nodes first in parallel since they may contain the most relevant debugging info
+          while IFS= read -r i; do
+            mkdir -p /tmp/artifacts/nodes/$i
+            queue /tmp/artifacts/nodes/$i/heap oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/debug/pprof/heap
+          done < /tmp/nodes
+
+          if oc adm node-logs -h &>/dev/null; then
+            # starting in 4.0 we can query node logs directly
+            FILTER=gzip queue /tmp/artifacts/nodes/masters-journal.gz oc adm node-logs --role=master --unify=false
+            FILTER=gzip queue /tmp/artifacts/nodes/workers-journal.gz oc adm node-logs --role=worker --unify=false
+          else
+            while IFS= read -r i; do
+              FILTER=gzip queue /tmp/artifacts/nodes/$i/messages.gz oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/messages
+              oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/journal | sed -e 's|.*href="\(.*\)".*|\1|;t;d' > /tmp/journals
+              while IFS= read -r j; do
+                FILTER=gzip queue /tmp/artifacts/nodes/$i/journal.gz oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/journal/${j}system.journal
+              done < /tmp/journals
+              FILTER=gzip queue /tmp/artifacts/nodes/$i/secure.gz oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/secure
+              FILTER=gzip queue /tmp/artifacts/nodes/$i/audit.gz oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/audit
+            done < /tmp/nodes
+          fi
+
+          while IFS= read -r i; do
+            file="$( echo "$i" | cut -d ' ' -f 3 | tr -s ' ' '_' )"
+            queue /tmp/artifacts/metrics/${file}-heap oc exec $i -- /bin/bash -c 'oc get --raw /debug/pprof/heap --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig'
+            queue /tmp/artifacts/metrics/${file}-controllers-heap oc exec $i -- /bin/bash -c 'oc get --raw /debug/pprof/heap --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig'
+          done < /tmp/pods-api
+
+          while IFS= read -r i; do
+            file="$( echo "$i" | cut -d ' ' -f 2,3,5 | tr -s ' ' '_' )"
+            FILTER=gzip queue /tmp/artifacts/pods/${file}.log.gz oc logs --request-timeout=20s $i
+            FILTER=gzip queue /tmp/artifacts/pods/${file}_previous.log.gz oc logs --request-timeout=20s -p $i
+          done < /tmp/containers
+
+          echo "Snapshotting prometheus (may take 15s) ..."
+          oc exec -n openshift-monitoring prometheus-k8s-0 -- tar cvzf - -C /prometheus . > /tmp/artifacts/metrics/prometheus.tar.gz
+
+          echo "Waiting for logs ..."
+          wait
+
+          echo "Deprovisioning cluster ..."
+          export AWS_SHARED_CREDENTIALS_FILE=/etc/openshift-installer/.awscred
+          openshift-install --dir /tmp/artifacts/installer destroy cluster
+        }
+
+        trap 'teardown' EXIT
+        trap 'kill $(jobs -p); exit 0' TERM
+
+        for i in `seq 1 180`; do
+          if [[ -f /tmp/shared/exit ]]; then
+            exit 0
+          fi
+          sleep 60 & wait
+        done
