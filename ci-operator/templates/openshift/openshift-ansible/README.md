@@ -22,7 +22,7 @@ ignition file first.
   2. sets necessary env vars based on cluster type (libvirt install on GCP)
   3. runs `create install-config`
   4. modifies install configs to change a number of masters and workers created
-  5. runs `create ignition-configs` to produce `boostrap.ign` in `/tmp/artifacts/installer`
+  5. runs `create pre-cluster` to produce `boostrap.ign` in `/tmp/artifacts/installer`
   6. creates `/tmp/config-success` on success, otherwise - `/tmp/exit`
 
 * `setup` runs ansible playbook in `IMAGE_ANSIBLE` image:
