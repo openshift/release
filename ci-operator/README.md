@@ -338,6 +338,40 @@ hack/pj_env.py \
     | oc -n ci-stg create -f -
 ```
 
+this example run the changes against:
+* the repository: `openshift/origin`
+* branch `master`
+* pull request: `21526`
+* user `Pull Request Author`
+* job: `pull-ci-openshift-origin-master-e2e-aws`
+
+The script produces a log like:
+
+```
+time="2019-01-18T14:53:08Z" level=warning msg="No BuildID found in ProwJob status or given with --build-id, GCS interaction will be poor." 
+pod/c47e597f-1b30-11e9-8b3b-661cd79effa8 created
+```
+From which you can follow the job logs: 
+
+`oc -n ci-stg logs  -c test -f c47e597f-1b30-11e9-8b3b-661cd79effa8`
+
+where you can determine the namespace where the `ci-operator` is running the job.  The logs have a line like:
+ 
+```2019/01/18 14:55:20 Using namespace ci-op-3167h4v3```
+
+This will allow to determine the installer logs:
+
+```oc logs -f e2e -c setup  -n ci-op-3167h4v3 ```
+
+and test logs:
+
+```
+oc logs -f e2e -c test -n ci-op-3167h4v3 
+```
+
+
+
+
 #### Testing manually
 
 `ci-operator` tests can be executed locally with little effort, but setting up
