@@ -420,7 +420,8 @@ objects:
           export PATH=$PATH:/tmp/shared
 
           echo "Gathering artifacts ..."
-          mkdir -p /tmp/artifacts/pods /tmp/artifacts/nodes /tmp/artifacts/metrics /tmp/artifacts/bootstrap
+          mkdir -p /tmp/artifacts/pods /tmp/artifacts/nodes /tmp/artifacts/metrics /tmp/artifacts/bootstrap /tmp/artifacts/network
+
 
           if [ -f /tmp/artifacts/installer/terraform.tfstate ]
           then
@@ -485,11 +486,18 @@ objects:
             done < /tmp/nodes
           fi
 
+          # Snapshot iptables-save on each node for debugging possible kube-proxy issues
+          oc get --request-timeout=20s -n openshift-sdn -l app=sdn pods --template '{{ range .items }}{{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/sdn-pods
+          while IFS= read -r i; do
+            queue /tmp/artifacts/network/iptables-save-$i oc rsh --timeout=20 -n openshift-sdn -c sdn $i iptables-save -c
+          done < /tmp/sdn-pods
+
           while IFS= read -r i; do
             file="$( echo "$i" | cut -d ' ' -f 3 | tr -s ' ' '_' )"
             queue /tmp/artifacts/metrics/${file}-heap oc exec $i -- /bin/bash -c 'oc get --raw /debug/pprof/heap --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig'
             queue /tmp/artifacts/metrics/${file}-controllers-heap oc exec $i -- /bin/bash -c 'oc get --raw /debug/pprof/heap --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig'
           done < /tmp/pods-api
+
 
           while IFS= read -r i; do
             file="$( echo "$i" | cut -d ' ' -f 2,3,5 | tr -s ' ' '_' )"
