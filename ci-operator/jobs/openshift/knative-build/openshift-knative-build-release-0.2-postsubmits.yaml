@@ -33,3 +33,37 @@ postsubmits:
           requests:
             cpu: 10m
       serviceAccountName: ci-operator
+  - agent: kubernetes
+    branches:
+    - ^release-0\.2$
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      artifacts: images
+      ci-operator.openshift.io/variant: v4.0
+    name: branch-ci-openshift-knative-build-release-0.2-v4.0-images
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --promote
+        - --target=[images]
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-knative-build-release-0.2__v4.0.yaml
+              name: ci-operator-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
