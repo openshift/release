@@ -299,7 +299,7 @@ objects:
       - |
         #!/bin/sh
         trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/setup-success; else touch /tmp/exit; fi; exit "${rc}"' EXIT
-        trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN}; fi' TERM
+        trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
         mkdir /tmp/artifacts/installer &&
         /bin/openshift-install version >/tmp/artifacts/installer/version
@@ -373,7 +373,8 @@ objects:
             exit 1
         fi
 
-        /bin/openshift-install --dir=/tmp/artifacts/installer create cluster
+        /bin/openshift-install --dir=/tmp/artifacts/installer create cluster &
+        wait "$!"
 
     # Performs cleanup of all created resources
     - name: teardown
