@@ -59,6 +59,14 @@ There are three different places where we store `ci-operator` and Prow configura
   build processes. In order to learn more about writting tests using templates
   refer to [TEMPLATES.md](https://github.com/openshift/ci-operator/blob/master/TEMPLATES.md)
 
+  Currently, we maintain three different templates:
+
+  | Name | Description |
+  | --- | --- |
+  | build-base-image | Build the base VM image |
+  | build-node-image | Build the node VM image, create a cluster with it and run OSA e2es to sign it off |
+  | cluster-launch-e2e-azure | Deploy an OSA cluster and run various types of tests (OSA, Origin Conformance, Bushslicer) |
+
 Similarly, you can find the CI configuration for `azure-misc` in `ci-operator/jobs/openshift/azure-misc/`
 and `ci-operator/config/openshift/azure-misc/`.
 
