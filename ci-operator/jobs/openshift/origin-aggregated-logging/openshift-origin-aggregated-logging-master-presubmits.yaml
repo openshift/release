@@ -62,6 +62,65 @@ presubmits:
     always_run: true
     branches:
     - master
+    context: ci/prow/full-integ-aws
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    name: pull-ci-openshift-origin-aggregated-logging-master-full-integ-aws
+    optional: true
+    rerun_command: /test full-integ-aws
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --secret-dir=/usr/local/full-integ-aws-cluster-profile
+        - --target=full-integ-aws
+        - --template=/usr/local/full-integ-aws
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-origin-aggregated-logging-master.yaml
+              name: ci-operator-configs
+        - name: JOB_NAME_SAFE
+          value: full-integ-aws
+        - name: TEST_COMMAND
+          value: |
+            . openshift/ci-operator/build-image/setup-logging-for-e2e.sh
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/full-integ-aws-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/full-integ-aws
+          name: job-definition
+          subPath: cluster-launch-installer-src.yaml
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-src
+        name: job-definition
+    trigger: ((?m)^/test( all| full-integ-aws),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -130,27 +189,3 @@ presubmits:
             cpu: 10m
       serviceAccountName: ci-operator
     trigger: ((?m)^/test( all| rhel-images),?(\s+|$))
-  - agent: jenkins
-    always_run: true
-    branches:
-    - master
-    - stage
-    context: ci/openshift-jenkins/logging
-    labels:
-      master: ci.openshift.redhat.com
-    name: test_pull_request_origin_aggregated_logging_journald
-    optional: true
-    rerun_command: /test logging
-    trigger: ((?m)^/test( all| logging),?(\s+|$))
-  - agent: jenkins
-    always_run: true
-    branches:
-    - master
-    - stage
-    context: ci/openshift-jenkins/json-file
-    labels:
-      master: ci.openshift.redhat.com
-    name: test_pull_request_origin_aggregated_logging_json_file
-    optional: true
-    rerun_command: /test json-file
-    trigger: ((?m)^/test( all| json-file),?(\s+|$))
