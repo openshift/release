@@ -70,6 +70,9 @@ There are three different places where we store `ci-operator` and Prow configura
 Similarly, you can find the CI configuration for `azure-misc` in `ci-operator/jobs/openshift/azure-misc/`
 and `ci-operator/config/openshift/azure-misc/`.
 
+All changes in `ci-operator/` are automatically applied in the CI cluster by Prow
+right after a pull request is merged.
+
 ## How to work with CI
 
 ### Automated jobs
@@ -343,14 +346,19 @@ image-mirror-openshift-azure-v3.11-quay   0 * * * *   False     0         56m   
 token-refresh                             0 0 * * *   False     1         44d             45d
 ```
 
-* _`azure-purge`_ is responsible for cleaning up long-lived resource groups in our subscription (created either by our CI tests or for development purposes)
-* _`image-mirror-openshift-azure-v3.11-quay`_ mirrors images from the `azure` CI namespace to `quay.io/openshift-on-azure`, the latter being used by our customers and developers alike
-* _`token-refresh`_ refreshes a token from the AWS registry that we put inside node images built from Origin master to pull images for the cluster
+* _[`azure-purge`](./azure-purge)_ is responsible for cleaning up long-lived resource groups in our subscription (created either by our CI tests or for development purposes)
+* _[`image-mirror-openshift-azure-v3.11-quay`](./image-mirror)_ mirrors images from the `azure` CI namespace to `quay.io/openshift-on-azure`, the latter being used by our customers and developers alike
+* _[`token-refresh`](./token-refresh)_ refreshes a token from the AWS registry that we put inside node images built from Origin master to pull images for the cluster
 
 We need to check whether the above jobs are in a working state. Access to the cluster is granted
 to every member of the openshift github organization. Access to the `azure` namespace is controlled
 by the [`azure-team` group](./cluster-wide.yaml). If you need to update group membership, you need to
+open a pull request adding your Github username in the group, and once your pull request is merged,
 ask a CI admin at [#forum-testplatform](https://coreos.slack.com/) to apply the new changes in the cluster.
+
+In general, all changes in `projects/azure/` are not automatically applied in the CI cluster. After your
+pull request is merged, apart from updating the group, you should be able to `oc apply` all other changes
+in the `azure` namespace.
 
 ## Building container images
 
