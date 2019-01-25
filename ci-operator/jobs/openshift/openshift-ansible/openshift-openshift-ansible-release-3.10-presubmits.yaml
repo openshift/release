@@ -4,80 +4,6 @@ presubmits:
     always_run: true
     branches:
     - release-3.10
-    context: ci/prow/gcp-major-upgrade
-    decorate: true
-    name: pull-ci-openshift-openshift-ansible-310-gcp-major-upgrade
-    rerun_command: /test gcp-major-upgrade
-    spec:
-      containers:
-      - args:
-        - |
-          export PREVIOUS_RPM_REPO="$( curl -q "${PREVIOUS_RPM_REPO_BASEREF}" 2>/dev/null)"
-          export RPM_REPO_OPENSHIFT_ORIGIN="$( curl -q "${RPM_REPO_BASEREF}" 2>/dev/null)"
-          ci-operator \
-            --artifact-dir=$(ARTIFACTS) \
-            --secret-dir=/usr/local/e2e-gcp-cluster-profile \
-            --template=/usr/local/e2e-gcp-major-upgrade-310 \
-            --target=e2e-gcp-major-upgrade-310 \
-            --give-pr-author-access-to-namespace=true
-        command:
-        - /bin/bash
-        - -c
-        env:
-        - name: CLUSTER_TYPE
-          value: gcp
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-openshift-ansible-release-3.10.yaml
-              name: ci-operator-configs
-        - name: JOB_NAME_SAFE
-          value: e2e-gcp-major-upgrade-310
-        - name: PREVIOUS_ANSIBLE_VERSION
-          value: "3.9"
-        - name: PREVIOUS_IMAGE_ANSIBLE
-          value: docker.io/openshift/origin-ansible:v3.9
-        - name: PREVIOUS_RPM_DEPENDENCIES_REPO
-          value: http://mirror.centos.org/centos/7/paas/x86_64/openshift-origin39/
-        - name: PREVIOUS_RPM_REPO_BASEREF
-          value: https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/release-3.9/.latest-rpms
-        - name: RPM_REPO_BASEREF
-          value: https://storage.googleapis.com/origin-ci-test/releases/openshift/origin/release-3.10/.latest-rpms
-        - name: RPM_REPO_DEPENDENCIES
-          value: http://mirror.centos.org/centos/7/paas/x86_64/openshift-origin310/
-        - name: TEST_COMMAND
-          value: TEST_FOCUS=Suite:openshift/conformance/parallel run-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          limits:
-            cpu: 500m
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/e2e-gcp-cluster-profile
-          name: e2e-gcp-major-upgrade-310
-        - mountPath: /usr/local/e2e-gcp-major-upgrade-310
-          name: job-definition
-          subPath: cluster-launch-e2e-upgrade.yaml
-      serviceAccountName: ci-operator
-      volumes:
-      - name: e2e-gcp-major-upgrade-310
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
-      - configMap:
-          name: prow-job-cluster-launch-e2e-upgrade
-        name: job-definition
-    trigger: ((?m)^/test( all| gcp-major-upgrade),?(\s+|$))
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-3.10
     context: ci/prow/gcp
     decorate: true
     name: pull-ci-openshift-openshift-ansible-e2e-gcp-310
@@ -330,6 +256,16 @@ presubmits:
             cpu: 10m
       serviceAccountName: ci-operator
     trigger: ((?m)^/test( all| unit),?(\s+|$))
+  - agent: jenkins
+    always_run: false
+    branches:
+    - release-3.10
+    context: ci/openshift-jenkins/gcp-ha
+    labels:
+      master: ci.openshift.redhat.com
+    name: pull-ci-openshift-openshift-ansible-310-gcp-major-upgrade
+    rerun_command: /test gcp-ha
+    trigger: ((?m)^/test gcp-ha,?(\s+|$))
   - agent: jenkins
     always_run: false
     branches:
