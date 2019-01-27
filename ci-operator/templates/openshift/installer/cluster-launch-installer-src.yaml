@@ -117,11 +117,7 @@ objects:
 
         mkdir -p "${HOME}"
 
-        # wait for the router namespace
-        SETUP_SUCCESS=
-        API_UP=
-        ROUTER_NAMESPACE=
-        ROUTER_DEPLOYMENT=
+        # wait for the API to come up
         while true; do
           if [[ -f /tmp/shared/exit ]]; then
             echo "Another process exited" 2>&1
@@ -130,76 +126,20 @@ objects:
           if [[ ! -f /tmp/shared/setup-success ]]; then
             sleep 15 & wait
             continue
-          elif [[ -z "${SETUP_SUCCESS}" ]]; then
-            echo "Setup success"
-            SETUP_SUCCESS=1
-
-            # don't let clients impact the global kubeconfig
-            cp "${KUBECONFIG}" /tmp/admin.kubeconfig
-            export KUBECONFIG=/tmp/admin.kubeconfig
           fi
-          if ! oc get nodes 2>/dev/null; then
-            echo "Waiting for API at $(oc whoami --show-server) to respond ..."
-            sleep 15 & wait
-            continue
-          elif [[ -z "${API_UP}" ]]; then
-            echo "API at $(oc whoami --show-server) has responded"
-            API_UP=1
-          fi
-          if [[ -z "${ROUTER_NAMESPACE}" ]]; then
-            # check multiple namespaces while we are transitioning to the new locations
-            if oc get deploy/router-default -n openshift-ingress 2>/dev/null; then
-              ROUTER_NAMESPACE=openshift-ingress
-              ROUTER_DEPLOYMENT="deploy/router-default"
-            elif oc get deploy/router -n tectonic-ingress 2>/dev/null; then
-              ROUTER_NAMESPACE=tectonic-ingress
-              ROUTER_DEPLOYMENT="deploy/router"
-            elif oc get ds/router-default -n openshift-ingress 2>/dev/null; then
-              ROUTER_NAMESPACE=openshift-ingress
-              ROUTER_DEPLOYMENT="ds/router-default"
-            elif oc get deploy/router -n openshift-ingress 2>/dev/null; then
-              ROUTER_NAMESPACE=openshift-ingress
-              ROUTER_DEPLOYMENT="deploy/router"
-            elif oc get deploy/router -n default 2>/dev/null; then
-              ROUTER_NAMESPACE=default
-              ROUTER_DEPLOYMENT="deploy/router"
-            else
-              echo "Waiting for router to be created ..."
-              sleep 15 & wait
-              continue
-            fi
-            echo "Found router in ${ROUTER_NAMESPACE}"
-          fi
+          # don't let clients impact the global kubeconfig
+          cp "${KUBECONFIG}" /tmp/admin.kubeconfig
+          export KUBECONFIG=/tmp/admin.kubeconfig
           break
         done
 
-        TARGET="$(date -d '10 minutes' +%s)"
-        NOW="$(date +%s)"
-        while [[ "${NOW}" -lt "${TARGET}" ]]; do
-          REMAINING="$((TARGET - NOW))"
-          if oc --request-timeout="${REMAINING}s" rollout status "${ROUTER_DEPLOYMENT}" -n "${ROUTER_NAMESPACE}" -w; then
-            break
-          fi
-          sleep 2
-          NOW="$(date +%s)"
+        until oc wait clusterversion/version --for condition=available 2>/dev/null; do
+          sleep 10 & wait
         done
-        [[ "${NOW}" -ge "${TARGET}" ]] && echo "timeout waiting for ${ROUTER_NAMESPACE}/${ROUTER_DEPLOYMENT} to be available" && exit 1
-
-        # wait until the image registry changes propogate to the apiserver to avoid
-        # unnecessary restarts
-        until oc get is -n openshift php 2>/dev/null; do
-          sleep 10
-        done
-        until [[ -n "$( oc get is -n openshift php --template '{{ .status.dockerImageRepository }}' 2>/dev/null )" ]]; do
-          sleep 10
-        done
-        # oh god the blood
-        sleep 180
-
-        export KUBE_SSH_BASTION="$( oc get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
-        export KUBE_SSH_KEY_PATH=/tmp/cluster/ssh-privatekey
 
         # set up cloud-provider-specific env vars
+        export KUBE_SSH_BASTION="$( oc get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
+        export KUBE_SSH_KEY_PATH=/tmp/cluster/ssh-privatekey
         if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
           export GOOGLE_APPLICATION_CREDENTIALS="/tmp/cluster/gce.json"
           export KUBE_SSH_USER=cloud-user
@@ -424,6 +364,7 @@ objects:
           oc --request-timeout=5s get pods --all-namespaces --template '{{ range .items }}{{ $name := .metadata.name }}{{ $ns := .metadata.namespace }}{{ range .spec.containers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ range .spec.initContainers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ end }}' > /tmp/containers
           oc --request-timeout=5s get pods -l openshift.io/component=api --all-namespaces --template '{{ range .items }}-n {{ .metadata.namespace }} {{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/pods-api
 
+          queue /tmp/artifacts/clusterversion.json oc --request-timeout=5s get clusterversion -o json
           queue /tmp/artifacts/nodes.json oc --request-timeout=5s get nodes -o json
           queue /tmp/artifacts/pods.json oc --request-timeout=5s get pods --all-namespaces -o json
           queue /tmp/artifacts/events.json oc --request-timeout=5s get events --all-namespaces -o json
