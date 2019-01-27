@@ -4,7 +4,7 @@ apiVersion: template.openshift.io/v1
 parameters:
 - name: JOB_NAME_SAFE
   required: true
-- name: LOCAL_IMAGE_TEST_BIN
+- name: LOCAL_IMAGE_SRC
   required: true
 - name: IMAGE_CLI
   required: true
@@ -44,6 +44,8 @@ objects:
     name: ${JOB_NAME_SAFE}
     namespace: ${NAMESPACE}
   spec:
+    # otherwise the control plane is attempting to load the wrong credentials
+    automountServiceAccountToken: false
     restartPolicy: Never
     activeDeadlineSeconds: 7200
     terminationGracePeriodSeconds: 600
@@ -101,7 +103,7 @@ objects:
 
     # Once admin.kubeconfig exists, executes shared tests
     - name: test
-      image: ${LOCAL_IMAGE_TEST_BIN}
+      image: ${LOCAL_IMAGE_SRC}
       terminationMessagePolicy: FallbackToLogsOnError
       volumeMounts:
       - name: shared-tmp
@@ -116,7 +118,7 @@ objects:
         set -euo pipefail
 
         trap 'touch /tmp/shared/exit' EXIT
-        trap 'jobs -p | xargs kill; exit 0' TERM
+        trap 'jobs -p | xargs kill || true; exit 0' TERM
 
         # wait until the master job creates admin.kubeconfig
         while true; do
@@ -133,7 +135,7 @@ objects:
 
     # Start a standalone master
     - name: setup
-      image: ${LOCAL_IMAGE_TEST_BIN}
+      image: ${LOCAL_IMAGE_SRC}
       terminationMessagePolicy: FallbackToLogsOnError
       volumeMounts:
       - name: shared-tmp
@@ -169,7 +171,7 @@ objects:
           cp -R /tmp/shared/logs /tmp/artifacts/
         }
         trap 'teardown' EXIT
-        trap 'jobs -p | xargs kill; wait; exit 0' TERM
+        trap 'jobs -p | xargs kill || true; wait; exit 0' TERM
 
         export PATH=/tmp/shared/bin:$PATH
         mkdir /tmp/cluster
@@ -707,32 +709,19 @@ objects:
       Use to increase verbosity on particular files, e.g. LOG_SPEC=token_controller*=5,other_controller*=4\nLOG_SPEC=${LOG_SPEC:-\"\"}\nWAIT_FOR_URL_API_SERVER=${WAIT_FOR_URL_API_SERVER:-60}\nMAX_TIME_FOR_URL_API_SERVER=${MAX_TIME_FOR_URL_API_SERVER:-1}\n\nfunction
       local::master::cleanup() {\n  local::master::log::info \"Cleaning up...\"\n\n
       \ set +e\n\n  # cleanup temp dirs\n  local::master::util::cleanup-temp-dir\n\n
-      \ # Check if the API server is still running\n  [[ -n \"${KUBE_APISERVER_PID-}\"
-      ]] && KUBE_APISERVER_PIDS=$(pgrep -P ${KUBE_APISERVER_PID} ; ps -o pid= -p ${KUBE_APISERVER_PID})\n
-      \ [[ -n \"${KUBE_APISERVER_PIDS-}\" ]] && kill ${KUBE_APISERVER_PIDS} 2>/dev/null\n\n
-      \ # Check if the controller-manager is still running\n  [[ -n \"${KUBE_CONTROLLER_MANAGER_PID-}\"
-      ]] && KUBE_CONTROLLER_MANAGER_PIDS=$(pgrep -P ${KUBE_CONTROLLER_MANAGER_PID} ;
-      ps -o pid= -p ${KUBE_CONTROLLER_MANAGER_PID})\n  [[ -n \"${KUBE_CONTROLLER_MANAGER_PIDS-}\"
-      ]] && kill ${KUBE_CONTROLLER_MANAGER_PIDS} 2>/dev/null\n\n  [[ -n \"${OPENSHIFT_APISERVER_PID-}\"
-      ]] && OPENSHIFT_APISERVER_PIDS=$(pgrep -P ${OPENSHIFT_APISERVER_PID} ; ps -o pid=
-      -p ${OPENSHIFT_APISERVER_PID})\n  [[ -n \"${OPENSHIFT_APISERVER_PIDS-}\" ]] &&
-      kill ${OPENSHIFT_APISERVER_PIDS} 2>/dev/null\n\n  [[ -n \"${OPENSHIFT_CONTROLLER_MANAGER_PID-}\"
-      ]] && OPENSHIFT_CONTROLLER_MANAGER_PIDS=$(pgrep -P ${OPENSHIFT_CONTROLLER_MANAGER_PID}
-      ; ps -o pid= -p ${OPENSHIFT_CONTROLLER_MANAGER_PID})\n  [[ -n \"${OPENSHIFT_CONTROLLER_MANAGER_PIDS-}\"
-      ]] && kill ${OPENSHIFT_CONTROLLER_MANAGER_PIDS} 2>/dev/null\n\n\n  # Check if
-      the etcd is still running\n  [[ -n \"${ETCD_PID-}\" ]] && local::master::etcd::stop\n
-      \ if [[ \"${PRESERVE_ETCD}\" == \"false\" ]]; then\n    [[ -n \"${ETCD_DIR-}\"
-      ]] && local::master::etcd::clean_etcd_dir\n  fi\n\n  local::master::ensure_free_port
-      10252\n  local::master::ensure_free_port 2379\n\n  local::master::log::info \"Cleanup
-      complete\"\n}\n\nfunction local::master::cleanup_config() {\n    rm -rf ${LOCALUP_CONFIG}\n}\n\nfunction
-      local::master::ensure_free_port() {\n  # checking for free ports is a convenience
-      to the user\n  if ! which nc &>/dev/null; then\n    return 0\n  fi\n  if nc 127.0.0.1
-      $1 </dev/null 2>/dev/null; then\n    local::master::log::error \"port $1 already
-      in use\"\n    return 1\n  fi\n}\n\n# Check if all processes are still running.
-      Prints a warning once each time\n# a process dies unexpectedly.\nfunction local::master::healthcheck()
-      {\n  if [[ -n \"${KUBE_APISERVER_PID-}\" ]] && ! kill -0 ${KUBE_APISERVER_PID}
-      2>/dev/null; then\n    local::master::log::error \"API server terminated unexpectedly,
-      see ${KUBE_APISERVER_LOG}\"\n    KUBE_APISERVER_PID=\n  fi\n\n  if [[ -n \"${KUBE_CONTROLLER_MANAGER_PID-}\"
+      \ jobs -p | xargs -L1 kill 2>/dev/null\n  sleep 1\n  # etcd requires two sigterms,
+      ensure we get at least a partial shutdown (bug in 3.3.9?)\n  jobs -p | xargs -L1
+      kill 2>/dev/null\n  wait\n\n  local::master::ensure_free_port 10252\n  local::master::ensure_free_port
+      2379\n\n  local::master::log::info \"Cleanup complete\"\n}\n\nfunction local::master::cleanup_config()
+      {\n    rm -rf ${LOCALUP_CONFIG}\n}\n\nfunction local::master::ensure_free_port()
+      {\n  # checking for free ports is a convenience to the user\n  if ! which nc &>/dev/null;
+      then\n    return 0\n  fi\n  if nc 127.0.0.1 $1 </dev/null 2>/dev/null; then\n
+      \   local::master::log::error \"port $1 already in use\"\n    return 1\n  fi\n}\n\n#
+      Check if all processes are still running. Prints a warning once each time\n# a
+      process dies unexpectedly.\nfunction local::master::healthcheck() {\n  if [[ -n
+      \"${KUBE_APISERVER_PID-}\" ]] && ! kill -0 ${KUBE_APISERVER_PID} 2>/dev/null;
+      then\n    local::master::log::error \"API server terminated unexpectedly, see
+      ${KUBE_APISERVER_LOG}\"\n    KUBE_APISERVER_PID=\n  fi\n\n  if [[ -n \"${KUBE_CONTROLLER_MANAGER_PID-}\"
       ]] && ! kill -0 ${KUBE_CONTROLLER_MANAGER_PID} 2>/dev/null; then\n    local::master::log::error
       \"kube-controller-manager terminated unexpectedly, see ${KUBE_CONTROLLER_MANAGER_LOG}\"\n
       \   KUBE_CONTROLLER_MANAGER_PID=\n  fi\n\n  if [[ -n \"${OPENSHIFT_APISERVER_PID-}\"
@@ -890,7 +879,7 @@ objects:
       ${LOG_DIR}\n\nif [[ -z \"${1-}\" ]]; then\n  echo \"Logging to ${LOG_DIR}\"\nfi\n\nlocal::master::init_master\n\necho\necho
       \"Cluster is available, use the following kubeconfig to interact with it\"\necho
       \"export KUBECONFIG=${LOCALUP_CONFIG}/admin.kubeconfig\"\necho \"Press ctrl+C
-      to finish\"\n\nwhile true; do sleep 1 & wait; local::master::healthcheck; done\n"
+      to finish\"\n\nwhile true; do sleep 1; local::master::healthcheck; done\n"
   kind: ConfigMap
   metadata:
     creationTimestamp: null
