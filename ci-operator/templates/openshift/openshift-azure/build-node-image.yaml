@@ -223,8 +223,11 @@ objects:
         done
         echo "Image build complete, proceeding with e2e testing"
 
+        # aad integration configuration - we dont test aad so populate as dummy
         source /etc/azure/credentials/secret
-        az login --service-principal -u ${AZURE_CLIENT_ID} -p ${AZURE_CLIENT_SECRET} --tenant ${AZURE_TENANT_ID} &>/dev/null
+        export AZURE_AAD_CLIENT_ID=$AZURE_CLIENT_ID
+        export AZURE_AAD_CLIENT_SECRET=$AZURE_CLIENT_SECRET
+
         export DNS_DOMAIN=osadev.cloud
         export DNS_RESOURCEGROUP=dns
         export DEPLOY_VERSION=v${OPENSHIFT_RELEASE}
@@ -233,18 +236,25 @@ objects:
         echo "Using built image $IMAGE_NAME"
         export IMAGE_RESOURCENAME=${IMAGE_NAME}
         export AZURE_REGION=eastus
-        export AZURE_AAD_CLIENT_ID=${AZURE_CLIENT_ID}
         export RESOURCEGROUP=${RESOURCEGROUP_PREFIX}-e2e
+
         # Clone openshift-azure by ourselves since it's not supported yet by the ci-operator
         # https://github.com/openshift/ci-operator/issues/142
         mkdir -p /go/src/github.com/openshift
         cd /go/src/github.com/openshift
         git clone https://github.com/openshift/openshift-azure
         cd openshift-azure/
+
+        # copy over geneva secrets
         mkdir -p /go/src/github.com/openshift/openshift-azure/secrets
-        cp /etc/azure/credentials/logging-int.cert /etc/azure/credentials/logging-int.key \
-        /etc/azure/credentials/metrics-int.cert /etc/azure/credentials/metrics-int.key \
-        /etc/azure/credentials/.dockerconfigjson /go/src/github.com/openshift/openshift-azure/secrets/
+        cp /etc/azure/credentials/logging-int.cert \
+          /etc/azure/credentials/logging-int.key \
+          /etc/azure/credentials/metrics-int.cert \
+          /etc/azure/credentials/metrics-int.key \
+          /etc/azure/credentials/.dockerconfigjson \
+          /etc/azure/credentials/system-docker-config.json \
+        /go/src/github.com/openshift/openshift-azure/secrets/
+
         make create e2e
         touch /tmp/shared/e2e_tests
 
