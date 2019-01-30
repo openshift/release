@@ -75,6 +75,42 @@ right after a pull request is merged.
 
 ## How to work with CI
 
+### How to merge a pull request
+
+Every pull request in our repos needs to satisfy the following requirements:
+* all [automated jobs](#automated-jobs) are passing
+* your pull request has the following labels:
+  - `lgtm`
+  - `approved`
+
+  `lgtm` stands for `looks good to me` and can be added by anyone who reviewed your pull
+  request by commenting `/lgtm`.
+
+  `approved` can only be added by owners of the repository by commenting either `/lgtm`
+  or `/approve`. Approvers can be found in `OWNERS` files.
+
+* your pull request does not have the following labels:
+  - `do-not-merge/hold`
+  - `do-not-merge/work-in-progress`
+  - `needs-rebase`
+
+  Anybody can `/hold` a pull request, signaling that it warrants more discussion.
+  Removing the hold label can be removed with `/hold cancel`.
+
+  You can signal that your pull request is a work in progress by adding a `WIP` prefix
+  in your pull request title. The bot should automatically add or remove the label depending
+  on whether the `WIP` prefix is found in your pull request title.
+
+#### Update OWNERS files in openshift/release
+
+All `OWNERS` files under the `ci-operator` directory are automatically updated
+based on the `OWNERS` files found in the respective repositories. Use the following
+script to update those files:
+
+```console
+$ ./ci-operator/populate-owners.sh
+```
+
 ### Automated jobs
 
 The following CI jobs run automatically on every PR in `openshift-azure`.
