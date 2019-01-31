@@ -1,0 +1,62 @@
+base_images:
+  os:
+    cluster: https://api.ci.openshift.org
+    name: centos
+    namespace: openshift
+    tag: '7'
+binary_build_commands: make install
+canonical_go_repository: github.com/openshift/ci-operator
+images:
+- context_dir: images/ci-operator/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/ci-operator
+  to: ci-operator
+- context_dir: images/ci-operator-checkconfig/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/ci-operator-checkconfig
+  to: ci-operator-checkconfig
+promotion:
+  cluster: https://api.ci.openshift.org
+  namespace: ci
+  tag: latest
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+tests:
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: ARTIFACT_DIR=/tmp/artifacts make test
+  container:
+    from: src
+- artifact_dir: /tmp/artifacts
+  as: lint
+  commands: ARTIFACT_DIR=/tmp/artifacts make check
+  container:
+    from: src
+- artifact_dir: /tmp/artifacts
+  as: demo
+  commands: ARTIFACT_DIR=/tmp/artifacts make test
+  container:
+    from: src
+- as: build
+  commands: ARTIFACT_DIR=/tmp/artifacts make build
+  container:
+    from: src
