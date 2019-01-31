@@ -4,6 +4,16 @@ base_images:
     name: centos
     namespace: openshift
     tag: '7'
+  base-machine:
+    cluster: https://api.ci.openshift.org
+    name: fedora
+    namespace: openshift
+    tag: '29'
+  machine-os-content-base:
+    cluster: https://api.ci.openshift.org
+    name: origin-v4.0
+    namespace: openshift
+    tag: machine-os-content
 binary_build_commands: make build
 canonical_go_repository: github.com/openshift/origin
 images:
@@ -52,10 +62,22 @@ images:
 - context_dir: images/node/
   from: control-plane
   to: node
+- context_dir: images/os/
+  from: os
+  inputs:
+    base-machine-with-rpms:
+      as:
+      - build
+    machine-os-content-base:
+      as:
+      -  registry.svc.ci.openshift.org/openshift/origin-v4.0:machine-os-content
+  to: machine-os-content
 promotion:
   additional_images:
     artifacts: artifacts
     base: base
+  excluded_images:
+  - machine-os-content
 raw_steps:
 - pipeline_image_cache_step:
     commands: mkdir -p _output/local/releases; touch _output/local/releases/CHECKSUM;
@@ -88,6 +110,9 @@ raw_steps:
 - rpm_image_injection_step:
     from: base
     to: base-with-rpms
+- rpm_image_injection_step:
+    from: base-machine
+    to: base-machine-with-rpms
 resources:
   '*':
     limits:
