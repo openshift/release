@@ -56,8 +56,8 @@ resources:
     limits:
       memory: 4Gi
     requests:
-      cpu: 100m
-      memory: 200Mi
+      cpu: 200m
+      memory: 500Mi
 tag_specification:
   cluster: https://api.ci.openshift.org
   name: origin-v3.11
@@ -76,5 +76,13 @@ tests:
 - artifact_dir: /tmp/artifacts
   as: unit
   commands: ARTIFACT_DIR=/tmp/artifacts make unit
+  container:
+    from: src
+- artifact_dir: /tmp/artifacts
+  as: e2e-upgrade-v1.2
+  commands: ARTIFACT_DIR=/tmp/artifacts SOURCE=v1.2 make upgrade
+  secret: 
+    name: azure
+    mount_path: /usr/secrets
   container:
     from: src

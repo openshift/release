@@ -201,8 +201,34 @@ registry.svc.ci.openshift.org/ci/ci-operator:latest \
 --git-ref openshift/openshift-azure@master \
 --namespace ${CI_OPERATOR_NAMESPACE} \
 --target cluster-launch-e2e-azure \
+--target=[output:stable:azure-controllers] \
+--target=[output:stable:etcdbackup] \
+--target=[output:stable:metricsbridge] \
+--target=[output:stable:sync] \
 --template /release/ci-operator/templates/openshift/openshift-azure/cluster-launch-e2e-azure.yaml \
 --secret-dir /release/cluster/test-deploy/azure/
+```
+
+Example: Run E2E-Upgrade test
+```
+docker run \
+--rm \
+-it \
+--security-opt label:disable \
+--env JOB_SAFE_NAME=e2e-upgrade-azure \
+--volume $HOME/.kube/config:/root/.kube/config \
+--volume $(pwd):/release registry.svc.ci.openshift.org/ci/ci-operator:latest \
+--config /release/ci-operator/config/openshift/openshift-azure/openshift-openshift-azure-master.yaml \
+--git-ref openshift/openshift-azure@master \
+--namespace ${CI_OPERATOR_NAMESPACE} \
+--target=[output:stable:azure-controllers] \
+--target=[output:stable:etcdbackup] \
+--target=[output:stable:metricsbridge] \
+--target=[output:stable:sync] \
+--target=e2e-upgrade-v1.0 \
+--template /release/ci-operator/templates/openshift/openshift-azure/rbac.yaml \
+--secret-dir /release/cluster/test-deploy/azure \
+--target=rbac
 ```
 
 Example: Run origin conformance tests
@@ -295,6 +321,25 @@ hack/pj_env.py \
     | oc -n ci-stg create -f -
 ```
 
+## Testing E2E-Upgrade script locally:
+
+To test e2e-upgrade script we can emulate prow and ci-operator env with docker command:
+```
+docker run -it --privileged \
+-v $GOPATH/src/github.com/openshift/release/cluster/test-deploy/azure:/usr/secrets \
+-v $GOPATH/src/github.com/openshift/openshift-azure:/go/src/github.com/openshift/openshift-azure:Z \
+registry.svc.ci.openshift.org/azure/test-base:latest bash
+# prow release_tag resource_group
+prow v0.0 test-cluster
+# this will initiate a cluster from `tags/v0.0` tag and leave you to execute next steps manually. Example:
+./hack/upgrade.sh $RESOURCEGROUP
+make e2e
+
+```
+Note: limitations are that tests are done using LATEST container images, and you might need to build destination images manually 
+and set them using `export SYNC_IMAGE=registry/namespace/sync:latest` before calling upgrade.
+
+to initiate source branch by executing `prow v0.0`. This will CD you yo local code base you are testing. From there you can execute `make update`
 
 ## CI secrets
 
