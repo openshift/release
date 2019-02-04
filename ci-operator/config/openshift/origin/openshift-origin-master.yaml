@@ -1,83 +1,90 @@
+tag_specification:
+  name: '4.0'
+  namespace: ocp
+promotion:
+  name: '4.0'
+  namespace: ocp
+  additional_images:
+    artifacts: artifacts
+  excluded_images:
+  - machine-os-content
 base_images:
-  os:
-    cluster: https://api.ci.openshift.org
-    name: centos
-    namespace: openshift
-    tag: '7'
+  base:
+    name: '4.0'
+    namespace: ocp
+    tag: base
   base-machine:
     cluster: https://api.ci.openshift.org
     name: fedora
     namespace: openshift
     tag: '29'
   machine-os-content-base:
-    cluster: https://api.ci.openshift.org
-    name: origin-v4.0
-    namespace: openshift
+    name: '4.0'
+    namespace: ocp
     tag: machine-os-content
-binary_build_commands: make build
+binary_build_commands: make build WHAT=cmd/hypershift
 canonical_go_repository: github.com/openshift/origin
 images:
-- context_dir: images/base/
-  from: os
-  to: base
-- context_dir: images/pod/
-  from: base-with-rpms
-  to: pod
-- context_dir: images/template-service-broker/
-  from: base-with-rpms
+- dockerfile_path: images/template-service-broker/Dockerfile.rhel
+  from: base
   to: template-service-broker
-- context_dir: images/cli/
-  from: base-with-rpms
+  inputs:
+    bin:
+      as:
+      - builder
+- dockerfile_path: images/cli/Dockerfile.rhel
+  from: base
   to: cli
-- context_dir: images/hypershift/
-  from: base-with-rpms
+  inputs:
+    bin:
+      as:
+      - builder
+- dockerfile_path: images/hypershift/Dockerfile.rhel
+  from: base
   to: hypershift
-- context_dir: images/hyperkube/
-  from: base-with-rpms
+  inputs:
+    bin:
+      as:
+      - builder
+- dockerfile_path: images/hyperkube/Dockerfile.rhel
+  from: base
   to: hyperkube
-- context_dir: images/egress/router/
-  from: base-with-rpms
-  to: egress-router
-- context_dir: images/egress/http-proxy/
-  from: base-with-rpms
-  to: egress-http-proxy
-- context_dir: images/egress/dns-proxy/
-  from: base-with-rpms
-  to: egress-dns-proxy
-- context_dir: images/ipfailover/keepalived/
-  from: base-with-rpms
-  to: keepalived-ipfailover
-- context_dir: images/origin/
-  from: cli
-  to: control-plane
-- context_dir: images/tests/
+  inputs:
+    bin:
+      as:
+      - builder
+- dockerfile_path: images/tests/Dockerfile.rhel
   from: cli
   to: tests
+  inputs:
+    bin:
+      as:
+      - builder
 - context_dir: images/deployer/
+  dockerfile_path: Dockerfile.rhel
   from: cli
   to: deployer
 - context_dir: images/recycler/
+  dockerfile_path: Dockerfile.rhel
   from: cli
   to: recycler
-- context_dir: images/node/
-  from: control-plane
-  to: node
+- dockerfile_path: images/sdn/Dockerfile.rhel
+  from: base
+  to: node # TODO: SDN
+  inputs:
+    bin:
+      as:
+      - builder
 - context_dir: images/os/
-  from: os
+  from: base
   inputs:
     base-machine-with-rpms:
       as:
-      - build
+      - builder
     machine-os-content-base:
       as:
       -  registry.svc.ci.openshift.org/openshift/origin-v4.0:machine-os-content
   to: machine-os-content
-promotion:
-  additional_images:
-    artifacts: artifacts
-    base: base
-  excluded_images:
-  - machine-os-content
 raw_steps:
 - pipeline_image_cache_step:
     commands: mkdir -p _output/local/releases; touch _output/local/releases/CHECKSUM;
@@ -87,7 +94,7 @@ raw_steps:
     from: bin
     to: bin-cross
 - project_directory_image_build_step:
-    from: os
+    from: base
     inputs:
       bin-cross:
         as:
@@ -163,12 +170,6 @@ resources:
       cpu: '3'
       memory: 8Gi
 rpm_build_commands: make build-rpms
-tag_specification:
-  cluster: https://api.ci.openshift.org
-  name: origin-v4.0
-  namespace: openshift
-  tag: ''
-  tag_overrides: {}
 build_root:
   image_stream_tag:
     cluster: https://api.ci.openshift.org

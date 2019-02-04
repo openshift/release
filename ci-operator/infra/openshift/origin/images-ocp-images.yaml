@@ -16,7 +16,23 @@ spec:
   - name: minimal
     from:
       kind: DockerImage
-      name: registry.access.redhat.com/rhel-minimal:latest
+      name: registry.access.redhat.com/ubi7/ubi-minimal:latest
+    importPolicy:
+      scheduled: true
+    referencePolicy:
+      type: Local
+---
+kind: ImageStream
+apiVersion: image.openshift.io/v1
+metadata:
+  namespace: ocp
+  name: ubi-minimal
+spec:
+  tags:
+  - name: "7"
+    from:
+      kind: DockerImage
+      name: registry.access.redhat.com/ubi7/ubi-minimal:latest
     importPolicy:
       scheduled: true
     referencePolicy:
@@ -66,6 +82,33 @@ spec:
       from:
         kind: ImageStreamTag
         name: rhel:7
+      imageOptimizationPolicy: SkipLayers
+  triggers:
+  - type: ConfigChange
+  - type: ImageChange
+---
+kind: BuildConfig
+apiVersion: build.openshift.io/v1
+metadata:
+  namespace: ocp
+  name: base-4.0-ubi
+spec:
+  successfulBuildsHistoryLimit: 1
+  failedBuildsHistoryLimit: 2
+  output:
+    to:
+      kind: ImageStreamTag
+      name: base-4.0:ubi
+  source:
+    dockerfile: |
+      FROM registry.svc.ci.openshift.org/ocp/ubi-minimal:7
+      RUN rm -rf /etc/yum.repos.d/* && \
+          curl http://base-4-0.ocp.svc > /etc/yum.repos.d/content.repo
+  strategy:
+    dockerStrategy:
+      from:
+        kind: ImageStreamTag
+        name: ubi-minimal:7
       imageOptimizationPolicy: SkipLayers
   triggers:
   - type: ConfigChange
