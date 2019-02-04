@@ -8,13 +8,16 @@ build_root:
     namespace: openshift
     tag: golang-1.10
 images:
-  # synthesized-fork-src is an image that is set up to be look like a fork of
-  # the upstream federation-v2 repository. It is marked optional because we do
-  # not want to promote it as part of the normal CI flow.
+  # federation-src is an image that is set up to be look like a fork of the
+  # upstream federation-v2 repository. This image is used to run vet checks,
+  # unit tests, and e2e tests; it is marked optional because we do not want to
+  # promote it as part of the normal CI flow.
 - from: root
-  dockerfile_path: Dockerfile.fork
-  to: synthesized-fork-src
+  dockerfile_path: Dockerfile.federation
+  to: federation-v2-src
   optional: true
+  # federation-v2 is the image that contains the federation-v2 binaries that
+  # will be used when federation is deployed to a cluster.
 - from: root
   dockerfile_path: Dockerfile
   to: federation-v2
@@ -41,7 +44,7 @@ tests:
   commands: |
     make vet
   container:
-    from: synthesized-fork-src
+    from: federation-v2-src
 - as: unit
   # The 'unit' test runs the upstream federation-v2 unit tests. This test does
   # not call the upstream makefile because one of the API packages relies on
@@ -49,7 +52,7 @@ tests:
   commands: |
     go list ./pkg/... | grep -v v1alpha1 | xargs go test
   container:
-    from: synthesized-fork-src
+    from: federation-v2-src
 - as: managed-e2e
   # The 'managed-e2e' test runs the upstream federation-v2 e2e tests in a
   # 'managed' fashion, ie, against a self-deployed Kubernetes API server.
@@ -60,4 +63,4 @@ tests:
     TEST_ASSET_KUBE_APISERVER="/go/src/github.com/kubernetes-sigs/federation-v2/bin/kube-apiserver" \
     go test -v ./test/e2e -args -ginkgo.v -single-call-timeout=1m -ginkgo.trace -ginkgo.randomizeAllSpecs
   container:
-    from: synthesized-fork-src
+    from: federation-v2-src
