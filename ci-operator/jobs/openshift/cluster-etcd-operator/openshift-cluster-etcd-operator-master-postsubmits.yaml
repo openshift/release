@@ -1,0 +1,36 @@
+postsubmits:
+  openshift/cluster-etcd-operator:
+  - agent: kubernetes
+    branches:
+    - ^master$
+    context: ""
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      artifacts: images
+    name: branch-ci-openshift-cluster-etcd-operator-master-images
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --promote
+        - --target=[images]
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-cluster-etcd-operator-master.yaml
+              name: ci-operator-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
