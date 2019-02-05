@@ -72,6 +72,74 @@ presubmits:
     always_run: true
     branches:
     - master
+    context: ci/prow/epic-fail
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    name: pull-ci-openshift-ci-operator-master-epic-fail
+    rerun_command: /test epic-fail
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --target=epic-fail
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-ci-operator-master.yaml
+              name: ci-operator-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| epic-fail),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/fail
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    name: pull-ci-openshift-ci-operator-master-fail
+    rerun_command: /test fail
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --target=fail
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-ci-operator-master.yaml
+              name: ci-operator-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| fail),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
     context: ci/prow/images
     decorate: true
     decoration_config:

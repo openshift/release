@@ -8,6 +8,40 @@ presubmits:
     decorate: true
     decoration_config:
       skip_cloning: true
+    name: pull-ci-openshift-ci-operator-masterofpuppets-build
+    rerun_command: /test build
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --target=build
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-ci-operator-masterofpuppets.yaml
+              name: ci-operator-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: ((?m)^/test( all| build),?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - masterofpuppets
+    context: ci/prow/build
+    decorate: true
+    decoration_config:
+      skip_cloning: true
     name: pull-ci-openshift-ci-operator-masterofpuppets-buildage
     rerun_command: /test build
     spec:
