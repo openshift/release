@@ -68,6 +68,7 @@ prow-rbac:
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/horologium_rbac.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/jenkins_operator_rbac.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/plank_rbac.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/pushgateway_rbac.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/sinker_rbac.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/tide_rbac.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/tracer_rbac.yaml
@@ -84,6 +85,7 @@ prow-services:
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/jenkins_operator.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/needs_rebase.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/plank.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/pushgateway.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/refresh.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/sinker.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/tide.yaml
