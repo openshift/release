@@ -226,14 +226,14 @@ objects:
 
         if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
           cat > /tmp/artifacts/installer/install-config.yaml << EOF
-        apiVersion: v1beta2
+        apiVersion: v1beta3
         baseDomain: origin-ci-int-gce.dev.rhcloud.com
         clusterID:  ${CLUSTER_ID}
-        machines:
-        - name: master
-          replicas: ${MASTERS}
+        compute:
         - name: worker
           replicas: ${WORKERS}
+        controlPlane:
+        - replicas: ${MASTERS}
         metadata:
           name: ${OPENSHIFT_INSTALL_CLUSTER_NAME}
         networking:
@@ -254,14 +254,14 @@ objects:
           export AWS_SHARED_CREDENTIALS_FILE="/etc/openshift-installer/.awscred"
           export EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
           cat > /tmp/artifacts/installer/install-config.yaml << EOF
-        apiVersion: v1beta2
+        apiVersion: v1beta3
         baseDomain: test.ose
         clusterID:  ${CLUSTER_ID}
-        machines:
-        - name:     master
-          replicas: ${MASTERS}
-        - name:     worker
+        compute:
+        - name: worker
           replicas: ${WORKERS}
+        controlPlane:
+        - replicas: ${MASTERS}
         metadata:
           name: ${CLUSTER_NAME}
         networking:
