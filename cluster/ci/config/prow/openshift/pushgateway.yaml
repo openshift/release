@@ -1,0 +1,44 @@
+kind: List
+apiVersion: v1
+items:
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: pushgateway
+    labels:
+      app: prow
+      component: pushgateway
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        app: prow
+        component: pushgateway
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: pushgateway
+      spec:
+        containers:
+        - name: pushgateway
+          image: prom/pushgateway:v0.4.0
+          ports:
+            - name: http
+              containerPort: 9091
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: pushgateway
+    labels:
+      app: prow
+      component: pushgateway
+  spec:
+    ports:
+    - name: pushgateway
+      port: 80
+      targetPort: http
+    type: NodePort
+    selector:
+      app: prow
+      component: pushgateway
