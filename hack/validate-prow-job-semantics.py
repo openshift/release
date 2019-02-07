@@ -151,7 +151,7 @@ def validate_names(path, data):
                         print("[ERROR] {}: ci-operator job {} should have rerun_command {}".format(path, job["name"], valid_rerun_command))
                         out = False
 
-                    valid_trigger = "((?m)^/test( all| {}),?(\\s+|$))".format(target)
+                    valid_trigger = r"(?m)^/test (?:.*? )?{}(?: .*?)?$".format(target)
                     if job["trigger"] != valid_trigger:
                         print("[ERROR] {}: ci-operator job {} should have trigger {}".format(path, job["name"], valid_trigger))
                         out = False
