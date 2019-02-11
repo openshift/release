@@ -12,15 +12,15 @@ build_root:
     namespace: openshift
     tag: golang-1.10
 
-canonical_go_repository: github.com/openshift/cluster-svcat-apiserver-operator
+canonical_go_repository: github.com/openshift/cluster-svcat-controller-manager-operator
 
-binary_build_commands: make build --warn-undefined-variables
-test_binary_build_commands: make build GOFLAGS='-race' --warn-undefined-variables
+binary_build_commands: make build
+test_binary_build_commands: make build GOFLAGS='-race'
 
 images:
 - dockerfile_path: Dockerfile
   from: base
-  to: cluster-svcat-apiserver-operator
+  to: cluster-svcat-controller-manager-operator
 
 tag_specification:
   cluster: https://api.ci.openshift.org
@@ -33,15 +33,15 @@ tests:
 - as: verify
   commands: |
     go get -u golang.org/x/tools/imports
-    make verify -k --warn-undefined-variables
+    make verify -k
   container:
     from: bin
 
 - as: unit
   commands: |
-    go get -u github.com/openshift/release/tools/gotest2junit
     mkdir -p /tmp/artifacts
-    make test-unit JUNITFILE=/tmp/artifacts/unit_report.xml --warn-undefined-variables
+    go get -u github.com/openshift/release/tools/gotest2junit
+    make test-unit JUNITFILE=/tmp/artifacts/unit_report.xml
   artifact_dir: /tmp/artifacts
   container:
     from: test-bin
@@ -49,6 +49,11 @@ tests:
 - as: e2e-aws
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
+    cluster_profile: aws
+
+- as: e2e-aws-operator
+  commands: make test-e2e
+  openshift_installer_src:
     cluster_profile: aws
 
 resources:
