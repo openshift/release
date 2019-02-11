@@ -4,10 +4,25 @@ ansible_become_sudo: true
 ansible_python_interpreter: "/usr/bin/python"
 ansible_user: "ec2-user"
 
-openshift_additional_repos: [
-  {"name": "origin-pr", "baseurl": "{{ openshift_test_repo }}", "enabled": 1, "gpgcheck": 0},
-  {"name": "origin-pr-dependencies", "baseurl": "{{ openshift_dependencies_repo | default('http://mirror.centos.org/centos/7/paas/x86_64/openshift-origin/') }}", "enabled": 1, "gpgcheck": 0}
-  ]
+openshift_additional_repos:
+  - name: "origin-pr"
+    baseurl: "{{ openshift_test_repo }}"
+    enabled: 1
+    gpgcheck: 0
+  - name: "criotested"
+    baseurl: "https://mirror.ops.rhcloud.com/enterprise/rhel/cri-o-tested/4.0/x86_64/os/
+      https://use-mirror1.ops.rhcloud.com/enterprise/rhel/cri-o-tested/4.0/x86_64/os/
+      https://use-mirror2.ops.rhcloud.com/enterprise/rhel/cri-o-tested/4.0/x86_64/os/
+      https://euw-mirror1.ops.rhcloud.com/enterprise/rhel/cri-o-tested/4.0/x86_64/os/
+      https://gce-mirror1.ops.rhcloud.com/enterprise/rhel/cri-o-tested/4.0/x86_64/os/
+      https://gce-mirror2.ops.rhcloud.com/enterprise/rhel/cri-o-tested/4.0/x86_64/os/"
+    sslverify: "false"
+    sslclientkey: "/var/lib/yum/ops-mirror.pem"
+    sslclientcert: "/var/lib/yum/ops-mirror.pem"
+    failovermethod: "priority"
+    gpgcheck: 0
+    enabled: 1
+    gpgkey: "https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-release https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-beta https://mirror.ops.rhcloud.com/libra/keys/RPM-GPG-KEY-redhat-openshifthosted"
 
 openshift_aws_scaleup_key: "libra"
 openshift_aws_scaleup_ami: "ami-0d8c186e89e19b0b3"  #us-east-1
