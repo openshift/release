@@ -261,12 +261,16 @@ def validate_resources(path, data):
                 if job["agent"] != "kubernetes":
                     continue
 
-                if job["spec"]["containers"][0]["command"][0] != "ci-operator":
+                ci_op_job = job["spec"]["containers"][0]["command"][0] == "ci-operator"
+                resources = job["spec"]["containers"][0].get("resources", {})
+                bad_ci_op_resources = resources != {"limits": {"cpu": "500m"}, "requests": {"cpu": "10m"}}
+                null_cpu_request = resources.get("requests", {}).get("cpu", "") == ""
+                if ci_op_job and bad_ci_op_resources:
+                    print("[ERROR] {}: ci-operator job {} should set the pod's CPU requests and limits to {}".format(path, job["name"], resources))
+                    out = False
                     continue
-
-                resources = {"limits": {"cpu": "500m"}, "requests": {"cpu": "10m"}}
-                if "resources" not in job["spec"]["containers"][0] or job["spec"]["containers"][0]["resources"] != resources:
-                    print("[ERROR] {}: ci-operator job {} should set the pod's CPU resources to {}".format(path, job["name"], resources))
+                elif null_cpu_request:
+                    print("[ERROR] {}: ci-operator job {} should set the pod's CPU requests".format(path, job["name"]))
                     out = False
                     continue
 
