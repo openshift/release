@@ -263,7 +263,7 @@ def validate_resources(path, data):
 
                 ci_op_job = job["spec"]["containers"][0]["command"][0] == "ci-operator"
                 resources = job["spec"]["containers"][0].get("resources", {})
-                bad_ci_op_resources = resources != {"limits": {"cpu": "500m"}, "requests": {"cpu": "10m"}}
+                bad_ci_op_resources = resources != {"requests": {"cpu": "10m"}}
                 null_cpu_request = resources.get("requests", {}).get("cpu", "") == ""
                 if ci_op_job and bad_ci_op_resources:
                     print("[ERROR] {}: ci-operator job {} should set the pod's CPU requests and limits to {}".format(path, job["name"], resources))
