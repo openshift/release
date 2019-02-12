@@ -1,0 +1,291 @@
+presubmits:
+  openshift/openshift-azure:
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-v1
+    context: ci/prow/e2e
+    decorate: true
+    labels:
+      artifacts: images
+    name: pull-ci-openshift-openshift-azure-release-v1-e2e-azure
+    rerun_command: /test e2e
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --secret-dir=/usr/local/e2e-secrets/azure
+        - --target=[output:stable:azure-controllers]
+        - --target=[output:stable:etcdbackup]
+        - --target=[output:stable:metricsbridge]
+        - --target=[output:stable:sync]
+        - --target=e2e-azure
+        - --template=/usr/local/e2e-azure
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: azure
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-openshift-azure-release-v1.yaml
+              name: ci-operator-configs
+        - name: DEPLOY_VERSION
+          value: v3.11
+        - name: JOB_NAME_SAFE
+          value: e2e-azure
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-secrets/azure
+          name: cluster-secrets-azure
+        - mountPath: /usr/local/e2e-azure
+          name: job-definition
+          subPath: cluster-launch-e2e-azure.yaml
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-secrets-azure
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-azure
+      - configMap:
+          name: prow-job-cluster-launch-e2e-azure
+        name: job-definition
+    trigger: '(?m)^/test (?:.*? )?e2e(?: .*?)?$'
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-v1
+    context: ci/prow/keyrotation
+    decorate: true
+    labels:
+      artifacts: images
+    name: pull-ci-openshift-openshift-azure-release-v1-e2e-azure-keyrotation
+    rerun_command: /test keyrotation
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --secret-dir=/usr/local/e2e-secrets/azure
+        - --target=[output:stable:azure-controllers]
+        - --target=[output:stable:etcdbackup]
+        - --target=[output:stable:metricsbridge]
+        - --target=[output:stable:sync]
+        - --target=e2e-azure-keyrotation
+        - --template=/usr/local/e2e-azure-keyrotation
+        command:
+        - ci-operator
+        env:
+        - name: ARTIFACT_DIR
+          value: /tmp/artifacts
+        - name: CLUSTER_TYPE
+          value: azure
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-openshift-azure-release-v1.yaml
+              name: ci-operator-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-azure-keyrotation
+        - name: TEST_COMMAND
+          value: make e2e-keyrotation
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-secrets/azure
+          name: cluster-secrets-azure
+        - mountPath: /usr/local/e2e-azure-keyrotation
+          name: job-definition
+          subPath: cluster-launch-e2e-azure.yaml
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-secrets-azure
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-azure
+      - configMap:
+          name: prow-job-cluster-launch-e2e-azure
+        name: job-definition
+    trigger: ((?m)^/test keyrotation,?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-v1
+    context: ci/prow/scaleupdown
+    decorate: true
+    labels:
+      artifacts: images
+    name: pull-ci-openshift-openshift-azure-release-v1-e2e-azure-scaleupdown
+    rerun_command: /test scaleupdown
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --secret-dir=/usr/local/e2e-secrets/azure
+        - --target=[output:stable:azure-controllers]
+        - --target=[output:stable:etcdbackup]
+        - --target=[output:stable:metricsbridge]
+        - --target=[output:stable:sync]
+        - --target=e2e-azure-scaleupdown
+        - --template=/usr/local/e2e-azure-scaleupdown
+        command:
+        - ci-operator
+        env:
+        - name: ARTIFACT_DIR
+          value: /tmp/artifacts
+        - name: CLUSTER_TYPE
+          value: azure
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-openshift-azure-release-v1.yaml
+              name: ci-operator-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-azure-scaleupdown
+        - name: TEST_COMMAND
+          value: make e2e-scaleupdown
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-secrets/azure
+          name: cluster-secrets-azure
+        - mountPath: /usr/local/e2e-azure-scaleupdown
+          name: job-definition
+          subPath: cluster-launch-e2e-azure.yaml
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-secrets-azure
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-azure
+      - configMap:
+          name: prow-job-cluster-launch-e2e-azure
+        name: job-definition
+    trigger: ((?m)^/test scaleupdown,?(\s+|$))
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - release-v1
+    context: ci/prow/images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    name: pull-ci-openshift-openshift-azure-release-v1-images
+    rerun_command: /test images
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --target=[images]
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-openshift-azure-release-v1.yaml
+              name: ci-operator-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: '(?m)^/test (?:.*? )?images(?: .*?)?$'
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-v1
+    context: ci/prow/unit
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    name: pull-ci-openshift-openshift-azure-release-v1-unit
+    rerun_command: /test unit
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --target=unit
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-openshift-azure-release-v1.yaml
+              name: ci-operator-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: '(?m)^/test (?:.*? )?unit(?: .*?)?$'
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-v1
+    context: ci/prow/verify
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    name: pull-ci-openshift-openshift-azure-release-v1-verify
+    rerun_command: /test verify
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --target=verify
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-openshift-azure-release-v1.yaml
+              name: ci-operator-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: '(?m)^/test (?:.*? )?verify(?: .*?)?$'
