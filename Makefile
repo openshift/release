@@ -209,6 +209,7 @@ origin-stable:
 origin-release:
 	$(MAKE) applyTemplate WHAT=projects/origin-release/pipeline.yaml
 	oc tag docker.io/centos/ruby-25-centos7:latest --scheduled openshift/release:ruby-25
+	oc tag docker.io/fedora:latest --scheduled openshift/release:fedora
 .PHONY: origin-release
 
 prometheus: node-exporter alert-buffer
