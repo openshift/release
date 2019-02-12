@@ -207,8 +207,6 @@ presubmits:
         imagePullPolicy: Always
         name: ""
         resources:
-          limits:
-            cpu: 500m
           requests:
             cpu: 10m
         volumeMounts:
