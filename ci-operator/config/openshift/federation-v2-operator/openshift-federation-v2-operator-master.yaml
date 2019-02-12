@@ -8,14 +8,6 @@ build_root:
     namespace: openshift
     tag: golang-1.10
 images:
-  # federation-src is an image that is set up to be look like a fork of the
-  # upstream federation-v2 repository. This image is used to run vet checks,
-  # unit tests, and e2e tests; it is marked optional because we do not want to
-  # promote it as part of the normal CI flow.
-- from: root
-  dockerfile_path: Dockerfile.federation
-  to: federation-src
-  optional: true
   # federation-controller is the image that contains the federation-v2 binaries
   # that will be used when federation is deployed to a cluster.
 - from: root
@@ -42,25 +34,34 @@ tests:
 - as: vet
   # The 'vet' test runs the upstream `make vet` check against federation-v2.
   commands: |
+    ./scripts/populate-federation-gopath.sh
+    cd /go/src/github.com/kubernetes-sigs/federation-v2
+
     make vet
   container:
-    from: federation-src
+    from: src
 - as: unit
   # The 'unit' test runs the upstream federation-v2 unit tests. This test does
   # not call the upstream makefile because one of the API packages relies on
   # having an etcd binary.
   commands: |
+    ./scripts/populate-federation-gopath.sh
+    cd /go/src/github.com/kubernetes-sigs/federation-v2
+
     go list ./pkg/... | grep -v v1alpha1 | xargs go test
   container:
-    from: federation-src
+    from: src
 - as: managed-e2e
   # The 'managed-e2e' test runs the upstream federation-v2 e2e tests in a
   # 'managed' fashion, ie, against a self-deployed Kubernetes API server.
   commands: |
+    ./scripts/populate-federation-gopath.sh
+    cd /go/src/github.com/kubernetes-sigs/federation-v2
+
     ./scripts/download-binaries.sh
     TEST_ASSET_PATH="/go/src/github.com/kubernetes-sigs/federation-v2/bin" \
     TEST_ASSET_ETCD="/go/src/github.com/kubernetes-sigs/federation-v2/bin/etcd" \
     TEST_ASSET_KUBE_APISERVER="/go/src/github.com/kubernetes-sigs/federation-v2/bin/kube-apiserver" \
     go test -v ./test/e2e -args -ginkgo.v -single-call-timeout=1m -ginkgo.trace -ginkgo.randomizeAllSpecs
   container:
-    from: federation-src
+    from: src
