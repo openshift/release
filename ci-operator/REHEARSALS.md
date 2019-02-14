@@ -1,19 +1,3 @@
-**This feature is not fully deployed to production yet**
-
-At the moment, all `openshift/release` pull requests trigger a
-`ci/prow/pj-rehearse` presubmit that is running the rehearse tool in the
-following way:
-
-1. dry mode: it never actually submits rehearsal jobs to Prow
-2. no-fail mode: the job should never fail, even if it should fail in
-   production
-3. optional: if the job fails despite the no-fail mode, it does not block a
-   merge
-
-The reason for running the tool in this "stealth" mode is that we can monitor
-its behavior until we finalize remaining rough edges. The timeframe for
-production deployment is mid-February 2019.
-
 # CI job rehearsals
 
 Pull requests to this repository that contain changes affecting Prow job setup
@@ -24,11 +8,15 @@ config changes impact CI setup for a given repo.
 
 ## How rehearsal works
 
-All pull requests trigger a `ci/prow/pj-rehearse` check, which detects the jobs
+All pull requests trigger a `ci/prow/pj-rehearse` job, which detects the jobs
 affected by the proposed change. For each job selected for rehearsal (for
 various reasons, we are not able to rehearse all jobs), new Prowjob is
 dynamically created, reporting results via a GitHub context named with the
-`ci/rehearse/$org/$repo/$test` pattern.
+`ci/rehearse/$org/$repo/$branch/$test` pattern. Both the "driver" job
+(`ci/prow/pj-rehearse`) and the actual rehearsals are optional, which means
+that their failures do not block Tide from merging the PR. The driver job waits
+for individual rehearsals to finish, and its own PASS/FAIL value depends on
+them: it will fail if at least one of the rehearsals did not succeed.
 
 ## Which jobs are rehearsed
 
@@ -45,6 +33,13 @@ These jobs are then further filtered to exclude jobs where some factor prevents
 us from reliably rehearsing them. Decisions about why a job was excluded from
 rehearsing are logged in the output of the `ci/prow/pj-rehearse` job. Most
 importantly, we are currently *not* rehearsing template-based jobs.
+
+## Rehearsal reruns
+
+It is not possible to re-run individual rehearsal jobs (they do not react to any
+trigger command themselves). Rerunning rehearsals must be always done by
+re-triggering the "driver" job (`ci/prow/pj-rehearse`), which then re-triggers
+each individual rehearsal job, including those that were passing before.
 
 ## Future work
 In the near future, we would like to enlarge the set of jobs that are
