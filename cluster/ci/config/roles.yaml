@@ -20,7 +20,17 @@ items:
 - kind: Namespace
   apiVersion: v1
   metadata:
+    name: qe
+- kind: Namespace
+  apiVersion: v1
+  metadata:
     name: telemeter
+
+- kind: ServiceAccount
+  apiVersion: v1
+  metadata:
+    name: cci-jenkins
+    namespace: qe
 
 - kind: Group
   apiVersion: v1
@@ -64,6 +74,12 @@ items:
   - bparees
   - mfojtik
   - smarterclayton
+- kind: Group
+  apiVersion: v1
+  metadata:
+    name: qe-admins
+  users:
+  - akostadinov
 
 - kind: ClusterRoleBinding
   apiVersion: rbac.authorization.k8s.io/v1beta1
@@ -274,3 +290,16 @@ items:
     kind: ClusterRole
     apiGroup: rbac.authorization.k8s.io
     name: system:image-puller
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: admin
+    namespace: qe
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: qe-admins
+  roleRef:
+    kind: Role
+    apiGroup: rbac.authorization.k8s.io
+    name: admin
