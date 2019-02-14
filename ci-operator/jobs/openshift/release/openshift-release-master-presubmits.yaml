@@ -139,6 +139,8 @@ presubmits:
         - --candidate-path=.
         - --debug-log
         - $(ARTIFACTS)/debug-log.txt
+        - --no-fail=false
+        - --dry-run=false
         command:
         - /bin/pj-rehearse
         image: pj-rehearse:latest
@@ -149,47 +151,6 @@ presubmits:
             cpu: 500m
       serviceAccountName: ci-operator
     trigger: '(?m)^/test (?:.*? )?pj-rehearse(?: .*?)?$'
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - master
-    context: ci/prow/pj-rehearse-testing
-    decorate: true
-    name: pull-ci-openshift-release-master-pj-rehearse-testing
-    optional: true
-    rerun_command: /test pj-rehearse-testing
-    spec:
-      containers:
-      - args:
-        - --candidate-path=.
-        - --debug-log
-        - $(ARTIFACTS)/debug-log.txt
-        - --no-fail=false
-        - --dry-run=false
-        command:
-        - /bin/pj-rehearse
-        image: registry.svc.ci.openshift.org/ci/pj-rehearse:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 500m
-        volumeMounts:
-        - mountPath: /etc/config
-          name: config
-          readOnly: true
-        - mountPath: /etc/job-config
-          name: job-config
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - configMap:
-          name: config
-        name: config
-      - configMap:
-          name: job-config
-        name: job-config
-    trigger: '(?m)^/test (?:.*? )?pj-rehearse-testing(?: .*?)?$'
   - agent: kubernetes
     always_run: true
     branches:
