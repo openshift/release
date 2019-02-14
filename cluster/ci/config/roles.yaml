@@ -274,3 +274,55 @@ items:
     kind: ClusterRole
     apiGroup: rbac.authorization.k8s.io
     name: system:image-puller
+
+# this is the cluster role system:registry from 3.11 with a new rule for imagestreams/layers
+- kind: ClusterRole
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
+      rbac.authorization.kubernetes.io/autoupdate: "true"
+    creationTimestamp: null
+    name: system:registry
+  rules:
+  - apiGroups:
+    - ""
+    resources:
+    - limitranges
+    - resourcequotas
+    verbs:
+    - list
+  - apiGroups:
+    - ""
+    - image.openshift.io
+    resources:
+    - images
+    - imagestreamtags
+    verbs:
+    - delete
+    - get
+  - apiGroups:
+    - ""
+    - image.openshift.io
+    resources:
+    - imagestreamimages
+    - imagestreams/layers
+    - imagestreams/secrets
+    verbs:
+    - get
+  - apiGroups:
+    - ""
+    - image.openshift.io
+    resources:
+    - images
+    - imagestreams
+    verbs:
+    - get
+    - update
+  - apiGroups:
+    - ""
+    - image.openshift.io
+    resources:
+    - imagestreammappings
+    verbs:
+    - create
