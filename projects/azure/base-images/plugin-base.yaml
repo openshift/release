@@ -1,36 +1,16 @@
 kind: List
 apiVersion: v1
 items:
-
 - apiVersion: image.openshift.io/v1
   kind: ImageStream
   metadata:
     name: plugin-base
     namespace: azure
-
-- kind: BuildConfig
-  apiVersion: v1
-  metadata:
-    name: plugin-base
-    namespace: azure
   spec:
-    successfulBuildsHistoryLimit: 1
-    failedBuildsHistoryLimit: 2
-    output:
-      to:
-        kind: ImageStreamTag
-        name: plugin-base:latest
-    source:
-      dockerfile: |
-        FROM docker.io/centos:7
-
-        RUN yum update -y
-      type: Dockerfile
-    strategy:
-      dockerStrategy:
-        from:
-          kind: DockerImage
-          name: docker.io/centos:7
-        imageOptimizationPolicy: SkipLayers
-    triggers:
-    - type: ConfigChange
+    tags:
+    - from:
+        kind: DockerImage
+        name: registry.access.redhat.com/rhel7:latest
+      importPolicy:
+        scheduled: true
+      name: latest
