@@ -123,9 +123,7 @@ prow-ocp-rpms:
 prow-ocp-rpm-secrets:
 	oc create secret generic base-4-0-repos \
 		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
-		--from-file=cluster/ci/config/prow/openshift/rpm-mirrors/docker.repo \
-		--from-file=cluster/ci/config/prow/openshift/rpm-mirrors/rhel.repo \
-		--from-file=cluster/ci/config/prow/openshift/rpm-mirrors/ocp-4.0.repo \
+		--from-file=cluster/ci/config/prow/openshift/rpm-mirrors/ocp-4.0-default.repo \
 		-o yaml --dry-run | oc apply -n ocp -f -
 .PHONY: prow-ocp-rpms-secrets
 
@@ -141,7 +139,7 @@ prow-artifacts:
 	oc policy add-role-to-group system:image-puller system:authenticated -n ci-pr-images
 	oc tag --source=docker centos:7 openshift/centos:7 --scheduled
 	oc create ns ci-rpms -o yaml --dry-run | oc apply -f -
-	oc apply -n ci-rpms -f ci-operator/infra/openshift/origin/
+	oc apply -f ci-operator/infra/openshift/origin/
 	oc apply -n ci -f ci-operator/infra/src-cache-origin.yaml
 .PHONY: prow-artifacts
 
