@@ -152,11 +152,12 @@ prow-release-controller:
 	oc create imagestream origin-release -o yaml --dry-run | oc apply -f - -n openshift
 	oc create imagestream origin-v4.0 -o yaml --dry-run | oc apply -f - -n openshift
 	oc annotate -n openshift is/origin-v4.0 "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/origin-4.0.json)" --overwrite
-	oc create imagestream release -o yaml --dry-run | oc apply -f - -n ocp
 	oc annotate -n ocp is/4.0-art-latest "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/ocp-4.0.json)" --overwrite
+	oc annotate -n ocp is/4.0 "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/ocp-4.0-ci.json)" --overwrite
 	$(MAKE) apply WHAT=ci-operator/infra/openshift/release-controller/art-publish.yaml
 	$(MAKE) apply WHAT=ci-operator/infra/openshift/release-controller/deploy-origin-4.0.yaml
 	$(MAKE) apply WHAT=ci-operator/infra/openshift/release-controller/deploy-ocp-4.0.yaml
+	oc create imagestream release -o yaml --dry-run | oc apply -f - -n ocp
 
 projects: ci-ns gcsweb origin origin-stable origin-release test-bases image-mirror-setup image-pruner-setup publishing-bot image-registry-publishing-bot content-mirror azure python-validation
 .PHONY: projects
