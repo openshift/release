@@ -157,7 +157,7 @@ prow-release-controller:
 	$(MAKE) apply WHAT=ci-operator/infra/openshift/release-controller/art-publish.yaml
 	$(MAKE) apply WHAT=ci-operator/infra/openshift/release-controller/deploy-origin-4.0.yaml
 	$(MAKE) apply WHAT=ci-operator/infra/openshift/release-controller/deploy-ocp-4.0.yaml
-	oc create imagestream release -o yaml --dry-run | oc apply -f - -n ocp
+	-oc create imagestream release -n ocp
 
 projects: ci-ns gcsweb origin origin-stable origin-release test-bases image-mirror-setup image-pruner-setup publishing-bot image-registry-publishing-bot content-mirror azure python-validation
 .PHONY: projects
