@@ -1,9 +1,43 @@
+tag_specification:
+  name: '4.0'
+  namespace: ocp
+promotion:
+  cluster: https://api.ci.openshift.org
+  namespace: ci-byoh
+  tag: devel-40
 base_rpm_images:
-  base:
+  os:
     cluster: https://api.ci.openshift.org
-    name: origin-v4.0
+    name: centos
     namespace: openshift
-    tag: base
+    tag: '7'
+
+raw_steps:
+# TODO: until ansible has all necessary RPMs mirrored, create a synthetic
+#       base image that is a copy of the existing Origin base image (instead of the
+#       new UBI base image).
+- pipeline_image_cache_step:
+    commands: |
+      INSTALL_PKGS="which tar wget hostname sysvinit-tools util-linux socat tree findutils lsof bind-utils shadow-utils"
+      cat <<DOCKERFILE > /opt/Dockerfile
+      FROM os
+      RUN mkdir -p /var/lib/origin && \
+          yum install -y ${INSTALL_PKGS} && \
+          rpm -V ${INSTALL_PKGS} && \
+          yum clean all && rm -rf /var/cache/yum/*
+      DOCKERFILE
+    from: os
+    to: src-dockerfile
+- project_directory_image_build_step:
+    from: os
+    inputs:
+      src-dockerfile:
+        paths:
+        - destination_dir: .
+          source_path: /opt/Dockerfile
+      src: {}
+    to: base
+
 images:
 - dockerfile_path: images/installer/Dockerfile
   from: base
@@ -17,17 +51,11 @@ resources:
       memory: 200Mi
   unit:
     limits:
-            memory: 3Gi
+      memory: 3Gi
     requests:
       cpu: '1'
       memory: 1.5Gi
 rpm_build_commands: tito tag --offline --accept-auto-changelog --use-release '9999%{?dist}'; tito build --output="_output/local/releases" --rpm --test --offline --quiet; mkdir -p _output/local/releases/rpms; mv _output/local/releases/noarch/* _output/local/releases/rpms; createrepo _output/local/releases/rpms
-tag_specification:
-  cluster: https://api.ci.openshift.org
-  name: origin-v4.0
-  namespace: openshift
-  tag: ''
-  tag_overrides: {}
 build_root:
   image_stream_tag:
     cluster: https://api.ci.openshift.org
