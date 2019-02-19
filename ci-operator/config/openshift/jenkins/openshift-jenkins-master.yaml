@@ -5,12 +5,7 @@ promotion:
   name: '4.0'
   namespace: ocp
 base_images:
-  os:
-    cluster: https://api.ci.openshift.org
-    name: centos
-    namespace: openshift
-    tag: '7'
-  cli:
+  base:
     name: '4.0'
     namespace: ocp
     tag: cli
@@ -22,38 +17,8 @@ build_root:
     tag: golang-1.10
 canonical_go_repository: github.com/openshift/jenkins
 
-raw_steps:
-# TODO: until RHEL Jenkins RPMs are mirrored, copy the cli binary into a synthetic
-#       base image that is a copy of the existing Origin base image (instead of the
-#       new UBI base image).
-- pipeline_image_cache_step:
-    commands: |
-      INSTALL_PKGS="which tar wget hostname sysvinit-tools util-linux socat tree findutils lsof bind-utils shadow-utils"
-      cat <<DOCKERFILE > /opt/Dockerfile
-      FROM os
-      COPY --from=cli /usr/bin/oc /usr/bin/oc
-      RUN mkdir -p /var/lib/origin && \
-          yum install -y ${INSTALL_PKGS} && \
-          rpm -V ${INSTALL_PKGS} && \
-          yum clean all && rm -rf /var/cache/yum/*
-      DOCKERFILE
-    from: os
-    to: src-dockerfile
-- project_directory_image_build_step:
-    from: os
-    inputs:
-      cli:
-        as:
-        - cli
-      src-dockerfile:
-        paths:
-        - destination_dir: .
-          source_path: /opt/Dockerfile
-      src: {}
-    to: base
-
 images:
-- dockerfile_path: Dockerfile
+- dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
     src:
@@ -61,7 +26,7 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/jenkins/2/.
   to: jenkins
-- dockerfile_path: Dockerfile
+- dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
     src:
@@ -69,7 +34,7 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/jenkins/slave-base/.
   to: jenkins-agent-base
-- dockerfile_path: Dockerfile
+- dockerfile_path: Dockerfile.rhel7
   from: jenkins-agent-base
   inputs:
     src:
@@ -77,7 +42,7 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/jenkins/agent-maven-3.5/.
   to: jenkins-agent-maven
-- dockerfile_path: Dockerfile
+- dockerfile_path: Dockerfile.rhel7
   from: jenkins-agent-base
   inputs:
     src:
