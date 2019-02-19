@@ -22,7 +22,7 @@ base_images:
     name: '4.0'
     namespace: ocp
     tag: machine-os-content
-binary_build_commands: make build WHAT=cmd/hypershift
+binary_build_commands: hack/build-go cmd/hypershift vendor/k8s.io/kubernetes/cmd/hyperkube
 canonical_go_repository: github.com/openshift/origin
 images:
 - dockerfile_path: images/template-service-broker/Dockerfile.rhel
@@ -159,10 +159,10 @@ resources:
       memory: 8Gi
   unit:
     limits:
-      memory: 13Gi
+      memory: 14Gi
     requests:
       cpu: '3'
-      memory: 5Gi
+      memory: 11Gi
   verify:
     limits:
       memory: 12Gi
@@ -179,10 +179,12 @@ build_root:
 tests:
 - artifact_dir: /tmp/artifacts
   as: cmd
-  commands: ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1 KUBERNETES_SERVICE_HOST= make
-    test-cmd -k
+  commands: TMPDIR=/tmp/volume ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1
+    KUBERNETES_SERVICE_HOST= make test-cmd -k
   container:
     from: bin
+    memory_backed_volume:
+      size: 4Gi
 - artifact_dir: /tmp/artifacts
   as: unit
   commands: ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1 TEST_KUBE=true KUBERNETES_SERVICE_HOST=
