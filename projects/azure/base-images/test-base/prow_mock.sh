@@ -8,6 +8,7 @@ if [[ $# -ne 2  ]]; then
 fi
 
 SOURCE=$1
+export RESOURCEGROUP=$2
 
 set +x
 source  /usr/secrets/secret
