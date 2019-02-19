@@ -125,6 +125,10 @@ prow-ocp-rpm-secrets:
 		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
 		--from-file=cluster/ci/config/prow/openshift/rpm-mirrors/ocp-4.0-default.repo \
 		-o yaml --dry-run | oc apply -n ocp -f -
+	oc create secret generic base-4-1-repos \
+		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
+		--from-file=cluster/ci/config/prow/openshift/rpm-mirrors/ocp-4.1-default.repo \
+		-o yaml --dry-run | oc apply -n ocp -f -
 .PHONY: prow-ocp-rpms-secrets
 
 prow-jobs: prow-cluster-jobs prow-artifacts prow-ocp-rpms
@@ -151,7 +155,9 @@ prow-release-controller:
 	oc create imagestream origin-v4.0 -o yaml --dry-run | oc apply -f - -n openshift
 	oc annotate -n openshift is/origin-v4.0 "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/origin-4.0.json)" --overwrite
 	oc annotate -n ocp is/4.0-art-latest "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/ocp-4.0.json)" --overwrite
+	oc annotate -n ocp is/4.1-art-latest "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/ocp-4.1.json)" --overwrite
 	oc annotate -n ocp is/4.0 "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/ocp-4.0-ci.json)" --overwrite
+	oc annotate -n ocp is/4.1 "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/ocp-4.1-ci.json)" --overwrite
 	$(MAKE) apply WHAT=ci-operator/infra/openshift/release-controller/art-publish.yaml
 	$(MAKE) apply WHAT=ci-operator/infra/openshift/release-controller/deploy-origin-4.0.yaml
 	$(MAKE) apply WHAT=ci-operator/infra/openshift/release-controller/deploy-ocp-4.0.yaml
