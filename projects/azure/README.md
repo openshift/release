@@ -205,6 +205,7 @@ registry.svc.ci.openshift.org/ci/ci-operator:latest \
 --target cluster-launch-e2e-azure \
 --target=[output:stable:azure-controllers] \
 --target=[output:stable:etcdbackup] \
+--target=[output:stable:startup] \
 --target=[output:stable:metricsbridge] \
 --target=[output:stable:sync] \
 --template /release/ci-operator/templates/openshift/openshift-azure/cluster-launch-e2e-azure.yaml \
@@ -225,6 +226,7 @@ docker run \
 --namespace ${CI_OPERATOR_NAMESPACE} \
 --target=[output:stable:azure-controllers] \
 --target=[output:stable:etcdbackup] \
+--target=[output:stable:startup] \
 --target=[output:stable:metricsbridge] \
 --target=[output:stable:sync] \
 --target=e2e-upgrade-v1.0 \
