@@ -157,7 +157,7 @@ prow-release-controller:
 	$(MAKE) apply WHAT=ci-operator/infra/openshift/release-controller/deploy-ocp-4.0.yaml
 	-oc create imagestream release -n ocp
 
-projects: ci-ns gcsweb origin origin-stable origin-release test-bases image-mirror-setup image-pruner-setup publishing-bot image-registry-publishing-bot content-mirror azure python-validation
+projects: ci-ns gcsweb origin origin-stable origin-release test-bases image-mirror-setup image-pruner-setup publishing-bot content-mirror azure python-validation
 .PHONY: projects
 
 ci-operator-config:
@@ -172,11 +172,6 @@ content-mirror:
 node-problem-detector:
 	$(MAKE) apply WHAT=projects/kubernetes/node-problem-detector.yaml
 .PHONY: node-problem-detector
-
-projects-secrets:
-	# IMAGE_REGISTRY_PUBLISHER_BOT_GITHUB_TOKEN is used to push changes from github.com/openshift/image-registry/vendor to our forked repositories.
-	oc create secret generic -n image-registry-publishing-bot github-token --from-literal=token=$${IMAGE_REGISTRY_PUBLISHER_BOT_GITHUB_TOKEN?} --dry-run -o yaml | oc apply -f -
-.PHONY: projects-secrets
 
 gcsweb:
 	$(MAKE) applyTemplate WHAT=projects/gcsweb/pipeline.yaml
@@ -193,11 +188,6 @@ oauth-proxy:
 publishing-bot:
 	$(MAKE) apply WHAT=projects/publishing-bot/storage-class.yaml
 .PHONY: publishing-bot
-
-image-registry-publishing-bot:
-	oc create configmap -n image-registry-publishing-bot publisher-config --from-file=config=cluster/ci/config/publishingbots/image-registry/config.yaml -o yaml --dry-run | oc apply -f -
-	oc create configmap -n image-registry-publishing-bot publisher-rules --from-file=config=cluster/ci/config/publishingbots/image-registry/rules.yaml -o yaml --dry-run | oc apply -f -
-	$(MAKE) apply WHAT=cluster/ci/config/publishingbots/image-registry/statefulset.yaml
 
 origin-stable:
 	$(MAKE) apply WHAT=projects/origin-stable/release.yaml
