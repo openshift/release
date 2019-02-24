@@ -10,6 +10,8 @@ OSA, from the Red Hat side, is comprised of a couple of different Github repos:
   is developed.
 * [openshift/azure-misc](https://github.com/openshift/azure-misc/)
   This repo contains various tools used either in our CI or by SRE processes.
+* [openshift/azure-sop](https://github.com/openshift/azure-sop/)
+  This repo contains various SOPs.
 * [openshift/openshift-ansible](https://github.com/openshift/openshift-ansible/)
   The VM image build process is currently maintained in this repo.
 
