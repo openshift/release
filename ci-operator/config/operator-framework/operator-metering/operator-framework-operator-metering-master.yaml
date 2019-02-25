@@ -1,0 +1,39 @@
+tag_specification:
+  name: '4.0'
+  namespace: ocp
+promotion:
+  name: '4.0'
+  namespace: ocp
+base_images:
+  base:
+    name: origin-v3.11
+    namespace: openshift
+    tag: base
+  helm:
+    name: '4.0'
+    namespace: ocp
+    tag: helm
+canonical_go_repository: github.com/operator-framework/operator-metering
+images:
+- dockerfile_path: Dockerfile.reporting-operator
+  from: base
+  to: reporting-operator
+- dockerfile_path: Dockerfile.metering-operator
+  from: helm
+  to: metering-operator
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+build_root:
+   project_image:
+    dockerfile_path: Dockerfile.src
+    context_dir: .
+tests:
+- as: unit
+  commands: make unit
+  container:
+    from: src
