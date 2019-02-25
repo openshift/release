@@ -438,7 +438,6 @@ objects:
             queue /tmp/artifacts/metrics/${file}-controllers-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig'
           done < /tmp/pods-api
 
-
           while IFS= read -r i; do
             file="$( echo "$i" | cut -d ' ' -f 2,3,5 | tr -s ' ' '_' )"
             FILTER=gzip queue /tmp/artifacts/pods/${file}.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s $i
@@ -446,7 +445,18 @@ objects:
           done < /tmp/containers
 
           echo "Gathering kube-apiserver audit.log ..."
-          FILTER=gzip queue /tmp/artifacts/nodes/masters-kube-apiserver-audit.log.gz oc --insecure-skip-tls-verify adm node-logs --role=master --path=kube-apiserver/audit.log
+          oc --insecure-skip-tls-verify adm node-logs --role=master --path=kube-apiserver/ > /tmp/kube-audit-logs
+          while IFS=$'\n' read -r line; do
+            IFS=' ' read -ra log <<< "${line}"
+            FILTER=gzip queue /tmp/artifacts/nodes/"${log[0]}"-"${log[1]}".gz oc --insecure-skip-tls-verify adm node-logs "${log[0]}" --path=kube-apiserver/"${log[1]}"
+          done < /tmp/kube-audit-logs
+
+          echo "Gathering openshift-apiserver audit.log ..."
+          oc --insecure-skip-tls-verify adm node-logs --role=master --path=openshift-apiserver/ > /tmp/openshift-audit-logs
+          while IFS=$'\n' read -r line; do
+            IFS=' ' read -ra log <<< "${line}"
+            FILTER=gzip queue /tmp/artifacts/nodes/"${log[0]}"-"${log[1]}".gz oc --insecure-skip-tls-verify adm node-logs "${log[0]}" --path=openshift-apiserver/"${log[1]}"
+          done < /tmp/openshift-audit-logs
 
           echo "Snapshotting prometheus (may take 15s) ..."
           queue /tmp/artifacts/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring prometheus-k8s-0 -- tar cvzf - -C /prometheus .
