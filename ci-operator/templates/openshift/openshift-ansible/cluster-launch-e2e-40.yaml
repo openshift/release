@@ -121,12 +121,12 @@ objects:
           break
         done
 
-        until oc wait clusterversion/version --for condition=available 2>/dev/null; do
+        until oc --insecure-skip-tls-verify wait clusterversion/version --for condition=available 2>/dev/null; do
           sleep 10 & wait
         done
 
         # set up cloud-provider-specific env vars
-        export KUBE_SSH_BASTION="$( oc get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
+        export KUBE_SSH_BASTION="$( oc --insecure-skip-tls-verify get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
         export KUBE_SSH_KEY_PATH=/tmp/cluster/ssh-privatekey
         if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
           export GOOGLE_APPLICATION_CREDENTIALS="/tmp/cluster/gce.json"
@@ -378,69 +378,69 @@ objects:
           echo "Gathering artifacts ..."
           mkdir -p /tmp/artifacts/pods /tmp/artifacts/nodes /tmp/artifacts/metrics
 
-          oc --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' > /tmp/nodes
-          oc --request-timeout=5s get pods --all-namespaces --template '{{ range .items }}{{ $name := .metadata.name }}{{ $ns := .metadata.namespace }}{{ range .spec.containers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ range .spec.initContainers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ end }}' > /tmp/containers
-          oc --request-timeout=5s get pods -l openshift.io/component=api --all-namespaces --template '{{ range .items }}-n {{ .metadata.namespace }} {{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/pods-api
+          oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' > /tmp/nodes
+          oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces --template '{{ range .items }}{{ $name := .metadata.name }}{{ $ns := .metadata.namespace }}{{ range .spec.containers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ range .spec.initContainers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ end }}' > /tmp/containers
+          oc --insecure-skip-tls-verify --request-timeout=5s get pods -l openshift.io/component=api --all-namespaces --template '{{ range .items }}-n {{ .metadata.namespace }} {{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/pods-api
 
-          queue /tmp/artifacts/apiservices.json oc --request-timeout=5s get apiservices -o json
-          queue /tmp/artifacts/clusteroperators.json oc --request-timeout=5s get clusteroperators -o json
-          queue /tmp/artifacts/clusterversion.json oc --request-timeout=5s get clusterversion -o json
-          queue /tmp/artifacts/configmaps.json oc --request-timeout=5s get configmaps --all-namespaces -o json
-          queue /tmp/artifacts/csr.json oc --request-timeout=5s get csr -o json
-          queue /tmp/artifacts/endpoints.json oc --request-timeout=5s get endpoints --all-namespaces -o json
-          queue /tmp/artifacts/events.json oc --request-timeout=5s get events --all-namespaces -o json
-          queue /tmp/artifacts/kubeapiserver.json oc --request-timeout=5s get kubeapiserver -o json
-          queue /tmp/artifacts/kubecontrollermanager.json oc --request-timeout=5s get kubecontrollermanager -o json
-          queue /tmp/artifacts/machineconfigpools.json oc --request-timeout=5s get machineconfigpools -o json
-          queue /tmp/artifacts/machineconfigs.json oc --request-timeout=5s get machineconfigs -o json
-          queue /tmp/artifacts/namespaces.json oc --request-timeout=5s get namespaces -o json
-          queue /tmp/artifacts/nodes.json oc --request-timeout=5s get nodes -o json
-          queue /tmp/artifacts/openshiftapiserver.json oc --request-timeout=5s get openshiftapiserver -o json
-          queue /tmp/artifacts/pods.json oc --request-timeout=5s get pods --all-namespaces -o json
-          queue /tmp/artifacts/rolebindings.json oc --request-timeout=5s get rolebindings --all-namespaces -o json
-          queue /tmp/artifacts/roles.json oc --request-timeout=5s get roles --all-namespaces -o json
-          queue /tmp/artifacts/secrets.json oc --request-timeout=5s get secrets --all-namespaces -o json
-          queue /tmp/artifacts/services.json oc --request-timeout=5s get services --all-namespaces -o json
+          queue /tmp/artifacts/apiservices.json oc --insecure-skip-tls-verify --request-timeout=5s get apiservices -o json
+          queue /tmp/artifacts/clusteroperators.json oc --insecure-skip-tls-verify --request-timeout=5s get clusteroperators -o json
+          queue /tmp/artifacts/clusterversion.json oc --insecure-skip-tls-verify --request-timeout=5s get clusterversion -o json
+          queue /tmp/artifacts/configmaps.json oc --insecure-skip-tls-verify --request-timeout=5s get configmaps --all-namespaces -o json
+          queue /tmp/artifacts/csr.json oc --insecure-skip-tls-verify --request-timeout=5s get csr -o json
+          queue /tmp/artifacts/endpoints.json oc --insecure-skip-tls-verify --request-timeout=5s get endpoints --all-namespaces -o json
+          queue /tmp/artifacts/events.json oc --insecure-skip-tls-verify --request-timeout=5s get events --all-namespaces -o json
+          queue /tmp/artifacts/kubeapiserver.json oc --insecure-skip-tls-verify --request-timeout=5s get kubeapiserver -o json
+          queue /tmp/artifacts/kubecontrollermanager.json oc --insecure-skip-tls-verify --request-timeout=5s get kubecontrollermanager -o json
+          queue /tmp/artifacts/machineconfigpools.json oc --insecure-skip-tls-verify --request-timeout=5s get machineconfigpools -o json
+          queue /tmp/artifacts/machineconfigs.json oc --insecure-skip-tls-verify --request-timeout=5s get machineconfigs -o json
+          queue /tmp/artifacts/namespaces.json oc --insecure-skip-tls-verify --request-timeout=5s get namespaces -o json
+          queue /tmp/artifacts/nodes.json oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o json
+          queue /tmp/artifacts/openshiftapiserver.json oc --insecure-skip-tls-verify --request-timeout=5s get openshiftapiserver -o json
+          queue /tmp/artifacts/pods.json oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces -o json
+          queue /tmp/artifacts/rolebindings.json oc --insecure-skip-tls-verify --request-timeout=5s get rolebindings --all-namespaces -o json
+          queue /tmp/artifacts/roles.json oc --insecure-skip-tls-verify --request-timeout=5s get roles --all-namespaces -o json
+          queue /tmp/artifacts/secrets.json oc --insecure-skip-tls-verify --request-timeout=5s get secrets --all-namespaces -o json
+          queue /tmp/artifacts/services.json oc --insecure-skip-tls-verify --request-timeout=5s get services --all-namespaces -o json
 
           # gather nodes first in parallel since they may contain the most relevant debugging info
           while IFS= read -r i; do
             mkdir -p /tmp/artifacts/nodes/$i
-            queue /tmp/artifacts/nodes/$i/heap oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/debug/pprof/heap
+            queue /tmp/artifacts/nodes/$i/heap oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/debug/pprof/heap
           done < /tmp/nodes
 
-          if oc adm node-logs -h &>/dev/null; then
+          if oc --insecure-skip-tls-verify adm node-logs -h &>/dev/null; then
             # starting in 4.0 we can query node logs directly
-            FILTER=gzip queue /tmp/artifacts/nodes/masters-journal.gz oc adm node-logs --role=master --unify=false
-            FILTER=gzip queue /tmp/artifacts/nodes/workers-journal.gz oc adm node-logs --role=worker --unify=false
+            FILTER=gzip queue /tmp/artifacts/nodes/masters-journal.gz oc --insecure-skip-tls-verify adm node-logs --role=master --unify=false
+            FILTER=gzip queue /tmp/artifacts/nodes/workers-journal.gz oc --insecure-skip-tls-verify adm node-logs --role=worker --unify=false
           else
             while IFS= read -r i; do
-              FILTER=gzip queue /tmp/artifacts/nodes/$i/messages.gz oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/messages
-              oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/journal | sed -e 's|.*href="\(.*\)".*|\1|;t;d' > /tmp/journals
+              FILTER=gzip queue /tmp/artifacts/nodes/$i/messages.gz oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/messages
+              oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/journal | sed -e 's|.*href="\(.*\)".*|\1|;t;d' > /tmp/journals
               while IFS= read -r j; do
-                FILTER=gzip queue /tmp/artifacts/nodes/$i/journal.gz oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/journal/${j}system.journal
+                FILTER=gzip queue /tmp/artifacts/nodes/$i/journal.gz oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/journal/${j}system.journal
               done < /tmp/journals
-              FILTER=gzip queue /tmp/artifacts/nodes/$i/secure.gz oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/secure
-              FILTER=gzip queue /tmp/artifacts/nodes/$i/audit.gz oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/audit
+              FILTER=gzip queue /tmp/artifacts/nodes/$i/secure.gz oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/secure
+              FILTER=gzip queue /tmp/artifacts/nodes/$i/audit.gz oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/audit
             done < /tmp/nodes
           fi
 
           while IFS= read -r i; do
             file="$( echo "$i" | cut -d ' ' -f 3 | tr -s ' ' '_' )"
-            queue /tmp/artifacts/metrics/${file}-heap oc exec $i -- /bin/bash -c 'oc get --raw /debug/pprof/heap --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig'
-            queue /tmp/artifacts/metrics/${file}-controllers-heap oc exec $i -- /bin/bash -c 'oc get --raw /debug/pprof/heap --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig'
+            queue /tmp/artifacts/metrics/${file}-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig'
+            queue /tmp/artifacts/metrics/${file}-controllers-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig'
           done < /tmp/pods-api
 
           while IFS= read -r i; do
             file="$( echo "$i" | cut -d ' ' -f 2,3,5 | tr -s ' ' '_' )"
-            FILTER=gzip queue /tmp/artifacts/pods/${file}.log.gz oc logs --request-timeout=20s $i
-            FILTER=gzip queue /tmp/artifacts/pods/${file}_previous.log.gz oc logs --request-timeout=20s -p $i
+            FILTER=gzip queue /tmp/artifacts/pods/${file}.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s $i
+            FILTER=gzip queue /tmp/artifacts/pods/${file}_previous.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s -p $i
           done < /tmp/containers
 
           echo "Gathering kube-apiserver audit.log ..."
-          FILTER=gzip queue /tmp/artifacts/nodes/masters-kube-apiserver-audit.log.gz oc adm node-logs --role=master --path=kube-apiserver/audit.log
+          FILTER=gzip queue /tmp/artifacts/nodes/masters-kube-apiserver-audit.log.gz oc --insecure-skip-tls-verify adm node-logs --role=master --path=kube-apiserver/audit.log
 
           echo "Snapshotting prometheus (may take 15s) ..."
-          queue /tmp/artifacts/metrics/prometheus.tar.gz oc exec -n openshift-monitoring prometheus-k8s-0 -- tar cvzf - -C /prometheus .
+          queue /tmp/artifacts/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring prometheus-k8s-0 -- tar cvzf - -C /prometheus .
 
           echo "Waiting for logs ..."
           wait
