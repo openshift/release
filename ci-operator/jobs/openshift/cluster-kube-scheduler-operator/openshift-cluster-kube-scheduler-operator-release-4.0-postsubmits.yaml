@@ -1,0 +1,32 @@
+postsubmits:
+  openshift/cluster-kube-scheduler-operator:
+  - agent: kubernetes
+    branches:
+    - ^release-4\.0$
+    context: ""
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    name: branch-ci-openshift-cluster-kube-scheduler-operator-release-4.0-images
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --promote
+        - --target=[images]
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-cluster-kube-scheduler-operator-release-4.0.yaml
+              name: ci-operator-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
