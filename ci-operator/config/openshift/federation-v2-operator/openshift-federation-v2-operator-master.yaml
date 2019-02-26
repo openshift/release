@@ -1,37 +1,29 @@
-tag_specification:
-  name: '4.0'
-  namespace: ocp
-promotion:
-  name: '4.0'
-  namespace: ocp
-
-canonical_go_repository: github.com/openshift/federation-v2-operator
-# build_root establishes the origin of the image that is represented by the
-# 'root' tag elsewhere in this configuration
 build_root:
   image_stream_tag:
     cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.10
+canonical_go_repository: github.com/openshift/federation-v2-operator
 images:
-  # federation-controller is the image that contains the federation-v2 binaries
-  # that will be used when federation is deployed to a cluster.
-- from: root
-  dockerfile_path: Dockerfile
+- dockerfile_path: Dockerfile
+  from: root
   to: federation-controller
+promotion:
+  name: "4.0"
+  namespace: ocp
 resources:
-  # '*' is evaluated over the the test or build name and therefore applies to
-  # all tests and builds.
   '*':
     limits:
       memory: 2Gi
     requests:
       cpu: 100m
       memory: 200Mi
+tag_specification:
+  name: "4.0"
+  namespace: ocp
 tests:
 - as: vet
-  # The 'vet' test runs the upstream `make vet` check against federation-v2.
   commands: |
     ./scripts/populate-federation-gopath.sh
     cd /go/src/github.com/kubernetes-sigs/federation-v2
@@ -40,9 +32,6 @@ tests:
   container:
     from: src
 - as: unit
-  # The 'unit' test runs the upstream federation-v2 unit tests. This test does
-  # not call the upstream makefile because one of the API packages relies on
-  # having an etcd binary.
   commands: |
     ./scripts/populate-federation-gopath.sh
     cd /go/src/github.com/kubernetes-sigs/federation-v2
@@ -51,8 +40,6 @@ tests:
   container:
     from: src
 - as: managed-e2e
-  # The 'managed-e2e' test runs the upstream federation-v2 e2e tests in a
-  # 'managed' fashion, ie, against a self-deployed Kubernetes API server.
   commands: |
     ./scripts/populate-federation-gopath.sh
     cd /go/src/github.com/kubernetes-sigs/federation-v2

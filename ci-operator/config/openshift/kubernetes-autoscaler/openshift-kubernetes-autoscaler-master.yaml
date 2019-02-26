@@ -1,20 +1,23 @@
-tag_specification:
-  name: '4.0'
-  namespace: ocp
-promotion:
-  name: '4.0'
-  namespace: ocp
 base_images:
   base:
-    name: '4.0'
+    name: "4.0"
     namespace: ocp
     tag: base
 binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.10
 canonical_go_repository: k8s.io/autoscaler
 images:
 - dockerfile_path: images/cluster-autoscaler/Dockerfile
   from: base
   to: cluster-autoscaler
+promotion:
+  name: "4.0"
+  namespace: ocp
 resources:
   '*':
     limits:
@@ -22,36 +25,33 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-  cluster-autoscaler:
-    limits:
-      memory: 7Gi
-    requests:
-      cpu: 2
-      memory: 4Gi
   bin:
     limits:
       memory: 7Gi
     requests:
-      cpu: 2
+      cpu: "2"
+      memory: 4Gi
+  cluster-autoscaler:
+    limits:
+      memory: 7Gi
+    requests:
+      cpu: "2"
       memory: 4Gi
   test-bin:
     limits:
       memory: 7Gi
     requests:
-      cpu: 2
+      cpu: "2"
       memory: 4Gi
   unit:
     limits:
       memory: 7Gi
     requests:
-      cpu: 2
+      cpu: "2"
       memory: 4Gi
-build_root:
-  image_stream_tag:
-    cluster: https://api.ci.openshift.org
-    name: release
-    namespace: openshift
-    tag: golang-1.10
+tag_specification:
+  name: "4.0"
+  namespace: ocp
 test_binary_build_commands: OS_GOFLAGS='-race' make build
 tests:
 - artifact_dir: /tmp/artifacts

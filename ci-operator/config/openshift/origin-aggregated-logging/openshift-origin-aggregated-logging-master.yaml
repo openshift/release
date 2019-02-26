@@ -1,15 +1,9 @@
-tag_specification:
-  name: '4.0'
-  namespace: ocp
-promotion:
-  name: '4.0'
-  namespace: ocp
 base_images:
   base:
     cluster: https://api.ci.openshift.org
     name: centos
     namespace: openshift
-    tag: '7'
+    tag: "7"
   base-npm:
     cluster: https://api.ci.openshift.org
     name: release
@@ -20,7 +14,13 @@ base_images:
     name: release
     namespace: openshift
     tag: ruby-25
-
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+canonical_go_repository: ""
 images:
 - context_dir: fluentd/
   dockerfile_path: Dockerfile.centos7
@@ -42,12 +42,15 @@ images:
   dockerfile_path: Dockerfile.centos7
   from: base
   to: logging-eventrouter
+promotion:
+  name: "4.0"
+  namespace: ocp
 resources:
   '*':
     limits:
       memory: 5Gi
     requests:
-      cpu: '1'
+      cpu: "1"
       memory: 200Mi
   src:
     limits:
@@ -55,12 +58,9 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-build_root:
-  image_stream_tag:
-    cluster: https://api.ci.openshift.org
-    name: release
-    namespace: openshift
-    tag: golang-1.10
+tag_specification:
+  name: "4.0"
+  namespace: ocp
 tests:
 - as: e2e-aws
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
