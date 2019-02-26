@@ -174,5 +174,5 @@ oc create secret generic "cluster-secrets-${target_cloud}"                    \
 	"$( format_attachment "jenkins-ci-provisioner" ssh-privatekey )"            \
 	"$( format_attachment "jenkins-ci-provisioner" ssh-publickey )"             \
 	"$( format_attachment "mirror.openshift.com" cert-key.pem ops-mirror.pem )" \
-	"$( format_field_value telemeter "Telemter Token" "telemeter-token" )"
+	"$( format_field_value telemeter "Telemeter Token" "telemeter-token" )"
 oc label secret "cluster-secrets-${target_cloud}" "ci.openshift.io/managed=true"
