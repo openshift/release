@@ -118,7 +118,7 @@ objects:
         trap 'touch /tmp/shared/exit' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
 
-        cp "$(which oc)" /tmp/shared/
+        cp "$(command -v oc)" /tmp/shared/
 
         mkdir -p "${HOME}"
 
@@ -304,6 +304,7 @@ objects:
         trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/setup-success; else touch /tmp/exit; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+        cp "$(command -v openshift-install)" /tmp
         mkdir /tmp/artifacts/installer &&
         /bin/openshift-install version >/tmp/artifacts/installer/version
 
@@ -366,7 +367,7 @@ objects:
             exit 1
         fi
 
-        /bin/openshift-install --dir=/tmp/artifacts/installer create cluster --log-level=debug &
+        openshift-install --dir=/tmp/artifacts/installer create cluster --log-level=debug &
         wait "$!"
 
     # Runs scale up playbook
@@ -411,7 +412,7 @@ objects:
 
     # Performs cleanup of all created resources
     - name: teardown
-      image: ${IMAGE_INSTALLER}
+      image: ${IMAGE_TESTS}
       terminationMessagePolicy: FallbackToLogsOnError
       volumeMounts:
       - name: shared-tmp
