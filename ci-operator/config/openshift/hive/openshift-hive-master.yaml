@@ -12,17 +12,8 @@ base_images:
 binary_build_commands: make build
 canonical_go_repository: github.com/openshift/hive
 images:
-- dockerfile_path: build/hive/Dockerfile
+- dockerfile_path: Dockerfile
   from: base
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/hive/bin/manager
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/hive/bin/hiveutil
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/hive/bin/hiveadmission
   to: hive
 resources:
   '*':
@@ -38,8 +29,11 @@ resources:
       cpu: 500m
       memory: 1Gi
 build_root:
-  project_image:
-    dockerfile_path: build/build-image/Dockerfile
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.10
 tests:
 - as: unit
   commands: make test
