@@ -1,0 +1,53 @@
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+canonical_go_repository: github.com/openshift/federation-v2-operator
+images:
+- dockerfile_path: Dockerfile
+  from: root
+  to: federation-controller
+promotion:
+  name: "4.0"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 2Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.0"
+  namespace: ocp
+tests:
+- as: vet
+  commands: |
+    ./scripts/populate-federation-gopath.sh
+    cd /go/src/github.com/kubernetes-sigs/federation-v2
+
+    make vet
+  container:
+    from: src
+- as: unit
+  commands: |
+    ./scripts/populate-federation-gopath.sh
+    cd /go/src/github.com/kubernetes-sigs/federation-v2
+
+    go list ./pkg/... | grep -v v1alpha1 | xargs go test
+  container:
+    from: src
+- as: managed-e2e
+  commands: |
+    ./scripts/populate-federation-gopath.sh
+    cd /go/src/github.com/kubernetes-sigs/federation-v2
+
+    ./scripts/download-binaries.sh
+    TEST_ASSET_PATH="/go/src/github.com/kubernetes-sigs/federation-v2/bin" \
+    TEST_ASSET_ETCD="/go/src/github.com/kubernetes-sigs/federation-v2/bin/etcd" \
+    TEST_ASSET_KUBE_APISERVER="/go/src/github.com/kubernetes-sigs/federation-v2/bin/kube-apiserver" \
+    go test -v ./test/e2e -args -ginkgo.v -single-call-timeout=1m -ginkgo.trace -ginkgo.randomizeAllSpecs
+  container:
+    from: src

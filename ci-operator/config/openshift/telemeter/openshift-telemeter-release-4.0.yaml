@@ -1,0 +1,50 @@
+base_images:
+  base:
+    name: "4.0"
+    namespace: ocp
+    tag: base
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+canonical_go_repository: github.com/openshift/telemeter
+images:
+- from: base
+  inputs:
+    root:
+      as:
+      - "0"
+      paths: null
+  to: telemeter
+promotion:
+  name: "4.0"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.0"
+  namespace: ocp
+tests:
+- as: unit
+  commands: make check
+  container:
+    from: src
+- as: integration
+  commands: make test-integration
+  container:
+    from: src
+- as: generate
+  commands: make test-generate
+  container:
+    from: src
+- as: e2e-aws
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer:
+    cluster_profile: aws

@@ -1,0 +1,56 @@
+base_images:
+  base:
+    name: "4.0"
+    namespace: ocp
+    tag: base
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: tectonic-console-builder
+canonical_go_repository: github.com/openshift/console
+images:
+- from: base
+  inputs:
+    root:
+      as:
+      - build
+      paths: null
+  to: console
+promotion:
+  name: "4.0"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  console:
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 5Gi
+tag_specification:
+  name: "4.0"
+  namespace: ocp
+test_binary_build_commands: ./build.sh
+tests:
+- artifact_dir: /tmp/artifacts
+  as: backend
+  commands: export ARTIFACT_DIR=/tmp/artifacts; ./test-backend.sh
+  container:
+    from: test-bin
+- artifact_dir: /tmp/artifacts
+  as: frontend
+  commands: export ARTIFACT_DIR=/tmp/artifacts; ./test-frontend.sh
+  container:
+    from: test-bin
+- artifact_dir: /tmp/artifacts
+  as: console-e2e
+  commands: ./test-prow-e2e.sh
+  openshift_installer_src:
+    cluster_profile: aws
