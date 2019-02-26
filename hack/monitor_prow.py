@@ -73,7 +73,7 @@ def highlight(log_dir, dc):
                     log_lines.append(RED + l + RESET)
 
         if not log_lines and not lines:
-            header = header + " " + GREEN + "OK" + RESET
+            header = "{} {}{}{}".format(header, GREEN, "OK", RESET)
         with open(log, 'w') as f:
             f.write('\n'.join([header, *lines, *log_lines[-5:]]))
         time.sleep(60)
@@ -93,9 +93,9 @@ def renderHeader(dc):
     version = "<unknown-version>"
     containers = spec.get("template", {}).get("spec", {}).get("containers", [])
     for container in containers:
-        if container.get("name", "") == dc:
+        if container.get("name") == dc:
             image = container.get("image", "")
-            version = image[image.index(":")+1:]
+            version = image.split(":", 1)[1]
     headerColor = ''
     if desired != current:
         headerColor = RED
@@ -117,19 +117,17 @@ def renderFlavor(pod, dc):
                               '--namespace', 'ci', '--output', 'json'))
     for container in raw.get("status", {}).get("containerStatuses", []):
         debug("pod/{}: handling status for container {}".format(pod, container.get("name", "")))
-        if container.get("name", "") == dc:
+        if container.get("name") == dc:
             state = container.get("state", {})
-            if state.get("running", "") == "":
-                waiting = state.get("waiting", "")
-                if waiting != "":
-                    reason = waiting.get("reason", "")
-                    message = waiting.get("message", "")
+            if "running" not in state:
+                if "waiting" in state:
+                    reason = state["waiting"].get("reason")
+                    message = state["waiting"].get("message")
                     lines.append(YELLOW + "pod {} is waiting: {}".format(pod, reason) + RESET)
                     lines.append(YELLOW + "\t{}".format(message) + RESET)
-                terminated = state.get("terminated", "")
-                if terminated != "":
-                    reason = terminated.get("reason", "")
-                    message = terminated.get("message", "")
+                if "terminated" in state:
+                    reason = state["terminated"].get("reason")
+                    message = state["terminated"].get("message")
                     lines.append(RED + "pod {} is terminated: {}".format(pod, reason) + RESET)
                     lines.append(RED + "\t{}".format(message) + RESET)
             restartCount = container.get("restartCount", 0)
