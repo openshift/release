@@ -30,7 +30,8 @@ def main():
     with tempfile.TemporaryDirectory() as log_dir:
         fs = [(display, log_dir), *((highlight, log_dir, x) for x in dcs)]
         with multiprocessing.Pool(len(fs)) as pool:
-            pool.starmap(lambda f, *args: f(*args), fs)
+            for _ in pool.imap_unordered(lambda x: x[0](*x[1:]), fs):
+                pass # a check for exceptions is implicit in the iteration
 
 
 def display(log_dir):
