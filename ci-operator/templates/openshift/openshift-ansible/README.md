@@ -18,12 +18,11 @@ ignition file first.
 
 ## Containers
 * `config` prepares config files in `IMAGE_INSTALLER` image:
-  1. records openshift-installer version
-  2. sets necessary env vars based on cluster type (libvirt install on GCP)
-  3. runs `create install-config`
-  4. modifies install configs to change a number of masters and workers created
-  5. runs `create ignition-configs` to produce `boostrap.ign` in `/tmp/artifacts/installer`
-  6. creates `/tmp/config-success` on success, otherwise - `/tmp/exit`
+  1. sets necessary env vars based on cluster type (libvirt install on GCP)
+  2. runs `create install-config`
+  3. modifies install configs to change a number of masters and workers created
+  4. runs `create ignition-configs` to produce `boostrap.ign` in `/tmp/artifacts/installer`
+  5. creates `/tmp/config-success` on success, otherwise - `/tmp/exit`
 
 * `setup` runs ansible playbook in `IMAGE_ANSIBLE` image:
   1. waits for `/tmp/config-success` to appear
