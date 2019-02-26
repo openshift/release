@@ -91,6 +91,16 @@ function format_attachment() {
 	echo "--from-file=${name}=$(get_attachment "${item}" "${attachment}")"
 }
 
+# merge all pull secret credentials into a single json
+# object
+function merge_pull_secrets() {
+	local quay_io redhat_io
+	quay_io="$(get_field_value quay.io 'Pull Credentials')"
+	redhat_io="$(<"$(get_attachment registry.redhat.io pull_secret)")"
+	printf '%s\n' "${quay_io}" "${redhat_io}" \
+		| jq --slurp --compact-output 'reduce .[] as $x ({}; . * $x)'
+}
+
 function update_secret() {
     oc create secret "$@" --dry-run -o yaml | oc apply -f -
 }
@@ -178,7 +188,7 @@ oc label secret "registry-pull-credentials-${registry}" "ci.openshift.io/managed
 # of information for easy consumption by tests
 target_cloud="aws"
 update_secret generic "cluster-secrets-${target_cloud}"                \
-	"$( format_field_value "quay.io" "Pull Credentials" "pull-secret" )" \
+	--from-literal=pull-secret="$(merge_pull_secrets)"                   \
 	"$( format_attachment "jenkins-ci-iam" .awscred )"                   \
 	"$( format_attachment "jenkins-ci-iam" ssh-privatekey )"             \
 	"$( format_attachment "jenkins-ci-iam" ssh-publickey )"
@@ -186,7 +196,7 @@ oc label secret "cluster-secrets-${target_cloud}" "ci.openshift.io/managed=true"
 
 target_cloud="gcp"
 update_secret generic "cluster-secrets-${target_cloud}"                       \
-	"$( format_field_value "quay.io" "Pull Credentials" "pull-secret" )"        \
+	--from-literal=pull-secret="$(merge_pull_secrets)"                          \
 	"$( format_attachment "jenkins-ci-provisioner" credentials.json gce.json )" \
 	"$( format_attachment "jenkins-ci-provisioner" ssh-privatekey )"            \
 	"$( format_attachment "jenkins-ci-provisioner" ssh-publickey )"             \
