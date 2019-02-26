@@ -58,14 +58,29 @@ function format_field() {
 }
 
 # retrieve the value of a field from an item in BitWarden
+function get_field_value() {
+	local item="$1"
+	local field="$2"
+	jq ".[] | select(.name == \"${item}\") | .fields[] | select(.name == \"${field}\") | .value" --raw-output <"${secrets}"
+}
+
+# retrieve the value of a field from an item in BitWarden
 # and format it in a key-value pair for a k8s secret
 function format_field_value() {
 	local item="$1"
 	local field="$2"
 	local name="${3:-"${item}"}"
-	echo "--from-literal=${name}=$( jq ".[] | select(.name == \"${item}\") | .fields[] | select(.name == \"${field}\") | .value" --raw-output <"${secrets}")"
+	echo "--from-literal=${name}=$(get_field_value "${item}" "${field}")"
 }
 
+# retrieve the content of an attachment from an item in BitWarden
+function get_attachment() {
+	local item="$1"
+	local attachment="$2"
+	local item_id="$( jq ".[] | select(.name == \"${item}\") | .id" --raw-output <"${secrets}" )"
+	local attachment_id="$( jq ".[] | select(.name == \"${item}\") | .attachments[] | select(.fileName == \"${attachment}\") | .id" --raw-output <"${secrets}" )"
+	bw --session "${BW_SESSION}" get attachment "${attachment_id}" --itemid "${item_id}" --raw
+}
 
 # retrieve the content of an attachment from an item in BitWarden
 # and format it in a key-value pair for a k8s secret
@@ -73,9 +88,7 @@ function format_attachment() {
 	local item="$1"
 	local attachment="$2"
 	local name="${3:-"${attachment}"}"
-	local item_id="$( jq ".[] | select(.name == \"${item}\") | .id" --raw-output <"${secrets}" )"
-	local attachment_id="$( jq ".[] | select(.name == \"${item}\") | .attachments[] | select(.fileName == \"${attachment}\") | .id" --raw-output <"${secrets}" )"
-	echo "--from-file=${name}=$( bw --session "${BW_SESSION}" get attachment "${attachment_id}" --itemid "${item_id}" --raw )"
+	echo "--from-file=${name}=$(get_attachment "${item}" "${attachment}")"
 }
 
 function update_secret() {
