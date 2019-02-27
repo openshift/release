@@ -171,7 +171,7 @@ for account in "aos-serviceaccount" "jenkins-ci-provisioner"; do
 	oc label secret --overwrite "gce-sa-credentials-${account}" "ci.openshift.io/managed=true"
 done
 
-# Credentials for registries are stored as
+# Push credentials for registries are stored as
 # separate fields on individual items
 for registry in "docker.io" "quay.io"; do
 	update_secret generic "registry-push-credentials-${registry}" $( format_field_value "${registry}" "Push Credentials" "config.json" )
@@ -180,8 +180,13 @@ for registry in "docker.io" "quay.io"; do
 	oc secrets link builder "registry-push-credentials-${registry}"
 done
 
-registry="quay.io"
+# Pull credentials for registries are stored as
+# separate fields on individual items
+registry=quay.io
 update_secret generic "registry-pull-credentials-${registry}" $( format_field_value "${registry}" "Pull Credentials" "config.json" )
+oc label secret --overwrite "registry-pull-credentials-${registry}" "ci.openshift.io/managed=true"
+registry=registry.redhat.io
+update_secret generic "registry-pull-credentials-${registry}" $( format_attachment "${registry}" pull_secret "config.json" )
 oc label secret --overwrite "registry-pull-credentials-${registry}" "ci.openshift.io/managed=true"
 
 # Cluster credentials aggregate multiple items
