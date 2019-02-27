@@ -37,3 +37,22 @@ tests:
   commands: make unit
   container:
     from: src
+- as: verify
+  commands: |
+    set -x
+    set -e
+    # (chance): Hacks to allow us write access to our source files since
+    # they're 664 in the image and owned by root:root, and we get a random UID
+    # in Openshift pods which means we don't have write permissions.
+
+    # create a copy of the source so we can modify the files.
+    export GOPATH=/tmp/go
+    mkdir -p $GOPATH/src/github.com/operator-framework/
+    cp -r /go/src/github.com/operator-framework/operator-metering/ $GOPATH/src/github.com/operator-framework/operator-metering
+    cd $GOPATH/src/github.com/operator-framework/operator-metering
+
+    # Run the actual tests that nothing in the changes after re-generating
+    # files. This ensures generated files aren't modified directly.
+    make verify
+  container:
+    from: src
