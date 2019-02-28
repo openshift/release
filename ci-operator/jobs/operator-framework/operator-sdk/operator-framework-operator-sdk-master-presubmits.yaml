@@ -1,0 +1,98 @@
+presubmits:
+  operator-framework/operator-sdk:
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/marker
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    name: pull-ci-operator-framework-operator-sdk-master-marker
+    rerun_command: /test marker
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --target=marker
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: operator-framework-operator-sdk-master.yaml
+              name: ci-operator-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: '(?m)^/test (?:.*? )?marker(?: .*?)?$'
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/sanity
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    name: pull-ci-operator-framework-operator-sdk-master-sanity
+    rerun_command: /test sanity
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --target=sanity
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: operator-framework-operator-sdk-master.yaml
+              name: ci-operator-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: '(?m)^/test (?:.*? )?sanity(?: .*?)?$'
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/unit
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    name: pull-ci-operator-framework-operator-sdk-master-unit
+    rerun_command: /test unit
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --target=unit
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: operator-framework-operator-sdk-master.yaml
+              name: ci-operator-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: '(?m)^/test (?:.*? )?unit(?: .*?)?$'
