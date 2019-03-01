@@ -1,0 +1,39 @@
+tag_specification:
+  name: '4.0'
+  namespace: ocp
+promotion:
+  name: '4.0'
+  namespace: ocp
+base_images:
+  base:
+    name: '4.0'
+    namespace: ocp
+    tag: base
+canonical_go_repository: github.com/kubernetes-csi/node-driver-registrar
+# Don't build images yet, wating for rebase to 1.13
+#images:
+#- from: base
+#  dockerfile_path: Dockerfile.openshift
+#  inputs:
+#    root:
+#      as:
+#      - '0'
+#  to: csi-node-driver-registrar
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.11
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
