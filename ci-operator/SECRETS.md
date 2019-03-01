@@ -17,16 +17,15 @@ vet that interaction for correctness.
 ### Aggregate IaaS Secrets for use in Cluster Tests
 
 A set of secrets exists that contain aggregated information for ease of mounting
-into tests that are interacting with an IaaS hosted by a cloud. The following
-secrets currently exist:
-
+into tests that are interacting with an IaaS hosted by a cloud. The following secrets
+currently exist:
 
 #### `cluster-secrets-aws`
 
 |       Key        | Description |
 | ---------------- | ----------- |
 | `.awscred`       | Credentials for the AWS EC2 API. See the [upstream credentials doc](https://docs.aws.amazon.com/cli/latest/userguide/cli-multiple-profiles.html). |
-| `pull-secret`    | Credentials for pulling OpenShift images from Quay. |
+| `pull-secret`    | Credentials for pulling OpenShift images from Quay and for authenticating to telemetry. Retrieved from [try.openshift.com](https://try.openshift.com) under the ccoleman+openshift-ci-test@redhat.com account, and has the service account token from the `ocp` namespace added with `oc registry login --to=/tmp/pull-secret -z default -n ocp`.|
 | `ssh-privatekey` | Private half of the SSH key, for connecting to AWS EC2 VMs. |
 | `ssh-publickey`  | Public half of the SSH key, for connecting to AWS EC2 VMs. |
 
@@ -39,7 +38,7 @@ secrets currently exist:
 | `ssh-privatekey`  | Private half of the SSH key, for connecting to GCE VMs. |
 | `ssh-publickey`   | Public half of the SSH key, for connecting to GCE VMs. |
 | `telemeter-token` | Token to push telemetry data on CI clusters. |
-| `pull-secret`     | Credentials for pulling OpenShift images from Quay. |
+| `pull-secret`    | Credentials for pulling OpenShift images from Quay and for authenticating to telemetry. Retrieved from [try.openshift.com](https://try.openshift.com) under the ccoleman+openshift-ci-test@redhat.com account, and has the service account token from the `ocp` namespace added with `oc registry login --to=/tmp/pull-secret -z default -n ocp`.|
 
 #### `cluster-secrets-azure`
 
