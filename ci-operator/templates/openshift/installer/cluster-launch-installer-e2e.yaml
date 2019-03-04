@@ -14,11 +14,12 @@ parameters:
   required: true
 - name: CLUSTER_TYPE
   required: true
-# Ensures the release image is created and tested
 - name: TEST_COMMAND
   required: true
 - name: RELEASE_IMAGE_LATEST
   required: true
+- name: RELEASE_IMAGE_INITIAL
+- name: INSTALL_INITIAL_RELEASE
 
 objects:
 
@@ -160,29 +161,16 @@ objects:
         mkdir -p /tmp/output
         cd /tmp/output
 
+        function run-upgrade-tests() {
+          openshift-tests run-upgrade "${TEST_SUITE}" --to-image "${RELEASE_IMAGE_LATEST}" \
+            --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
+          exit 0
+        }
+
         function run-tests() {
-          if which openshift-tests && [[ -n "${TEST_SUITE-}" ]]; then
-            openshift-tests run "${TEST_SUITE}" --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
-            exit 0
-          fi
-          # TODO: remove everything after this point once we fork templates by release - starting with 4.0
-          if ! which extended.test; then
-            echo "must provide TEST_SUITE variable"
-            exit 1
-          fi
-          if [[ -n "${TEST_FOCUS:-}" ]]; then
-            ginkgo -v -noColor -nodes="${TEST_PARALLELISM:-30}" $( which extended.test ) -- \
-              -ginkgo.focus="${TEST_FOCUS}" -ginkgo.skip="${TEST_SKIP:-"\\[local\\]"}" \
-              -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit \
-              -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
-          fi
-          if [[ -n "${TEST_FOCUS_SERIAL:-}" ]]; then
-            ginkgo -v -noColor -nodes=1 $( which extended.test ) -- \
-              -ginkgo.focus="${TEST_FOCUS_SERIAL}" -ginkgo.skip="${TEST_SKIP_SERIAL:-"\\[local\\]"}" \
-              -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit/serial \
-              -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
-          fi
-          exit ${rc:-0}
+          openshift-tests run "${TEST_SUITE}" \
+            --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
+          exit 0
         }
 
         ${TEST_COMMAND}
@@ -239,6 +227,13 @@ objects:
 
         cp "$(command -v openshift-install)" /tmp
         mkdir /tmp/artifacts/installer
+
+        if [[ -n "${INSTALL_INITIAL_RELEASE}" && -n "${RELEASE_IMAGE_INITIAL}" ]]; then
+          echo "Installing from initial release ${RELEASE_IMAGE_INITIAL}"
+          OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_INITIAL}"
+        else
+          echo "Installing from release ${RELEASE_IMAGE_LATEST}"
+        fi
 
         export EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
         export CLUSTER_ID=$(uuidgen --random)
