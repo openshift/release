@@ -13,6 +13,19 @@ items:
     - port: 80
       targetPort: 8888
     type: ClusterIP
+- kind: PersistentVolumeClaim
+  apiVersion: v1
+  metadata:
+    labels:
+      app: prow
+      component: tot
+    name: tot-storage
+  spec:
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 1Gi
 - apiVersion: apps/v1
   kind: Deployment
   metadata:
@@ -46,7 +59,7 @@ items:
             - name: http
               containerPort: 8888
           volumeMounts:
-          - name: datadir
+          - name: tot-volume
             mountPath: /storage
           - name: config
             mountPath: /etc/config
@@ -63,9 +76,9 @@ items:
             mountPath: /etc/job-config/4.0
             readOnly: true
         volumes:
-        - name: datadir
+        - name: tot-volume
           persistentVolumeClaim:
-            claimName: datadir
+            claimName: tot-storage
         - name: config
           configMap:
             name: config
@@ -81,12 +94,3 @@ items:
         - name: job-config-40
           configMap:
             name: job-config-4.0
-    volumeClaimTemplates:
-    - metadata:
-        name: datadir
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 1Gi
