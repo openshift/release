@@ -33,10 +33,7 @@ tests:
 - as: vet
   # The 'vet' test runs the upstream `make vet` check against federation-v2.
   commands: |
-    ./scripts/populate-federation-gopath.sh
-    cd /go/src/github.com/kubernetes-sigs/federation-v2
-
-    make vet
+    make -f Makefile.ci vet
   container:
     from: src
 - as: unit
@@ -44,23 +41,14 @@ tests:
   # not call the upstream makefile because one of the API packages relies on
   # having an etcd binary.
   commands: |
-    ./scripts/populate-federation-gopath.sh
-    cd /go/src/github.com/kubernetes-sigs/federation-v2
-
-    go list ./pkg/... | grep -v v1alpha1 | xargs go test
+    make -f Makefile.ci unit
   container:
     from: src
 - as: managed-e2e
   # The 'managed-e2e' test runs the upstream federation-v2 e2e tests in a
   # 'managed' fashion, ie, against a self-deployed Kubernetes API server.
   commands: |
-    ./scripts/populate-federation-gopath.sh
-    cd /go/src/github.com/kubernetes-sigs/federation-v2
-
-    ./scripts/download-binaries.sh
-    TEST_ASSET_PATH="/go/src/github.com/kubernetes-sigs/federation-v2/bin" \
-    TEST_ASSET_ETCD="/go/src/github.com/kubernetes-sigs/federation-v2/bin/etcd" \
-    TEST_ASSET_KUBE_APISERVER="/go/src/github.com/kubernetes-sigs/federation-v2/bin/kube-apiserver" \
-    go test -v ./test/e2e -args -ginkgo.v -single-call-timeout=1m -ginkgo.trace -ginkgo.randomizeAllSpecs
+    make -f Makefile.ci managed-e2e
   container:
     from: src
+ 
