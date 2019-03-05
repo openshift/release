@@ -67,11 +67,14 @@ def highlight(log_dir, dc):
             if pod.startswith('deck-internal'):
                 cmd += ['--container', 'deck']
             debug("deployment/{}: pod/{}: getting logs".format(dc, pod))
-            for l in exec_cmd(*cmd).splitlines():
-                if warn in l:
-                    log_lines.append(YELLOW + l + RESET)
-                elif error in l or fatal in l:
-                    log_lines.append(RED + l + RESET)
+            try:
+                for l in exec_cmd(*cmd).splitlines():
+                    if warn in l:
+                        log_lines.append(YELLOW + l + RESET)
+                    elif error in l or fatal in l:
+                        log_lines.append(RED + l + RESET)
+            except subprocess.CalledProcessError:
+                debug("deployment/{}: pod/{}: getting logs failed".format(dc, pod))
 
         if not log_lines and not lines:
             header = "{} {}{}{}".format(header, GREEN, "OK", RESET)
@@ -116,7 +119,17 @@ def renderFlavor(pod, dc):
     lines = []
     raw = json.loads(exec_cmd('oc', 'get', 'pod/{}'.format(pod),
                               '--namespace', 'ci', '--output', 'json'))
-    for container in raw.get("status", {}).get("containerStatuses", []):
+    status = raw.get("status", {})
+    phase = status.get("phase", "")
+    if phase != "Running":
+        reason = status.get("reason", "")
+        message = status.get("message", "")
+        color = YELLOW
+        if phase in ["Failed", "Unknown", "CrashLoopBackOff"]:
+            color = RED
+        lines.append(color + "pod {} is {}: {}, {}".format(pod, phase, reason, message))
+
+    for container in status.get("containerStatuses", []):
         debug("pod/{}: handling status for container {}".format(pod, container.get("name", "")))
         if container.get("name") == dc:
             state = container.get("state", {})
