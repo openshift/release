@@ -4,6 +4,11 @@ base_images:
     name: centos
     namespace: openshift
     tag: '7'
+  git:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.11
 binary_build_commands: make install
 canonical_go_repository: github.com/openshift/ci-operator-prowgen
 images:
@@ -31,6 +36,38 @@ images:
       - destination_dir: .
         source_path: /go/bin/pj-rehearse
   to: pj-rehearse
+- context_dir: images/config-shard-validator/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/config-shard-validator
+  to: config-shard-validator
+- context_dir: images/config-brancher/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/config-brancher
+  to: config-brancher
+- context_dir: images/repo-brancher/
+  from: git
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/repo-brancher
+  to: repo-brancher
+- context_dir: images/determinize-ci-operator/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/determinize-ci-operator
+  to: determinize-ci-operator
 promotion:
   cluster: https://api.ci.openshift.org
   namespace: ci
