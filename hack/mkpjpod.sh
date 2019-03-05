@@ -1,7 +1,13 @@
 #!/bin/bash
 # Create a pod from a Prow job using the test-infra mkpj and mkpod utilities.
-# Requires the following environment variables (see the pj_env.py script for a
-# way to set them automatically):
+# The required information about the pull request can be passed in a few
+# different ways:
+#
+# 1. Passing the pull request number as the only argument.  `mkpj`'s defaulting
+# behavior will use Github's API to fetch the required information.
+# Convenient, but has been victim of API throttling in the past.
+# 2. Passing the required information as environment variables.  See the
+# `pj_env.py` script for a way to set them using `git`.  The variables are:
 #
 # - BASE_REF
 # - BASE_SHA
@@ -10,19 +16,24 @@
 # - PULL_AUTHOR
 set -euo pipefail
 
-if [[ "$#" -ne 1 ]]; then
-    echo >&2 "Usage: $0 job_name"
-    exit 1
-fi
-job=$1
-img=registry.svc.ci.openshift.org/ci/test-infra:binaries
-docker run --rm -iv "$PWD:/tmp/release:z" -w /tmp/release "$img" bash <<-EOF
-	/go/bin/mkpj \
-	--config-path cluster/ci/config/prow/config.yaml \
-	--job-config-path ci-operator/jobs/ \
-	--job "$job" \
-	--base-ref "$BASE_REF" --base-sha "$BASE_SHA" \
-	--pull-number "$PULL_NUMBER" --pull-sha "$PULL_SHA" \
-	--pull-author "$PULL_AUTHOR" \
-	| /go/bin/mkpod --prow-job -
-EOF
+run() {
+    docker run \
+        --rm \
+        --volume "$PWD:/tmp/release:z" \
+        --volume ~/go/bin:/go/bin:z \
+        --workdir /tmp/release \
+        registry.svc.ci.openshift.org/ci/test-infra:binaries \
+        bash -c '/go/bin/mkpj "$@" | /go/bin/mkpod --prow-job -' -- \
+        --config-path cluster/ci/config/prow/config.yaml \
+        --job-config-path ci-operator/jobs/ \
+        "$@"
+}
+
+case "$#" in
+1) run --job "$1" \
+    --base-ref "$BASE_REF" --base-sha "$BASE_SHA" \
+    --pull-number "$PULL_NUMBER" --pull-sha "$PULL_SHA" \
+    --pull-author "$PULL_AUTHOR";;
+2) run --job "$1" --pull-number "$2";;
+*) echo >&2 "Usage: $0 job_name [pull_number]"; exit 1;;
+esac

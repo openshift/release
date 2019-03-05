@@ -320,10 +320,13 @@ available in the `registry.svc.ci.openshift.org/ci/test-infra:binaries` image
 or in the [upstream repository](https://github.com/kubernetes/test-infra/tree/master/prow/cmd#dev-tools).
 
 The [`mkpjpod.sh`](../hack/mkpjpod.sh) script can be used to streamline that
-process. It expects information about the base and pull request git references
-to be passed via environment variables, which can be set manually or using the
-[`pj_env.py`](../hack/pj_env.py) helper script (check the script files for
-detailed information).
+process. See the documentation in the script file and the following screencasts
+for details:
+
+- Basic usage of the script to reproduce container and template tests:
+ [![asciicast](https://asciinema.org/a/231019.svg)](https://asciinema.org/a/231019)
+- Making changes to the job or ci-operator configuration file:
+ [![asciicast](https://asciinema.org/a/231020.svg)](https://asciinema.org/a/231020)
 
 The output of the script is a regular Pod that can be executed in the staging
 namespace in the [CI cluster](https://api.ci.openshift.org) and will report the
