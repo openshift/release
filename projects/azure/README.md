@@ -356,6 +356,7 @@ We use various OpenShift secrets in our CI. You can manage these secrets in the
 | `cluster-secrets-azure-env` | environment based secret. It can be injected to pod using pod spec (see azure-purge) |
 | `codecov-token` | used for pushing reports to Codecov |
 | `openshift-on-azure-openshiftci-secret` | quay robot secret used for mirroring images between the CI registry and quay |
+| `aos-azure-github-ssh-secret` | ssh-key, used to access OSA private repositories |
 
 
 ### cluster-secrets-azure
