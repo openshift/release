@@ -105,6 +105,14 @@ function update_secret() {
     oc create secret "$@" --dry-run -o yaml | oc apply -f -
 }
 
+# retrieve the value of a field and format it as a string, for
+# use when more complex values are required to generate a secret
+function field_value() {
+	local item="$1"
+	local field="$2"
+	echo "$( jq ".[] | select(.name == \"${item}\") | .fields[] | select(.name == \"${field}\") | .value" --raw-output <"${secrets}")"
+}
+
 # Jenkins credentials are stored as separate items in Bitwarden,
 # with the token recorded as the password for the account
 for master in "ci.openshift.redhat.com" "kata-jenkins-ci.westus2.cloudapp.azure.com"; do
@@ -203,3 +211,8 @@ update_secret generic "cluster-secrets-${target_cloud}"                       \
 	"$( format_attachment "mirror.openshift.com" cert-key.pem ops-mirror.pem )" \
 	"$( format_field_value telemeter "Telemeter Token" "telemeter-token" )"
 oc label secret "cluster-secrets-${target_cloud}" "ci.openshift.io/managed=true"
+
+# Configuration for the .git-credentials used by the release controller to clone
+# private repositories to generate changelogs
+oc -n "ci-release" create secret generic "git-credentials" "--from-literal=.git-credentials=https://openshift-bot:$( field_value "openshift-bot" "GitHub OAuth Token" "oauth" )@github.com"
+oc -n "ci-release" label secret "git-credentials" "ci.openshift.io/managed=true"
