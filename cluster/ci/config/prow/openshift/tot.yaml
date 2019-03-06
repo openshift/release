@@ -13,19 +13,29 @@ items:
     - port: 80
       targetPort: 8888
     type: ClusterIP
-- apiVersion: apps/v1beta1
-  kind: StatefulSet
+- kind: PersistentVolumeClaim
+  apiVersion: v1
+  metadata:
+    labels:
+      app: prow
+      component: tot
+    name: tot-storage
+  spec:
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 1Gi
+- apiVersion: apps/v1
+  kind: Deployment
   metadata:
     name: tot
     labels:
       app: prow
       component: tot
   spec:
-    serviceName: tot
     replicas: 1
     revisionHistoryLimit: 2
-    updateStrategy:
-      type: RollingUpdate
     selector:
       matchLabels:
         app: prow
@@ -49,7 +59,7 @@ items:
             - name: http
               containerPort: 8888
           volumeMounts:
-          - name: datadir
+          - name: tot-volume
             mountPath: /storage
           - name: config
             mountPath: /etc/config
@@ -59,16 +69,16 @@ items:
           - name: job-config-master
             mountPath: /etc/job-config/master
             readOnly: true
-          - name: job-config-3.x
+          - name: job-config-3x
             mountPath: /etc/job-config/3.x
             readOnly: true
-          - name: job-config-4.0
+          - name: job-config-40
             mountPath: /etc/job-config/4.0
             readOnly: true
         volumes:
-        - name: datadir
+        - name: tot-volume
           persistentVolumeClaim:
-            claimName: datadir
+            claimName: tot-storage
         - name: config
           configMap:
             name: config
@@ -78,18 +88,9 @@ items:
         - name: job-config-master
           configMap:
             name: job-config-master
-        - name: job-config-3.x
+        - name: job-config-3x
           configMap:
             name: job-config-3.x
-        - name: job-config-4.0
+        - name: job-config-40
           configMap:
             name: job-config-4.0
-    volumeClaimTemplates:
-    - metadata:
-        name: datadir
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 1Gi
