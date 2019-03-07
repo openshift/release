@@ -8,28 +8,26 @@ resources:
       cpu: 100m
       memory: 600Mi
 
-build_root:
-  image_stream_tag:
-    cluster: https://api.ci.openshift.org
-    name: release
-    namespace: openshift
-    tag: golang-1.11
-
 base_images:
-  cli:
+  cli40:
     name: '4.0'
     namespace: ocp
     tag: cli
 
-    #images:
-    #- dockerfile_path: Dockerfile
-    #  from: base
-    #  inputs:
-    #    cli:
-    #      paths:
-    #      - destination_dir: .
-    #        source_path: /usr/bin/oc
-    #  to: your-output-image
+build_root:
+  project_image:
+    dockerfile_path: openshift-ci/build-root/Dockerfile
+
+binary_build_commands: make bin && cp -avrf ./odo /tmp/bin/odo/
+
+images:
+- from: src
+  inputs:
+    cli40:
+      paths:
+      - destination_dir: /tmp/bin/
+        source_path: /usr/bin/oc
+  to: e2ebuilder40
 
 tests:
 - artifact_dir: /tmp/artifacts
