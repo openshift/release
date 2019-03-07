@@ -18,8 +18,6 @@ parameters:
   required: true
 - name: RELEASE_IMAGE_LATEST
   required: true
-- name: RELEASE_IMAGE_INITIAL
-- name: INSTALL_INITIAL_RELEASE
 
 objects:
 
@@ -228,7 +226,7 @@ objects:
         cp "$(command -v openshift-install)" /tmp
         mkdir /tmp/artifacts/installer
 
-        if [[ -n "${INSTALL_INITIAL_RELEASE}" && -n "${RELEASE_IMAGE_INITIAL}" ]]; then
+        if [[ -n "${INSTALL_INITIAL_RELEASE-}" && -n "${RELEASE_IMAGE_INITIAL-}" ]]; then
           echo "Installing from initial release ${RELEASE_IMAGE_INITIAL}"
           OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_INITIAL}"
         else
@@ -466,7 +464,7 @@ objects:
         trap 'teardown' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
 
-        for i in `seq 1 180`; do
+        for i in $(seq 1 180); do
           if [[ -f /tmp/shared/exit ]]; then
             exit 0
           fi
