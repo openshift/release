@@ -282,3 +282,38 @@ periodics:
     - configMap:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
+- agent: kubernetes
+  cron: '@hourly'
+  decorate: true
+  interval: ""
+  name: periodic-openshift-release-fast-forward
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  spec:
+    containers:
+    - args:
+      - --config-dir=./ci-operator/config/
+      - --current-release=4.0
+      - --future-release=4.1
+      - --fast-forward
+      - --confirm
+      - --username=openshift-merge-robot
+      - --token-path=/etc/secrets/oauth 
+      command:
+      - repo-brancher
+      image: repo-brancher:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: token
+        readOnly: true
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-merge-robot
