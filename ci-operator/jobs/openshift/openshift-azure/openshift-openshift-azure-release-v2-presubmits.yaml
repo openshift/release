@@ -31,7 +31,7 @@ presubmits:
           valueFrom:
             configMapKeyRef:
               key: openshift-openshift-azure-release-v2.yaml
-              name: ci-operator-configs
+              name: ci-operator-misc-configs
         - name: DEPLOY_VERSION
           value: v3.11
         - name: JOB_NAME_SAFE
@@ -92,7 +92,7 @@ presubmits:
           valueFrom:
             configMapKeyRef:
               key: openshift-openshift-azure-release-v2.yaml
-              name: ci-operator-configs
+              name: ci-operator-misc-configs
         - name: JOB_NAME_SAFE
           value: e2e-azure-keyrotation
         - name: TEST_COMMAND
@@ -153,7 +153,7 @@ presubmits:
           valueFrom:
             configMapKeyRef:
               key: openshift-openshift-azure-release-v2.yaml
-              name: ci-operator-configs
+              name: ci-operator-misc-configs
         - name: JOB_NAME_SAFE
           value: e2e-azure-scaleupdown
         - name: TEST_COMMAND
@@ -277,53 +277,6 @@ presubmits:
             cpu: 10m
       serviceAccountName: ci-operator
     trigger: '(?m)^/test (?:.*? )?unit(?: .*?)?$'
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - release-v2
-    context: ci/prow/upgrade-v1.2
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    name: pull-ci-openshift-openshift-azure-release-v2-upgrade-v1.2
-    optional: true
-    rerun_command: /test upgrade-v1.2
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/e2e-secrets/azure
-        - --target=[output:stable:azure-controllers]
-        - --target=[output:stable:etcdbackup]
-        - --target=[output:stable:metricsbridge]
-        - --target=[output:stable:sync]
-        - --target=e2e-upgrade-v1.2
-        command:
-        - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-openshift-azure-master.yaml
-              name: ci-operator-configs
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/e2e-secrets/azure
-          name: cluster-secrets-azure
-      serviceAccountName: ci-operator
-      volumes:
-      - name: cluster-secrets-azure
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-azure
-    trigger: '(?m)^/test (?:.*? )?upgrade-v1.2(?: .*?)?$'
   - agent: kubernetes
     always_run: true
     branches:
