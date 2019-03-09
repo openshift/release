@@ -4,95 +4,6 @@ presubmits:
     always_run: true
     branches:
     - master
-    context: ci/prow/images
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    name: pull-ci-redhat-developer-odo-master-images
-    rerun_command: /test images
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --target=[images]
-        command:
-        - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: redhat-developer-odo-master.yaml
-              name: ci-operator-master-configs
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-      serviceAccountName: ci-operator
-    trigger: '(?m)^/test (?:.*? )?images(?: .*?)?$'
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    context: ci/prow/simple
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    name: pull-ci-redhat-developer-odo-master-simple
-    rerun_command: /test simple
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/simple-cluster-profile
-        - --target=simple
-        - --template=/usr/local/simple
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: gcp
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: redhat-developer-odo-master.yaml
-              name: ci-operator-master-configs
-        - name: JOB_NAME_SAFE
-          value: simple
-        - name: TEST_COMMAND
-          value: echo $KUBECONFIG && oc whoami
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/simple-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/simple
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
-      serviceAccountName: ci-operator
-      volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
-    trigger: '(?m)^/test (?:.*? )?simple(?: .*?)?$'
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
     context: ci/prow/test-login-e2e
     decorate: true
     decoration_config:
@@ -121,7 +32,7 @@ presubmits:
           value: test-login-e2e
         - name: TEST_COMMAND
           value: |
-            echo $KUBECONFIG && oc whoami;
+            make configure-installer-cluster;
             PATH="$PATH:$(pwd)" CUSTOM_HOMEDIR="/tmp/artifacts" make test-login-e2e;
         image: ci-operator:latest
         imagePullPolicy: Always
@@ -148,65 +59,6 @@ presubmits:
           name: prow-job-cluster-launch-installer-src
         name: job-definition
     trigger: '(?m)^/test (?:.*? )?test-login-e2e(?: .*?)?$'
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    context: ci/prow/test-main-e2e
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    name: pull-ci-redhat-developer-odo-master-test-main-e2e
-    rerun_command: /test test-main-e2e
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/test-main-e2e-cluster-profile
-        - --target=test-main-e2e
-        - --template=/usr/local/test-main-e2e
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: gcp
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: redhat-developer-odo-master.yaml
-              name: ci-operator-master-configs
-        - name: JOB_NAME_SAFE
-          value: test-main-e2e
-        - name: TEST_COMMAND
-          value: |
-            echo $KUBECONFIG && oc whoami;
-            PATH="$PATH:$(pwd)" CUSTOM_HOMEDIR="/tmp/artifacts" make test-main-e2e;
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/test-main-e2e-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/test-main-e2e
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
-      serviceAccountName: ci-operator
-      volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
-    trigger: '(?m)^/test (?:.*? )?test-main-e2e(?: .*?)?$'
   - agent: kubernetes
     always_run: true
     branches:
