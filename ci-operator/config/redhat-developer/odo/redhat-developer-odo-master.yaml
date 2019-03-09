@@ -8,27 +8,11 @@ resources:
       cpu: 100m
       memory: 600Mi
 
-base_images:
-  cli40:
-    name: '4.0'
-    namespace: ocp
-    tag: cli
-
 build_root:
   project_image:
     dockerfile_path: openshift-ci/build-root/Dockerfile
 
 binary_build_commands: make bin
-
-images:
-- dockerfile_path: openshift-ci/build-root/Dockerfile
-  from: src
-  inputs:
-    cli40:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: e2ebuilder40
 
 tests:
 - artifact_dir: /tmp/artifacts
@@ -37,11 +21,9 @@ tests:
   container:
     from: src
 - artifacts_dir: /tmp/artifacts
-  as: test-main-e2e
+  as: test-login-e2e
   openshift_installer_src:
     cluster_profile: gcp
-    #  container:
-    #    from: e2ebuilder40
   commands: |
     echo $KUBECONFIG && oc whoami;
-    PATH="$PATH:$(pwd)" CUSTOM_HOMEDIR="/tmp/artifacts" make test-main-e2e;
+    PATH="$PATH:$(pwd)" CUSTOM_HOMEDIR="/tmp/artifacts" make test-login-e2e;
