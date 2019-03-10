@@ -145,17 +145,25 @@ prow-artifacts:
 
 prow-ci-chat-bot:
 	$(MAKE) apply WHAT=ci-operator/infra/openshift/ci-chat-bot/deploy.yaml
+.PHONY: prow-ci-chat-bot
 
-prow-release-controller:
+prow-release-controller-definitions:
 	oc create imagestream origin-release -o yaml --dry-run | oc apply -f - -n openshift
 	oc create imagestream origin-v4.0 -o yaml --dry-run | oc apply -f - -n openshift
+	-oc create imagestream release -n ocp
 	oc annotate -n openshift is/origin-v4.0 "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/origin-4.0.json)" --overwrite
 	oc annotate -n ocp is/4.0-art-latest "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/ocp-4.0.json)" --overwrite
 	oc annotate -n ocp is/4.0 "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/ocp-4.0-ci.json)" --overwrite
+.PHONY: prow-release-controller-definitions
+
+prow-release-controller-deploy:
 	$(MAKE) apply WHAT=ci-operator/infra/openshift/release-controller/art-publish.yaml
 	$(MAKE) apply WHAT=ci-operator/infra/openshift/release-controller/deploy-origin-4.0.yaml
 	$(MAKE) apply WHAT=ci-operator/infra/openshift/release-controller/deploy-ocp-4.0.yaml
-	-oc create imagestream release -n ocp
+.PHONY: prow-release-controller-deploy
+
+prow-release-controller: prow-release-controller-definitions prow-release-controller-deploy
+.PHONY: prow-release-controller
 
 projects: ci-ns gcsweb origin origin-stable origin-release test-bases image-mirror-setup image-pruner-setup publishing-bot content-mirror azure python-validation
 .PHONY: projects
