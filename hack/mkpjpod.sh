@@ -20,7 +20,6 @@ run() {
     docker run \
         --rm \
         --volume "$PWD:/tmp/release:z" \
-        --volume ~/go/bin:/go/bin:z \
         --workdir /tmp/release \
         registry.svc.ci.openshift.org/ci/test-infra:binaries \
         bash -c '/go/bin/mkpj "$@" | /go/bin/mkpod --prow-job -' -- \
