@@ -88,6 +88,7 @@ prow-services:
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/pushgateway.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/refresh.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/sinker.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/statusreconciler.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/tide.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/tot.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tracer.yaml
