@@ -58,15 +58,13 @@ There are three different places where we store `ci-operator` and Prow configura
   Unfortunately, we cannot define all types of tests in `ci-operator/config/openshift/openshift-azure/`.
   Hence, we use Openshift templates to do black-box testing with `ci-operator`.
   This directory contains the templates used by our e2e tests and by our image
-  build processes. In order to learn more about writting tests using templates
+  build processes. In order to learn more about writing tests using templates
   refer to [TEMPLATES.md](https://github.com/openshift/ci-operator/blob/master/TEMPLATES.md)
 
   Currently, we maintain three different templates:
 
   | Name | Description |
   | --- | --- |
-  | build-base-image | Build the base VM image |
-  | build-node-image | Build the node VM image, create a cluster with it and run OSA e2es to sign it off |
   | cluster-launch-e2e-azure | Deploy an OSA cluster and run various types of tests (OSA, Origin Conformance, Bushslicer) |
 
 Similarly, you can find the CI configuration for `azure-misc` in `ci-operator/jobs/openshift/azure-misc/`
@@ -256,65 +254,6 @@ registry.svc.ci.openshift.org/ci/ci-operator:latest \
 --secret-dir /release/cluster/test-deploy/azure/
 ```
 
-#### Testing vm image builds
-
-Generate a new ssh keypair making sure to set the name of the keypair file as `ssh-privatekey`
-
-```console
-ssh-keygen -t rsa -b 4096 -f cluster/test-deploy/azure/ssh-privatekey 
-```
-
-Checkout the repository containing the yum client certificates required by openshift-ansible to update the packages on the root VM.
-```console
-git clone git@github.com:openshift/aos-ansible.git ../aos-ansible
-```
-
-Create `cluster/test-deploy/azure/certs.yaml` with the following format making sure to replace the `<contents of *>` placeholders
-```yaml
-yum_client_cert_contents: |
-	<contents of ../aos-ansible/playbooks/roles/ops_mirror_bootstrap/files/client-cert.pem>
-
-yum_client_key_contents: |
-	<contents of ../aos-ansible/playbooks/roles/ops_mirror_bootstrap/files/client-key.pem>
-```
-
-Example: Build a rhel base vm image
-```console
-docker run \
---rm \
--it \
---env DEPLOY_OS=rhel7 \
---security-opt label:disable \
---volume $HOME/.kube/config:/root/.kube/config \
---volume $(pwd):/release \
-registry.svc.ci.openshift.org/ci/ci-operator:latest \
---config /release/ci-operator/config/openshift/openshift-azure/openshift-openshift-azure-master.yaml \
---git-ref openshift/openshift-azure@master \
---namespace ${CI_OPERATOR_NAMESPACE} \
---target build-base-image \
---template /release/ci-operator/templates/openshift/openshift-azure/build-base-image.yaml \
---secret-dir /release/cluster/test-deploy/azure/
-```
-
-Example: Build a rhel node vm image with openshift 3.11
-```console
-docker run \
---rm \
--it \
---env DEPLOY_OS=rhel7 \
---env OPENSHIFT_RELEASE="3.11" \
---security-opt label:disable \
---volume $HOME/.kube/config:/root/.kube/config \
---volume $(pwd):/release \
-registry.svc.ci.openshift.org/ci/ci-operator:latest \
---config /release/ci-operator/config/openshift/openshift-ansible/openshift-openshift-ansible-release-3.11.yaml \
---git-ref openshift/openshift-azure@master \
---namespace ${CI_OPERATOR_NAMESPACE} \
---target build-node-image \
---template /release/ci-operator/templates/openshift/openshift-azure/build-node-image.yaml \
---secret-dir /release/cluster/test-deploy/azure/
-```
-
 ## Testing prow jobs
 
 To test native prow jobs (non ci-operator) follow [Testing with MKPJ and MKPOD documentation](https://github.com/openshift/release/blob/master/ci-operator/README.md#testing-with-mkpj-and-mkpod)
@@ -342,7 +281,7 @@ prow v0.0 test-cluster
 make e2e
 
 ```
-Note: limitations are that tests are done using LATEST container images, and you might need to build destination images manually 
+Note: limitations are that tests are done using LATEST container images, and you might need to build destination images manually
 and set them using `export SYNC_IMAGE=registry/namespace/sync:latest` before calling upgrade.
 
 to initiate source branch by executing `prow v0.0`. This will CD you yo local code base you are testing. From there you can execute `make update`
@@ -465,7 +404,7 @@ in the `azure` namespace.
 To onboard a new container image into CI and possibly setup mirroring of the image to quay the
 following steps should be performed:
 
-* Ensure there is a `Dockerfile.<image_name>` in [openshift-azure](https://github.com/openshift/openshift-azure) 
+* Ensure there is a `Dockerfile.<image_name>` in [openshift-azure](https://github.com/openshift/openshift-azure)
 specifying how to build the new image.
 * Create 3 new make targets in that repository for the various stages leading up to building the image
   * one target for building the binary (`make <image_name>-bin`)
@@ -486,7 +425,7 @@ specifying how to build the new image.
   to: <image_name>
 ```
 * If the image needs to be mirrored from the CI registry to [our public quay account](https://quay.io/organization/openshift-on-azure/) then you need to update the
-[image mirror config](https://github.com/openshift/release/blob/master/projects/azure/image-mirror/image-mirror.yaml) 
+[image mirror config](https://github.com/openshift/release/blob/master/projects/azure/image-mirror/image-mirror.yaml)
 in the release repo:
 	* Add a new entry to the `items[0].data.openshift-azure_<openshift_version>_quay` key of that file which looks as follows:
 	```yaml
@@ -500,7 +439,7 @@ The new image and others configured as such are built for [every commit pushed t
 
 ## Test dependencies
 
-If you need to update the base image used by our tests, you should make changes to the [`test-base`](https://github.com/openshift/release/blob/master/projects/azure/base-images/test-base.yaml) 
+If you need to update the base image used by our tests, you should make changes to the [`test-base`](https://github.com/openshift/release/blob/master/projects/azure/base-images/test-base.yaml)
 image build and once your PR is merged:
 * apply the build config in the cluster:
 ```console
