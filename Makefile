@@ -126,6 +126,10 @@ prow-ocp-rpm-secrets:
 		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
 		--from-file=cluster/ci/config/prow/openshift/rpm-mirrors/ocp-4.0-default.repo \
 		-o yaml --dry-run | oc apply -n ocp -f -
+	oc create secret generic sdn-4-0-repos \
+		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
+		--from-file=cluster/ci/config/prow/openshift/rpm-mirrors/ocp-4.0-sdn.repo \
+		-o yaml --dry-run | oc apply -n ocp -f -
 .PHONY: prow-ocp-rpms-secrets
 
 prow-jobs: prow-cluster-jobs prow-artifacts prow-ocp-rpms

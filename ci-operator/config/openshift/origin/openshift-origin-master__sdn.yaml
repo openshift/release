@@ -1,0 +1,107 @@
+tag_specification:
+  name: '4.0'
+  namespace: ocp
+promotion:
+  name: '4.0'
+  namespace: ocp
+base_images:
+  base:
+    name: '4.0'
+    namespace: ocp
+    tag: base
+canonical_go_repository: github.com/openshift/origin
+images:
+- dockerfile_path: images/sdn/Dockerfile.rhel.sdn-next
+  from: base-sdn
+  to: node # TODO: SDN
+  inputs:
+    bin:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.10
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      rm -rf /etc/yum.repos.d/*
+      curl http://sdn-4-0.ocp.svc > /etc/yum.repos.d/content.repo
+      echo '#!/bin/sh' > /usr/bin/yum-config-manager
+      chmod ug+x /usr/bin/yum-config-manager
+    from: base
+    to: base-sdn
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 100m
+      memory: 4Gi
+  hyperkube:
+    limits:
+      memory: 12Gi
+    requests:
+      cpu: '3'
+      memory: 7Gi
+  hypershift:
+    limits:
+      memory: 12Gi
+    requests:
+      cpu: '3'
+      memory: 7Gi
+  tests:
+    limits:
+      memory: 12Gi
+    requests:
+      cpu: '3'
+      memory: 7Gi
+  bin:
+    limits:
+      memory: 12Gi
+    requests:
+      cpu: '3'
+      memory: 7Gi
+  bin-cross:
+    limits:
+      memory: 12Gi
+    requests:
+      cpu: '3'
+      memory: 8Gi
+  cmd:
+    limits:
+      memory: 11Gi
+    requests:
+      cpu: '4'
+      memory: 8Gi
+  integration:
+    limits:
+      memory: 18Gi
+    requests:
+      cpu: '6'
+      memory: 14Gi
+  rpms:
+    limits:
+      memory: 10Gi
+    requests:
+      cpu: '4'
+      memory: 8Gi
+  unit:
+    limits:
+      memory: 11Gi
+    requests:
+      cpu: '6'
+      memory: 8Gi
+  verify:
+    limits:
+      memory: 12Gi
+    requests:
+      cpu: '3'
+      memory: 8Gi
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: src-cache-origin
+    namespace: ci
+    tag: master
+tests:
+- as: e2e-aws
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer:
+    cluster_profile: aws
