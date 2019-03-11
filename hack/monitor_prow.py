@@ -17,16 +17,25 @@ BOLD = exec_cmd('tput', 'bold')
 RESET = exec_cmd('tput', 'sgr0')
 CLEAR = exec_cmd('tput', 'clear')
 
+
+def run_oc(args):
+    command = ['oc', '--loglevel', '10', '--namespace', 'ci'] + args
+    try:
+        process = subprocess.run(command, capture_output=True, check=True)
+    except subprocess.CalledProcessError as exc:
+        print(exc.stderr.decode('utf-8'))
+        raise
+
+    return process.stdout.decode('utf-8')
+
+
 def debug(msg):
     if os.environ.get("DEBUG", "") == "true":
         print(msg)
 
 
 def main():
-    dcs = exec_cmd(
-        'oc', 'get', 'deployment',
-        '--namespace', 'ci', '--selector', 'app=prow',
-        '--output', 'jsonpath={.items[*].metadata.name}').split()
+    dcs = run_oc(['get', 'deployment', '--selector', 'app=prow', '--output', 'jsonpath={.items[*].metadata.name}']).split()
     with tempfile.TemporaryDirectory() as log_dir:
         fs = [(display, log_dir), *((highlight, log_dir, x) for x in dcs)]
         with multiprocessing.Pool(len(fs)) as pool:
@@ -55,20 +64,15 @@ def highlight(log_dir, dc):
         header = renderHeader(dc)
         lines = []
         log_lines = []
-        for pod in exec_cmd(
-                'oc', 'get', 'pods', '--namespace', 'ci',
-                '--selector', 'component={}'.format(dc),
-                '--output', 'jsonpath={.items[*].metadata.name}').split():
+        for pod in run_oc(['get', 'pods', '--selector', 'component={}'.format(dc), '--output', 'jsonpath={.items[*].metadata.name}']).split():
             debug("deployment/{}: pod/{}: gathering info".format(dc, pod))
             lines.extend(renderFlavor(pod, dc))
-            cmd = [
-                'oc', 'logs', '--namespace', 'ci', '--since', '20m',
-                'pod/{}'.format(pod)]
+            cmd = ['logs', '--since', '20m', 'pod/{}'.format(pod)]
             if pod.startswith('deck-internal'):
                 cmd += ['--container', 'deck']
             debug("deployment/{}: pod/{}: getting logs".format(dc, pod))
             try:
-                for l in exec_cmd(*cmd).splitlines():
+                for l in run_oc(cmd).splitlines():
                     if warn in l:
                         log_lines.append(YELLOW + l + RESET)
                     elif error in l or fatal in l:
@@ -85,9 +89,7 @@ def highlight(log_dir, dc):
 
 def renderHeader(dc):
     debug("deployment/{}: rendering header".format(dc))
-    rawdc = json.loads(exec_cmd(
-        'oc', 'get', 'deployment/{}'.format(dc),
-        '--namespace', 'ci', '--output', 'json'))
+    rawdc = json.loads(run_oc(['get', 'deployment/{}'.format(dc), '--output', 'json']))
     spec = rawdc.get("spec", {})
     status = rawdc.get("status", {})
     desired = spec.get("replicas", 0)
@@ -117,8 +119,7 @@ def renderHeader(dc):
 def renderFlavor(pod, dc):
     debug("deployment/{}: pod/{}: rendering flavor".format(dc, pod))
     lines = []
-    raw = json.loads(exec_cmd('oc', 'get', 'pod/{}'.format(pod),
-                              '--namespace', 'ci', '--output', 'json'))
+    raw = json.loads(run_oc(['get', 'pod/{}'.format(pod), '--output', 'json']))
     status = raw.get("status", {})
     phase = status.get("phase", "")
     if phase != "Running":
