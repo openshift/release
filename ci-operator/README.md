@@ -320,31 +320,31 @@ available in the `registry.svc.ci.openshift.org/ci/test-infra:binaries` image
 or in the [upstream repository](https://github.com/kubernetes/test-infra/tree/master/prow/cmd#dev-tools).
 
 The [`mkpjpod.sh`](../hack/mkpjpod.sh) script can be used to streamline that
-process. See the documentation in the script file and the following screencasts
-for details:
+process. This script outputs the yaml for a pod that runs the specified test job
+and reports the status back into the referenced pull request. You can pipe the
+output of the script to `oc create -f -` and launch the pod in a cluster
+somewhere. For Red Hat employees working on OpenShift, you can use the `ci-stg`
+namespace in the [CI cluster](https://api.ci.openshift.org) to run test jobs.
 
-- Basic usage of the script to reproduce container and template tests:
- [![asciicast](https://asciinema.org/a/231019.svg)](https://asciinema.org/a/231019)
-- Making changes to the job or ci-operator configuration file:
- [![asciicast](https://asciinema.org/a/231020.svg)](https://asciinema.org/a/231020)
+For example, say that we want to test the
+`pull-ci-openshift-origin-master-e2e-aws` job against a pull request to
+`openshift/origin`. We'll specify the following pieces of information:
 
-The output of the script is a regular Pod that can be executed in the staging
-namespace in the [CI cluster](https://api.ci.openshift.org) and will report the
-results in the pull request, e.g.:
+* the repository: `openshift/origin`
+* the base branch of the repository to test: `master`
+* the pull request to merge onto the base branch: `21526`
+* the github user that should have access to the namespace where the tests are run: `yourgithubname`
+* the job to run: `pull-ci-openshift-origin-master-e2e-aws`
 
 ```sh
 hack/pj_env.py \
-    openshift/origin master 21526 'Pull Request Author' \
+    openshift/origin \
+    master \
+    21526 \
+    'yourgithubname' \
     hack/mkpjpod.sh pull-ci-openshift-origin-master-e2e-aws \
     | oc -n ci-stg create -f -
 ```
-
-this example run the changes against:
-* the repository: `openshift/origin`
-* branch `master`
-* pull request: `21526`
-* user `Pull Request Author`
-* job: `pull-ci-openshift-origin-master-e2e-aws`
 
 The script produces a log like:
 
@@ -362,16 +362,26 @@ where you can determine the namespace where the `ci-operator` is running the job
 
 This will allow to determine the installer logs:
 
-```oc logs -f e2e -c setup  -n ci-op-3167h4v3 ```
+```
+oc logs -f e2e -c setup  -n ci-op-3167h4v3
+```
 
-and test logs:
+Note, it is important to supply the name of your github account in order to be
+granted RBAC permission to view pods in the created test namespace.
+
+You'll be able to see the test logs in the pod where `ci-operator` runs the job:
 
 ```
 oc logs -f e2e -c test -n ci-op-3167h4v3 
 ```
 
+You can also see the documentation in the script file and the following screencasts
+for details:
 
-
+- Basic usage of the script to reproduce container and template tests:
+ [![asciicast](https://asciinema.org/a/231019.svg)](https://asciinema.org/a/231019)
+- Making changes to the job or ci-operator configuration file:
+ [![asciicast](https://asciinema.org/a/231020.svg)](https://asciinema.org/a/231020)
 
 #### Testing manually
 
