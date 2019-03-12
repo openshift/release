@@ -67,6 +67,5 @@ RUN chown -R $USER_UID:$USER_UID $HOME && \
     chmod g+rw /etc/passwd
 
 COPY entrypoint /usr/local/bin/
-COPY prow_mock.sh /usr/local/bin/prow
 USER $USER_UID
 ENTRYPOINT [ "/usr/local/bin/entrypoint" ]
