@@ -60,36 +60,77 @@ presubmits:
     always_run: false
     branches:
     - master
-    context: ci/prow/e2e-aws-all
+    context: ci/prow/e2e-aws-rhel8
     decorate: true
     decoration_config:
       skip_cloning: true
-    name: pull-ci-openshift-installer-master-e2e-aws-all
+    name: pull-ci-openshift-installer-master-e2e-aws-rhel8
     optional: true
-    rerun_command: /test e2e-aws-all
-    skip_report: true
+    rerun_command: /test e2e-aws-rhel8
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/e2e-aws-all-cluster-profile
-        - --target=e2e-aws-all
-        - --template=/usr/local/e2e-aws-all
+        - --secret-dir=/usr/local/e2e-aws-rhel8-cluster-profile
+        - --target=e2e-aws-rhel8
+        - --template=/usr/local/e2e-aws-rhel8
         command:
         - ci-operator
         env:
         - name: CLUSTER_TYPE
           value: aws
         - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-installer-master.yaml
-              name: ci-operator-master-configs
+          value: |
+            tag_specification:
+              name: '4.0'
+              namespace: ocp
+            build_root:
+              image_stream_tag:
+                cluster: https://api.ci.openshift.org
+                name: release
+                namespace: openshift
+                tag: golang-1.10
+            base_images:
+              base:
+                name: '4.0'
+                namespace: ocp
+                tag: base
+              machine-os-content:
+                name: machine-os-content
+                namespace: rhcos
+                tag: latest
+            canonical_go_repository: github.com/openshift/installer
+            images:
+            - dockerfile_path: images/installer/Dockerfile.ci
+              from: base
+              inputs:
+                root:
+                  as:
+                  - build
+              to: installer
+            raw_steps:
+            - output_image_tag_step:
+                from: machine-os-content
+                to:
+                  name: stable
+                  tag: machine-os-content
+            resources:
+              '*':
+                limits:
+                  memory: 4Gi
+                requests:
+                  cpu: 100m
+                  memory: 200Mi
+            tests:
+            - as: e2e-aws
+              commands: TEST_SUITE=openshift/conformance/parallel run-tests
+              openshift_installer:
+                cluster_profile: aws
         - name: JOB_NAME_SAFE
-          value: e2e-aws-all
+          value: e2e-aws-rhel8
         - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance run-tests
+          value: TEST_SUITE=openshift/conformance/parallel run-tests
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -97,9 +138,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/e2e-aws-all-cluster-profile
+        - mountPath: /usr/local/e2e-aws-rhel8-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-aws-all
+        - mountPath: /usr/local/e2e-aws-rhel8
           name: job-definition
           subPath: cluster-launch-installer-e2e.yaml
       serviceAccountName: ci-operator
@@ -112,7 +153,7 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-e2e
         name: job-definition
-    trigger: '(?m)^/test (?:.*? )?e2e-aws-all(?: .*?)?$'
+    trigger: '(?m)^/test (?:.*? )?e2e-aws-rhel8(?: .*?)?$'
   - agent: kubernetes
     always_run: false
     branches:
