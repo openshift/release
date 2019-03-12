@@ -36,6 +36,65 @@ presubmits:
     always_run: true
     branches:
     - release-3.11
+    context: ci/prow/console-e2e
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    name: pull-ci-openshift-console-release-3.11-console-e2e
+    rerun_command: /test console-e2e
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --secret-dir=/usr/local/console-e2e-cluster-profile
+        - --target=console-e2e
+        - --template=/usr/local/console-e2e
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: gcp
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-console-release-3.11.yaml
+              name: ci-operator-3.x-configs
+        - name: JOB_NAME_SAFE
+          value: console-e2e
+        - name: RPM_REPO_OPENSHIFT_ORIGIN
+          value: https://rpms.svc.ci.openshift.org/openshift-origin-v3.11/
+        - name: TEST_COMMAND
+          value: ./test-prow-e2e.sh
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/console-e2e-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/console-e2e
+          name: job-definition
+          subPath: cluster-launch-e2e.yaml
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - configMap:
+          name: prow-job-cluster-launch-e2e
+        name: job-definition
+    trigger: '(?m)^/test (?:.*? )?console-e2e(?: .*?)?$'
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-3.11
     context: ci/prow/frontend
     decorate: true
     decoration_config:
