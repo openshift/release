@@ -60,12 +60,26 @@ tests:
 - as: integration-aws-metering
   commands: |
     set -x
-    # increase the size of the machines the cluster has to be big enough
+    # Increase the size of the machines so that there are machines large enough
+    # to run Presto, and the full metering stack.
     kubectl -n openshift-machine-api get machinesets -o name | cut -d/ -f2 | head -n2 | xargs -I{} kubectl -n openshift-machine-api patch machineset {} --type json -p '[{"op": "replace", "path": "/spec/template/spec/providerSpec/value/instanceType", "value": "m4.xlarge"}]'
     # delete the first two workers so that larger machines replace it
     # wait=false because the machines never actually get deleted from the
     # API
     kubectl -n openshift-machine-api get machines -l machine.openshift.io/cluster-api-machine-role=worker -o name | head -n2 | xargs kubectl -n openshift-machine-api delete --wait=false
     TEST_OUTPUT_PATH=/tmp/artifacts make integration
+  openshift_installer_src:
+    cluster_profile: aws
+- as: e2e-aws-metering
+  commands: |
+    set -x
+    # Increase the size of the machines so that there are machines large enough
+    # to run Presto, and the full metering stack.
+    kubectl -n openshift-machine-api get machinesets -o name | cut -d/ -f2 | head -n2 | xargs -I{} kubectl -n openshift-machine-api patch machineset {} --type json -p '[{"op": "replace", "path": "/spec/template/spec/providerSpec/value/instanceType", "value": "m4.xlarge"}]'
+    # delete the first two workers so that larger machines replace it
+    # wait=false because the machines never actually get deleted from the
+    # API
+    kubectl -n openshift-machine-api get machines -l machine.openshift.io/cluster-api-machine-role=worker -o name | head -n2 | xargs kubectl -n openshift-machine-api delete --wait=false
+    TEST_OUTPUT_PATH=/tmp/artifacts make e2e
   openshift_installer_src:
     cluster_profile: aws
