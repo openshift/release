@@ -2,6 +2,45 @@ periodics:
 - agent: kubernetes
   decorate: true
   interval: 24h
+  name: periodic-ci-azure-node-image
+  skip_cloning: true
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --git-ref=openshift/openshift-azure@master
+      - --secret-dir=/usr/local/e2e-secrets/azure
+      - --target=[output:stable:azure-controllers]
+      - --target=[output:stable:etcdbackup]
+      - --target=[output:stable:metricsbridge]
+      - --target=[output:stable:startup]
+      - --target=[output:stable:sync]
+      - --target=vmimage
+      command:
+      - ci-operator
+      env:
+      - name: CONFIG_SPEC
+        valueFrom:
+          configMapKeyRef:
+            key: openshift-openshift-azure-master.yaml
+            name: ci-operator-master-configs
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/e2e-secrets/azure
+        name: cluster-secrets-azure
+    serviceAccountName: ci-operator
+    volumes:
+    - name: cluster-secrets-azure
+      secret:
+        secretName: cluster-secrets-azure
+- agent: kubernetes
+  decorate: true
+  interval: 24h
   name: periodic-ci-azure-changeloglevel-e2e
   skip_cloning: true
   spec:
