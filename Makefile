@@ -16,8 +16,11 @@ postsubmit-update: prow-services
 all: roles prow prow-stg projects
 .PHONY: all
 
-roles: cluster-operator-roles
+cluster-roles:
 	$(MAKE) apply WHAT=cluster/ci/config/roles.yaml
+.PHONY: cluster-roles
+
+roles: cluster-operator-roles cluster-roles
 .PHONY: roles
 
 prow: ci-ns prow-crd prow-config prow-rbac prow-services prow-jobs prow-scaling prow-secrets ci-operator-config
