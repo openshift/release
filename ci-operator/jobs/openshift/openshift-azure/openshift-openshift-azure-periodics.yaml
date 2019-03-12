@@ -1,5 +1,44 @@
 periodics:
 - agent: kubernetes
+  decorate: true
+  interval: 24h
+  name: periodic-ci-azure-node-image
+  spec:
+    containers:
+    - command:
+      - /bin/bash
+      - -c
+      - |
+        set -ex
+
+        git clone https://github.com/openshift/openshift-azure /go/src/github.com/openshift/openshift-azure
+        cd /go/src/github.com/openshift/openshift-azure
+        cp -a /usr/local/e2e-secrets/azure secrets
+
+        set +x
+        . ./secrets/secret
+        az login --service-principal -u ${AZURE_CLIENT_ID} -p ${AZURE_CLIENT_SECRET} --tenant ${AZURE_TENANT_ID} >/dev/null
+        set -x
+
+        export AZURE_REGION=eastus
+        export RUNNING_UNDER_TEST=true
+
+        make vmimage
+      image: registry.svc.ci.openshift.org/azure/test-base:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/e2e-secrets/azure
+        name: cluster-secrets-azure
+    restartPolicy: Never
+    volumes:
+    - name: cluster-secrets-azure
+      secret:
+        secretName: cluster-secrets-azure
+- agent: kubernetes
   cron: ""
   decorate: true
   interval: 24h
