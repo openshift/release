@@ -1,0 +1,32 @@
+postsubmits:
+  openshift/origin-branding:
+  - agent: kubernetes
+    branches:
+    - ^master$
+    context: ""
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    name: branch-ci-openshift-origin-branding-master-images
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --promote
+        - --target=[images]
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-origin-branding-master.yaml
+              name: ci-operator-master-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
