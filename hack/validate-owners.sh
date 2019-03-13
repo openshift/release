@@ -6,8 +6,6 @@
 set -euo pipefail
 
 WHITELIST=$(sort <<'EOF'
-ci-operator/config/openshift/console
-ci-operator/jobs/openshift/console
 ci-operator/config/openshift/kubernetes-metrics-server
 ci-operator/jobs/openshift/kubernetes-metrics-server
 ci-operator/config/openshift/origin-metrics
