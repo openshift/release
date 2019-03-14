@@ -191,6 +191,8 @@ done
 registry="quay.io"
 update_secret generic "registry-pull-credentials-${registry}" $( format_field_value "${registry}" "Pull Credentials" "config.json" )
 oc label secret "registry-pull-credentials-${registry}" "ci.openshift.io/managed=true"
+update_secret generic "ci-pull-credentials" --type=kubernetes.io/dockerconfigjson $( format_field_value "${registry}" "Pull Credentials" ".dockerconfigjson" )
+oc label secret "ci-pull-credentials" "ci.openshift.io/managed=true"
 
 # Cluster credentials aggregate multiple items
 # of information for easy consumption by tests
