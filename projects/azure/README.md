@@ -208,6 +208,7 @@ registry.svc.ci.openshift.org/ci/ci-operator:latest \
 --target=[output:stable:startup] \
 --target=[output:stable:metricsbridge] \
 --target=[output:stable:sync] \
+--target=[output:stable:tlsproxy] \
 --template /release/ci-operator/templates/openshift/openshift-azure/cluster-launch-e2e-azure.yaml \
 --secret-dir /release/cluster/test-deploy/azure/
 ```
@@ -229,6 +230,7 @@ docker run \
 --target=[output:stable:startup] \
 --target=[output:stable:metricsbridge] \
 --target=[output:stable:sync] \
+--target=[output:stable:tlsproxy] \
 --target=e2e-upgrade-v1.0 \
 --template /release/ci-operator/templates/openshift/openshift-azure/rbac.yaml \
 --secret-dir /release/cluster/test-deploy/azure \
