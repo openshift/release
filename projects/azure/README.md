@@ -202,6 +202,7 @@ registry.svc.ci.openshift.org/ci/ci-operator:latest \
 --namespace ${CI_OPERATOR_NAMESPACE} \
 --target cluster-launch-e2e-azure \
 --target=[output:stable:azure-controllers] \
+--target=[output:stable:canary] \
 --target=[output:stable:etcdbackup] \
 --target=[output:stable:startup] \
 --target=[output:stable:metricsbridge] \
@@ -224,6 +225,7 @@ docker run \
 --git-ref openshift/openshift-azure@master \
 --namespace ${CI_OPERATOR_NAMESPACE} \
 --target=[output:stable:azure-controllers] \
+--target=[output:stable:canary] \
 --target=[output:stable:etcdbackup] \
 --target=[output:stable:startup] \
 --target=[output:stable:metricsbridge] \
