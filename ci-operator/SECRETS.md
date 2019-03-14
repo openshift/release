@@ -55,6 +55,14 @@ secrets currently exist:
 | `metrics-int.key`             | Azure Geneva metrics authentication key |
 | `system-docker-config.json`   | Root/node/system level docker config.json file, currently holding access registry.redhat.io |
 
+#### `cluster-secrets-openstack`
+
+|        Key        | Description |
+| ----------------- | ----------- |
+| `clouds.yaml`     | Credentials for the openstack cloud. See the [Openstack docs](https://docs.openstack.org/python-openstackclient/pike/configuration/index.html). |
+| `ssh-publickey`   | Public half of the SSH key, for connecting to OpenStack Nova VMs. |
+| `pull-secret`     | Credentials for pulling OpenShift images from Quay. |
+
 ### GCE ServiceAccount Credentials
 
 The following serviceaccounts have their credentials stored in secrets on the
