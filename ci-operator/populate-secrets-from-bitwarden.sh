@@ -230,6 +230,13 @@ update_secret generic "cluster-secrets-${target_cloud}"                  \
 	"$( format_attachment "packet.net" client.crt matchbox-client.crt )" \
 	"$( format_attachment "packet.net" client.key matchbox-client.key )"
 
+update_secret generic "cluster-secrets-${target_cloud}"                       \
+	--from-literal=pull-secret="$(merge_pull_secrets)"                          \
+	"$( format_attachment "openstack" clouds.yaml )"                            \
+	"$( format_attachment "jenkins-ci-provisioner" ssh-privatekey )"            \
+	"$( format_attachment "jenkins-ci-provisioner" ssh-publickey )"
+oc label secret "cluster-secrets-${target_cloud}" "ci.openshift.io/managed=true"
+
 # Configuration for the .git-credentials used by the release controller to clone
 # private repositories to generate changelogs
 oc -n "ci-release" create secret generic "git-credentials" "--from-literal=.git-credentials=https://openshift-bot:$( field_value "openshift-bot" "GitHub OAuth Token" "oauth" )@github.com"
