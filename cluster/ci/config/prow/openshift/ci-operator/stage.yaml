@@ -150,3 +150,34 @@ items:
   - kind: ServiceAccount
     name: hook
     namespace: ci
+
+- kind: Role
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: configmap-pruner
+    namespace: ci-stg
+  rules:
+  - apiGroups:
+    - ""
+    resources:
+    - configmaps
+    verbs:
+    - get
+    - create
+    - update
+    - delete
+    - deletecollection
+
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: configmap-pruner-ci-operator
+    namespace: ci-stg
+  roleRef:
+    kind: Role
+    name: configmap-pruner
+    namespace: ci-stg
+  subjects:
+  - kind: ServiceAccount
+    name: ci-operator
+    namespace: ci-stg
