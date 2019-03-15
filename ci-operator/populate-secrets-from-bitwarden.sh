@@ -137,6 +137,10 @@ for login in "openshift-bot" "openshift-build-robot" "openshift-cherrypick-robot
 	update_secret generic "github-credentials-${login}" "$( format_field_value "${login}" "GitHub OAuth Token" "oauth" )"
 done
 
+# openshift-publish-robot also has a token that grants read-only
+# access to private repositories.
+update_secret generic "private-git-cloner" "$( format_field_value "openshift-publish-robot" private-git-cloner "oauth" )"
+
 # Configuration for Slack ci-chat-bot is stored under "Token"
 # and the key value is "token" in the secret
 update_secret generic ci-chat-bot-slack-token "$( format_field_value ci-chat-bot-slack-token "Token" "token" )"
@@ -162,7 +166,6 @@ update_secret generic github-deploymentconfig-trigger "$( format_field_value git
 for account in "aos-pubsub-subscriber" "ci-vm-operator" "gcs-publisher"; do
 	update_secret generic "gce-sa-credentials-${account}" "$( format_attachment "${account}" credentials.json service-account.json )"
 done
-
 
 # Some GCE serviceaccounts also have SSH keys
 for account in "aos-serviceaccount" "jenkins-ci-provisioner"; do
@@ -208,7 +211,6 @@ update_secret generic "cluster-secrets-${target_cloud}"                       \
 	"$( format_attachment "openstack" clouds.yaml )"                            \
 	"$( format_attachment "jenkins-ci-provisioner" ssh-privatekey )"            \
 	"$( format_attachment "jenkins-ci-provisioner" ssh-publickey )"
-oc label secret "cluster-secrets-${target_cloud}" "ci.openshift.io/managed=true"
 
 # Configuration for the .git-credentials used by the release controller to clone
 # private repositories to generate changelogs
