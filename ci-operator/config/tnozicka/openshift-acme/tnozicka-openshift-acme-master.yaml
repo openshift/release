@@ -1,9 +1,17 @@
 base_images:
-  os:
-    cluster: https://api.ci.openshift.org
-    name: origin-v3.11
-    namespace: openshift
+  base:
+    name: '4.0'
+    namespace: ocp
     tag: base
+  base-machine:
+    cluster: https://api.ci.openshift.org
+    name: fedora
+    namespace: openshift
+    tag: '29'
+  machine-os-content-base:
+    name: '4.0'
+    namespace: ocp
+    tag: machine-os-content
 
 build_root:
   project_image:
@@ -16,7 +24,7 @@ test_binary_build_commands: make build GOFLAGS='-v -race'
 
 images:
 - dockerfile_path: images/openshift-acme-controller/Dockerfile
-  from: os
+  from: base
   inputs:
     bin:
       as:
@@ -30,8 +38,8 @@ promotion:
 
 tag_specification:
   cluster: https://api.ci.openshift.org
-  name: origin-v3.11
-  namespace: openshift
+  name: '4.0'
+  namespace: ocp
   tag: ''
   tag_overrides: {}
 
@@ -48,8 +56,8 @@ tests:
 
 - as: e2e
   commands: hack/ci-run-e2e.sh
-  openshift_ansible_src:
-    cluster_profile: gcp
+  openshift_installer:
+    cluster_profile: aws
 
 resources:
   '*':
