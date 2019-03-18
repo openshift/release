@@ -13,14 +13,16 @@ parameters:
 - name: IMAGE_TESTS
   required: true
 - name: CLUSTER_TYPE
-  required: true
+  value: "openstack"
 - name: TEST_COMMAND
   required: true
 - name: RELEASE_IMAGE_LATEST
   required: true
 - name: BASE_DOMAIN
-  value: origin-ci-int-aws.dev.rhcloud.com
+  value: shiftstack.ci
   required: true
+- name: CI_DNS_IP
+  value: 128.31.27.48
 
 objects:
 
@@ -74,7 +76,11 @@ objects:
     - name: cluster-profile
       secret:
         secretName: ${JOB_NAME_SAFE}-cluster-profile
-
+    dnsPolicy: "None"
+    dnsConfig:
+      nameservers:
+        - ${CI_DNS_IP}
+        - 1.1.1.1
     containers:
 
     # Once the cluster is up, executes shared tests
@@ -95,8 +101,6 @@ objects:
       - name: artifacts
         mountPath: /tmp/artifacts
       env:
-      - name: AWS_SHARED_CREDENTIALS_FILE
-        value: /tmp/cluster/.awscred
       - name: ARTIFACT_DIR
         value: /tmp/artifacts
       - name: HOME
@@ -137,24 +141,11 @@ objects:
           sleep 10 & wait
         done
 
-        # set up cloud-provider-specific env vars
+        # set up env vars
         export KUBE_SSH_BASTION="$( oc --insecure-skip-tls-verify get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
         export KUBE_SSH_KEY_PATH=/tmp/cluster/ssh-privatekey
-        if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
-          export GOOGLE_APPLICATION_CREDENTIALS="/tmp/cluster/gce.json"
-          export KUBE_SSH_USER=cloud-user
-          mkdir -p ~/.ssh
-          cp /tmp/cluster/ssh-privatekey ~/.ssh/google_compute_engine || true
-          export PROVIDER_ARGS='-provider=gce -gce-zone=us-east1-c -gce-project=openshift-gce-devel-ci'
-          export TEST_PROVIDER='{"type":"gce","zone":"us-east1-c","projectid":"openshift-gce-devel-ci"}'
-        elif [[ "${CLUSTER_TYPE}" == "aws" ]]; then
-          mkdir -p ~/.ssh
-          cp /tmp/cluster/ssh-privatekey ~/.ssh/kube_aws_rsa || true
-          export PROVIDER_ARGS="-provider=aws -gce-zone=us-east-1"
-          # TODO: make openshift-tests auto-discover this from cluster config
-          export TEST_PROVIDER='{"type":"aws","region":"us-east-1","zone":"us-east-1a","multizone":true,"multimaster":true}'
-          export KUBE_SSH_USER=core
-        fi
+        mkdir -p ~/.ssh
+        cp /tmp/cluster/ssh-privatekey ~/.ssh/kube_openstack_rsa || true
 
         mkdir -p /tmp/output
         cd /tmp/output
@@ -187,12 +178,8 @@ objects:
       env:
       - name: TYPE
         value: ${CLUSTER_TYPE}
-      - name: AWS_SHARED_CREDENTIALS_FILE
-        value: /etc/openshift-installer/.awscred
-      - name: AWS_REGION
-        value: us-east-1
       - name: CLUSTER_NAME
-        value: ${NAMESPACE}-${JOB_NAME_HASH}
+        value: ${JOB_NAME_HASH}
       - name: BASE_DOMAIN
         value: ${BASE_DOMAIN}
       - name: SSH_PUB_KEY_PATH
@@ -201,10 +188,24 @@ objects:
         value: /etc/openshift-installer/pull-secret
       - name: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
         value: ${RELEASE_IMAGE_LATEST}
+      - name: OPENSTACK_IMAGE
+        value: rhcos
+      - name: OPENSTACK_REGION
+        value: moc-kzn
+      - name: OPENSTACK_FLAVOR
+        value: m1.medium
+      - name: OPENSTACK_EXTERNAL_NETWORK
+        value: external
+      - name: OS_CLOUD
+        value: openstack-cloud
+      - name: OS_CLIENT_CONFIG_FILE
+        value: /etc/openshift-installer/clouds.yaml
       - name: USER
         value: test
       - name: HOME
         value: /tmp
+      - name: CI_DNS_IP
+        value: ${CI_DNS_IP}
       - name: INSTALL_INITIAL_RELEASE
       - name: RELEASE_IMAGE_INITIAL
       command:
@@ -230,37 +231,34 @@ objects:
         export SSH_PUB_KEY=$(cat "${SSH_PUB_KEY_PATH}")
         export PULL_SECRET=$(cat "${PULL_SECRET_PATH}")
 
-        if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
-            cat > /tmp/artifacts/installer/install-config.yaml << EOF
+        cat > /tmp/artifacts/installer/install-config.yaml << EOF
         apiVersion: v1beta4
         baseDomain: ${BASE_DOMAIN}
         clusterID:  ${CLUSTER_ID}
         metadata:
           name: ${CLUSTER_NAME}
         networking:
-          clusterNetwork:
-          - cidr: 10.128.0.0/14
-            hostPrefix: 23
+          clusterNetworks:
+          - cidr:             10.128.0.0/14
+            hostSubnetLength: 9
           machineCIDR: 10.0.0.0/16
-          serviceNetwork:
-          - 172.30.0.0/16
-          networkType: OpenShiftSDN
+          serviceCIDR: 172.30.0.0/16
+          type:        OpenShiftSDN
         platform:
-          aws:
-            region:       ${AWS_REGION}
-            userTags:
-              expirationDate: ${EXPIRATION_DATE}
+          openstack:
+            baseImage:        ${OPENSTACK_IMAGE}
+            cloud:            ${OS_CLOUD}
+            externalNetwork:  ${OPENSTACK_EXTERNAL_NETWORK}
+            computeFlavor:    ${OPENSTACK_FLAVOR}
+            region:           ${OPENSTACK_REGION}
+            lbFloatingIP:     ${CI_DNS_IP}
         pullSecret: >
           ${PULL_SECRET}
         sshKey: |
           ${SSH_PUB_KEY}
         EOF
-        else
-            echo "Unsupported cluster type '${CLUSTER_NAME}'"
-            exit 1
-        fi
 
-        TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create cluster &
+        TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create cluster --log-level=debug &
         wait "$!"
 
     # Performs cleanup of all created resources
@@ -276,11 +274,15 @@ objects:
         mountPath: /tmp/artifacts
       env:
       - name: INSTANCE_PREFIX
-        value: ${NAMESPACE}-${JOB_NAME_HASH}
+        value: ${JOB_NAME_HASH}
       - name: TYPE
         value: ${CLUSTER_TYPE}
       - name: KUBECONFIG
         value: /tmp/artifacts/installer/auth/kubeconfig
+      - name: OS_CLOUD
+        value: openstack-cloud
+      - name: OS_CLIENT_CONFIG_FILE
+        value: /etc/openshift-installer/clouds.yaml
       command:
       - /bin/bash
       - -c
@@ -307,7 +309,7 @@ objects:
           touch /tmp/shared/exit
           export PATH=$PATH:/tmp/shared
 
-          echo "Gathering artifacts ..."
+         echo "Gathering artifacts ..."
           mkdir -p /tmp/artifacts/pods /tmp/artifacts/nodes /tmp/artifacts/metrics /tmp/artifacts/bootstrap /tmp/artifacts/network
 
 
@@ -315,11 +317,11 @@ objects:
           then
               # we don't have jq, so the python equivalent of
               # jq '.modules[].resources."aws_instance.bootstrap".primary.attributes."public_ip" | select(.)'
-              bootstrap_ip=$(python -c \
-                  'import sys, json; d=reduce(lambda x,y: dict(x.items() + y.items()), map(lambda x: x["resources"], json.load(sys.stdin)["modules"])); k="aws_instance.bootstrap"; print d[k]["primary"]["attributes"]["public_ip"] if k in d else ""' \
-                  < /tmp/artifacts/installer/terraform.tfstate
-              )
-
+                #              bootstrap_ip=$(python -c \
+                #                  'import sys, json; d=reduce(lambda x,y: dict(x.items() + y.items()), map(lambda x: x["resources"], json.load(sys.stdin)["modules"])); k="aws_instance.bootstrap"; print d[k]["primary"]["attributes"]["public_ip"] if k in d else ""' \
+                #                  < /tmp/artifacts/installer/terraform.tfstate
+                #              )
+                #
               if [ -n "${bootstrap_ip}" ]
               then
                 for service in bootkube openshift kubelet crio
@@ -425,7 +427,6 @@ objects:
           wait
 
           echo "Deprovisioning cluster ..."
-          export AWS_SHARED_CREDENTIALS_FILE=/etc/openshift-installer/.awscred
           openshift-install --dir /tmp/artifacts/installer destroy cluster
         }
 
