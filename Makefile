@@ -154,10 +154,11 @@ prow-ci-chat-bot:
 prow-release-controller-definitions:
 	oc create imagestream origin-release -o yaml --dry-run | oc apply -f - -n openshift
 	oc create imagestream origin-v4.0 -o yaml --dry-run | oc apply -f - -n openshift
-	-oc create imagestream release -n ocp
+	oc create imagestream release -o yaml --dry-run | oc apply -f - -n ocp
 	oc annotate -n openshift is/origin-v4.0 "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/origin-4.0.json)" --overwrite
 	oc annotate -n ocp is/4.0-art-latest "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/ocp-4.0.json)" --overwrite
 	oc annotate -n ocp is/4.0 "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/ocp-4.0-ci.json)" --overwrite
+	oc annotate -n ocp is/release "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/ocp-4.0-stable.json)" --overwrite
 .PHONY: prow-release-controller-definitions
 
 prow-release-controller-deploy:
