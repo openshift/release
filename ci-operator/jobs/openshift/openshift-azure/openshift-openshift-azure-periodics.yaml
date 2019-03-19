@@ -1,263 +1,94 @@
 periodics:
-# Azure node image build jobs
-# Centos-base, centos-ocp-3.10, centos-ocp-3.11
 - agent: kubernetes
-  cron: ""
   decorate: true
   interval: 24h
-  labels:
-    master: ci.openshift.redhat.com
-  name: periodic-ci-azure-base-image-centos
+  name: periodic-ci-azure-node-image
   skip_cloning: true
   spec:
     containers:
     - args:
       - --artifact-dir=$(ARTIFACTS)
+      - --git-ref=openshift/openshift-azure@master
       - --secret-dir=/usr/local/e2e-secrets/azure
-      - --template=/usr/local/build-base-image
-      - --target=build-base-image
+      - --target=[output:stable:azure-controllers]
+      - --target=[output:stable:etcdbackup]
+      - --target=[output:stable:metricsbridge]
+      - --target=[output:stable:startup]
+      - --target=[output:stable:sync]
+      - --target=[output:stable:tlsproxy]
+      - --target=vmimage
       command:
       - ci-operator
       env:
       - name: CONFIG_SPEC
         valueFrom:
           configMapKeyRef:
-            key: openshift-openshift-ansible-release-3.11.yaml
-            name: ci-operator-3.x-configs
-      - name: JOB_NAME_SAFE
-        value: build-base-image
-      - name: DEPLOY_OS
-        value: centos7
+            key: openshift-openshift-azure-master.yaml
+            name: ci-operator-master-configs
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
       resources:
-          requests:
-            cpu: 500m
+        requests:
+          cpu: 10m
       volumeMounts:
-      - mountPath: /usr/local/build-base-image
-        name: job-definition
-        subPath: build-base-image.yaml
       - mountPath: /usr/local/e2e-secrets/azure
         name: cluster-secrets-azure
     serviceAccountName: ci-operator
     volumes:
-    - configMap:
-        name: prow-job-build-base-image
-      name: job-definition
     - name: cluster-secrets-azure
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-azure
+      secret:
+        secretName: cluster-secrets-azure
 - agent: kubernetes
-  cron: ""
-  decorate: true
-  interval: 24h
-  name: periodic-ci-azure-node-image-centos-311
-  skip_cloning: true
-  spec:
-    containers:
-    - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --secret-dir=/usr/local/e2e-secrets/azure
-      - --template=/usr/local/build-node-image
-      - --target=build-node-image
-      command:
-      - ci-operator
-      env:
-      - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-openshift-ansible-release-3.11.yaml
-            name: ci-operator-3.x-configs
-      - name: JOB_NAME_SAFE
-        value: build-node-image
-      - name: CLUSTER_TYPE
-        value: azure
-      - name: DEPLOY_OS
-        value: centos7
-      - name: OPENSHIFT_RELEASE
-        value: "3.11"
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-          requests:
-            cpu: 500m
-      volumeMounts:
-      - mountPath: /usr/local/build-node-image
-        name: job-definition
-        subPath: build-node-image.yaml
-      - mountPath: /usr/local/e2e-secrets/azure
-        name: cluster-secrets-azure
-    serviceAccountName: ci-operator
-    volumes:
-    - configMap:
-        name: prow-job-build-node-image
-      name: job-definition
-    - name: cluster-secrets-azure
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-azure
-# RHEL-base, rhel-ocp-3.11
-- agent: kubernetes
-  cron: ""
-  decorate: true
-  interval: 24h
-  labels:
-    master: ci.openshift.redhat.com
-  name: periodic-ci-azure-base-image-rhel
-  skip_cloning: true
-  spec:
-    containers:
-    - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --secret-dir=/usr/local/e2e-secrets/azure
-      - --template=/usr/local/build-base-image
-      - --target=build-base-image
-      command:
-      - ci-operator
-      env:
-      - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-openshift-ansible-release-3.11.yaml
-            name: ci-operator-3.x-configs
-      - name: JOB_NAME_SAFE
-        value: build-base-image
-      - name: DEPLOY_OS
-        value: rhel7
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-          requests:
-            cpu: 500m
-      volumeMounts:
-      - mountPath: /usr/local/build-base-image
-        name: job-definition
-        subPath: build-base-image.yaml
-      - mountPath: /usr/local/e2e-secrets/azure
-        name: cluster-secrets-azure
-    serviceAccountName: ci-operator
-    volumes:
-    - configMap:
-        name: prow-job-build-base-image
-      name: job-definition
-    - name: cluster-secrets-azure
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-azure
-- agent: kubernetes
-  cron: ""
-  decorate: true
-  interval: 24h
-  name: periodic-ci-azure-node-image-rhel-311
-  skip_cloning: true
-  spec:
-    containers:
-    - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --secret-dir=/usr/local/e2e-secrets/azure
-      - --template=/usr/local/build-node-image
-      - --target=build-node-image
-      command:
-      - ci-operator
-      env:
-      - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-openshift-ansible-release-3.11.yaml
-            name: ci-operator-3.x-configs
-      - name: JOB_NAME_SAFE
-        value: build-node-image
-      - name: CLUSTER_TYPE
-        value: azure
-      - name: DEPLOY_OS
-        value: rhel7
-      - name: OPENSHIFT_RELEASE
-        value: "3.11"
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-          requests:
-            cpu: 500m
-      volumeMounts:
-      - mountPath: /usr/local/build-node-image
-        name: job-definition
-        subPath: build-node-image.yaml
-      - mountPath: /usr/local/e2e-secrets/azure
-        name: cluster-secrets-azure
-    serviceAccountName: ci-operator
-    volumes:
-    - configMap:
-        name: prow-job-build-node-image
-      name: job-definition
-    - name: cluster-secrets-azure
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-azure
-- agent: kubernetes
-  cron: ""
   decorate: true
   interval: 24h
   name: periodic-ci-azure-changeloglevel-e2e
   skip_cloning: true
   spec:
     containers:
-      - args:
-          - --artifact-dir=$(ARTIFACTS)
-          - --git-ref=openshift/openshift-azure@master
-          - --secret-dir=/usr/local/e2e-secrets/azure
-          - --target=[output:stable:azure-controllers]
-          - --target=[output:stable:etcdbackup]
-          - --target=[output:stable:metricsbridge]
-          - --target=[output:stable:sync]
-          - --target=e2e-azure-changeloglevel
-          - --template=/usr/local/e2e-azure-changeloglevel
-        command:
-          - ci-operator
-        env:
-          - name: CLUSTER_TYPE
-            value: azure
-          - name: CONFIG_SPEC
-            valueFrom:
-              configMapKeyRef:
-                key: openshift-openshift-azure-master.yaml
-                name: ci-operator-master-configs
-          - name: JOB_NAME_SAFE
-            value: e2e-azure-changeloglevel
-          - name: TEST_COMMAND
-            value: make e2e-changeloglevel
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-          - mountPath: /usr/local/e2e-secrets/azure
-            name: cluster-secrets-azure
-          - mountPath: /usr/local/e2e-azure-changeloglevel
-            name: job-definition
-            subPath: cluster-launch-e2e-azure.yaml
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --git-ref=openshift/openshift-azure@master
+      - --secret-dir=/usr/local/e2e-secrets/azure
+      - --target=[output:stable:azure-controllers]
+      - --target=[output:stable:etcdbackup]
+      - --target=[output:stable:metricsbridge]
+      - --target=[output:stable:startup]
+      - --target=[output:stable:sync]
+      - --target=[output:stable:tlsproxy]
+      - --target=cluster-launch-e2e-azure
+      - --template=/usr/local/cluster-launch-e2e-azure.yaml
+      command:
+      - ci-operator
+      env:
+      - name: CONFIG_SPEC
+        valueFrom:
+          configMapKeyRef:
+            key: openshift-openshift-azure-master.yaml
+            name: ci-operator-master-configs
+      - name: TEST_COMMAND
+        value: make e2e-changeloglevel
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/e2e-secrets/azure
+        name: cluster-secrets-azure
+      - mountPath: /usr/local/cluster-launch-e2e-azure.yaml
+        name: job-definition
+        subPath: cluster-launch-e2e-azure.yaml
     serviceAccountName: ci-operator
     volumes:
-      - name: cluster-secrets-azure
-        projected:
-          sources:
-            - secret:
-                name: cluster-secrets-azure
-      - configMap:
-          name: prow-job-cluster-launch-e2e-azure
-        name: job-definition
+    - name: cluster-secrets-azure
+      secret:
+        secretName: cluster-secrets-azure
+    - configMap:
+        name: prow-job-cluster-launch-e2e-azure
+      name: job-definition
 - agent: kubernetes
-  cron: ""
   decorate: true
   interval: 24h
   name: periodic-ci-azure-etcdbackuprecovery-e2e
@@ -274,20 +105,16 @@ periodics:
       - --target=[output:stable:startup]
       - --target=[output:stable:sync]
       - --target=[output:stable:tlsproxy]
-      - --target=e2e-azure-etcdbackuprecovery
-      - --template=/usr/local/e2e-azure-etcdbackuprecovery
+      - --target=cluster-launch-e2e-azure
+      - --template=/usr/local/cluster-launch-e2e-azure.yaml
       command:
       - ci-operator
       env:
-      - name: CLUSTER_TYPE
-        value: azure
       - name: CONFIG_SPEC
         valueFrom:
           configMapKeyRef:
             key: openshift-openshift-azure-master.yaml
             name: ci-operator-master-configs
-      - name: JOB_NAME_SAFE
-        value: e2e-azure-etcdbackuprecovery
       - name: TEST_COMMAND
         value: make e2e-etcdbackuprecovery
       image: ci-operator:latest
@@ -299,77 +126,67 @@ periodics:
       volumeMounts:
       - mountPath: /usr/local/e2e-secrets/azure
         name: cluster-secrets-azure
-      - mountPath: /usr/local/e2e-azure-etcdbackuprecovery
+      - mountPath: /usr/local/cluster-launch-e2e-azure.yaml
         name: job-definition
         subPath: cluster-launch-e2e-azure.yaml
     serviceAccountName: ci-operator
     volumes:
     - name: cluster-secrets-azure
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-azure
+      secret:
+        secretName: cluster-secrets-azure
     - configMap:
         name: prow-job-cluster-launch-e2e-azure
       name: job-definition
 - agent: kubernetes
-  cron: ""
   decorate: true
   interval: 24h
   name: periodic-ci-azure-forceupdate-e2e
   skip_cloning: true
   spec:
     containers:
-      - args:
-          - --artifact-dir=$(ARTIFACTS)
-          - --git-ref=openshift/openshift-azure@master
-          - --secret-dir=/usr/local/e2e-secrets/azure
-          - --target=[output:stable:azure-controllers]
-          - --target=[output:stable:etcdbackup]
-          - --target=[output:stable:metricsbridge]
-          - --target=[output:stable:startup]
-          - --target=[output:stable:sync]
-          - --target=[output:stable:tlsproxy]
-          - --target=e2e-azure-forceupdate
-          - --template=/usr/local/e2e-azure-forceupdate
-        command:
-          - ci-operator
-        env:
-          - name: CLUSTER_TYPE
-            value: azure
-          - name: CONFIG_SPEC
-            valueFrom:
-              configMapKeyRef:
-                key: openshift-openshift-azure-master.yaml
-                name: ci-operator-master-configs
-          - name: JOB_NAME_SAFE
-            value: e2e-azure-forceupdate
-          - name: TEST_COMMAND
-            value: make e2e-forceupdate
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-          - mountPath: /usr/local/e2e-secrets/azure
-            name: cluster-secrets-azure
-          - mountPath: /usr/local/e2e-azure-forceupdate
-            name: job-definition
-            subPath: cluster-launch-e2e-azure.yaml
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --git-ref=openshift/openshift-azure@master
+      - --secret-dir=/usr/local/e2e-secrets/azure
+      - --target=[output:stable:azure-controllers]
+      - --target=[output:stable:etcdbackup]
+      - --target=[output:stable:metricsbridge]
+      - --target=[output:stable:startup]
+      - --target=[output:stable:sync]
+      - --target=[output:stable:tlsproxy]
+      - --target=cluster-launch-e2e-azure
+      - --template=/usr/local/cluster-launch-e2e-azure.yaml
+      command:
+      - ci-operator
+      env:
+      - name: CONFIG_SPEC
+        valueFrom:
+          configMapKeyRef:
+            key: openshift-openshift-azure-master.yaml
+            name: ci-operator-master-configs
+      - name: TEST_COMMAND
+        value: make e2e-forceupdate
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/e2e-secrets/azure
+        name: cluster-secrets-azure
+      - mountPath: /usr/local/cluster-launch-e2e-azure.yaml
+        name: job-definition
+        subPath: cluster-launch-e2e-azure.yaml
     serviceAccountName: ci-operator
     volumes:
-      - name: cluster-secrets-azure
-        projected:
-          sources:
-            - secret:
-                name: cluster-secrets-azure
-      - configMap:
-          name: prow-job-cluster-launch-e2e-azure
-        name: job-definition
+    - name: cluster-secrets-azure
+      secret:
+        secretName: cluster-secrets-azure
+    - configMap:
+        name: prow-job-cluster-launch-e2e-azure
+      name: job-definition
 - agent: kubernetes
-  cron: ""
   decorate: true
   interval: 24h
   name: periodic-ci-azure-key-rotation-e2e
@@ -386,20 +203,16 @@ periodics:
       - --target=[output:stable:startup]
       - --target=[output:stable:sync]
       - --target=[output:stable:tlsproxy]
-      - --target=e2e-azure-keyrotation
-      - --template=/usr/local/e2e-azure-keyrotation
+      - --target=cluster-launch-e2e-azure
+      - --template=/usr/local/cluster-launch-e2e-azure.yaml
       command:
       - ci-operator
       env:
-      - name: CLUSTER_TYPE
-        value: azure
       - name: CONFIG_SPEC
         valueFrom:
           configMapKeyRef:
             key: openshift-openshift-azure-master.yaml
             name: ci-operator-master-configs
-      - name: JOB_NAME_SAFE
-        value: e2e-azure-keyrotation
       - name: TEST_COMMAND
         value: make e2e-keyrotation
       image: ci-operator:latest
@@ -411,21 +224,18 @@ periodics:
       volumeMounts:
       - mountPath: /usr/local/e2e-secrets/azure
         name: cluster-secrets-azure
-      - mountPath: /usr/local/e2e-azure-keyrotation
+      - mountPath: /usr/local/cluster-launch-e2e-azure.yaml
         name: job-definition
         subPath: cluster-launch-e2e-azure.yaml
     serviceAccountName: ci-operator
     volumes:
     - name: cluster-secrets-azure
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-azure
+      secret:
+        secretName: cluster-secrets-azure
     - configMap:
         name: prow-job-cluster-launch-e2e-azure
       name: job-definition
 - agent: kubernetes
-  cron: ""
   decorate: true
   interval: 168h
   name: periodic-ci-azure-no-running-under-test
@@ -442,20 +252,16 @@ periodics:
       - --target=[output:stable:startup]
       - --target=[output:stable:sync]
       - --target=[output:stable:tlsproxy]
-      - --target=e2e-azure-no-test
-      - --template=/usr/local/e2e-azure-no-test
+      - --target=cluster-launch-e2e-azure
+      - --template=/usr/local/cluster-launch-e2e-azure.yaml
       command:
       - ci-operator
       env:
-      - name: CLUSTER_TYPE
-        value: azure
       - name: CONFIG_SPEC
         valueFrom:
           configMapKeyRef:
             key: openshift-openshift-azure-master.yaml
             name: ci-operator-master-configs
-      - name: JOB_NAME_SAFE
-        value: e2e-azure-no-test
       - name: RUNNING_UNDER_TEST
         value: "false"
       image: ci-operator:latest
@@ -467,75 +273,67 @@ periodics:
       volumeMounts:
       - mountPath: /usr/local/e2e-secrets/azure
         name: cluster-secrets-azure
-      - mountPath: /usr/local/e2e-azure-no-test
+      - mountPath: /usr/local/cluster-launch-e2e-azure.yaml
         name: job-definition
         subPath: cluster-launch-e2e-azure.yaml
     serviceAccountName: ci-operator
     volumes:
     - name: cluster-secrets-azure
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-azure
+      secret:
+        secretName: cluster-secrets-azure
     - configMap:
         name: prow-job-cluster-launch-e2e-azure
       name: job-definition
 - agent: kubernetes
-  cron: ""
   decorate: true
   interval: 24h
   name: periodic-ci-azure-reimagevm-e2e
   skip_cloning: true
   spec:
     containers:
-      - args:
-          - --artifact-dir=$(ARTIFACTS)
-          - --git-ref=openshift/openshift-azure@master
-          - --secret-dir=/usr/local/e2e-secrets/azure
-          - --target=[output:stable:azure-controllers]
-          - --target=[output:stable:etcdbackup]
-          - --target=[output:stable:metricsbridge]
-          - --target=[output:stable:sync]
-          - --target=e2e-azure-reimagevm
-          - --template=/usr/local/e2e-azure-reimagevm
-        command:
-          - ci-operator
-        env:
-          - name: CLUSTER_TYPE
-            value: azure
-          - name: CONFIG_SPEC
-            valueFrom:
-              configMapKeyRef:
-                key: openshift-openshift-azure-master.yaml
-                name: ci-operator-master-configs
-          - name: JOB_NAME_SAFE
-            value: e2e-azure-reimagevm
-          - name: TEST_COMMAND
-            value: make e2e-reimagevm
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-          - mountPath: /usr/local/e2e-secrets/azure
-            name: cluster-secrets-azure
-          - mountPath: /usr/local/e2e-azure-reimagevm
-            name: job-definition
-            subPath: cluster-launch-e2e-azure.yaml
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --git-ref=openshift/openshift-azure@master
+      - --secret-dir=/usr/local/e2e-secrets/azure
+      - --target=[output:stable:azure-controllers]
+      - --target=[output:stable:etcdbackup]
+      - --target=[output:stable:metricsbridge]
+      - --target=[output:stable:startup]
+      - --target=[output:stable:sync]
+      - --target=[output:stable:tlsproxy]
+      - --target=cluster-launch-e2e-azure
+      - --template=/usr/local/cluster-launch-e2e-azure.yaml
+      command:
+      - ci-operator
+      env:
+      - name: CONFIG_SPEC
+        valueFrom:
+          configMapKeyRef:
+            key: openshift-openshift-azure-master.yaml
+            name: ci-operator-master-configs
+      - name: TEST_COMMAND
+        value: make e2e-reimagevm
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/e2e-secrets/azure
+        name: cluster-secrets-azure
+      - mountPath: /usr/local/cluster-launch-e2e-azure.yaml
+        name: job-definition
+        subPath: cluster-launch-e2e-azure.yaml
     serviceAccountName: ci-operator
     volumes:
-      - name: cluster-secrets-azure
-        projected:
-          sources:
-            - secret:
-                name: cluster-secrets-azure
-      - configMap:
-          name: prow-job-cluster-launch-e2e-azure
-        name: job-definition
+    - name: cluster-secrets-azure
+      secret:
+        secretName: cluster-secrets-azure
+    - configMap:
+        name: prow-job-cluster-launch-e2e-azure
+      name: job-definition
 - agent: kubernetes
-  cron: ""
   decorate: true
   interval: 24h
   name: periodic-ci-azure-scaleupdown-e2e
@@ -552,20 +350,16 @@ periodics:
       - --target=[output:stable:startup]
       - --target=[output:stable:sync]
       - --target=[output:stable:tlsproxy]
-      - --target=e2e-azure-scaleupdown
-      - --template=/usr/local/e2e-azure-scaleupdown
+      - --target=cluster-launch-e2e-azure
+      - --template=/usr/local/cluster-launch-e2e-azure.yaml
       command:
       - ci-operator
       env:
-      - name: CLUSTER_TYPE
-        value: azure
       - name: CONFIG_SPEC
         valueFrom:
           configMapKeyRef:
             key: openshift-openshift-azure-master.yaml
             name: ci-operator-master-configs
-      - name: JOB_NAME_SAFE
-        value: e2e-azure-scaleupdown
       - name: TEST_COMMAND
         value: make e2e-scaleupdown
       image: ci-operator:latest
@@ -577,75 +371,67 @@ periodics:
       volumeMounts:
       - mountPath: /usr/local/e2e-secrets/azure
         name: cluster-secrets-azure
-      - mountPath: /usr/local/e2e-azure-scaleupdown
+      - mountPath: /usr/local/cluster-launch-e2e-azure.yaml
         name: job-definition
         subPath: cluster-launch-e2e-azure.yaml
     serviceAccountName: ci-operator
     volumes:
     - name: cluster-secrets-azure
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-azure
+      secret:
+        secretName: cluster-secrets-azure
     - configMap:
         name: prow-job-cluster-launch-e2e-azure
       name: job-definition
 - agent: kubernetes
-  cron: ""
   decorate: true
   interval: 24h
   name: periodic-ci-azure-updatecluster-e2e
   skip_cloning: true
   spec:
     containers:
-      - args:
-          - --artifact-dir=$(ARTIFACTS)
-          - --git-ref=openshift/openshift-azure@master
-          - --secret-dir=/usr/local/e2e-secrets/azure
-          - --target=[output:stable:azure-controllers]
-          - --target=[output:stable:etcdbackup]
-          - --target=[output:stable:metricsbridge]
-          - --target=[output:stable:sync]
-          - --target=e2e-azure-updatecluster
-          - --template=/usr/local/e2e-azure-updatecluster
-        command:
-          - ci-operator
-        env:
-          - name: CLUSTER_TYPE
-            value: azure
-          - name: CONFIG_SPEC
-            valueFrom:
-              configMapKeyRef:
-                key: openshift-openshift-azure-master.yaml
-                name: ci-operator-master-configs
-          - name: JOB_NAME_SAFE
-            value: e2e-azure-updatecluster
-          - name: TEST_COMMAND
-            value: make e2e-updatecluster
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-          - mountPath: /usr/local/e2e-secrets/azure
-            name: cluster-secrets-azure
-          - mountPath: /usr/local/e2e-azure-updatecluster
-            name: job-definition
-            subPath: cluster-launch-e2e-azure.yaml
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --git-ref=openshift/openshift-azure@master
+      - --secret-dir=/usr/local/e2e-secrets/azure
+      - --target=[output:stable:azure-controllers]
+      - --target=[output:stable:etcdbackup]
+      - --target=[output:stable:metricsbridge]
+      - --target=[output:stable:startup]
+      - --target=[output:stable:sync]
+      - --target=[output:stable:tlsproxy]
+      - --target=cluster-launch-e2e-azure
+      - --template=/usr/local/cluster-launch-e2e-azure.yaml
+      command:
+      - ci-operator
+      env:
+      - name: CONFIG_SPEC
+        valueFrom:
+          configMapKeyRef:
+            key: openshift-openshift-azure-master.yaml
+            name: ci-operator-master-configs
+      - name: TEST_COMMAND
+        value: make e2e-updatecluster
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/e2e-secrets/azure
+        name: cluster-secrets-azure
+      - mountPath: /usr/local/cluster-launch-e2e-azure.yaml
+        name: job-definition
+        subPath: cluster-launch-e2e-azure.yaml
     serviceAccountName: ci-operator
     volumes:
-      - name: cluster-secrets-azure
-        projected:
-          sources:
-            - secret:
-                name: cluster-secrets-azure
-      - configMap:
-          name: prow-job-cluster-launch-e2e-azure
-        name: job-definition
+    - name: cluster-secrets-azure
+      secret:
+        secretName: cluster-secrets-azure
+    - configMap:
+        name: prow-job-cluster-launch-e2e-azure
+      name: job-definition
 - agent: kubernetes
-  cron: ""
   decorate: true
   interval: 24h
   name: periodic-ci-azure-vnet-e2e
@@ -656,20 +442,16 @@ periodics:
       - --artifact-dir=$(ARTIFACTS)
       - --git-ref=openshift/openshift-azure@master
       - --secret-dir=/usr/local/e2e-secrets/azure
-      - --target=e2e-azure-vnet
-      - --template=/usr/local/e2e-azure-vnet
+      - --target=cluster-launch-e2e-azure
+      - --template=/usr/local/cluster-launch-e2e-azure.yaml
       command:
       - ci-operator
       env:
-      - name: CLUSTER_TYPE
-        value: azure
       - name: CONFIG_SPEC
         valueFrom:
           configMapKeyRef:
             key: openshift-openshift-azure-master.yaml
             name: ci-operator-master-configs
-      - name: JOB_NAME_SAFE
-        value: e2e-azure-vnet
       - name: RUNNING_UNDER_TEST
         value: "false"
       - name: TEST_COMMAND
@@ -685,21 +467,18 @@ periodics:
       volumeMounts:
       - mountPath: /usr/local/e2e-secrets/azure
         name: cluster-secrets-azure
-      - mountPath: /usr/local/e2e-azure-vnet
+      - mountPath: /usr/local/cluster-launch-e2e-azure.yaml
         name: job-definition
         subPath: cluster-launch-e2e-azure.yaml
     serviceAccountName: ci-operator
     volumes:
     - name: cluster-secrets-azure
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-azure
+      secret:
+        secretName: cluster-secrets-azure
     - configMap:
         name: prow-job-cluster-launch-e2e-azure
       name: job-definition
 - agent: kubernetes
-  cron: ""
   decorate: true
   interval: 24h
   name: periodic-ci-azure-prod-e2e
@@ -710,20 +489,16 @@ periodics:
       - --artifact-dir=$(ARTIFACTS)
       - --git-ref=openshift/openshift-azure@master
       - --secret-dir=/usr/local/e2e-secrets/azure
-      - --target=e2e-azure-prod
-      - --template=/usr/local/e2e-azure-prod
+      - --target=cluster-launch-e2e-azure
+      - --template=/usr/local/cluster-launch-e2e-azure.yaml
       command:
       - ci-operator
       env:
-      - name: CLUSTER_TYPE
-        value: azure
       - name: CONFIG_SPEC
         valueFrom:
           configMapKeyRef:
             key: openshift-openshift-azure-master.yaml
             name: ci-operator-master-configs
-      - name: JOB_NAME_SAFE
-        value: e2e-azure-prod
       - name: NO_WAIT
         value: "false"
       - name: RUNNING_UNDER_TEST
@@ -741,21 +516,18 @@ periodics:
       volumeMounts:
       - mountPath: /usr/local/e2e-secrets/azure
         name: cluster-secrets-azure
-      - mountPath: /usr/local/e2e-azure-prod
+      - mountPath: /usr/local/cluster-launch-e2e-azure.yaml
         name: job-definition
         subPath: cluster-launch-e2e-azure.yaml
     serviceAccountName: ci-operator
     volumes:
     - name: cluster-secrets-azure
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-azure
+      secret:
+        secretName: cluster-secrets-azure
     - configMap:
         name: prow-job-cluster-launch-e2e-azure
       name: job-definition
 - agent: kubernetes
-  cron: ""
   decorate: true
   interval: 24h
   name: periodic-ci-openshift-openshift-azure-master-images
@@ -783,7 +555,6 @@ periodics:
           cpu: 10m
     serviceAccountName: ci-operator
 - agent: kubernetes
-  cron: ""
   decorate: true
   interval: 24h
   name: periodic-ci-openshift-openshift-azure-master-conformance
@@ -800,20 +571,16 @@ periodics:
       - --target=[output:stable:startup]
       - --target=[output:stable:sync]
       - --target=[output:stable:tlsproxy]
-      - --target=e2e-azure-conformance
-      - --template=/usr/local/e2e-azure-conformance
+      - --target=cluster-launch-e2e-azure
+      - --template=/usr/local/cluster-launch-e2e-azure.yaml
       command:
       - ci-operator
       env:
-      - name: CLUSTER_TYPE
-        value: azure
       - name: CONFIG_SPEC
         valueFrom:
           configMapKeyRef:
             key: openshift-openshift-azure-master.yaml
             name: ci-operator-master-configs
-      - name: JOB_NAME_SAFE
-        value: azure-test-conformance
       - name: TEST_COMMAND
         value: TEST_FOCUS=Suite:openshift/conformance/parallel run-tests
       - name: TEST_IMAGE
@@ -827,21 +594,18 @@ periodics:
       volumeMounts:
       - mountPath: /usr/local/e2e-secrets/azure
         name: cluster-secrets-azure
-      - mountPath: /usr/local/e2e-azure-conformance
+      - mountPath: /usr/local/cluster-launch-e2e-azure.yaml
         name: job-definition
         subPath: cluster-launch-e2e-azure.yaml
     serviceAccountName: ci-operator
     volumes:
     - name: cluster-secrets-azure
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-azure
+      secret:
+        secretName: cluster-secrets-azure
     - configMap:
         name: prow-job-cluster-launch-e2e-azure
       name: job-definition
 - agent: kubernetes
-  cron: ""
   decorate: true
   interval: 24h
   name: periodic-ci-openshift-openshift-azure-master-bushslicer
@@ -852,23 +616,22 @@ periodics:
       - --artifact-dir=$(ARTIFACTS)
       - --git-ref=openshift/openshift-azure@master
       - --secret-dir=/usr/local/e2e-secrets/azure
-      - --target=e2e-azure-bushslicer
-      - --template=/usr/local/e2e-azure-bushslicer
+      - --target=cluster-launch-e2e-azure
+      - --template=/usr/local/cluster-launch-e2e-azure.yaml
       - --target=[output:stable:azure-controllers]
+      - --target=[output:stable:etcdbackup]
       - --target=[output:stable:metricsbridge]
+      - --target=[output:stable:startup]
       - --target=[output:stable:sync]
+      - --target=[output:stable:tlsproxy]
       command:
       - ci-operator
       env:
-      - name: CLUSTER_TYPE
-        value: azure
       - name: CONFIG_SPEC
         valueFrom:
           configMapKeyRef:
             key: openshift-openshift-azure-master.yaml
             name: ci-operator-master-configs
-      - name: JOB_NAME_SAFE
-        value: e2e-azure-bushslicer
       - name: TEST_IMAGE
         value: quay.io/kwoodson/bushslicer
       - name: TEST_COMMAND
@@ -894,16 +657,14 @@ periodics:
       volumeMounts:
       - mountPath: /usr/local/e2e-secrets/azure
         name: cluster-secrets-azure
-      - mountPath: /usr/local/e2e-azure-bushslicer
+      - mountPath: /usr/local/cluster-launch-e2e-azure.yaml
         name: job-definition
         subPath: cluster-launch-e2e-azure.yaml
     serviceAccountName: ci-operator
     volumes:
     - name: cluster-secrets-azure
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-azure
+      secret:
+        secretName: cluster-secrets-azure
     - configMap:
         name: prow-job-cluster-launch-e2e-azure
       name: job-definition
