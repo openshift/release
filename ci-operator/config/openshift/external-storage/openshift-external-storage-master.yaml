@@ -1,0 +1,45 @@
+tag_specification:
+  name: '4.0'
+  namespace: ocp
+promotion:
+  name: '4.0'
+  namespace: ocp
+base_images:
+  base:
+    name: '4.0'
+    namespace: ocp
+    tag: base
+canonical_go_repository: github.com/kubernetes-incubator/external-storage
+images:
+- from: base
+  dockerfile_path: Dockerfile.snapshot-controller
+  inputs:
+    root:
+      as:
+      - '0'
+  to: snapshot-controller
+- from: base
+  dockerfile_path: Dockerfile.snapshot-provisioner
+  inputs:
+    root:
+      as:
+      - '0'
+  to: snapshot-provisioner
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.11
+tests:
+- as: unit
+  commands: make test-snapshot
+  container:
+    from: src
