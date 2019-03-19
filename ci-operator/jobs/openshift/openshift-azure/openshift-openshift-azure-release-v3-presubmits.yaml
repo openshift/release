@@ -33,6 +33,8 @@ presubmits:
             configMapKeyRef:
               key: openshift-openshift-azure-release-v3.yaml
               name: ci-operator-misc-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-azure
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -89,6 +91,8 @@ presubmits:
             configMapKeyRef:
               key: openshift-openshift-azure-release-v3.yaml
               name: ci-operator-misc-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-changeloglevel
         - name: TEST_COMMAND
           value: make e2e-changeloglevel
         image: ci-operator:latest
@@ -145,6 +149,8 @@ presubmits:
             configMapKeyRef:
               key: openshift-openshift-azure-release-v3.yaml
               name: ci-operator-misc-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-conformance
         - name: TEST_COMMAND
           value: TEST_SUITE=openshift/conformance/parallel run-tests
         - name: TEST_IMAGE
@@ -205,6 +211,8 @@ presubmits:
             configMapKeyRef:
               key: openshift-openshift-azure-release-v3.yaml
               name: ci-operator-misc-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-etcdbackuprecovery
         - name: TEST_COMMAND
           value: make e2e-etcdbackuprecovery
         image: ci-operator:latest
@@ -263,6 +271,8 @@ presubmits:
             configMapKeyRef:
               key: openshift-openshift-azure-release-v3.yaml
               name: ci-operator-misc-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-forceupdate
         - name: TEST_COMMAND
           value: make e2e-forceupdate
         image: ci-operator:latest
@@ -321,6 +331,8 @@ presubmits:
             configMapKeyRef:
               key: openshift-openshift-azure-release-v3.yaml
               name: ci-operator-misc-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-keyrotation
         - name: TEST_COMMAND
           value: make e2e-keyrotation
         image: ci-operator:latest
@@ -377,6 +389,8 @@ presubmits:
             configMapKeyRef:
               key: openshift-openshift-azure-release-v3.yaml
               name: ci-operator-misc-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-no-test
         - name: RUNNING_UNDER_TEST
           value: "false"
         image: ci-operator:latest
@@ -431,6 +445,8 @@ presubmits:
             configMapKeyRef:
               key: openshift-openshift-azure-release-v3.yaml
               name: ci-operator-misc-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-prod
         - name: NO_WAIT
           value: "false"
         - name: RUNNING_UNDER_TEST
@@ -461,7 +477,7 @@ presubmits:
         name: job-definition
     trigger: ((?m)^/test prod,?(\s+|$))
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - release-v3
     context: ci/prow/reimagevm
@@ -495,6 +511,8 @@ presubmits:
             configMapKeyRef:
               key: openshift-openshift-azure-release-v3.yaml
               name: ci-operator-misc-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-reimagevm
         - name: TEST_COMMAND
           value: make e2e-reimagevm
         image: ci-operator:latest
@@ -553,6 +571,8 @@ presubmits:
             configMapKeyRef:
               key: openshift-openshift-azure-release-v3.yaml
               name: ci-operator-misc-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-scaleupdown
         - name: TEST_COMMAND
           value: make e2e-scaleupdown
         image: ci-operator:latest
@@ -611,6 +631,8 @@ presubmits:
             configMapKeyRef:
               key: openshift-openshift-azure-release-v3.yaml
               name: ci-operator-misc-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-updatecluster
         - name: TEST_COMMAND
           value: make e2e-updatecluster
         image: ci-operator:latest
@@ -634,38 +656,6 @@ presubmits:
           name: prow-job-cluster-launch-e2e-azure
         name: job-definition
     trigger: ((?m)^/test updatecluster,?(\s+|$))
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-v3
-    context: ci/prow/e2e-upgrade-v2.5
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    name: pull-ci-openshift-openshift-azure-release-v3-e2e-upgrade-v2.5
-    rerun_command: /test e2e-upgrade-v2.5
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --target=e2e-upgrade-v2.5
-        command:
-        - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-openshift-azure-release-v3.yaml
-              name: ci-operator-misc-configs
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-      serviceAccountName: ci-operator
-    trigger: '(?m)^/test (?:.*? )?e2e-upgrade-v2.5(?: .*?)?$'
   - agent: kubernetes
     always_run: true
     branches:
@@ -699,6 +689,39 @@ presubmits:
       serviceAccountName: ci-operator
     trigger: '(?m)^/test (?:.*? )?images(?: .*?)?$'
   - agent: kubernetes
+    always_run: false
+    branches:
+    - release-v3
+    context: ci/prow/internal-upgrade-v2.5
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    name: pull-ci-openshift-openshift-azure-release-v3-internal-upgrade-v2.5
+    optional: true
+    rerun_command: /test internal-upgrade-v2.5
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --target=internal-upgrade-v2.5
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-openshift-azure-release-v3.yaml
+              name: ci-operator-misc-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: '(?m)^/test (?:.*? )?internal-upgrade-v2.5(?: .*?)?$'
+  - agent: kubernetes
     always_run: true
     branches:
     - release-v3
@@ -731,7 +754,7 @@ presubmits:
       serviceAccountName: ci-operator
     trigger: '(?m)^/test (?:.*? )?unit(?: .*?)?$'
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - release-v3
     context: ci/prow/upgrade-v2.4
@@ -753,7 +776,9 @@ presubmits:
         - --target=[output:stable:startup]
         - --target=[output:stable:sync]
         - --target=[output:stable:tlsproxy]
-        - --target=e2e-upgrade-v2.4
+        - --target=internal-upgrade-v2.4
+        - --target=rbac
+        - --template=/usr/local/rbac.yaml
         command:
         - ci-operator
         env:
@@ -762,6 +787,8 @@ presubmits:
             configMapKeyRef:
               key: openshift-openshift-azure-release-v3.yaml
               name: ci-operator-misc-configs
+        - name: JOB_NAME_SAFE
+          value: upgrade-v24
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -771,14 +798,20 @@ presubmits:
         volumeMounts:
         - mountPath: /usr/local/e2e-secrets/azure
           name: cluster-secrets-azure
+        - mountPath: /usr/local/rbac.yaml
+          name: job-definition
+          subPath: rbac.yaml
       serviceAccountName: ci-operator
       volumes:
       - name: cluster-secrets-azure
         secret:
           secretName: cluster-secrets-azure
+      - configMap:
+          name: prow-job-rbac-azure
+        name: job-definition
     trigger: '(?m)^/test (?:.*? )?upgrade-v2.4(?: .*?)?$'
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - release-v3
     context: ci/prow/upgrade-v2.5
@@ -800,7 +833,9 @@ presubmits:
         - --target=[output:stable:startup]
         - --target=[output:stable:sync]
         - --target=[output:stable:tlsproxy]
-        - --target=e2e-upgrade-v2.5
+        - --target=internal-upgrade-v2.5
+        - --target=rbac
+        - --template=/usr/local/rbac.yaml
         command:
         - ci-operator
         env:
@@ -809,6 +844,8 @@ presubmits:
             configMapKeyRef:
               key: openshift-openshift-azure-release-v3.yaml
               name: ci-operator-misc-configs
+        - name: JOB_NAME_SAFE
+          value: upgrade-v25
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -818,11 +855,17 @@ presubmits:
         volumeMounts:
         - mountPath: /usr/local/e2e-secrets/azure
           name: cluster-secrets-azure
+        - mountPath: /usr/local/rbac.yaml
+          name: job-definition
+          subPath: rbac.yaml
       serviceAccountName: ci-operator
       volumes:
       - name: cluster-secrets-azure
         secret:
           secretName: cluster-secrets-azure
+      - configMap:
+          name: prow-job-rbac-azure
+        name: job-definition
     trigger: '(?m)^/test (?:.*? )?upgrade-v2.5(?: .*?)?$'
   - agent: kubernetes
     always_run: true
@@ -856,36 +899,3 @@ presubmits:
             cpu: 10m
       serviceAccountName: ci-operator
     trigger: '(?m)^/test (?:.*? )?verify(?: .*?)?$'
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - release-v3
-    context: ci/prow/vmimage
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    name: pull-ci-openshift-openshift-azure-release-v3-vmimage
-    optional: true
-    rerun_command: /test vmimage
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --target=vmimage
-        command:
-        - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-openshift-azure-release-v3.yaml
-              name: ci-operator-misc-configs
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-      serviceAccountName: ci-operator
-    trigger: '(?m)^/test (?:.*? )?vmimage(?: .*?)?$'
