@@ -65,3 +65,18 @@ tests:
     make test-e2e
   openshift_installer_src:
     cluster_profile: aws
+- as: git-history
+  commands: |
+    PREFIX="UPSTREAM: <[[:alnum:]]+>: openshift:"
+    if ! [[ "$(git log -1 --pretty=%B)" =~ ^$PREFIX ]]; then
+      echo "Last commit message didn't contain needed prefix. Check your git history."
+      exit 1
+    fi
+    for LINE in $(git log master.. --pretty=%s); do
+      if ! [[ "$LINE" =~ ^$PREFIX ]]; then
+        echo "Git history in this PR doesn't conform to set commit message standards."
+        exit 1
+      fi
+    done
+  container:
+    from: src
