@@ -44,6 +44,9 @@ items:
           - --github-token-path=/etc/github/oauth
           - --job-config-path=/etc/job-config
           - --github-endpoint=http://ghproxy
+          - --gcs-credentials-file=/etc/service-account/service-account.json
+          - --history-uri=gs://k8s-prow/tide-history.json
+          - --status-path=gs://k8s-prow/tide-status-checkpoint.yaml
           ports:
           - name: http
             containerPort: 8888
@@ -68,6 +71,9 @@ items:
             readOnly: true
           - name: tmp
             mountPath: /tmp
+          - name: service-account
+            mountPath: /etc/service-account
+            readOnly: true
         volumes:
         - name: oauth
           secret:
@@ -89,3 +95,6 @@ items:
             name: job-config-4.0
         - name: tmp
           emptyDir: {}
+        - name: service-account
+          secret:
+            secretName: gce-sa-credentials-gcs-tide-publisher
