@@ -24,6 +24,7 @@ RUN yum update -y && \
     gcc \
     git \
     jq \
+    libgit2-devel \
     lsof \
     make \
     tar \
