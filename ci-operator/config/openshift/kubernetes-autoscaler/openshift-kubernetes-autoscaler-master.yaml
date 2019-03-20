@@ -67,16 +67,20 @@ tests:
     cluster_profile: aws
 - as: git-history
   commands: |
-    PREFIX="UPSTREAM: <[[:alnum:]]+>: openshift:"
+    PREFIX="UPSTREAM: <[[:alnum:]]+>: openshift:|Merge pull request"
     if ! [[ "$(git log -1 --pretty=%B)" =~ ^$PREFIX ]]; then
-      echo "Last commit message didn't contain needed prefix. Check your git history."
+      echo "Last commit message didn't contain needed prefix. Offending commit message is:"
+      echo "$LINE"
       exit 1
     fi
+    ( IFS='
+    '
     for LINE in $(git log master.. --pretty=%s); do
       if ! [[ "$LINE" =~ ^$PREFIX ]]; then
-        echo "Git history in this PR doesn't conform to set commit message standards."
+        echo "Git history in this PR doesn't conform to set commit message standards. Offending commit message is:"
+        echo "$LINE"
         exit 1
       fi
-    done
+    done )
   container:
     from: src
