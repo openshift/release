@@ -163,7 +163,7 @@ update_secret generic github-deploymentconfig-trigger "$( format_field_value git
 
 # Credentials for GCE service accounts are stored
 # as an attachment on each distinct credential
-for account in "aos-pubsub-subscriber" "ci-vm-operator" "gcs-publisher"; do
+for account in "aos-pubsub-subscriber" "ci-vm-operator" "gcs-publisher" "gcs-tide-publisher"; do
 	update_secret generic "gce-sa-credentials-${account}" "$( format_attachment "${account}" credentials.json service-account.json )"
 done
 
