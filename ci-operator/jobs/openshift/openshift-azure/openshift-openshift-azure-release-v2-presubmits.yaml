@@ -6,8 +6,8 @@ presubmits:
     - release-v2
     context: ci/prow/e2e
     decorate: true
-    labels:
-      artifacts: images
+    decoration_config:
+      skip_cloning: true
     name: pull-ci-openshift-openshift-azure-release-v2-e2e-azure
     rerun_command: /test e2e
     spec:
@@ -30,8 +30,8 @@ presubmits:
             configMapKeyRef:
               key: openshift-openshift-azure-release-v2.yaml
               name: ci-operator-misc-configs
-        - name: DEPLOY_VERSION
-          value: v3.11
+        - name: TEST_COMMAND
+          value: make e2e
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -54,14 +54,15 @@ presubmits:
         name: job-definition
     trigger: '(?m)^/test (?:.*? )?e2e(?: .*?)?$'
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-v2
     context: ci/prow/keyrotation
     decorate: true
-    labels:
-      artifacts: images
+    decoration_config:
+      skip_cloning: true
     name: pull-ci-openshift-openshift-azure-release-v2-e2e-azure-keyrotation
+    optional: true
     rerun_command: /test keyrotation
     spec:
       containers:
@@ -78,8 +79,6 @@ presubmits:
         command:
         - ci-operator
         env:
-        - name: ARTIFACT_DIR
-          value: /tmp/artifacts
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
@@ -107,16 +106,17 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-e2e-azure
         name: job-definition
-    trigger: ((?m)^/test keyrotation,?(\s+|$))
+    trigger: '(?m)^/test (?:.*? )?keyrotation(?: .*?)?$'
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-v2
     context: ci/prow/scaleupdown
     decorate: true
-    labels:
-      artifacts: images
+    decoration_config:
+      skip_cloning: true
     name: pull-ci-openshift-openshift-azure-release-v2-e2e-azure-scaleupdown
+    optional: true
     rerun_command: /test scaleupdown
     spec:
       containers:
@@ -133,8 +133,6 @@ presubmits:
         command:
         - ci-operator
         env:
-        - name: ARTIFACT_DIR
-          value: /tmp/artifacts
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
@@ -162,41 +160,9 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-e2e-azure
         name: job-definition
-    trigger: ((?m)^/test scaleupdown,?(\s+|$))
+    trigger: '(?m)^/test (?:.*? )?scaleupdown(?: .*?)?$'
   - agent: kubernetes
     always_run: true
-    branches:
-    - release-v2
-    context: ci/prow/e2e-upgrade-v1.2
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    name: pull-ci-openshift-openshift-azure-release-v2-e2e-upgrade-v1.2
-    rerun_command: /test e2e-upgrade-v1.2
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --target=e2e-upgrade-v1.2
-        command:
-        - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-openshift-azure-release-v2.yaml
-              name: ci-operator-misc-configs
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-      serviceAccountName: ci-operator
-    trigger: '(?m)^/test (?:.*? )?e2e-upgrade-v1.2(?: .*?)?$'
-  - agent: kubernetes
-    always_run: false
     branches:
     - release-v2
     context: ci/prow/images
@@ -204,7 +170,6 @@ presubmits:
     decoration_config:
       skip_cloning: true
     name: pull-ci-openshift-openshift-azure-release-v2-images
-    optional: true
     rerun_command: /test images
     spec:
       containers:
