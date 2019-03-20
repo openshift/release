@@ -5,6 +5,12 @@ base_images:
     namespace: azure
     tag: latest
 binary_build_commands: make all
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: test-base
+    namespace: azure
+    tag: latest
 canonical_go_repository: github.com/openshift/openshift-azure
 images:
 - dockerfile_path: images/sync/Dockerfile
@@ -78,12 +84,6 @@ tag_specification:
   cluster: https://api.ci.openshift.org
   name: origin-v3.11
   namespace: openshift
-build_root:
-  image_stream_tag:
-    cluster: https://api.ci.openshift.org
-    name: test-base
-    namespace: azure
-    tag: latest
 tests:
 - as: verify
   commands: make verify
@@ -96,9 +96,9 @@ tests:
     from: src
 - artifact_dir: /tmp/artifacts
   as: e2e-upgrade-v2.5
-  commands: ARTIFACT_DIR=/tmp/artifacts SOURCE=v2.5 make upgrade
-  secret:
-    name: azure
-    mount_path: /usr/secrets
+  commands: hack/upgrade-e2e.sh v2.5
   container:
     from: src
+  secret:
+    mount_path: /usr/local/e2e-secrets/azure
+    name: azure
