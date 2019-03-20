@@ -3,4 +3,5 @@ build:
 	./fake-rpm.sh golang-1.9
 	./fake-rpm.sh golang-1.10
 	./fake-rpm.sh golang-1.11
+	./fake-rpm.sh golang-1.12
 .PHONY: build
