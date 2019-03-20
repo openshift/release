@@ -70,17 +70,15 @@ tests:
     PREFIX="UPSTREAM: <[[:alnum:]]+>: openshift:|Merge pull request"
     if ! [[ "$(git log -1 --pretty=%B)" =~ ^$PREFIX ]]; then
       echo "Last commit message didn't contain needed prefix. Offending commit message is:"
-      echo "$LINE"
+      git log -1 --pretty=%B
       exit 1
     fi
-    ( IFS='
-    '
-    for LINE in $(git log master.. --pretty=%s); do
-      if ! [[ "$LINE" =~ ^$PREFIX ]]; then
+    git log master.. --pretty=%s | while read; do
+      if ! [[ "$REPLY" =~ ^$PREFIX ]]; then
         echo "Git history in this PR doesn't conform to set commit message standards. Offending commit message is:"
-        echo "$LINE"
+        echo "$REPLY"
         exit 1
       fi
-    done )
+    done
   container:
     from: src
