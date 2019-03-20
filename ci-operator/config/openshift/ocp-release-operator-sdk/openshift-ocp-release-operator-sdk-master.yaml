@@ -10,7 +10,7 @@ base_images:
     cluster: https://api.ci.openshift.org
     namespace: openshift
     name: ansible-runner
-    tag: '1.2.0'
+    tag: latest
 images:
 - from: ansible_runner
   dockerfile_path: Dockerfile
@@ -28,4 +28,28 @@ tag_specification:
 promotion:
   name: '4.0'
   namespace: ocp
-
+tests:
+- as: unit
+  commands: |
+    mkdir -p $GOPATH/src/github.com/operator-framework
+    cp . $GOPATH/src/github.com/operator-framework/operator-sdk
+    cd $GOPATH/src/github.com/operator-framework/operator-sdk
+    make test/unit
+  container:
+    from: src
+- as: sanity
+  commands: |
+    mkdir -p $GOPATH/src/github.com/operator-framework
+    cp . $GOPATH/src/github.com/operator-framework/operator-sdk
+    cd $GOPATH/src/github.com/operator-framework/operator-sdk
+    make test/sanity
+  container:
+    from: src
+- as: e2e-ansible
+  commands: |
+    mkdir -p $GOPATH/src/github.com/operator-framework
+    cp . $GOPATH/src/github.com/operator-framework/operator-sdk
+    cd $GOPATH/src/github.com/operator-framework/operator-sdk
+    ./hack/tests/e2e-ansible.sh
+  container:
+    from: src
