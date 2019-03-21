@@ -3,12 +3,12 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - release-0.4
     context: ci/prow/e2e
     decorate: true
     decoration_config:
       skip_cloning: true
-    name: pull-ci-openshift-knative-build-master-e2e
+    name: pull-ci-openshift-knative-build-release-0.4-e2e
     rerun_command: /test e2e
     spec:
       containers:
@@ -22,16 +22,14 @@ presubmits:
         - ci-operator
         env:
         - name: CLUSTER_TYPE
-          value: gcp
+          value: aws
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-knative-build-master.yaml
-              name: ci-operator-master-configs
+              key: openshift-knative-build-release-0.4.yaml
+              name: ci-operator-misc-configs
         - name: JOB_NAME_SAFE
           value: e2e
-        - name: RPM_REPO_OPENSHIFT_ORIGIN
-          value: https://rpms.svc.ci.openshift.org/openshift-origin-v4.0/
         - name: TEST_COMMAND
           value: make test-e2e
         image: ci-operator:latest
@@ -45,29 +43,27 @@ presubmits:
           name: cluster-profile
         - mountPath: /usr/local/e2e
           name: job-definition
-          subPath: cluster-launch-src.yaml
+          subPath: cluster-launch-installer-src.yaml
       serviceAccountName: ci-operator
       volumes:
       - name: cluster-profile
         projected:
           sources:
           - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
+              name: cluster-secrets-aws
       - configMap:
-          name: prow-job-cluster-launch-src
+          name: prow-job-cluster-launch-installer-src
         name: job-definition
     trigger: '(?m)^/test (?:.*? )?e2e(?: .*?)?$'
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - release-0.4
     context: ci/prow/images
     decorate: true
     decoration_config:
       skip_cloning: true
-    name: pull-ci-openshift-knative-build-master-images
+    name: pull-ci-openshift-knative-build-release-0.4-images
     rerun_command: /test images
     spec:
       containers:
@@ -81,8 +77,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-knative-build-master.yaml
-              name: ci-operator-master-configs
+              key: openshift-knative-build-release-0.4.yaml
+              name: ci-operator-misc-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
