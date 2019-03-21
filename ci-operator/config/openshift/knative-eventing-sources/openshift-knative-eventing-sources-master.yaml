@@ -1,35 +1,34 @@
 tag_specification:
+  name: '4.0'
+  namespace: ocp
+promotion:
   cluster: https://api.ci.openshift.org
-  name: origin-v3.11
   namespace: openshift
+  name: knative
 base_images:
   base:
-    cluster: https://api.ci.openshift.org
-    name: origin-v3.11
-    namespace: openshift
+    name: '4.0'
+    namespace: ocp
     tag: base
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
 canonical_go_repository: github.com/knative/eventing-sources
 binary_build_commands: make install
+test_binary_build_commands: make test-install
+tests:
+- as: e2e
+  commands: "make test-e2e"
+  openshift_installer_src:
+    cluster_profile: aws
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
 images:
-- dockerfile_path: openshift/ci-operator/knative-images/cronjob_receive_adapter/Dockerfile
-  from: base
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/bin/cronjob_receive_adapter
-  to: knative-eventing-sources-cronjob-receive-adapter
-- dockerfile_path: openshift/ci-operator/knative-images/github_receive_adapter/Dockerfile
-  from: base
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/bin/github_receive_adapter
-  to: knative-eventing-sources-github-receive-adapter
 - dockerfile_path: openshift/ci-operator/knative-images/websocketsource/Dockerfile
   from: base
   inputs:
@@ -37,15 +36,7 @@ images:
       paths:
       - destination_dir: .
         source_path: /go/bin/websocketsource
-  to: knative-eventing-sources-github-websocketsource
-- dockerfile_path: openshift/ci-operator/knative-images/awssqs_receive_adapter/Dockerfile
-  from: base
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/bin/awssqs_receive_adapter
-  to: knative-eventing-sources-awssqs-receive-adapter
+  to: knative-eventing-sources-websocketsource
 - dockerfile_path: openshift/ci-operator/knative-images/heartbeats/Dockerfile
   from: base
   inputs:
@@ -54,6 +45,38 @@ images:
       - destination_dir: .
         source_path: /go/bin/heartbeats
   to: knative-eventing-sources-heartbeats
+- dockerfile_path: openshift/ci-operator/knative-images/github_receive_adapter/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/github_receive_adapter
+  to: knative-eventing-sources-github-receive-adapter
+- dockerfile_path: openshift/ci-operator/knative-images/message_dumper/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/message_dumper
+  to: knative-eventing-sources-message-dumper
+- dockerfile_path: openshift/ci-operator/knative-images/cronjob_receive_adapter/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/cronjob_receive_adapter
+  to: knative-eventing-sources-cronjob-receive-adapter
+- dockerfile_path: openshift/ci-operator/knative-images/awssqs_receive_adapter/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/awssqs_receive_adapter
+  to: knative-eventing-sources-awssqs-receive-adapter
 - dockerfile_path: openshift/ci-operator/knative-images/heartbeats_receiver/Dockerfile
   from: base
   inputs:
@@ -78,27 +101,3 @@ images:
       - destination_dir: .
         source_path: /go/bin/manager
   to: knative-eventing-sources-manager
-- dockerfile_path: openshift/ci-operator/knative-images/message_dumper/Dockerfile
-  from: base
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/bin/message_dumper
-  to: knative-eventing-sources-message-dumper
-promotion:
-  cluster: https://api.ci.openshift.org
-  namespace: openshift
-  name: knative
-tests:
-- as: e2e
-  commands: "make test-e2e"
-  openshift_ansible_src:
-    cluster_profile: gcp
-resources:
-  '*':
-    limits:
-      memory: 4Gi
-    requests:
-      cpu: 100m
-      memory: 200Mi
