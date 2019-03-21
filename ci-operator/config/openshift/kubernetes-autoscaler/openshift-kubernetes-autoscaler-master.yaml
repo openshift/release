@@ -66,19 +66,6 @@ tests:
   openshift_installer_src:
     cluster_profile: aws
 - as: git-history
-  commands: |
-    PREFIX="UPSTREAM: <[[:alnum:]]+>: openshift:"
-    if ! [[ "$(git log -1 --pretty=%B --no-merges)" =~ ^$PREFIX ]]; then
-      echo "Last commit message didn't contain needed prefix. Offending commit message is:"
-      git log -1 --pretty=%B --no-merges
-      exit 1
-    fi
-    git log master.. --pretty=%s --no-merges | while read; do
-      if ! [[ "$REPLY" =~ ^$PREFIX ]]; then
-        echo "Git history in this PR doesn't conform to set commit message standards. Offending commit message is:"
-        echo "$REPLY"
-        exit 1
-      fi
-    done
+  commands: ./hack/verify_history.sh
   container:
     from: src
