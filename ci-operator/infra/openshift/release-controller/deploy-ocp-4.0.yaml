@@ -61,6 +61,18 @@ items:
 - kind: Role
   apiVersion: authorization.openshift.io/v1
   metadata:
+    name: release-controller-import-ocp
+    namespace: ocp
+  rules:
+  - apiGroups:
+    - image.openshift.io
+    resources:
+    - imagestreamimports
+    verbs:
+    - create
+- kind: Role
+  apiVersion: authorization.openshift.io/v1
+  metadata:
     name: release-controller-prowjob
     namespace: ci
   rules:
@@ -153,6 +165,19 @@ items:
   roleRef:
     kind: ClusterRole
     name: system:image-builder
+  subjects:
+  - kind: ServiceAccount
+    namespace: ci-release
+    name: builder
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: release-controller-binding-import
+    namespace: ocp
+  roleRef:
+    kind: Role
+    namespace: ocp
+    name: release-controller-import-ocp
   subjects:
   - kind: ServiceAccount
     namespace: ci-release
