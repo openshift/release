@@ -22,7 +22,7 @@ presubmits:
         - ci-operator
         env:
         - name: CLUSTER_TYPE
-          value: gcp
+          value: aws
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
@@ -30,8 +30,6 @@ presubmits:
               name: ci-operator-master-configs
         - name: JOB_NAME_SAFE
           value: e2e
-        - name: RPM_REPO_OPENSHIFT_ORIGIN
-          value: https://rpms.svc.ci.openshift.org/openshift-origin-v3.11/
         - name: TEST_COMMAND
           value: make test-e2e
         image: ci-operator:latest
@@ -45,18 +43,16 @@ presubmits:
           name: cluster-profile
         - mountPath: /usr/local/e2e
           name: job-definition
-          subPath: cluster-launch-src.yaml
+          subPath: cluster-launch-installer-src.yaml
       serviceAccountName: ci-operator
       volumes:
       - name: cluster-profile
         projected:
           sources:
           - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
+              name: cluster-secrets-aws
       - configMap:
-          name: prow-job-cluster-launch-src
+          name: prow-job-cluster-launch-installer-src
         name: job-definition
     trigger: '(?m)^/test (?:.*? )?e2e(?: .*?)?$'
   - agent: kubernetes
