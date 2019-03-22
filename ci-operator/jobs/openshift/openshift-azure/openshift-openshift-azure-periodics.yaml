@@ -385,7 +385,9 @@ periodics:
       - --target=[output:stable:startup]
       - --target=[output:stable:sync]
       - --target=[output:stable:tlsproxy]
-      - --target=vmimage
+      - --target=internal-vmimage
+      - --target=rbac
+      - --template=/usr/local/rbac.yaml
       command:
       - ci-operator
       env:
@@ -403,11 +405,17 @@ periodics:
       volumeMounts:
       - mountPath: /usr/local/e2e-secrets/azure
         name: cluster-secrets-azure
+      - mountPath: /usr/local/rbac.yaml
+        name: job-definition
+        subPath: rbac.yaml
     serviceAccountName: ci-operator
     volumes:
     - name: cluster-secrets-azure
       secret:
         secretName: cluster-secrets-azure
+    - configMap:
+        name: prow-job-rbac-azure
+      name: job-definition
 - agent: kubernetes
   decorate: true
   interval: 24h
