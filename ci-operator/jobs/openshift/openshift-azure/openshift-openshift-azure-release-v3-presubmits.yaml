@@ -626,6 +626,38 @@ presubmits:
         name: job-definition
     trigger: '(?m)^/test (?:.*? )?updatecluster(?: .*?)?$'
   - agent: kubernetes
+    always_run: true
+    branches:
+    - release-v3
+    context: ci/prow/images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    name: pull-ci-openshift-openshift-azure-release-v3-images
+    rerun_command: /test images
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --target=[images]
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-openshift-azure-release-v3.yaml
+              name: ci-operator-misc-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: '(?m)^/test (?:.*? )?images(?: .*?)?$'
+  - agent: kubernetes
     always_run: false
     branches:
     - release-v3
@@ -658,38 +690,6 @@ presubmits:
             cpu: 10m
       serviceAccountName: ci-operator
     trigger: '(?m)^/test (?:.*? )?internal-upgrade-v2.5(?: .*?)?$'
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-v3
-    context: ci/prow/images
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    name: pull-ci-openshift-openshift-azure-release-v3-images
-    rerun_command: /test images
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --target=[images]
-        command:
-        - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-openshift-azure-release-v3.yaml
-              name: ci-operator-misc-configs
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-      serviceAccountName: ci-operator
-    trigger: '(?m)^/test (?:.*? )?images(?: .*?)?$'
   - agent: kubernetes
     always_run: true
     branches:

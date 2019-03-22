@@ -665,6 +665,38 @@ presubmits:
         name: job-definition
     trigger: '(?m)^/test (?:.*? )?updatecluster(?: .*?)?$'
   - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    name: pull-ci-openshift-openshift-azure-master-images
+    rerun_command: /test images
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --target=[images]
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-openshift-azure-master.yaml
+              name: ci-operator-master-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: '(?m)^/test (?:.*? )?images(?: .*?)?$'
+  - agent: kubernetes
     always_run: false
     branches:
     - master
@@ -731,21 +763,22 @@ presubmits:
       serviceAccountName: ci-operator
     trigger: '(?m)^/test (?:.*? )?internal-upgrade-v3.1(?: .*?)?$'
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - master
-    context: ci/prow/images
+    context: ci/prow/internal-vmimage
     decorate: true
     decoration_config:
       skip_cloning: true
-    name: pull-ci-openshift-openshift-azure-master-images
-    rerun_command: /test images
+    name: pull-ci-openshift-openshift-azure-master-internal-vmimage
+    optional: true
+    rerun_command: /test internal-vmimage
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
-        - --target=[images]
+        - --target=internal-vmimage
         command:
         - ci-operator
         env:
@@ -761,7 +794,7 @@ presubmits:
           requests:
             cpu: 10m
       serviceAccountName: ci-operator
-    trigger: '(?m)^/test (?:.*? )?images(?: .*?)?$'
+    trigger: '(?m)^/test (?:.*? )?internal-vmimage(?: .*?)?$'
   - agent: kubernetes
     always_run: true
     branches:
@@ -938,36 +971,3 @@ presubmits:
             cpu: 10m
       serviceAccountName: ci-operator
     trigger: '(?m)^/test (?:.*? )?verify(?: .*?)?$'
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - master
-    context: ci/prow/internal-vmimage
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    name: pull-ci-openshift-openshift-azure-master-internal-vmimage
-    optional: true
-    rerun_command: /test internal-vmimage
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --target=internal-vmimage
-        command:
-        - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-openshift-azure-master.yaml
-              name: ci-operator-master-configs
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-      serviceAccountName: ci-operator
-    trigger: '(?m)^/test (?:.*? )?internal-vmimage(?: .*?)?$'
