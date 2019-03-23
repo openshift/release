@@ -1,0 +1,135 @@
+kind: List
+apiVersion: v1
+items:
+
+- kind: PersistentVolumeClaim
+  apiVersion: v1
+  metadata:
+    labels:
+      app: matchbox
+      role: infra
+    name: matchbox-data
+    namespace: matchbox
+  spec:
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 8Gi
+    storageClassName: ssd
+
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: matchbox
+    namespace: matchbox
+  spec:
+    replicas: 1
+    strategy:
+      rollingUpdate:
+        maxUnavailable: 1
+    selector:
+      matchLabels:
+        app: matchbox
+        role: infra
+    template:
+      metadata:
+        labels:
+          app: matchbox
+          role: infra
+      spec:
+        containers:
+          - name: matchbox
+            image: quay.io/coreos/matchbox:v0.7.1
+            terminationMessagePolicy: FallbackToLogsOnError
+            env:
+              - name: MATCHBOX_ADDRESS
+                value: "0.0.0.0:8080"
+              - name: MATCHBOX_RPC_ADDRESS
+                value: "0.0.0.0:8081"
+              - name: MATCHBOX_LOG_LEVEL
+                value: "debug"
+              - name: MATCHBOX_CERT_FILE
+                value: "/var/run/matchbox/pki/server/tls.crt"
+              - name: MATCHBOX_KEY_FILE
+                value: "/var/run/matchbox/pki/server/tls.key"
+              - name: MATCHBOX_CA_FILE
+                value: "/var/run/matchbox/pki/ca/bundle.crt"
+            ports:
+              - name: http
+                containerPort: 8080
+              - name: https
+                containerPort: 8081
+            volumeMounts:
+              - name: rpc-server-tls
+                mountPath: /var/run/matchbox/pki/server
+              - name: rpc-client-ca-bundle
+                mountPath: /var/run/matchbox/pki/ca
+              - name: data
+                mountPath: /var/lib/matchbox
+              - name: assets
+                mountPath: /var/lib/matchbox/assets
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        terminationGracePeriodSeconds: 30
+        volumes:
+          - name: rpc-server-tls
+            secret:
+              secretName: rpc-server-tls
+          - name: rpc-client-ca-bundle
+            secret:
+              secretName: rpc-client-ca-bundle
+          - name: data
+            persistentVolumeClaim:
+              claimName: matchbox-data
+          - name: assets
+            emptyDir: {}
+
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: rpc
+    namespace: matchbox
+    annotations:
+      service.alpha.openshift.io/serving-cert-secret-name: rpc-server-tls
+  spec:
+    type: ClusterIP
+    selector:
+      app: matchbox
+      role: infra
+    ports:
+      - name: https
+        protocol: TCP
+        port: 8081
+        targetPort: 8081
+
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: http
+    namespace: matchbox
+  spec:
+    type: ClusterIP
+    selector:
+      app: matchbox
+      role: infra
+    ports:
+      - name: http
+        protocol: TCP
+        port: 8080
+        targetPort: 8080
+
+# This is the read-only http endpoint that serves the PXE scripts and Ignition configs for machines.
+# https://github.com/coreos/matchbox/blob/master/Documentation/api.md
+- apiVersion: route.openshift.io/v1
+  kind: Route
+  metadata:
+    name: http
+    namespace: matchbox
+  spec:
+    port:
+      targetPort: 8080
+    to:
+      kind: Service
+      name: http
+      weight: 100

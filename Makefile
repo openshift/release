@@ -298,6 +298,35 @@ azure-secrets:
 	oc create secret generic codecov-token --from-literal=upload=${CODECOV_UPLOAD_TOKEN} -o yaml --dry-run | oc apply -n azure -f -
 .PHONY: azure-secrets
 
+matchbox: matchbox-ns matchbox-rbac matchbox-services matchbox-secrets
+.PHONY: matchbox
+
+matchbox-ns:
+	oc project matchbox
+.PHONY: matchbox-ns
+
+matchbox-rbac:
+	$(MAKE) apply WHAT=cluster/ci/config/matchbox/roles.yaml
+.PHONY: matchbox-rbac
+
+matchbox-services:
+	$(MAKE) apply WHAT=cluster/ci/config/matchbox/services.yaml
+.PHONY: matchbox-services
+
+matchbox-secrets:
+	oc create secret generic rpc-client-ca-bundle \
+	--from-file=bundle.crt=cluster/test-deploy/matchbox/client-ca.crt \
+	-o yaml --dry-run | oc apply -n matchbox -f -
+	oc create secret generic rpc-client-ca \
+	--from-file=ca.crt=cluster/test-deploy/matchbox/client-ca.crt \
+	--from-file=ca.key=cluster/test-deploy/matchbox/client-ca.key \
+	-o yaml --dry-run | oc apply -n matchbox -f -
+	oc create secret generic rpc-client-certificate \
+	--from-file=client.crt=cluster/test-deploy/matchbox/client.crt \
+	--from-file=client.key=cluster/test-deploy/matchbox/client.key \
+	-o yaml --dry-run | oc apply -n matchbox -f -
+.PHONY: matchbox-secrets
+
 check:
 	# test that the prow config is parseable
 	mkpj --config-path cluster/ci/config/prow/config.yaml --job-config-path ci-operator/jobs/ --job branch-ci-origin-images --base-ref master --base-sha abcdef
