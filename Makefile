@@ -23,7 +23,7 @@ cluster-roles:
 roles: cluster-operator-roles cluster-roles
 .PHONY: roles
 
-prow: ci-ns prow-crd prow-config prow-rbac prow-services prow-jobs prow-scaling prow-secrets ci-operator-config
+prow: ci-ns prow-crd prow-config prow-rbac prow-services prow-jobs prow-scaling prow-secrets ci-operator-config prow-ci-search prow-ci-chat-bot
 .PHONY: prow
 
 prow-stg: ci-stg-ns prow-cluster-jobs ci-operator-config
@@ -150,6 +150,11 @@ prow-artifacts:
 prow-ci-chat-bot:
 	$(MAKE) apply WHAT=ci-operator/infra/openshift/ci-chat-bot/deploy.yaml
 .PHONY: prow-ci-chat-bot
+
+prow-ci-search:
+	$(MAKE) apply WHAT=ci-operator/infra/openshift/ci-search/deploy.yaml
+	oc create configmap job-config --from-file=ci-operator/infra/openshift/ci-search/config.yaml -o yaml --dry-run | oc apply -f - -n ci-search
+.PHONY: prow-ci-search
 
 prow-release-controller-definitions:
 	oc create imagestream origin-release -o yaml --dry-run | oc apply -f - -n openshift
