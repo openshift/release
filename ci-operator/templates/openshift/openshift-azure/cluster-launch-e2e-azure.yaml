@@ -315,11 +315,9 @@ objects:
         # start cluster
         make create
 
-        # disable sync pod
+        # delete sync deployment to disable sync pod
         if [[ "${TEST_IMAGE}" =~ "origin-v3.11:tests" ]]; then
-          az login --service-principal -u ${AZURE_CLIENT_ID} -p ${AZURE_CLIENT_SECRET} --tenant ${AZURE_TENANT_ID} &>/dev/null
-          mkdir -p "${HOME}" && echo "default:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
-          ./hack/ssh.sh -c "sudo rm /etc/origin/node/pods/sync.yaml" ${RESOURCEGROUP}
+          KUBECONFIG=/tmp/shared/openshift-azure/_data/_out/admin.kubeconfig oc --namespace=kube-system delete deployment sync
         fi
 
         # Share openshift-azure code with the test container since
