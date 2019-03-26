@@ -94,10 +94,9 @@ function format_attachment() {
 # merge all pull secret credentials into a single json
 # object
 function merge_pull_secrets() {
-	local quay_io redhat_io
+	local quay_io
 	quay_io="$(get_field_value quay.io 'Pull Credentials')"
-	redhat_io="$(<"$(get_attachment registry.redhat.io pull_secret)")"
-	printf '%s\n' "${quay_io}" "${redhat_io}" \
+	printf '%s\n' "${quay_io}" \
 		| jq --slurp --compact-output 'reduce .[] as $x ({}; . * $x)'
 }
 
@@ -191,14 +190,14 @@ update_secret generic "ci-pull-credentials" --type=kubernetes.io/dockerconfigjso
 # of information for easy consumption by tests
 target_cloud="aws"
 update_secret generic "cluster-secrets-${target_cloud}"                \
-	--from-literal=pull-secret="$(merge_pull_secrets)"                   \
+	"$( format_attachment "quay.io" pull-secret )"                       \
 	"$( format_attachment "jenkins-ci-iam" .awscred )"                   \
 	"$( format_attachment "jenkins-ci-iam" ssh-privatekey )"             \
 	"$( format_attachment "jenkins-ci-iam" ssh-publickey )"
 
 target_cloud="gcp"
 update_secret generic "cluster-secrets-${target_cloud}"                       \
-	--from-literal=pull-secret="$(merge_pull_secrets)"                          \
+	"$( format_attachment "quay.io" pull-secret )"                              \
 	"$( format_attachment "jenkins-ci-provisioner" credentials.json gce.json )" \
 	"$( format_attachment "jenkins-ci-provisioner" ssh-privatekey )"            \
 	"$( format_attachment "jenkins-ci-provisioner" ssh-publickey )"             \
