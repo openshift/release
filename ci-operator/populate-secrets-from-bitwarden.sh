@@ -177,10 +177,10 @@ done
 
 # Credentials for registries are stored as
 # separate fields on individual items
-for registry in "docker.io" "quay.io"; do
-	update_secret generic "registry-push-credentials-${registry}" $( format_field_value "${registry}" "Push Credentials" "config.json" )
+for registry in "docker.io" "quay.io" "quay.io/openshift-knative"; do
+	update_secret generic "registry-push-credentials-${registry//\//\-}" $( format_field_value "${registry}" "Push Credentials" "config.json" )
 	# we want to be able to build and push out to registries
-	oc secrets link builder "registry-push-credentials-${registry}"
+	oc secrets link builder "registry-push-credentials-${registry//\//\-}"
 done
 
 registry="quay.io"
