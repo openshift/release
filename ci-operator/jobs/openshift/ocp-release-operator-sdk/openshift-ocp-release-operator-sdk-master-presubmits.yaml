@@ -4,42 +4,12 @@ presubmits:
     always_run: true
     branches:
     - master
-    context: ci/prow/e2e-ansible
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    name: pull-ci-openshift-ocp-release-operator-sdk-master-e2e-ansible
-    rerun_command: /test e2e-ansible
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --target=e2e-ansible
-        command:
-        - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-ocp-release-operator-sdk-master.yaml
-              name: ci-operator-master-configs
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-      serviceAccountName: ci-operator
-    trigger: '(?m)^/test (?:.*? )?e2e-ansible(?: .*?)?$'
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
     context: ci/prow/images
     decorate: true
     decoration_config:
       skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
     name: pull-ci-openshift-ocp-release-operator-sdk-master-images
     rerun_command: /test images
     spec:
@@ -73,6 +43,8 @@ presubmits:
     decorate: true
     decoration_config:
       skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
     name: pull-ci-openshift-ocp-release-operator-sdk-master-sanity
     rerun_command: /test sanity
     spec:
@@ -105,6 +77,8 @@ presubmits:
     decorate: true
     decoration_config:
       skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
     name: pull-ci-openshift-ocp-release-operator-sdk-master-unit
     rerun_command: /test unit
     spec:
