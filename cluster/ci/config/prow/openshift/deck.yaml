@@ -18,6 +18,18 @@ objects:
       kind: Service
       name: deck
 - apiVersion: v1
+  kind: Route
+  metadata:
+    name: prow
+  spec:
+    host: prow.svc.ci.openshift.org
+    tls:
+      insecureEdgeTerminationPolicy: Redirect
+      termination: edge
+    to:
+      kind: Service
+      name: deck
+- apiVersion: v1
   kind: Service
   metadata:
     name: deck
@@ -68,6 +80,9 @@ objects:
           - name: config
             mountPath: /etc/config
             readOnly: true
+          - name: extensions
+            mountPath: /static/extensions
+            readOnly: true
           - name: oauth-config
             mountPath: /etc/github
             readOnly: true
@@ -90,6 +105,9 @@ objects:
         - name: config
           configMap:
             name: config
+        - name: extensions
+          secret:
+            secretName: deck-extensions
         - name: oauth-config
           secret:
             secretName: github-app-credentials
