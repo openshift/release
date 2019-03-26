@@ -216,7 +216,6 @@ origin-stable:
 origin-release:
 	$(MAKE) applyTemplate WHAT=projects/origin-release/pipeline.yaml
 	oc tag docker.io/centos/ruby-25-centos7:latest --scheduled openshift/release:ruby-25
-	$(MAKE) apply WHAT=ci-operator/infra/ansible-runner-imagestream.yaml
 .PHONY: origin-release
 
 ci-infra-imagestreams:
