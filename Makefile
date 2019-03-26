@@ -216,6 +216,7 @@ origin-stable:
 origin-release:
 	$(MAKE) applyTemplate WHAT=projects/origin-release/pipeline.yaml
 	oc tag docker.io/centos/ruby-25-centos7:latest --scheduled openshift/release:ruby-25
+	$(MAKE) apply WHAT=ci-operator/infra/ansible-runner-imagestream.yaml
 .PHONY: origin-release
 
 ci-infra-imagestreams:
@@ -310,5 +311,5 @@ azure-secrets:
 
 check:
 	# test that the prow config is parseable
-	mkpj --config-path cluster/ci/config/prow/config.yaml --job-config-path ci-operator/jobs/ --job branch-ci-origin-images --base-ref master --base-sha abcdef
+	mkpj --config-path cluster/ci/config/prow/config.yaml --job-config-path ki-operator/jobs/ --job branch-ci-origin-images --base-ref master --base-sha abcdef
 .PHONY: check
