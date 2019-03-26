@@ -10,7 +10,7 @@ applyTemplate:
 	oc process -f $(WHAT) | oc apply -f -
 .PHONY: applyTemplate
 
-postsubmit-update: prow-services origin-release
+postsubmit-update: prow-services origin-release ci-infra-imagestreams
 .PHONY: postsubmit-update
 
 all: roles prow prow-stg projects
@@ -216,6 +216,10 @@ origin-release:
 	$(MAKE) applyTemplate WHAT=projects/origin-release/pipeline.yaml
 	oc tag docker.io/centos/ruby-25-centos7:latest --scheduled openshift/release:ruby-25
 .PHONY: origin-release
+
+ci-infra-imagestreams:
+	$(MAKE) apply WHAT=ci-operator/infra/ansible-runner-imagestream.yaml
+.PHONY: ci-infra-imagestreams
 
 prometheus: node-exporter alert-buffer
 	$(MAKE) apply WHAT=projects/prometheus/prometheus.yaml
