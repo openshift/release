@@ -152,10 +152,6 @@ objects:
         LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
           --zone "${GOOGLE_COMPUTE_ZONE}" \
           packer@"${INSTANCE_PREFIX}" \
-          --command 'export KUBECONFIG=/home/packer/clusters/nested/auth/kubeconfig && /home/packer/cluster-version-check.sh'
-        LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
-          --zone "${GOOGLE_COMPUTE_ZONE}" \
-          packer@"${INSTANCE_PREFIX}" \
           --command 'export KUBECONFIG=/home/packer/clusters/nested/auth/kubeconfig && /home/packer/run-tests.sh'
 
     # Runs an install
@@ -193,35 +189,6 @@ objects:
         set -euo pipefail
         trap 'rc=$?; if test "${rc}" -eq 0; then touch "${HOME}"/setup-success; else touch "${HOME}"/exit; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-        cat  > "${HOME}"/cluster-version-check.sh << 'EOF'
-        #!/bin/bash
-        set -euo pipefail
-
-        API_UP=
-        cluster_version_check()
-        {
-          while true; do
-            if ! oc get nodes 2>/dev/null; then
-              echo "Waiting for API at $(oc whoami --show-server) to respond ..."
-              sleep 15 & wait
-              continue
-            elif [[ -z "${API_UP}" ]]; then
-              echo "API at $(oc whoami --show-server) has responded"
-              API_UP=1
-            fi
-          done
-
-          TARGET="$(date -d '100 minutes' +%s)"
-          NOW="$(date +%s)"
-
-          until oc --insecure-skip-tls-verify wait clusterversion/version --for condition=available 2>/dev/null; do
-            sleep 10 & wait
-          done
-        }
-
-        declare -fxr cluster_version_check
-        timeout 600 bash -ce 'cluster_version_check'
-        EOF
         cat  > "${HOME}"/run-tests.sh << 'EOF'
         #!/bin/bash
         set -euo pipefail
@@ -237,9 +204,8 @@ objects:
 
         ${TEST_COMMAND}
         declare -fxr run_tests
-        timeout 1200 bash -ce 'run_tests'
+        timeout 4800 bash -ce 'run_tests'
         EOF
-        chmod +x "${HOME}"/cluster-version-check.sh
         chmod +x "${HOME}"/run-tests.sh
         mock-nss.sh
         mkdir "${HOME}"/.ssh
@@ -263,12 +229,12 @@ objects:
           --quiet \
           --project "${GOOGLE_PROJECT_ID}" \
           --zone "${GOOGLE_COMPUTE_ZONE}" \
-          --recurse "${HOME}"/cluster-version-check.sh packer@"${INSTANCE_PREFIX}":~/cluster-version-check.sh
+          --recurse "${HOME}"/run-tests.sh packer@"${INSTANCE_PREFIX}":~/run-tests.sh
         LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
           --quiet \
           --project "${GOOGLE_PROJECT_ID}" \
           --zone "${GOOGLE_COMPUTE_ZONE}" \
-          --recurse "${HOME}"/run-tests.sh packer@"${INSTANCE_PREFIX}":~/run-tests.sh.sh
+          --recurse "${HOME}"/openshift-tests packer@"${INSTANCE_PREFIX}":~/openshift-tests
         LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
           --quiet \
           --project "${GOOGLE_PROJECT_ID}" \
@@ -283,7 +249,7 @@ objects:
         LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
           --zone "${GOOGLE_COMPUTE_ZONE}" \
           packer@"${INSTANCE_PREFIX}" \
-          --command 'export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_LATEST}" && timeout 1800 bash -ce "create-cluster nested 2>&1 | tee output"' | tee /tmp/artifacts/output-e2e-libvirt
+          --command 'export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_LATEST}" && timeout 4800 bash -ce "create-cluster nested 2>&1 | tee output"' | tee /tmp/artifacts/output-e2e-libvirt
 
    # Performs cleanup of all created resources
     - name: teardown
