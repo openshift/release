@@ -146,11 +146,11 @@ update_secret generic ci-chat-bot-slack-token "$( format_field_value ci-chat-bot
 
 # Configuration for GitHub OAuth Apps are stored
 # as an opaque field "Client Configuration"
-update_secret generic github-app-credentials "$( format_field_value deck-ci.svc.ci.openshift.org "Client Configuration" "config.json" )"
+update_secret generic github-app-credentials "$( format_field_value prow.svc.ci.openshift.org "Client Configuration" "config.json" )"
 
 # Cookie secret to encrypt frontend and backend
 # communication is stored in the "Cookie" field
-update_secret generic cookie "$( format_field_value deck-ci.svc.ci.openshift.org Cookie "cookie" )"
+update_secret generic cookie "$( format_field_value prow.svc.ci.openshift.org Cookie "cookie" )"
 
 # HMAC token for encrypting GitHub webhook payloads
 # is stored in the "HMAC Token" field
