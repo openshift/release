@@ -1,0 +1,37 @@
+canonical_go_repository: github.com/redhat-developer/devconsole-operator
+
+resources:
+  '*':
+    limits:
+      memory: 1Gi
+    requests:
+      memory: 250Mi
+
+build_root:
+  project_image:
+    dockerfile_path: openshift-ci/build-root/Dockerfile
+
+tag_specification:
+  name: '4.0'
+  namespace: ocp
+
+binary_build_commands: make build
+
+tests:
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: CUSTOM_HOMEDIR="/tmp/artifacts" make test
+  container:
+    from: src
+- artifacts_dir: /tmp/artifacts
+  as: e2e-core
+  optional: true
+  openshift_installer_src:
+    cluster_profile: aws
+  commands: |
+    export CI="openshift"
+    export TIMEOUT="30m"
+    make build
+    export PATH="$PATH:$(pwd)"
+    export CUSTOM_HOMEDIR="/tmp/artifacts"
+    make test-e2e
