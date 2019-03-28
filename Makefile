@@ -13,7 +13,7 @@ applyTemplate:
 postsubmit-update: prow-services origin-release ci-infra-imagestreams
 .PHONY: postsubmit-update
 
-all: roles prow prow-stg projects
+all: roles prow projects
 .PHONY: all
 
 cluster-roles:
@@ -23,15 +23,15 @@ cluster-roles:
 roles: cluster-operator-roles cluster-roles
 .PHONY: roles
 
-prow: prow-ci-ns
+prow: prow-ci-ns prow-ci-stg-ns
 .PHONY: prow
 
 prow-ci-ns: ci-ns prow-crd prow-config prow-rbac prow-services prow-jobs prow-scaling prow-secrets ci-operator-config prow-ci-search prow-ci-chat-bot
 .PHONY: prow-ci-ns
 
-prow-stg: ci-stg-ns prow-cluster-jobs ci-operator-config
+prow-ci-stg-ns: ci-stg-ns prow-cluster-jobs ci-operator-config
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/ci-operator/stage.yaml
-.PHONY: prow-stg
+.PHONY: prow-ci-stg-ns
 
 ci-ns:
 	oc project ci
