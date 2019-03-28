@@ -13,7 +13,7 @@ applyTemplate:
 postsubmit-update: prow-services origin-release ci-infra-imagestreams
 .PHONY: postsubmit-update
 
-all: roles prow prow-stg projects
+all: roles prow projects
 .PHONY: all
 
 cluster-roles:
@@ -23,12 +23,19 @@ cluster-roles:
 roles: cluster-operator-roles cluster-roles
 .PHONY: roles
 
-prow: ci-ns prow-crd prow-config prow-rbac prow-services prow-jobs prow-scaling prow-secrets ci-operator-config prow-ci-search prow-ci-chat-bot
+prow: prow-ci-ns prow-ci-stg-ns prow-openshift-ns
 .PHONY: prow
 
-prow-stg: ci-stg-ns prow-cluster-jobs ci-operator-config
+prow-ci-ns: ci-ns prow-crd prow-config prow-rbac prow-services prow-jobs prow-scaling prow-secrets ci-operator-config prow-ci-search prow-ci-chat-bot
+.PHONY: prow-ci-ns
+
+prow-ci-stg-ns: ci-stg-ns prow-cluster-jobs ci-operator-config
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/ci-operator/stage.yaml
-.PHONY: prow-stg
+.PHONY: prow-ci-stg-ns
+
+prow-openshift-ns: openshift-ns
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/config_updater_rbac.yaml
+.PHONY: prow-openshift-ns
 
 ci-ns:
 	oc project ci
@@ -37,6 +44,10 @@ ci-ns:
 ci-stg-ns:
 	oc project ci-stg
 .PHONY: ci-stg-ns
+
+openshift-ns:
+	oc project openshift
+.PHONY: openshift-ns
 
 prow-crd:
 	$(MAKE) apply WHAT=cluster/ci/config/prow/prow_crd.yaml
@@ -176,7 +187,7 @@ prow-release-controller-deploy:
 prow-release-controller: prow-release-controller-definitions prow-release-controller-deploy
 .PHONY: prow-release-controller
 
-projects: ci-ns gcsweb origin origin-stable origin-release test-bases image-mirror-setup image-pruner-setup publishing-bot content-mirror azure python-validation
+projects: ci-ns gcsweb origin-stable origin-release test-bases image-mirror-setup image-pruner-setup publishing-bot content-mirror azure python-validation
 .PHONY: projects
 
 ci-operator-config:
