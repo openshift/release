@@ -23,8 +23,11 @@ cluster-roles:
 roles: cluster-operator-roles cluster-roles
 .PHONY: roles
 
-prow: ci-ns prow-crd prow-config prow-rbac prow-services prow-jobs prow-scaling prow-secrets ci-operator-config prow-ci-search prow-ci-chat-bot
+prow: prow-ci-ns
 .PHONY: prow
+
+prow-ci-ns: ci-ns prow-crd prow-config prow-rbac prow-services prow-jobs prow-scaling prow-secrets ci-operator-config prow-ci-search prow-ci-chat-bot
+.PHONY: prow-ci-ns
 
 prow-stg: ci-stg-ns prow-cluster-jobs ci-operator-config
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/ci-operator/stage.yaml
