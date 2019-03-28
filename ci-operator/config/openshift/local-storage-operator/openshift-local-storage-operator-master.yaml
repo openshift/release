@@ -1,0 +1,45 @@
+tag_specification:
+  name: '4.0'
+  namespace: ocp
+promotion:
+  name: '4.0'
+  namespace: ocp
+base_images:
+  base:
+    name: '4.0'
+    namespace: ocp
+    tag: base
+canonical_go_repository: github.com/openshift/local-storage-operator
+images:
+- from: base
+  dockerfile_path: Dockerfile
+  inputs:
+    root:
+      as:
+      - '0'
+  to: local-storage-operator
+- from: base
+  dockerfile_path: Dockerfile.diskmaker
+  inputs:
+    root:
+      as:
+      - '0'
+  to: local-storage-diskmaker
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
