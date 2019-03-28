@@ -176,7 +176,7 @@ prow-release-controller-deploy:
 prow-release-controller: prow-release-controller-definitions prow-release-controller-deploy
 .PHONY: prow-release-controller
 
-projects: ci-ns gcsweb origin origin-stable origin-release test-bases image-mirror-setup image-pruner-setup publishing-bot content-mirror azure python-validation
+projects: ci-ns gcsweb origin-stable origin-release test-bases image-mirror-setup image-pruner-setup publishing-bot content-mirror azure python-validation
 .PHONY: projects
 
 ci-operator-config:
