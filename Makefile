@@ -23,7 +23,7 @@ cluster-roles:
 roles: cluster-operator-roles cluster-roles
 .PHONY: roles
 
-prow: prow-ci-ns prow-ci-stg-ns
+prow: prow-ci-ns prow-ci-stg-ns prow-openshift-ns
 .PHONY: prow
 
 prow-ci-ns: ci-ns prow-crd prow-config prow-rbac prow-services prow-jobs prow-scaling prow-secrets ci-operator-config prow-ci-search prow-ci-chat-bot
@@ -33,6 +33,10 @@ prow-ci-stg-ns: ci-stg-ns prow-cluster-jobs ci-operator-config
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/ci-operator/stage.yaml
 .PHONY: prow-ci-stg-ns
 
+prow-openshift-ns: openshift-ns
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/config_updater_rbac.yaml
+.PHONY: prow-openshift-ns
+
 ci-ns:
 	oc project ci
 .PHONY: ci-ns
@@ -40,6 +44,10 @@ ci-ns:
 ci-stg-ns:
 	oc project ci-stg
 .PHONY: ci-stg-ns
+
+openshift-ns:
+	oc project openshift
+.PHONY: openshift-ns
 
 prow-crd:
 	$(MAKE) apply WHAT=cluster/ci/config/prow/prow_crd.yaml
