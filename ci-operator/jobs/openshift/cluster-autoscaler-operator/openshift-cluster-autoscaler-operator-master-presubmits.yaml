@@ -1,5 +1,40 @@
 presubmits:
   openshift/cluster-autoscaler-operator:
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/actuator-pkg-staleness
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+    name: pull-ci-openshift-cluster-autoscaler-operator-master-actuator-pkg-staleness
+    optional: true
+    rerun_command: /test actuator-pkg-staleness
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --target=actuator-pkg-staleness
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-cluster-autoscaler-operator-master.yaml
+              name: ci-operator-master-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: '(?m)^/test (?:.*? )?actuator-pkg-staleness(?: .*?)?$'
   - agent: jenkins
     always_run: true
     branches:
