@@ -5,10 +5,12 @@ items:
   kind: ServiceAccount
   metadata:
     name: config-updater
+    namespace: ci
 - kind: Role
   apiVersion: rbac.authorization.k8s.io/v1
   metadata:
     name: config-updater
+    namespace: ci
   rules:
     - apiGroups:
         - apps
@@ -47,6 +49,35 @@ items:
   apiVersion: rbac.authorization.k8s.io/v1
   metadata:
     name: config-updater
+    namespace: ci
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: Role
+    name: config-updater
+  subjects:
+  - kind: ServiceAccount
+    name: config-updater
+    namespace: ci
+- kind: Role
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: config-updater
+    namespace: openshift
+  rules:
+    - apiGroups:
+        - image.openshift.io
+      resources:
+        - imagestreams
+      verbs:
+        - get
+        - create
+        - update
+        - patch
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: config-updater
+    namespace: openshift
   roleRef:
     apiGroup: rbac.authorization.k8s.io
     kind: Role
