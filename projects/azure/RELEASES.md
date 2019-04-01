@@ -1,6 +1,6 @@
 # OSA Release tracker
 
-All Azure Red Hat OpenShift (ARHO) versions statuses:
+All Azure Red Hat OpenShift (ARHO) versions:
 
 |Version|Subversion|Status |
 |---|---|---|
@@ -12,7 +12,7 @@ All Azure Red Hat OpenShift (ARHO) versions statuses:
 
 # Testing matrix
 
-Automated testing for all upgrade paths:
+Automated upgrade paths testing for all versions:
 
 |Version|Upgrade path testing|
 |---|---|
