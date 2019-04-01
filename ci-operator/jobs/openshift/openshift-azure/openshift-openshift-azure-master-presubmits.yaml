@@ -608,6 +608,62 @@ presubmits:
         name: job-definition
     trigger: '(?m)^/test (?:.*? )?scaleupdown(?: .*?)?$'
   - agent: kubernetes
+    always_run: false
+    branches:
+    - master
+    context: ci/prow/scaleupdown-previous-v3.2
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    name: pull-ci-openshift-openshift-azure-master-e2e-scaleupdown-previous-v3.2
+    optional: true
+    rerun_command: /test scaleupdown-previous-v3.2
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --secret-dir=/usr/local/e2e-secrets/azure
+        - --target=[output:stable:azure-controllers]
+        - --target=[output:stable:canary]
+        - --target=[output:stable:etcdbackup]
+        - --target=[output:stable:metricsbridge]
+        - --target=[output:stable:startup]
+        - --target=[output:stable:sync]
+        - --target=[output:stable:tlsproxy]
+        - --target=e2e-scaleupdown-previous-v3.2
+        - --target=rbac-e2e-scaleupdown-previous-v3.2
+        - --template=/usr/local/rbac-e2e-scaleupdown-previous-v3.2.yaml
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-openshift-azure-master.yaml
+              name: ci-operator-master-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-secrets/azure
+          name: cluster-secrets-azure
+        - mountPath: /usr/local/rbac-e2e-scaleupdown-previous-v3.2.yaml
+          name: job-definition
+          subPath: rbac.yaml
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-secrets-azure
+        secret:
+          secretName: cluster-secrets-azure
+      - configMap:
+          name: prow-job-rbac-azure
+        name: job-definition
+    trigger: '(?m)^/test (?:.*? )?scaleupdown-previous-v3.2(?: .*?)?$'
+  - agent: kubernetes
     always_run: true
     branches:
     - master
@@ -676,6 +732,41 @@ presubmits:
             cpu: 10m
       serviceAccountName: ci-operator
     trigger: '(?m)^/test (?:.*? )?internal-e2e(?: .*?)?$'
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - master
+    context: ci/prow/internal-e2e-scaleupdown-previous-v3.2
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+    name: pull-ci-openshift-openshift-azure-master-internal-e2e-scaleupdown-previous-v3.2
+    optional: true
+    rerun_command: /test internal-e2e-scaleupdown-previous-v3.2
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --target=internal-e2e-scaleupdown-previous-v3.2
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-openshift-azure-master.yaml
+              name: ci-operator-master-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: '(?m)^/test (?:.*? )?internal-e2e-scaleupdown-previous-v3.2(?: .*?)?$'
   - agent: kubernetes
     always_run: false
     branches:
