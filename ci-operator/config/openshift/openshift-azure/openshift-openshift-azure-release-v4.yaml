@@ -69,18 +69,6 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/openshift-azure/tlsproxy
   to: tlsproxy
-- dockerfile_path: images/canary/Dockerfile
-  from: base
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/openshift-azure/canary
-  to: canary
-promotion:
-  cluster: https://api.ci.openshift.org
-  name: azure-plugins
-  namespace: azure
 resources:
   '*':
     limits:
@@ -104,25 +92,7 @@ tests:
     from: src
 - artifact_dir: /tmp/artifacts
   as: internal-upgrade-v3.2
-  commands: timeout 3h hack/tests/e2e-upgrade.sh v3.2
-  container:
-    from: src
-  secret:
-    mount_path: /usr/local/e2e-secrets/azure
-    name: azure
-- artifact_dir: /tmp/artifacts
-  as: internal-upgrade-v4.0
-  commands: hack/tests/upgrade-e2e.sh v4.0
-  container:
-    from: src
-  secret:
-    mount_path: /usr/local/e2e-secrets/azure
-    name: azure
-- artifact_dir: /tmp/artifacts
-  as: internal-vmimage
-  commands: |
-    . hack/ci-operator-prepare.sh
-    make vmimage
+  commands: hack/tests/upgrade-e2e.sh v3.2
   container:
     from: src
   secret:
@@ -130,15 +100,7 @@ tests:
     name: azure
 - artifact_dir: /tmp/artifacts
   as: internal-e2e
-  commands: timeout 3h hack/tests/e2e-create.sh
-  container:
-    from: src
-  secret:
-    mount_path: /usr/local/e2e-secrets/azure
-    name: azure
-- artifact_dir: /tmp/artifacts
-  as: internal-e2e-scaleupdown-previous-v3.2
-  commands: timeout 3h hack/tests/e2e-scaleupdown-previous.sh v3.2
+  commands: hack/tests/create-e2e.sh
   container:
     from: src
   secret:
