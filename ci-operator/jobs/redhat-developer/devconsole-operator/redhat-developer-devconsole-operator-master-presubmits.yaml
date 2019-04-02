@@ -67,10 +67,15 @@ presubmits:
         - name: JOB_NAME_SAFE
           value: e2e-core
         - name: TEST_COMMAND
-          value: "oc new-project devconsole \nmake deploy-crd\nmake deploy-rbac\nsed
-            -i 's|/quay.io/shbose/devconsole-operator:b16e650-1554146546|REPLACE_IMAGE|g'
-            ./deploy/test/operator_test.yaml\noc apply -f ./deploy/test/operator_test.yaml\noperator-sdk
-            test local ./test/e2e --namespace devconsole  --no-setup\n"
+          value: |
+            GOPATH=/tmp/go
+            make build
+            oc new-project devconsole
+            make deploy-crd
+            make deploy-rbac
+            sed -i 's|/quay.io/shbose/devconsole-operator:b16e650-1554146546|REPLACE_IMAGE|g' ./deploy/test/operator_test.yaml
+            oc apply -f ./deploy/test/operator_test.yaml
+            operator-sdk test local ./test/e2e --namespace devconsole  --no-setup
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
