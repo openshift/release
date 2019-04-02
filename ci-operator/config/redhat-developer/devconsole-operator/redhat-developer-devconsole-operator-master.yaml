@@ -7,11 +7,6 @@ base_images:
     namespace: openshift
     tag: '7'
 
-images: 
-- from: os
-  to: devconsole-operator
-  dockerfile_path: Dockerfile
-
 resources:
   '*':
     limits:
@@ -25,12 +20,18 @@ build_root:
   project_image:
     dockerfile_path: openshift-ci/Dockerfile.tools
 
+binary_build_commands: make build
+
+images:
+- from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: /usr/local/bin/devconsole-operator
+        source_path: /tmp/go/src/github.com/redhat-developer/devconsole-operator/out/operator 
+  to: devconsole-operator
 
 tests:
-- as: build
-  commands: make build
-  container:
-    from: src
 - as: test
   commands: make test
   container:
