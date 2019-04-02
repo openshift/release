@@ -219,7 +219,6 @@ objects:
 
         mkdir /tmp/artifacts/installer
 
-        export CLUSTER_ID=$(uuidgen --random)
         export SSH_PUB_KEY=$(cat "${OPENSHIFT_INSTALL_SSH_PUB_KEY_PATH}")
         export PULL_SECRET=$(cat "${OPENSHIFT_INSTALL_PULL_SECRET_PATH}")
 
@@ -227,7 +226,6 @@ objects:
           cat > /tmp/artifacts/installer/install-config.yaml << EOF
         apiVersion: v1beta4
         baseDomain: origin-ci-int-gce.dev.rhcloud.com
-        clusterID:  ${CLUSTER_ID}
         compute:
         - name: worker
           replicas: ${WORKERS}
@@ -256,7 +254,6 @@ objects:
           cat > /tmp/artifacts/installer/install-config.yaml << EOF
         apiVersion: v1beta4
         baseDomain: test.ose
-        clusterID:  ${CLUSTER_ID}
         controlPlane:
           name: master
           replicas: ${MASTERS}
@@ -402,6 +399,8 @@ objects:
           queue /tmp/artifacts/configmaps.json oc --insecure-skip-tls-verify --request-timeout=5s get configmaps --all-namespaces -o json
           queue /tmp/artifacts/csr.json oc --insecure-skip-tls-verify --request-timeout=5s get csr -o json
           queue /tmp/artifacts/endpoints.json oc --insecure-skip-tls-verify --request-timeout=5s get endpoints --all-namespaces -o json
+          queue /tmp/artifacts/deployments.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get deployments --all-namespaces -o json
+          queue /tmp/artifacts/daemonsets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get daemonsets --all-namespaces -o json
           queue /tmp/artifacts/events.json oc --insecure-skip-tls-verify --request-timeout=5s get events --all-namespaces -o json
           queue /tmp/artifacts/kubeapiserver.json oc --insecure-skip-tls-verify --request-timeout=5s get kubeapiserver -o json
           queue /tmp/artifacts/kubecontrollermanager.json oc --insecure-skip-tls-verify --request-timeout=5s get kubecontrollermanager -o json
@@ -411,10 +410,11 @@ objects:
           queue /tmp/artifacts/nodes.json oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o json
           queue /tmp/artifacts/openshiftapiserver.json oc --insecure-skip-tls-verify --request-timeout=5s get openshiftapiserver -o json
           queue /tmp/artifacts/pods.json oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces -o json
+          queue /tmp/artifacts/replicasets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get replicasets --all-namespaces -o json
           queue /tmp/artifacts/rolebindings.json oc --insecure-skip-tls-verify --request-timeout=5s get rolebindings --all-namespaces -o json
           queue /tmp/artifacts/roles.json oc --insecure-skip-tls-verify --request-timeout=5s get roles --all-namespaces -o json
-          queue /tmp/artifacts/secrets.json oc --insecure-skip-tls-verify --request-timeout=5s get secrets --all-namespaces -o json
           queue /tmp/artifacts/services.json oc --insecure-skip-tls-verify --request-timeout=5s get services --all-namespaces -o json
+          queue /tmp/artifacts/statefulsets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get statefulsets --all-namespaces -o json
 
           FILTER=gzip queue /tmp/artifacts/openapi.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get --raw /openapi/v2
 
