@@ -38,22 +38,22 @@ presubmits:
     always_run: true
     branches:
     - master
-    context: ci/prow/e2e-local
+    context: ci/prow/e2e-core
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-    name: pull-ci-redhat-developer-devconsole-operator-master-e2e-local
-    rerun_command: /test e2e-local
+    name: pull-ci-redhat-developer-devconsole-operator-master-e2e-core
+    rerun_command: /test e2e-core
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/e2e-local-cluster-profile
-        - --target=e2e-local
-        - --template=/usr/local/e2e-local
+        - --secret-dir=/usr/local/e2e-core-cluster-profile
+        - --target=e2e-core
+        - --template=/usr/local/e2e-core
         command:
         - ci-operator
         env:
@@ -65,7 +65,7 @@ presubmits:
               key: redhat-developer-devconsole-operator-master.yaml
               name: ci-operator-master-configs
         - name: JOB_NAME_SAFE
-          value: e2e-local
+          value: e2e-core
         - name: TEST_COMMAND
           value: "oc new-project devconsole \nmake deploy-crd\nmake deploy-rbac\nsed
             -i 's|/quay.io/shbose/devconsole-operator:b16e650-1554146546|REPLACE_IMAGE|g'
@@ -78,9 +78,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/e2e-local-cluster-profile
+        - mountPath: /usr/local/e2e-core-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-local
+        - mountPath: /usr/local/e2e-core
           name: job-definition
           subPath: cluster-launch-installer-src.yaml
       serviceAccountName: ci-operator
@@ -93,7 +93,7 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-src
         name: job-definition
-    trigger: '(?m)^/test (?:.*? )?e2e-local(?: .*?)?$'
+    trigger: '(?m)^/test (?:.*? )?e2e-core(?: .*?)?$'
   - agent: kubernetes
     always_run: true
     branches:
