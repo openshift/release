@@ -10,10 +10,15 @@ base_images:
 resources:
   '*':
     limits:
-      memory: 1Gi
+      memory: 4Gi
     requests:
       memory: 250Mi
       cpu: 100m
+
+images:
+- from: os
+  to: devconsole-operator
+  dockerfile_path: Dockerfile
 
     
 build_root:
@@ -30,3 +35,16 @@ tests:
   commands: make test
   container:
     from: src
+- as: e2e-local
+  optional: true
+  openshift_installer_src:
+    cluster_profile: aws
+  commands: |
+   oc new-project devconsole 
+   make deploy-crd
+   make deploy-rbac
+   sed -i 's|/quay.io/shbose/devconsole-operator:b16e650-1554146546|REPLACE_IMAGE|g' ./deploy/test/operator_test.yaml
+   oc apply -f ./deploy/test/operator_test.yaml
+   operator-sdk test local ./test/e2e --namespace devconsole  --no-setup
+
+
