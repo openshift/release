@@ -12,6 +12,8 @@ parameters:
   required: true
 - name: IMAGE_TESTS
   required: true
+- name: LOCAL_IMAGE_OPENSTACK_INSTALLER
+  required: true
 - name: CLUSTER_TYPE
   value: "openstack"
 - name: TEST_COMMAND
@@ -80,12 +82,11 @@ objects:
     dnsConfig:
       nameservers:
         - ${CI_DNS_IP}
-        - 1.1.1.1
     containers:
 
     # Once the cluster is up, executes shared tests
     - name: test
-      image: ${IMAGE_TESTS}
+      image: ${LOCAL_IMAGE_OPENSTACK_INSTALLER}
       terminationMessagePolicy: FallbackToLogsOnError
       resources:
         requests:
@@ -166,7 +167,7 @@ objects:
 
     # Runs an install
     - name: setup
-      image: ${IMAGE_INSTALLER}
+      image: ${LOCAL_IMAGE_OPENSTACK_INSTALLER}
       terminationMessagePolicy: FallbackToLogsOnError
       volumeMounts:
       - name: shared-tmp
@@ -215,7 +216,6 @@ objects:
         #!/bin/sh
         trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/setup-success; else touch /tmp/exit; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-
         cp "$(command -v openshift-install)" /tmp
         mkdir /tmp/artifacts/installer
 
@@ -229,6 +229,16 @@ objects:
         export EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
         export SSH_PUB_KEY=$(cat "${SSH_PUB_KEY_PATH}")
         export PULL_SECRET=$(cat "${PULL_SECRET_PATH}")
+        # check whether we already have a floating ip created
+        LB_FIP=$(openstack floating ip list --format value --status DOWN -c 'Floating IP Address'| head -n1)
+
+        # create new floating ip if doesn't exist
+        if [ -z "$LB_FIP" ]; then
+            LB_FIP=$(openstack floating ip create $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address')
+        fi
+
+        # create A record for the api
+        curl -v -X POST $CI_DNS_IP:8080 -d '{"name": "'api.$CLUSTER_NAME'", "ip": "'$LB_FIP'"}'
 
         cat > /tmp/artifacts/installer/install-config.yaml << EOF
         apiVersion: v1beta4
@@ -249,19 +259,20 @@ objects:
             externalNetwork:  ${OPENSTACK_EXTERNAL_NETWORK}
             computeFlavor:    ${OPENSTACK_FLAVOR}
             region:           ${OPENSTACK_REGION}
-            lbFloatingIP:     ${CI_DNS_IP}
+            lbFloatingIP:     ${LB_FIP}
         pullSecret: >
           ${PULL_SECRET}
         sshKey: |
           ${SSH_PUB_KEY}
         EOF
 
+
         TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create cluster --log-level=debug &
         wait "$!"
 
     # Performs cleanup of all created resources
     - name: teardown
-      image: ${IMAGE_TESTS}
+      image: ${LOCAL_IMAGE_OPENSTACK_INSTALLER}
       terminationMessagePolicy: FallbackToLogsOnError
       volumeMounts:
       - name: shared-tmp
@@ -271,8 +282,6 @@ objects:
       - name: artifacts
         mountPath: /tmp/artifacts
       env:
-      - name: INSTANCE_PREFIX
-        value: ${JOB_NAME_HASH}
       - name: TYPE
         value: ${CLUSTER_TYPE}
       - name: KUBECONFIG
@@ -301,18 +310,48 @@ objects:
             "${@}" >"${TARGET}" &
           fi
         }
+        function nuke() {
+          export PREFIX=$(grep cluster_id /tmp/artifacts/installer/terraform.tfvars | cut -d '"' -f4)
+          openstack server list -c ID -f value --name $PREFIX | xargs openstack server delete
+
+          openstack router remove subnet  $PREFIX-external-router $PREFIX-service
+          openstack router remove subnet  $PREFIX-external-router $PREFIX-nodes
+          # delete interfaces from the router
+          openstack network trunk list -c Name -f value | grep $PREFIX | xargs openstack network trunk delete
+          openstack port list --network $PREFIX-openshift -c ID -f value | xargs openstack port delete
+
+          # delete interfaces from the router
+          PORT=$(openstack router show $PREFIX-external-router -c interfaces_info -f value | cut -d '"' -f 12)
+          openstack router remove port $PREFIX-external-router $PORT
+
+
+          openstack router unset --external-gateway $PREFIX-external-router
+          openstack router delete $PREFIX-external-router
+
+          openstack network delete $PREFIX-openshift
+
+          openstack security group delete $PREFIX-api
+          openstack security group delete $PREFIX-master
+          openstack security group delete $PREFIX-worker
+
+
+          CONTAINER=$PREFIX
+          openstack object list -f value $CONTAINER | xargs openstack object delete $CONTAINER
+          openstack container delete $CONTAINER
+        }
 
         function teardown() {
           set +e
           touch /tmp/shared/exit
           export PATH=$PATH:/tmp/shared
 
-         echo "Gathering artifacts ..."
+          echo "Gathering artifacts ..."
           mkdir -p /tmp/artifacts/pods /tmp/artifacts/nodes /tmp/artifacts/metrics /tmp/artifacts/bootstrap /tmp/artifacts/network
 
 
           if [ -f /tmp/artifacts/installer/terraform.tfstate ]
           then
+              # TODO(trown): rework this to fetch bootstrap logs from openstack
               # we don't have jq, so the python equivalent of
               # jq '.modules[].resources."aws_instance.bootstrap".primary.attributes."public_ip" | select(.)'
                 #              bootstrap_ip=$(python -c \
@@ -337,6 +376,9 @@ objects:
           else
               echo "No terraform statefile found. Skipping collection of bootstrap logs."
           fi
+          # WORKAROUND https://github.com/openshift/installer/issues/1467
+          # We need this to be able to collect logs
+          oc --insecure-skip-tls-verify --request-timeout=5s get csr -o name | xargs oc --insecure-skip-tls-verify --request-timeout=5s adm certificate approve
 
           oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' > /tmp/nodes
           oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces --template '{{ range .items }}{{ $name := .metadata.name }}{{ $ns := .metadata.namespace }}{{ range .spec.containers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ range .spec.initContainers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ end }}' > /tmp/containers
@@ -429,6 +471,9 @@ objects:
 
           echo "Deprovisioning cluster ..."
           openshift-install --dir /tmp/artifacts/installer destroy cluster
+
+          echo "Nuking any resources left"
+          nuke
         }
 
         trap 'teardown' EXIT
