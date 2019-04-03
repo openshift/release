@@ -23,7 +23,7 @@ jenkins_operators:
   max_concurrency: 150
   max_goroutines: 20
   allow_cancellations: true
-  job_url_template: 'https://openshift-gce-devel.appspot.com/build/origin-{{if eq .Spec.Type "presubmit"}}{{if eq .Spec.Refs.Org "kubernetes"}}federated-results{{else if eq .Spec.Refs.Org "kubernetes-incubator"}}federated-results{{else if eq .Spec.Refs.Org "kubernetes-sigs"}}federated-results{{else}}ci-test{{end}}{{else}}ci-test{{end}}/{{if eq .Spec.Type "presubmit"}}pr-logs/pull{{else if eq .Spec.Type "batch"}}pr-logs/pull{{else}}logs{{end}}{{if ne .Spec.Refs.Repo "origin"}}/{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}{{end}}{{if eq .Spec.Type "presubmit"}}/{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}{{else if eq .Spec.Type "batch"}}/batch{{end}}/{{.Spec.Job}}/{{.Status.JenkinsBuildID}}/'
+  job_url_template: 'https://openshift-gce-devel.appspot.com/build/origin-{{if eq .Spec.Type "presubmit"}}{{if eq .Spec.Refs.Org "kubernetes"}}federated-results{{else if eq .Spec.Refs.Org "kubernetes-incubator"}}federated-results{{else if eq .Spec.Refs.Org "cri-o"}}federated-results{{else}}ci-test{{end}}{{else}}ci-test{{end}}/{{if eq .Spec.Type "presubmit"}}pr-logs/pull{{else if eq .Spec.Type "batch"}}pr-logs/pull{{else}}logs{{end}}{{if ne .Spec.Refs.Repo "origin"}}/{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}{{end}}{{if eq .Spec.Type "presubmit"}}/{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}{{else if eq .Spec.Type "batch"}}/batch{{end}}/{{.Spec.Job}}/{{.Status.JenkinsBuildID}}/'
   report_template: '[Full PR test history](https://openshift-gce-devel.appspot.com/pr/{{if ne .Spec.Refs.Repo "origin"}}{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}/{{end}}{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://openshift-gce-devel.appspot.com/pr/{{with index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}). Please help us cut down on flakes by [linking to](https://github.com/kubernetes/community/blob/master/contributors/devel/flaky-tests.md#filing-issues-for-flaky-tests) an [open issue](https://github.com/{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}/issues?q=is:issue+is:open) when you hit one in your PR.'
 - label_selector: master=ci.dev.openshift.redhat.com
   max_concurrency: 25
@@ -85,21 +85,7 @@ tide:
   pr_status_base_url: https://prow.svc.ci.openshift.org/pr
   queries:
   - repos:
-    - openshift/library-go
-    - openshift/origin
-    - openshift/api
-    - openshift/client-go
-    labels:
-    - lgtm
-    - approved
-    - kube-rebase-in-progress
-    missingLabels:
-    - needs-rebase
-    - do-not-merge/blocked-paths
-    - do-not-merge/hold
-    - do-not-merge/work-in-progress
-    - do-not-merge/invalid-owners-file
-  - repos:
+    - cri-o/cri-o
     - openshift/image-registry
     - openshift/installer
     - openshift/online-hibernation
@@ -110,6 +96,7 @@ tide:
     - openshift/jenkins-client-plugin
     - openshift/jenkins-openshift-login-plugin
     - openshift/library
+    - openshift/library-go
     - openshift-s2i/s2i-wildfly
     - openshift/monitor-project-lifecycle
     - openshift/autoheal
@@ -141,6 +128,7 @@ tide:
     - openshift/ci-vm-operator
     - openshift/ci-ns-ttl-controller
     - openshift/machine-config-operator
+    - openshift/client-go
     - openshift/cluster-image-registry-operator
     - openshift/cluster-samples-operator
     - openshift/cluster-ingress-operator
@@ -157,7 +145,9 @@ tide:
     - openshift/cluster-api-provider-kubemark
     - openshift/cluster-api-actuator-pkg
     - openshift/cluster-autoscaler-operator
+    - openshift/origin
     - openshift/machine-api-operator
+    - openshift/api
     - openshift/router
     - openshift/imagebuilder
     - openshift/must-gather
@@ -196,6 +186,7 @@ tide:
     - openshift/knative-eventing
     - openshift/knative-eventing-sources
     - openshift/knative-pkg
+    - openshift/tektoncd-pipeline
     - openshift/ansible-service-broker
     - openshift/template-service-broker-operator
     - openshift/federation-v2-operator
@@ -223,6 +214,7 @@ tide:
     - openshift/external-storage
     - openshift/cloud-provider-openstack
     - openshift/local-storage-operator
+    - openshift/dedicated-admin-operator
     labels:
     - lgtm
     - approved
