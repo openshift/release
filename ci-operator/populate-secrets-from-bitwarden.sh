@@ -219,6 +219,15 @@ update_secret generic "cluster-secrets-${target_cloud}"          \
 	"$( format_attachment "jenkins-ci-iam" ssh-publickey )"      \
 	"$( format_attachment "vsphere-credentials" secret.tfvars )"
 
+target_cloud="metal"
+update_secret generic "cluster-secrets-${target_cloud}"                  \
+	"$( format_attachment "quay.io" pull-secret )"                       \
+	"$( format_attachment "jenkins-ci-iam" .awscred )"                   \
+	"$( format_attachment "jenkins-ci-iam" ssh-privatekey )"             \
+	"$( format_attachment "jenkins-ci-iam" ssh-publickey )"              \
+	"$( format_attachment "packet.net" .packetcred )"                    \
+	"$( format_attachment "packet.net" client.crt matchbox-client.crt )" \
+	"$( format_attachment "packet.net" client.key matchbox-client.key )"
 
 # Configuration for the .git-credentials used by the release controller to clone
 # private repositories to generate changelogs
