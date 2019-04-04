@@ -189,14 +189,14 @@ update_secret generic "ci-pull-credentials" --type=kubernetes.io/dockerconfigjso
 # Cluster credentials aggregate multiple items
 # of information for easy consumption by tests
 target_cloud="aws"
-update_secret generic "cluster-secrets-${target_cloud}"                \
-	"$( format_attachment "quay.io" pull-secret )"                       \
-	"$( format_attachment "jenkins-ci-iam" .awscred )"                   \
-	"$( format_attachment "jenkins-ci-iam" ssh-privatekey )"             \
+update_secret generic "cluster-secrets-${target_cloud}"      \
+	"$( format_attachment "quay.io" pull-secret )"           \
+	"$( format_attachment "jenkins-ci-iam" .awscred )"       \
+	"$( format_attachment "jenkins-ci-iam" ssh-privatekey )" \
 	"$( format_attachment "jenkins-ci-iam" ssh-publickey )"
 
 target_cloud="gcp"
-update_secret generic "cluster-secrets-${target_cloud}"                       \
+update_secret generic "cluster-secrets-${target_cloud}"                         \
 	"$( format_attachment "quay.io" pull-secret )"                              \
 	"$( format_attachment "jenkins-ci-provisioner" credentials.json gce.json )" \
 	"$( format_attachment "jenkins-ci-provisioner" ssh-privatekey )"            \
@@ -205,11 +205,20 @@ update_secret generic "cluster-secrets-${target_cloud}"                       \
 	"$( format_field_value telemeter "Telemeter Token" "telemeter-token" )"
 
 target_cloud="openstack"
-update_secret generic "cluster-secrets-${target_cloud}"                       \
-	--from-literal=pull-secret="$(merge_pull_secrets)"                          \
-	"$( format_attachment "openstack" clouds.yaml )"                            \
-	"$( format_attachment "jenkins-ci-provisioner" ssh-privatekey )"            \
+update_secret generic "cluster-secrets-${target_cloud}"              \
+	--from-literal=pull-secret="$(merge_pull_secrets)"               \
+	"$( format_attachment "openstack" clouds.yaml )"                 \
+	"$( format_attachment "jenkins-ci-provisioner" ssh-privatekey )" \
 	"$( format_attachment "jenkins-ci-provisioner" ssh-publickey )"
+
+target_cloud="vsphere"
+update_secret generic "cluster-secrets-${target_cloud}"          \
+	"$( format_attachment "quay.io" pull-secret )"               \
+	"$( format_attachment "jenkins-ci-iam" .awscred )"           \
+	"$( format_attachment "jenkins-ci-iam" ssh-privatekey )"     \
+	"$( format_attachment "jenkins-ci-iam" ssh-publickey )"      \
+	"$( format_attachment "vsphere-credentials" secret.tfvars )"
+
 
 # Configuration for the .git-credentials used by the release controller to clone
 # private repositories to generate changelogs
