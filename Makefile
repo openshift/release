@@ -187,7 +187,7 @@ prow-release-controller-deploy:
 prow-release-controller: prow-release-controller-definitions prow-release-controller-deploy
 .PHONY: prow-release-controller
 
-projects: ci-ns gcsweb origin-stable origin-release test-bases image-mirror-setup image-pruner-setup publishing-bot content-mirror azure python-validation
+projects: ci-ns gcsweb origin-stable origin-release test-bases image-mirror-setup image-pruner-setup publishing-bot content-mirror azure python-validation metering
 .PHONY: projects
 
 ci-operator-config:
@@ -318,6 +318,10 @@ azure-secrets:
 	oc create secret generic aws-reg-master --from-literal=username=${AWS_REG_USERNAME} --from-literal=password=${AWS_REG_PASSWORD} -o yaml --dry-run | oc apply -n azure -f -
 	oc create secret generic codecov-token --from-literal=upload=${CODECOV_UPLOAD_TOKEN} -o yaml --dry-run | oc apply -n azure -f -
 .PHONY: azure-secrets
+
+metering:
+	$(MAKE) -C projects/metering
+.PHONY: metering
 
 check:
 	# test that the prow config is parseable
