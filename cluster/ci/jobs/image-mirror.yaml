@@ -236,9 +236,9 @@ items:
 - apiVersion: batch/v1beta1
   kind: CronJob
   metadata:
-    name: "image-mirror-knative-0.4-quay"
+    name: "image-mirror-knative-v0.4-quay"
     labels:
-      app: "image-mirror-knative-0.4-quay"
+      app: "image-mirror-knative-v0.4-quay"
   spec:
     schedule: "0 * * * *"
     concurrencyPolicy: Forbid
@@ -248,9 +248,9 @@ items:
       spec:
         template:
           metadata:
-            name: "image-mirror-knative-0.4-quay"
+            name: "image-mirror-knative-v0.4-quay"
             labels:
-              app: "image-mirror-knative-0.4-quay"
+              app: "image-mirror-knative-v0.4-quay"
           spec:
             restartPolicy: OnFailure
             volumes:
@@ -278,5 +278,52 @@ items:
               args:
               - image
               - mirror
-              - -f=/etc/imagemirror/knative_0_4_quay
+              - -f=/etc/imagemirror/knative/knative_v0_4_quay
+              - --skip-multiple-scopes # quay chokes when requesting multiple
+- apiVersion: batch/v1beta1
+  kind: CronJob
+  metadata:
+    name: "image-mirror-knative-v0.5-quay"
+    labels:
+      app: "image-mirror-knative-v0.5-quay"
+  spec:
+    schedule: "0 * * * *"
+    concurrencyPolicy: Forbid
+    successfulJobsHistoryLimit: 1
+    failedJobsHistoryLimit: 2
+    jobTemplate:
+      spec:
+        template:
+          metadata:
+            name: "image-mirror-knative-v0.5-quay"
+            labels:
+              app: "image-mirror-knative-v0.5-quay"
+          spec:
+            restartPolicy: OnFailure
+            volumes:
+            - name: push
+              secret:
+                secretName: registry-push-credentials-quay.io-openshift-knative
+            - name: config
+              configMap:
+                name: image-mirror
+            containers:
+            - name: "mirror"
+              image: "openshift/origin-cli:v3.10"
+              terminationMessagePolicy: FallbackToLogsOnError
+              volumeMounts:
+              - name: push
+                mountPath: /home/mirror/.docker/config.json
+                subPath: config.json
+              - name: config
+                mountPath: /etc/imagemirror
+              env:
+              - name: HOME
+                value: /home/mirror
+              command:
+              - oc
+              args:
+              - image
+              - mirror
+              - -f=/etc/imagemirror/knative/knative_v0_5_quay
               - --skip-multiple-scopes # quay chokes when requesting multiple
