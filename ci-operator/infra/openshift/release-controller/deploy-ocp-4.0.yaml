@@ -190,6 +190,32 @@ items:
     name: release-upgrade-graph
     namespace: ocp
 
+# expose the files cache to the outside world
+- kind: Service
+  apiVersion: v1
+  metadata:
+    name: files-cache
+    namespace: ci-release
+  spec:
+    selector:
+      app: files-cache
+    ports:
+    - port: 80
+      targetPort: 8080
+- kind: Route
+  apiVersion: v1
+  metadata:
+    name: files-cache
+    namespace: ci-release
+  spec:
+    host: openshift-release-artifacts.svc.ci.openshift.org
+    tls:
+      termination: Edge
+      insecureEdgeTerminationPolicy: Redirect
+    to:
+      kind: Service
+      name: files-cache
+
 # deploy the controller
 - kind: ServiceAccount
   apiVersion: v1
@@ -200,6 +226,7 @@ items:
   apiVersion: v1
   metadata:
     name: release-controller-ocp
+    namespace: ci
   spec:
     selector:
       app: release-controller-ocp
@@ -210,6 +237,7 @@ items:
   apiVersion: v1
   metadata:
     name: release-controller-ocp
+    namespace: ci
   spec:
     host: openshift-release.svc.ci.openshift.org
     tls:
@@ -218,17 +246,6 @@ items:
     to:
       kind: Service
       name: release-controller-ocp
-- kind: PersistentVolumeClaim
-  apiVersion: v1
-  metadata:
-    name: git-cache
-    namespace: ci-release
-  spec:
-    accessModes:
-    - ReadWriteOnce
-    resources:
-      requests:
-        storage: 20Gi
 - kind: Deployment
   apiVersion: apps/v1
   metadata:
@@ -271,6 +288,7 @@ items:
           - --release-namespace=openshift
           - --prow-config=/etc/prow/config.yaml
           - --job-config=/etc/jobs/openshift-release-periodics.yaml
+          - --artifacts=openshift-release-artifacts.svc.ci.openshift.org
           - --prow-namespace=ci
           - --job-namespace=ci-release
           - -v=4
