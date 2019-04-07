@@ -10,7 +10,8 @@ trap 'rm -rf "${workspace}"' EXIT
 cat <<EOF >>"${workspace}/commit.txt"
 [$(TZ=UTC date '+%d-%m-%Y %H:%M:%S')] Bumping Prow component images
 
-$(printf '%-18s %-20s %-20s' component from to)
+$(printf '|%-20s|%-22s|%-22s|' Component From To Changes)
+|------------------|--------------------|--------------------|
 EOF
 
 new_tag=""
@@ -22,8 +23,10 @@ for component in $( grep -Porh "(?<=gcr.io/k8s-prow/).*(?=:v)" "${target_files[@
 	if [[ -n "${new_tag}" && "${latest_tag}" != "${new_tag}" ]]; then
 		echo "[WARNING] For ${component} found the latest tag at ${latest_tag}, not ${new_tag} like other components."
 	fi
+	current_sha="${current_tag#*-}"
+	latest_sha="${latest_tag#*-}"
 	if [[ "${current_tag}" != "${latest_tag}" ]]; then
-		printf '%-18s %-20s %-20s\n' "${component}" "${current_tag}" "${latest_tag}" | tee -a "${workspace}/commit.txt"
+		printf '|%-20s|%-22s|%-22s|[link](github.com/kubernetes/test-infra/compare/%s...%s)\n' "\`${component}\`" "\`${current_tag}\`" "\`${latest_tag}\`" "${current_sha}" "${latest_sha}"| tee -a "${workspace}/commit.txt"
 		sed -i "s|\(gcr\.io/k8s-prow/${component}:\)v[0-9][0-9]*-[a-z0-9][a-z0-9]*|\1${latest_tag}|g" "${target_files[@]}"
 	fi
 done
