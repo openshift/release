@@ -1,0 +1,127 @@
+tag_specification:
+  name: '4.0'
+  namespace: ocp
+promotion:
+  cluster: https://api.ci.openshift.org
+  namespace: openshift
+  name: knative-v0.5.0
+base_images:
+  base:
+    name: '4.0'
+    namespace: ocp
+    tag: base
+build_root:
+  project_image:
+    dockerfile_path: openshift/ci-operator/build-image/Dockerfile
+canonical_go_repository: github.com/knative/eventing
+binary_build_commands: make install
+test_binary_build_commands: make test-install
+tests:
+- as: e2e
+  commands: "INTERNAL_REGISTRY=image-registry.openshift-image-registry.svc:5000 ENABLE_ADMISSION_WEBHOOKS=false make test-e2e"
+  openshift_installer_src:
+    cluster_profile: aws
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+images:
+- dockerfile_path: openshift/ci-operator/knative-images/controller/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/controller
+  to: knative-eventing-controller
+- dockerfile_path: openshift/ci-operator/knative-images/fanoutsidecar/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/fanoutsidecar
+  to: knative-eventing-fanoutsidecar
+- dockerfile_path: openshift/ci-operator/knative-images/filter/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/filter
+  to: knative-eventing-filter
+- dockerfile_path: openshift/ci-operator/knative-images/in-memory-channel-controller/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/in-memory-channel-controller
+  to: knative-eventing-in-memory-channel-controller
+- dockerfile_path: openshift/ci-operator/knative-images/ingress/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/ingress
+  to: knative-eventing-ingress
+- dockerfile_path: openshift/ci-operator/knative-images/kafka-channel-controller/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/kafka-channel-controller
+  to: knative-eventing-kafka-channel-controller
+- dockerfile_path: openshift/ci-operator/knative-images/kafka-channel-dispatcher/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/kafka-channel-dispatcher
+  to: knative-eventing-kafka-channel-dispatcher
+- dockerfile_path: openshift/ci-operator/knative-images/pong/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/pong
+  to: knative-eventing-pong
+- dockerfile_path: openshift/ci-operator/knative-images/sendevent/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/sendevent
+  to: knative-eventing-sendevent
+- dockerfile_path: openshift/ci-operator/knative-images/webhook/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/webhook
+  to: knative-eventing-webhook
+- dockerfile_path: openshift/ci-operator/knative-test-images/logevents/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/logevents
+  to: knative-eventing-test-logevents
+- dockerfile_path: openshift/ci-operator/knative-test-images/sendevent/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/sendevent
+  to: knative-eventing-test-sendevent
