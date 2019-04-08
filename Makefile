@@ -10,7 +10,7 @@ applyTemplate:
 	oc process -f $(WHAT) | oc apply -f -
 .PHONY: applyTemplate
 
-postsubmit-update: prow-services origin-release origin-stable ci-infra-imagestreams
+postsubmit-update: prow-services origin-release origin-stable ci-infra-imagestreams libpod
 .PHONY: postsubmit-update
 
 all: roles prow projects
@@ -327,3 +327,7 @@ check:
 	# test that the prow config is parseable
 	mkpj --config-path cluster/ci/config/prow/config.yaml --job-config-path ci-operator/jobs/ --job branch-ci-origin-images --base-ref master --base-sha abcdef
 .PHONY: check
+
+libpod:
+	$(MAKE) apply WHAT=projects/libpod/libpod.yaml
+.PHONY: libpod
