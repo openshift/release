@@ -1,0 +1,36 @@
+tag_specification:
+  name: '4.0'
+  namespace: ocp
+promotion:
+  name: '4.0'
+  namespace: ocp
+base_images:
+  base:
+    name: '4.0'
+    namespace: ocp
+    tag: base
+canonical_go_repository: github.com/openshift/support-operator
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  to: support-operator
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+tests:
+- as: unit
+  commands: go test ./...
+  container:
+    from: src
+- as: e2e-aws
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer:
+    cluster_profile: aws
