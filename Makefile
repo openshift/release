@@ -175,6 +175,8 @@ prow-release-controller-definitions:
 	oc annotate -n openshift is/origin-v4.0 "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/origin-4.0.json)" --overwrite
 	oc annotate -n ocp is/4.0-art-latest "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/ocp-4.0.json)" --overwrite
 	oc annotate -n ocp is/4.0 "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/ocp-4.0-ci.json)" --overwrite
+	oc annotate -n ocp is/4.1-art-latest "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/ocp-4.1.json)" --overwrite
+	oc annotate -n ocp is/4.1 "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/ocp-4.1-ci.json)" --overwrite
 	oc annotate -n ocp is/release "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/ocp-4.0-stable.json)" --overwrite
 .PHONY: prow-release-controller-definitions
 
@@ -182,6 +184,7 @@ prow-release-controller-deploy:
 	$(MAKE) apply WHAT=ci-operator/infra/openshift/release-controller/art-publish.yaml
 	$(MAKE) apply WHAT=ci-operator/infra/openshift/release-controller/deploy-origin-4.0.yaml
 	$(MAKE) apply WHAT=ci-operator/infra/openshift/release-controller/deploy-ocp-4.0.yaml
+	$(MAKE) apply WHAT=ci-operator/infra/openshift/release-controller/deploy-ocp-4.1.yaml
 .PHONY: prow-release-controller-deploy
 
 prow-release-controller: prow-release-controller-definitions prow-release-controller-deploy
