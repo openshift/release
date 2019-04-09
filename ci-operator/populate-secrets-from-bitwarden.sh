@@ -218,7 +218,7 @@ update_secret generic "cluster-secrets-${target_cloud}"          \
 	"$( format_attachment "jenkins-ci-iam" .awscred )"           \
 	"$( format_attachment "jenkins-ci-iam" ssh-privatekey )"     \
 	"$( format_attachment "jenkins-ci-iam" ssh-publickey )"      \
-	"$( format_attachment "vsphere-credentials" secret.tfvars )"
+	"$( format_attachment "vsphere-credentials" secret.auto.tfvars )"
 
 target_cloud="metal"
 update_secret generic "cluster-secrets-${target_cloud}"                  \
