@@ -1,19 +1,22 @@
-tag_specification:
-  name: '4.0'
-  namespace: ocp
-promotion:
-  name: '4.0'
-  namespace: ocp
 base_images:
   base:
-    name: '4.0'
+    name: "4.0"
     namespace: ocp
     tag: base
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.10
 canonical_go_repository: github.com/openshift/multus-admission-controller
 images:
 - dockerfile_path: Dockerfile.openshift
   from: base
   to: multus-admission-controller
+promotion:
+  name: "4.0"
+  namespace: ocp
 resources:
   '*':
     limits:
@@ -21,14 +24,12 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-build_root:
-  image_stream_tag:
-    cluster: https://api.ci.openshift.org
-    name: release
-    namespace: openshift
-    tag: golang-1.10
+tag_specification:
+  name: "4.0"
+  namespace: ocp
 tests:
 - as: e2e-aws
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: aws
+    upgrade: false

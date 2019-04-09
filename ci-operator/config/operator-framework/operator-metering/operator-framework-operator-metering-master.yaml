@@ -1,18 +1,16 @@
-tag_specification:
-  name: '4.0'
-  namespace: ocp
-promotion:
-  name: '4.0'
-  namespace: ocp
 base_images:
   base:
     name: origin-v3.11
     namespace: openshift
     tag: base
   metering-helm:
-    name: '4.0'
+    name: "4.0"
     namespace: ocp
     tag: metering-helm
+build_root:
+  project_image:
+    context_dir: .
+    dockerfile_path: Dockerfile.src
 canonical_go_repository: github.com/operator-framework/operator-metering
 images:
 - dockerfile_path: Dockerfile.reporting-operator
@@ -21,6 +19,9 @@ images:
 - dockerfile_path: Dockerfile.metering-operator
   from: metering-helm
   to: metering-helm-operator
+promotion:
+  name: "4.0"
+  namespace: ocp
 resources:
   '*':
     limits:
@@ -28,14 +29,13 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-build_root:
-   project_image:
-    dockerfile_path: Dockerfile.src
-    context_dir: .
+tag_specification:
+  name: "4.0"
+  namespace: ocp
 tests:
-- as: unit
+- artifact_dir: /tmp/artifacts
+  as: unit
   commands: make unit TEST_OUTPUT_DIR=/tmp/artifacts
-  artifact_dir: /tmp/artifacts
   container:
     from: src
 - as: verify

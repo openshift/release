@@ -1,12 +1,6 @@
-tag_specification:
-  name: '4.0'
-  namespace: ocp
-promotion:
-  name: '4.0'
-  namespace: ocp
 base_images:
   base:
-    name: '4.0'
+    name: "4.0"
     namespace: ocp
     tag: base
 build_root:
@@ -19,6 +13,19 @@ canonical_go_repository: github.com/openshift/cluster-samples-operator
 images:
 - from: base
   to: cluster-samples-operator
+promotion:
+  name: "4.0"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.0"
+  namespace: ocp
 tests:
 - as: unit
   commands: make test-unit
@@ -28,6 +35,7 @@ tests:
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: aws
+    upgrade: false
 - as: e2e-aws-operator
   commands: make test-e2e
   openshift_installer_src:
@@ -36,10 +44,4 @@ tests:
   commands: TEST_SUITE=openshift/image-ecosystem run-tests
   openshift_installer:
     cluster_profile: aws
-resources:
-  '*':
-    limits:
-      memory: 4Gi
-    requests:
-      cpu: 100m
-      memory: 200Mi
+    upgrade: false

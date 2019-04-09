@@ -1,12 +1,6 @@
-tag_specification:
-  name: '4.0'
-  namespace: ocp
-promotion:
-  name: '4.0'
-  namespace: ocp
 base_images:
   base:
-    name: '4.0'
+    name: "4.0"
     namespace: ocp
     tag: base
 build_root:
@@ -17,19 +11,29 @@ build_root:
     tag: golang-1.10
 canonical_go_repository: github.com/openshift/router
 images:
-- from: base
-  to: base-router
-  dockerfile_path: images/router/base/Dockerfile
+- dockerfile_path: images/router/base/Dockerfile
+  from: base
   optional: true
-- from: base-router
+  to: base-router
+- dockerfile_path: images/router/haproxy/Dockerfile
+  from: base-router
   to: haproxy-router
-  dockerfile_path: images/router/haproxy/Dockerfile
-#- from: base-router
-#  to: nginx-router
-#  dockerfile_path: images/router/nginx/Dockerfile
-- from: base-router
+- dockerfile_path: images/router/f5/Dockerfile
+  from: base-router
   to: f5-router
-  dockerfile_path: images/router/f5/Dockerfile
+promotion:
+  name: "4.0"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.0"
+  namespace: ocp
 tests:
 - as: unit
   commands: go test -race ./...
@@ -39,10 +43,4 @@ tests:
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: aws
-resources:
-  '*':
-    limits:
-      memory: 4Gi
-    requests:
-      cpu: 100m
-      memory: 200Mi
+    upgrade: false
