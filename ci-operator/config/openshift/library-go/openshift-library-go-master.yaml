@@ -1,28 +1,31 @@
-tag_specification:
-  name: '4.0'
-  namespace: ocp
-promotion:
-  name: '4.0'
-  namespace: ocp
 base_images:
   os:
     cluster: https://api.ci.openshift.org
     name: centos
     namespace: openshift
-    tag: '7'
-
+    tag: "7"
+binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
     cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.10
-
 canonical_go_repository: github.com/openshift/library-go
-
-binary_build_commands: make build --warn-undefined-variables
+promotion:
+  name: "4.0"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: "3"
+      memory: 2Gi
+tag_specification:
+  name: "4.0"
+  namespace: ocp
 test_binary_build_commands: make build GOFLAGS='-race' --warn-undefined-variables
-
 tests:
 - as: verify
   commands: |
@@ -30,7 +33,6 @@ tests:
     make verify -k --warn-undefined-variables
   container:
     from: bin
-
 - as: verify-deps
   commands: |
     HOME=$( mktemp -d )
@@ -38,26 +40,16 @@ tests:
     make verify-deps -k --warn-undefined-variables
   container:
     from: src
-
 - as: verify-alpha-build-machinery
   commands: |
     make -C alpha-build-machinery/ verify -k --warn-undefined-variables
   container:
     from: src
-
-- as: unit
+- artifact_dir: /tmp/artifacts
+  as: unit
   commands: |
     mkdir -p /tmp/artifacts
     go get -u github.com/openshift/release/tools/gotest2junit
     make test-unit JUNITFILE=/tmp/artifacts/unit_report.xml --warn-undefined-variables
-  artifact_dir: /tmp/artifacts
   container:
     from: test-bin
-
-resources:
-  '*':
-    limits:
-      memory: 4Gi
-    requests:
-      cpu: '3'
-      memory: 2Gi

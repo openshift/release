@@ -1,20 +1,23 @@
-tag_specification:
-  name: '4.0'
-  namespace: ocp
-promotion:
-  name: '4.0'
-  namespace: ocp
 base_images:
   base:
-    name: '4.0'
+    name: "4.0"
     namespace: ocp
     tag: base
 binary_build_commands: NO_DOCKER=1 make build
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.10
 canonical_go_repository: github.com/openshift/cluster-api-provider-kubemark
 images:
 - dockerfile_path: Dockerfile
   from: base
   to: kubemark-machine-controllers
+promotion:
+  name: "4.0"
+  namespace: ocp
 resources:
   '*':
     limits:
@@ -22,12 +25,9 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-build_root:
-  image_stream_tag:
-    cluster: https://api.ci.openshift.org
-    name: release
-    namespace: openshift
-    tag: golang-1.10
+tag_specification:
+  name: "4.0"
+  namespace: ocp
 tests:
 - as: unit
   commands: NO_DOCKER=1 make test

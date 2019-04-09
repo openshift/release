@@ -2,17 +2,14 @@ base_images:
   os:
     name: ubi
     namespace: ocp
-    tag: '7'
+    tag: "7"
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.10
 canonical_go_repository: github.com/openshift/images
-raw_steps:
-- pipeline_image_cache_step:
-    commands: |
-      rm -rf /etc/yum.repos.d/*
-      curl http://base-4-0.ocp.svc > /etc/yum.repos.d/content.repo
-      echo '#!/bin/sh' > /usr/bin/yum-config-manager
-      chmod ug+x /usr/bin/yum-config-manager
-    from: os
-    to: base-os
 images:
 - context_dir: base/
   dockerfile_path: Dockerfile.rhel
@@ -34,10 +31,19 @@ images:
   from: base
   to: keepalived-ipfailover
 promotion:
-  name: '4.0'
-  namespace: ocp
   additional_images:
     base: base
+  name: "4.0"
+  namespace: ocp
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      rm -rf /etc/yum.repos.d/*
+      curl http://base-4-0.ocp.svc > /etc/yum.repos.d/content.repo
+      echo '#!/bin/sh' > /usr/bin/yum-config-manager
+      chmod ug+x /usr/bin/yum-config-manager
+    from: os
+    to: base-os
 resources:
   '*':
     limits:
@@ -46,13 +52,5 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: '4.0'
+  name: "4.0"
   namespace: ocp
-  tag: ''
-  tag_overrides: {}
-build_root:
-  image_stream_tag:
-    cluster: https://api.ci.openshift.org
-    name: release
-    namespace: openshift
-    tag: golang-1.10
