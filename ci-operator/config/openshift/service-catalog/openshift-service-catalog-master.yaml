@@ -1,19 +1,22 @@
-tag_specification:
-  name: '4.0'
-  namespace: ocp
-promotion:
-  name: '4.0'
-  namespace: ocp
 base_images:
   base:
-    name: '4.0'
+    name: "4.0"
     namespace: ocp
     tag: base
 binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.10
 canonical_go_repository: github.com/kubernetes-incubator/service-catalog
 images:
 - from: base
   to: service-catalog
+promotion:
+  name: "4.0"
+  namespace: ocp
 resources:
   '*':
     limits:
@@ -21,12 +24,9 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-build_root:
-  image_stream_tag:
-    cluster: https://api.ci.openshift.org
-    name: release
-    namespace: openshift
-    tag: golang-1.10
+tag_specification:
+  name: "4.0"
+  namespace: ocp
 test_binary_build_commands: OS_GOFLAGS='-race' make build
 tests:
 - artifact_dir: /tmp/artifacts
@@ -36,6 +36,6 @@ tests:
     from: test-bin
 - artifact_dir: /tmp/artifacts
   as: e2e-aws-operator
-  commands:  make build-e2e && hack/create-subscription.sh && hack/run-e2e.sh
+  commands: make build-e2e && hack/create-subscription.sh && hack/run-e2e.sh
   openshift_installer_src:
     cluster_profile: aws
