@@ -1,0 +1,103 @@
+base_images:
+  base:
+    name: "4.0"
+    namespace: ocp
+    tag: base
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+canonical_go_repository: github.com/openshift/installer
+images:
+- dockerfile_path: images/installer/Dockerfile.ci
+  from: base
+  inputs:
+    root:
+      as:
+      - build
+      paths: null
+  to: installer
+- dockerfile_path: images/installer-artifacts/Dockerfile.rhel
+  from: installer
+  inputs:
+    root:
+      as:
+      - build
+      paths: null
+  to: installer-artifacts
+- dockerfile_path: images/nested-libvirt/Dockerfile
+  from: base
+  inputs:
+    root:
+      as:
+      - build
+      paths: null
+  optional: true
+  to: libvirt-installer
+- dockerfile_path: images/installer/Dockerfile.upi.ci
+  from: base
+  inputs:
+    root:
+      as:
+      - build
+      paths: null
+  optional: true
+  to: upi-installer
+- dockerfile_path: images/openstack/Dockerfile.ci
+  from: base
+  inputs:
+    root:
+      as:
+      - build
+      paths: null
+  optional: true
+  to: openstack-installer
+promotion:
+  disabled: true
+  name: "4.0"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  unit:
+    limits:
+      memory: 9Gi
+    requests:
+      cpu: "3"
+      memory: 5Gi
+tag_specification:
+  name: "4.0"
+  namespace: ocp
+tests:
+- as: unit
+  commands: go test ./pkg/...
+  container:
+    from: src
+- as: gofmt
+  commands: IS_CONTAINER=TRUE ./hack/go-fmt.sh .
+  container:
+    from: src
+- as: govet
+  commands: IS_CONTAINER=TRUE ./hack/go-vet.sh ./...
+  container:
+    from: src
+- as: golint
+  commands: IS_CONTAINER=TRUE ./hack/go-lint.sh -min_confidence 0.3 $(go list -f '{{
+    .ImportPath }}' ./...)
+  container:
+    from: src
+- as: e2e-aws
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer:
+    cluster_profile: aws
+    upgrade: false
+- as: e2e-rhel-scaleup
+  commands: TEST_SUITE=openshift/conformance run-tests
+  openshift_ansible_40:
+    cluster_profile: aws-centos-40
