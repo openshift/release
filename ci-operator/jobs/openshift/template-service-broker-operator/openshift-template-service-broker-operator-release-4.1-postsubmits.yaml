@@ -1,0 +1,34 @@
+postsubmits:
+  openshift/template-service-broker-operator:
+  - agent: kubernetes
+    branches:
+    - ^release-4\.1$
+    context: ""
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+    name: branch-ci-openshift-template-service-broker-operator-release-4.1-images
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --promote
+        - --target=[images]
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-template-service-broker-operator-release-4.1.yaml
+              name: ci-operator-4.1-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
