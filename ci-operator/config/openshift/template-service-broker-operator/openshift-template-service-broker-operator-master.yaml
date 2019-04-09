@@ -1,25 +1,22 @@
-test_binary_build_commands: make openshift-ci-test-container
+base_images:
+  ansible_operator:
+    cluster: https://api.ci.openshift.org
+    name: ansible-operator
+    namespace: openshift
+    tag: latest
 build_root:
   image_stream_tag:
     cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.10
-tests:
-- as: lint
-  commands: make openshift-ci-operator-lint
-  container:
-    from: test-bin
-base_images:
-  ansible_operator:
-    cluster: https://api.ci.openshift.org
-    namespace: openshift
-    name: ansible-operator
-    tag: latest
 images:
-- from: ansible_operator
-  dockerfile_path: build/Dockerfile
+- dockerfile_path: build/Dockerfile
+  from: ansible_operator
   to: template-service-broker-operator
+promotion:
+  name: "4.0"
+  namespace: ocp
 resources:
   '*':
     limits:
@@ -28,8 +25,11 @@ resources:
       cpu: 200m
       memory: 200Mi
 tag_specification:
-  name: '4.0'
+  name: "4.0"
   namespace: ocp
-promotion:
-  name: '4.0'
-  namespace: ocp
+test_binary_build_commands: make openshift-ci-test-container
+tests:
+- as: lint
+  commands: make openshift-ci-operator-lint
+  container:
+    from: test-bin

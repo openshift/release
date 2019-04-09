@@ -1,20 +1,23 @@
-tag_specification:
-  name: '4.0'
-  namespace: ocp
-promotion:
-  name: '4.0'
-  namespace: ocp
 base_rpm_images:
   os:
     cluster: https://api.ci.openshift.org
     name: centos
     namespace: openshift
-    tag: '7'
-
+    tag: "7"
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+images:
+- dockerfile_path: images/installer/Dockerfile
+  from: base
+  to: ansible
+promotion:
+  name: "4.0"
+  namespace: ocp
 raw_steps:
-# TODO: until ansible has all necessary RPMs mirrored, create a synthetic
-#       base image that is a copy of the existing Origin base image (instead of the
-#       new UBI base image).
 - pipeline_image_cache_step:
     commands: |
       INSTALL_PKGS="which tar wget hostname sysvinit-tools util-linux socat tree findutils lsof bind-utils shadow-utils"
@@ -30,17 +33,13 @@ raw_steps:
 - project_directory_image_build_step:
     from: os
     inputs:
+      src:
+        paths: null
       src-dockerfile:
         paths:
         - destination_dir: .
           source_path: /opt/Dockerfile
-      src: {}
     to: base
-
-images:
-- dockerfile_path: images/installer/Dockerfile
-  from: base
-  to: ansible
 resources:
   '*':
     limits:
@@ -52,15 +51,15 @@ resources:
     limits:
       memory: 3Gi
     requests:
-      cpu: '1'
+      cpu: "1"
       memory: 1.5Gi
-rpm_build_commands: tito tag --offline --accept-auto-changelog --use-release '9999%{?dist}'; tito build --output="_output/local/releases" --rpm --test --offline --quiet; mkdir -p _output/local/releases/rpms; mv _output/local/releases/noarch/* _output/local/releases/rpms; createrepo _output/local/releases/rpms
-build_root:
-  image_stream_tag:
-    cluster: https://api.ci.openshift.org
-    name: release
-    namespace: openshift
-    tag: golang-1.10
+rpm_build_commands: tito tag --offline --accept-auto-changelog --use-release '9999%{?dist}';
+  tito build --output="_output/local/releases" --rpm --test --offline --quiet; mkdir
+  -p _output/local/releases/rpms; mv _output/local/releases/noarch/* _output/local/releases/rpms;
+  createrepo _output/local/releases/rpms
+tag_specification:
+  name: "4.0"
+  namespace: ocp
 test_binary_build_commands: yum install -y gcc libffi-devel python-devel openssl-devel
   python-pip; pip install tox; chmod uga+w /etc/passwd
 tests:

@@ -1,20 +1,23 @@
-tag_specification:
-  name: '4.0'
-  namespace: ocp
-promotion:
-  name: '4.0'
-  namespace: ocp
 base_images:
   base:
-    name: '4.0'
+    name: "4.0"
     namespace: ocp
     tag: base
 binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.10
 canonical_go_repository: github.com/openshift/cluster-kube-scheduler-operator
 images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
   to: cluster-kube-scheduler-operator
+promotion:
+  name: "4.0"
+  namespace: ocp
 resources:
   '*':
     limits:
@@ -22,12 +25,9 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-build_root:
-  image_stream_tag:
-    cluster: https://api.ci.openshift.org
-    name: release
-    namespace: openshift
-    tag: golang-1.10
+tag_specification:
+  name: "4.0"
+  namespace: ocp
 test_binary_build_commands: OS_GOFLAGS='-race' make build
 tests:
 - as: unit
@@ -38,6 +38,7 @@ tests:
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: aws
+    upgrade: false
 - as: e2e-aws-operator
   commands: make e2e
   openshift_installer_src:
@@ -57,3 +58,4 @@ tests:
   commands: TEST_SUITE=openshift/conformance/serial run-tests
   openshift_installer:
     cluster_profile: aws
+    upgrade: false
