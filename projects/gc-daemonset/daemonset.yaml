@@ -1,0 +1,75 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: dont-gc-me-bro
+spec:
+  revisionHistoryLimit: 1
+  selector:
+    matchLabels:
+      app: dont-gc-me-bro
+  template:
+    metadata:
+      labels:
+        app: dont-gc-me-bro
+    spec:
+      containers:
+      - command:
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -euo pipefail
+
+          trap 'kill $(jobs -p); exit 0' TERM
+          while true; do
+            sleep 600 &
+            wait $!
+          done
+        image: registry.svc.ci.openshift.org/openshift/release:golang-1.10
+        imagePullPolicy: Always
+        name: golang110
+        resources:
+          requests:
+            cpu: 50m
+      - command:
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -euo pipefail
+
+          trap 'kill $(jobs -p); exit 0' TERM
+          while true; do
+            sleep 600 &
+            wait $!
+          done
+        image: registry.svc.ci.openshift.org/openshift/release:golang-1.11
+        imagePullPolicy: Always
+        name: golang111
+        resources:
+          requests:
+            cpu: 50m
+      - command:
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -euo pipefail
+
+          trap 'kill $(jobs -p); exit 0' TERM
+          while true; do
+            sleep 600 &
+            wait $!
+          done
+        image: registry.svc.ci.openshift.org/ocp/4.0:base
+        imagePullPolicy: Always
+        name: 40base
+        resources:
+          requests:
+            cpu: 50m
+      restartPolicy: Always
+  templateGeneration: 1
+  updateStrategy:
+    rollingUpdate:
+      maxUnavailable: 50%
+    type: RollingUpdate
