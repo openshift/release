@@ -1,13 +1,16 @@
 apiVersion: v1
 kind: List
 items:
+
+# each RPM (group,release) pair gets a service and deployment to serve RPM content from the mirrors
 - apiVersion: v1
   kind: Service
   metadata:
-    name: rpm-ocp-4-0
+    name: base-4-1
+    namespace: ocp
   spec:
     selector:
-      app: rpm-ocp-4-0
+      app: base-4-1
     ports:
     - port: 80
       targetPort: 8080
@@ -15,24 +18,26 @@ items:
 - apiVersion: apps/v1
   kind: Deployment
   metadata:
-    name: rpm-ocp-4-0
+    name: base-4-1
+    namespace: ocp
     labels:
-      app: rpm-ocp-4-0
+      app: base-4-1
     annotations:
       image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"content-mirror:latest","namespace":"ci"},"fieldPath":"spec.template.spec.containers[?(@.name==\"mirror\")].image"}]'
   spec:
+    replicas: 2
     selector:
       matchLabels:
-        app: rpm-ocp-4-0
+        app: base-4-1
     template:
       metadata:
         labels:
-          app: rpm-ocp-4-0
+          app: base-4-1
       spec:
         volumes:
         - name: repos
           secret:
-            secretName: rpm-ocp-4-0-repos
+            secretName: base-4-1-repos
         - name: cache
           emptyDir: {}
         - name: run
