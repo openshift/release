@@ -1,6 +1,38 @@
 kind: List
 apiVersion: v1
 items:
+- kind: Namespace
+  apiVersion: v1
+  metadata:
+    name: ocp
+# pull access to authenticated users
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: image-puller
+    namespace: ocp
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:authenticated
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: system:image-puller
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: user-viewer
+    namespace: ocp
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:authenticated
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: view
+
 # grant release-controller image modification in the
 # release namespace
 - kind: Role

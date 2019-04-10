@@ -1,6 +1,45 @@
 kind: List
 apiVersion: v1
 items:
+- kind: Namespace
+  apiVersion: v1
+  metadata:
+    name: origin
+
+# pull access to all users
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: image-puller
+    namespace: ocp
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:unauthenticated
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:authenticated
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: system:image-puller
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: user-viewer
+    namespace: ocp
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:authenticated
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:unauthenticated
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: view
+
 # grant release-controller image modification in the
 # release namespace
 - kind: Role
@@ -63,7 +102,7 @@ items:
   apiVersion: rbac.authorization.k8s.io/v1
   metadata:
     name: release-controller-binding
-    namespace: openshift
+    namespace: origin
   roleRef:
     kind: Role
     name: release-controller-modify
@@ -75,7 +114,7 @@ items:
   apiVersion: rbac.authorization.k8s.io/v1
   metadata:
     name: release-controller-binding-view
-    namespace: openshift
+    namespace: origin
   roleRef:
     kind: ClusterRole
     name: view
@@ -119,7 +158,7 @@ items:
   apiVersion: rbac.authorization.k8s.io/v1
   metadata:
     name: release-controller-binding-promote
-    namespace: openshift
+    namespace: origin
   roleRef:
     kind: ClusterRole
     name: system:image-builder
@@ -190,8 +229,8 @@ items:
             mountPath: /etc/jobs/
           command:
           - /usr/bin/release-controller
-          - --to=origin-release
-          - --release-namespace=openshift
+          - --to=release
+          - --release-namespace=origin
           - --prow-config=/etc/prow/config.yaml
           - --job-config=/etc/jobs
           - --prow-namespace=ci
