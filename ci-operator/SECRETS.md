@@ -54,6 +54,16 @@ currently exist:
 | `metrics-int.key`             | Azure Geneva metrics authentication key |
 | `system-docker-config.json`   | Root/node/system level docker config.json file, currently holding access registry.redhat.io |
 
+#### `cluster-secrets-vsphere`
+
+|       Key             | Description |
+| ----------------------| ----------- |
+| `secret.auto.tfvars`  | Secret part of terraform vars. See the [example tfvars](https://github.com/openshift/installer/blob/master/upi/vsphere/terraform.tfvars.example). |
+| `.awscred`            | Credentials for the AWS EC2 API, used for Route53 access. See the [upstream credentials doc](https://docs.aws.amazon.com/cli/latest/userguide/cli-multiple-profiles.html). |
+| `pull-secret`         | Credentials for pulling OpenShift images from Quay and for authenticating to telemetry. Retrieved from [try.openshift.com](https://try.openshift.com) under the ccoleman+openshift-ci-test@redhat.com account, and has the service account token from the `ocp` namespace added with `oc registry login --to=/tmp/pull-secret -z default -n ocp`.|
+| `ssh-privatekey`      | Private half of the SSH key, for connecting to VSphere VMs. |
+| `ssh-publickey`       | Public half of the SSH key, for connecting to VSphere VMs. |
+
 #### `cluster-secrets-openstack`
 
 |        Key        | Description |
