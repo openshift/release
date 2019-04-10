@@ -50,9 +50,11 @@ def validate_filename(path):
         return False
 
     if job_type == "periodics":
-        if base != "{}-{}-{}.yaml".format(org_dir, repo_dir, job_type):
-            print("[ERROR] {}: Invalid formatting in filename: expected filename format $org-$repo-periodics.yaml".format(path))
-            return False
+        branch = base[len("{}-{}-".format(org_dir, repo_dir)):-len("-{}.yaml".format(job_type))]
+        if branch == "":
+            if base != "{}-{}-{}.yaml".format(org_dir, repo_dir, job_type):
+                print("[ERROR] {}: Invalid formatting in filename: expected filename format $org-$repo-periodics.yaml".format(path))
+                return False
     else:
         branch = base[len("{}-{}-".format(org_dir, repo_dir)):-len("-{}.yaml".format(job_type))]
         if branch == "":
