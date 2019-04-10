@@ -86,7 +86,7 @@ objects:
 
     # Once the cluster is up, executes shared tests
     - name: test
-      image: ${LOCAL_IMAGE_OPENSTACK_INSTALLER}
+      image: ${IMAGE_TESTS}
       terminationMessagePolicy: FallbackToLogsOnError
       resources:
         requests:
@@ -162,6 +162,21 @@ objects:
             --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
           exit 0
         }
+        
+        function run-minimal-tests() {
+          # Grab all of the tests marked Feature:Builds and conformance/parallel/minimal 
+          openshift-tests run openshift/conformance/parallel --dry-run |
+            grep 'minimal' | grep 'Feature:Builds' |
+          openshift-tests run -o /tmp/artifacts/e2e.log \
+            --junit-dir /tmp/artifacts/junit -f -
+          exit 0
+        }
+
+        function run-no-tests() {
+          # This can be used if we just want to check the installer exits 0
+          echo "WARNING: No tests were run against the installed cluster"
+          exit 0
+        }
 
         ${TEST_COMMAND}
 
@@ -194,7 +209,7 @@ objects:
       - name: OPENSTACK_REGION
         value: moc-kzn
       - name: OPENSTACK_FLAVOR
-        value: m1.medium
+        value: m1.xlarge
       - name: OPENSTACK_EXTERNAL_NETWORK
         value: external
       - name: OS_CLOUD
