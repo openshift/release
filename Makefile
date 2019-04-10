@@ -130,20 +130,18 @@ prow-cluster-jobs:
 	oc create configmap prow-job-master-sidecar-3 --from-file=ci-operator/templates/master-sidecar-3.yaml -o yaml --dry-run | oc apply -f -
 .PHONY: prow-cluster-jobs
 
-prow-ocp-rpms:
-	$(MAKE) apply WHAT=ci-operator/infra/openshift/origin/images-ocp-base.yaml
-	$(MAKE) apply WHAT=ci-operator/infra/openshift/origin/images-ocp-rpms.yaml
-	$(MAKE) apply WHAT=ci-operator/infra/openshift/origin/images-ocp-images.yaml
-.PHONY: prow-ocp-rpms
-
 prow-ocp-rpm-secrets:
 	oc create secret generic base-4-0-repos \
 		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
-		--from-file=cluster/ci/config/prow/openshift/rpm-mirrors/ocp-4.0-default.repo \
+		--from-file=ci-operator/infra/openshift/release-controller/repos/ocp-4.0-default.repo \
+		-o yaml --dry-run | oc apply -n ocp -f -
+	oc create secret generic base-4-1-repos \
+		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
+		--from-file=ci-operator/infra/openshift/release-controller/repos/ocp-4.1-default.repo \
 		-o yaml --dry-run | oc apply -n ocp -f -
 .PHONY: prow-ocp-rpms-secrets
 
-prow-jobs: prow-cluster-jobs prow-artifacts prow-ocp-rpms
+prow-jobs: prow-cluster-jobs prow-artifacts
 	$(MAKE) apply WHAT=projects/prometheus/test/build.yaml
 	$(MAKE) apply WHAT=ci-operator/templates/os.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/ci-operator/roles.yaml
@@ -154,6 +152,7 @@ prow-artifacts:
 	oc policy add-role-to-group system:image-puller system:unauthenticated -n ci-pr-images
 	oc policy add-role-to-group system:image-puller system:authenticated -n ci-pr-images
 	oc tag --source=docker centos:7 openshift/centos:7 --scheduled
+
 	oc create ns ci-rpms -o yaml --dry-run | oc apply -f -
 	oc apply -f ci-operator/infra/openshift/origin/
 	oc apply -n ci -f ci-operator/infra/src-cache-origin.yaml
@@ -169,21 +168,16 @@ prow-ci-search:
 .PHONY: prow-ci-search
 
 prow-release-controller-definitions:
-	oc create imagestream origin-release -o yaml --dry-run | oc apply -f - -n openshift
-	oc create imagestream origin-v4.0 -o yaml --dry-run | oc apply -f - -n openshift
-	oc create imagestream release -o yaml --dry-run | oc apply -f - -n ocp
-	oc annotate -n openshift is/origin-v4.0 "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/origin-4.0.json)" --overwrite
-	oc annotate -n ocp is/4.0-art-latest "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/ocp-4.0.json)" --overwrite
-	oc annotate -n ocp is/4.0 "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/ocp-4.0-ci.json)" --overwrite
-	oc annotate -n ocp is/4.1-art-latest "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/ocp-4.1.json)" --overwrite
-	oc annotate -n ocp is/4.1 "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/ocp-4.1-ci.json)" --overwrite
-	oc annotate -n ocp is/release "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/ocp-4.0-stable.json)" --overwrite
+	oc annotate -n origin is/4.1 "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/releases/release-origin-4.1.json)" --overwrite
+	oc annotate -n ocp is/4.0-art-latest "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/releases/release-ocp-4.0.json)" --overwrite
+	oc annotate -n ocp is/4.0 "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/releases/release-ocp-4.0-ci.json)" --overwrite
+	oc annotate -n ocp is/4.1-art-latest "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/releases/release-ocp-4.1.json)" --overwrite
+	oc annotate -n ocp is/4.1 "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/releases/release-ocp-4.1-ci.json)" --overwrite
+	oc annotate -n ocp is/release "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/releases/release-ocp-4.y-stable.json)" --overwrite
 .PHONY: prow-release-controller-definitions
 
 prow-release-controller-deploy:
-	$(MAKE) apply WHAT=ci-operator/infra/openshift/release-controller/art-publish.yaml
-	$(MAKE) apply WHAT=ci-operator/infra/openshift/release-controller/deploy-origin.yaml
-	$(MAKE) apply WHAT=ci-operator/infra/openshift/release-controller/deploy-ocp.yaml
+	$(MAKE) apply WHAT=ci-operator/infra/openshift/release-controller/
 .PHONY: prow-release-controller-deploy
 
 prow-release-controller: prow-release-controller-definitions prow-release-controller-deploy

@@ -77,63 +77,11 @@ spec:
       scheduled: true
     referencePolicy:
       type: Local
----
-kind: ImageStream
-apiVersion: image.openshift.io/v1
-metadata:
-  namespace: ocp
-  name: base-4.0
----
-kind: BuildConfig
-apiVersion: build.openshift.io/v1
-metadata:
-  namespace: ocp
-  name: base-4.0-rhel
-spec:
-  successfulBuildsHistoryLimit: 1
-  failedBuildsHistoryLimit: 2
-  output:
-    to:
-      kind: ImageStreamTag
-      name: base-4.0:rhel
-  source:
-    dockerfile: |
-      FROM registry.svc.ci.openshift.org/ocp/rhel:7
-      RUN rm -rf /etc/yum.repos.d/* && \
-          curl http://base-4-0.ocp.svc > /etc/yum.repos.d/content.repo
-  strategy:
-    dockerStrategy:
-      from:
-        kind: ImageStreamTag
-        name: rhel:7
-      imageOptimizationPolicy: SkipLayers
-  triggers:
-  - type: ConfigChange
-  - type: ImageChange
----
-kind: BuildConfig
-apiVersion: build.openshift.io/v1
-metadata:
-  namespace: ocp
-  name: base-4.0-ubi
-spec:
-  successfulBuildsHistoryLimit: 1
-  failedBuildsHistoryLimit: 2
-  output:
-    to:
-      kind: ImageStreamTag
-      name: base-4.0:ubi
-  source:
-    dockerfile: |
-      FROM registry.svc.ci.openshift.org/ocp/ubi-minimal:7
-      RUN rm -rf /etc/yum.repos.d/* && \
-          curl http://base-4-0.ocp.svc > /etc/yum.repos.d/content.repo
-  strategy:
-    dockerStrategy:
-      from:
-        kind: ImageStreamTag
-        name: ubi-minimal:7
-      imageOptimizationPolicy: SkipLayers
-  triggers:
-  - type: ConfigChange
-  - type: ImageChange
+  - name: golang-1.12
+    from:
+      kind: DockerImage
+      name: docker.io/openshift/origin-release:golang-1.12
+    importPolicy:
+      scheduled: true
+    referencePolicy:
+      type: Local

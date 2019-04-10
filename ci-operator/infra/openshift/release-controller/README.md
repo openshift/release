@@ -37,10 +37,7 @@ Data about the release is tracked as an annotation on the release image stream t
 
 ### Initial configuration
 
-The `ocp-4.0.json` and `origin-4.0.json` values are set as annotations on `ocp/4.0-art-latest` and `openshift/origin-v4.0` respectively. A secret must be created in the `ci-release` namespace called
-`source` with a single file `config.json` that is a Docker config.json carrying the secrets required
-to pull sources for built images. The job that creates the payload will use this image, but the
-secret will not be used outside of that namespace for anything other than building the payload.
+The `release-*.json` files are set as annotations on `ocp/4.X-art-latest` and `origin/4.X` image streamsy. A secret must be created in the `ci-release` namespace called `source` with a single file `config.json` that is a Docker config.json carrying the secrets required to pull sources for built images. The job that creates the payload will use this image, but the secret will not be used outside of that namespace for anything other than building the payload.
 
 ### Admin actions:
 
@@ -52,3 +49,10 @@ To abort/remove a release tag:
 
     $ oc delete istag -n openshift release:<release_name>
 
+### Files in this folder
+
+* `deploy-*.yaml` - the controller definitions
+* `images-*.yaml` - definitions of the image streams used by the publish / build rules
+* `releases/release-*.json` - definitions of the build and publishing rules for sets of images
+* `repos/ocp-*-*.repo` - definitions where RPMs are loaded from for OCP builds
+* `rpms-*.yaml` - definitions of the services that exposed mirrored RPMs within the clutser
