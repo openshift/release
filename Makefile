@@ -182,9 +182,8 @@ prow-release-controller-definitions:
 
 prow-release-controller-deploy:
 	$(MAKE) apply WHAT=ci-operator/infra/openshift/release-controller/art-publish.yaml
-	$(MAKE) apply WHAT=ci-operator/infra/openshift/release-controller/deploy-origin-4.0.yaml
-	$(MAKE) apply WHAT=ci-operator/infra/openshift/release-controller/deploy-ocp-4.0.yaml
-	$(MAKE) apply WHAT=ci-operator/infra/openshift/release-controller/deploy-ocp-4.1.yaml
+	$(MAKE) apply WHAT=ci-operator/infra/openshift/release-controller/deploy-origin.yaml
+	$(MAKE) apply WHAT=ci-operator/infra/openshift/release-controller/deploy-ocp.yaml
 .PHONY: prow-release-controller-deploy
 
 prow-release-controller: prow-release-controller-definitions prow-release-controller-deploy
