@@ -7,7 +7,7 @@ items:
   apiVersion: authorization.openshift.io/v1
   metadata:
     name: release-controller-modify
-    namespace: openshift
+    namespace: ocp
   rules:
   - apiGroups:
     - ""
@@ -43,6 +43,36 @@ items:
 - kind: Role
   apiVersion: authorization.openshift.io/v1
   metadata:
+    name: release-controller-modify-ocp
+    namespace: openshift
+  rules:
+  - apiGroups:
+    - image.openshift.io
+    resources:
+    - imagestreams
+    resourceNames:
+    - origin-v4.0
+    verbs:
+    - get
+    - list
+    - watch
+    - update
+    - patch
+- kind: Role
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: release-controller-import-ocp
+    namespace: ocp
+  rules:
+  - apiGroups:
+    - image.openshift.io
+    resources:
+    - imagestreamimports
+    verbs:
+    - create
+- kind: Role
+  apiVersion: authorization.openshift.io/v1
+  metadata:
     name: release-controller-prowjob
     namespace: ci
   rules:
@@ -63,30 +93,42 @@ items:
   apiVersion: rbac.authorization.k8s.io/v1
   metadata:
     name: release-controller-binding
-    namespace: openshift
+    namespace: ocp
   roleRef:
     kind: Role
     name: release-controller-modify
   subjects:
   - kind: ServiceAccount
     namespace: ci
-    name: release-controller
+    name: release-controller-ocp
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: release-controller-binding-ocp
+    namespace: openshift
+  roleRef:
+    kind: Role
+    name: release-controller-modify-ocp
+  subjects:
+  - kind: ServiceAccount
+    namespace: ci
+    name: release-controller-ocp
 - kind: RoleBinding
   apiVersion: rbac.authorization.k8s.io/v1
   metadata:
     name: release-controller-binding-view
-    namespace: openshift
+    namespace: ocp
   roleRef:
     kind: ClusterRole
     name: view
   subjects:
   - kind: ServiceAccount
     namespace: ci
-    name: release-controller
+    name: release-controller-ocp
 - kind: RoleBinding
   apiVersion: rbac.authorization.k8s.io/v1
   metadata:
-    name: release-controller-binding-prowjob
+    name: release-controller-binding-prowjob-ocp
     namespace: ci
   roleRef:
     kind: Role
@@ -94,9 +136,9 @@ items:
   subjects:
   - kind: ServiceAccount
     namespace: ci
-    name: release-controller
+    name: release-controller-ocp
 
-# grant release-controller edit on its work namespace
+# grant release-controller-ocp edit on its work namespace
 - kind: Namespace
   apiVersion: v1
   metadata:
@@ -104,7 +146,7 @@ items:
 - kind: RoleBinding
   apiVersion: rbac.authorization.k8s.io/v1
   metadata:
-    name: release-controller-binding
+    name: release-controller-binding-ocp
     namespace: ci-release
   roleRef:
     kind: ClusterRole
@@ -112,14 +154,14 @@ items:
   subjects:
   - kind: ServiceAccount
     namespace: ci
-    name: release-controller
+    name: release-controller-ocp
 # give jobs in the work namespace authority to push to the
 # release namespace
 - kind: RoleBinding
   apiVersion: rbac.authorization.k8s.io/v1
   metadata:
     name: release-controller-binding-promote
-    namespace: openshift
+    namespace: ocp
   roleRef:
     kind: ClusterRole
     name: system:image-builder
@@ -127,52 +169,100 @@ items:
   - kind: ServiceAccount
     namespace: ci-release
     name: builder
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: release-controller-binding-import
+    namespace: ocp
+  roleRef:
+    kind: Role
+    namespace: ocp
+    name: release-controller-import-ocp
+  subjects:
+  - kind: ServiceAccount
+    namespace: ci-release
+    name: builder
 
-# deploy the controller
-- kind: ServiceAccount
+# create the secret that holds the upgrade graph state
+- kind: Secret
   apiVersion: v1
   metadata:
-    name: release-controller
-    namespace: ci
+    name: release-upgrade-graph
+    namespace: ocp
+
+# expose the files cache to the outside world
 - kind: Service
   apiVersion: v1
   metadata:
-    name: release-controller
+    name: files-cache
+    namespace: ci-release
   spec:
     selector:
-      app: release-controller
+      app: files-cache
     ports:
     - port: 80
       targetPort: 8080
 - kind: Route
   apiVersion: v1
   metadata:
-    name: release-controller
+    name: files-cache
+    namespace: ci-release
   spec:
-    host: origin-release.svc.ci.openshift.org
+    host: openshift-release-artifacts.svc.ci.openshift.org
     tls:
       termination: Edge
       insecureEdgeTerminationPolicy: Redirect
     to:
       kind: Service
-      name: release-controller
+      name: files-cache
+
+# deploy the controller
+- kind: ServiceAccount
+  apiVersion: v1
+  metadata:
+    name: release-controller-ocp
+    namespace: ci
+- kind: Service
+  apiVersion: v1
+  metadata:
+    name: release-controller-ocp
+    namespace: ci
+  spec:
+    selector:
+      app: release-controller-ocp
+    ports:
+    - port: 80
+      targetPort: 8080
+- kind: Route
+  apiVersion: v1
+  metadata:
+    name: release-controller-ocp
+    namespace: ci
+  spec:
+    host: openshift-release.svc.ci.openshift.org
+    tls:
+      termination: Edge
+      insecureEdgeTerminationPolicy: Redirect
+    to:
+      kind: Service
+      name: release-controller-ocp
 - kind: Deployment
   apiVersion: apps/v1
   metadata:
-    name: release-controller
+    name: release-controller-ocp
     namespace: ci
     annotations:
       image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"release-controller:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"controller\")].image"}]'
   spec:
     selector:
       matchLabels:
-        app: release-controller
+        app: release-controller-ocp
     template:
       metadata:
         labels:
-          app: release-controller
+          app: release-controller-ocp
       spec:
-        serviceAccountName: release-controller
+        serviceAccountName: release-controller-ocp
         volumes:
         - name: prow-config
           configMap:
@@ -180,9 +270,6 @@ items:
         - name: job-config
           configMap:
             name: job-config-misc
-            items:
-            - key: openshift-release-periodics.yaml
-              path: openshift-release-periodics.yaml
         containers:
         - name: controller
           image: release-controller:latest
@@ -193,10 +280,12 @@ items:
             mountPath: /etc/jobs/
           command:
           - /usr/bin/release-controller
-          - --to=origin-release
+          - --to=release
+          - --release-namespace=ocp
           - --release-namespace=openshift
           - --prow-config=/etc/prow/config.yaml
-          - --job-config=/etc/jobs/openshift-release-periodics.yaml
+          - --job-config=/etc/jobs
+          - --artifacts=openshift-release-artifacts.svc.ci.openshift.org
           - --prow-namespace=ci
           - --job-namespace=ci-release
           - -v=4

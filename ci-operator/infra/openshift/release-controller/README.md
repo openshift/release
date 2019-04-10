@@ -12,7 +12,7 @@ Any failures result in the release being marked a failure.
 
 Supported verification steps:
 
-1. ProwJob defined in the `ci-operator/jobs/openshift/release/openshift-release-periodics.yaml` folder
+1. ProwJob defined in the `ci-operator/jobs/openshift/release/openshift-release-*-periodics.yaml` folder
 2. Future: Manual
 3. Future: Webhook?
 
