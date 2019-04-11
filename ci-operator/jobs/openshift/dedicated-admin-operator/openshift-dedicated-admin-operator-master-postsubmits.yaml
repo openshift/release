@@ -1,24 +1,22 @@
-presubmits:
+postsubmits:
   openshift/dedicated-admin-operator:
   - agent: kubernetes
-    always_run: true
     branches:
-    - master
-    context: ci/prow/images
+    - ^master$
+    context: ""
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-    name: pull-ci-openshift-dedicated-admin-operator-master-images
-    rerun_command: /test images
+    name: branch-ci-openshift-dedicated-admin-operator-master-images
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --promote
         - --target=[images]
-        - --target=[release:latest]
         command:
         - ci-operator
         env:
@@ -34,4 +32,3 @@ presubmits:
           requests:
             cpu: 10m
       serviceAccountName: ci-operator
-    trigger: '(?m)^/test (?:.*? )?images(?: .*?)?$'
