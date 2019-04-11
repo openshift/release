@@ -248,6 +248,21 @@ objects:
           --zone "${GOOGLE_COMPUTE_ZONE}" \
           packer@"${INSTANCE_PREFIX}" \
           --command 'export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_LATEST}" && timeout 4800 bash -ce "create-cluster nested 2>&1 | tee output"' | tee /tmp/artifacts/output-e2e-libvirt
+        echo 'Collect all the info about clusteroperators'
+        LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+          --zone "${GOOGLE_COMPUTE_ZONE}" \
+          packer@"${INSTANCE_PREFIX}" \
+          --command 'export KUBECONFIG=/home/$USER/clusters/nested/auth/kubeconfig && bash -ce "oc get co | tee output"' | tee /tmp/artifacts/output-e2e-libvirt
+        echo 'Extract openshift-must-gather from the image and put it to executable path'
+        LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+          --zone "${GOOGLE_COMPUTE_ZONE}" \
+          packer@"${INSTANCE_PREFIX}" \
+          --command 'mkdir -p /tmp/must-gather && oc image extract $(oc adm release info --image-for must-gather "${RELEASE_IMAGE_LATEST}") --path /usr/bin/openshift-must-gather:/tmp/must-gather && chmod +x /tmp/must-gather/openshift-must-gather'
+        echo 'Collect all the info about clusteroperators and pods'
+        LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+          --zone "${GOOGLE_COMPUTE_ZONE}" \
+          packer@"${INSTANCE_PREFIX}" \
+          --command 'export KUBECONFIG=/home/$USER/clusters/nested/auth/kubeconfig && bash -ce "/tmp/must-gather/openshift-must-gather inspect clusteroperator --base-dir /tmp/artifacts"'
 
    # Performs cleanup of all created resources
     - name: teardown
