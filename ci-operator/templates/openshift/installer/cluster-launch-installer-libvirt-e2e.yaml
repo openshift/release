@@ -252,7 +252,7 @@ objects:
         LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
           --zone "${GOOGLE_COMPUTE_ZONE}" \
           packer@"${INSTANCE_PREFIX}" \
-          --command 'export KUBECONFIG=/home/$USER/clusters/nested/auth/kubeconfig && bash -ce "oc get co | tee output"' | tee /tmp/artifacts/output-e2e-libvirt
+          --command 'export KUBECONFIG=/home/$USER/clusters/nested/auth/kubeconfig && bash -ce "oc get co | tee output"' | tee /tmp/artifacts/output-co-libvirt
         echo 'Extract openshift-must-gather from the image and put it to executable path'
         LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
           --zone "${GOOGLE_COMPUTE_ZONE}" \
@@ -262,7 +262,13 @@ objects:
         LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
           --zone "${GOOGLE_COMPUTE_ZONE}" \
           packer@"${INSTANCE_PREFIX}" \
-          --command 'export KUBECONFIG=/home/$USER/clusters/nested/auth/kubeconfig && bash -ce "/tmp/must-gather/openshift-must-gather inspect clusteroperator --base-dir /tmp/artifacts"'
+          --command 'mkdir -p /tmp/must-gather-logs && export KUBECONFIG=/home/$USER/clusters/nested/auth/kubeconfig && bash -ce "/tmp/must-gather/openshift-must-gather inspect clusteroperator --base-dir /tmp/must-gather-logs || true"'
+        echo "scp must-gather logs back to setup pod"
+        LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+          --quiet \
+          --project "${GOOGLE_PROJECT_ID}" \
+          --zone "${GOOGLE_COMPUTE_ZONE}" \
+          --recurse packer@"${INSTANCE_PREFIX}":/tmp/must-gather-logs /tmp/artifacts
 
    # Performs cleanup of all created resources
     - name: teardown
