@@ -73,7 +73,7 @@ objects:
     namespace: ${NAMESPACE}
   spec:
     selector:
-      app: testpod
+      app: ${JOB_NAME_SAFE}-bootstrap-exporter
     ports:
     - port: 80
       targetPort: 8080
@@ -90,7 +90,7 @@ objects:
       ci-operator.openshift.io/save-container-logs: "true"
       ci-operator.openshift.io/container-sub-tests: "setup,test,teardown"
     labels:
-      app: testpod
+      app: ${JOB_NAME_SAFE}-bootstrap-exporter
   spec:
     restartPolicy: Never
     activeDeadlineSeconds: 14400
@@ -171,7 +171,7 @@ objects:
       env:
       - name: AWS_SHARED_CREDENTIALS_FILE
         value: /tmp/cluster/.awscred
-      - name: AWS_DEFAULT_REGION
+      - name: AWS_REGION
         value: us-east-1
       - name: ARTIFACT_DIR
         value: /tmp/artifacts
@@ -307,22 +307,41 @@ objects:
         export PULL_SECRET=$(cat "${PULL_SECRET_PATH}")
 
         if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
-            cat > /tmp/artifacts/installer/install-config.yaml << EOF
-        apiVersion: v1beta4
+          MACHINE_CIDR=10.0.0.0/16
+          cat > /tmp/artifacts/installer/install-config.yaml << EOF
+        apiVersion: v1
         baseDomain: ${BASE_DOMAIN}
         metadata:
           name: ${CLUSTER_NAME}
+        controlPlane:
+          name: master
+          replicas: 3
+          platform:
+            aws:
+              zones:
+              - ${AWS_REGION}a
+              - ${AWS_REGION}b
+              - ${AWS_REGION}c
+        compute:
+        - name: worker
+          replicas: 0
+          platform:
+            aws:
+              zones:
+              - ${AWS_REGION}a
+              - ${AWS_REGION}b
+              - ${AWS_REGION}c
         networking:
           clusterNetwork:
           - cidr: 10.128.0.0/14
             hostPrefix: 23
-          machineCIDR: 10.0.0.0/16
+          machineCIDR: "${MACHINE_CIDR}"
           serviceNetwork:
           - 172.30.0.0/16
           networkType: OpenShiftSDN
         platform:
           aws:
-            region:       ${AWS_REGION}
+            region: ${AWS_REGION}
             userTags:
               expirationDate: ${EXPIRATION_DATE}
         pullSecret: >
@@ -330,6 +349,9 @@ objects:
         sshKey: |
           ${SSH_PUB_KEY}
         EOF
+
+          openshift-install --dir=/tmp/artifacts/installer create manifests
+          rm -f /tmp/artifacts/installer/openshift/99_openshift-cluster-api_master-machines-*.yaml /tmp/artifacts/installer/openshift/99_openshift-cluster-api_worker-machinesets-*.yaml
         elif [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
             # Get user and password from TFVARS_PATH
             export VSPHERE_USER=$(grep -oP 'vsphere_user="\K[^"]+' ${TFVARS_PATH})
@@ -378,18 +400,188 @@ objects:
         wait "$!"
 
         cp /tmp/artifacts/installer/bootstrap.ign /srv
+        BOOTSTRAP_URI="https://${JOB_NAME_SAFE}-bootstrap-exporter-${NAMESPACE}.svc.ci.openshift.org/bootstrap.ign"
 
-        mkdir -p /tmp/tf
+        # begin bootstrapping
+        if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
+          RHCOS_AMI=ami-0df3f99538fbef10f  # FIXME: assumes AWS_REGION is us-east-1
 
-        # Copy sample UPI files
-        cp -r /var/lib/openshift-install/upi/${CLUSTER_TYPE}/* /tmp/tf
+          # FIXME: get epel-release or otherwise add awscli to our UPI image
+          export PATH="${HOME}/.local/bin:${PATH}"
+          easy_install --user pip  # our Python 2.7.5 is even too old for ensurepip
+          pip install --user awscli
 
-        # Create terraform.tfvars
-        export BOOTSTRAP_URL="http://${JOB_NAME_SAFE}-bootstrap-exporter-${NAMESPACE}.svc.ci.openshift.org/bootstrap.ign"
-        export MASTER_IGN=$(cat /tmp/artifacts/installer/master.ign)
-        export WORKER_IGN=$(cat /tmp/artifacts/installer/worker.ign)
+          export AWS_DEFAULT_REGION="${AWS_REGION}"  # CLI prefers the former
 
-        cat > /tmp/tf/terraform.tfvars <<-EOF
+          INFRA_ID="$(jq -r .infraID /tmp/artifacts/installer/metadata.json)"
+          TAGS="Key=expirationDate,Value=${EXPIRATION_DATE}"
+          IGNITION_CA="$(jq '.ignition.security.tls.certificateAuthorities[0].source' /tmp/artifacts/installer/master.ign)"  # explicitly keeping wrapping quotes
+
+          HOSTED_ZONE="$(aws route53 list-hosted-zones-by-name \
+            --dns-name "${BASE_DOMAIN}" \
+            --query "HostedZones[? Config.PrivateZone != \`true\` && Name == \`${BASE_DOMAIN}.\`].Id" \
+            --output text)"
+
+          aws cloudformation create-stack  --stack-name "${CLUSTER_NAME}-vpc" \
+            --template-body "$(cat "/var/lib/openshift-install/upi/${CLUSTER_TYPE}/cloudformation/01_vpc.yaml")" \
+            --tags "${TAGS}" \
+            --parameters \
+              ParameterKey=AvailabilityZoneCount,ParameterValue=3 &
+          wait "$!"
+
+          aws cloudformation wait stack-create-complete --stack-name "${CLUSTER_NAME}-vpc" &
+          wait "$!"
+
+          VPC_JSON="$(aws cloudformation describe-stacks --stack-name "${CLUSTER_NAME}-vpc" \
+            --query 'Stacks[].Outputs[]' --output json)"
+          VPC_ID="$(echo "${VPC_JSON}" | jq -r '.[] | select(.OutputKey == "VpcId").OutputValue')"
+          PRIVATE_SUBNETS="$(echo "${VPC_JSON}" | jq '.[] | select(.OutputKey == "PrivateSubnetIds").OutputValue')"  # explicitly keeping wrapping quotes
+          PRIVATE_SUBNET_0="$(echo "${PRIVATE_SUBNETS}" | sed 's/"//g' | cut -d, -f1)"
+          PRIVATE_SUBNET_1="$(echo "${PRIVATE_SUBNETS}" | sed 's/"//g' | cut -d, -f2)"
+          PRIVATE_SUBNET_2="$(echo "${PRIVATE_SUBNETS}" | sed 's/"//g' | cut -d, -f3)"
+          PUBLIC_SUBNETS="$(echo "${VPC_JSON}" | jq '.[] | select(.OutputKey == "PublicSubnetIds").OutputValue')"  # explicitly keeping wrapping quotes
+
+          aws cloudformation create-stack \
+            --stack-name "${CLUSTER_NAME}-infra" \
+            --template-body "$(cat "/var/lib/openshift-install/upi/${CLUSTER_TYPE}/cloudformation/02_cluster_infra.yaml")" \
+            --tags "${TAGS}" \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --parameters \
+              ParameterKey=ClusterName,ParameterValue="${CLUSTER_NAME}" \
+              ParameterKey=InfrastructureName,ParameterValue="${INFRA_ID}" \
+              ParameterKey=HostedZoneId,ParameterValue="${HOSTED_ZONE}" \
+              ParameterKey=HostedZoneName,ParameterValue="${BASE_DOMAIN}" \
+              ParameterKey=VpcId,ParameterValue="${VPC_ID}" \
+              ParameterKey=PrivateSubnets,ParameterValue="${PRIVATE_SUBNETS}" \
+              ParameterKey=PublicSubnets,ParameterValue="${PUBLIC_SUBNETS}" &
+          wait "$!"
+
+          aws cloudformation wait stack-create-complete --stack-name "${CLUSTER_NAME}-infra" &
+          wait "$!"
+
+          INFRA_JSON="$(aws cloudformation describe-stacks --stack-name "${CLUSTER_NAME}-infra" \
+            --query 'Stacks[].Outputs[]' --output json)"
+          NLB_IP_TARGETS_LAMBDA="$(echo "${INFRA_JSON}" | jq -r '.[] | select(.OutputKey == "RegisterNlbIpTargetsLambda").OutputValue')"
+          EXTERNAL_API_TARGET_GROUP="$(echo "${INFRA_JSON}" | jq -r '.[] | select(.OutputKey == "ExternalApiTargetGroupArn").OutputValue')"
+          INTERNAL_API_TARGET_GROUP="$(echo "${INFRA_JSON}" | jq -r '.[] | select(.OutputKey == "InternalApiTargetGroupArn").OutputValue')"
+          INTERNAL_SERVICE_TARGET_GROUP="$(echo "${INFRA_JSON}" | jq -r '.[] | select(.OutputKey == "InternalServiceTargetGroupArn").OutputValue')"
+          PRIVATE_HOSTED_ZONE="$(echo "${INFRA_JSON}" | jq -r '.[] | select(.OutputKey == "PrivateHostedZoneId").OutputValue')"
+
+          aws cloudformation create-stack \
+            --stack-name "${CLUSTER_NAME}-security" \
+            --template-body "$(cat "/var/lib/openshift-install/upi/${CLUSTER_TYPE}/cloudformation/03_cluster_security.yaml")" \
+            --tags "${TAGS}" \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --parameters \
+              ParameterKey=InfrastructureName,ParameterValue="${INFRA_ID}" \
+              ParameterKey=VpcCidr,ParameterValue="${MACHINE_CIDR}" \
+              ParameterKey=VpcId,ParameterValue="${VPC_ID}" \
+              ParameterKey=PrivateSubnets,ParameterValue="${PRIVATE_SUBNETS}" &
+          wait "$!"
+
+          aws cloudformation wait stack-create-complete --stack-name "${CLUSTER_NAME}-security" &
+          wait "$!"
+
+          SECURITY_JSON="$(aws cloudformation describe-stacks --stack-name "${CLUSTER_NAME}-security" \
+            --query 'Stacks[].Outputs[]' --output json)"
+          MASTER_SECURITY_GROUP="$(echo "${SECURITY_JSON}" | jq -r '.[] | select(.OutputKey == "MasterSecurityGroupId").OutputValue')"
+          MASTER_INSTANCE_PROFILE="$(echo "${SECURITY_JSON}" | jq -r '.[] | select(.OutputKey == "MasterInstanceProfile").OutputValue')"
+          WORKER_SECURITY_GROUP="$(echo "${SECURITY_JSON}" | jq -r '.[] | select(.OutputKey == "WorkerSecurityGroupId").OutputValue')"
+          WORKER_INSTANCE_PROFILE="$(echo "${SECURITY_JSON}" | jq -r '.[] | select(.OutputKey == "WorkerInstanceProfile").OutputValue')"
+
+          aws cloudformation create-stack \
+            --stack-name "${CLUSTER_NAME}-bootstrap" \
+            --template-body "$(cat "/var/lib/openshift-install/upi/${CLUSTER_TYPE}/cloudformation/04_cluster_bootstrap.yaml")" \
+            --tags "${TAGS}" \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --parameters \
+              ParameterKey=InfrastructureName,ParameterValue="${INFRA_ID}" \
+              ParameterKey=RhcosAmi,ParameterValue="${RHCOS_AMI}" \
+              ParameterKey=VpcId,ParameterValue="${VPC_ID}" \
+              ParameterKey=PublicSubnet,ParameterValue="${PUBLIC_SUBNETS%%,*}\"" \
+              ParameterKey=MasterSecurityGroupId,ParameterValue="${MASTER_SECURITY_GROUP}" \
+              ParameterKey=VpcId,ParameterValue="${VPC_ID}" \
+              ParameterKey=BootstrapIgnitionLocation,ParameterValue="${BOOTSTRAP_URI}" \
+              ParameterKey=RegisterNlbIpTargetsLambdaArn,ParameterValue="${NLB_IP_TARGETS_LAMBDA}" \
+              ParameterKey=ExternalApiTargetGroupArn,ParameterValue="${EXTERNAL_API_TARGET_GROUP}" \
+              ParameterKey=InternalApiTargetGroupArn,ParameterValue="${INTERNAL_API_TARGET_GROUP}" \
+              ParameterKey=InternalServiceTargetGroupArn,ParameterValue="${INTERNAL_SERVICE_TARGET_GROUP}" &
+          wait "$!"
+
+          aws cloudformation wait stack-create-complete --stack-name "${CLUSTER_NAME}-bootstrap" &
+          wait "$!"
+
+          BOOTSTRAP_IP="$(aws cloudformation describe-stacks --stack-name "${CLUSTER_NAME}-bootstrap" \
+            --query 'Stacks[].Outputs[?OutputKey == `BootstrapPublicIp`].OutputValue' --output text)"
+
+          aws cloudformation create-stack \
+            --stack-name "${CLUSTER_NAME}-control-plane" \
+            --template-body "$(cat "/var/lib/openshift-install/upi/${CLUSTER_TYPE}/cloudformation/05_cluster_master_nodes.yaml")" \
+            --tags "${TAGS}" \
+            --parameters \
+              ParameterKey=InfrastructureName,ParameterValue="${INFRA_ID}" \
+              ParameterKey=RhcosAmi,ParameterValue="${RHCOS_AMI}" \
+              ParameterKey=PrivateHostedZoneId,ParameterValue="${PRIVATE_HOSTED_ZONE}" \
+              ParameterKey=PrivateHostedZoneName,ParameterValue="${CLUSTER_NAME}.${BASE_DOMAIN}" \
+              ParameterKey=Master0Subnet,ParameterValue="${PRIVATE_SUBNET_0}" \
+              ParameterKey=Master1Subnet,ParameterValue="${PRIVATE_SUBNET_1}" \
+              ParameterKey=Master2Subnet,ParameterValue="${PRIVATE_SUBNET_2}" \
+              ParameterKey=MasterSecurityGroupId,ParameterValue="${MASTER_SECURITY_GROUP}" \
+              ParameterKey=IgnitionLocation,ParameterValue="https://api-int.${CLUSTER_NAME}.${BASE_DOMAIN}:22623/config/master" \
+              ParameterKey=CertificateAuthorities,ParameterValue="${IGNITION_CA}" \
+              ParameterKey=MasterInstanceProfileName,ParameterValue="${MASTER_INSTANCE_PROFILE}" \
+              ParameterKey=RegisterNlbIpTargetsLambdaArn,ParameterValue="${NLB_IP_TARGETS_LAMBDA}" \
+              ParameterKey=ExternalApiTargetGroupArn,ParameterValue="${EXTERNAL_API_TARGET_GROUP}" \
+              ParameterKey=InternalApiTargetGroupArn,ParameterValue="${INTERNAL_API_TARGET_GROUP}" \
+              ParameterKey=InternalServiceTargetGroupArn,ParameterValue="${INTERNAL_SERVICE_TARGET_GROUP}" &
+          wait "$!"
+
+          aws cloudformation wait stack-create-complete --stack-name "${CLUSTER_NAME}-control-plane" &
+          wait "$!"
+
+          aws cloudformation wait stack-create-complete --stack-name "${CLUSTER_NAME}-control-plane"
+          CONTROL_PLANE_IPS="$(aws cloudformation describe-stacks --stack-name "${CLUSTER_NAME}-control-plane" --query 'Stacks[].Outputs[?OutputKey == `PrivateIPs`].OutputValue' --output text)"
+          CONTROL_PLANE_0_IP="$(echo "${CONTROL_PLANE_IPS}" | cut -d, -f1)"
+          CONTROL_PLANE_1_IP="$(echo "${CONTROL_PLANE_IPS}" | cut -d, -f2)"
+          CONTROL_PLANE_2_IP="$(echo "${CONTROL_PLANE_IPS}" | cut -d, -f3)"
+
+          for INDEX in 0 1
+          do
+            SUBNET="PRIVATE_SUBNET_${INDEX}"
+            aws cloudformation create-stack \
+              --stack-name "${CLUSTER_NAME}-compute-${INDEX}" \
+              --template-body "$(cat "/var/lib/openshift-install/upi/${CLUSTER_TYPE}/cloudformation/06_cluster_worker_node.yaml")" \
+              --tags "${TAGS}" \
+              --parameters \
+                ParameterKey=InfrastructureName,ParameterValue="${INFRA_ID}" \
+                ParameterKey=RhcosAmi,ParameterValue="${RHCOS_AMI}" \
+                ParameterKey=WorkerSubnet,ParameterValue="${!SUBNET}" \
+                ParameterKey=WorkerSecurityGroupId,ParameterValue="${WORKER_SECURITY_GROUP}" \
+                ParameterKey=IgnitionLocation,ParameterValue="https://api-int.${CLUSTER_NAME}.${BASE_DOMAIN}:22623/config/worker" \
+                ParameterKey=CertificateAuthorities,ParameterValue="${IGNITION_CA}" \
+                ParameterKey=WorkerInstanceProfileName,ParameterValue="${WORKER_INSTANCE_PROFILE}" &
+            wait "$!"
+
+            aws cloudformation wait stack-create-complete --stack-name "${CLUSTER_NAME}-compute-${INDEX}" &
+            wait "$!"
+
+            COMPUTE_VAR="COMPUTE_${INDEX}_IP"
+            COMPUTE_IP="$(aws cloudformation describe-stacks --stack-name "${CLUSTER_NAME}-compute-${INDEX}" --query 'Stacks[].Outputs[?OutputKey == `PrivateIP`].OutputValue' --output text)"
+            eval "${COMPUTE_VAR}=\${COMPUTE_IP}"
+          done
+
+          echo "bootstrap: ${BOOTSTRAP_IP} control-plane: ${CONTROL_PLANE_0_IP} ${CONTROL_PLANE_1_IP} ${CONTROL_PLANE_2_IP} compute: ${COMPUTE_0_IP} ${COMPUTE_1_IP}"
+        elif [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
+          mkdir -p /tmp/tf
+
+          # Copy sample UPI files
+          cp -r /var/lib/openshift-install/upi/${CLUSTER_TYPE}/* /tmp/tf
+
+          # Create terraform.tfvars
+          export MASTER_IGN=$(cat /tmp/artifacts/installer/master.ign)
+          export WORKER_IGN=$(cat /tmp/artifacts/installer/worker.ign)
+
+          cat > /tmp/tf/terraform.tfvars <<-EOF
           machine_cidr = "139.178.73.0/26"
 
           vm_template = "${VM_TEMPLATE}"
@@ -410,7 +602,7 @@ objects:
 
           cluster_domain = "${CLUSTER_NAME}.${BASE_DOMAIN}"
 
-          bootstrap_ignition_url = "${BOOTSTRAP_URL}"
+          bootstrap_ignition_url = "${BOOTSTRAP_URI}"
 
           // Ignition config for the control plane machines. You should copy the contents of the master.ign generated by the installer.
           control_plane_ignition = <<END_OF_MASTER_IGNITION
@@ -423,24 +615,33 @@ objects:
           END_OF_WORKER_IGNITION
         EOF
 
-        # Copy secret tfvars
-        cp ${TFVARS_PATH} /tmp/tf
+          # Copy secret tfvars
+          cp ${TFVARS_PATH} /tmp/tf
 
-        cd /tmp/tf
-        echo "Creating infra"
-        terraform init -input=false -no-color &
-        wait "$!"
+          cd /tmp/tf
+          echo "Creating infra"
+          terraform init -input=false -no-color &
+          wait "$!"
 
-        terraform apply -auto-approve -no-color &
-        wait "$!"
+          terraform apply -auto-approve -no-color &
+          wait "$!"
+        fi
 
         echo "Waiting for bootstrap to complete"
         openshift-install --dir=/tmp/artifacts/installer wait-for bootstrap-complete &
         wait "$!"
 
-        echo "Bootstrap complete, destroying bootstrap VM"
-        terraform apply -auto-approve -var 'bootstrap_complete=true' -no-color &
-        wait "$!"
+        echo "Bootstrap complete, destroying bootstrap resources"
+        if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
+          aws cloudformation delete-stack --stack-name "${CLUSTER_NAME}-bootstrap" &
+          wait "$!"
+
+          aws cloudformation wait stack-delete-complete --stack-name "${CLUSTER_NAME}-bootstrap" &
+          wait "$!"
+        elif [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
+          terraform apply -auto-approve -var 'bootstrap_complete=true' -no-color &
+          wait "$!"
+        fi
 
         function approve_csrs() {
           while true; do
@@ -465,7 +666,10 @@ objects:
         echo "Approving pending CSRs"
         export KUBECONFIG=/tmp/artifacts/installer/auth/kubeconfig
         approve_csrs &
-        update_image_registry &
+
+        if [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
+          update_image_registry &
+        fi
 
         echo "Completing UPI setup"
         openshift-install --dir=/tmp/artifacts/installer wait-for install-complete &
@@ -484,7 +688,7 @@ objects:
       - name: artifacts
         mountPath: /tmp/artifacts
       env:
-      - name: INSTANCE_PREFIX
+      - name: CLUSTER_NAME
         value: ${NAMESPACE}-${JOB_NAME_HASH}
       - name: TYPE
         value: ${CLUSTER_TYPE}
@@ -496,11 +700,16 @@ objects:
         value: /etc/openshift-installer/secret.auto.tfvars
       - name: AWS_REGION
         value: us-east-1
+      - name: USER
+        value: test
+      - name: HOME
+        value: /tmp
       command:
       - /bin/bash
       - -c
       - |
         #!/bin/bash
+
         function queue() {
           local TARGET="${1}"
           shift
@@ -660,10 +869,30 @@ objects:
           wait
 
           echo "Deprovisioning cluster ..."
-          cd /tmp/shared/tf
-          rm -rf .terraform
-          terraform init -input=false -no-color
-          terraform destroy -auto-approve -no-color
+          if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
+            # FIXME: picking up awscli installed by the setup container
+            export HOME=/tmp/shared
+            export PATH="${HOME}/.local/bin:${PATH}"
+
+            export AWS_DEFAULT_REGION="${AWS_REGION}"  # CLI prefers the former
+
+            for STACK_SUFFIX in compute-1 compute-0 control-plane bootstrap security infra vpc
+            do
+              aws cloudformation delete-stack --stack-name "${CLUSTER_NAME}-${STACK_SUFFIX}"
+            done
+
+            openshift-install --dir /tmp/artifacts/installer destroy cluster
+
+            for STACK_SUFFIX in compute-1 compute-0 control-plane bootstrap security infra vpc
+            do
+              aws cloudformation wait stack-delete-complete --stack-name "${CLUSTER_NAME}-${STACK_SUFFIX}"
+            done
+          else
+            cd /tmp/shared/tf
+            rm -rf .terraform
+            terraform init -input=false -no-color
+            terraform destroy -auto-approve -no-color
+          fi
         }
 
         trap 'teardown' EXIT
