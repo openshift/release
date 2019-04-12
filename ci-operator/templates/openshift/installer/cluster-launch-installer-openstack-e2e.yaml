@@ -195,7 +195,7 @@ objects:
       - name: TYPE
         value: ${CLUSTER_TYPE}
       - name: CLUSTER_NAME
-        value: ${JOB_NAME_HASH}
+        value: ${NAMESPACE}
       - name: BASE_DOMAIN
         value: ${BASE_DOMAIN}
       - name: SSH_PUB_KEY_PATH
@@ -244,13 +244,9 @@ objects:
         export EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
         export SSH_PUB_KEY=$(cat "${SSH_PUB_KEY_PATH}")
         export PULL_SECRET=$(cat "${PULL_SECRET_PATH}")
-        # check whether we already have a floating ip created
-        LB_FIP=$(openstack floating ip list --format value --status DOWN -c 'Floating IP Address'| head -n1)
 
-        # create new floating ip if doesn't exist
-        if [ -z "$LB_FIP" ]; then
-            LB_FIP=$(openstack floating ip create $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address')
-        fi
+        # create a new floating ip tagged with CLUSTER_NAME so it can be deleted later
+        LB_FIP=$(openstack floating ip create --description $CLUSTER_NAME $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address')
 
         # create A record for the api
         curl -v -X POST $CI_DNS_IP:8080 -d '{"name": "'api.$CLUSTER_NAME'", "ip": "'$LB_FIP'"}'
@@ -299,6 +295,8 @@ objects:
       env:
       - name: TYPE
         value: ${CLUSTER_TYPE}
+      - name: CLUSTER_NAME
+        value: ${NAMESPACE}
       - name: KUBECONFIG
         value: /tmp/artifacts/installer/auth/kubeconfig
       - name: OS_CLOUD
@@ -483,6 +481,9 @@ objects:
 
           echo "Waiting for logs ..."
           wait
+
+          echo "Deleting service VM FIP ..."
+          openstack floating ip list --long -f csv -c Description -c "Floating IP Address" | grep $CLUSTER_NAME | cut -f1 -d "," | xargs openstack floating ip delete
 
           echo "Deprovisioning cluster ..."
           openshift-install --dir /tmp/artifacts/installer destroy cluster
