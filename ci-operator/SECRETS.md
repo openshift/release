@@ -72,6 +72,16 @@ currently exist:
 | `ssh-publickey`   | Public half of the SSH key, for connecting to OpenStack Nova VMs. |
 | `pull-secret`     | Credentials for pulling OpenShift images from Quay. |
 
+#### `cluster-secrets-metal`
+
+|       Key        | Description |
+| -----------------| ----------- |
+| `.awscred`       | Credentials for the AWS EC2 API, used for Route53 access. See the [upstream credentials doc](https://docs.aws.amazon.com/cli/latest/userguide/cli-multiple-profiles.html). |
+| `.packetcred`    | Credentials for the Packet.net API, used for creating bare-metal servers. See the [upstream credentials doc](https://www.packet.com/developers/api/). |
+| `pull-secret`    | Credentials for pulling OpenShift images from Quay and for authenticating to telemetry. Retrieved from [try.openshift.com](https://try.openshift.com) under the ccoleman+openshift-ci-test@redhat.com account, and has the service account token from the `ocp` namespace added with `oc registry login --to=/tmp/pull-secret -z default -n ocp`.|
+| `ssh-privatekey` | Private half of the SSH key, for connecting to VMs. |
+| `ssh-publickey`  | Public half of the SSH key, for connecting to VMs. |
+
 ### GCE ServiceAccount Credentials
 
 The following serviceaccounts have their credentials stored in secrets on the
