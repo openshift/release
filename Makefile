@@ -319,6 +319,18 @@ metering:
 	$(MAKE) -C projects/metering
 .PHONY: metering
 
+metal-secrets:
+	oc create secret generic cluster-secrets-metal \
+	--from-file=cluster/test-deploy/metal/.awscred \
+	--from-file=cluster/test-deploy/metal/.packetcred \
+	--from-file=cluster/test-deploy/metal/matchbox-client.crt \
+	--from-file=cluster/test-deploy/metal/matchbox-client.key \
+	--from-file=cluster/test-deploy/metal/ssh-privatekey \
+	--from-file=cluster/test-deploy/metal/ssh-publickey \
+	--from-file=cluster/test-deploy/metal/pull-secret \
+	-o yaml --dry-run | oc apply -n ocp -f -
+.PHONY: metal-secrets
+
 check:
 	# test that the prow config is parseable
 	mkpj --config-path cluster/ci/config/prow/config.yaml --job-config-path ci-operator/jobs/ --job branch-ci-origin-images --base-ref master --base-sha abcdef
