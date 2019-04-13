@@ -5,7 +5,7 @@ All Azure Red Hat OpenShift (ARHO) versions:
 |Version|Subversion|Status |
 |---|---|---|
 |release-v1|-|deprecated|
-|release-v2|-|EOL/deprecated|
+|release-v2|-|deprecated|
 |release-v3|v3.2|live|
 |release-v4|v4.1|pre-release|
 |release-v5|v5.0|development|
