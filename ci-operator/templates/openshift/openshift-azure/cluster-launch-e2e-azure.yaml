@@ -26,20 +26,14 @@ parameters:
 - name: JOB_NAME_SAFE
   required: true
 # OSA-specific images
+- name: IMAGE_AZURE
 - name: IMAGE_AZURE_CONTROLLERS
-  required: true
 - name: IMAGE_CANARY
-  required: true
 - name: IMAGE_ETCDBACKUP
-  required: true
 - name: IMAGE_METRICSBRIDGE
-  required: true
 - name: IMAGE_SYNC
-  required: true
 - name: IMAGE_STARTUP
-  required: true
 - name: IMAGE_TLSPROXY
-  required: true
 # The binary image built by ci-operator
 - name: LOCAL_IMAGE_BIN
   required: true
@@ -132,8 +126,6 @@ objects:
       env:
       - name: ARTIFACT_DIR
         value: /tmp/artifacts
-      - name: AZURE_CONTROLLERS_IMAGE
-        value: ${IMAGE_AZURE_CONTROLLERS}
       - name: BUSHSLICER_TEST_CONFIG
         value: ${BUSHSLICER_TEST_CONFIG}
       - name: BUSHSLICER_TEST_ENVIRONMENT
@@ -152,22 +144,10 @@ objects:
         value: ${DNS_DOMAIN}
       - name: DNS_RESOURCEGROUP
         value: ${DNS_RESOURCEGROUP}
-      - name: ETCDBACKUP_IMAGE
-        value: ${IMAGE_ETCDBACKUP}
-      - name: METRICSBRIDGE_IMAGE
-        value: ${IMAGE_METRICSBRIDGE}
-      - name: TLSPROXY_IMAGE
-        value: ${IMAGE_TLSPROXY}
-      - name: CANARY_IMAGE
-        value: ${IMAGE_CANARY}
       - name: RESOURCEGROUP
         value: e2e-${RESOURCEGROUP_SUFFIX}
       - name: RUNNING_UNDER_TEST
         value: ${RUNNING_UNDER_TEST}
-      - name: SYNC_IMAGE
-        value: ${IMAGE_SYNC}
-      - name: STARTUP_IMAGE
-        value: ${IMAGE_STARTUP}
       - name: TEST_IN_PRODUCTION
         value: ${TEST_IN_PRODUCTION}
       command:
@@ -250,6 +230,8 @@ objects:
       - name: cluster-secrets-azure
         mountPath: /etc/azure/credentials
       env:
+      - name: AZURE_IMAGE
+        value: ${IMAGE_AZURE}
       - name: AZURE_CONTROLLERS_IMAGE
         value: ${IMAGE_AZURE_CONTROLLERS}
       - name: DEPLOY_VERSION
@@ -308,6 +290,16 @@ objects:
         export AZURE_AAD_CLIENT_ID=$AZURE_CLIENT_ID
         export AZURE_AAD_CLIENT_SECRET=$AZURE_CLIENT_SECRET
         export AZURE_AAD_GROUP_ADMINS_ID=$AZURE_AAD_GROUP_ADMINS_ID
+
+        if [[ -n "$AZURE_IMAGE" ]]; then
+          export SYNC_IMAGE="$AZURE_IMAGE"
+          export STARTUP_IMAGE="$AZURE_IMAGE"
+          export ETCDBACKUP_IMAGE="$AZURE_IMAGE"
+          export AZURE_CONTROLLERS_IMAGE="$AZURE_IMAGE"
+          export METRICSBRIDGE_IMAGE="$AZURE_IMAGE"
+          export TLSPROXY_IMAGE="$AZURE_IMAGE"
+          export CANARY_IMAGE="$AZURE_IMAGE"
+        fi
 
         echo "Using sync image ${SYNC_IMAGE}"
         echo "Using startup image ${STARTUP_IMAGE}"
