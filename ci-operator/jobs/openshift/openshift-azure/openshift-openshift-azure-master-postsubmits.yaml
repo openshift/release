@@ -2,53 +2,6 @@ postsubmits:
   openshift/openshift-azure:
   - agent: kubernetes
     branches:
-    - master
-    context: ""
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    name: branch-ci-openshift-openshift-azure-master-e2e-azure
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/e2e-secrets/azure
-        - --target=[output:stable:azure]
-        - --target=cluster-launch-e2e-azure
-        - --template=/usr/local/cluster-launch-e2e-azure.yaml
-        command:
-        - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-openshift-azure-master.yaml
-              name: ci-operator-master-configs
-        - name: TEST_COMMAND
-          value: make e2e
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/e2e-secrets/azure
-          name: cluster-secrets-azure
-        - mountPath: /usr/local/cluster-launch-e2e-azure.yaml
-          name: job-definition
-          subPath: cluster-launch-e2e-azure.yaml
-      serviceAccountName: ci-operator
-      volumes:
-      - name: cluster-secrets-azure
-        secret:
-          secretName: cluster-secrets-azure
-      - configMap:
-          name: prow-job-cluster-launch-e2e-azure
-        name: job-definition
-  - agent: kubernetes
-    branches:
     - ^master$
     context: ""
     decorate: true
@@ -79,61 +32,62 @@ postsubmits:
           requests:
             cpu: 10m
       serviceAccountName: ci-operator
-  - agent: kubernetes
+  - agent: ""
     branches:
     - master
     context: ""
     decorate: true
-    decoration_config:
-      skip_cloning: true
-    name: branch-ci-openshift-openshift-azure-master-unit
+    name: e2e
     spec:
       containers:
       - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --target=unit
-        command:
-        - ci-operator
+        - hack/tests/e2e-create.sh
         env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-openshift-azure-master.yaml
-              name: ci-operator-master-configs
-        image: ci-operator:latest
-        imagePullPolicy: Always
+        - name: FOCUS
+          value: \[CustomerAdmin\]|\[EndUser\]\[Fake\]
+        image: registry.svc.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources:
+          limits:
+            memory: 6Gi
           requests:
-            cpu: 10m
-      serviceAccountName: ci-operator
-  - agent: kubernetes
+            cpu: 100m
+            memory: 512Mi
+  - agent: ""
     branches:
     - master
     context: ""
     decorate: true
-    decoration_config:
-      skip_cloning: true
-    name: branch-ci-openshift-openshift-azure-master-verify
+    name: unit
     spec:
       containers:
       - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --target=verify
-        command:
-        - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-openshift-azure-master.yaml
-              name: ci-operator-master-configs
-        image: ci-operator:latest
-        imagePullPolicy: Always
+        - make
+        - unit
+        image: registry.svc.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources:
+          limits:
+            memory: 6Gi
           requests:
-            cpu: 10m
-      serviceAccountName: ci-operator
+            cpu: 100m
+            memory: 512Mi
+  - agent: ""
+    branches:
+    - master
+    context: ""
+    decorate: true
+    name: verify
+    spec:
+      containers:
+      - args:
+        - make
+        - verify
+        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        name: ""
+        resources:
+          limits:
+            memory: 6Gi
+          requests:
+            cpu: 100m
+            memory: 512Mi
