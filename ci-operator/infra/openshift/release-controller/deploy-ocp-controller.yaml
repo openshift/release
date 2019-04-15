@@ -93,6 +93,27 @@ items:
 - kind: Role
   apiVersion: authorization.openshift.io/v1
   metadata:
+    name: release-controller-modify-ocp
+    namespace: origin
+  rules:
+  - apiGroups:
+    - image.openshift.io
+    resources:
+    - imagestreams
+    resourceNames:
+    - release
+    - "4.1"
+    - "4.2"
+    - "4.3"
+    verbs:
+    - get
+    - list
+    - watch
+    - update
+    - patch
+- kind: Role
+  apiVersion: authorization.openshift.io/v1
+  metadata:
     name: release-controller-import-ocp
     namespace: ocp
   rules:
@@ -138,6 +159,18 @@ items:
   metadata:
     name: release-controller-binding-ocp
     namespace: openshift
+  roleRef:
+    kind: Role
+    name: release-controller-modify-ocp
+  subjects:
+  - kind: ServiceAccount
+    namespace: ci
+    name: release-controller-ocp
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: release-controller-binding-ocp
+    namespace: origin
   roleRef:
     kind: Role
     name: release-controller-modify-ocp
@@ -314,7 +347,7 @@ items:
           - /usr/bin/release-controller
           - --to=release
           - --release-namespace=ocp
-          - --release-namespace=openshift
+          - --release-namespace=origin
           - --prow-config=/etc/prow/config.yaml
           - --job-config=/etc/jobs
           - --artifacts=openshift-release-artifacts.svc.ci.openshift.org
