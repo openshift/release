@@ -1,0 +1,33 @@
+### rbac on the client side of prometheus (in namespace ci)
+---
+apiVersion: authorization.openshift.io/v1
+kind: Role
+metadata:
+  name: prow-prometheus-k8s
+  namespace: ci
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - endpoints
+  - pods
+  - services
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: authorization.openshift.io/v1
+kind: RoleBinding
+metadata:
+  name: prow-prometheus-k8s
+  namespace: ci
+roleRef:
+  name: prow-prometheus-k8s
+  namespace: ci
+subjects:
+- kind: ServiceAccount
+  name: prometheus-k8s
+  namespace: prow-monitoring
+userNames:
+- system:serviceaccount:prow-monitoring:prometheus-k8s
