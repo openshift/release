@@ -16,7 +16,7 @@ EOF
 
 new_tag=""
 
-target_files=($( find cluster/ci/config/prow/openshift -type f ) "cluster/ci/config/prow/config.yaml" "ci-operator/jobs/infra-periodics.yaml" "ci-operator/jobs/openshift/release/openshift-release-master-presubmits.yaml")
+target_files=( $( find cluster/ci/config/prow ci-operator/ -type f ) )
 for component in $( grep -Porh "(?<=gcr.io/k8s-prow/).*(?=:v)" "${target_files[@]}" | sort | uniq ); do
 	current_tag="$( grep -Porh "(?<=${component}:)v[0-9]{8}-[a-z0-9]+" "${target_files[@]}" | head -n 1 )"
 	latest_tag="$( gcloud container images list-tags "gcr.io/k8s-prow/${component}" --format='value(tags)' --limit 1 | grep -Po "v[0-9]+\-[a-z0-9]+" )"
@@ -31,5 +31,5 @@ for component in $( grep -Porh "(?<=gcr.io/k8s-prow/).*(?=:v)" "${target_files[@
 	fi
 done
 
-git add cluster/ci/config/prow/openshift cluster/ci/config/prow/config.yaml ci-operator/jobs/infra-periodics.yaml ci-operator/jobs/openshift/release/openshift-release-master-presubmits.yaml
+git add cluster/ci/config/prow/ ci-operator/
 git commit -m "$( cat "${workspace}/commit.txt" )"
