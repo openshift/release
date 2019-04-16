@@ -19,3 +19,39 @@ postsubmits:
           requests:
             cpu: 10m
       serviceAccountName: config-updater
+  - agent: kubernetes
+    branches:
+    - ^master$
+    context: ""
+    decorate: true
+    decoration_config:
+      timeout: 28800000000000
+    labels:
+      ci.openshift.io/role: infra
+    name: branch-ci-openshift-release-master-label-sync
+    run_if_changed: cluster/ci/config/prow/labels.yaml
+    spec:
+      containers:
+      - args:
+        - --config=./cluster/ci/config/prow/labels.yaml
+        - --confirm=true
+        - --orgs=openshift,cri-o,operator-framework
+        - --token=/etc/github/oauth
+        - --endpoint=http://ghproxy
+        - --debug
+        command:
+        - /app/label_sync/app.binary
+        image: gcr.io/k8s-prow/label_sync:v20190416-51581078c
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+        volumeMounts:
+        - mountPath: /etc/github
+          name: token
+          readOnly: true
+      volumes:
+      - name: token
+        secret:
+          secretName: github-credentials-openshift-ci-robot
