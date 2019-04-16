@@ -698,6 +698,64 @@ presubmits:
         name: job-definition
     trigger: '(?m)^/test (?:.*? )?launch-aws(?: .*?)?$'
   - agent: kubernetes
+    always_run: false
+    branches:
+    - master
+    context: ci/prow/launch-vsphere
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+    name: pull-ci-openshift-origin-master-launch-vsphere
+    optional: true
+    rerun_command: /test launch-vsphere
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --secret-dir=/usr/local/launch-vsphere-cluster-profile
+        - --target=launch-vsphere
+        - --template=/usr/local/launch-vsphere
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: vsphere
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-origin-master.yaml
+              name: ci-operator-master-configs
+        - name: JOB_NAME_SAFE
+          value: launch-vsphere
+        - name: TEST_COMMAND
+          value: sleep 7200 & wait
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/launch-vsphere-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/launch-vsphere
+          name: job-definition
+          subPath: cluster-launch-installer-upi-e2e.yaml
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-vsphere
+      - configMap:
+          name: prow-job-cluster-launch-installer-upi-e2e
+        name: job-definition
+    trigger: '(?m)^/test (?:.*? )?launch-vsphere(?: .*?)?$'
+  - agent: kubernetes
     always_run: true
     branches:
     - master
