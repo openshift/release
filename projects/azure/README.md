@@ -395,9 +395,13 @@ We need to check whether the above jobs are in a working state. Access to the cl
 to every member of the openshift github organization. Access to the `azure` namespace is controlled
 by the [`azure-team` group](./cluster-wide.yaml). If you need to update group membership, you need to
 open a pull request adding your Github username in the group, and once your pull request is merged,
-ask a CI admin at [#forum-testplatform](https://coreos.slack.com/) to apply the new changes in the cluster.
+ask an existing member of the `azure-team` group to apply the changes on the cluster.
 
-In general, all changes in `projects/azure/` are not automatically applied in the CI cluster. After your
+``
+oc apply -f cluster-wide.yaml
+``
+
+In general, all changes in `projects/azure/` are not automatically applied in the CI cluster. CI admins can be contacted at [#forum-testplatform](https://coreos.slack.com/). After your
 pull request is merged, apart from updating the group, you should be able to `oc apply` all other changes
 in the `azure` namespace.
 
