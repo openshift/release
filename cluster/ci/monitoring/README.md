@@ -9,6 +9,7 @@ have existed already (they usually come with `openshift-monitoring`).
 ## Deploy
 
 ```
+$ make prow-monitoring-pre-steps
 $ make prow-monitoring-deploy
 ```
 
