@@ -193,8 +193,14 @@ objects:
         export PATH=/home/packer:$PATH
         function run-tests() {
           mkdir -p /tmp/artifacts/junit
-          if which openshift-tests && [[ -n "${TEST_SUITE-}" ]]; then
-            openshift-tests run "${TEST_SUITE}" \
+          if which openshift-tests; then
+            if [ "${TEST_SUITE}" != "run-with-file" ]; then
+                openshift-tests run "${TEST_SUITE}" \
+                -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
+            exit 0
+            fi
+            curl -L -O https://raw.githubusercontent.com/code-ready/crc/master/test/extended/openshift-conformance-test
+            openshift-tests run -f openshift-conformance-test \
             -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
             exit 0
           fi
