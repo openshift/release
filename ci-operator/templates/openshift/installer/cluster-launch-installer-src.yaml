@@ -367,6 +367,15 @@ objects:
                         --key /tmp/artifacts/installer/tls/journal-gatewayd.key \
                         --url "https://${bootstrap_ip}:19531/entries?_SYSTEMD_UNIT=${service}.service"
                 done
+                if ! whoami &> /dev/null; then
+                  if [ -w /etc/passwd ]; then
+                    echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+                  fi
+                fi
+                eval $(ssh-agent)
+                ssh-add /etc/openshift-installer/ssh-privatekey
+                ssh -A -o PreferredAuthentications=publickey -o StrictHostKeyChecking=false -o UserKnownHostsFile=/dev/null core@${bootstrap_ip} /bin/bash -x /usr/local/bin/installer-gather.sh
+                scp -o PreferredAuthentications=publickey -o StrictHostKeyChecking=false -o UserKnownHostsFile=/dev/null core@${bootstrap_ip}:log-bundle.tar.gz /tmp/artifacts/installer/bootstrap-logs.tar.gz
               fi
           else
               echo "No terraform statefile found. Skipping collection of bootstrap logs."
