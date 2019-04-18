@@ -290,3 +290,47 @@ periodics:
     - name: job-config-40
       configMap:
         name: job-config-4.0
+- agent: kubernetes
+  labels:
+    ci.openshift.io/role: infra
+  cron: ""
+  decorate: true
+  interval: 24h
+  name: periodic-org-sync
+  skip_cloning: true
+  spec:
+    containers:
+    - args:
+      - --config-path=/etc/config/org.yaml
+      - --confirm=true
+      - --github-token-path=/etc/github/oauth
+      - --github-endpoint=http://ghproxy
+      - --fix-org
+      - --fix-org-members
+      - --fix-teams
+      - --fix-team-members
+      - --fix-team-repos
+      - --log-level=debug
+      - --ignore-secret-teams
+      command:
+      - /app/prow/cmd/peribolos/app.binary
+      image: gcr.io/k8s-prow/peribolos:v20190416-51581078c
+      imagePullPolicy: Always
+      name: ""
+      resources:
+          requests:
+            cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: token
+        readOnly: true
+      - mountPath: /etc/config
+        name: config
+        readOnly: true
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-merge-robot
+    - name: config
+      configMap:
+        name: org-config
