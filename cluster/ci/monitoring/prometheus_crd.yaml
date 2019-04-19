@@ -1,0 +1,22 @@
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  name: prow
+  namespace: prow-monitoring
+spec:
+  serviceAccountName: prometheus-prow
+  alerting:
+    alertmanagers:
+    - namespace: prow-monitoring
+      name: alertmanager
+      port: web
+  enableAdminAPI: false
+  ruleSelector:
+    matchLabels:
+      role: alert-rules
+      prometheus: prow
+  serviceMonitorSelector:
+    matchExpressions:
+    - key: prow-app
+      operator: Exists
+  version: v2.3.2
