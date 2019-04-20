@@ -16,6 +16,7 @@ prow-monitoring-deploy:
 	oc create -n prow-monitoring configmap grafana-datasources --from-file=./datasources.yaml --dry-run -o yaml | kubectl apply -f -
 	oc create -n prow-monitoring configmap grafana-dashboards --from-file=./dashboards.yaml --dry-run -o yaml | kubectl apply -f -
 	oc create -n prow-monitoring configmap grafana-dashboard-sinker --from-file=./sinker.json --dry-run -o yaml | kubectl apply -f -
+	oc apply -f ./grafana_proxy_secret.yaml
 	oc apply -f ./grafana_deploy.yaml
 	oc apply -f ./grafana_expose.yaml
 
@@ -25,6 +26,7 @@ prow-monitoring-pre-steps:
 	oc apply -f ./client_rbac.yaml --as=system:admin
 	oc apply -f ./prometheus_project.yaml --as=system:admin
 	oc apply -f ./prometheus_rbac.yaml --as=system:admin
+	oc apply -f ./grafana_rabc.yaml --as=system:admin
 
 .PHONY : prow-monitoring-cleanup
 prow-monitoring-cleanup:
@@ -44,5 +46,7 @@ prow-monitoring-cleanup:
 	oc delete configmap -n prow-monitoring grafana-dashboards --ignore-not-found=true --as=system:admin
 	oc delete configmap -n prow-monitoring grafana-datasources --ignore-not-found=true --as=system:admin
 	oc delete secret -n prow-monitoring grafana-config --ignore-not-found=true --as=system:admin
+	oc delete -f ./grafana_proxy_secret.yaml --as=system:admin
+	oc delete -f ./grafana_rabc.yaml --as=system:admin
 	oc delete -f ./client_rbac.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./prometheus_project.yaml --wait=true --ignore-not-found=true --as=system:admin
