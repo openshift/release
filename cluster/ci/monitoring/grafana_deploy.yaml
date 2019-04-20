@@ -1,0 +1,69 @@
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  labels:
+    app: grafana
+  name: grafana
+  namespace: prow-monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+      - args:
+        - -config=/etc/grafana/grafana.ini
+        image: grafana/grafana:6.1.4
+        name: grafana
+        env:
+        # TODO: auth-proxy
+        - name: GF_SECURITY_ADMIN_USER
+          value: "ci"
+        - name: GF_SECURITY_ADMIN_PASSWORD
+          value: "ci"
+        ports:
+        - containerPort: 3001
+          name: http
+        resources:
+          requests:
+            cpu: 100m
+            memory: 100Mi
+        volumeMounts:
+        - mountPath: /var/lib/grafana
+          name: grafana-storage
+          readOnly: false
+        - mountPath: /etc/grafana/provisioning/datasources
+          name: grafana-datasources
+          readOnly: false
+        - mountPath: /etc/grafana/provisioning/dashboards
+          name: grafana-dashboards
+          readOnly: false
+        - mountPath: /grafana-dashboard-definitions/0/sinker
+          name: grafana-dashboard-sinker
+          readOnly: false
+        - mountPath: /etc/grafana
+          name: grafana-config
+          readOnly: false
+      nodeSelector:
+        node-role.kubernetes.io/infra: "true"
+      securityContext: {}
+      volumes:
+      - emptyDir: {}
+        name: grafana-storage
+      - name: grafana-datasources
+        configMap:
+          name: grafana-datasources
+      - configMap:
+          name: grafana-dashboards
+        name: grafana-dashboards
+      - configMap:
+          name: grafana-dashboard-sinker
+        name: grafana-dashboard-sinker
+      - name: grafana-config
+        secret:
+          secretName: grafana-config
