@@ -62,11 +62,11 @@ tests:
     set -x
     # Increase the size of the machines so that there are machines large enough
     # to run Presto, and the full metering stack.
-    kubectl -n openshift-machine-api get machinesets -l machine.openshift.io/cluster-api-machine-type=worker -o name | cut -d/ -f2 | xargs -I{} kubectl -n openshift-machine-api patch machineset {} --type json -p '[{"op": "replace", "path": "/spec/template/spec/providerSpec/value/instanceType", "value": "m4.xlarge"}]'
+    kubectl -n openshift-machine-api get machinesets -o name | grep worker | cut -d/ -f2 | xargs -I{} kubectl -n openshift-machine-api patch machineset {} --type json -p '[{"op": "replace", "path": "/spec/template/spec/providerSpec/value/instanceType", "value": "m4.xlarge"}]'
     # delete the workers so that larger machines replace it
     # wait=false because the machines never actually get deleted from the
     # API
-    kubectl -n openshift-machine-api get machines -l machine.openshift.io/cluster-api-machine-role=worker -o name | xargs kubectl -n openshift-machine-api delete --wait=false
+    kubectl -n openshift-machine-api get machines -o name | grep worker | xargs kubectl -n openshift-machine-api delete --wait=false
     TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/integration make integration
     TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/e2e make e2e
   openshift_installer_src:
