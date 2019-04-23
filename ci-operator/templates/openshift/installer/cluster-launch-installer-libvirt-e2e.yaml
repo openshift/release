@@ -191,18 +191,15 @@ objects:
         #!/bin/bash
         set -euo pipefail
         export PATH=/home/packer:$PATH
+        mkdir -p /tmp/artifacts/junit
+
         function run-tests() {
-          mkdir -p /tmp/artifacts/junit
-          if which openshift-tests && [[ -n "${TEST_SUITE-}" ]]; then
-            openshift-tests run "${TEST_SUITE}" \
+          openshift-tests run "${TEST_SUITE}" \
             -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
-            exit 0
-          fi
+          exit 0
         }
 
         ${TEST_COMMAND}
-        declare -fxr run_tests
-        timeout 4800 bash -ce 'run_tests'
         EOF
         chmod +x "${HOME}"/run-tests.sh
         mock-nss.sh
