@@ -7,6 +7,7 @@ prow-monitoring-deploy:
 	oc apply -f ./prometheus_crd.yaml
 	oc apply -f ./prometheus_rule_sinker.yaml
 	oc apply -f ./prometheus_expose.yaml
+	oc apply -f ./alert_manager_proxy_secret.yaml
 	oc apply -f ./alert_manager_crd.yaml
 	oc delete secret -n prow-monitoring alertmanager-prow --ignore-not-found=true
 	oc create -n prow-monitoring secret generic alertmanager-prow --from-file=./alertmanager.yaml --from-file=./msg.tmpl
@@ -26,7 +27,11 @@ prow-monitoring-pre-steps:
 	oc apply -f ./client_rbac.yaml --as=system:admin
 	oc apply -f ./prometheus_project.yaml --as=system:admin
 	oc apply -f ./prometheus_rbac.yaml --as=system:admin
+<<<<<<< HEAD
 	oc apply -f ./grafana_rabc.yaml --as=system:admin
+=======
+	oc apply -f ./alert_manager_rbac.yaml --as=system:admin
+>>>>>>> 6adedfa7... Enable auth-proxy on alter-manager in prow-monitoring
 
 .PHONY : prow-monitoring-cleanup
 prow-monitoring-cleanup:
@@ -40,6 +45,7 @@ prow-monitoring-cleanup:
 	oc delete -f ./alert_manager_expose.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./alert_manager_crd.yaml --ignore-not-found=true --as=system:admin
 	oc delete secret -n prow-monitoring alertmanager-prow --ignore-not-found=true --as=system:admin
+<<<<<<< HEAD
 	oc delete -f ./grafana_expose.yaml --as=system:admin
 	oc delete -f ./grafana_deploy.yaml --as=system:admin
 	oc delete configmap -n prow-monitoring grafana-dashboard-sinker --ignore-not-found=true --as=system:admin
@@ -48,5 +54,9 @@ prow-monitoring-cleanup:
 	oc delete secret -n prow-monitoring grafana-config --ignore-not-found=true --as=system:admin
 	oc delete -f ./grafana_proxy_secret.yaml --as=system:admin
 	oc delete -f ./grafana_rabc.yaml --as=system:admin
+=======
+	oc delete -f ./alert_manager_proxy_secret.yaml --as=system:admin
+	oc delete -f ./alert_manager_rbac.yaml --as=system:admin
+>>>>>>> 6adedfa7... Enable auth-proxy on alter-manager in prow-monitoring
 	oc delete -f ./client_rbac.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./prometheus_project.yaml --wait=true --ignore-not-found=true --as=system:admin
