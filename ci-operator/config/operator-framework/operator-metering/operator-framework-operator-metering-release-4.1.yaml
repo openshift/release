@@ -20,6 +20,7 @@ images:
   from: metering-helm
   to: metering-helm-operator
 promotion:
+  disabled: true
   name: "4.1"
   namespace: ocp
 resources:
@@ -57,29 +58,17 @@ tests:
     make verify
   container:
     from: src
-- as: integration-aws-metering
+- as: metering-e2e-aws
   commands: |
     set -x
     # Increase the size of the machines so that there are machines large enough
     # to run Presto, and the full metering stack.
-    kubectl -n openshift-machine-api get machinesets -o name | cut -d/ -f2 | head -n2 | xargs -I{} kubectl -n openshift-machine-api patch machineset {} --type json -p '[{"op": "replace", "path": "/spec/template/spec/providerSpec/value/instanceType", "value": "m4.xlarge"}]'
-    # delete the first two workers so that larger machines replace it
+    kubectl -n openshift-machine-api get machinesets -o name | grep worker | cut -d/ -f2 | xargs -I{} kubectl -n openshift-machine-api patch machineset {} --type json -p '[{"op": "replace", "path": "/spec/template/spec/providerSpec/value/instanceType", "value": "m4.xlarge"}]'
+    # delete the workers so that larger machines replace it
     # wait=false because the machines never actually get deleted from the
     # API
-    kubectl -n openshift-machine-api get machines -l machine.openshift.io/cluster-api-machine-role=worker -o name | head -n2 | xargs kubectl -n openshift-machine-api delete --wait=false
-    TEST_OUTPUT_PATH=/tmp/artifacts make integration
-  openshift_installer_src:
-    cluster_profile: aws
-- as: e2e-aws-metering
-  commands: |
-    set -x
-    # Increase the size of the machines so that there are machines large enough
-    # to run Presto, and the full metering stack.
-    kubectl -n openshift-machine-api get machinesets -o name | cut -d/ -f2 | head -n2 | xargs -I{} kubectl -n openshift-machine-api patch machineset {} --type json -p '[{"op": "replace", "path": "/spec/template/spec/providerSpec/value/instanceType", "value": "m4.xlarge"}]'
-    # delete the first two workers so that larger machines replace it
-    # wait=false because the machines never actually get deleted from the
-    # API
-    kubectl -n openshift-machine-api get machines -l machine.openshift.io/cluster-api-machine-role=worker -o name | head -n2 | xargs kubectl -n openshift-machine-api delete --wait=false
-    TEST_OUTPUT_PATH=/tmp/artifacts make e2e
+    kubectl -n openshift-machine-api get machines -o name | grep worker | xargs kubectl -n openshift-machine-api delete --wait=false
+    TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/integration make integration
+    TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/e2e make e2e
   openshift_installer_src:
     cluster_profile: aws

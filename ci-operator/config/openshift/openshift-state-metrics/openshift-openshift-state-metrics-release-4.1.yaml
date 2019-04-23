@@ -1,18 +1,32 @@
 base_images:
   base:
-    name: '4.0'
+    name: "4.0"
     namespace: ocp
     tag: base
-canonical_go_repository: github.com/openshift/openshift-state-metrics
-images:
-- dockerfile_path: Dockerfile
-  from: base
-  to: openshift-state-metrics
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.11
+canonical_go_repository: github.com/openshift/openshift-state-metrics
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  to: openshift-state-metrics
+promotion:
+  disabled: true
+  name: "4.1"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.1"
+  namespace: ocp
 tests:
 - as: gofmt
   commands: make gofmtcheck
@@ -22,16 +36,3 @@ tests:
   commands: make test-unit
   container:
     from: src
-resources:
-  '*':
-    limits:
-      memory: 4Gi
-    requests:
-      cpu: 100m
-      memory: 200Mi
-tag_specification:
-  name: '4.1'
-  namespace: ocp
-promotion:
-  name: '4.1'
-  namespace: ocp
