@@ -4,72 +4,6 @@ presubmits:
     always_run: true
     branches:
     - release-4.1
-    context: ci/prow/e2e-aws-metering
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-    name: pull-ci-operator-framework-operator-metering-release-4.1-e2e-aws-metering
-    rerun_command: /test e2e-aws-metering
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/e2e-aws-metering-cluster-profile
-        - --target=e2e-aws-metering
-        - --template=/usr/local/e2e-aws-metering
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: operator-framework-operator-metering-release-4.1.yaml
-              name: ci-operator-4.1-configs
-        - name: JOB_NAME_SAFE
-          value: e2e-aws-metering
-        - name: TEST_COMMAND
-          value: |
-            set -x
-            # Increase the size of the machines so that there are machines large enough
-            # to run Presto, and the full metering stack.
-            kubectl -n openshift-machine-api get machinesets -o name | cut -d/ -f2 | head -n2 | xargs -I{} kubectl -n openshift-machine-api patch machineset {} --type json -p '[{"op": "replace", "path": "/spec/template/spec/providerSpec/value/instanceType", "value": "m4.xlarge"}]'
-            # delete the first two workers so that larger machines replace it
-            # wait=false because the machines never actually get deleted from the
-            # API
-            kubectl -n openshift-machine-api get machines -l machine.openshift.io/cluster-api-machine-role=worker -o name | head -n2 | xargs kubectl -n openshift-machine-api delete --wait=false
-            TEST_OUTPUT_PATH=/tmp/artifacts make e2e
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/e2e-aws-metering-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-aws-metering
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
-      serviceAccountName: ci-operator
-      volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
-    trigger: '(?m)^/test (?:.*? )?e2e-aws-metering(?: .*?)?$'
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.1
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -84,7 +18,6 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
         - --target=[images]
-        - --target=[release:latest]
         command:
         - ci-operator
         env:
@@ -105,22 +38,22 @@ presubmits:
     always_run: true
     branches:
     - release-4.1
-    context: ci/prow/integration-aws-metering
+    context: ci/prow/metering-e2e-aws
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-    name: pull-ci-operator-framework-operator-metering-release-4.1-integration-aws-metering
-    rerun_command: /test integration-aws-metering
+    name: pull-ci-operator-framework-operator-metering-release-4.1-metering-e2e-aws
+    rerun_command: /test metering-e2e-aws
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/integration-aws-metering-cluster-profile
-        - --target=integration-aws-metering
-        - --template=/usr/local/integration-aws-metering
+        - --secret-dir=/usr/local/metering-e2e-aws-cluster-profile
+        - --target=metering-e2e-aws
+        - --template=/usr/local/metering-e2e-aws
         command:
         - ci-operator
         env:
@@ -132,18 +65,19 @@ presubmits:
               key: operator-framework-operator-metering-release-4.1.yaml
               name: ci-operator-4.1-configs
         - name: JOB_NAME_SAFE
-          value: integration-aws-metering
+          value: metering-e2e-aws
         - name: TEST_COMMAND
           value: |
             set -x
             # Increase the size of the machines so that there are machines large enough
             # to run Presto, and the full metering stack.
-            kubectl -n openshift-machine-api get machinesets -o name | cut -d/ -f2 | head -n2 | xargs -I{} kubectl -n openshift-machine-api patch machineset {} --type json -p '[{"op": "replace", "path": "/spec/template/spec/providerSpec/value/instanceType", "value": "m4.xlarge"}]'
-            # delete the first two workers so that larger machines replace it
+            kubectl -n openshift-machine-api get machinesets -o name | grep worker | cut -d/ -f2 | xargs -I{} kubectl -n openshift-machine-api patch machineset {} --type json -p '[{"op": "replace", "path": "/spec/template/spec/providerSpec/value/instanceType", "value": "m4.xlarge"}]'
+            # delete the workers so that larger machines replace it
             # wait=false because the machines never actually get deleted from the
             # API
-            kubectl -n openshift-machine-api get machines -l machine.openshift.io/cluster-api-machine-role=worker -o name | head -n2 | xargs kubectl -n openshift-machine-api delete --wait=false
-            TEST_OUTPUT_PATH=/tmp/artifacts make integration
+            kubectl -n openshift-machine-api get machines -o name | grep worker | xargs kubectl -n openshift-machine-api delete --wait=false
+            TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/integration make integration
+            TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/e2e make e2e
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -151,9 +85,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/integration-aws-metering-cluster-profile
+        - mountPath: /usr/local/metering-e2e-aws-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/integration-aws-metering
+        - mountPath: /usr/local/metering-e2e-aws
           name: job-definition
           subPath: cluster-launch-installer-src.yaml
       serviceAccountName: ci-operator
@@ -166,7 +100,7 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-src
         name: job-definition
-    trigger: '(?m)^/test (?:.*? )?integration-aws-metering(?: .*?)?$'
+    trigger: '(?m)^/test (?:.*? )?metering-e2e-aws(?: .*?)?$'
   - agent: kubernetes
     always_run: true
     branches:
