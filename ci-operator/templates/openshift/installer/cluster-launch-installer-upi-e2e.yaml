@@ -429,8 +429,13 @@ objects:
 
         function approve_csrs() {
           while true; do
-            sleep 5;
-            oc get csr -ojson | jq -r '.items[] | select(.status == {} ) | .metadata.name' | xargs --no-run-if-empty oc adm certificate approve && break
+            if [[ ! -f /tmp/install-complete ]]; then
+              oc get csr -ojson | jq -r '.items[] | select(.status == {} ) | .metadata.name' | xargs --no-run-if-empty oc adm certificate approve
+              sleep 15 & wait
+              continue
+            else
+              break
+            fi
           done
         }
 
@@ -450,6 +455,7 @@ objects:
         echo "Completing UPI setup"
         openshift-install --dir=/tmp/artifacts/installer wait-for install-complete &
         wait "$!"
+        touch /tmp/install-complete
 
     # Performs cleanup of all created resources
     - name: teardown
