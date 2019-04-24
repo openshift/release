@@ -427,13 +427,25 @@ objects:
         terraform apply -auto-approve -var 'bootstrap_complete=true' -no-color &
         wait "$!"
 
+        function approve_csrs() {
+          while true; do
+            sleep 5;
+            oc get csr -ojson | jq -r '.items[] | select(.status == {} ) | .metadata.name' | xargs --no-run-if-empty oc adm certificate approve && break
+          done
+        }
+
+        function update_image_registry() {
+          while true; do
+            sleep 10;
+            oc get configs.imageregistry.operator.openshift.io/cluster > /dev/null && break
+          done
+          oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"storage":{"emptyDir":{}}}}'
+        }
+
         echo "Approving pending CSRs"
         export KUBECONFIG=/tmp/artifacts/installer/auth/kubeconfig
-        oc get csr -ojson | jq -r '.items[] | select(.status == {} ) | .metadata.name' | xargs oc adm certificate approve
-
-        echo "Set registry storage to emptyDir"
-        while true; do oc get configs.imageregistry.operator.openshift.io/cluster && break; done
-        oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"storage":{"emptyDir":{}}}}'
+        approve_csrs &
+        update_image_registry &
 
         echo "Completing UPI setup"
         openshift-install --dir=/tmp/artifacts/installer wait-for install-complete &
