@@ -1,5 +1,52 @@
 postsubmits:
   openshift/openshift-azure:
+  - agent: ""
+    branches:
+    - master
+    context: e2e
+    decorate: true
+    name: branch-ci-openshift-azure-master-e2e
+    spec:
+      containers:
+      - args:
+        - hack/tests/e2e-create.sh
+        env:
+        - name: FOCUS
+          value: \[CustomerAdmin\]|\[EndUser\]\[Fake\]
+        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        name: ""
+        resources: {}
+      serviceAccountName: ci-operator
+  - agent: ""
+    branches:
+    - master
+    context: unit
+    decorate: true
+    name: branch-ci-openshift-azure-master-unit
+    spec:
+      containers:
+      - args:
+        - make
+        - unit
+        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        name: ""
+        resources: {}
+      serviceAccountName: ci-operator
+  - agent: ""
+    branches:
+    - master
+    context: verify
+    decorate: true
+    name: branch-ci-openshift-azure-master-verify
+    spec:
+      containers:
+      - args:
+        - make
+        - verify
+        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        name: ""
+        resources: {}
+      serviceAccountName: ci-operator
   - agent: kubernetes
     branches:
     - ^master$
@@ -31,51 +78,4 @@ postsubmits:
         resources:
           requests:
             cpu: 10m
-      serviceAccountName: ci-operator
-  - agent: ""
-    branches:
-    - master
-    context: ""
-    decorate: true
-    name: e2e
-    spec:
-      containers:
-      - args:
-        - hack/tests/e2e-create.sh
-        env:
-        - name: FOCUS
-          value: \[CustomerAdmin\]|\[EndUser\]\[Fake\]
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
-        name: ""
-        resources: {}
-      serviceAccountName: ci-operator
-  - agent: ""
-    branches:
-    - master
-    context: ""
-    decorate: true
-    name: unit
-    spec:
-      containers:
-      - args:
-        - make
-        - unit
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
-        name: ""
-        resources: {}
-      serviceAccountName: ci-operator
-  - agent: ""
-    branches:
-    - master
-    context: ""
-    decorate: true
-    name: verify
-    spec:
-      containers:
-      - args:
-        - make
-        - verify
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
-        name: ""
-        resources: {}
       serviceAccountName: ci-operator
