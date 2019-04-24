@@ -23,25 +23,21 @@ spec:
     - -openshift-ca=/etc/pki/tls/cert.pem
     - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
     - -skip-auth-regex=^/metrics
-    env:
-    - name: HTTP_PROXY
-      value: ""
-    - name: HTTPS_PROXY
-      value: ""
-    - name: NO_PROXY
-      value: ""
     image: openshift/oauth-proxy:latest
     name: alertmanager-proxy
     ports:
     - containerPort: 9094
-      name: web
+      name: https
+    readinessProbe:
+      tcpSocket:
+        port: https
     resources: {}
     volumeMounts:
     - mountPath: /etc/tls/private
       name: secret-alertmanager-tls
     - mountPath: /etc/proxy/secrets
       name: secret-alertmanager-proxy
-  listenLocal: true
+  listenLocal: false
   nodeSelector:
     node-role.kubernetes.io/infra: "true"
   secrets:

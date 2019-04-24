@@ -2,15 +2,18 @@
 .PHONY : prow-monitoring-deploy
 prow-monitoring-deploy:
 	@echo "Deploying prow-monitoring stack ..."
+	oc apply -f ./prometheus_expose.yaml
+	oc apply -f ./prometheus_proxy_secret.yaml
 	oc apply -f ./prometheus_operator_deploy.yaml
 	oc apply -f ./sinker_service_monitor.yaml
 	oc apply -f ./prometheus_crd.yaml
 	oc apply -f ./prometheus_rule_sinker.yaml
-	oc apply -f ./prometheus_expose.yaml
+	oc apply -f ./alert_manager_expose.yaml
 	oc apply -f ./alert_manager_proxy_secret.yaml
 	oc apply -f ./alert_manager_crd.yaml
 	oc delete secret -n prow-monitoring alertmanager-prow --ignore-not-found=true
 	oc create -n prow-monitoring secret generic alertmanager-prow --from-file=./alertmanager.yaml --from-file=./msg.tmpl
+<<<<<<< HEAD
 	oc apply -f ./alert_manager_expose.yaml
 	#grafana
 	oc create -n prow-monitoring secret generic grafana-config --from-file=./grafana.ini --dry-run -o yaml | oc apply -f -
@@ -20,6 +23,8 @@ prow-monitoring-deploy:
 	oc apply -f ./grafana_proxy_secret.yaml
 	oc apply -f ./grafana_deploy.yaml
 	oc apply -f ./grafana_expose.yaml
+=======
+>>>>>>> b6a595a7... Enable oauth-proxy on prometheus of prow-monitoring
 
 .PHONY : prow-monitoring-pre-steps
 prow-monitoring-pre-steps:
@@ -36,13 +41,13 @@ prow-monitoring-pre-steps:
 .PHONY : prow-monitoring-cleanup
 prow-monitoring-cleanup:
 	@echo "Cleaning up prow-monitoring stack ..."
-	oc delete -f ./prometheus_expose.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./prometheus_rule_sinker.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./prometheus_crd.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./sinker_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./prometheus_operator_deploy.yaml --ignore-not-found=true --as=system:admin
+	oc delete -f ./prometheus_proxy_secret.yaml --as=system:admin
+	oc delete -f ./prometheus_expose.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./prometheus_rbac.yaml --ignore-not-found=true --as=system:admin
-	oc delete -f ./alert_manager_expose.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./alert_manager_crd.yaml --ignore-not-found=true --as=system:admin
 	oc delete secret -n prow-monitoring alertmanager-prow --ignore-not-found=true --as=system:admin
 <<<<<<< HEAD
@@ -56,6 +61,7 @@ prow-monitoring-cleanup:
 	oc delete -f ./grafana_rabc.yaml --as=system:admin
 =======
 	oc delete -f ./alert_manager_proxy_secret.yaml --as=system:admin
+	oc delete -f ./alert_manager_expose.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./alert_manager_rbac.yaml --as=system:admin
 >>>>>>> 6adedfa7... Enable auth-proxy on alter-manager in prow-monitoring
 	oc delete -f ./client_rbac.yaml --ignore-not-found=true --as=system:admin
