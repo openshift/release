@@ -295,6 +295,12 @@ objects:
         #!/bin/bash
         function teardown() {
           set +e
+          echo "scp junit logs back to test pod"
+          LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+            --quiet \
+            --project "${GOOGLE_PROJECT_ID}" \
+            --zone "${GOOGLE_COMPUTE_ZONE}" \
+            --recurse packer@"${INSTANCE_PREFIX}":/tmp/artifacts/junit /tmp/artifacts
           touch /tmp/shared/exit
           echo "Deprovisioning cluster ..."
           set -x
