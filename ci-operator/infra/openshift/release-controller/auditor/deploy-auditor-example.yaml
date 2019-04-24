@@ -1,0 +1,102 @@
+kind: List
+apiVersion: v1
+items:
+
+# create the secret that holds the upgrade graph state
+- kind: Secret
+  apiVersion: v1
+  metadata:
+    name: auditor-signer
+- kind: Secret
+  apiVersion: v1
+  metadata:
+    name: auditor-publisher
+- kind: Secret
+  apiVersion: v1
+  metadata:
+    name: auditor-cluster-kubeconfig
+
+- kind: Deployment
+  apiVersion: apps/v1
+  metadata:
+    name: release-controller-auditor
+  spec:
+    selector:
+      matchLabels:
+        app: release-controller-auditor
+    template:
+      metadata:
+        labels:
+          app: release-controller-auditor
+      spec:
+        volumes:
+        - name: pull-secret
+          secret:
+            # This secret must contain a single key ".dockercfg" that is a Docker
+            # legacy pull secret that can pull any needed images.
+            secretName: auditor-pull-secret
+        - name: signer
+          secret:
+            # This secret must contain a single key "release-sign.gpg" that is a
+            # GPG key without password with a single private key that should be used
+            # for signing release images.
+            secretName: auditor-signer
+        - name: publisher
+          secret:
+            # This secret must contain a single key "service-account.json" that
+            # can create, read, but not delete or update, objects in the GCS bucket
+            # openshift-release
+            secretName: auditor-publisher
+        - name: cluster-kubeconfig
+          secret:
+            # This secret must contain a single key "kubeconfig" that has read access
+            # to the "ocp" namespace on api.ci
+            secretName: auditor-cluster-kubeconfig
+        - name: binaries
+          emptyDir: {}
+
+        initContainers:
+        - name: binary-client
+          # use cli binary from 4.1.0-rc.0
+          image: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:654c46744f87fec49ea13589f4025f997264e891853ce0a65641309d73606d01
+          - name: binaries
+            mountPath: /var/lib/binaries
+          command:
+          - /bin/sh
+          - -c
+          - |
+            #/bin/sh
+            set -euo pipefail
+            cp $(which oc) /var/lib/binaries/
+
+        containers:
+        - name: controller
+          image: release-controller:latest
+          env:
+          - name: HOME
+            value: /etc/release-controller/home
+          - name: PATH
+            value: /usr/bin:/bin:/sbin:/var/lib/binaries
+          - name: KUBECONFIG
+            value: /etc/release-controller/cluster-kubeconfig/kubeconfig
+          volumeMounts:
+          - name: pull-secret
+            mountPath: /etc/release-controller/home
+          - name: binaries
+            mountPath: /var/lib/binaries
+          - name: signer
+            mountPath: /etc/release-controller/signer
+          - name: publisher
+            mountPath: /etc/release-controller/publisher
+          - name: cluster-kubeconfig
+            mountPath: /etc/release-controller/cluster-kubeconfig
+          command:
+          - /usr/bin/release-controller
+          - --release-namespace=ocp
+          - --artifacts=openshift-release-artifacts.svc.ci.openshift.org
+          - --job-namespace=ci-release
+          - --audit=gs://openshift-release/test-1
+          - --audit-cli-image=local
+          - --audit-gcs-service-account=/etc/release-controller-publisher/service-account.json
+          - --sign=/etc/release-controller-signer/release-sign.gpg
+          - -v=4
