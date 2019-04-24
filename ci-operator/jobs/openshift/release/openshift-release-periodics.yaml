@@ -114,3 +114,23 @@ periodics:
     - name: pull-secret
       secret:
         secretName: ci-pull-credentials
+- agent: kubernetes
+  interval: 12h
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  decorate: true
+  name: openshift-release-master-config-updates
+  spec:
+    containers:
+    - args:
+      - postsubmit-update
+      command:
+      - make
+      image: registry.svc.ci.openshift.org/ci/origin-release:cli
+      imagePullPolicy: Always
+      resources:
+        requests:
+          cpu: 10m
+    serviceAccountName: config-updater
