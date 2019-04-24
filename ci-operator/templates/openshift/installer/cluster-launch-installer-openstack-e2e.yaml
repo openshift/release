@@ -241,9 +241,9 @@ objects:
           echo "Installing from release ${RELEASE_IMAGE_LATEST}"
         fi
 
-        export EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
-        export SSH_PUB_KEY=$(cat "${SSH_PUB_KEY_PATH}")
-        export PULL_SECRET=$(cat "${PULL_SECRET_PATH}")
+        EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
+        SSH_PUB_KEY=$(cat "${SSH_PUB_KEY_PATH}")
+        PULL_SECRET=$(cat "${PULL_SECRET_PATH}")
 
         # create a new floating ip tagged with CLUSTER_NAME so it can be deleted later
         LB_FIP=$(openstack floating ip create --description $CLUSTER_NAME $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address')
@@ -324,7 +324,7 @@ objects:
           fi
         }
         function nuke() {
-          export PREFIX=$(grep cluster_id /tmp/artifacts/installer/terraform.tfvars | cut -d '"' -f4)
+          PREFIX=$(grep cluster_id /tmp/artifacts/installer/terraform.tfvars | cut -d '"' -f4)
           openstack server list -c ID -f value --name $PREFIX | xargs openstack server delete
 
           openstack router remove subnet  $PREFIX-external-router $PREFIX-service

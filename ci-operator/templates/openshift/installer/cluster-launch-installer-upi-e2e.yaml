@@ -302,9 +302,9 @@ objects:
           echo "Installing from release ${RELEASE_IMAGE_LATEST}"
         fi
 
-        export EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
-        export SSH_PUB_KEY=$(cat "${SSH_PUB_KEY_PATH}")
-        export PULL_SECRET=$(cat "${PULL_SECRET_PATH}")
+        EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
+        SSH_PUB_KEY=$(cat "${SSH_PUB_KEY_PATH}")
+        PULL_SECRET=$(cat "${PULL_SECRET_PATH}")
 
         if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
             cat > /tmp/artifacts/installer/install-config.yaml << EOF
@@ -332,8 +332,8 @@ objects:
         EOF
         elif [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
             # Get user and password from TFVARS_PATH
-            export VSPHERE_USER=$(grep -oP 'vsphere_user="\K[^"]+' ${TFVARS_PATH})
-            export VSPHERE_PASSWORD=$(grep -oP 'vsphere_password="\K[^"]+' ${TFVARS_PATH})
+            VSPHERE_USER=$(grep -oP 'vsphere_user="\K[^"]+' ${TFVARS_PATH})
+            VSPHERE_PASSWORD=$(grep -oP 'vsphere_password="\K[^"]+' ${TFVARS_PATH})
             cat > /tmp/artifacts/installer/install-config.yaml << EOF
         apiVersion: v1beta4
         baseDomain: ${BASE_DOMAIN}
@@ -370,9 +370,9 @@ objects:
         cp -r /var/lib/openshift-install/upi/${CLUSTER_TYPE}/* /tmp/tf
 
         # Create terraform.tfvars
-        export BOOTSTRAP_URL="http://${JOB_NAME_SAFE}-bootstrap-exporter-${NAMESPACE}.svc.ci.openshift.org/bootstrap.ign"
-        export MASTER_IGN=$(cat /tmp/artifacts/installer/master.ign)
-        export WORKER_IGN=$(cat /tmp/artifacts/installer/worker.ign)
+        BOOTSTRAP_URL="http://${JOB_NAME_SAFE}-bootstrap-exporter-${NAMESPACE}.svc.ci.openshift.org/bootstrap.ign"
+        MASTER_IGN=$(cat /tmp/artifacts/installer/master.ign)
+        WORKER_IGN=$(cat /tmp/artifacts/installer/worker.ign)
 
         cat > /tmp/tf/terraform.tfvars <<-EOF
           machine_cidr = "139.178.73.0/26"
@@ -513,8 +513,8 @@ objects:
           if [ -f /tmp/artifacts/installer/.openshift_install_state.json ]
           then
               # Remove VSPHERE_USER and VSPHERE_PASSWORD from install state json
-              export VSPHERE_USER=$(grep -oP 'vsphere_user="\K[^"]+' ${TFVARS_PATH})
-              export VSPHERE_PASSWORD=$(grep -oP 'vsphere_password="\K[^"]+' ${TFVARS_PATH})
+              VSPHERE_USER=$(grep -oP 'vsphere_user="\K[^"]+' ${TFVARS_PATH})
+              VSPHERE_PASSWORD=$(grep -oP 'vsphere_password="\K[^"]+' ${TFVARS_PATH})
               sed -i "s;${VSPHERE_USER};REDACTED;g" /tmp/artifacts/installer/.openshift_install_state.json
               sed -i "s;${VSPHERE_PASSWORD};REDACTED;g" /tmp/artifacts/installer/.openshift_install_state.json
 
