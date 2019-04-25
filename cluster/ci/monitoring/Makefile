@@ -2,22 +2,23 @@
 .PHONY : prow-monitoring-deploy
 prow-monitoring-deploy:
 	@echo "Deploying prow-monitoring stack ..."
+	oc apply -f ./prometheus_expose.yaml
 	oc apply -f ./prometheus_operator_deploy.yaml
 	oc apply -f ./sinker_service_monitor.yaml
 	oc apply -f ./prometheus_crd.yaml
 	oc apply -f ./prometheus_rule_sinker.yaml
-	oc apply -f ./prometheus_expose.yaml
+	oc apply -f ./alert_manager_expose.yaml
 	oc apply -f ./alert_manager_proxy_secret.yaml
 	oc apply -f ./alert_manager_crd.yaml
-	oc delete secret -n prow-monitoring alertmanager-prow --ignore-not-found=true
-	oc create -n prow-monitoring secret generic alertmanager-prow --from-file=./alertmanager.yaml --from-file=./msg.tmpl
-	oc apply -f ./alert_manager_expose.yaml
+	#TODO: get it from bitwarden; manual step for the moment
+	#oc create -n prow-monitoring secret generic alertmanager-prow --from-file=./alertmanager.yaml --from-file=./msg.tmpl --dry-run -o yaml | oc apply -f -
 	#grafana
 	oc apply -f ./grafana_expose.yaml
 	oc create -n prow-monitoring secret generic grafana-config --from-file=./grafana.ini --dry-run -o yaml | oc apply -f -
-	oc create -n prow-monitoring configmap grafana-datasources --from-file=./datasources.yaml --dry-run -o yaml | oc apply -f -
-	oc create -n prow-monitoring configmap grafana-dashboards --from-file=./dashboards.yaml --dry-run -o yaml | oc apply -f -
-	oc create -n prow-monitoring configmap grafana-dashboard-sinker --from-file=./sinker.json --dry-run -o yaml | oc apply -f -
+	#Those config are deployed by config_uploader; we leave those here for manual debugging
+	#oc create -n prow-monitoring configmap grafana-datasources --from-file=./datasources.yaml --dry-run -o yaml | oc apply -f -
+	#oc create -n prow-monitoring configmap grafana-dashboards --from-file=./dashboards.yaml --dry-run -o yaml | oc apply -f -
+	#oc create -n prow-monitoring configmap grafana-dashboard-sinker --from-file=./sinker.json --dry-run -o yaml | oc apply -f -
 	oc apply -f ./grafana_proxy_secret.yaml
 	oc apply -f ./grafana_deploy.yaml
 
