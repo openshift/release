@@ -1,0 +1,99 @@
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  labels:
+    app: grafana
+  name: grafana
+  namespace: prow-monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+      - args:
+        - -config=/etc/grafana/grafana.ini
+        image: grafana/grafana:6.1.4
+        name: grafana
+        ports:
+        - containerPort: 3001
+          name: http
+        resources:
+          requests:
+            cpu: 100m
+            memory: 100Mi
+        volumeMounts:
+        - mountPath: /var/lib/grafana
+          name: grafana-storage
+          readOnly: false
+        - mountPath: /etc/grafana/provisioning/datasources
+          name: grafana-datasources
+          readOnly: false
+        - mountPath: /etc/grafana/provisioning/dashboards
+          name: grafana-dashboards
+          readOnly: false
+        - mountPath: /grafana-dashboard-definitions/0/sinker
+          name: grafana-dashboard-sinker
+          readOnly: false
+        - mountPath: /etc/grafana
+          name: grafana-config
+          readOnly: false
+      - args:
+        - -provider=openshift
+        - -https-address=:3000
+        - -http-address=
+        - -email-domain=*
+        - -upstream=http://localhost:3001
+        - '-openshift-sar={"resource": "namespaces", "verb": "get"}'
+        - '-openshift-delegate-urls={"/": {"resource": "namespaces", "verb": "get"}}'
+        - -tls-cert=/etc/tls/private/tls.crt
+        - -tls-key=/etc/tls/private/tls.key
+        - -client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
+        - -cookie-secret-file=/etc/proxy/secrets/session_secret
+        - -openshift-service-account=grafana
+        - -openshift-ca=/etc/pki/tls/cert.pem
+        - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        - -skip-auth-regex=^/metrics
+        image: openshift/oauth-proxy:latest
+        name: grafana-proxy
+        ports:
+        - containerPort: 3000
+          name: https
+        readinessProbe:
+          tcpSocket:
+            port: https
+        volumeMounts:
+        - mountPath: /etc/tls/private
+          name: secret-grafana-tls
+        - mountPath: /etc/proxy/secrets
+          name: secret-grafana-proxy
+      nodeSelector:
+        node-role.kubernetes.io/infra: "true"
+      securityContext: {}
+      serviceAccountName: grafana
+      volumes:
+      - emptyDir: {}
+        name: grafana-storage
+      - name: grafana-datasources
+        configMap:
+          name: grafana-datasources
+      - configMap:
+          name: grafana-dashboards
+        name: grafana-dashboards
+      - configMap:
+          name: grafana-dashboard-sinker
+        name: grafana-dashboard-sinker
+      - name: grafana-config
+        secret:
+          secretName: grafana-config
+      - name: secret-grafana-tls
+        secret:
+          secretName: grafana-tls
+      - name: secret-grafana-proxy
+        secret:
+          secretName: grafana-proxy
