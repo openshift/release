@@ -2,16 +2,16 @@
 .PHONY : prow-monitoring-deploy
 prow-monitoring-deploy:
 	@echo "Deploying prow-monitoring stack ..."
+	oc apply -f ./prometheus_expose.yaml
 	oc apply -f ./prometheus_operator_deploy.yaml
 	oc apply -f ./sinker_service_monitor.yaml
 	oc apply -f ./prometheus_crd.yaml
 	oc apply -f ./prometheus_rule_sinker.yaml
-	oc apply -f ./prometheus_expose.yaml
+	oc apply -f ./alert_manager_expose.yaml
 	oc apply -f ./alert_manager_proxy_secret.yaml
 	oc apply -f ./alert_manager_crd.yaml
 	oc delete secret -n prow-monitoring alertmanager-prow --ignore-not-found=true
 	oc create -n prow-monitoring secret generic alertmanager-prow --from-file=./alertmanager.yaml --from-file=./msg.tmpl
-	oc apply -f ./alert_manager_expose.yaml
 	#grafana
 	oc apply -f ./grafana_expose.yaml
 	oc create -n prow-monitoring secret generic grafana-config --from-file=./grafana.ini --dry-run -o yaml | oc apply -f -
