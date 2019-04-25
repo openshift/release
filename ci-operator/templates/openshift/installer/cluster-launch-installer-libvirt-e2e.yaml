@@ -244,12 +244,12 @@ objects:
         LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
           --zone "${GOOGLE_COMPUTE_ZONE}" \
           packer@"${INSTANCE_PREFIX}" \
-          --command 'export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_LATEST}" && timeout 4800 bash -ce "create-cluster nested 2>&1 | tee output"' | tee /tmp/artifacts/output-e2e-libvirt
+          --command 'export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_LATEST}" && timeout 4800 bash -ce "create-cluster nested"' | tee /tmp/artifacts/output-e2e-libvirt
         echo 'Collect all the info about clusteroperators'
         LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
           --zone "${GOOGLE_COMPUTE_ZONE}" \
           packer@"${INSTANCE_PREFIX}" \
-          --command 'export KUBECONFIG=/home/$USER/clusters/nested/auth/kubeconfig && bash -ce "oc get co | tee output"' | tee /tmp/artifacts/output-co-libvirt
+          --command 'export KUBECONFIG=/home/$USER/clusters/nested/auth/kubeconfig && bash -ce "oc get co"' | tee /tmp/artifacts/output-co-libvirt
         echo 'Extract openshift-must-gather from the image and put it to executable path'
         LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
           --zone "${GOOGLE_COMPUTE_ZONE}" \
@@ -280,14 +280,22 @@ objects:
       env:
       - name: USER
         value: packer
+      - name: NSS_WRAPPER_PASSWD
+        value: /home/packer/passwd
+      - name: NSS_WRAPPER_GROUP
+        value: /home/packer/group
+      - name: NSS_USERNAME
+        value: packer
+      - name: NSS_GROUPNAME
+        value: packer
       - name: HOME
         value: /tmp/shared
-      - name: INSTANCE_PREFIX
-        value: ${NAMESPACE}-${JOB_NAME_HASH}
       - name: GOOGLE_PROJECT_ID
         value: openshift-gce-devel-ci
       - name: GOOGLE_COMPUTE_ZONE
         value: us-east1-c
+      - name: INSTANCE_PREFIX
+        value: ${NAMESPACE}-${JOB_NAME_HASH}
       command:
       - /bin/bash
       - -c
