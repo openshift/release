@@ -498,12 +498,13 @@ objects:
 
           echo "Deprovisioning cluster ..."
           openshift-install --dir /tmp/artifacts/installer destroy cluster
+          DELETE_FAIL=$?
 
           echo "Nuking any resources left"
           nuke
         }
 
-        trap 'teardown' EXIT
+        trap 'teardown; exit $DELETE_FAIL' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
 
         for i in $(seq 1 180); do
