@@ -1,0 +1,36 @@
+postsubmits:
+  openshift/knative-eventing:
+  - agent: kubernetes
+    branches:
+    - ^release-v0\.5\.0$
+    context: ""
+    decorate: true
+    decoration_config:
+      grace_period: 0s
+      skip_cloning: true
+      timeout: 0s
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+    name: branch-ci-openshift-knative-eventing-release-v0.5.0-images
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --promote
+        - --target=[images]
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-knative-eventing-release-v0.5.0.yaml
+              name: ci-operator-misc-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
