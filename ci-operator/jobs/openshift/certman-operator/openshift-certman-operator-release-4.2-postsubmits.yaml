@@ -1,0 +1,36 @@
+postsubmits:
+  openshift/certman-operator:
+  - agent: kubernetes
+    branches:
+    - ^release-4\.2$
+    context: ""
+    decorate: true
+    decoration_config:
+      grace_period: 0s
+      skip_cloning: true
+      timeout: 0s
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+    name: branch-ci-openshift-certman-operator-release-4.2-images
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --promote
+        - --target=[images]
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-certman-operator-release-4.2.yaml
+              name: ci-operator-4.2-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
