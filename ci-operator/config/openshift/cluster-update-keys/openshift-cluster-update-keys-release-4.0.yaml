@@ -9,14 +9,12 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.10
-canonical_go_repository: github.com/openshift/sriov-dp-admission-controller
+canonical_go_repository: github.com/openshift/cluster-update-keys
 images:
-- dockerfile_path: Dockerfile.rhel7
-  from: base
-  to: sriov-dp-admission-controller
+- from: base
+  to: cluster-update-keys
 promotion:
-  disabled: true
-  name: "4.1"
+  name: "4.0"
   namespace: ocp
 resources:
   '*':
@@ -26,7 +24,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.1"
+  name: "4.0"
   namespace: ocp
 tests:
 - as: e2e-aws
@@ -34,3 +32,8 @@ tests:
   openshift_installer:
     cluster_profile: aws
     upgrade: false
+- as: e2e-aws-upgrade
+  commands: TEST_SUITE=all run-upgrade-tests
+  openshift_installer:
+    cluster_profile: aws
+    upgrade: true
