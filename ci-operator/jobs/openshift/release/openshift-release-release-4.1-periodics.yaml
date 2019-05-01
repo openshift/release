@@ -2,30 +2,58 @@ periodics:
 - agent: kubernetes
   cron: ""
   decorate: true
-  interval: 8h
+  interval: 15m
   name: release-promote-openshift-machine-os-content-e2e-aws-4.1
   spec:
     containers:
-    - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-aws-cluster-profile
-      - --template=/usr/local/e2e-aws
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --promote
-      command:
-      - ci-operator
+    - command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -euo pipefail
+
+        # prow doesn't allow init containers or a second container
+        export PATH=$PATH:/tmp/bin
+        mkdir /tmp/bin
+        curl https://storage.googleapis.com/origin-ci-test/_tools/4.1.0/oc >/tmp/bin/oc 2>/dev/null
+        chmod ug+x /tmp/bin/oc
+
+        # if the source and destination are identical, do nothing
+        from=$( oc get istag -n rhcos "machine-os-content:latest" -o template='{{ .image.metadata.name }}' )
+        to=$( oc get istag -n ocp "${BRANCH}:machine-os-content" -o template='{{ .image.metadata.name }}' )
+        if [[ "${from}" == "${to}" ]]; then
+          echo "info: rhcos/machine-os-content:latest matches ocp/${branch}:machine-os-content"
+          exit 0
+        fi
+        echo "Will promote ${from}, current is ${to}"
+
+        # error out if the image isn't on quay
+        to_quay="quay.io/openshift-release-dev/ocp-v4.0-art-dev@${from}"
+        if ! oc image info -a "/usr/local/pull-secret/.dockerconfigjson" "${to_quay}"; then
+          echo "error: The source image has not been pushed to quay ${from}"
+          exit 1
+        fi
+
+        # verify the tests pass
+        ci-operator --artifact-dir=$(ARTIFACTS) --secret-dir=/usr/local/pull-secret \
+          --secret-dir=/usr/local/e2e-aws-cluster-profile --template=/usr/local/e2e-aws \
+          --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME) --promote
+
+        # also tag the image into the art-latest stream
+        oc tag "${to_quay}" "ocp/${BRANCH}-art-latest"
       env:
+      - name: BRANCH
+        value: "4.1"
       - name: CLUSTER_TYPE
         value: aws
       - name: CONFIG_SPEC
         value: |
           tag_specification:
-            name: '4.1'
+            name: "$(BRANCH)"
             namespace: ocp
           promotion:
-            name: '4.1'
+            name: "$(BRANCH)"
             namespace: ocp
             additional_images:
               machine-os-content: machine-os-content
@@ -34,7 +62,7 @@ periodics:
               cluster: https://api.ci.openshift.org
               name: release
               namespace: openshift
-              tag: golang-1.10
+              tag: golang-1.11
           base_images:
             machine-os-content:
               name: machine-os-content
