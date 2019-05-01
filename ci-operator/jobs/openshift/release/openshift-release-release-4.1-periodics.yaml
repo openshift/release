@@ -20,10 +20,10 @@ periodics:
         chmod ug+x /tmp/bin/oc
 
         # if the source and destination are identical, do nothing
-        from=$( oc get istag -n rhcos "machine-os-content:latest" -o template='{{ .image.metadata.name }}' )
-        to=$( oc get istag -n ocp "${BRANCH}:machine-os-content" -o template='{{ .image.metadata.name }}' )
+        from=$( oc get istag -n "${TAG_NS}" "${TAG_SOURCE}" -o template='{{ .image.metadata.name }}' )
+        to=$( oc get istag -n ocp "${BRANCH}:${TAG}" -o template='{{ .image.metadata.name }}' )
         if [[ "${from}" == "${to}" ]]; then
-          echo "info: rhcos/machine-os-content:latest matches ocp/${branch}:machine-os-content"
+          echo "info: ${TAG_NS}/${TAG_SOURCE} matches ocp/${BRANCH}:${TAG}"
           exit 0
         fi
         echo "Will promote ${from}, current is ${to}"
@@ -41,8 +41,14 @@ periodics:
           --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME) --promote
 
         # also tag the image into the art-latest stream
-        oc tag "${to_quay}" "ocp/${BRANCH}-art-latest"
+        oc tag "${to_quay}" "ocp/${BRANCH}-art-latest:${TAG}"
       env:
+      - name: TAG_NS
+        value: rhcos
+      - name: TAG
+        value: machine-os-content
+      - name: TAG_SOURCE
+        value: machine-os-content:latest
       - name: BRANCH
         value: "4.1"
       - name: CLUSTER_TYPE
@@ -56,7 +62,7 @@ periodics:
             name: "$(BRANCH)"
             namespace: ocp
             additional_images:
-              machine-os-content: machine-os-content
+              $(TAG): $(TAG)
           build_root:
             image_stream_tag:
               cluster: https://api.ci.openshift.org
@@ -64,16 +70,16 @@ periodics:
               namespace: openshift
               tag: golang-1.11
           base_images:
-            machine-os-content:
-              name: machine-os-content
+            $(TAG):
+              name: $(TAG)
               namespace: rhcos
               tag: latest
           raw_steps:
           - output_image_tag_step:
-              from: machine-os-content
+              from: $(TAG)
               to:
                 name: stable
-                tag: machine-os-content
+                tag: $(TAG)
           resources:
             '*':
               limits:
