@@ -90,7 +90,7 @@ objects:
           cpu: 1
           memory: 300Mi
         limits:
-          memory: 2Gi
+          memory: 3Gi
       volumeMounts:
       - name: shared-tmp
         mountPath: /tmp/shared
@@ -118,16 +118,11 @@ objects:
 
         trap 'touch /tmp/shared/exit' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
-
-        cp "$(command -v oc)" /tmp/shared/
-
+        
         mkdir -p "${HOME}"
 
-        # wait for the router namespace
-        SCALEUP_SUCCESS=
-        API_UP=
-        ROUTER_NAMESPACE=
-        ROUTER_DEPLOYMENT=
+        echo -n "Waiting for scaleup to complete..."
+        
         while true; do
           if [[ -f /tmp/shared/exit ]]; then
             echo "Another process exited" 2>&1
@@ -136,76 +131,18 @@ objects:
           if [[ ! -f /tmp/shared/scaleup-success ]]; then
             sleep 15 & wait
             continue
-          elif [[ -z "${SCALEUP_SUCCESS}" ]]; then
-            echo "Scale up success"
-            SCALEUP_SUCCESS=1
-
-            # don't let clients impact the global kubeconfig
-            cp "${KUBECONFIG}" /tmp/admin.kubeconfig
-            export KUBECONFIG=/tmp/admin.kubeconfig
           fi
-          if ! oc get nodes 2>/dev/null; then
-            echo "Waiting for API at $(oc whoami --show-server) to respond ..."
-            sleep 15 & wait
-            continue
-          elif [[ -z "${API_UP}" ]]; then
-            echo "API at $(oc whoami --show-server) has responded"
-            API_UP=1
-          fi
-          if [[ -z "${ROUTER_NAMESPACE}" ]]; then
-            # check multiple namespaces while we are transitioning to the new locations
-            if oc get deploy/router-default -n openshift-ingress 2>/dev/null; then
-              ROUTER_NAMESPACE=openshift-ingress
-              ROUTER_DEPLOYMENT="deploy/router-default"
-            elif oc get deploy/router -n tectonic-ingress 2>/dev/null; then
-              ROUTER_NAMESPACE=tectonic-ingress
-              ROUTER_DEPLOYMENT="deploy/router"
-            elif oc get ds/router-default -n openshift-ingress 2>/dev/null; then
-              ROUTER_NAMESPACE=openshift-ingress
-              ROUTER_DEPLOYMENT="ds/router-default"
-            elif oc get deploy/router -n openshift-ingress 2>/dev/null; then
-              ROUTER_NAMESPACE=openshift-ingress
-              ROUTER_DEPLOYMENT="deploy/router"
-            elif oc get deploy/router -n default 2>/dev/null; then
-              ROUTER_NAMESPACE=default
-              ROUTER_DEPLOYMENT="deploy/router"
-            else
-              echo "Waiting for router to be created ..."
-              sleep 15 & wait
-              continue
-            fi
-            echo "Found router in ${ROUTER_NAMESPACE}"
-          fi
+          # don't let clients impact the global kubeconfig
+          cp "${KUBECONFIG}" /tmp/admin.kubeconfig
+          export KUBECONFIG=/tmp/admin.kubeconfig
           break
         done
 
-        TARGET="$(date -d '10 minutes' +%s)"
-        NOW="$(date +%s)"
-        while [[ "${NOW}" -lt "${TARGET}" ]]; do
-          REMAINING="$((TARGET - NOW))"
-          if oc --request-timeout="${REMAINING}s" rollout status "${ROUTER_DEPLOYMENT}" -n "${ROUTER_NAMESPACE}" -w; then
-            break
-          fi
-          sleep 2
-          NOW="$(date +%s)"
-        done
-        [[ "${NOW}" -ge "${TARGET}" ]] && echo "timeout waiting for ${ROUTER_NAMESPACE}/${ROUTER_DEPLOYMENT} to be available" && exit 1
-
-        # wait until the image registry changes propogate to the apiserver to avoid
-        # unnecessary restarts
-        until oc get is -n openshift php 2>/dev/null; do
-          sleep 10
-        done
-        until [[ -n "$( oc get is -n openshift php --template '{{ .status.dockerImageRepository }}' 2>/dev/null )" ]]; do
-          sleep 10
-        done
-        # oh god the blood
-        sleep 180
-
-        export KUBE_SSH_BASTION="$( oc get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
-        export KUBE_SSH_KEY_PATH=/tmp/cluster/ssh-privatekey
-
+        echo "completed!"
+        
         # set up cloud-provider-specific env vars
+        export KUBE_SSH_BASTION="$( oc --insecure-skip-tls-verify get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
+        export KUBE_SSH_KEY_PATH=/tmp/cluster/ssh-privatekey
         if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
           export GOOGLE_APPLICATION_CREDENTIALS="/tmp/cluster/gce.json"
           export KUBE_SSH_USER=cloud-user
@@ -220,37 +157,15 @@ objects:
           # TODO: make openshift-tests auto-discover this from cluster config
           export TEST_PROVIDER='{"type":"aws","region":"us-east-1","zone":"us-east-1a","multizone":true,"multimaster":true}'
           export KUBE_SSH_USER=core
-        elif [[ "${CLUSTER_TYPE}" == "openstack" ]]; then
-          mkdir -p ~/.ssh
-          cp /tmp/cluster/ssh-privatekey ~/.ssh/kube_openstack_rsa || true
         fi
 
         mkdir -p /tmp/output
         cd /tmp/output
 
-        function run-tests() {
-          if which openshift-tests && [[ -n "${TEST_SUITE-}" ]]; then
-            openshift-tests run "${TEST_SUITE}" --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
-            exit 0
-          fi
-          # TODO: remove everything after this point once we fork templates by release - starting with 4.0
-          if ! which extended.test; then
-            echo "must provide TEST_SUITE variable"
-            exit 1
-          fi
-          if [[ -n "${TEST_FOCUS:-}" ]]; then
-            ginkgo -v -noColor -nodes="${TEST_PARALLELISM:-30}" $( which extended.test ) -- \
-              -ginkgo.focus="${TEST_FOCUS}" -ginkgo.skip="${TEST_SKIP:-"\\[local\\]"}" \
-              -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit \
-              -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
-          fi
-          if [[ -n "${TEST_FOCUS_SERIAL:-}" ]]; then
-            ginkgo -v -noColor -nodes=1 $( which extended.test ) -- \
-              -ginkgo.focus="${TEST_FOCUS_SERIAL}" -ginkgo.skip="${TEST_SKIP_SERIAL:-"\\[local\\]"}" \
-              -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit/serial \
-              -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
-          fi
-          exit ${rc:-0}
+         function run-tests() {
+          openshift-tests run "${TEST_SUITE}" \
+            --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
+          exit 0
         }
 
         ${TEST_COMMAND}
@@ -283,22 +198,12 @@ objects:
         value: /etc/openshift-installer/pull-secret
       - name: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
         value: ${RELEASE_IMAGE_LATEST}
-      - name: OPENSTACK_IMAGE
-        value: rhcos
-      - name: OPENSTACK_REGION
-        value: moc-kzn
-      - name: OPENSTACK_FLAVOR
-        value: m1.medium
-      - name: OPENSTACK_EXTERNAL_NETWORK
-        value: external
-      - name: OS_CLOUD
-        value: openstack-cloud
-      - name: OS_CLIENT_CONFIG_FILE
-        value: /etc/openshift-installer/clouds.yaml
       - name: USER
         value: test
       - name: HOME
         value: /tmp
+      - name: INSTALL_INITIAL_RELEASE
+      - name: RELEASE_IMAGE_INITIAL
       command:
       - /bin/sh
       - -c
@@ -309,6 +214,13 @@ objects:
 
         cp "$(command -v openshift-install)" /tmp
         mkdir /tmp/artifacts/installer
+
+        if [[ -n "${INSTALL_INITIAL_RELEASE}" && -n "${RELEASE_IMAGE_INITIAL}" ]]; then
+          echo "Installing from initial release ${RELEASE_IMAGE_INITIAL}"
+          OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_INITIAL}"
+        else
+          echo "Installing from release ${RELEASE_IMAGE_LATEST}"
+        fi
 
         export EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
         export SSH_PUB_KEY=$(cat "${SSH_PUB_KEY_PATH}")
@@ -356,37 +268,12 @@ objects:
         sshKey: |
           ${SSH_PUB_KEY}
         EOF
-        elif [[ "${CLUSTER_TYPE}" == "openstack" ]]; then
-            cat > /tmp/artifacts/installer/install-config.yaml << EOF
-        apiVersion: v1beta4
-        baseDomain: ${BASE_DOMAIN}
-        metadata:
-          name: ${CLUSTER_NAME}
-        networking:
-          clusterNetwork:
-          - cidr: 10.128.0.0/14
-            hostPrefix: 23
-          machineCIDR: 10.0.0.0/16
-          serviceNetwork:
-          - 172.30.0.0/16
-          networkType: OpenShiftSDN
-        platform:
-          openstack:
-            baseImage:        ${OPENSTACK_IMAGE}
-            cloud:            ${OS_CLOUD}
-            externalNetwork:  ${OPENSTACK_EXTERNAL_NETWORK}
-            region:           ${OPENSTACK_REGION}
-        pullSecret: >
-          ${PULL_SECRET}
-        sshKey: |
-          ${SSH_PUB_KEY}
-        EOF
         else
             echo "Unsupported cluster type '${CLUSTER_NAME}'"
             exit 1
         fi
 
-        openshift-install --dir=/tmp/artifacts/installer create cluster --log-level=debug &
+        TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create cluster &
         wait "$!"
 
     # Runs scale up playbook
@@ -407,6 +294,8 @@ objects:
         value: ${CLUSTER_TYPE}
       - name: ANSIBLE_STDOUT_CALLBACK
         value: yaml
+      - name: KUBECONFIG
+        value: /tmp/artifacts/installer/auth/kubeconfig
       command:
       - /usr/local/bin/entrypoint-provider
       args:
@@ -419,10 +308,20 @@ objects:
         trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/scaleup-success; else touch /tmp/exit; fi; exit "${rc}"' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
 
+        echo -n "Waiting for cluster setup..."
+
         for i in `seq 1 360`; do
           if [[ -f /tmp/setup-success ]]; then break; fi
           sleep 15 & wait
         done
+
+        echo -ne "complete! \n Waiting for CVO..."
+
+        until oc --insecure-skip-tls-verify wait clusterversion/version --for condition=available 2>/dev/null; do
+          sleep 10 & wait
+        done
+
+        echo -e "complete! \n Starting scaleup playbooks..."
 
         ansible-playbook -vvv \
           -e "openshift_test_repo=${RPM_REPO_OPENSHIFT_ORIGIN}" \
@@ -474,53 +373,138 @@ objects:
           export PATH=$PATH:/tmp/shared
 
           echo "Gathering artifacts ..."
-          mkdir -p /tmp/artifacts/pods /tmp/artifacts/nodes /tmp/artifacts/metrics
+          mkdir -p /tmp/artifacts/pods /tmp/artifacts/nodes /tmp/artifacts/metrics /tmp/artifacts/bootstrap /tmp/artifacts/network
 
-          oc --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' > /tmp/nodes
-          oc --request-timeout=5s get pods --all-namespaces --template '{{ range .items }}{{ $name := .metadata.name }}{{ $ns := .metadata.namespace }}{{ range .spec.containers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ range .spec.initContainers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ end }}' > /tmp/containers
-          oc --request-timeout=5s get pods -l openshift.io/component=api --all-namespaces --template '{{ range .items }}-n {{ .metadata.namespace }} {{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/pods-api
 
-          queue /tmp/artifacts/nodes.json oc --request-timeout=5s get nodes -o json
-          queue /tmp/artifacts/pods.json oc --request-timeout=5s get pods --all-namespaces -o json
-          queue /tmp/artifacts/events.json oc --request-timeout=5s get events --all-namespaces -o json
-          queue /tmp/artifacts/clusteroperators.json oc --request-timeout=5s get clusteroperators -o json
+          if [ -f /tmp/artifacts/installer/terraform.tfstate ]
+          then
+              # we don't have jq, so the python equivalent of
+              # jq '.modules[].resources."aws_instance.bootstrap".primary.attributes."public_ip" | select(.)'
+              bootstrap_ip=$(python -c \
+                  'import sys, json; d=reduce(lambda x,y: dict(x.items() + y.items()), map(lambda x: x["resources"], json.load(sys.stdin)["modules"])); k="aws_instance.bootstrap"; print d[k]["primary"]["attributes"]["public_ip"] if k in d else ""' \
+                  < /tmp/artifacts/installer/terraform.tfstate
+              )
+
+              if [ -n "${bootstrap_ip}" ]
+              then
+                for service in bootkube openshift kubelet crio
+                do
+                    queue "/tmp/artifacts/bootstrap/${service}.service" curl \
+                        --insecure \
+                        --silent \
+                        --connect-timeout 5 \
+                        --retry 3 \
+                        --cert /tmp/artifacts/installer/tls/journal-gatewayd.crt \
+                        --key /tmp/artifacts/installer/tls/journal-gatewayd.key \
+                        --url "https://${bootstrap_ip}:19531/entries?_SYSTEMD_UNIT=${service}.service"
+                done
+                if ! whoami &> /dev/null; then
+                  if [ -w /etc/passwd ]; then
+                    echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+                  fi
+                fi
+                eval $(ssh-agent)
+                ssh-add /etc/openshift-installer/ssh-privatekey
+                ssh -A -o PreferredAuthentications=publickey -o StrictHostKeyChecking=false -o UserKnownHostsFile=/dev/null core@${bootstrap_ip} /bin/bash -x /usr/local/bin/installer-gather.sh
+                scp -o PreferredAuthentications=publickey -o StrictHostKeyChecking=false -o UserKnownHostsFile=/dev/null core@${bootstrap_ip}:log-bundle.tar.gz /tmp/artifacts/installer/bootstrap-logs.tar.gz
+              fi
+          else
+              echo "No terraform statefile found. Skipping collection of bootstrap logs."
+          fi
+
+          oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' > /tmp/nodes
+          oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces --template '{{ range .items }}{{ $name := .metadata.name }}{{ $ns := .metadata.namespace }}{{ range .spec.containers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ range .spec.initContainers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ end }}' > /tmp/containers
+          oc --insecure-skip-tls-verify --request-timeout=5s get pods -l openshift.io/component=api --all-namespaces --template '{{ range .items }}-n {{ .metadata.namespace }} {{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/pods-api
+
+          queue /tmp/artifacts/config-resources.json oc --insecure-skip-tls-verify --request-timeout=5s get apiserver.config.openshift.io authentication.config.openshift.io build.config.openshift.io console.config.openshift.io dns.config.openshift.io featuregate.config.openshift.io image.config.openshift.io infrastructure.config.openshift.io ingress.config.openshift.io network.config.openshift.io oauth.config.openshift.io project.config.openshift.io scheduler.config.openshift.io -o json
+          queue /tmp/artifacts/apiservices.json oc --insecure-skip-tls-verify --request-timeout=5s get apiservices -o json
+          queue /tmp/artifacts/clusteroperators.json oc --insecure-skip-tls-verify --request-timeout=5s get clusteroperators -o json
+          queue /tmp/artifacts/clusterversion.json oc --insecure-skip-tls-verify --request-timeout=5s get clusterversion -o json
+          queue /tmp/artifacts/configmaps.json oc --insecure-skip-tls-verify --request-timeout=5s get configmaps --all-namespaces -o json
+          queue /tmp/artifacts/credentialsrequests.json oc --insecure-skip-tls-verify --request-timeout=5s get credentialsrequests --all-namespaces -o json
+          queue /tmp/artifacts/csr.json oc --insecure-skip-tls-verify --request-timeout=5s get csr -o json
+          queue /tmp/artifacts/endpoints.json oc --insecure-skip-tls-verify --request-timeout=5s get endpoints --all-namespaces -o json
+          FILTER=gzip queue /tmp/artifacts/deployments.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get deployments --all-namespaces -o json
+          FILTER=gzip queue /tmp/artifacts/daemonsets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get daemonsets --all-namespaces -o json
+          queue /tmp/artifacts/events.json oc --insecure-skip-tls-verify --request-timeout=5s get events --all-namespaces -o json
+          queue /tmp/artifacts/kubeapiserver.json oc --insecure-skip-tls-verify --request-timeout=5s get kubeapiserver -o json
+          queue /tmp/artifacts/kubecontrollermanager.json oc --insecure-skip-tls-verify --request-timeout=5s get kubecontrollermanager -o json
+          queue /tmp/artifacts/machineconfigpools.json oc --insecure-skip-tls-verify --request-timeout=5s get machineconfigpools -o json
+          queue /tmp/artifacts/machineconfigs.json oc --insecure-skip-tls-verify --request-timeout=5s get machineconfigs -o json
+          queue /tmp/artifacts/namespaces.json oc --insecure-skip-tls-verify --request-timeout=5s get namespaces -o json
+          queue /tmp/artifacts/nodes.json oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o json
+          queue /tmp/artifacts/openshiftapiserver.json oc --insecure-skip-tls-verify --request-timeout=5s get openshiftapiserver -o json
+          queue /tmp/artifacts/pods.json oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces -o json
+          queue /tmp/artifacts/persistentvolumes.json oc --insecure-skip-tls-verify --request-timeout=5s get persistentvolumes --all-namespaces -o json
+          queue /tmp/artifacts/persistentvolumeclaims.json oc --insecure-skip-tls-verify --request-timeout=5s get persistentvolumeclaims --all-namespaces -o json
+          FILTER=gzip queue /tmp/artifacts/replicasets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get replicasets --all-namespaces -o json
+          queue /tmp/artifacts/rolebindings.json oc --insecure-skip-tls-verify --request-timeout=5s get rolebindings --all-namespaces -o json
+          queue /tmp/artifacts/roles.json oc --insecure-skip-tls-verify --request-timeout=5s get roles --all-namespaces -o json
+          queue /tmp/artifacts/services.json oc --insecure-skip-tls-verify --request-timeout=5s get services --all-namespaces -o json
+          FILTER=gzip queue /tmp/artifacts/statefulsets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get statefulsets --all-namespaces -o json
+
+          FILTER=gzip queue /tmp/artifacts/openapi.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get --raw /openapi/v2
 
           # gather nodes first in parallel since they may contain the most relevant debugging info
           while IFS= read -r i; do
             mkdir -p /tmp/artifacts/nodes/$i
-            queue /tmp/artifacts/nodes/$i/heap oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/debug/pprof/heap
+            queue /tmp/artifacts/nodes/$i/heap oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/debug/pprof/heap
           done < /tmp/nodes
 
-          if oc adm node-logs -h &>/dev/null; then
+          if oc --insecure-skip-tls-verify adm node-logs -h &>/dev/null; then
             # starting in 4.0 we can query node logs directly
-            FILTER=gzip queue /tmp/artifacts/nodes/masters-journal.gz oc adm node-logs --role=master --unify=false
-            FILTER=gzip queue /tmp/artifacts/nodes/workers-journal.gz oc adm node-logs --role=worker --unify=false
+            FILTER=gzip queue /tmp/artifacts/nodes/masters-journal.gz oc --insecure-skip-tls-verify adm node-logs --role=master --unify=false
+            FILTER=gzip queue /tmp/artifacts/nodes/workers-journal.gz oc --insecure-skip-tls-verify adm node-logs --role=worker --unify=false
           else
             while IFS= read -r i; do
-              FILTER=gzip queue /tmp/artifacts/nodes/$i/messages.gz oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/messages
-              oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/journal | sed -e 's|.*href="\(.*\)".*|\1|;t;d' > /tmp/journals
+              FILTER=gzip queue /tmp/artifacts/nodes/$i/messages.gz oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/messages
+              oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/journal | sed -e 's|.*href="\(.*\)".*|\1|;t;d' > /tmp/journals
               while IFS= read -r j; do
-                FILTER=gzip queue /tmp/artifacts/nodes/$i/journal.gz oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/journal/${j}system.journal
+                FILTER=gzip queue /tmp/artifacts/nodes/$i/journal.gz oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/journal/${j}system.journal
               done < /tmp/journals
-              FILTER=gzip queue /tmp/artifacts/nodes/$i/secure.gz oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/secure
-              FILTER=gzip queue /tmp/artifacts/nodes/$i/audit.gz oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/audit
+              FILTER=gzip queue /tmp/artifacts/nodes/$i/secure.gz oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/secure
+              FILTER=gzip queue /tmp/artifacts/nodes/$i/audit.gz oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/audit
             done < /tmp/nodes
           fi
 
+          # Snapshot iptables-save on each node for debugging possible kube-proxy issues
+          oc --insecure-skip-tls-verify get --request-timeout=20s -n openshift-sdn -l app=sdn pods --template '{{ range .items }}{{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/sdn-pods
+          while IFS= read -r i; do
+            queue /tmp/artifacts/network/iptables-save-$i oc --insecure-skip-tls-verify rsh --timeout=20 -n openshift-sdn -c sdn $i iptables-save -c
+          done < /tmp/sdn-pods
+
           while IFS= read -r i; do
             file="$( echo "$i" | cut -d ' ' -f 3 | tr -s ' ' '_' )"
-            queue /tmp/artifacts/metrics/${file}-heap oc exec $i -- /bin/bash -c 'oc get --raw /debug/pprof/heap --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig'
-            queue /tmp/artifacts/metrics/${file}-controllers-heap oc exec $i -- /bin/bash -c 'oc get --raw /debug/pprof/heap --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig'
+            queue /tmp/artifacts/metrics/${file}-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig'
+            queue /tmp/artifacts/metrics/${file}-controllers-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig'
           done < /tmp/pods-api
 
           while IFS= read -r i; do
             file="$( echo "$i" | cut -d ' ' -f 2,3,5 | tr -s ' ' '_' )"
-            FILTER=gzip queue /tmp/artifacts/pods/${file}.log.gz oc logs --request-timeout=20s $i
-            FILTER=gzip queue /tmp/artifacts/pods/${file}_previous.log.gz oc logs --request-timeout=20s -p $i
+            FILTER=gzip queue /tmp/artifacts/pods/${file}.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s $i
+            FILTER=gzip queue /tmp/artifacts/pods/${file}_previous.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s -p $i
           done < /tmp/containers
 
+          echo "Gathering kube-apiserver audit.log ..."
+          oc --insecure-skip-tls-verify adm node-logs --role=master --path=kube-apiserver/ > /tmp/kube-audit-logs
+          while IFS=$'\n' read -r line; do
+            IFS=' ' read -ra log <<< "${line}"
+            FILTER=gzip queue /tmp/artifacts/nodes/"${log[0]}"-"${log[1]}".gz oc --insecure-skip-tls-verify adm node-logs "${log[0]}" --path=kube-apiserver/"${log[1]}"
+          done < /tmp/kube-audit-logs
+
+          echo "Gathering openshift-apiserver audit.log ..."
+          oc --insecure-skip-tls-verify adm node-logs --role=master --path=openshift-apiserver/ > /tmp/openshift-audit-logs
+          while IFS=$'\n' read -r line; do
+            IFS=' ' read -ra log <<< "${line}"
+            FILTER=gzip queue /tmp/artifacts/nodes/"${log[0]}"-"${log[1]}".gz oc --insecure-skip-tls-verify adm node-logs "${log[0]}" --path=openshift-apiserver/"${log[1]}"
+          done < /tmp/openshift-audit-logs
+
           echo "Snapshotting prometheus (may take 15s) ..."
-          oc exec -n openshift-monitoring prometheus-k8s-0 -- tar cvzf - -C /prometheus . > /tmp/artifacts/metrics/prometheus.tar.gz
+          queue /tmp/artifacts/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring prometheus-k8s-0 -- tar cvzf - -C /prometheus .
+
+          echo "Running must-gather..."
+          mkdir -p /tmp/artifacts/must-gather
+          queue /tmp/artifacts/must-gather/must-gather.log oc --insecure-skip-tls-verify adm must-gather --dest-dir /tmp/artifacts/must-gather
 
           echo "Waiting for logs ..."
           wait
@@ -533,7 +517,7 @@ objects:
         trap 'teardown' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
 
-        for i in `seq 1 180`; do
+        for i in $(seq 1 180); do
           if [[ -f /tmp/shared/exit ]]; then
             exit 0
           fi
