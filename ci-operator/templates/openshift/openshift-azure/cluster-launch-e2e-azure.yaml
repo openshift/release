@@ -67,6 +67,8 @@ parameters:
   value: "registry.svc.ci.openshift.org/azure/test-base:latest"
 # If set to "true", it means the production OSA RP is going to be used.
 - name: TEST_IN_PRODUCTION
+- name: BRANCHVERSION
+  value: "master"
 
 objects:
 
@@ -269,6 +271,8 @@ objects:
         value: ${IMAGE_CANARY}
       - name: ARTIFACT_DIR
         value: /tmp/artifacts
+      - name: BRANCHVERSION
+        value: ${BRANCHVERSION}
       command:
       - /bin/bash
       - -c
@@ -296,7 +300,7 @@ objects:
         export AZURE_AAD_CLIENT_SECRET=$AZURE_CLIENT_SECRET
         export AZURE_AAD_GROUP_ADMINS_ID=$AZURE_AAD_GROUP_ADMINS_ID
 
-        if [[ -n "$AZURE_IMAGE" ]]; then
+        if [[ $BRANCHVERSION -ge 5 || $BRANCHVERSION == master ]]; then
           export SYNC_IMAGE="$AZURE_IMAGE"
           export STARTUP_IMAGE="$AZURE_IMAGE"
           export ETCDBACKUP_IMAGE="$AZURE_IMAGE"
