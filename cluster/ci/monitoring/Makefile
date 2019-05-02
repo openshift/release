@@ -21,6 +21,7 @@ prow-monitoring-deploy:
 	#oc create -n prow-monitoring configmap grafana-datasources --from-file=./datasources.yaml --dry-run -o yaml | oc apply -f -
 	#oc create -n prow-monitoring configmap grafana-dashboards --from-file=./dashboards.yaml --dry-run -o yaml | oc apply -f -
 	#oc create -n prow-monitoring configmap grafana-dashboard-sinker --from-file=./sinker.json --dry-run -o yaml | oc apply -f -
+	#oc create -n prow-monitoring configmap grafana-dashboard-ghproxy --from-file=./ghproxy.json --dry-run -o yaml | oc apply -f -
 	oc apply -f ./grafana_proxy_secret.yaml
 	oc apply -f ./grafana_deploy.yaml
 	oc apply -f ./grafana_service_monitor.yaml
