@@ -353,6 +353,21 @@ objects:
         sshKey: |
           ${SSH_PUB_KEY}
         EOF
+            export GOVC_URL=vcsa-ci.vmware.devcluster.openshift.com
+            export GOVC_USERNAME="${VSPHERE_USER}"
+            export GOVC_PASSWORD="${VSPHERE_PASSWORD}"
+            export GOVC_INSECURE=1
+            export GOVC_DATACENTER=dc1
+            export GOVC_DATASTORE=nvme-ds1
+            export OVA_URL="$(jq -r '.baseURI + .images["vmware"].path' /var/lib/openshift-install/rhcos.json)"
+            export VM_TEMPLATE="${OVA_URL##*/}"
+            if [[ "$(govc vm.info ${VM_TEMPLATE} | wc -c)" -eq 0 ]]
+            then
+                echo "Creating a template for the VMs from ${OVA_URL}..."
+                mkdir /tmp/rhcos
+                curl -L -o /tmp/rhcos/rhcos.ova "${OVA_URL}"
+                govc import.ova -name="${VM_TEMPLATE}" /tmp/rhcos/rhcos.ova
+            fi
         else
             echo "Unsupported cluster type '${CLUSTER_TYPE}'"
             exit 1
@@ -377,7 +392,7 @@ objects:
         cat > /tmp/tf/terraform.tfvars <<-EOF
           machine_cidr = "139.178.73.0/26"
 
-          vm_template = "rhcos-latest"
+          vm_template = "${VM_TEMPLATE}"
 
           vsphere_cluster = "devel"
 
