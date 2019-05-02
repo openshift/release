@@ -872,6 +872,42 @@ presubmits:
     trigger: '(?m)^/test (?:.*? )?unit(?: .*?)?$'
   - agent: kubernetes
     always_run: true
+    branches:
+    - master
+    context: ci/prow/verify-vendor
+    decorate: true
+    decoration_config:
+      grace_period: 0s
+      skip_cloning: true
+      timeout: 0s
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+    name: pull-ci-openshift-installer-master-verify-vendor
+    rerun_command: /test verify-vendor
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --target=verify-vendor
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-installer-master.yaml
+              name: ci-operator-master-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: '(?m)^/test (?:.*? )?verify-vendor(?: .*?)?$'
+  - agent: kubernetes
+    always_run: true
     context: ci/prow/shellcheck
     decorate: true
     name: pull-ci-openshift-installer-shellcheck
