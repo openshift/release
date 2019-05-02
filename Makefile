@@ -10,7 +10,7 @@ applyTemplate:
 	oc process -f $(WHAT) | oc apply -f -
 .PHONY: applyTemplate
 
-postsubmit-update: prow-services origin-release ci-infra-imagestreams libpod prow-monitoring
+postsubmit-update: prow-services origin-release ci-infra-imagestreams libpod prow-monitoring build-dashboards-validation-image
 .PHONY: postsubmit-update
 
 all: roles prow projects
@@ -338,3 +338,7 @@ libpod:
 prow-monitoring:
 	make -C cluster/ci/monitoring prow-monitoring-deploy
 .PHONY: prow-monitoring
+
+build-dashboards-validation-image:
+	oc apply -f projects/origin-release/dashboards-validation/dashboards-validation.yaml
+.PHONY: build-dashboards-validation-image
