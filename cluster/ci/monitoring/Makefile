@@ -78,3 +78,8 @@ grafana-debug-cleanup:
 	oc delete -f ./debug/grafana_deploy.yaml --ignore-not-found=true
 	oc create -n prow-monitoring-stage configmap grafana-config --from-file=./debug/grafana.ini --dry-run -o yaml | oc delete --ignore-not-found=true -f -
 	oc create -n prow-monitoring-stage configmap grafana-datasources --from-file=.datasources.yaml=./debug/grafana_datasources.yaml --dry-run -o yaml | oc delete --ignore-not-found=true -f -
+
+.PHONY : generate-mixins
+generate-mixins:
+	@echo "generating mixins ..."
+	make -C mixins all

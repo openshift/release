@@ -59,3 +59,20 @@ Clean up:
 ```
 $ make grafana-debug-cleanup
 ```
+
+## Use mixins
+
+### Debugging locally
+
+* Install required binary:
+
+    ```
+    $ go get github.com/google/go-jsonnet/cmd/jsonnet
+    $ go get github.com/jsonnet-bundler/jsonnet-bundler/cmd/jb
+    ```
+
+* Edit `.jsonnet` in the [mixins](./mixins) folder. Add targets in [mixins/Makefile](./mixins/Makefile) to generate the targeting file in case of creating a new `.jsonnet`.
+
+    ```
+    $ make generate-mixins
+    ```
