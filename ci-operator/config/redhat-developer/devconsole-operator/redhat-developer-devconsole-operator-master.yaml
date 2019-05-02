@@ -6,11 +6,15 @@ base_images:
     name: centos
     namespace: openshift
     tag: '7'
+  operator-registry:
+    name: "4.0"
+    namespace: ocp
+    tag: operator-registry
 
 resources:
   '*':
     limits:
-      memory: 3Gi
+      memory: 6Gi
     requests:
       memory: 250Mi
       cpu: 100m
@@ -24,7 +28,7 @@ images:
         source_path: /go/src/github.com/redhat-developer/devconsole-operator/out/operator 
   dockerfile_path: openshift-ci/Dockerfile.deploy
   to: devconsole-operator
-- from: src    
+- from: operator-registry
   dockerfile_path: openshift-ci/Dockerfile.registry.build
   to: devconsole-operator-registry
     
@@ -44,7 +48,7 @@ tests:
   container:
     from: src
 - as: lint
-  commands: make lint
+  commands: VERBOSE=2 make lint
   container:
     from: src
 - as: test
