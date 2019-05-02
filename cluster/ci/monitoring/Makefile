@@ -61,3 +61,20 @@ prow-monitoring-cleanup:
 	oc delete -f ./grafana_rabc.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./client_rbac.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./prometheus_project.yaml --wait=true --ignore-not-found=true --as=system:admin
+
+.PHONY : grafana-debug-deploy
+grafana-debug-deploy:
+	@echo "Running grafana-debug-deploy ..."
+	# oc new-project prow-monitoring-stage --skip-config-write=true
+	oc get project prow-monitoring-stage
+	oc create -n prow-monitoring-stage configmap grafana-config --from-file=./debug/grafana.ini --dry-run -o yaml | oc apply -f -
+	oc create -n prow-monitoring-stage configmap grafana-datasources --from-file=.datasources.yaml=./debug/grafana_datasources.yaml --dry-run -o yaml | oc apply -f -
+	oc apply -f ./debug/grafana_deploy.yaml
+
+.PHONY : grafana-debug-cleanup
+grafana-debug-cleanup:
+	@echo "Running grafana-debug-deploy ..."
+	oc get project prow-monitoring-stage
+	oc delete -f ./debug/grafana_deploy.yaml --ignore-not-found=true
+	oc create -n prow-monitoring-stage configmap grafana-config --from-file=./debug/grafana.ini --dry-run -o yaml | oc delete --ignore-not-found=true -f -
+	oc create -n prow-monitoring-stage configmap grafana-datasources --from-file=.datasources.yaml=./debug/grafana_datasources.yaml --dry-run -o yaml | oc delete --ignore-not-found=true -f -
