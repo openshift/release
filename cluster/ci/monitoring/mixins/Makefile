@@ -11,3 +11,8 @@ clean:
 
 install:
 	jb install
+
+validate-latest: clean install all
+	@echo "Generating sinker.json ..."
+	git status -s ../
+	test -z "$$(git status -s ../)"
