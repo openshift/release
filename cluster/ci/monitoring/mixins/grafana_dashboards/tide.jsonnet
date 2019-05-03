@@ -2,6 +2,7 @@ local grafana = import 'grafonnet/grafana.libsonnet';
 local dashboard = grafana.dashboard;
 local graphPanel = grafana.graphPanel;
 local prometheus = grafana.prometheus;
+local tablePanel = grafana.tablePanel;
 
 dashboard.new(
         'tide dashboard',
@@ -11,11 +12,11 @@ dashboard.new(
 .addPanel(
     graphPanel.new(
         'PRs in each Tide pool',
-        description="sum(pooledprs) by (org, repo, branch)",
+        description="sum(pooledprs)",
         datasource='prometheus',
     )
     .addTarget(prometheus.target(
-        'sum(pooledprs) by (org, repo, branch)'
+        'sum(pooledprs)'
     )), gridPos={
     h: 9,
     w: 12,
@@ -24,12 +25,12 @@ dashboard.new(
   })
 .addPanel(
     graphPanel.new(
-        'last time each subpool synced',
-        description="updatetime",
+        'PRs in each Tide pool by (org, repo, branch)',
+        description="sum(pooledprs) by (org, repo, branch)",
         datasource='prometheus',
     )
     .addTarget(prometheus.target(
-        'updatetime'
+        'sum(pooledprs) by (org, repo, branch)'
     )), gridPos={
     h: 9,
     w: 12,
@@ -91,4 +92,44 @@ dashboard.new(
     w: 12,
     x: 12,
     y: 18,
+  })
+.addPanel(
+    tablePanel.new(
+        'last time each subpool synced',
+        description="max_over_time(updatetime[30d]) * 1000",
+        datasource='prometheus',
+        styles=[
+            {
+                "alias": "Time",
+                "dateFormat": "YYYY-MM-DD HH:mm:ss",
+                "pattern": "Time",
+                "type": "date"
+            },{
+                "alias": "",
+                "dateFormat": "YYYY-MM-DD HH:mm:ss",
+                "decimals": 2,
+                "mappingType": 1,
+                "pattern": "Value",
+                "thresholds": [],
+                "type": "date",
+                "unit": "short"
+            },
+            {
+                "alias": "",
+                "decimals": 2,
+                "pattern": "/.*/",
+                "thresholds": [],
+                "type": "number",
+                "unit": "short"
+            },
+        ],
+    )
+    .addTarget(prometheus.target(
+        'max_over_time(updatetime[30d]) * 1000',
+        format='table'
+    )), gridPos={
+    h: 9,
+    w: 24,
+    x: 0,
+    y: 27,
   })
