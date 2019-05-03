@@ -1,0 +1,177 @@
+presubmits:
+  openshift/etcd-operator:
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - openshift-4.0
+    context: ci/prow/e2e-aws
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+    name: pull-ci-openshift-etcd-operator-openshift-4.0-e2e-aws
+    rerun_command: /test e2e-aws
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --secret-dir=/usr/local/e2e-aws-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=e2e-aws
+        - --template=/usr/local/e2e-aws
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-etcd-operator-openshift-4.0.yaml
+              name: ci-operator-4.0-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-aws
+        - name: TEST_COMMAND
+          value: TEST_SUITE=openshift/conformance/parallel run-tests
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-aws-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-aws
+          name: job-definition
+          subPath: cluster-launch-installer-e2e.yaml
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-e2e
+        name: job-definition
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: '(?m)^/test (?:.*? )?e2e-aws(?: .*?)?$'
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - openshift-4.0
+    context: ci/prow/etcd-operator-unit
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+    name: pull-ci-openshift-etcd-operator-openshift-4.0-etcd-operator-unit
+    rerun_command: /test etcd-operator-unit
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --secret-dir=/usr/local/etcd-operator-unit-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=etcd-operator-unit
+        - --template=/usr/local/etcd-operator-unit
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-etcd-operator-openshift-4.0.yaml
+              name: ci-operator-4.0-configs
+        - name: JOB_NAME_SAFE
+          value: etcd-operator-unit
+        - name: TEST_COMMAND
+          value: |
+            curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+            hack/update_vendor.sh
+            go test -v ./test/e2e/ --kubeconfig "$KUBECONFIG" --operator-image="${IMAGE_FORMAT/\${component\}/etcd-operator}"
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/etcd-operator-unit-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/etcd-operator-unit
+          name: job-definition
+          subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-src
+        name: job-definition
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: '(?m)^/test (?:.*? )?etcd-operator-unit(?: .*?)?$'
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - openshift-4.0
+    context: ci/prow/images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+    name: pull-ci-openshift-etcd-operator-openshift-4.0-images
+    rerun_command: /test images
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=[images]
+        - --target=[release:latest]
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-etcd-operator-openshift-4.0.yaml
+              name: ci-operator-4.0-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: '(?m)^/test (?:.*? )?images(?: .*?)?$'

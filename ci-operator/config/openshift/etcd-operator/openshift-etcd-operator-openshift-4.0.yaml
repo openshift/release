@@ -1,0 +1,42 @@
+base_images:
+  base:
+    name: "4.0"
+    namespace: ocp
+    tag: base
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+canonical_go_repository: github.com/coreos/etcd-operator
+images:
+- dockerfile_path: Dockerfile.openshift
+  from: base
+  to: etcd-operator
+promotion:
+  name: "4.0"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.0"
+  namespace: ocp
+tests:
+- as: etcd-operator-unit
+  commands: |
+    curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+    hack/update_vendor.sh
+    go test -v ./test/e2e/ --kubeconfig "$KUBECONFIG" --operator-image="${IMAGE_FORMAT/\${component\}/etcd-operator}"
+  openshift_installer_src:
+    cluster_profile: aws
+- as: e2e-aws
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer:
+    cluster_profile: aws
+    upgrade: false
