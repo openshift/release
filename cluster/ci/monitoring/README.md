@@ -41,8 +41,8 @@ _Note_ that the serviemonitor has to have label `prow-app` as key (value could b
 With the `oauth-proxy` container, it is not clear how to access the grafana instance as admin (email sent to the monitoring team asking about this). As a workaround, we can create a new grafana instance
 
 ```
-### Modify `CHANGE_ME` in ./debug/grafana_deploy.yaml then run:
 $ make grafana-debug-deploy
+### username and password will be displayed in the output.
 ```
 
 Play with [the grafana instance for debugging](https://grafana-prow-monitoring-stage.svc.ci.openshift.org) which already connects to the prometheus service in prow-monitoring.
