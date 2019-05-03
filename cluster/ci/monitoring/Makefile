@@ -5,6 +5,7 @@ prow-monitoring-deploy:
 	oc apply -f ./prometheus_expose.yaml
 	oc apply -f ./prometheus_operator_deploy.yaml
 	oc apply -f ./sinker_service_monitor.yaml
+	oc apply -f ./pushgateway_service_monitor.yaml
 	oc apply -f ./prometheus_crd.yaml
 	oc apply -f ./prometheus_rule_sinker.yaml
 	oc apply -f ./alert_manager_expose.yaml
@@ -42,6 +43,7 @@ prow-monitoring-cleanup:
 	oc delete -f ./prometheus_rule_sinker.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./prometheus_crd.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./sinker_service_monitor.yaml --ignore-not-found=true --as=system:admin
+	oc delete -f ./pushgateway_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./prometheus_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./alert_manager_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./grafana_service_monitor.yaml --ignore-not-found=true --as=system:admin
