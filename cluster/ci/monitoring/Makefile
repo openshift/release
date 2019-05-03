@@ -63,14 +63,19 @@ prow-monitoring-cleanup:
 	oc delete -f ./client_rbac.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./prometheus_project.yaml --wait=true --ignore-not-found=true --as=system:admin
 
+grafana_password := $(shell uuidgen)
+
 .PHONY : grafana-debug-deploy
 grafana-debug-deploy:
-	@echo "Running grafana-debug-deploy ..."
+	@echo "Running grafana-debug-deploy ... with password: $(grafana_password)"
 	# oc new-project prow-monitoring-stage --skip-config-write=true
 	oc get project prow-monitoring-stage
 	oc create -n prow-monitoring-stage configmap grafana-config --from-file=./debug/grafana.ini --dry-run -o yaml | oc apply -f -
 	oc create -n prow-monitoring-stage configmap grafana-datasources --from-file=.datasources.yaml=./debug/grafana_datasources.yaml --dry-run -o yaml | oc apply -f -
+	sed -i -e "s|CHANGE_ME|$(grafana_password)|g" ./debug/grafana_deploy.yaml
 	oc apply -f ./debug/grafana_deploy.yaml
+	git checkout ./debug/grafana_deploy.yaml
+	oc get deployment -n prow-monitoring-stage grafana -o yaml | grep ": GF_SECURITY_ADMIN_PASSWORD" -A1 -B2
 
 .PHONY : grafana-debug-cleanup
 grafana-debug-cleanup:
