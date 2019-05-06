@@ -1,0 +1,36 @@
+postsubmits:
+  kiegroup/kie-cloud-operator:
+  - agent: kubernetes
+    branches:
+    - ^release-v1\.0\.x$
+    context: ""
+    decorate: true
+    decoration_config:
+      grace_period: 0s
+      skip_cloning: true
+      timeout: 0s
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+    name: branch-ci-kiegroup-kie-cloud-operator-release-v1.0.x-images
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --promote
+        - --target=[images]
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: kiegroup-kie-cloud-operator-release-v1.0.x.yaml
+              name: ci-operator-misc-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator

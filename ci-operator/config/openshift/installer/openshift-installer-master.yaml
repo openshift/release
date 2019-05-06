@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "4.0"
+    name: "4.1"
     namespace: ocp
     tag: base
 build_root:
@@ -69,7 +69,7 @@ resources:
     requests:
       cpu: "3"
       memory: 5Gi
-  upi-installer:
+  installer-artifacts:
     limits:
       memory: 9Gi
     requests:
@@ -87,13 +87,13 @@ resources:
     requests:
       cpu: "3"
       memory: 5Gi
-  installer-artifacts:
+  unit:
     limits:
       memory: 9Gi
     requests:
       cpu: "3"
       memory: 5Gi
-  unit:
+  upi-installer:
     limits:
       memory: 9Gi
     requests:
@@ -118,6 +118,10 @@ tests:
 - as: golint
   commands: IS_CONTAINER=TRUE ./hack/go-lint.sh -min_confidence 0.3 $(go list -f '{{
     .ImportPath }}' ./...)
+  container:
+    from: src
+- as: verify-vendor
+  commands: IS_CONTAINER=TRUE ./hack/verify-vendor.sh
   container:
     from: src
 - as: e2e-aws
