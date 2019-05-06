@@ -64,7 +64,7 @@ presubmits:
         - mismatched-tide-lenient
         command:
         - /checkconfig
-        image: gcr.io/k8s-prow/checkconfig:v20190424-3f037d559
+        image: gcr.io/k8s-prow/checkconfig:v20190506-dd08c919a
         imagePullPolicy: Always
         name: ""
         resources:
@@ -113,6 +113,25 @@ presubmits:
     always_run: true
     branches:
     - master
+    context: ci/prow/generated-dashboards
+    decorate: true
+    name: pull-ci-openshift-release-master-generated-dashboards
+    rerun_command: /test generated-dashboards
+    spec:
+      containers:
+      - command:
+        - hack/validate-generated-dashboards.sh
+        image: registry.svc.ci.openshift.org/ci/dashboards-validation:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: ((?m)^/test generated-dashboards,?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
     context: ci/prow/ordered-prow-config
     decorate: true
     name: pull-ci-openshift-release-master-ordered-prow-config
@@ -127,7 +146,7 @@ presubmits:
         resources:
           requests:
             cpu: 10m
-    trigger: ""
+    trigger: '(?m)^/test (?:.*? )?ordered-prow-config(?: .*?)?$'
   - agent: kubernetes
     always_run: true
     branches:

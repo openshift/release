@@ -1,0 +1,51 @@
+base_images:
+  ansible_runner:
+    cluster: https://api.ci.openshift.org
+    name: ansible-runner
+    namespace: openshift
+    tag: latest
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+images:
+- dockerfile_path: upstream.Dockerfile
+  from: ansible_runner
+  to: ansible-operator
+promotion:
+  name: "4.2"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 200m
+      memory: 200Mi
+tag_specification:
+  name: "4.2"
+  namespace: ocp
+test_binary_build_commands: make build/operator-sdk-dev-x86_64-linux-gnu
+tests:
+- as: unit
+  commands: |
+    mkdir -p $GOPATH/src/github.com/operator-framework/operator-sdk
+    cp -r ./* $GOPATH/src/github.com/operator-framework/operator-sdk/
+    cd $GOPATH/src/github.com/operator-framework/operator-sdk
+    rm -rf vendor/github.com/operator-framework/operator-sdk
+    make test/unit
+  container:
+    from: src
+- as: sanity
+  commands: |
+    mkdir -p $GOPATH/src/github.com/operator-framework/operator-sdk
+    cp -r ./* $GOPATH/src/github.com/operator-framework/operator-sdk/
+    cd $GOPATH/src/github.com/operator-framework/operator-sdk
+    rm -rf vendor/github.com/operator-framework/operator-sdk
+    go vet ./...
+    ./hack/check_license.sh
+    ./hack/check_error_log_msg_format.sh
+  container:
+    from: src

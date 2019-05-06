@@ -134,3 +134,28 @@ periodics:
         requests:
           cpu: 10m
     serviceAccountName: config-updater
+- agent: kubernetes
+  interval: 12h
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  decorate: true
+  name: openshift-release-master-config-bootstrapper
+  spec:
+    containers:
+    - name: ""
+      image: gcr.io/k8s-prow/config-bootstrapper:v20190506-dd08c919a
+      command:
+      - /app/prow/cmd/config-bootstrapper/app.binary
+      args:
+      - --dry-run=false
+      - --source-path=.
+      - --config-path=cluster/ci/config/prow/config.yaml
+      - --plugin-config=cluster/ci/config/prow/plugins.yaml
+      imagePullPolicy: Always
+      resources:
+        requests:
+          cpu: 10m
+    serviceAccountName: config-updater
+    

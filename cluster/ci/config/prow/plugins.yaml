@@ -47,6 +47,10 @@ plugins:
   - wip
   - yuks
 
+  openshift/config:
+  - config-updater
+  - approve
+
   openshift/autoheal:
   - approve
 
@@ -429,9 +433,15 @@ plugins:
 
   openshift/odo:
   - approve
+  - project
+  - milestone
+  - milestonestatus
 
   openshift/odo-supervisord-image:
   - approve
+  - project
+  - milestone
+  - milestonestatus
 
   openshift/openshift-state-metrics:
   - approve
@@ -629,6 +639,30 @@ plugins:
   - wip
   - yuks
 
+  fabric8-services/toolchain-operator:
+  - assign
+  - blunderbuss
+  - blockade
+  - cat
+  - dog
+  - heart
+  - golint
+  - help
+  - hold
+  - label
+  - lgtm
+  - lifecycle
+  - override
+  - shrug
+  - sigmention
+  - size
+  - skip
+  - trigger
+  - verify-owners
+  - wip
+  - yuks
+  - approve
+
   kubernetes-incubator:
   - trigger
 
@@ -693,6 +727,11 @@ approve:
   require_self_approval: true
   lgtm_acts_as_approve: true
   ignore_review_state: false
+- repos:
+  - fabric8-services/toolchain-operator
+  require_self_approval: true
+  lgtm_acts_as_approve: false
+  ignore_review_state: false
 
 lgtm:
 - repos:
@@ -709,7 +748,7 @@ heart:
 
 config_updater:
   maps:
-    cluster/ci/config/prow/org.yaml:
+    org/config.yaml:
       name: org-config
     cluster/ci/config/prow/config.yaml:
       name: config
@@ -933,6 +972,12 @@ config_updater:
     cluster/ci/monitoring/sinker.json:
       name: grafana-dashboard-sinker
       namespace: prow-monitoring
+    cluster/ci/monitoring/ghproxy.json:
+      name: grafana-dashboard-ghproxy
+      namespace: prow-monitoring
+    cluster/ci/monitoring/tide.json:
+      name: grafana-dashboard-tide
+      namespace: prow-monitoring
 
 sigmention:
   regexp: (?m)@openshift/sig-([\w-]*)
@@ -995,3 +1040,10 @@ external_plugins:
   - name: needs-rebase
     events:
     - pull_request
+  fabric8-services/toolchain-operator:
+    - name: refresh
+      events:
+      - issue_comment
+    - name: needs-rebase
+      events:
+      - pull_request
