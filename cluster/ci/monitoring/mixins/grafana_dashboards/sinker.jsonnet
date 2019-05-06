@@ -24,30 +24,19 @@ dashboard.new(
   })
 .addPanel(
     graphPanel.new(
-        'existing pods',
-        description='sum(sinker_pods_existing)',
+        'existing pods/prow jobs',
+        description='sum(sinker_pods_existing) and sum(sinker_prow_jobs_existing)',
         datasource='prometheus',
     )
     .addTarget(prometheus.target(
-        'sum(sinker_pods_existing)'
-    )), gridPos={
+        'sum(sinker_pods_existing)')
+    )
+    .addTarget(prometheus.target(
+        'sum(sinker_prow_jobs_existing)')
+    ), gridPos={
     h: 9,
-    w: 12,
+    w: 24,
     x: 0,
-    y: 18,
-  })
-.addPanel(
-    graphPanel.new(
-        'existing prow jobs',
-        description='sum(sinker_prow_jobs_existing)',
-        datasource='prometheus',
-    )
-    .addTarget(prometheus.target(
-        'sum(sinker_prow_jobs_existing)'
-    )), gridPos={
-    h: 9,
-    w: 12,
-    x: 12,
     y: 18,
   })
 .addPanel(
