@@ -20,6 +20,7 @@ parameters:
 - name: RELEASE_IMAGE_LATEST
   required: true
 - name: BASE_DOMAIN
+- name: CLUSTER_NETWORK_MANIFEST
 
 objects:
 
@@ -650,6 +651,12 @@ objects:
         else
             echo "Unsupported cluster type '${CLUSTER_TYPE}'"
             exit 1
+        fi
+
+        # TODO: Replace with a more concise manifest injection approach
+        if [[ -n "${CLUSTER_NETWORK_MANIFEST}" ]]; then
+            openshift-install --dir=/tmp/artifacts/installer/create manifests
+            echo "${CLUSTER_NETWORK_MANIFEST}" > /tmp/artifacts/installer/manifests/cluster-network-03-config.yml
         fi
 
         TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create cluster &
