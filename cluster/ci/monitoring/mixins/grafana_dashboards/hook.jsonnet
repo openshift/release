@@ -42,29 +42,33 @@ dashboard.new(
   })
 .addPanel(
     graphPanel.new(
-        'webhook response codes',
-        description='sum(prow_webhook_counter) by (event_type)',
+        'webhook counter',
+        description='sum(rate(prow_webhook_counter[1m])) by (event_type)',
         datasource='prometheus',
+        legend_alignAsTable=true,
+        legend_rightSide=true,
     )
     .addTarget(prometheus.target(
-        'sum(prow_webhook_counter) by (event_type)'
+        'sum(rate(prow_webhook_counter[1m])) by (event_type)'
     )), gridPos={
     h: 9,
-    w: 12,
+    w: 24,
     x: 0,
     y: 4,
   })
 .addPanel(
     graphPanel.new(
         'webhook response codes',
-        description='sum(prow_webhook_response_codes) by (response_code)',
+        description='sum(rate(prow_webhook_response_codes[1m])) by (response_code)',
         datasource='prometheus',
+        legend_alignAsTable=true,
+        legend_rightSide=true,
     )
     .addTarget(prometheus.target(
-        'sum(prow_webhook_response_codes) by (response_code)'
+        'sum(rate(prow_webhook_response_codes[1m])) by (response_code)'
     )), gridPos={
     h: 9,
-    w: 12,
+    w: 24,
     x: 12,
-    y: 4,
+    y: 13,
   })
