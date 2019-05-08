@@ -20,3 +20,10 @@ validate-latest: clean install all
 	@echo "Generating sinker.json ..."
 	git status -s ../
 	test -z "$$(git status -s ../)"
+
+.PHONY : generate-k8s-dashboards
+generate-k8s-dashboards: clean install
+	cd ./vendor/kubernetes-mixin; jb install
+	make -C ./vendor/kubernetes-mixin dashboards_out
+	rm -rfv ./vendor/kubernetes-mixin/vendor
+	find ./vendor/kubernetes-mixin/dashboards_out -name "*.json"
