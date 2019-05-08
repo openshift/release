@@ -2,134 +2,126 @@ local grafana = import 'grafonnet/grafana.libsonnet';
 local dashboard = grafana.dashboard;
 local graphPanel = grafana.graphPanel;
 local prometheus = grafana.prometheus;
-local tablePanel = grafana.tablePanel;
+
+local legendConfig = {
+        legend+: {
+            sideWidth: 500
+        },
+    };
 
 dashboard.new(
         'tide dashboard',
-        time_from='now-1h',
+        time_from='now-2d',
         schemaVersion=18,
       )
 .addPanel(
-    graphPanel.new(
-        'PRs in each Tide pool',
-        description="sum(pooledprs)",
+    (graphPanel.new(
+        'Tide Pool Sizes',
+        description="The number of PRs eligible for merge in each Tide pool.",
         datasource='prometheus',
-    )
+        legend_values=true,
+        legend_current=true,
+        legend_avg=true,
+        legend_alignAsTable=true,
+        legend_rightSide=true,
+        nullPointMode='null as zero',
+    ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(pooledprs)'
+        'avg(pooledprs and ((time() - updatetime) < 240)) by (org, repo, branch)',
+        legendFormat='{{org}}/{{repo}}:{{branch}}',
     )), gridPos={
     h: 9,
-    w: 12,
+    w: 24,
     x: 0,
     y: 0,
   })
 .addPanel(
-    graphPanel.new(
-        'PRs in each Tide pool by (org, repo, branch)',
-        description="sum(pooledprs) by (org, repo, branch)",
+    (graphPanel.new(
+        'Tide Daily Merge Rate',
+        description="Calculated on a 24 hour interval.",
         datasource='prometheus',
-    )
+        legend_values=true,
+        legend_current=true,
+        legend_avg=true,
+        legend_alignAsTable=true,
+        legend_rightSide=true,
+        legend_sort='avg',
+        legend_sortDesc=true,
+        nullPointMode='null as zero',
+    ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(pooledprs) by (org, repo, branch)'
+        '(sum(rate(merges_sum[1d]) > 0) by (org, repo, branch)) * 86400',
+        legendFormat='{{org}}/{{repo}}:{{branch}}',
     )), gridPos={
     h: 9,
-    w: 12,
-    x: 12,
-    y: 0,
-  })
-.addPanel(
-    graphPanel.new(
-        'merges where values are the number of PRs merged together',
-        description="sum(merges_sum) by (org, repo, branch)",
-        datasource='prometheus',
-    )
-    .addTarget(prometheus.target(
-        'sum(merges_sum) by (org, repo, branch)'
-    )), gridPos={
-    h: 9,
-    w: 12,
+    w: 24,
     x: 0,
     y: 9,
   })
 .addPanel(
-    graphPanel.new(
-        'percentage of merge with 1 PR',
-        description="sum(rate(merges_bucket{le=\"1\"}[10m])) by (job) / sum(rate(merges_count[10m])) by (job)",
+    (graphPanel.new(
+        'Tide Daily Merge Rate: Batches Only',
+        description="Calculated on a 24 hour interval.",
         datasource='prometheus',
-    )
+        legend_values=true,
+        legend_current=true,
+        legend_avg=true,
+        legend_alignAsTable=true,
+        legend_rightSide=true,
+        legend_sort='avg',
+        legend_sortDesc=true,
+        nullPointMode='null as zero',
+    ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(rate(merges_bucket{le=\"1\"}[10m])) by (job) / sum(rate(merges_count[10m])) by (job)'
-    )), gridPos={
-    h: 9,
-    w: 12,
-    x: 12,
-    y: 9,
-  })
-.addPanel(
-    graphPanel.new(
-        'duration of the last loop of the sync controller',
-        description="syncdur",
-        datasource='prometheus',
-    )
-    .addTarget(prometheus.target(
-        'syncdur'
-    )), gridPos={
-    h: 9,
-    w: 12,
-    x: 0,
-    y: 18,
-  })
-.addPanel(
-    graphPanel.new(
-        'duration of the last loop of the status update controller',
-        description="statusupdatedur",
-        datasource='prometheus',
-    )
-    .addTarget(prometheus.target(
-        'statusupdatedur'
-    )), gridPos={
-    h: 9,
-    w: 12,
-    x: 12,
-    y: 18,
-  })
-.addPanel(
-    tablePanel.new(
-        'last time each subpool synced',
-        description="max_over_time(updatetime[30d]) * 1000",
-        datasource='prometheus',
-        styles=[
-            {
-                "alias": "Time",
-                "dateFormat": "YYYY-MM-DD HH:mm:ss",
-                "pattern": "Time",
-                "type": "date"
-            },{
-                "alias": "",
-                "dateFormat": "YYYY-MM-DD HH:mm:ss",
-                "decimals": 2,
-                "mappingType": 1,
-                "pattern": "Value",
-                "thresholds": [],
-                "type": "date",
-                "unit": "short"
-            },
-            {
-                "alias": "",
-                "decimals": 2,
-                "pattern": "/.*/",
-                "thresholds": [],
-                "type": "number",
-                "unit": "short"
-            },
-        ],
-    )
-    .addTarget(prometheus.target(
-        'max_over_time(updatetime[30d]) * 1000',
-        format='table'
+        '(sum(    rate(merges_sum[1d]) - (sum(rate(merges_bucket{le=\"1\"}[1d])) without (le)) > 0     ) by (org, repo, branch)) * 86400',
+        legendFormat='{{org}}/{{repo}}:{{branch}}',
     )), gridPos={
     h: 9,
     w: 24,
     x: 0,
     y: 27,
+  })
+.addPanel(
+    //TODO: Merge Event + Recent merges: might be related the protmetheus setting
+    (graphPanel.new(
+        'Tide Pool: openshift/origin:master',
+        description="Tide stats for the master branch of the openshift/origin repo.\nSpecifically, the number of pooled PRs and the daily merge rate.\n(See the more general graphs for details on how these are calculated.)",
+        datasource='prometheus',
+        legend_values=true,
+        legend_current=true,
+        legend_avg=true,
+        legend_alignAsTable=true,
+        legend_rightSide=true,
+        nullPointMode='null as zero',
+    ) + legendConfig)
+    .addTarget(prometheus.target(
+        'avg(pooledprs{org=\"openshift\",repo=\"origin\",branch=\"master\"} and ((time() - updatetime) < 240)) or vector(0)',
+        legendFormat='Pool size',
+    )).addTarget(prometheus.target(
+        'sum(rate(merges_sum{org=\"openshift\",repo=\"origin\",branch=\"master\"}[1d])) * 86400',
+        legendFormat='Daily merge rate',
+    )), gridPos={
+    h: 9,
+    w: 24,
+    x: 0,
+    y: 36,
+  })
+.addPanel(
+    (graphPanel.new(
+        'Tide Processing Time (seconds)',
+        datasource='prometheus',
+        legend_alignAsTable=true,
+        legend_rightSide=true,
+    ) + legendConfig)
+    .addTarget(prometheus.target(
+        'max(syncdur and (changes(syncdur[1h]) > 0))',
+        legendFormat='Sync time',
+    )).addTarget(prometheus.target(
+        'max(statusupdatedur and (changes(statusupdatedur[1h]) > 0))',
+        legendFormat='Status update time',
+    )), gridPos={
+    h: 9,
+    w: 24,
+    x: 0,
+    y: 45,
   })
