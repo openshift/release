@@ -76,11 +76,17 @@ grafana-debug-deploy:
 	# oc new-project prow-monitoring-stage --skip-config-write=true
 	oc get project prow-monitoring-stage
 	oc create -n prow-monitoring-stage configmap grafana-config --from-file=./debug/grafana.ini --dry-run -o yaml | oc apply -f -
-	oc create -n prow-monitoring-stage configmap grafana-datasources --from-file=.datasources.yaml=./debug/grafana_datasources.yaml --dry-run -o yaml | oc apply -f -
+	oc get secret -n openshift-monitoring --as system:admin grafana-datasources -o json | jq -r '.data["prometheus.yaml"]' | base64 -d | jq '.datasources[].name = "prometheus-k8s"' > /tmp/prometheus-k8s.yaml
+	oc create -n prow-monitoring-stage configmap grafana-datasources --from-file=datasources.yaml=./debug/grafana_datasources.yaml --from-file=prometheus-k8s.yaml=/tmp/prometheus-k8s.yaml --dry-run -o yaml | oc apply -f -
+	rm -fv /tmp/prometheus-k8s.yaml
 	sed -i -e "s|CHANGE_ME|$(grafana_password)|g" ./debug/grafana_deploy.yaml
 	oc apply -f ./debug/grafana_deploy.yaml
 	git checkout ./debug/grafana_deploy.yaml
 	oc get deployment -n prow-monitoring-stage grafana -o yaml | grep ": GF_SECURITY_ADMIN_PASSWORD" -A1 -B2
+
+.PHONY : grafana-debug-generate-k8s-dashboards
+grafana-debug-generate-k8s-dashboards:
+	make -C ./mixins generate-k8s-dashboards
 
 .PHONY : grafana-debug-cleanup
 grafana-debug-cleanup:
@@ -88,7 +94,7 @@ grafana-debug-cleanup:
 	oc get project prow-monitoring-stage
 	oc delete -f ./debug/grafana_deploy.yaml --ignore-not-found=true
 	oc create -n prow-monitoring-stage configmap grafana-config --from-file=./debug/grafana.ini --dry-run -o yaml | oc delete --ignore-not-found=true -f -
-	oc create -n prow-monitoring-stage configmap grafana-datasources --from-file=.datasources.yaml=./debug/grafana_datasources.yaml --dry-run -o yaml | oc delete --ignore-not-found=true -f -
+	oc delete -n prow-monitoring-stage configmap grafana-datasources --ignore-not-found=true
 
 .PHONY : generate-mixins
 generate-mixins:
