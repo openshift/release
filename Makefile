@@ -84,6 +84,7 @@ prow-rbac:
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/plank_rbac.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/pushgateway_rbac.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/sinker_rbac.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/statusreconciler_rbac.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/tide_rbac.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/tracer_rbac.yaml
 .PHONY: prow-rbac
