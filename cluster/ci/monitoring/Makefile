@@ -24,6 +24,7 @@ prow-monitoring-deploy:
 	#oc create -n prow-monitoring configmap grafana-dashboard-sinker --from-file=./sinker.json --dry-run -o yaml | oc apply -f -
 	#oc create -n prow-monitoring configmap grafana-dashboard-ghproxy --from-file=./ghproxy.json --dry-run -o yaml | oc apply -f -
 	#oc create -n prow-monitoring configmap grafana-dashboard-tide --from-file=./tide.json --dry-run -o yaml | oc apply -f -
+	#oc create -n prow-monitoring configmap grafana-dashboard-hook --from-file=./hook.json --dry-run -o yaml | oc apply -f -
 	oc apply -f ./grafana_proxy_secret.yaml
 	oc apply -f ./grafana_deploy.yaml
 	oc apply -f ./grafana_service_monitor.yaml
@@ -59,6 +60,7 @@ prow-monitoring-cleanup:
 	oc delete configmap -n prow-monitoring grafana-dashboard-sinker --ignore-not-found=true --as=system:admin
 	oc delete configmap -n prow-monitoring grafana-dashboard-ghproxy --ignore-not-found=true --as=system:admin
 	oc delete configmap -n prow-monitoring grafana-dashboard-tide --ignore-not-found=true --as=system:admin
+	oc delete configmap -n prow-monitoring grafana-dashboard-hook --ignore-not-found=true --as=system:admin
 	oc delete configmap -n prow-monitoring grafana-dashboards --ignore-not-found=true --as=system:admin
 	oc delete configmap -n prow-monitoring grafana-datasources --ignore-not-found=true --as=system:admin
 	oc delete secret -n prow-monitoring grafana-config --ignore-not-found=true --as=system:admin
