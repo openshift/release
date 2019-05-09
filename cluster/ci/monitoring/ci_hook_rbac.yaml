@@ -1,0 +1,30 @@
+---
+apiVersion: authorization.openshift.io/v1
+kind: Role
+metadata:
+  name: ci-hook
+  namespace: prow-monitoring
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - create
+  - get
+  - update
+---
+apiVersion: authorization.openshift.io/v1
+kind: RoleBinding
+metadata:
+  name: ci-hook
+  namespace: prow-monitoring
+roleRef:
+  name: ci-hook
+  namespace: prow-monitoring
+subjects:
+- kind: ServiceAccount
+  name: hook
+  namespace: ci
+userNames:
+- system:serviceaccount:ci:hook
