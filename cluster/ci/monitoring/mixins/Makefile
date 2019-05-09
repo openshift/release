@@ -1,10 +1,14 @@
 #
 
-all: hook.json plank.json sinker.json tide.json
+all: hook.json jenkins_operator.json plank.json sinker.json tide.json
 
 hook.json:
 	@echo "Generating sinker.json ..."
 	jsonnet -J vendor/ grafana_dashboards/hook.jsonnet > ../$@
+
+jenkins_operator.json:
+	@echo "Generating sinker.json ..."
+	jsonnet -J vendor/ grafana_dashboards/jenkins.jsonnet > ../$@
 
 plank.json:
 	@echo "Generating plank.json ..."
