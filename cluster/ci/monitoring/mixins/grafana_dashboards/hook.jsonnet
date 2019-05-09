@@ -4,6 +4,12 @@ local graphPanel = grafana.graphPanel;
 local singlestat = grafana.singlestat;
 local prometheus = grafana.prometheus;
 
+local legendConfig = {
+        legend+: {
+            sideWidth: 250
+        },
+    };
+
 dashboard.new(
         'hook dashboard',
         time_from='now-1h',
@@ -41,15 +47,16 @@ dashboard.new(
     y: 0,
   })
 .addPanel(
-    graphPanel.new(
-        'webhook counter',
+    (graphPanel.new(
+        'incoming webhooks by event type',
         description='sum(rate(prow_webhook_counter[1m])) by (event_type)',
         datasource='prometheus',
         legend_alignAsTable=true,
         legend_rightSide=true,
-    )
+    ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(rate(prow_webhook_counter[1m])) by (event_type)'
+        'sum(rate(prow_webhook_counter[1m])) by (event_type)',
+        legendFormat='{{event_type}}',
     )), gridPos={
     h: 9,
     w: 24,
@@ -57,15 +64,16 @@ dashboard.new(
     y: 4,
   })
 .addPanel(
-    graphPanel.new(
+    (graphPanel.new(
         'webhook response codes',
         description='sum(rate(prow_webhook_response_codes[1m])) by (response_code)',
         datasource='prometheus',
         legend_alignAsTable=true,
         legend_rightSide=true,
-    )
+    ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(rate(prow_webhook_response_codes[1m])) by (response_code)'
+        'sum(rate(prow_webhook_response_codes[1m])) by (response_code)',
+        legendFormat='{{response_code}}',
     )), gridPos={
     h: 9,
     w: 24,
