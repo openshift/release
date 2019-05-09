@@ -244,7 +244,12 @@ objects:
             exit 1
           fi
           if [[ -n "${TEST_FOCUS:-}" ]]; then
-            ginkgo -v -noColor -focus="${TEST_FOCUS}" -skip="${TEST_SKIP:-"\\[local\\]"}" -nodes="${TEST_PARALLELISM:-30}" $( which extended.test ) -- \
+            # delta between here and cluster-launch-e2e-jenkins ... --ginkgo.focus no lonter seem supported, but we are stopping short
+            # updating all the openshift-ansible templates pending direction from Clayton or DPTP
+            # also, after adding the test_skip back in after a successful run, we had more issues ... since we don't leverage TEST_SKIP
+            # for jenkins we are just removing
+            echo "Invoking ginkgo for jenkins with test focus ${TEST_FOCUS} and test parallelism ${TEST_PARALLELISM}"
+            ginkgo -v -noColor -focus="${TEST_FOCUS}" -nodes="${TEST_PARALLELISM:-30}" $( which extended.test ) -- \
               -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit \
               -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
           fi
