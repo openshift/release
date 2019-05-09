@@ -32,6 +32,7 @@ prow-monitoring-deploy:
 .PHONY : prow-monitoring-pre-steps
 prow-monitoring-pre-steps:
 	@echo "Running prow-monitoring-pre-steps ..."
+	oc apply -f ./ci_hook_rbac.yaml --as=system:admin
 	oc apply -f ./client_rbac.yaml --as=system:admin
 	oc apply -f ./prometheus_project.yaml --as=system:admin
 	oc apply -f ./prometheus_rbac.yaml --as=system:admin
@@ -68,6 +69,7 @@ prow-monitoring-cleanup:
 	oc delete -f ./grafana_expose.yaml --ignore-not-found=true --ignore-not-found=true --as=system:admin
 	oc delete -f ./grafana_rabc.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./client_rbac.yaml --ignore-not-found=true --as=system:admin
+	oc delete -f ./ci_hook_rbac.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./prometheus_project.yaml --wait=true --ignore-not-found=true --as=system:admin
 
 grafana_password := $(shell uuidgen)
