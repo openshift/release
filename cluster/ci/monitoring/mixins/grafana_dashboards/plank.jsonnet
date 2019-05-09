@@ -5,7 +5,7 @@ local prometheus = grafana.prometheus;
 
 local legendConfig = {
         legend+: {
-            sideWidth: 500
+            sideWidth: 250
         },
     };
 
@@ -16,19 +16,37 @@ dashboard.new(
       )
 .addPanel(
     (graphPanel.new(
-        'ProwJobs',
-        description="The number of ProwJobs.",
+        'number of Prow jobs by type',
+        description='sum(prowjobs{exported_job="plank"}) by (type)',
         datasource='prometheus',
         legend_alignAsTable=true,
         legend_rightSide=true,
         
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(prowjobs{exported_job="plank"}) by (job_name, type, state)',
-        legendFormat='{{job_name}}:{{type}}:{{state}}',
+        'sum(prowjobs{exported_job="plank"}) by (type)',
+        legendFormat='{{type}}',
     )), gridPos={
     h: 9,
     w: 24,
     x: 0,
     y: 0,
+  })
+.addPanel(
+    (graphPanel.new(
+        'number of Prow jobs by state',
+        description='sum(prowjobs{exported_job="plank"}) by (state)',
+        datasource='prometheus',
+        legend_alignAsTable=true,
+        legend_rightSide=true,
+        
+    ) + legendConfig)
+    .addTarget(prometheus.target(
+        'sum(prowjobs{exported_job="plank"}) by (state)',
+        legendFormat='{{state}}',
+    )), gridPos={
+    h: 9,
+    w: 24,
+    x: 0,
+    y: 9,
   })
