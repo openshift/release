@@ -230,6 +230,9 @@ update_secret generic "cluster-secrets-${target_cloud}"                  \
 	"$( format_attachment "packet.net" client.crt matchbox-client.crt )" \
 	"$( format_attachment "packet.net" client.key matchbox-client.key )"
 
+# DSNs for tools reporting failures to Sentry
+update_secret generic "sentry-dsn" "$( format_field_value "sentry" "ci-operator" "ci-operator" )"
+
 # Configuration for the .git-credentials used by the release controller to clone
 # private repositories to generate changelogs
 oc -n "ci-release" create secret generic "git-credentials" "--from-literal=.git-credentials=https://openshift-bot:$( field_value "openshift-bot" "GitHub OAuth Token" "oauth" )@github.com"
