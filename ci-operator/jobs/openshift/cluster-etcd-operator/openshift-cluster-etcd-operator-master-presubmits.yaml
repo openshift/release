@@ -17,6 +17,7 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=[images]
         command:
         - ci-operator
@@ -32,7 +33,15 @@ presubmits:
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
       serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
     trigger: '(?m)^/test (?:.*? )?images(?: .*?)?$'
   - agent: kubernetes
     always_run: true
@@ -51,6 +60,7 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=unit
         command:
         - ci-operator
@@ -66,7 +76,15 @@ presubmits:
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
       serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
     trigger: '(?m)^/test (?:.*? )?unit(?: .*?)?$'
   - agent: kubernetes
     always_run: true
@@ -85,6 +103,7 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=verify
         command:
         - ci-operator
@@ -100,7 +119,15 @@ presubmits:
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
       serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
     trigger: '(?m)^/test (?:.*? )?verify(?: .*?)?$'
   - agent: kubernetes
     always_run: true
@@ -119,6 +146,7 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=verify-deps
         command:
         - ci-operator
@@ -134,5 +162,13 @@ presubmits:
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
       serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
     trigger: '(?m)^/test (?:.*? )?verify-deps(?: .*?)?$'
