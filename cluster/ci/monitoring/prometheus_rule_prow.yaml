@@ -1,0 +1,19 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  labels:
+    prometheus: prow
+    role: alert-rules
+  name: prometheus-prow-rules
+  namespace: prow-monitoring
+spec:
+  groups:
+  - name: prow-absent
+    rules:
+    - alert: ServiceLostHA
+      expr: sum(up{job=~"grafana|prometheus|alertmanager"}) by (job) <= 1
+      for: 1m
+      labels:
+        severity: slack
+      annotations:
+        message: "The service {{ $labels.job }} has lost HA: at most 1 instance for one minute."
