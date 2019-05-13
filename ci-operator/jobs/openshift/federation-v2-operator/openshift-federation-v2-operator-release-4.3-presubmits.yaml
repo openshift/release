@@ -1,16 +1,16 @@
 presubmits:
-  openshift/template-service-broker-operator:
+  openshift/federation-v2-operator:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.1
+    - release-4.3
     context: ci/prow/images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-    name: pull-ci-openshift-template-service-broker-operator-release-4.1-images
+    name: pull-ci-openshift-federation-v2-operator-release-4.3-images
     rerun_command: /test images
     spec:
       containers:
@@ -19,14 +19,15 @@ presubmits:
         - --give-pr-author-access-to-namespace=true
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=[images]
+        - --target=[release:latest]
         command:
         - ci-operator
         env:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-template-service-broker-operator-release-4.1.yaml
-              name: ci-operator-4.1-configs
+              key: openshift-federation-v2-operator-release-4.3.yaml
+              name: ci-operator-4.3-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -46,30 +47,30 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.1
-    context: ci/prow/lint
+    - release-4.3
+    context: ci/prow/managed-e2e
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-    name: pull-ci-openshift-template-service-broker-operator-release-4.1-lint
-    rerun_command: /test lint
+    name: pull-ci-openshift-federation-v2-operator-release-4.3-managed-e2e
+    rerun_command: /test managed-e2e
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=lint
+        - --target=managed-e2e
         command:
         - ci-operator
         env:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-template-service-broker-operator-release-4.1.yaml
-              name: ci-operator-4.1-configs
+              key: openshift-federation-v2-operator-release-4.3.yaml
+              name: ci-operator-4.3-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -85,44 +86,34 @@ presubmits:
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-    trigger: '(?m)^/test (?:.*? )?lint(?: .*?)?$'
+    trigger: '(?m)^/test (?:.*? )?managed-e2e(?: .*?)?$'
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.1
-    context: ci/prow/operator-molecule-e2e
+    - release-4.3
+    context: ci/prow/unit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-    name: pull-ci-openshift-template-service-broker-operator-release-4.1-operator-molecule-e2e
-    rerun_command: /test operator-molecule-e2e
+    name: pull-ci-openshift-federation-v2-operator-release-4.3-unit
+    rerun_command: /test unit
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/operator-molecule-e2e-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=operator-molecule-e2e
-        - --template=/usr/local/operator-molecule-e2e
+        - --target=unit
         command:
         - ci-operator
         env:
-        - name: CLUSTER_TYPE
-          value: aws
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-template-service-broker-operator-release-4.1.yaml
-              name: ci-operator-4.1-configs
-        - name: JOB_NAME_SAFE
-          value: operator-molecule-e2e
-        - name: TEST_COMMAND
-          value: |
-            echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
-            molecule test -s cluster
+              key: openshift-federation-v2-operator-release-4.3.yaml
+              name: ci-operator-4.3-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -130,65 +121,42 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/operator-molecule-e2e-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/operator-molecule-e2e
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-    trigger: '(?m)^/test (?:.*? )?operator-molecule-e2e(?: .*?)?$'
+    trigger: '(?m)^/test (?:.*? )?unit(?: .*?)?$'
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.1
-    context: ci/prow/operator-molecule-olm-e2e
+    - release-4.3
+    context: ci/prow/vet
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-    name: pull-ci-openshift-template-service-broker-operator-release-4.1-operator-molecule-olm-e2e
-    rerun_command: /test operator-molecule-olm-e2e
+    name: pull-ci-openshift-federation-v2-operator-release-4.3-vet
+    rerun_command: /test vet
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/operator-molecule-olm-e2e-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=operator-molecule-olm-e2e
-        - --template=/usr/local/operator-molecule-olm-e2e
+        - --target=vet
         command:
         - ci-operator
         env:
-        - name: CLUSTER_TYPE
-          value: aws
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-template-service-broker-operator-release-4.1.yaml
-              name: ci-operator-4.1-configs
-        - name: JOB_NAME_SAFE
-          value: operator-molecule-olm-e2e
-        - name: TEST_COMMAND
-          value: |
-            echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
-            molecule test -s cluster-olm
+              key: openshift-federation-v2-operator-release-4.3.yaml
+              name: ci-operator-4.3-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -196,25 +164,12 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/operator-molecule-olm-e2e-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/operator-molecule-olm-e2e
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-    trigger: '(?m)^/test (?:.*? )?operator-molecule-olm-e2e(?: .*?)?$'
+    trigger: '(?m)^/test (?:.*? )?vet(?: .*?)?$'

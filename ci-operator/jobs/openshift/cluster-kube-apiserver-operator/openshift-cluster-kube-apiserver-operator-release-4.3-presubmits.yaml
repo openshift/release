@@ -1,16 +1,16 @@
 presubmits:
-  openshift/console-operator:
+  openshift/cluster-kube-apiserver-operator:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.1
+    - release-4.3
     context: ci/prow/e2e-aws
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-    name: pull-ci-openshift-console-operator-release-4.1-e2e-aws
+    name: pull-ci-openshift-cluster-kube-apiserver-operator-release-4.3-e2e-aws
     rerun_command: /test e2e-aws
     spec:
       containers:
@@ -29,8 +29,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-console-operator-release-4.1.yaml
-              name: ci-operator-4.1-configs
+              key: openshift-cluster-kube-apiserver-operator-release-4.3.yaml
+              name: ci-operator-4.3-configs
         - name: JOB_NAME_SAFE
           value: e2e-aws
         - name: TEST_COMMAND
@@ -67,78 +67,14 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.1
-    context: ci/prow/e2e-aws-console
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-    name: pull-ci-openshift-console-operator-release-4.1-e2e-aws-console
-    rerun_command: /test e2e-aws-console
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/e2e-aws-console-cluster-profile
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=e2e-aws-console
-        - --template=/usr/local/e2e-aws-console
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-console-operator-release-4.1.yaml
-              name: ci-operator-4.1-configs
-        - name: JOB_NAME_SAFE
-          value: e2e-aws-console
-        - name: TEST_COMMAND
-          value: ./test-prow-e2e.sh e2e
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/e2e-aws-console-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-aws-console
-          name: job-definition
-          subPath: cluster-launch-installer-console.yaml
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-console
-        name: job-definition
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: '(?m)^/test (?:.*? )?e2e-aws-console(?: .*?)?$'
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.1
+    - release-4.3
     context: ci/prow/e2e-aws-operator
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-    name: pull-ci-openshift-console-operator-release-4.1-e2e-aws-operator
+    name: pull-ci-openshift-cluster-kube-apiserver-operator-release-4.3-e2e-aws-operator
     rerun_command: /test e2e-aws-operator
     spec:
       containers:
@@ -157,12 +93,15 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-console-operator-release-4.1.yaml
-              name: ci-operator-4.1-configs
+              key: openshift-cluster-kube-apiserver-operator-release-4.3.yaml
+              name: ci-operator-4.3-configs
         - name: JOB_NAME_SAFE
           value: e2e-aws-operator
         - name: TEST_COMMAND
-          value: make test-e2e
+          value: |
+            mkdir -p /tmp/artifacts
+            go get -u github.com/openshift/release/tools/gotest2junit
+            make test-e2e JUNITFILE=/tmp/artifacts/unit_report.xml
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -195,14 +134,14 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.1
+    - release-4.3
     context: ci/prow/e2e-aws-upgrade
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-    name: pull-ci-openshift-console-operator-release-4.1-e2e-aws-upgrade
+    name: pull-ci-openshift-cluster-kube-apiserver-operator-release-4.3-e2e-aws-upgrade
     rerun_command: /test e2e-aws-upgrade
     spec:
       containers:
@@ -218,8 +157,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-console-operator-release-4.1.yaml
-              name: ci-operator-4.1-configs
+              key: openshift-cluster-kube-apiserver-operator-release-4.3.yaml
+              name: ci-operator-4.3-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -246,14 +185,14 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.1
+    - release-4.3
     context: ci/prow/images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-    name: pull-ci-openshift-console-operator-release-4.1-images
+    name: pull-ci-openshift-cluster-kube-apiserver-operator-release-4.3-images
     rerun_command: /test images
     spec:
       containers:
@@ -262,14 +201,15 @@ presubmits:
         - --give-pr-author-access-to-namespace=true
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=[images]
+        - --target=[release:latest]
         command:
         - ci-operator
         env:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-console-operator-release-4.1.yaml
-              name: ci-operator-4.1-configs
+              key: openshift-cluster-kube-apiserver-operator-release-4.3.yaml
+              name: ci-operator-4.3-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -289,57 +229,14 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.1
-    context: ci/prow/integration
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-    name: pull-ci-openshift-console-operator-release-4.1-integration
-    rerun_command: /test integration
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=integration
-        command:
-        - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-console-operator-release-4.1.yaml
-              name: ci-operator-4.1-configs
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: '(?m)^/test (?:.*? )?integration(?: .*?)?$'
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.1
+    - release-4.3
     context: ci/prow/unit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-    name: pull-ci-openshift-console-operator-release-4.1-unit
+    name: pull-ci-openshift-cluster-kube-apiserver-operator-release-4.3-unit
     rerun_command: /test unit
     spec:
       containers:
@@ -354,8 +251,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-console-operator-release-4.1.yaml
-              name: ci-operator-4.1-configs
+              key: openshift-cluster-kube-apiserver-operator-release-4.3.yaml
+              name: ci-operator-4.3-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -375,14 +272,14 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.1
+    - release-4.3
     context: ci/prow/verify
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-    name: pull-ci-openshift-console-operator-release-4.1-verify
+    name: pull-ci-openshift-cluster-kube-apiserver-operator-release-4.3-verify
     rerun_command: /test verify
     spec:
       containers:
@@ -397,8 +294,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-console-operator-release-4.1.yaml
-              name: ci-operator-4.1-configs
+              key: openshift-cluster-kube-apiserver-operator-release-4.3.yaml
+              name: ci-operator-4.3-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
