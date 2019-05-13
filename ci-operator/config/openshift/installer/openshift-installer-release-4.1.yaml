@@ -121,6 +121,10 @@ tests:
     .ImportPath }}' ./...)
   container:
     from: src
+- as: verify-vendor
+  commands: IS_CONTAINER=TRUE ./hack/verify-vendor.sh
+  container:
+    from: src
 - as: e2e-aws
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
@@ -131,6 +135,10 @@ tests:
   openshift_installer:
     cluster_profile: aws
     upgrade: true
+- as: e2e-aws-upi
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer_upi:
+    cluster_profile: aws
 - as: e2e-rhel-scaleup
   commands: TEST_SUITE=openshift/conformance run-tests
   openshift_ansible_40:
