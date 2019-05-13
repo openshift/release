@@ -21,7 +21,7 @@ parameters:
   required: true
 - name: RELEASE_IMAGE_LATEST
   required: true
-- name: RPM_REPO_OPENSHIFT_ORIGIN
+- name: OPENSHIFT_VERSION
   required: true
 - name: BASE_DOMAIN
   value: origin-ci-int-aws.dev.rhcloud.com
@@ -118,11 +118,11 @@ objects:
 
         trap 'touch /tmp/shared/exit' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
-        
+
         mkdir -p "${HOME}"
 
         echo -n "Waiting for scaleup to complete..."
-        
+
         while true; do
           if [[ -f /tmp/shared/exit ]]; then
             echo "Another process exited" 2>&1
@@ -139,7 +139,7 @@ objects:
         done
 
         echo "completed!"
-        
+
         # set up cloud-provider-specific env vars
         export KUBE_SSH_BASTION="$( oc --insecure-skip-tls-verify get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
         export KUBE_SSH_KEY_PATH=/tmp/cluster/ssh-privatekey
@@ -322,7 +322,7 @@ objects:
         echo -e "complete! \n Starting scaleup playbooks..."
 
         ansible-playbook -vvv \
-          -e "openshift_test_repo=${RPM_REPO_OPENSHIFT_ORIGIN}" \
+          -e "openshift_version=${OPENSHIFT_VERSION}" \
           -e kubeconfig_path=/tmp/artifacts/installer/auth/kubeconfig \
           test/${CLUSTER_TYPE}/scaleup.yml
 
