@@ -150,7 +150,7 @@ objects:
         LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
           --zone "${GOOGLE_COMPUTE_ZONE}" \
           packer@"${INSTANCE_PREFIX}" \
-          --command 'export KUBECONFIG=/home/packer/clusters/nested/auth/kubeconfig && /home/packer/run-tests.sh'
+          --command 'export KUBECONFIG=/home/packer/clusters/installer/auth/kubeconfig && /home/packer/run-tests.sh'
 
     # Runs an install
     - name: setup
@@ -244,42 +244,21 @@ objects:
         LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
           --zone "${GOOGLE_COMPUTE_ZONE}" \
           packer@"${INSTANCE_PREFIX}" \
-          --command 'export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_LATEST}" && timeout 4800 bash -ce "create-cluster nested"' | tee /tmp/artifacts/output-e2e-libvirt
-        echo 'Collect all the info about clusteroperators'
-        LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
-          --zone "${GOOGLE_COMPUTE_ZONE}" \
-          packer@"${INSTANCE_PREFIX}" \
-          --command 'export KUBECONFIG=/home/$USER/clusters/nested/auth/kubeconfig && bash -ce "oc get co"' | tee /tmp/artifacts/output-co-libvirt
-        echo 'Extract openshift-must-gather from the image and put it to executable path'
-        LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
-          --zone "${GOOGLE_COMPUTE_ZONE}" \
-          packer@"${INSTANCE_PREFIX}" \
-          --command 'mkdir -p /tmp/must-gather && oc image extract $(oc adm release info --image-for must-gather "${RELEASE_IMAGE_LATEST}") --path /usr/bin/openshift-must-gather:/tmp/must-gather && chmod +x /tmp/must-gather/openshift-must-gather'
-        echo 'Collect all the info about clusteroperators and pods'
-        LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
-          --zone "${GOOGLE_COMPUTE_ZONE}" \
-          packer@"${INSTANCE_PREFIX}" \
-          --command 'mkdir -p /tmp/must-gather-logs && export KUBECONFIG=/home/$USER/clusters/nested/auth/kubeconfig && bash -ce "/tmp/must-gather/openshift-must-gather inspect clusteroperator --base-dir /tmp/must-gather-logs || true"'
-        echo "scp must-gather logs back to setup pod"
-        LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
-          --quiet \
-          --project "${GOOGLE_PROJECT_ID}" \
-          --zone "${GOOGLE_COMPUTE_ZONE}" \
-          --recurse packer@"${INSTANCE_PREFIX}":/tmp/must-gather-logs /tmp/artifacts
+          --command 'export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_LATEST}" && timeout 4800 bash -ce "create-cluster installer"'
 
-   # Performs cleanup of all created resources
+   # Performs cleanup of all created resources and upload the artifacts
     - name: teardown
       image: ${LOCAL_IMAGE_LIBVIRT_INSTALLER}
       volumeMounts:
       - name: shared-tmp
-        mountPath: /tmp/shared
+        mountPath: /home/packer
       - name: cluster-profile
         mountPath: /tmp/cluster
       - name: artifacts
         mountPath: /tmp/artifacts
       env:
-      - name: USER
-        value: packer
+      - name: HOME
+        value: /home/packer
       - name: NSS_WRAPPER_PASSWD
         value: /home/packer/passwd
       - name: NSS_WRAPPER_GROUP
@@ -288,8 +267,6 @@ objects:
         value: packer
       - name: NSS_GROUPNAME
         value: packer
-      - name: HOME
-        value: /tmp/shared
       - name: GOOGLE_PROJECT_ID
         value: openshift-gce-devel-ci
       - name: GOOGLE_COMPUTE_ZONE
@@ -301,28 +278,56 @@ objects:
       - -c
       - |
         #!/bin/bash
+        set -euo pipefail
         function teardown() {
+          # This is for running the gcloud commands
+          mock-nss.sh
+          gcloud auth activate-service-account \
+            --quiet --key-file /tmp/cluster/gce.json
+          gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
+          gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
+
+          set -x
           set +e
+          echo 'Collect all the info about clusteroperators'
+          LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+            --zone "${GOOGLE_COMPUTE_ZONE}" \
+            packer@"${INSTANCE_PREFIX}" \
+            --command 'export KUBECONFIG=/home/$USER/clusters/installer/auth/kubeconfig && bash -ce "oc get co"' | tee /tmp/artifacts/output-co-libvirt
+          echo 'Run must gather on the cluster'
+          LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+            --zone "${GOOGLE_COMPUTE_ZONE}" \
+            packer@"${INSTANCE_PREFIX}" \
+            --command 'mkdir -p $HOME/must-gather && export KUBECONFIG=$HOME/clusters/installer/auth/kubeconfig && bash -ce "oc adm must-gather --dest-dir $HOME/must-gather || true"'
+          echo "scp everything related to installer back to pod"
+          LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+            --quiet \
+            --project "${GOOGLE_PROJECT_ID}" \
+            --zone "${GOOGLE_COMPUTE_ZONE}" \
+            --recurse packer@"${INSTANCE_PREFIX}":$HOME/clusters/installer /tmp/artifacts
+          echo "scp must-gather logs back to pod"
+          LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+            --quiet \
+            --project "${GOOGLE_PROJECT_ID}" \
+            --zone "${GOOGLE_COMPUTE_ZONE}" \
+            --recurse packer@"${INSTANCE_PREFIX}":$HOME/must-gather /tmp/artifacts
           echo "scp junit logs back to test pod"
           LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
             --quiet \
             --project "${GOOGLE_PROJECT_ID}" \
             --zone "${GOOGLE_COMPUTE_ZONE}" \
             --recurse packer@"${INSTANCE_PREFIX}":/tmp/artifacts/junit /tmp/artifacts
-          touch /tmp/shared/exit
+
+          touch /home/packer/exit
           echo "Deprovisioning cluster ..."
-          set -x
-          gcloud auth activate-service-account \
-            --quiet --key-file /tmp/cluster/gce.json
-          gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
-          gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
           gcloud compute instances delete "${INSTANCE_PREFIX}" --quiet
         }
+
         trap 'teardown' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
 
         for i in `seq 1 180`; do
-          if [[ -f /tmp/shared/exit ]]; then
+          if [[ -f /home/packer/exit ]]; then
             exit 0
           fi
           sleep 60 & wait
