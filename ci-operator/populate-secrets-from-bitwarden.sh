@@ -146,7 +146,7 @@ update_secret generic ci-chat-bot-slack-token "$( format_field_value ci-chat-bot
 
 # Configuration for api_url, which is for slack incoming hooks and can be used eg in prometheus alert-manager, is stored under "url"
 # and the key value is "url" in the secret
-update_secret generic slack-api-url "$( format_field_value slack-api-url "url" "url" )"
+update_secret generic ci-slack-api-url "$( format_field_value ci-slack-api-url "url" "url" )"
 
 # Configuration for GitHub OAuth Apps are stored
 # as an opaque field "Client Configuration"
