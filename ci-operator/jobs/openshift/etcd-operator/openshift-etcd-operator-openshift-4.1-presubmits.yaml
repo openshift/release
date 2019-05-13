@@ -99,9 +99,12 @@ presubmits:
           value: etcd-operator-unit
         - name: TEST_COMMAND
           value: |
+            set -euxo pipefail
             curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
             hack/update_vendor.sh
-            go test -v ./test/e2e/ --kubeconfig "$KUBECONFIG" --operator-image="${IMAGE_FORMAT/\${component\}/etcd-operator}"
+            echo "IMAGE_FORMAT: ${IMAGE_FORMAT/\${component\}/etcd-operator}"
+            printenv
+            go test -v ./test/e2e/ --kubeconfig "$KUBECONFIG" --operator-image="${IMAGE_FORMAT/\${component\}/etcd-operator}" --namespace=${NAMESPACE}
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
