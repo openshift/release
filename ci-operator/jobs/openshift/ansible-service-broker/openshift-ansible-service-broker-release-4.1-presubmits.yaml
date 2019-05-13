@@ -17,6 +17,7 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=build
         command:
         - ci-operator
@@ -32,7 +33,15 @@ presubmits:
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
       serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
     trigger: '(?m)^/test (?:.*? )?build(?: .*?)?$'
   - agent: kubernetes
     always_run: true
@@ -51,6 +60,7 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=fmt
         command:
         - ci-operator
@@ -66,7 +76,15 @@ presubmits:
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
       serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
     trigger: '(?m)^/test (?:.*? )?fmt(?: .*?)?$'
   - agent: kubernetes
     always_run: true
@@ -85,6 +103,7 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=fmtcheck
         command:
         - ci-operator
@@ -100,7 +119,15 @@ presubmits:
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
       serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
     trigger: '(?m)^/test (?:.*? )?fmtcheck(?: .*?)?$'
   - agent: kubernetes
     always_run: true
@@ -119,6 +146,7 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=[images]
         command:
         - ci-operator
@@ -134,7 +162,15 @@ presubmits:
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
       serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
     trigger: '(?m)^/test (?:.*? )?images(?: .*?)?$'
   - agent: kubernetes
     always_run: true
@@ -153,6 +189,7 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=lint
         command:
         - ci-operator
@@ -168,7 +205,15 @@ presubmits:
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
       serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
     trigger: '(?m)^/test (?:.*? )?lint(?: .*?)?$'
   - agent: kubernetes
     always_run: true
@@ -188,6 +233,7 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
         - --secret-dir=/usr/local/operator-molecule-e2e-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=operator-molecule-e2e
         - --template=/usr/local/operator-molecule-e2e
         command:
@@ -219,6 +265,9 @@ presubmits:
         - mountPath: /usr/local/operator-molecule-e2e
           name: job-definition
           subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
       - name: cluster-profile
@@ -229,6 +278,9 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-src
         name: job-definition
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
     trigger: '(?m)^/test (?:.*? )?operator-molecule-e2e(?: .*?)?$'
   - agent: kubernetes
     always_run: true
@@ -248,6 +300,7 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
         - --secret-dir=/usr/local/operator-molecule-olm-e2e-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=operator-molecule-olm-e2e
         - --template=/usr/local/operator-molecule-olm-e2e
         command:
@@ -279,6 +332,9 @@ presubmits:
         - mountPath: /usr/local/operator-molecule-olm-e2e
           name: job-definition
           subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
       - name: cluster-profile
@@ -289,6 +345,9 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-src
         name: job-definition
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
     trigger: '(?m)^/test (?:.*? )?operator-molecule-olm-e2e(?: .*?)?$'
   - agent: kubernetes
     always_run: true
@@ -307,6 +366,7 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=test
         command:
         - ci-operator
@@ -322,7 +382,15 @@ presubmits:
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
       serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
     trigger: '(?m)^/test (?:.*? )?test(?: .*?)?$'
   - agent: kubernetes
     always_run: true
@@ -341,6 +409,7 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=vet
         command:
         - ci-operator
@@ -356,5 +425,13 @@ presubmits:
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
       serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
     trigger: '(?m)^/test (?:.*? )?vet(?: .*?)?$'
