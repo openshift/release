@@ -35,6 +35,17 @@ tests:
     hack/update_vendor.sh
     echo "IMAGE_FORMAT: ${IMAGE_FORMAT/\${component\}/etcd-operator}"
     printenv
+
+    export ROLE_NAME=etcd_operator
+    export ROLE_BINDING_NAME=etcd_operator
+
+    sed -e "s/<ROLE_NAME>/${ROLE_NAME}/g" example/rbac/cluster-role-template.yaml | oc create -f -
+
+    sed -e "s/<ROLE_NAME>/${ROLE_NAME}/g" \
+      -e "s/<ROLE_BINDING_NAME>/${ROLE_BINDING_NAME}/g" \
+      -e "s/<NAMESPACE>/${OPENSHIFT_BUILD_NAMESPACE}/g" \
+      example/rbac/cluster-role-binding-template.yaml | oc create -f -
+
     go test -v ./test/e2e/ --kubeconfig "$KUBECONFIG" --operator-image="${IMAGE_FORMAT/\${component\}/etcd-operator}" --namespace=${OPENSHIFT_BUILD_NAMESPACE}
   openshift_installer_src:
     cluster_profile: aws
