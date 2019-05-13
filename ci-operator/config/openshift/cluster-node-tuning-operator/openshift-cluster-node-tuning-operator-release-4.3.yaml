@@ -9,18 +9,12 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.10
-canonical_go_repository: github.com/openshift/console-operator
+canonical_go_repository: github.com/openshift/cluster-node-tuning-operator
 images:
 - from: base
-  inputs:
-    root:
-      as:
-      - "0"
-      paths: null
-  to: console-operator
+  to: cluster-node-tuning-operator
 promotion:
-  disabled: true
-  name: "4.1"
+  name: "4.3"
   namespace: ocp
 resources:
   '*':
@@ -30,25 +24,17 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.1"
+  name: "4.3"
   namespace: ocp
 tests:
 - as: unit
-  commands: make test-unit
-  container:
-    from: src
-- as: integration
-  commands: make test-integration
+  commands: make test
   container:
     from: src
 - as: verify
   commands: make verify
   container:
     from: src
-- as: e2e-aws-operator
-  commands: make test-e2e
-  openshift_installer_src:
-    cluster_profile: aws
 - as: e2e-aws
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
@@ -59,8 +45,3 @@ tests:
   openshift_installer:
     cluster_profile: aws
     upgrade: true
-- artifact_dir: /tmp/artifacts
-  as: e2e-aws-console
-  commands: ./test-prow-e2e.sh e2e
-  openshift_installer_console:
-    cluster_profile: aws
