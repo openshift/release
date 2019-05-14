@@ -8,7 +8,7 @@ metadata:
   namespace: prow-monitoring
 spec:
   groups:
-  - name: prow-absent
+  - name: prow-monitoring-absent
     rules:
     - alert: ServiceLostHA
       expr: sum(up{job=~"grafana|prometheus|alertmanager"}) by (job) <= 1
@@ -17,3 +17,12 @@ spec:
         severity: slack
       annotations:
         message: "The service {{ $labels.job }} has lost HA: at most 1 instance for one minute."
+  - name: ci-absent
+    rules:
+    - alert: ServiceDown
+      expr: sum(up{job=~"sinker|pushgateway"}) by (job) = 0
+      for: 1m
+      labels:
+        severity: slack
+      annotations:
+        message: "The service {{ $labels.job }} has been down for one minute."
