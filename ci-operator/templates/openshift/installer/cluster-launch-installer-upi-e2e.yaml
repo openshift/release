@@ -545,7 +545,7 @@ objects:
           CONTROL_PLANE_1_IP="$(echo "${CONTROL_PLANE_IPS}" | cut -d, -f2)"
           CONTROL_PLANE_2_IP="$(echo "${CONTROL_PLANE_IPS}" | cut -d, -f3)"
 
-          for INDEX in 0 1
+          for INDEX in 0 1 2
           do
             SUBNET="PRIVATE_SUBNET_${INDEX}"
             aws cloudformation create-stack \
@@ -876,14 +876,14 @@ objects:
 
             export AWS_DEFAULT_REGION="${AWS_REGION}"  # CLI prefers the former
 
-            for STACK_SUFFIX in compute-1 compute-0 control-plane bootstrap security infra vpc
+            for STACK_SUFFIX in compute-2 compute-1 compute-0 control-plane bootstrap security infra vpc
             do
               aws cloudformation delete-stack --stack-name "${CLUSTER_NAME}-${STACK_SUFFIX}"
             done
 
             openshift-install --dir /tmp/artifacts/installer destroy cluster
 
-            for STACK_SUFFIX in compute-1 compute-0 control-plane bootstrap security infra vpc
+            for STACK_SUFFIX in compute-2 compute-1 compute-0 control-plane bootstrap security infra vpc
             do
               aws cloudformation wait stack-delete-complete --stack-name "${CLUSTER_NAME}-${STACK_SUFFIX}"
             done
