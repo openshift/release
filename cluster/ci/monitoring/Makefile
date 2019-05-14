@@ -1,20 +1,18 @@
 ### --as=system:serviceaccount:ci:config-updater
 .PHONY : prow-monitoring-deploy
-prow-monitoring-deploy:
+prow-monitoring-deploy: ci-secret-deploy
 	@echo "Deploying prow-monitoring stack ..."
 	oc apply -f ./prometheus_expose.yaml
 	oc apply -f ./prometheus_operator_deploy.yaml
 	oc apply -f ./sinker_service_monitor.yaml
 	oc apply -f ./pushgateway_service_monitor.yaml
 	oc apply -f ./prometheus_crd.yaml
-	oc apply -f ./prometheus_rule_sinker.yaml
+	oc apply -f ./prometheus_rule_prow.yaml
 	oc apply -f ./alert_manager_expose.yaml
 	oc apply -f ./alert_manager_proxy_secret.yaml
 	oc apply -f ./alert_manager_crd.yaml
 	oc apply -f ./prometheus_service_monitor.yaml
 	oc apply -f ./alert_manager_service_monitor.yaml
-	#TODO: get it from bitwarden; manual step for the moment
-	#oc create -n prow-monitoring secret generic alertmanager-prow --from-file=./alertmanager.yaml --from-file=./msg.tmpl --dry-run -o yaml | oc apply -f -
 	#grafana
 	oc apply -f ./grafana_expose.yaml
 	oc create -n prow-monitoring secret generic grafana-config --from-file=./grafana.ini --dry-run -o yaml | oc apply -f -
@@ -31,6 +29,17 @@ prow-monitoring-deploy:
 	oc apply -f ./grafana_deploy.yaml
 	oc apply -f ./grafana_service_monitor.yaml
 
+slack_api_url := $(shell oc get secret -n ci ci-slack-api-url -o json | jq -r .data.url | base64 -d)
+
+.PHONY : ci-secret-deploy
+ci-secret-deploy:
+	@echo "deploy ci secret ..."
+	#TODO: reference a value should be doable with jsonnet
+	sed -e "s|{{ api_url }}|$(slack_api_url)|g" ./alertmanager.yaml > /tmp/alertmanager_with_secret.yaml
+	oc create -n prow-monitoring secret generic alertmanager-prow --from-file=alertmanager.yaml=/tmp/alertmanager_with_secret.yaml --from-file=./msg.tmpl --dry-run -o yaml | oc apply -f -
+	sha256sum /tmp/alertmanager_with_secret.yaml
+	rm -fv /tmp/alertmanager_with_secret.yaml
+
 .PHONY : prow-monitoring-pre-steps
 prow-monitoring-pre-steps:
 	@echo "Running prow-monitoring-pre-steps ..."
@@ -45,7 +54,7 @@ prow-monitoring-pre-steps:
 prow-monitoring-cleanup:
 	@echo "Cleaning up prow-monitoring stack ..."
 	oc delete -f ./prometheus_expose.yaml --ignore-not-found=true --as=system:admin
-	oc delete -f ./prometheus_rule_sinker.yaml --ignore-not-found=true --as=system:admin
+	oc delete -f ./prometheus_rule_prow.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./prometheus_crd.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./sinker_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./pushgateway_service_monitor.yaml --ignore-not-found=true --as=system:admin
