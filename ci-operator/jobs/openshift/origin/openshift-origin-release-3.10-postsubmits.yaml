@@ -3,12 +3,9 @@ postsubmits:
   - agent: kubernetes
     branches:
     - ^release-3\.10$
-    context: ""
     decorate: true
     decoration_config:
-      grace_period: 0s
       skip_cloning: true
-      timeout: 0s
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
     name: branch-ci-openshift-origin-release-3.10-images
@@ -18,6 +15,7 @@ postsubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
         - --promote
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=[images]
         command:
         - ci-operator
@@ -33,25 +31,30 @@ postsubmits:
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
       serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
   - agent: jenkins
     branches:
     - release-3.10
-    context: ""
     labels:
       master: ci.openshift.redhat.com
     name: push_origin_release_310
   - agent: jenkins
     branches:
     - release-3.10
-    context: ""
     labels:
       master: ci.openshift.redhat.com
     name: test_branch_origin_extended_conformance_gce_310
   - agent: jenkins
     branches:
     - release-3.10
-    context: ""
     labels:
       master: ci.openshift.redhat.com
     name: test_branch_origin_service_catalog_310

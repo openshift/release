@@ -41,8 +41,8 @@ _Note_ that the serviemonitor has to have label `prow-app` as key (value could b
 With the `oauth-proxy` container, it is not clear how to access the grafana instance as admin (email sent to the monitoring team asking about this). As a workaround, we can create a new grafana instance
 
 ```
-### Modify `CHANGE_ME` in ./debug/grafana_deploy.yaml then run:
 $ make grafana-debug-deploy
+### username and password will be displayed in the output.
 ```
 
 Play with [the grafana instance for debugging](https://grafana-prow-monitoring-stage.svc.ci.openshift.org) which already connects to the prometheus service in prow-monitoring.
@@ -59,3 +59,20 @@ Clean up:
 ```
 $ make grafana-debug-cleanup
 ```
+
+## Use mixins
+
+### Debugging locally
+
+* Install required binary:
+
+    ```
+    $ go get github.com/google/go-jsonnet/cmd/jsonnet
+    $ go get github.com/jsonnet-bundler/jsonnet-bundler/cmd/jb
+    ```
+
+* Edit `.jsonnet` in the [mixins](./mixins) folder. Add targets in [mixins/Makefile](./mixins/Makefile) to generate the targeting file in case of creating a new `.jsonnet`.
+
+    ```
+    $ make generate-mixins
+    ```

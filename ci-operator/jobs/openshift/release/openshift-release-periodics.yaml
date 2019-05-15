@@ -145,7 +145,7 @@ periodics:
   spec:
     containers:
     - name: ""
-      image: gcr.io/k8s-prow/config-bootstrapper:v20190426-063214a7c
+      image: gcr.io/k8s-prow/config-bootstrapper:v20190515-63ba1af83
       command:
       - /app/prow/cmd/config-bootstrapper/app.binary
       args:
@@ -158,4 +158,38 @@ periodics:
         requests:
           cpu: 10m
     serviceAccountName: config-updater
-    
+- agent: kubernetes
+  cron: '@hourly'
+  decorate: true
+  interval: ""
+  name: periodic-openshift-release-fast-forward
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  spec:
+    containers:
+    - args:
+      - --config-dir=./ci-operator/config/
+      - --current-release=4.2
+      - --future-release=4.3
+      - --fast-forward
+      - --confirm
+      - --username=openshift-merge-robot
+      - --token-path=/etc/github/oauth
+      command:
+      - repo-brancher
+      image: repo-brancher:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: token
+        readOnly: true
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-merge-robot

@@ -10,7 +10,7 @@ applyTemplate:
 	oc process -f $(WHAT) | oc apply -f -
 .PHONY: applyTemplate
 
-postsubmit-update: prow-services origin-release ci-infra-imagestreams libpod prow-monitoring
+postsubmit-update: prow-services origin-release ci-infra-imagestreams libpod prow-monitoring build-dashboards-validation-image
 .PHONY: postsubmit-update
 
 all: roles prow projects
@@ -84,6 +84,7 @@ prow-rbac:
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/plank_rbac.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/pushgateway_rbac.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/sinker_rbac.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/statusreconciler_rbac.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/tide_rbac.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/tracer_rbac.yaml
 .PHONY: prow-rbac
@@ -170,10 +171,11 @@ prow-ci-search:
 
 prow-release-controller-definitions:
 	oc annotate -n origin is/4.1 "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/releases/release-origin-4.1.json)" --overwrite
-	#oc annotate -n ocp is/4.0-art-latest "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/releases/release-ocp-4.0.json)" --overwrite
-	#oc annotate -n ocp is/4.0 "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/releases/release-ocp-4.0-ci.json)" --overwrite
 	oc annotate -n ocp is/4.1-art-latest "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/releases/release-ocp-4.1.json)" --overwrite
 	oc annotate -n ocp is/4.1 "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/releases/release-ocp-4.1-ci.json)" --overwrite
+	oc annotate -n origin is/4.2 "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/releases/release-origin-4.2.json)" --overwrite
+	oc annotate -n ocp is/4.2-art-latest "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/releases/release-ocp-4.2.json)" --overwrite
+	oc annotate -n ocp is/4.2 "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/releases/release-ocp-4.2-ci.json)" --overwrite
 	oc annotate -n ocp is/release "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/releases/release-ocp-4.y-stable.json)" --overwrite
 .PHONY: prow-release-controller-definitions
 
@@ -269,6 +271,7 @@ image-restore-from-mirror:
 # Regenerate the mirror files by looking at what we are publishing to the image stream.
 image-mirror-files:
 	BASE=quay.io/openshift/origin- VERSION=4.1 TAG=4.1,4.1.0,latest hack/mirror-file > cluster/ci/config/mirroring/origin_4_1
+	BASE=quay.io/openshift/origin- VERSION=4.2 TAG=4.2,4.2.0,latest hack/mirror-file > cluster/ci/config/mirroring/origin_4_2
 .PHONY: image-mirror-files
 
 image-mirror-setup:
@@ -338,3 +341,7 @@ libpod:
 prow-monitoring:
 	make -C cluster/ci/monitoring prow-monitoring-deploy
 .PHONY: prow-monitoring
+
+build-dashboards-validation-image:
+	oc apply -f projects/origin-release/dashboards-validation/dashboards-validation.yaml
+.PHONY: build-dashboards-validation-image

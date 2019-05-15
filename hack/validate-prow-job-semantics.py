@@ -104,6 +104,9 @@ def validate_names(path, data):
                 if job["agent"] != "kubernetes":
                     continue
 
+                if not "command" in job["spec"]["containers"][0].keys():
+                    continue
+
                 if job["spec"]["containers"][0]["command"][0] != "ci-operator":
                     continue
 
@@ -213,6 +216,9 @@ def validate_ci_op_args(path, data):
                 if job["agent"] != "kubernetes":
                     continue
 
+                if not "command" in job["spec"]["containers"][0].keys():
+                    continue
+
                 if job["spec"]["containers"][0]["command"][0] != "ci-operator":
                     continue
 
@@ -261,6 +267,9 @@ def validate_resources(path, data):
         for repo in data[job_type]:
             for job in data[job_type][repo]:
                 if job["agent"] != "kubernetes":
+                    continue
+
+                if not "command" in job["spec"]["containers"][0].keys():
                     continue
 
                 ci_op_job = job["spec"]["containers"][0]["command"][0] == "ci-operator"
