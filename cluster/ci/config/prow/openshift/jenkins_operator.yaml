@@ -123,6 +123,9 @@ items:
   kind: Service
   metadata:
     name: jenkins-dev-operator
+    labels:
+      app: prow
+      component: jenkins-dev-operator
     annotations:
       prometheus.io/scrape: "true"
   spec:
@@ -130,8 +133,13 @@ items:
       app: prow
       component: jenkins-dev-operator
     ports:
-    - port: 80
+    - name: main
+      port: 80
       targetPort: 8080
+    - name: metrics
+      port: 9090
+      protocol: TCP
+      targetPort: 9090
     type: ClusterIP
 - apiVersion: apps/v1
   kind: Deployment
@@ -173,8 +181,10 @@ items:
           - --dry-run=false
           - --job-config-path=/etc/job-config
           ports:
-          - name: logs
+          - name: main
             containerPort: 8080
+          - name: metrics
+            containerPort: 9090
           volumeMounts:
           - mountPath: /etc/jenkins
             name: jenkins
@@ -243,6 +253,9 @@ items:
   kind: Service
   metadata:
     name: kata-jenkins-operator
+    labels:
+      app: prow
+      component: kata-jenkins-operator
     annotations:
       prometheus.io/scrape: "true"
   spec:
@@ -250,8 +263,13 @@ items:
       app: prow
       component: kata-jenkins-operator
     ports:
-    - port: 80
+    - name: main
+      port: 80
       targetPort: 8080
+    - name: metrics
+      port: 9090
+      protocol: TCP
+      targetPort: 9090
     type: ClusterIP
 - apiVersion: apps/v1
   kind: Deployment
@@ -290,8 +308,10 @@ items:
           - --dry-run=false
           - --job-config-path=/etc/job-config
           ports:
-          - name: logs
+          - name: main
             containerPort: 8080
+          - name: metrics
+            containerPort: 9090
           volumeMounts:
           - mountPath: /etc/jenkins
             name: jenkins
