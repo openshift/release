@@ -11,6 +11,8 @@ objects:
   metadata:
     name: deck
   spec:
+    port:
+      targetPort: 80
     tls:
       insecureEdgeTerminationPolicy: Redirect
       termination: edge
@@ -38,8 +40,13 @@ objects:
       app: prow
       component: deck
     ports:
-    - port: 80
+    - name: main
+      port: 80
       targetPort: 8080
+    - name: metrics
+      port: 9090
+      protocol: TCP
+      targetPort: 9090
     type: ClusterIP
 - apiVersion: apps/v1
   kind: Deployment
@@ -75,8 +82,10 @@ objects:
           - --job-config-path=/etc/job-config
           - --spyglass=true
           ports:
-            - name: http
+            - name: main
               containerPort: 8080
+            - name: metrics
+              containerPort: 9090
           volumeMounts:
           - name: config
             mountPath: /etc/config
