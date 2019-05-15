@@ -271,6 +271,7 @@ image-restore-from-mirror:
 # Regenerate the mirror files by looking at what we are publishing to the image stream.
 image-mirror-files:
 	BASE=quay.io/openshift/origin- VERSION=4.1 TAG=4.1,4.1.0,latest hack/mirror-file > cluster/ci/config/mirroring/origin_4_1
+	BASE=quay.io/openshift/origin- VERSION=4.2 TAG=4.2,4.2.0,latest hack/mirror-file > cluster/ci/config/mirroring/origin_4_2
 .PHONY: image-mirror-files
 
 image-mirror-setup:
