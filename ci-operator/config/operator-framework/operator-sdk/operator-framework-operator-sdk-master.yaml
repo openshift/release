@@ -9,6 +9,10 @@ base_images:
     name: ansible-runner
     namespace: openshift
     tag: latest
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "7"
 canonical_go_repository: github.com/operator-framework/operator-sdk
 test_binary_build_commands: ./hack/ci/setup-build-dependencies.sh
 resources:
@@ -44,6 +48,30 @@ images:
       as:
       - osdk-builder
   to: osdk-ansible-e2e
+- from: base
+  dockerfile_path: ci/dockerfiles/helm.Dockerfile
+  inputs:
+    osdk-builder:
+      as:
+      - osdk-builder
+      paths: null
+  to: helm-operator
+- from: base
+  dockerfile_path: ci/dockerfiles/helm-e2e-hybrid.Dockerfile
+  inputs:
+    osdk-builder:
+      as:
+      - osdk-builder
+      paths: null
+  to: osdk-helm-e2e-hybrid
+- from: helm-operator
+  dockerfile_path: ci/dockerfiles/helm-e2e.Dockerfile
+  inputs:
+    osdk-builder:
+      as:
+      - osdk-builder
+      paths: null
+  to: osdk-helm-e2e
 promotion:
   name: "4.2"
   namespace: ocp
@@ -51,6 +79,8 @@ promotion:
   - osdk-builder
   - osdk-ansible-e2e
   - osdk-ansible-e2e-hybrid
+  - osdk-helm-e2e
+  - osdk-helm-e2e-hybrid
 tag_specification:
   name: "4.2"
   namespace: ocp
@@ -69,5 +99,9 @@ tests:
     from: test-bin
 - as: e2e-aws-ansible
   commands: make test/e2e/ansible2
+  openshift_installer_src:
+    cluster_profile: aws
+- as: e2e-aws-helm
+  commands: make test/e2e/helm2
   openshift_installer_src:
     cluster_profile: aws
