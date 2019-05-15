@@ -7,6 +7,7 @@ prow-monitoring-deploy: ci-secret-deploy
 	oc apply -f ./sinker_service_monitor.yaml
 	oc apply -f ./ghproxy_service_monitor.yaml
 	oc apply -f ./hook_service_monitor.yaml
+	oc apply -f ./deck_service_monitor.yaml
 	oc apply -f ./jenkins-operator_service_monitor.yaml
 	oc apply -f ./plank_service_monitor.yaml
 	oc apply -f ./tide_service_monitor.yaml
@@ -64,6 +65,7 @@ prow-monitoring-cleanup:
 	oc delete -f ./sinker_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./ghproxy_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./hook_service_monitor.yaml --ignore-not-found=true --as=system:admin
+	oc delete -f ./deck_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./jenkins-operator_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./plank_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./tide_service_monitor.yaml --ignore-not-found=true --as=system:admin
