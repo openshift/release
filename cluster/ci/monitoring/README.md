@@ -1,17 +1,35 @@
 # Monitoring
 
-This folder contains the manifest files for monitoring CI resources. It is _assumed_ that the following CRDs
-have existed already (they usually come with `openshift-monitoring`).
+This folder contains the manifest files for monitoring CI resources. It is _assumed_ that [the following CRDs](https://github.com/coreos/prometheus-operator) have existed already.
 
 * prometheuses.monitoring.coreos.com
 * servicemonitors.monitoring.coreos.com
 
 ## Deploy
 
+The deployment has been integrated into our CI system. The following commands are only for debugging:
+
 ```
 $ make prow-monitoring-pre-steps
 $ make prow-monitoring-deploy
 ```
+
+A successful deploy will spawn a stack of monitoring for prow: _prometheus_, _alertmanager_, and _grafana_.
+
+```
+$ oc get sts -n prow-monitoring
+NAME                DESIRED   CURRENT   AGE
+alertmanager-prow   3         3         21d
+prometheus-prow     2         2         13d
+$ oc get deploy -n prow-monitoring
+NAME                  DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+grafana               2         2         2            2           23d
+prometheus-operator   1         1         1            1           26d
+
+```
+
+Note that StatefulSets `alertmanager-prow` and `prometheus-prow` are controlled by `prometheus-operator`.
+There is no operator controlling `grafana` deployment.
 
 ## Clean up
 
@@ -38,7 +56,7 @@ _Note_ that the serviemonitor has to have label `prow-app` as key (value could b
 
 ### Debugging for a new grafana dashboard
 
-With the `oauth-proxy` container, it is not clear how to access the grafana instance as admin (email sent to the monitoring team asking about this). As a workaround, we can create a new grafana instance
+We create a new grafana instance for debugging and developing purpose. _Note_ that this instance could be cleaned up anytime. Please save the json files of panels in development frequently to avoid data loss.
 
 ```
 $ make grafana-debug-deploy
@@ -64,10 +82,11 @@ $ make grafana-debug-cleanup
 
 ### Debugging locally
 
-* Install required binary:
+* Install required binary: See [dashboards-validation/Dockerfile](https://github.com/openshift/release/blob/master/projects/origin-release/dashboards-validation/Dockerfile) for details of installation of dependencies on a centos-based image used in our CI system. The following commands should give us a working development environment on Fedroa:
 
     ```
-    $ go get github.com/google/go-jsonnet/cmd/jsonnet
+    $ sudo dnf copr enable paulfantom/jsonnet -y
+    $ sudo dnf install -y jsonnet
     $ go get github.com/jsonnet-bundler/jsonnet-bundler/cmd/jb
     ```
 
