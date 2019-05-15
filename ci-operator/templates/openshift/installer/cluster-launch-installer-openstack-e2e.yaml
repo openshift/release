@@ -325,13 +325,13 @@ objects:
         }
         function nuke() {
           export PREFIX=$(grep cluster_id /tmp/artifacts/installer/terraform.tfvars | cut -d '"' -f4)
-          openstack server list -c ID -f value --name $PREFIX | xargs openstack server delete
+          openstack server list -c ID -f value --name $PREFIX | xargs --no-run-if-empty openstack server delete
 
-          openstack router remove subnet  $PREFIX-external-router $PREFIX-service
-          openstack router remove subnet  $PREFIX-external-router $PREFIX-nodes
+          openstack router remove subnet $PREFIX-external-router $PREFIX-service
+          openstack router remove subnet $PREFIX-external-router $PREFIX-nodes
           # delete interfaces from the router
-          openstack network trunk list -c Name -f value | grep $PREFIX | xargs openstack network trunk delete
-          openstack port list --network $PREFIX-openshift -c ID -f value | xargs openstack port delete
+          openstack network trunk list -c Name -f value | grep $PREFIX | xargs --no-run-if-empty openstack network trunk delete
+          openstack port list --network $PREFIX-openshift -c ID -f value | xargs --no-run-if-empty openstack port delete
 
           # delete interfaces from the router
           PORT=$(openstack router show $PREFIX-external-router -c interfaces_info -f value | cut -d '"' -f 12)
@@ -349,7 +349,7 @@ objects:
 
 
           CONTAINER=$PREFIX
-          openstack object list -f value $CONTAINER | xargs openstack object delete $CONTAINER
+          openstack object list -f value $CONTAINER | xargs --no-run-if-empty openstack object delete $CONTAINER
           openstack container delete $CONTAINER
         }
 

@@ -5,6 +5,9 @@ items:
   kind: Service
   metadata:
     name: jenkins-operator
+    labels:
+      app: prow
+      component: jenkins-operator
     annotations:
       prometheus.io/scrape: "true"
   spec:
@@ -12,8 +15,13 @@ items:
       app: prow
       component: jenkins-operator
     ports:
-    - port: 80
+    - name: main
+      port: 80
       targetPort: 8080
+    - name: metrics
+      port: 9090
+      protocol: TCP
+      targetPort: 9090
     type: ClusterIP
 - apiVersion: apps/v1
   kind: Deployment
@@ -41,7 +49,7 @@ items:
         serviceAccountName: jenkins-operator
         containers:
         - name: jenkins-operator
-          image: gcr.io/k8s-prow/jenkins-operator:v20190426-063214a7c
+          image: gcr.io/k8s-prow/jenkins-operator:v20190515-63ba1af83
           args:
           - --jenkins-url=https://ci.openshift.redhat.com/jenkins
           - --jenkins-user=openshift-ci-robot
@@ -52,8 +60,10 @@ items:
           - --job-config-path=/etc/job-config
           - --dry-run=false
           ports:
-          - name: logs
+          - name: main
             containerPort: 8080
+          - name: metrics
+            containerPort: 9090
           volumeMounts:
           - mountPath: /etc/jenkins
             name: jenkins
@@ -99,11 +109,23 @@ items:
         - name: job-config-40
           configMap:
             name: job-config-4.0
+        - name: job-config-41
+          configMap:
+            name: job-config-4.1
+        - name: job-config-42
+          configMap:
+            name: job-config-4.2
+        - name: job-config-43
+          configMap:
+            name: job-config-4.3
 
 - apiVersion: v1
   kind: Service
   metadata:
     name: jenkins-dev-operator
+    labels:
+      app: prow
+      component: jenkins-dev-operator
     annotations:
       prometheus.io/scrape: "true"
   spec:
@@ -111,8 +133,13 @@ items:
       app: prow
       component: jenkins-dev-operator
     ports:
-    - port: 80
+    - name: main
+      port: 80
       targetPort: 8080
+    - name: metrics
+      port: 9090
+      protocol: TCP
+      targetPort: 9090
     type: ClusterIP
 - apiVersion: apps/v1
   kind: Deployment
@@ -140,7 +167,7 @@ items:
         serviceAccountName: jenkins-operator
         containers:
         - name: jenkins-operator
-          image: gcr.io/k8s-prow/jenkins-operator:v20190426-063214a7c
+          image: gcr.io/k8s-prow/jenkins-operator:v20190515-63ba1af83
           args:
           - --jenkins-url=https://ci.dev.openshift.redhat.com:8443/jenkins
           - --jenkins-user=openshift-ci-robot
@@ -154,8 +181,10 @@ items:
           - --dry-run=false
           - --job-config-path=/etc/job-config
           ports:
-          - name: logs
+          - name: main
             containerPort: 8080
+          - name: metrics
+            containerPort: 9090
           volumeMounts:
           - mountPath: /etc/jenkins
             name: jenkins
@@ -177,6 +206,15 @@ items:
             readOnly: true
           - name: job-config-40
             mountPath: /etc/job-config/4.0
+            readOnly: true
+          - name: job-config-41
+            mountPath: /etc/job-config/4.1
+            readOnly: true
+          - name: job-config-42
+            mountPath: /etc/job-config/4.2
+            readOnly: true
+          - name: job-config-43
+            mountPath: /etc/job-config/4.3
             readOnly: true
         volumes:
         - name: jenkins
@@ -201,11 +239,23 @@ items:
         - name: job-config-40
           configMap:
             name: job-config-4.0
+        - name: job-config-41
+          configMap:
+            name: job-config-4.1
+        - name: job-config-42
+          configMap:
+            name: job-config-4.2
+        - name: job-config-43
+          configMap:
+            name: job-config-4.3
 
 - apiVersion: v1
   kind: Service
   metadata:
     name: kata-jenkins-operator
+    labels:
+      app: prow
+      component: kata-jenkins-operator
     annotations:
       prometheus.io/scrape: "true"
   spec:
@@ -213,8 +263,13 @@ items:
       app: prow
       component: kata-jenkins-operator
     ports:
-    - port: 80
+    - name: main
+      port: 80
       targetPort: 8080
+    - name: metrics
+      port: 9090
+      protocol: TCP
+      targetPort: 9090
     type: ClusterIP
 - apiVersion: apps/v1
   kind: Deployment
@@ -242,7 +297,7 @@ items:
         serviceAccountName: jenkins-operator
         containers:
         - name: kata-jenkins-operator
-          image: gcr.io/k8s-prow/jenkins-operator:v20190426-063214a7c
+          image: gcr.io/k8s-prow/jenkins-operator:v20190515-63ba1af83
           args:
           - --jenkins-url=http://jenkins.katacontainers.io/
           - --jenkins-user=katabuilder
@@ -253,8 +308,10 @@ items:
           - --dry-run=false
           - --job-config-path=/etc/job-config
           ports:
-          - name: logs
+          - name: main
             containerPort: 8080
+          - name: metrics
+            containerPort: 9090
           volumeMounts:
           - mountPath: /etc/jenkins
             name: jenkins
@@ -276,6 +333,15 @@ items:
             readOnly: true
           - name: job-config-40
             mountPath: /etc/job-config/4.0
+            readOnly: true
+          - name: job-config-41
+            mountPath: /etc/job-config/4.1
+            readOnly: true
+          - name: job-config-42
+            mountPath: /etc/job-config/4.2
+            readOnly: true
+          - name: job-config-43
+            mountPath: /etc/job-config/4.3
             readOnly: true
         volumes:
         - name: jenkins
@@ -300,3 +366,12 @@ items:
         - name: job-config-40
           configMap:
             name: job-config-4.0
+        - name: job-config-41
+          configMap:
+            name: job-config-4.1
+        - name: job-config-42
+          configMap:
+            name: job-config-4.2
+        - name: job-config-43
+          configMap:
+            name: job-config-4.3

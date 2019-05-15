@@ -5,13 +5,21 @@ items:
   kind: Service
   metadata:
     name: tide
+    labels:
+      app: prow
+      component: tide
   spec:
     selector:
       app: prow
       component: tide
     ports:
     - port: 80
+      name: main
       targetPort: 8888
+    - name: metrics
+      port: 9090
+      protocol: TCP
+      targetPort: 9090
     type: ClusterIP
 - apiVersion: apps/v1
   kind: Deployment
@@ -38,7 +46,7 @@ items:
         serviceAccountName: tide
         containers:
         - name: tide
-          image: gcr.io/k8s-prow/tide:v20190426-063214a7c
+          image: gcr.io/k8s-prow/tide:v20190515-63ba1af83
           args:
           - --config-path=/etc/config/config.yaml
           - --dry-run=false
@@ -49,8 +57,10 @@ items:
           - --history-uri=gs://openshift-prow/tide-history.json
           - --status-path=gs://openshift-prow/tide-status-checkpoint.yaml
           ports:
-          - name: http
+          - name: main
             containerPort: 8888
+          - name: metrics
+            containerPort: 9090
           volumeMounts:
           - name: oauth
             mountPath: /etc/github
@@ -69,6 +79,15 @@ items:
             readOnly: true
           - name: job-config-40
             mountPath: /etc/job-config/4.0
+            readOnly: true
+          - name: job-config-41
+            mountPath: /etc/job-config/4.1
+            readOnly: true
+          - name: job-config-42
+            mountPath: /etc/job-config/4.2
+            readOnly: true
+          - name: job-config-43
+            mountPath: /etc/job-config/4.3
             readOnly: true
           - name: tmp
             mountPath: /tmp
@@ -94,6 +113,15 @@ items:
         - name: job-config-40
           configMap:
             name: job-config-4.0
+        - name: job-config-41
+          configMap:
+            name: job-config-4.1
+        - name: job-config-42
+          configMap:
+            name: job-config-4.2
+        - name: job-config-43
+          configMap:
+            name: job-config-4.3
         - name: tmp
           emptyDir: {}
         - name: service-account

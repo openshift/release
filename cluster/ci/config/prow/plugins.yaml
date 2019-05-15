@@ -248,6 +248,9 @@ plugins:
   openshift/knative-pkg:
   - approve
 
+  openshift/kuryr-kubernetes:
+  - approve
+
   openshift/tektoncd-pipeline:
   - approve
 
@@ -309,6 +312,9 @@ plugins:
   - approve
 
   openshift/cluster-api-provider-kubemark:
+  - approve
+
+  openshift/cluster-api-provider-gcp:
   - approve
 
   openshift/console-operator:
@@ -639,6 +645,30 @@ plugins:
   - wip
   - yuks
 
+  fabric8-services/toolchain-operator:
+  - assign
+  - blunderbuss
+  - blockade
+  - cat
+  - dog
+  - heart
+  - golint
+  - help
+  - hold
+  - label
+  - lgtm
+  - lifecycle
+  - override
+  - shrug
+  - sigmention
+  - size
+  - skip
+  - trigger
+  - verify-owners
+  - wip
+  - yuks
+  - approve
+
   kubernetes-incubator:
   - trigger
 
@@ -671,6 +701,7 @@ approve:
   - openshift/cluster-api-provider-azure
   - openshift/cluster-api-provider-libvirt
   - openshift/cluster-api-provider-kubemark
+  - openshift/cluster-api-provider-gcp
   - openshift/cluster-api-actuator-pkg
   - openshift/cluster-autoscaler-operator
   require_self_approval: true
@@ -703,6 +734,11 @@ approve:
   require_self_approval: true
   lgtm_acts_as_approve: true
   ignore_review_state: false
+- repos:
+  - fabric8-services/toolchain-operator
+  require_self_approval: true
+  lgtm_acts_as_approve: false
+  ignore_review_state: false
 
 lgtm:
 - repos:
@@ -716,6 +752,19 @@ blunderbuss:
 heart:
   adorees:
   - openshift-merge-robot
+
+repo_milestone:
+  openshift/odo:
+    maintainers_id: 3240507
+    maintainers_team: odo-maintainers
+    maintainers_friendly_name: odo maintainers
+
+project_config:
+  project_org_configs:
+    openshift:
+      project_repo_configs:
+        odo:
+          repo_maintainers_team_id: 3240507
 
 config_updater:
   maps:
@@ -735,8 +784,6 @@ config_updater:
       name: job-config-misc
     ci-operator/jobs/**/*master*.yaml:
       name: job-config-master
-    ci-operator/jobs/**/*devel-40*.yaml:
-      name: job-config-misc
     ci-operator/jobs/**/*release-0.*.yaml:
       name: job-config-misc
     ci-operator/jobs/**/*release-v*.yaml:
@@ -761,6 +808,10 @@ config_updater:
       name: job-config-4.2
     ci-operator/jobs/**/*openshift-4.2*submits.yaml:
       name: job-config-4.2
+    ci-operator/jobs/**/*release-4.3*submits.yaml:
+      name: job-config-4.3
+    ci-operator/jobs/**/*openshift-4.3*submits.yaml:
+      name: job-config-4.3
     ci-operator/config/**/*master.yaml:
       name: ci-operator-master-configs
       additional_namespaces:
@@ -774,10 +825,6 @@ config_updater:
       additional_namespaces:
       - ci-stg
     ci-operator/config/**/*release-v*.yaml:
-      name: ci-operator-misc-configs
-      additional_namespaces:
-      - ci-stg
-    ci-operator/config/**/*devel-40*.yaml:
       name: ci-operator-misc-configs
       additional_namespaces:
       - ci-stg
@@ -811,6 +858,14 @@ config_updater:
       - ci-stg
     ci-operator/config/**/*release-4.2.yaml:
       name: ci-operator-4.2-configs
+      additional_namespaces:
+      - ci-stg
+    ci-operator/config/**/*openshift-4.3.yaml:
+      name: ci-operator-4.3-configs
+      additional_namespaces:
+      - ci-stg
+    ci-operator/config/**/*release-4.3.yaml:
+      name: ci-operator-4.3-configs
       additional_namespaces:
       - ci-stg
 
@@ -943,6 +998,21 @@ config_updater:
     cluster/ci/monitoring/sinker.json:
       name: grafana-dashboard-sinker
       namespace: prow-monitoring
+    cluster/ci/monitoring/ghproxy.json:
+      name: grafana-dashboard-ghproxy
+      namespace: prow-monitoring
+    cluster/ci/monitoring/tide.json:
+      name: grafana-dashboard-tide
+      namespace: prow-monitoring
+    cluster/ci/monitoring/hook.json:
+      name: grafana-dashboard-hook
+      namespace: prow-monitoring
+    cluster/ci/monitoring/plank.json:
+      name: grafana-dashboard-plank
+      namespace: prow-monitoring
+    cluster/ci/monitoring/jenkins_operator.json:
+      name: grafana-dashboard-jenkins-operator
+      namespace: prow-monitoring
 
 sigmention:
   regexp: (?m)@openshift/sig-([\w-]*)
@@ -1005,3 +1075,10 @@ external_plugins:
   - name: needs-rebase
     events:
     - pull_request
+  fabric8-services/toolchain-operator:
+    - name: refresh
+      events:
+      - issue_comment
+    - name: needs-rebase
+      events:
+      - pull_request

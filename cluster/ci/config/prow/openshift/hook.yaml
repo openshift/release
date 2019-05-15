@@ -6,6 +6,8 @@ items:
   metadata:
     name: hook
   spec:
+    port:
+      targetPort: 8888
     path: /hook
     tls:
       insecureEdgeTerminationPolicy: Redirect
@@ -17,6 +19,9 @@ items:
   kind: Service
   metadata:
     name: hook
+    labels:
+      app: prow
+      component: hook
     annotations:
       prometheus.io/scrape: "true"
       prometheus.io/port: "8888"
@@ -25,7 +30,12 @@ items:
       app: prow
       component: hook
     ports:
-    - port: 8888
+    - name: main
+      port: 8888
+    - name: metrics
+      port: 9090
+      protocol: TCP
+      targetPort: 9090
     type: ClusterIP
 - apiVersion: apps/v1
   kind: Deployment
@@ -50,7 +60,7 @@ items:
         serviceAccountName: hook
         containers:
         - name: hook
-          image: gcr.io/k8s-prow/hook:v20190426-063214a7c
+          image: gcr.io/k8s-prow/hook:v20190515-63ba1af83
           args:
           - --config-path=/etc/config/config.yaml
           - --github-token-path=/etc/github/oauth
@@ -59,8 +69,10 @@ items:
           - --job-config-path=/etc/job-config
           - --github-endpoint=http://ghproxy
           ports:
-            - name: http
+            - name: main
               containerPort: 8888
+            - name: metrics
+              containerPort: 9090
           volumeMounts:
           - name: hmac
             mountPath: /etc/webhook
@@ -88,6 +100,15 @@ items:
           - name: job-config-40
             mountPath: /etc/job-config/4.0
             readOnly: true
+          - name: job-config-41
+            mountPath: /etc/job-config/4.1
+            readOnly: true
+          - name: job-config-42
+            mountPath: /etc/job-config/4.2
+            readOnly: true
+          - name: job-config-43
+            mountPath: /etc/job-config/4.3
+            readOnly: true
         volumes:
         - name: hmac
           secret:
@@ -113,5 +134,14 @@ items:
         - name: job-config-40
           configMap:
             name: job-config-4.0
+        - name: job-config-41
+          configMap:
+            name: job-config-4.1
+        - name: job-config-42
+          configMap:
+            name: job-config-4.2
+        - name: job-config-43
+          configMap:
+            name: job-config-4.3
         - name: tmp
           emptyDir: {}
