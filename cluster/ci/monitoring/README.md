@@ -88,6 +88,7 @@ $ make grafana-debug-cleanup
     $ sudo dnf copr enable paulfantom/jsonnet -y
     $ sudo dnf install -y jsonnet
     $ go get github.com/jsonnet-bundler/jsonnet-bundler/cmd/jb
+    $ go get github.com/brancz/gojsontoyaml
     ```
 
 * Edit `.jsonnet` in the [mixins](./mixins) folder. Add targets in [mixins/Makefile](./mixins/Makefile) to generate the targeting file in case of creating a new `.jsonnet`.
