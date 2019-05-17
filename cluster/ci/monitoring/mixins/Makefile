@@ -3,8 +3,12 @@ SHELL=/bin/bash -o pipefail
 
 all: hook.json jenkins_operator.json plank.json prow.json sinker.json tide.json prometheus_rule_prow.yaml
 
+deck.json:
+	@echo "Generating deck.json ..."
+	jsonnet -J vendor/ grafana_dashboards/deck.jsonnet > ../$@
+
 hook.json:
-	@echo "Generating sinker.json ..."
+	@echo "Generating hook.json ..."
 	jsonnet -J vendor/ grafana_dashboards/hook.jsonnet > ../$@
 
 jenkins_operator.json:
