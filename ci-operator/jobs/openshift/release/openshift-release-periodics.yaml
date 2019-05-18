@@ -14,9 +14,9 @@ periodics:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
       - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/launch-aws-cluster-profile
-      - --target=launch-aws
-      - --template=/usr/local/launch-aws
+      - --secret-dir=/usr/local/launch-$(CLUSTER_TYPE)-cluster-profile
+      - --target=launch-$(CLUSTER_TYPE)
+      - --template=/usr/local/launch-$(CLUSTER_TYPE)
       - --namespace=$(NAMESPACE)
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -24,13 +24,42 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
+      - name: BRANCH
+        value: "4.1"
       - name: CLUSTER_TYPE
         value: aws
       - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-origin-master.yaml
-            name: ci-operator-master-configs
+        value: |
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-serial
+            commands: TEST_SUITE=openshift/conformance/serial run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: false
+          - as: e2e-$(CLUSTER_TYPE)-upgrade
+            commands: TEST_SUITE=all run-upgrade-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: launch-$(CLUSTER_TYPE)
+            commands: sleep 9000 & wait
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: false
       - name: JOB_NAME_SAFE
         value: launch-aws
       - name: TEST_COMMAND
@@ -79,8 +108,8 @@ periodics:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
       - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-aws-upgrade-cluster-profile
-      - --target=e2e-aws-upgrade
+      - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
+      - --target=e2e-$(CLUSTER_TYPE)-upgrade
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       command:
@@ -88,11 +117,42 @@ periodics:
       env:
       - name: RELEASE_IMAGE_INITIAL
       - name: RELEASE_IMAGE_LATEST
+      - name: BRANCH
+        value: "4.1"
+      - name: CLUSTER_TYPE
+        value: aws
       - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-origin-master.yaml
-            name: ci-operator-master-configs
+        value: |
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-serial
+            commands: TEST_SUITE=openshift/conformance/serial run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: false
+          - as: e2e-$(CLUSTER_TYPE)-upgrade
+            commands: TEST_SUITE=all run-upgrade-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: launch-$(CLUSTER_TYPE)
+            commands: sleep 9000 & wait
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: false
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
