@@ -345,3 +345,8 @@ prow-monitoring:
 build-dashboards-validation-image:
 	oc apply -f projects/origin-release/dashboards-validation/dashboards-validation.yaml
 .PHONY: build-dashboards-validation-image
+
+logging:
+	$(MAKE) apply WHAT=cluster/ci/config/logging/fluentd-daemonset.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/logging/fluentd-configmap.yaml
+.PHONY: logging
