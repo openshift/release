@@ -7,9 +7,7 @@ presubmits:
     context: ci/prow/images
     decorate: true
     decoration_config:
-      grace_period: 0s
       skip_cloning: true
-      timeout: 0s
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
     name: pull-ci-operator-framework-operator-metering-master-images
@@ -19,6 +17,7 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=[images]
         - --target=[release:latest]
         command:
@@ -35,7 +34,15 @@ presubmits:
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
       serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
     trigger: '(?m)^/test (?:.*? )?images(?: .*?)?$'
   - agent: kubernetes
     always_run: true
@@ -44,9 +51,7 @@ presubmits:
     context: ci/prow/metering-e2e-aws
     decorate: true
     decoration_config:
-      grace_period: 0s
       skip_cloning: true
-      timeout: 0s
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
     name: pull-ci-operator-framework-operator-metering-master-metering-e2e-aws
@@ -57,6 +62,7 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
         - --secret-dir=/usr/local/metering-e2e-aws-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=metering-e2e-aws
         - --template=/usr/local/metering-e2e-aws
         command:
@@ -95,6 +101,9 @@ presubmits:
         - mountPath: /usr/local/metering-e2e-aws
           name: job-definition
           subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
       - name: cluster-profile
@@ -105,6 +114,9 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-src
         name: job-definition
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
     trigger: '(?m)^/test (?:.*? )?metering-e2e-aws(?: .*?)?$'
   - agent: kubernetes
     always_run: true
@@ -113,9 +125,7 @@ presubmits:
     context: ci/prow/unit
     decorate: true
     decoration_config:
-      grace_period: 0s
       skip_cloning: true
-      timeout: 0s
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
     name: pull-ci-operator-framework-operator-metering-master-unit
@@ -125,6 +135,7 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=unit
         command:
         - ci-operator
@@ -140,7 +151,15 @@ presubmits:
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
       serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
     trigger: '(?m)^/test (?:.*? )?unit(?: .*?)?$'
   - agent: kubernetes
     always_run: true
@@ -149,9 +168,7 @@ presubmits:
     context: ci/prow/verify
     decorate: true
     decoration_config:
-      grace_period: 0s
       skip_cloning: true
-      timeout: 0s
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
     name: pull-ci-operator-framework-operator-metering-master-verify
@@ -161,6 +178,7 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=verify
         command:
         - ci-operator
@@ -176,5 +194,13 @@ presubmits:
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
       serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
     trigger: '(?m)^/test (?:.*? )?verify(?: .*?)?$'

@@ -1,6 +1,6 @@
 presubmits:
   openshift/openshift-azure:
-  - agent: ""
+  - agent: kubernetes
     always_run: false
     branches:
     - release-v5
@@ -55,7 +55,7 @@ presubmits:
           name: prow-job-cluster-launch-e2e-azure
         name: job-definition
     trigger: '(?m)^/test (?:.*? )?conformance(?: .*?)?$'
-  - agent: ""
+  - agent: kubernetes
     always_run: false
     branches:
     - release-v5
@@ -75,7 +75,7 @@ presubmits:
         resources: {}
       serviceAccountName: ci-operator
     trigger: '(?m)^/test (?:.*? )?e2e-changeloglevel(?: .*?)?$'
-  - agent: ""
+  - agent: kubernetes
     always_run: true
     branches:
     - release-v5
@@ -95,7 +95,7 @@ presubmits:
         resources: {}
       serviceAccountName: ci-operator
     trigger: '(?m)^/test (?:.*? )?e2e-create(?: .*?)?$'
-  - agent: ""
+  - agent: kubernetes
     always_run: false
     branches:
     - release-v5
@@ -115,7 +115,7 @@ presubmits:
         resources: {}
       serviceAccountName: ci-operator
     trigger: '(?m)^/test (?:.*? )?e2e-etcdbackuprecovery(?: .*?)?$'
-  - agent: ""
+  - agent: kubernetes
     always_run: false
     branches:
     - release-v5
@@ -135,7 +135,7 @@ presubmits:
         resources: {}
       serviceAccountName: ci-operator
     trigger: '(?m)^/test (?:.*? )?e2e-forceupdate(?: .*?)?$'
-  - agent: ""
+  - agent: kubernetes
     always_run: false
     branches:
     - release-v5
@@ -155,7 +155,7 @@ presubmits:
         resources: {}
       serviceAccountName: ci-operator
     trigger: '(?m)^/test (?:.*? )?e2e-keyrotation(?: .*?)?$'
-  - agent: ""
+  - agent: kubernetes
     always_run: false
     branches:
     - release-v5
@@ -175,7 +175,7 @@ presubmits:
         resources: {}
       serviceAccountName: ci-operator
     trigger: '(?m)^/test (?:.*? )?e2e-reimagevm(?: .*?)?$'
-  - agent: ""
+  - agent: kubernetes
     always_run: false
     branches:
     - release-v5
@@ -195,7 +195,7 @@ presubmits:
         resources: {}
       serviceAccountName: ci-operator
     trigger: '(?m)^/test (?:.*? )?e2e-scaleupdown(?: .*?)?$'
-  - agent: ""
+  - agent: kubernetes
     always_run: false
     branches:
     - release-v5
@@ -213,7 +213,7 @@ presubmits:
         resources: {}
       serviceAccountName: ci-operator
     trigger: '(?m)^/test (?:.*? )?e2e-scaleupdown-v3.2(?: .*?)?$'
-  - agent: ""
+  - agent: kubernetes
     always_run: false
     branches:
     - release-v5
@@ -231,7 +231,7 @@ presubmits:
         resources: {}
       serviceAccountName: ci-operator
     trigger: '(?m)^/test (?:.*? )?e2e-scaleupdown-v4.2(?: .*?)?$'
-  - agent: ""
+  - agent: kubernetes
     always_run: false
     branches:
     - release-v5
@@ -249,7 +249,25 @@ presubmits:
         resources: {}
       serviceAccountName: ci-operator
     trigger: '(?m)^/test (?:.*? )?e2e-scaleupdown-v4.3(?: .*?)?$'
-  - agent: ""
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-v5
+    context: e2e-scaleupdown-v4.4
+    decorate: true
+    name: pull-ci-azure-release-v5-e2e-scaleupdown-v4.4
+    rerun_command: /test e2e-scaleupdown-v4.4
+    spec:
+      containers:
+      - args:
+        - hack/tests/e2e-scaleupdown-previous.sh
+        - v4.4
+        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        name: ""
+        resources: {}
+      serviceAccountName: ci-operator
+    trigger: '(?m)^/test (?:.*? )?e2e-scaleupdown-v4.4(?: .*?)?$'
+  - agent: kubernetes
     always_run: true
     branches:
     - release-v5
@@ -267,7 +285,7 @@ presubmits:
         resources: {}
       serviceAccountName: ci-operator
     trigger: '(?m)^/test (?:.*? )?unit(?: .*?)?$'
-  - agent: ""
+  - agent: kubernetes
     always_run: true
     branches:
     - release-v5
@@ -285,7 +303,7 @@ presubmits:
         resources: {}
       serviceAccountName: ci-operator
     trigger: '(?m)^/test (?:.*? )?upgrade-v3.2(?: .*?)?$'
-  - agent: ""
+  - agent: kubernetes
     always_run: false
     branches:
     - release-v5
@@ -303,7 +321,7 @@ presubmits:
         resources: {}
       serviceAccountName: ci-operator
     trigger: '(?m)^/test (?:.*? )?upgrade-v4.2(?: .*?)?$'
-  - agent: ""
+  - agent: kubernetes
     always_run: true
     branches:
     - release-v5
@@ -325,12 +343,28 @@ presubmits:
     always_run: true
     branches:
     - release-v5
+    context: upgrade-v4.4
+    decorate: true
+    name: pull-ci-azure-release-v5-upgrade-v4.4
+    rerun_command: /test upgrade-v4.4
+    spec:
+      containers:
+      - args:
+        - hack/tests/e2e-upgrade.sh
+        - v4.4
+        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        name: ""
+        resources: {}
+      serviceAccountName: ci-operator
+    trigger: '(?m)^/test (?:.*? )?upgrade-v4.4(?: .*?)?$'
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-v5
     context: ci/prow/images
     decorate: true
     decoration_config:
-      grace_period: 0s
       skip_cloning: true
-      timeout: 0s
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
     name: pull-ci-openshift-openshift-azure-release-v5-images
@@ -340,6 +374,7 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=[images]
         command:
         - ci-operator
@@ -355,13 +390,20 @@ presubmits:
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
       serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
     trigger: '(?m)^/test (?:.*? )?images(?: .*?)?$'
-  - agent: ""
+  - agent: kubernetes
     always_run: true
     branches:
     - release-v5
-    context: ""
     decorate: true
     name: verify
     rerun_command: /test verify

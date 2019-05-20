@@ -7,9 +7,7 @@ presubmits:
     context: ci/prow/e2e-aws-operator
     decorate: true
     decoration_config:
-      grace_period: 0s
       skip_cloning: true
-      timeout: 0s
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
     name: pull-ci-openshift-kubernetes-autoscaler-release-4.1-e2e-aws-operator
@@ -20,6 +18,7 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
         - --secret-dir=/usr/local/e2e-aws-operator-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=e2e-aws-operator
         - --template=/usr/local/e2e-aws-operator
         command:
@@ -50,6 +49,9 @@ presubmits:
         - mountPath: /usr/local/e2e-aws-operator
           name: job-definition
           subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
       - name: cluster-profile
@@ -60,6 +62,9 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-src
         name: job-definition
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
     trigger: '(?m)^/test (?:.*? )?e2e-aws-operator(?: .*?)?$'
   - agent: kubernetes
     always_run: true
@@ -68,18 +73,18 @@ presubmits:
     context: ci/prow/git-history
     decorate: true
     decoration_config:
-      grace_period: 0s
       skip_cloning: true
-      timeout: 0s
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
     name: pull-ci-openshift-kubernetes-autoscaler-release-4.1-git-history
+    optional: true
     rerun_command: /test git-history
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=git-history
         command:
         - ci-operator
@@ -95,7 +100,15 @@ presubmits:
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
       serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
     trigger: '(?m)^/test (?:.*? )?git-history(?: .*?)?$'
   - agent: kubernetes
     always_run: true
@@ -104,9 +117,7 @@ presubmits:
     context: ci/prow/gofmt
     decorate: true
     decoration_config:
-      grace_period: 0s
       skip_cloning: true
-      timeout: 0s
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
     name: pull-ci-openshift-kubernetes-autoscaler-release-4.1-gofmt
@@ -116,6 +127,7 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=gofmt
         command:
         - ci-operator
@@ -131,7 +143,15 @@ presubmits:
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
       serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
     trigger: '(?m)^/test (?:.*? )?gofmt(?: .*?)?$'
   - agent: kubernetes
     always_run: true
@@ -140,9 +160,7 @@ presubmits:
     context: ci/prow/golint
     decorate: true
     decoration_config:
-      grace_period: 0s
       skip_cloning: true
-      timeout: 0s
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
     name: pull-ci-openshift-kubernetes-autoscaler-release-4.1-golint
@@ -152,6 +170,7 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=golint
         command:
         - ci-operator
@@ -167,7 +186,15 @@ presubmits:
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
       serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
     trigger: '(?m)^/test (?:.*? )?golint(?: .*?)?$'
   - agent: kubernetes
     always_run: true
@@ -176,9 +203,7 @@ presubmits:
     context: ci/prow/govet
     decorate: true
     decoration_config:
-      grace_period: 0s
       skip_cloning: true
-      timeout: 0s
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
     name: pull-ci-openshift-kubernetes-autoscaler-release-4.1-govet
@@ -188,6 +213,7 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=govet
         command:
         - ci-operator
@@ -203,7 +229,15 @@ presubmits:
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
       serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
     trigger: '(?m)^/test (?:.*? )?govet(?: .*?)?$'
   - agent: kubernetes
     always_run: true
@@ -212,9 +246,7 @@ presubmits:
     context: ci/prow/images
     decorate: true
     decoration_config:
-      grace_period: 0s
       skip_cloning: true
-      timeout: 0s
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
     name: pull-ci-openshift-kubernetes-autoscaler-release-4.1-images
@@ -224,7 +256,9 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=[images]
+        - --target=[release:latest]
         command:
         - ci-operator
         env:
@@ -239,7 +273,15 @@ presubmits:
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
       serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
     trigger: '(?m)^/test (?:.*? )?images(?: .*?)?$'
   - agent: kubernetes
     always_run: true
@@ -248,9 +290,7 @@ presubmits:
     context: ci/prow/unit
     decorate: true
     decoration_config:
-      grace_period: 0s
       skip_cloning: true
-      timeout: 0s
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
     name: pull-ci-openshift-kubernetes-autoscaler-release-4.1-unit
@@ -260,6 +300,7 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=unit
         command:
         - ci-operator
@@ -275,5 +316,13 @@ presubmits:
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
       serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
     trigger: '(?m)^/test (?:.*? )?unit(?: .*?)?$'

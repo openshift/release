@@ -159,6 +159,189 @@ objects:
         mkdir -p /tmp/output
         cd /tmp/output
 
+        function restore-cluster-state() {
+          echo "Placing file /etc/rollback-test with contents A"
+          cat > /tmp/machineconfig.yaml <<'EOF'
+        apiVersion: machineconfiguration.openshift.io/v1
+        kind: MachineConfig
+        metadata:
+          labels:
+            machineconfiguration.openshift.io/role: master
+          name: 99-rollback-test
+        spec:
+          config:
+            ignition:
+              version: 2.2.0
+            storage:
+              files:
+              - contents:
+                  source: data:,A
+                filesystem: root
+                mode: 420
+                path: /etc/rollback-test
+        EOF
+          oc create -f /tmp/machineconfig.yaml
+
+          function wait_for_machineconfigpool_to_apply() {
+            for i in $(seq 0 10); do oc wait machineconfigpool/master --for=condition=Updating --timeout=5m && break; done
+            for i in $(seq 0 10); do oc wait machineconfigpool/master --for=condition=Updated --timeout=5m && break; sleep 30; done
+          }
+
+          wait_for_machineconfigpool_to_apply
+
+          echo "Setting up ssh bastion"
+          mkdir -p ~/.ssh || true
+          cp "${KUBE_SSH_KEY_PATH}" ~/.ssh/id_rsa
+          chmod 0600 ~/.ssh/id_rsa
+          echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
+          curl https://raw.githubusercontent.com/eparis/ssh-bastion/master/deploy/deploy.sh | bash
+          BASTION_HOST=$(oc get service -n openshift-ssh-bastion ssh-bastion -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+
+          function bastion_ssh() {
+            while true
+            do
+              ssh -o LogLevel=error -o ConnectionAttempts=100 -o ConnectTimeout=5 -o StrictHostKeyChecking=no -o ProxyCommand="ssh -A -o StrictHostKeyChecking=no -o LogLevel=error -o ServerAliveInterval=30 -o ConnectionAttempts=100 -o ConnectTimeout=5 -W %h:%p core@${BASTION_HOST}" $@ && break
+              sleep 10
+            done
+          }
+
+          echo "Make etcd backup on first master"
+          FIRST_MASTER=$(oc get node -l node-role.kubernetes.io/master= -o name | head -n1 | cut -d '/' -f 2)
+          cat > /tmp/etcd_backup.sh <<'EOF'
+        #!/bin/bash
+        set -x
+        RUNNING_ETCD_POD=$(crictl pods -q --label k8s-app=etcd --state=Ready)
+        RUNNING_ETCD_CONTAINER=$(crictl ps --pod ${RUNNING_ETCD_POD} --name etcd-member -q)
+        crictl exec ${RUNNING_ETCD_CONTAINER} /bin/sh -c 'source /run/etcd/environment && ETCDCTL_API=3 etcdctl --cert /etc/ssl/etcd/system:etcd-peer:${ETCD_DNS_NAME}.crt --key /etc/ssl/etcd/system:etcd-peer:${ETCD_DNS_NAME}.key --cacert /etc/ssl/etcd/ca.crt snapshot save /var/lib/etcd/snapshot.db'
+        EOF
+          chmod +x /tmp/etcd_backup.sh
+          scp -o StrictHostKeyChecking=no -o ProxyCommand="ssh -A -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p core@${BASTION_HOST}" /tmp/etcd_backup.sh "core@${FIRST_MASTER}":/tmp
+          bastion_ssh "core@${FIRST_MASTER}" "sudo -i /tmp/etcd_backup.sh"
+
+          echo "Backup manifests"
+          mapfile -t MASTERS < <(oc get node -l node-role.kubernetes.io/master= -o name | cut -d '/' -f 2)
+          for master in "${MASTERS[@]}"
+          do
+            bastion_ssh "core@${master}" "sudo -i mkdir /etc/kubernetes/manifests-backup && sudo -i cp -rvf /etc/kubernetes/manifests/* /etc/kubernetes/manifests-backup"
+          done
+
+          # TODO: upgrade conditionally here
+
+          echo "Update rollback-test machineconfig"
+          oc patch machineconfig 99-rollback-test -n openshift-machine-api --patch '{"spec":{"config":{"storage":{"files":[{"contents":{"source":"data:,B","verification":{}},"filesystem":"root","mode":420,"path":"/etc/rollback-test"}]}}}}' --type=merge
+          wait_for_machineconfigpool_to_apply
+
+          echo "Distribute snapshot across all masters"
+          mapfile -t MASTERS < <(oc get node -l node-role.kubernetes.io/master= -o name | cut -d '/' -f 2)
+          for master in "${MASTERS[@]}"
+          do
+            scp -o StrictHostKeyChecking=no -o ProxyCommand="ssh -A -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p core@${BASTION_HOST}" ${KUBE_SSH_KEY_PATH} "core@${master}":/home/core/.ssh/id_rsa
+            bastion_ssh "core@${master}" "chmod 0600 /home/core/.ssh/id_rsa"
+            bastion_ssh "core@${FIRST_MASTER}" "scp -o StrictHostKeyChecking=no /var/lib/etcd/snapshot.db core@${master}:/tmp/snapshot.db"
+          done
+
+          echo "Collect etcd names"
+          ETCD_CONN_STRING_TEMP=""
+          for master in "${MASTERS[@]}"
+          do
+            ETCD_NAME="etcd-member-$(bastion_ssh core@${master} hostname -f)"
+            ETCD_URI=$(bastion_ssh "core@${master}" 'source /run/etcd/environment && echo "https://${ETCD_DNS_NAME}:2380"')
+            ETCD_CONN_STRING_TEMP="${ETCD_CONN_STRING_TEMP}${ETCD_NAME}=${ETCD_URI},"
+          done
+          ETCD_CONN_STRING=${ETCD_CONN_STRING_TEMP::-1}
+
+          echo "Stop static pods"
+          for master in "${MASTERS[@]}"
+          do
+            bastion_ssh "core@${master}" "sudo -i mkdir /etc/kubernetes/stopped-pods && sudo -i mv /etc/kubernetes/manifests/* /etc/kubernetes/stopped-pods"
+          done
+
+          echo "Restore etcd from snapshot"
+          cat > /tmp/etcd_restore.sh <<'EOF'
+        #!/bin/bash
+        set -ex
+
+        ETCD_VER=v3.3.10
+        DOWNLOAD_URL=https://storage.googleapis.com/etcd
+        ASSET_DIR=/root/.local
+
+        mkdir -p ${ASSET_DIR}/bin ${ASSET_DIR}/tmp ${ASSET_DIR}/shared
+
+        echo "Downloading etcdctl binary.."
+        curl -s -L ${DOWNLOAD_URL}/${ETCD_VER}/etcd-${ETCD_VER}-linux-amd64.tar.gz -o $ASSET_DIR/tmp/etcd-${ETCD_VER}-linux-amd64.tar.gz \
+          && tar -xzf $ASSET_DIR/tmp/etcd-${ETCD_VER}-linux-amd64.tar.gz -C $ASSET_DIR/shared --strip-components=1 \
+          && mv $ASSET_DIR/shared/etcdctl $ASSET_DIR/bin/ \
+          && rm $ASSET_DIR/shared/etcd \
+          && ETCDCTL_API=3 $ASSET_DIR/bin/etcdctl version
+
+        ETCD_NAME="etcd-member-$(hostname -f)"
+
+        rm -rf /var/lib/etcd/
+
+        source /run/etcd/environment
+        ETCDCTL_API=3 etcdctl \
+          --cert /etc/ssl/etcd/system:etcd-peer:${ETCD_DNS_NAME}.crt \
+          --key /etc/ssl/etcd/system:etcd-peer:${ETCD_DNS_NAME}.key \
+          --cacert /etc/ssl/etcd/ca.crt \
+          snapshot restore /tmp/snapshot.db \
+          --name ${ETCD_NAME} \
+          --initial-cluster "$@" \
+          --initial-cluster-token etcd-cluster-1 \
+          --skip-hash-check=true \
+          --initial-advertise-peer-urls https://${ETCD_IPV4_ADDRESS}:2380 \
+          --data-dir /var/lib/etcd/
+        EOF
+          chmod +x /tmp/etcd_restore.sh
+          for master in "${MASTERS[@]}"
+          do
+            scp -o StrictHostKeyChecking=no -o ProxyCommand="ssh -A -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p core@${BASTION_HOST}" /tmp/etcd_restore.sh "core@${master}":/tmp
+            bastion_ssh "core@${master}" "sudo -i /tmp/etcd_restore.sh ${ETCD_CONN_STRING}"
+          done
+
+          for master in "${MASTERS[@]}"
+          do
+            while true
+            do
+              bastion_ssh "core@${master}" "sudo -i mv /etc/kubernetes/manifests-backup/* /etc/kubernetes/manifests" && break; sleep 10
+            done
+          done
+
+          echo "Wait for API server to come up"
+          for i in $(seq 0 10)
+          do
+            oc get nodes && break
+            sleep 30
+          done
+
+          echo "Wait for MCO to rollout new configs"
+          for i in $(seq 0 10); do oc get machineconfigpool/master > /dev/null && break; sleep 30; done
+          wait_for_machineconfigpool_to_apply
+
+          echo "Verify 99-rollback-test machineconfig"
+          MC="$(oc get machineconfig/99-rollback-test -o jsonpath='{.spec.config.storage.files[0].contents.source}')"
+          if [[ "${MC}" != "data:,A" ]]; then
+            echo "Unexpected MachineConfig output: ${MC}"
+            exit 1
+          fi
+
+          echo "Verify /etc/rollback-test contents"
+          rc=0
+          for master in "${MASTERS[@]}"
+          do
+            ROLLBACK="$(bastion_ssh core@${master} "sudo -i cat /etc/rollback-test")"
+            if [[ "${ROLLBACK}" != "A" ]]; then
+              echo "Master ${master} rollback contents was ${ROLLBACK}"
+              rc=1
+            fi
+          done
+
+          if [[ "${rc}" == "1" ]]; then exit 1; fi
+
+          echo "Removing ssh-bastion"
+          oc delete project openshift-ssh-bastion
+          oc wait namespace/openshift-ssh-bastion --for delete --timeout=10m
+        }
+
         function run-upgrade-tests() {
           openshift-tests run-upgrade "${TEST_SUITE}" --to-image "${RELEASE_IMAGE_LATEST}" \
             --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
@@ -400,21 +583,8 @@ objects:
             queue /tmp/artifacts/nodes/$i/heap oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/debug/pprof/heap
           done < /tmp/nodes
 
-          if oc --insecure-skip-tls-verify adm node-logs -h &>/dev/null; then
-            # starting in 4.0 we can query node logs directly
-            FILTER=gzip queue /tmp/artifacts/nodes/masters-journal.gz oc --insecure-skip-tls-verify adm node-logs --role=master --unify=false
-            FILTER=gzip queue /tmp/artifacts/nodes/workers-journal.gz oc --insecure-skip-tls-verify adm node-logs --role=worker --unify=false
-          else
-            while IFS= read -r i; do
-              FILTER=gzip queue /tmp/artifacts/nodes/$i/messages.gz oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/messages
-              oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/journal | sed -e 's|.*href="\(.*\)".*|\1|;t;d' > /tmp/journals
-              while IFS= read -r j; do
-                FILTER=gzip queue /tmp/artifacts/nodes/$i/journal.gz oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/journal/${j}system.journal
-              done < /tmp/journals
-              FILTER=gzip queue /tmp/artifacts/nodes/$i/secure.gz oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/secure
-              FILTER=gzip queue /tmp/artifacts/nodes/$i/audit.gz oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/audit
-            done < /tmp/nodes
-          fi
+          FILTER=gzip queue /tmp/artifacts/nodes/masters-journal.gz oc --insecure-skip-tls-verify adm node-logs --role=master --unify=false
+          FILTER=gzip queue /tmp/artifacts/nodes/workers-journal.gz oc --insecure-skip-tls-verify adm node-logs --role=worker --unify=false
 
           # Snapshot iptables-save on each node for debugging possible kube-proxy issues
           oc --insecure-skip-tls-verify get --request-timeout=20s -n openshift-sdn -l app=sdn pods --template '{{ range .items }}{{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/sdn-pods
@@ -433,20 +603,6 @@ objects:
             FILTER=gzip queue /tmp/artifacts/pods/${file}.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s $i
             FILTER=gzip queue /tmp/artifacts/pods/${file}_previous.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s -p $i
           done < /tmp/containers
-
-          echo "Gathering kube-apiserver audit.log ..."
-          oc --insecure-skip-tls-verify adm node-logs --role=master --path=kube-apiserver/ > /tmp/kube-audit-logs
-          while IFS=$'\n' read -r line; do
-            IFS=' ' read -ra log <<< "${line}"
-            FILTER=gzip queue /tmp/artifacts/nodes/"${log[0]}"-"${log[1]}".gz oc --insecure-skip-tls-verify adm node-logs "${log[0]}" --path=kube-apiserver/"${log[1]}"
-          done < /tmp/kube-audit-logs
-
-          echo "Gathering openshift-apiserver audit.log ..."
-          oc --insecure-skip-tls-verify adm node-logs --role=master --path=openshift-apiserver/ > /tmp/openshift-audit-logs
-          while IFS=$'\n' read -r line; do
-            IFS=' ' read -ra log <<< "${line}"
-            FILTER=gzip queue /tmp/artifacts/nodes/"${log[0]}"-"${log[1]}".gz oc --insecure-skip-tls-verify adm node-logs "${log[0]}" --path=openshift-apiserver/"${log[1]}"
-          done < /tmp/openshift-audit-logs
 
           echo "Snapshotting prometheus (may take 15s) ..."
           queue /tmp/artifacts/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring prometheus-k8s-0 -- tar cvzf - -C /prometheus .

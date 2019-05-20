@@ -17,30 +17,31 @@
          "dashLength": 10,
          "dashes": false,
          "datasource": "prometheus",
-         "description": "sum(pooledprs)",
+         "description": "The number of PRs eligible for merge in each Tide pool.",
          "fill": 1,
          "gridPos": {
             "h": 9,
-            "w": 12,
+            "w": 24,
             "x": 0,
             "y": 0
          },
          "id": 2,
          "legend": {
-            "alignAsTable": false,
-            "avg": false,
-            "current": false,
+            "alignAsTable": true,
+            "avg": true,
+            "current": true,
             "max": false,
             "min": false,
-            "rightSide": false,
+            "rightSide": true,
             "show": true,
+            "sideWidth": 500,
             "total": false,
-            "values": false
+            "values": true
          },
          "lines": true,
          "linewidth": 1,
          "links": [ ],
-         "nullPointMode": "null",
+         "nullPointMode": "null as zero",
          "percentage": false,
          "pointradius": 5,
          "points": false,
@@ -52,17 +53,17 @@
          "steppedLine": false,
          "targets": [
             {
-               "expr": "sum(pooledprs)",
+               "expr": "avg(pooledprs and ((time() - updatetime) < 240)) by (org, repo, branch)",
                "format": "time_series",
                "intervalFactor": 2,
-               "legendFormat": "",
+               "legendFormat": "{{org}}/{{repo}}:{{branch}}",
                "refId": "A"
             }
          ],
          "thresholds": [ ],
          "timeFrom": null,
          "timeShift": null,
-         "title": "PRs in each Tide pool",
+         "title": "Tide Pool Sizes",
          "tooltip": {
             "shared": true,
             "sort": 0,
@@ -101,30 +102,33 @@
          "dashLength": 10,
          "dashes": false,
          "datasource": "prometheus",
-         "description": "sum(pooledprs) by (org, repo, branch)",
+         "description": "Calculated on a 24 hour interval.",
          "fill": 1,
          "gridPos": {
             "h": 9,
-            "w": 12,
-            "x": 12,
-            "y": 0
+            "w": 24,
+            "x": 0,
+            "y": 9
          },
          "id": 3,
          "legend": {
-            "alignAsTable": false,
-            "avg": false,
-            "current": false,
+            "alignAsTable": true,
+            "avg": true,
+            "current": true,
             "max": false,
             "min": false,
-            "rightSide": false,
+            "rightSide": true,
             "show": true,
+            "sideWidth": 500,
+            "sort": "avg",
+            "sortDesc": true,
             "total": false,
-            "values": false
+            "values": true
          },
          "lines": true,
          "linewidth": 1,
          "links": [ ],
-         "nullPointMode": "null",
+         "nullPointMode": "null as zero",
          "percentage": false,
          "pointradius": 5,
          "points": false,
@@ -136,17 +140,17 @@
          "steppedLine": false,
          "targets": [
             {
-               "expr": "sum(pooledprs) by (org, repo, branch)",
+               "expr": "(sum(rate(merges_sum[1d]) > 0) by (org, repo, branch)) * 86400",
                "format": "time_series",
                "intervalFactor": 2,
-               "legendFormat": "",
+               "legendFormat": "{{org}}/{{repo}}:{{branch}}",
                "refId": "A"
             }
          ],
          "thresholds": [ ],
          "timeFrom": null,
          "timeShift": null,
-         "title": "PRs in each Tide pool by (org, repo, branch)",
+         "title": "Tide Daily Merge Rate",
          "tooltip": {
             "shared": true,
             "sort": 0,
@@ -185,384 +189,269 @@
          "dashLength": 10,
          "dashes": false,
          "datasource": "prometheus",
-         "description": "sum(merges_sum) by (org, repo, branch)",
+         "description": "Calculated on a 24 hour interval.",
          "fill": 1,
-         "gridPos": {
-            "h": 9,
-            "w": 12,
-            "x": 0,
-            "y": 9
-         },
-         "id": 4,
-         "legend": {
-            "alignAsTable": false,
-            "avg": false,
-            "current": false,
-            "max": false,
-            "min": false,
-            "rightSide": false,
-            "show": true,
-            "total": false,
-            "values": false
-         },
-         "lines": true,
-         "linewidth": 1,
-         "links": [ ],
-         "nullPointMode": "null",
-         "percentage": false,
-         "pointradius": 5,
-         "points": false,
-         "renderer": "flot",
-         "repeat": null,
-         "seriesOverrides": [ ],
-         "spaceLength": 10,
-         "stack": false,
-         "steppedLine": false,
-         "targets": [
-            {
-               "expr": "sum(merges_sum) by (org, repo, branch)",
-               "format": "time_series",
-               "intervalFactor": 2,
-               "legendFormat": "",
-               "refId": "A"
-            }
-         ],
-         "thresholds": [ ],
-         "timeFrom": null,
-         "timeShift": null,
-         "title": "merges where values are the number of PRs merged together",
-         "tooltip": {
-            "shared": true,
-            "sort": 0,
-            "value_type": "individual"
-         },
-         "type": "graph",
-         "xaxis": {
-            "buckets": null,
-            "mode": "time",
-            "name": null,
-            "show": true,
-            "values": [ ]
-         },
-         "yaxes": [
-            {
-               "format": "short",
-               "label": null,
-               "logBase": 1,
-               "max": null,
-               "min": null,
-               "show": true
-            },
-            {
-               "format": "short",
-               "label": null,
-               "logBase": 1,
-               "max": null,
-               "min": null,
-               "show": true
-            }
-         ]
-      },
-      {
-         "aliasColors": { },
-         "bars": false,
-         "dashLength": 10,
-         "dashes": false,
-         "datasource": "prometheus",
-         "description": "sum(rate(merges_bucket{le=\"1\"}[10m])) by (job) / sum(rate(merges_count[10m])) by (job)",
-         "fill": 1,
-         "gridPos": {
-            "h": 9,
-            "w": 12,
-            "x": 12,
-            "y": 9
-         },
-         "id": 5,
-         "legend": {
-            "alignAsTable": false,
-            "avg": false,
-            "current": false,
-            "max": false,
-            "min": false,
-            "rightSide": false,
-            "show": true,
-            "total": false,
-            "values": false
-         },
-         "lines": true,
-         "linewidth": 1,
-         "links": [ ],
-         "nullPointMode": "null",
-         "percentage": false,
-         "pointradius": 5,
-         "points": false,
-         "renderer": "flot",
-         "repeat": null,
-         "seriesOverrides": [ ],
-         "spaceLength": 10,
-         "stack": false,
-         "steppedLine": false,
-         "targets": [
-            {
-               "expr": "sum(rate(merges_bucket{le=\"1\"}[10m])) by (job) / sum(rate(merges_count[10m])) by (job)",
-               "format": "time_series",
-               "intervalFactor": 2,
-               "legendFormat": "",
-               "refId": "A"
-            }
-         ],
-         "thresholds": [ ],
-         "timeFrom": null,
-         "timeShift": null,
-         "title": "percentage of merge with 1 PR",
-         "tooltip": {
-            "shared": true,
-            "sort": 0,
-            "value_type": "individual"
-         },
-         "type": "graph",
-         "xaxis": {
-            "buckets": null,
-            "mode": "time",
-            "name": null,
-            "show": true,
-            "values": [ ]
-         },
-         "yaxes": [
-            {
-               "format": "short",
-               "label": null,
-               "logBase": 1,
-               "max": null,
-               "min": null,
-               "show": true
-            },
-            {
-               "format": "short",
-               "label": null,
-               "logBase": 1,
-               "max": null,
-               "min": null,
-               "show": true
-            }
-         ]
-      },
-      {
-         "aliasColors": { },
-         "bars": false,
-         "dashLength": 10,
-         "dashes": false,
-         "datasource": "prometheus",
-         "description": "syncdur",
-         "fill": 1,
-         "gridPos": {
-            "h": 9,
-            "w": 12,
-            "x": 0,
-            "y": 18
-         },
-         "id": 6,
-         "legend": {
-            "alignAsTable": false,
-            "avg": false,
-            "current": false,
-            "max": false,
-            "min": false,
-            "rightSide": false,
-            "show": true,
-            "total": false,
-            "values": false
-         },
-         "lines": true,
-         "linewidth": 1,
-         "links": [ ],
-         "nullPointMode": "null",
-         "percentage": false,
-         "pointradius": 5,
-         "points": false,
-         "renderer": "flot",
-         "repeat": null,
-         "seriesOverrides": [ ],
-         "spaceLength": 10,
-         "stack": false,
-         "steppedLine": false,
-         "targets": [
-            {
-               "expr": "syncdur",
-               "format": "time_series",
-               "intervalFactor": 2,
-               "legendFormat": "",
-               "refId": "A"
-            }
-         ],
-         "thresholds": [ ],
-         "timeFrom": null,
-         "timeShift": null,
-         "title": "duration of the last loop of the sync controller",
-         "tooltip": {
-            "shared": true,
-            "sort": 0,
-            "value_type": "individual"
-         },
-         "type": "graph",
-         "xaxis": {
-            "buckets": null,
-            "mode": "time",
-            "name": null,
-            "show": true,
-            "values": [ ]
-         },
-         "yaxes": [
-            {
-               "format": "short",
-               "label": null,
-               "logBase": 1,
-               "max": null,
-               "min": null,
-               "show": true
-            },
-            {
-               "format": "short",
-               "label": null,
-               "logBase": 1,
-               "max": null,
-               "min": null,
-               "show": true
-            }
-         ]
-      },
-      {
-         "aliasColors": { },
-         "bars": false,
-         "dashLength": 10,
-         "dashes": false,
-         "datasource": "prometheus",
-         "description": "statusupdatedur",
-         "fill": 1,
-         "gridPos": {
-            "h": 9,
-            "w": 12,
-            "x": 12,
-            "y": 18
-         },
-         "id": 7,
-         "legend": {
-            "alignAsTable": false,
-            "avg": false,
-            "current": false,
-            "max": false,
-            "min": false,
-            "rightSide": false,
-            "show": true,
-            "total": false,
-            "values": false
-         },
-         "lines": true,
-         "linewidth": 1,
-         "links": [ ],
-         "nullPointMode": "null",
-         "percentage": false,
-         "pointradius": 5,
-         "points": false,
-         "renderer": "flot",
-         "repeat": null,
-         "seriesOverrides": [ ],
-         "spaceLength": 10,
-         "stack": false,
-         "steppedLine": false,
-         "targets": [
-            {
-               "expr": "statusupdatedur",
-               "format": "time_series",
-               "intervalFactor": 2,
-               "legendFormat": "",
-               "refId": "A"
-            }
-         ],
-         "thresholds": [ ],
-         "timeFrom": null,
-         "timeShift": null,
-         "title": "duration of the last loop of the status update controller",
-         "tooltip": {
-            "shared": true,
-            "sort": 0,
-            "value_type": "individual"
-         },
-         "type": "graph",
-         "xaxis": {
-            "buckets": null,
-            "mode": "time",
-            "name": null,
-            "show": true,
-            "values": [ ]
-         },
-         "yaxes": [
-            {
-               "format": "short",
-               "label": null,
-               "logBase": 1,
-               "max": null,
-               "min": null,
-               "show": true
-            },
-            {
-               "format": "short",
-               "label": null,
-               "logBase": 1,
-               "max": null,
-               "min": null,
-               "show": true
-            }
-         ]
-      },
-      {
-         "datasource": "prometheus",
-         "description": "max_over_time(updatetime[30d]) * 1000",
          "gridPos": {
             "h": 9,
             "w": 24,
             "x": 0,
             "y": 27
          },
-         "id": 8,
-         "styles": [
-            {
-               "alias": "Time",
-               "dateFormat": "YYYY-MM-DD HH:mm:ss",
-               "pattern": "Time",
-               "type": "date"
-            },
-            {
-               "alias": "",
-               "dateFormat": "YYYY-MM-DD HH:mm:ss",
-               "decimals": 2,
-               "mappingType": 1,
-               "pattern": "Value",
-               "thresholds": [ ],
-               "type": "date",
-               "unit": "short"
-            },
-            {
-               "alias": "",
-               "decimals": 2,
-               "pattern": "/.*/",
-               "thresholds": [ ],
-               "type": "number",
-               "unit": "short"
-            }
-         ],
+         "id": 4,
+         "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": true,
+            "max": false,
+            "min": false,
+            "rightSide": true,
+            "show": true,
+            "sideWidth": 500,
+            "sort": "avg",
+            "sortDesc": true,
+            "total": false,
+            "values": true
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null as zero",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
          "targets": [
             {
-               "expr": "max_over_time(updatetime[30d]) * 1000",
-               "format": "table",
+               "expr": "(sum(    rate(merges_sum[1d]) - (sum(rate(merges_bucket{le=\"1\"}[1d])) without (le)) > 0     ) by (org, repo, branch)) * 86400",
+               "format": "time_series",
                "intervalFactor": 2,
-               "legendFormat": "",
+               "legendFormat": "{{org}}/{{repo}}:{{branch}}",
                "refId": "A"
             }
          ],
-         "title": "last time each subpool synced",
-         "transform": "table",
-         "type": "table"
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Tide Daily Merge Rate: Batches Only",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "short",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "short",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": { },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "prometheus",
+         "description": "Tide stats for the master branch of the openshift/origin repo.\nSpecifically, the number of pooled PRs and the daily merge rate.\n(See the more general graphs for details on how these are calculated.)",
+         "fill": 1,
+         "gridPos": {
+            "h": 9,
+            "w": 24,
+            "x": 0,
+            "y": 36
+         },
+         "id": 5,
+         "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": true,
+            "max": false,
+            "min": false,
+            "rightSide": true,
+            "show": true,
+            "sideWidth": 500,
+            "total": false,
+            "values": true
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null as zero",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "avg(pooledprs{org=\"openshift\",repo=\"origin\",branch=\"master\"} and ((time() - updatetime) < 240)) or vector(0)",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Pool size",
+               "refId": "A"
+            },
+            {
+               "expr": "sum(rate(merges_sum{org=\"openshift\",repo=\"origin\",branch=\"master\"}[1d])) * 86400",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Daily merge rate",
+               "refId": "B"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Tide Pool: openshift/origin:master",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "short",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "short",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": { },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "prometheus",
+         "fill": 1,
+         "gridPos": {
+            "h": 9,
+            "w": 24,
+            "x": 0,
+            "y": 45
+         },
+         "id": 6,
+         "legend": {
+            "alignAsTable": true,
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "rightSide": true,
+            "show": true,
+            "sideWidth": 500,
+            "total": false,
+            "values": false
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "max(syncdur and (changes(syncdur[1h]) > 0))",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Sync time",
+               "refId": "A"
+            },
+            {
+               "expr": "max(statusupdatedur and (changes(statusupdatedur[1h]) > 0))",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Status update time",
+               "refId": "B"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Tide Processing Time (seconds)",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "short",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "short",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
       }
    ],
    "refresh": "",
@@ -574,7 +463,7 @@
       "list": [ ]
    },
    "time": {
-      "from": "now-1h",
+      "from": "now-2d",
       "to": "now"
    },
    "timepicker": {

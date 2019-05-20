@@ -8,8 +8,9 @@ All Azure Red Hat OpenShift (ARO) versions:
 |release-v2|*         |deprecated |
 |release-v3|v3.2      |deprecated |
 |release-v4|v4.2      |live       |
-|release-v4|v4.3      |pre-release|
-|release-v5|v5.0      |pre-release|
+|release-v4|v4.3      |live       |
+|release-v4|v4.4      |pre-release|
+|release-v5|v5.1      |pre-release|
 |master    |v6.0      |development|
 
 # Testing matrix
@@ -20,9 +21,12 @@ Automated upgrade paths testing for all versions:
 |----------|--------------------|
 |release-v3|                    |
 |release-v4|v3.2->v4.3/dev      |
-|release-v5|v3.2->v5.0/dev      |
-|release-v5|v4.2->v5.0/dev      |
-|release-v5|v4.3->v5.0/dev      |
-|master    |v3.2->v5.0/dev      |
-|master    |v4.2->v5.0/dev      |
-|master    |v4.3->v5.0/dev      |
+|release-v4|v3.2->v4.3/dev      |
+|release-v5|v3.2->v5.1/dev      |
+|release-v5|v4.2->v5.1/dev      |
+|release-v5|v4.3->v5.1/dev      |
+|release-v5|v4.4->v5.1/dev      |
+|master    |v3.2->v5.1/dev      |
+|master    |v4.2->v5.1/dev      |
+|master    |v4.3->v5.1/dev      |
+|master    |v4.4->v5.1/dev      |

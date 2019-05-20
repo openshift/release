@@ -4,13 +4,13 @@ plank:
   job_url_template: 'https://openshift-gce-devel.appspot.com/build/origin-ci-test/{{if eq .Spec.Type "presubmit"}}pr-logs/pull{{else if eq .Spec.Type "batch"}}pr-logs/pull{{else}}logs{{end}}{{if ne .Spec.Refs.Repo "origin"}}/{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}{{end}}{{if eq .Spec.Type "presubmit"}}/{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}{{else if eq .Spec.Type "batch"}}/batch{{end}}/{{.Spec.Job}}/{{.Status.BuildID}}/'
   report_template: '[Full PR test history](https://openshift-gce-devel.appspot.com/pr/{{if ne .Spec.Refs.Repo "origin"}}{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}/{{end}}{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://openshift-gce-devel.appspot.com/pr/{{with index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}). Please help us cut down on flakes by [linking to](https://github.com/kubernetes/community/blob/master/contributors/devel/flaky-tests.md#filing-issues-for-flaky-tests) an [open issue](https://github.com/{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}/issues?q=is:issue+is:open) when you hit one in your PR.'
   default_decoration_config:
-    timeout: 14400000000000 # 4h
-    grace_period: 15000000000 # 15s
+    timeout: 4h
+    grace_period: 15s
     utility_images:
-      clonerefs: gcr.io/k8s-prow/clonerefs:v20190506-dd08c919a
-      initupload: gcr.io/k8s-prow/initupload:v20190506-dd08c919a
-      entrypoint: gcr.io/k8s-prow/entrypoint:v20190506-dd08c919a
-      sidecar: gcr.io/k8s-prow/sidecar:v20190506-dd08c919a
+      clonerefs: gcr.io/k8s-prow/clonerefs:v20190516-8a91f16c7
+      initupload: gcr.io/k8s-prow/initupload:v20190516-8a91f16c7
+      entrypoint: gcr.io/k8s-prow/entrypoint:v20190516-8a91f16c7
+      sidecar: gcr.io/k8s-prow/sidecar:v20190516-8a91f16c7
     gcs_configuration:
       bucket: origin-ci-test
       path_strategy: single
@@ -147,6 +147,7 @@ tide:
     - openshift/cluster-api-provider-baremetal
     - openshift/cluster-api-provider-azure
     - openshift/cluster-api-provider-kubemark
+    - openshift/cluster-api-provider-gcp
     - openshift/cluster-api-actuator-pkg
     - openshift/cluster-autoscaler-operator
     - openshift/origin
@@ -175,6 +176,7 @@ tide:
     - operator-framework/presto
     - operator-framework/hadoop
     - operator-framework/hive
+    - operator-framework/ghostunnel
     - openshift/release-controller
     - containers/libpod
     - openshift/csi-operator
@@ -228,6 +230,7 @@ tide:
     - openshift/aws-account-operator
     - openshift/configure-alertmanager-operator
     - openshift/config
+    - openshift/kuryr-kubernetes
     labels:
     - lgtm
     - approved
@@ -372,6 +375,8 @@ branch-protection:
         cluster-api-provider-kubemark:
           protect: true
         cluster-api-provider-azure:
+          protect: true
+        cluster-api-provider-gcp:
           protect: true
         cluster-api-actuator-pkg:
           protect: true
@@ -647,7 +652,5 @@ branch-protection:
           protect: true
         presto:
           protect: true
-
-push_gateway:
-  interval: 30s
-  endpoint: pushgateway
+        ghostunnel:
+          protect: true

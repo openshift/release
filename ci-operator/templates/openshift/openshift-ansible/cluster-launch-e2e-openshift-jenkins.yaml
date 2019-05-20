@@ -144,6 +144,7 @@ objects:
     # part of the test run
     - name: test
       image: ${IMAGE_TESTS}
+      terminationMessagePolicy: FallbackToLogsOnError
       resources:
         requests:
           cpu: 1
@@ -162,6 +163,10 @@ objects:
         value: /tmp/home
       - name: KUBECONFIG
         value: /tmp/admin.kubeconfig
+      - name: ARTIFACT_DIR
+        value: /tmp/artifacts
+      - name: IMAGE_FORMAT
+        value: ${IMAGE_FORMAT}
       - name: IMAGE_MAVEN_AGENT
         value: "${IMAGE_MAVEN_AGENT}"
       - name: IMAGE_NODEJS_AGENT
@@ -239,14 +244,17 @@ objects:
             exit 1
           fi
           if [[ -n "${TEST_FOCUS:-}" ]]; then
-            ginkgo -v -noColor -nodes="${TEST_PARALLELISM:-30}" $( which extended.test ) -- \
-              -ginkgo.focus="${TEST_FOCUS}" -ginkgo.skip="${TEST_SKIP:-"\\[local\\]"}" \
+            # delta between here and cluster-launch-e2e-jenkins ... --ginkgo.focus no lonter seem supported, but we are stopping short
+            # updating all the openshift-ansible templates pending direction from Clayton or DPTP
+            # also, after adding the test_skip back in after a successful run, we had more issues ... since we don't leverage TEST_SKIP
+            # for jenkins we are just removing
+            echo "Invoking ginkgo for jenkins with test focus ${TEST_FOCUS} and test parallelism ${TEST_PARALLELISM}"
+            ginkgo -v -noColor -focus="${TEST_FOCUS}" -nodes="${TEST_PARALLELISM:-30}" $( which extended.test ) -- \
               -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit \
               -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
           fi
           if [[ -n "${TEST_FOCUS_SERIAL:-}" ]]; then
-            ginkgo -v -noColor -nodes=1 $( which extended.test ) -- \
-              -ginkgo.focus="${TEST_FOCUS_SERIAL}" -ginkgo.skip="${TEST_SKIP_SERIAL:-"\\[local\\]"}" \
+            ginkgo -v -noColor -focus="${TEST_FOCUS_SERIAL}" -skip="${TEST_SKIP_SERIAL:-"\\[local\\]"}" -nodes=1 $( which extended.test ) -- \
               -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit/serial \
               -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
           fi

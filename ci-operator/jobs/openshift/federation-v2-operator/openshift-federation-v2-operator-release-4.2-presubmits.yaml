@@ -7,9 +7,7 @@ presubmits:
     context: ci/prow/images
     decorate: true
     decoration_config:
-      grace_period: 0s
       skip_cloning: true
-      timeout: 0s
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
     name: pull-ci-openshift-federation-v2-operator-release-4.2-images
@@ -19,8 +17,8 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=[images]
-        - --target=[release:latest]
         command:
         - ci-operator
         env:
@@ -35,7 +33,15 @@ presubmits:
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
       serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
     trigger: '(?m)^/test (?:.*? )?images(?: .*?)?$'
   - agent: kubernetes
     always_run: true
@@ -44,9 +50,7 @@ presubmits:
     context: ci/prow/managed-e2e
     decorate: true
     decoration_config:
-      grace_period: 0s
       skip_cloning: true
-      timeout: 0s
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
     name: pull-ci-openshift-federation-v2-operator-release-4.2-managed-e2e
@@ -56,6 +60,7 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=managed-e2e
         command:
         - ci-operator
@@ -71,7 +76,15 @@ presubmits:
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
       serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
     trigger: '(?m)^/test (?:.*? )?managed-e2e(?: .*?)?$'
   - agent: kubernetes
     always_run: true
@@ -80,9 +93,7 @@ presubmits:
     context: ci/prow/unit
     decorate: true
     decoration_config:
-      grace_period: 0s
       skip_cloning: true
-      timeout: 0s
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
     name: pull-ci-openshift-federation-v2-operator-release-4.2-unit
@@ -92,6 +103,7 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=unit
         command:
         - ci-operator
@@ -107,7 +119,15 @@ presubmits:
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
       serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
     trigger: '(?m)^/test (?:.*? )?unit(?: .*?)?$'
   - agent: kubernetes
     always_run: true
@@ -116,9 +136,7 @@ presubmits:
     context: ci/prow/vet
     decorate: true
     decoration_config:
-      grace_period: 0s
       skip_cloning: true
-      timeout: 0s
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
     name: pull-ci-openshift-federation-v2-operator-release-4.2-vet
@@ -128,6 +146,7 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=vet
         command:
         - ci-operator
@@ -143,5 +162,13 @@ presubmits:
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
       serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
     trigger: '(?m)^/test (?:.*? )?vet(?: .*?)?$'

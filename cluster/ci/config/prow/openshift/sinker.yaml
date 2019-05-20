@@ -24,11 +24,14 @@ items:
         serviceAccountName: sinker
         containers:
         - name: sinker
-          image: gcr.io/k8s-prow/sinker:v20190506-dd08c919a
+          image: gcr.io/k8s-prow/sinker:v20190516-8a91f16c7
           args:
           - --config-path=/etc/config/config.yaml
           - --job-config-path=/etc/job-config
           - --dry-run=false
+          ports:
+          - name: metrics
+            containerPort: 9090
           volumeMounts:
           - name: config
             mountPath: /etc/config
@@ -44,6 +47,15 @@ items:
             readOnly: true
           - name: job-config-40
             mountPath: /etc/job-config/4.0
+            readOnly: true
+          - name: job-config-41
+            mountPath: /etc/job-config/4.1
+            readOnly: true
+          - name: job-config-42
+            mountPath: /etc/job-config/4.2
+            readOnly: true
+          - name: job-config-43
+            mountPath: /etc/job-config/4.3
             readOnly: true
         volumes:
         - name: config
@@ -61,6 +73,15 @@ items:
         - name: job-config-40
           configMap:
             name: job-config-4.0
+        - name: job-config-41
+          configMap:
+            name: job-config-4.1
+        - name: job-config-42
+          configMap:
+            name: job-config-4.2
+        - name: job-config-43
+          configMap:
+            name: job-config-4.3
 - apiVersion: v1
   kind: Service
   metadata:
@@ -70,7 +91,7 @@ items:
     name: sinker
   spec:
     ports:
-    - name: http
+    - name: metrics
       port: 9090
       protocol: TCP
       targetPort: 9090

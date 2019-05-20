@@ -144,6 +144,10 @@ update_secret generic "private-git-cloner" "$( format_field_value "openshift-pub
 # and the key value is "token" in the secret
 update_secret generic ci-chat-bot-slack-token "$( format_field_value ci-chat-bot-slack-token "Token" "token" )"
 
+# Configuration for api_url, which is for slack incoming hooks and can be used eg in prometheus alert-manager, is stored under "url"
+# and the key value is "url" in the secret
+update_secret generic ci-slack-api-url "$( format_field_value ci-slack-api-url "url" "url" )"
+
 # Configuration for GitHub OAuth Apps are stored
 # as an opaque field "Client Configuration"
 update_secret generic github-app-credentials "$( format_field_value prow.svc.ci.openshift.org "Client Configuration" "config.json" )"
@@ -229,6 +233,9 @@ update_secret generic "cluster-secrets-${target_cloud}"                  \
 	"$( format_attachment "packet.net" .packetcred )"                    \
 	"$( format_attachment "packet.net" client.crt matchbox-client.crt )" \
 	"$( format_attachment "packet.net" client.key matchbox-client.key )"
+
+# DSNs for tools reporting failures to Sentry
+update_secret generic "sentry-dsn" "$( format_field_value "sentry" "ci-operator" "ci-operator" )"
 
 # Configuration for the .git-credentials used by the release controller to clone
 # private repositories to generate changelogs

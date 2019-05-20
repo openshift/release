@@ -2,21 +2,19 @@ global:
   resolve_timeout: 5m
 
 route:
-  group_by: ['alertname']
-  group_wait: 10s
-  group_interval: 10s
-  repeat_interval: 1h
+  group_by: ['job']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 2h
   receiver: 'slack-notifications'
 
 receivers:
 - name: 'slack-notifications'
   slack_configs:
-  - channel: '#prometheus-alerts'
-    ## TODO use the ci-operator/populate-secrets-from-bitwarden.sh script to put them in the cluster
-    api_url: https://hooks.slack.com/services/<secret>
+  - channel: '#ops-testplatform'
+    api_url: '{{ api_url }}'
     icon_url: https://avatars3.githubusercontent.com/u/3380462
-    ## TODO costomize the custom_slack_text in ./msg.tmpl
-    text: '{{ template "slack.default.text" . }}; {{ template "custom_slack_text" . }};'
+    text: '{{ template "custom_slack_text" . }}'
 
 templates:
 - '*.tmpl'

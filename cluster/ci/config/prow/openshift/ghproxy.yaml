@@ -24,9 +24,14 @@ items:
     name: ghproxy
   spec:
     ports:
-    - port: 80
+    - name: main
+      port: 80
       protocol: TCP
       targetPort: 8888
+    - name: metrics
+      port: 9090
+      protocol: TCP
+      targetPort: 9090
     selector:
       app: prow
       component: ghproxy
@@ -48,15 +53,16 @@ items:
       spec:
         containers:
         - name: ghproxy
-          image: gcr.io/k8s-prow/ghproxy:v20190506-dd08c919a
+          image: gcr.io/k8s-prow/ghproxy:v20190516-8a91f16c7
           imagePullPolicy: Always
           args:
           - --cache-dir=/cache
           - --cache-sizeGB=19
-          - --push-gateway=pushgateway
-          - --push-gateway-interval=30s
           ports:
-          - containerPort: 8888
+          - name: main
+            containerPort: 8888
+          - name: metrics
+            containerPort: 9090
           volumeMounts:
           - name: cache
             mountPath: /cache
