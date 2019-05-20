@@ -3,10 +3,10 @@ base_images:
     name: origin-v3.11
     namespace: openshift
     tag: base
-  metering-helm:
-    name: "4.1"
+  ansible-operator:
+    name: "4.2"
     namespace: ocp
-    tag: metering-helm
+    tag: ansible-operator
 build_root:
   project_image:
     context_dir: .
@@ -17,10 +17,13 @@ images:
   from: base
   to: metering-reporting-operator
 - dockerfile_path: Dockerfile.metering-operator
-  from: metering-helm
+  from: base
   to: metering-helm-operator
+- dockerfile_path: Dockerfile.metering-ansible-operator
+  from: ansible-operator
+  to: metering-ansible-operator
 promotion:
-  name: "4.1"
+  name: "4.2"
   namespace: ocp
 resources:
   '*':
@@ -30,7 +33,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.1"
+  name: "4.2"
   namespace: ocp
 tests:
 - artifact_dir: /tmp/artifacts

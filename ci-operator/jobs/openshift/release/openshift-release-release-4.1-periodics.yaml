@@ -147,13 +147,42 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
+      - name: BRANCH
+        value: "4.1"
       - name: CLUSTER_TYPE
         value: aws
       - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-origin-master.yaml
-            name: ci-operator-master-configs
+        value: |
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-serial
+            commands: TEST_SUITE=openshift/conformance/serial run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: false
+          - as: e2e-$(CLUSTER_TYPE)-upgrade
+            commands: TEST_SUITE=all run-upgrade-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: launch-$(CLUSTER_TYPE)
+            commands: sleep 9000 & wait
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: false
       - name: JOB_NAME_SAFE
         value: e2e-aws
       - name: TEST_COMMAND
@@ -210,11 +239,42 @@ periodics:
       env:
       - name: RELEASE_IMAGE_INITIAL
       - name: RELEASE_IMAGE_LATEST
+      - name: BRANCH
+        value: "4.1"
+      - name: CLUSTER_TYPE
+        value: aws
       - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-origin-master.yaml
-            name: ci-operator-master-configs
+        value: |
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-serial
+            commands: TEST_SUITE=openshift/conformance/serial run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: false
+          - as: e2e-$(CLUSTER_TYPE)-upgrade
+            commands: TEST_SUITE=all run-upgrade-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: launch-$(CLUSTER_TYPE)
+            commands: sleep 9000 & wait
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: false
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -260,13 +320,42 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
+      - name: BRANCH
+        value: "4.1"
       - name: CLUSTER_TYPE
         value: aws
       - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-origin-master.yaml
-            name: ci-operator-master-configs
+        value: |
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-serial
+            commands: TEST_SUITE=openshift/conformance/serial run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: false
+          - as: e2e-$(CLUSTER_TYPE)-upgrade
+            commands: TEST_SUITE=all run-upgrade-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: launch-$(CLUSTER_TYPE)
+            commands: sleep 9000 & wait
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: false
       - name: JOB_NAME_SAFE
         value: e2e-aws-serial
       - name: TEST_COMMAND
@@ -323,13 +412,42 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
+      - name: BRANCH
+        value: "4.1"
       - name: CLUSTER_TYPE
         value: aws
       - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-origin-master.yaml
-            name: ci-operator-master-configs
+        value: |
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-serial
+            commands: TEST_SUITE=openshift/conformance/serial run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: false
+          - as: e2e-$(CLUSTER_TYPE)-upgrade
+            commands: TEST_SUITE=all run-upgrade-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: launch-$(CLUSTER_TYPE)
+            commands: sleep 9000 & wait
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: false
       - name: JOB_NAME_SAFE
         value: launch-aws
       - name: TEST_COMMAND
@@ -384,13 +502,42 @@ periodics:
       env:
       - name: RELEASE_IMAGE_LATEST
         value: registry.svc.ci.openshift.org/ocp/release:v4.1
+      - name: BRANCH
+        value: "4.1"
       - name: CLUSTER_TYPE
         value: aws
       - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-origin-master.yaml
-            name: ci-operator-master-configs
+        value: |
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-serial
+            commands: TEST_SUITE=openshift/conformance/serial run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: false
+          - as: e2e-$(CLUSTER_TYPE)-upgrade
+            commands: TEST_SUITE=all run-upgrade-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: launch-$(CLUSTER_TYPE)
+            commands: sleep 9000 & wait
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: false
       - name: JOB_NAME_SAFE
         value: e2e-aws
       - name: TEST_COMMAND
@@ -443,13 +590,42 @@ periodics:
       env:
       - name: RELEASE_IMAGE_LATEST
         value: registry.svc.ci.openshift.org/ocp/release:v4.1
+      - name: BRANCH
+        value: "4.1"
       - name: CLUSTER_TYPE
         value: aws
       - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-origin-master.yaml
-            name: ci-operator-master-configs
+        value: |
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-serial
+            commands: TEST_SUITE=openshift/conformance/serial run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: false
+          - as: e2e-$(CLUSTER_TYPE)-upgrade
+            commands: TEST_SUITE=all run-upgrade-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: launch-$(CLUSTER_TYPE)
+            commands: sleep 9000 & wait
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: false
       - name: JOB_NAME_SAFE
         value: e2e-aws
       - name: TEST_COMMAND
@@ -481,38 +657,3 @@ periodics:
     - name: pull-secret
       secret:
         secretName: ci-pull-credentials
-- agent: kubernetes
-  cron: '@hourly'
-  decorate: true
-  interval: ""
-  name: periodic-openshift-release-fast-forward
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: release
-  spec:
-    containers:
-    - args:
-      - --config-dir=./ci-operator/config/
-      - --current-release=4.0
-      - --future-release=4.1
-      - --fast-forward
-      - --confirm
-      - --username=openshift-merge-robot
-      - --token-path=/etc/github/oauth 
-      command:
-      - repo-brancher
-      image: repo-brancher:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /etc/github
-        name: token
-        readOnly: true
-    volumes:
-    - name: token
-      secret:
-        secretName: github-credentials-openshift-merge-robot
