@@ -133,10 +133,6 @@ prow-cluster-jobs:
 .PHONY: prow-cluster-jobs
 
 prow-ocp-rpm-secrets:
-	oc create secret generic base-4-0-repos \
-		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
-		--from-file=ci-operator/infra/openshift/release-controller/repos/ocp-4.0-default.repo \
-		-o yaml --dry-run | oc apply -n ocp -f -
 	oc create secret generic base-4-1-repos \
 		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
 		--from-file=ci-operator/infra/openshift/release-controller/repos/ocp-4.1-default.repo \
