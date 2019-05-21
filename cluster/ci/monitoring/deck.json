@@ -17,7 +17,7 @@
          "dashLength": 10,
          "dashes": false,
          "datasource": "prometheus",
-         "description": "sum(rate(deck_http_request_duration_seconds_sum[5m])) without (path)/sum(rate(deck_http_request_duration_seconds_count[5m])) without (path)",
+         "description": "histogram_quantile(0.5, sum(rate(deck_http_request_duration_seconds_bucket{path=~\"<path_expr>\", method=~\"${method}\", status=~\"${status}\"}[5m])) by (le))",
          "fill": 1,
          "gridPos": {
             "h": 9,
@@ -34,7 +34,7 @@
             "min": false,
             "rightSide": true,
             "show": true,
-            "sideWidth": 500,
+            "sideWidth": 250,
             "sort": "avg",
             "sortDesc": true,
             "total": false,
@@ -55,17 +55,87 @@
          "steppedLine": false,
          "targets": [
             {
-               "expr": "sum(rate(deck_http_request_duration_seconds_sum[5m])) without (path)/sum(rate(deck_http_request_duration_seconds_count[5m])) without (path)",
+               "expr": "histogram_quantile(0.5, sum(rate(deck_http_request_duration_seconds_bucket{path=~\"/tide.*\", method=~\"${method}\", status=~\"${status}\"}[5m])) by (le))",
                "format": "time_series",
                "intervalFactor": 2,
-               "legendFormat": "{{pod}}:{{method}}:{{status}}",
+               "legendFormat": "/tide.*",
                "refId": "A"
+            },
+            {
+               "expr": "histogram_quantile(0.5, sum(rate(deck_http_request_duration_seconds_bucket{path=~\"/plugin-help.js.*\", method=~\"${method}\", status=~\"${status}\"}[5m])) by (le))",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "/plugin-help.js.*",
+               "refId": "B"
+            },
+            {
+               "expr": "histogram_quantile(0.5, sum(rate(deck_http_request_duration_seconds_bucket{path=~\"/data.js.*\", method=~\"${method}\", status=~\"${status}\"}[5m])) by (le))",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "/data.js.*",
+               "refId": "C"
+            },
+            {
+               "expr": "histogram_quantile(0.5, sum(rate(deck_http_request_duration_seconds_bucket{path=~\"/tide.*\", method=~\"${method}\", status=~\"${status}\"}[5m])) by (le))",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "/prowjobs.js.*",
+               "refId": "D"
+            },
+            {
+               "expr": "histogram_quantile(0.5, sum(rate(deck_http_request_duration_seconds_bucket{path=~\"/pr-data.js.*\", method=~\"${method}\", status=~\"${status}\"}[5m])) by (le))",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "/pr-data.js.*",
+               "refId": "E"
+            },
+            {
+               "expr": "histogram_quantile(0.5, sum(rate(deck_http_request_duration_seconds_bucket{path=~\"/log.*\", method=~\"${method}\", status=~\"${status}\"}[5m])) by (le))",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "/log.*",
+               "refId": "F"
+            },
+            {
+               "expr": "histogram_quantile(0.5, sum(rate(deck_http_request_duration_seconds_bucket{path=~\"/rerun.*\", method=~\"${method}\", status=~\"${status}\"}[5m])) by (le))",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "/rerun.*",
+               "refId": "G"
+            },
+            {
+               "expr": "histogram_quantile(0.5, sum(rate(deck_http_request_duration_seconds_bucket{path=~\"/spyglass/.*\", method=~\"${method}\", status=~\"${status}\"}[5m])) by (le))",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "/spyglass/.*",
+               "refId": "H"
+            },
+            {
+               "expr": "histogram_quantile(0.5, sum(rate(deck_http_request_duration_seconds_bucket{path=~\"/view/.*\", method=~\"${method}\", status=~\"${status}\"}[5m])) by (le))",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "/view/.*",
+               "refId": "I"
+            },
+            {
+               "expr": "histogram_quantile(0.5, sum(rate(deck_http_request_duration_seconds_bucket{path=~\"/job-history/.*\", method=~\"${method}\", status=~\"${status}\"}[5m])) by (le))",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "/job-history/.*",
+               "refId": "J"
+            },
+            {
+               "expr": "histogram_quantile(0.5, sum(rate(deck_http_request_duration_seconds_bucket{path=~\"/pr-history/.*\", method=~\"${method}\", status=~\"${status}\"}[5m])) by (le))",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "/pr-history/.*",
+               "refId": "K"
             }
          ],
          "thresholds": [ ],
          "timeFrom": null,
          "timeShift": null,
-         "title": "latency: avg request duration",
+         "title": "median latency with (pre-defined) paths, method ${method}, and status ${status}",
          "tooltip": {
             "shared": true,
             "sort": 0,
@@ -104,7 +174,7 @@
          "dashLength": 10,
          "dashes": false,
          "datasource": "prometheus",
-         "description": "sum(rate(deck_http_request_duration_seconds_sum{path=~\"<path_expr>\"}[5m]))/sum(rate(deck_http_request_duration_seconds_count{path=~\"<path_expr>\"}[5m]))",
+         "description": "histogram_quantile(<phi>, sum(rate(deck_http_request_duration_seconds_bucket{path=~\"${path}\", method=~\"${method}\", status=~\"${status}\"}[5m])) by (le))",
          "fill": 1,
          "gridPos": {
             "h": 9,
@@ -121,7 +191,7 @@
             "min": false,
             "rightSide": true,
             "show": true,
-            "sideWidth": 500,
+            "sideWidth": 250,
             "sort": "avg",
             "sortDesc": true,
             "total": false,
@@ -142,101 +212,31 @@
          "steppedLine": false,
          "targets": [
             {
-               "expr": "sum(rate(deck_http_request_duration_seconds_sum{path=~\"/tide.js.*\"}[5m]))/sum(rate(deck_http_request_duration_seconds_count{path=~\"/tide.js.*\"}[5m]))",
+               "expr": "histogram_quantile(0.99, sum(rate(deck_http_request_duration_seconds_bucket{path=~\"${path}\", method=~\"${method}\", status=~\"${status}\"}[5m])) by (le))",
                "format": "time_series",
                "intervalFactor": 2,
-               "legendFormat": "/tide.js.*",
+               "legendFormat": "phi=0.99",
                "refId": "A"
             },
             {
-               "expr": "sum(rate(deck_http_request_duration_seconds_sum{path=~\"/tide-history.js.*\"}[5m]))/sum(rate(deck_http_request_duration_seconds_count{path=~\"/tide-history.js.*\"}[5m]))",
+               "expr": "histogram_quantile(0.95, sum(rate(deck_http_request_duration_seconds_bucket{path=~\"${path}\", method=~\"${method}\", status=~\"${status}\"}[5m])) by (le))",
                "format": "time_series",
                "intervalFactor": 2,
-               "legendFormat": "/tide-history.js.*",
+               "legendFormat": "phi=0.95",
                "refId": "B"
             },
             {
-               "expr": "sum(rate(deck_http_request_duration_seconds_sum{path=~\"/plugin-help.js.*\"}[5m]))/sum(rate(deck_http_request_duration_seconds_count{path=~\"/plugin-help.js.*\"}[5m]))",
+               "expr": "histogram_quantile(0.5, sum(rate(deck_http_request_duration_seconds_bucket{path=~\"${path}\", method=~\"${method}\", status=~\"${status}\"}[5m])) by (le))",
                "format": "time_series",
                "intervalFactor": 2,
-               "legendFormat": "/plugin-help.js.*",
+               "legendFormat": "phi=0.5",
                "refId": "C"
-            },
-            {
-               "expr": "sum(rate(deck_http_request_duration_seconds_sum{path=~\"/data.js.*\"}[5m]))/sum(rate(deck_http_request_duration_seconds_count{path=~\"/data.js.*\"}[5m]))",
-               "format": "time_series",
-               "intervalFactor": 2,
-               "legendFormat": "/data.js.*",
-               "refId": "D"
-            },
-            {
-               "expr": "sum(rate(deck_http_request_duration_seconds_sum{path=~\"/prowjobs.js.*\"}[5m]))/sum(rate(deck_http_request_duration_seconds_count{path=~\"/prowjobs.js.*\"}[5m]))",
-               "format": "time_series",
-               "intervalFactor": 2,
-               "legendFormat": "/prowjobs.js.*",
-               "refId": "E"
-            },
-            {
-               "expr": "sum(rate(deck_http_request_duration_seconds_sum{path=~\"/pr-data.js.*\"}[5m]))/sum(rate(deck_http_request_duration_seconds_count{path=~\"/pr-data.js.*\"}[5m]))",
-               "format": "time_series",
-               "intervalFactor": 2,
-               "legendFormat": "/pr-data.js.*",
-               "refId": "F"
-            },
-            {
-               "expr": "sum(rate(deck_http_request_duration_seconds_sum{path=~\"/log.*\"}[5m]))/sum(rate(deck_http_request_duration_seconds_count{path=~\"/log.*\"}[5m]))",
-               "format": "time_series",
-               "intervalFactor": 2,
-               "legendFormat": "/log.*",
-               "refId": "G"
-            },
-            {
-               "expr": "sum(rate(deck_http_request_duration_seconds_sum{path=~\"/rerun.*\"}[5m]))/sum(rate(deck_http_request_duration_seconds_count{path=~\"/rerun.*\"}[5m]))",
-               "format": "time_series",
-               "intervalFactor": 2,
-               "legendFormat": "/rerun.*",
-               "refId": "H"
-            },
-            {
-               "expr": "sum(rate(deck_http_request_duration_seconds_sum{path=~\"/spyglass/static/.*\"}[5m]))/sum(rate(deck_http_request_duration_seconds_count{path=~\"/spyglass/static/.*\"}[5m]))",
-               "format": "time_series",
-               "intervalFactor": 2,
-               "legendFormat": "/spyglass/static/.*",
-               "refId": "I"
-            },
-            {
-               "expr": "sum(rate(deck_http_request_duration_seconds_sum{path=~\"/spyglass/lens/.*\"}[5m]))/sum(rate(deck_http_request_duration_seconds_count{path=~\"/spyglass/lens/.*\"}[5m]))",
-               "format": "time_series",
-               "intervalFactor": 2,
-               "legendFormat": "/spyglass/lens/.*",
-               "refId": "J"
-            },
-            {
-               "expr": "sum(rate(deck_http_request_duration_seconds_sum{path=~\"/view/.*\"}[5m]))/sum(rate(deck_http_request_duration_seconds_count{path=~\"/view/.*\"}[5m]))",
-               "format": "time_series",
-               "intervalFactor": 2,
-               "legendFormat": "/view/.*",
-               "refId": "K"
-            },
-            {
-               "expr": "sum(rate(deck_http_request_duration_seconds_sum{path=~\"/job-history/.*\"}[5m]))/sum(rate(deck_http_request_duration_seconds_count{path=~\"/job-history/.*\"}[5m]))",
-               "format": "time_series",
-               "intervalFactor": 2,
-               "legendFormat": "/job-history/.*",
-               "refId": "L"
-            },
-            {
-               "expr": "sum(rate(deck_http_request_duration_seconds_sum{path=~\"/pr-history/.*\"}[5m]))/sum(rate(deck_http_request_duration_seconds_count{path=~\"/pr-history/.*\"}[5m]))",
-               "format": "time_series",
-               "intervalFactor": 2,
-               "legendFormat": "/pr-history/.*",
-               "refId": "M"
             }
          ],
          "thresholds": [ ],
          "timeFrom": null,
          "timeShift": null,
-         "title": "latency by (pre-defined) path: avg request duration",
+         "title": "latency percentile with path ${path}, method ${method}, and status ${status}",
          "tooltip": {
             "shared": true,
             "sort": 0,
@@ -275,7 +275,7 @@
          "dashLength": 10,
          "dashes": false,
          "datasource": "prometheus",
-         "description": "sum(rate(deck_http_request_duration_seconds_sum{path=~\"${path}\"}[5m])) by (status)/sum(rate(deck_http_request_duration_seconds_count{path=~\"${path}\"}[5m])) by (status)",
+         "description": "sum(rate(deck_http_request_duration_seconds_count{path=~\"$path\", method=~\"$method\"}[5m])) by (status)",
          "fill": 1,
          "gridPos": {
             "h": 9,
@@ -292,7 +292,7 @@
             "min": false,
             "rightSide": true,
             "show": true,
-            "sideWidth": 500,
+            "sideWidth": 250,
             "sort": "avg",
             "sortDesc": true,
             "total": false,
@@ -313,7 +313,7 @@
          "steppedLine": false,
          "targets": [
             {
-               "expr": "sum(rate(deck_http_request_duration_seconds_sum{path=~\"${path}\"}[5m])) by (status)/sum(rate(deck_http_request_duration_seconds_count{path=~\"${path}\"}[5m])) by (status)",
+               "expr": "sum(rate(deck_http_request_duration_seconds_count{path=~\"$path\", method=~\"$method\"}[5m])) by (status)",
                "format": "time_series",
                "intervalFactor": 2,
                "legendFormat": "{{status}}",
@@ -323,7 +323,7 @@
          "thresholds": [ ],
          "timeFrom": null,
          "timeShift": null,
-         "title": "latency of the selected path by status: ${path}",
+         "title": "traffic: couter by status with path ${path} and method ${method}",
          "tooltip": {
             "shared": true,
             "sort": 0,
@@ -362,7 +362,7 @@
          "dashLength": 10,
          "dashes": false,
          "datasource": "prometheus",
-         "description": "sum(rate(deck_http_request_duration_seconds_count[5m])) by (status)",
+         "description": "sum(rate(deck_http_request_duration_seconds_count{status=~\"n..\", path=~\"$path\", method=~\"$method\"}[5m]))/sum(rate(deck_http_request_duration_seconds_count{path=~\"$path\"}[5m]))",
          "fill": 1,
          "gridPos": {
             "h": 9,
@@ -379,7 +379,7 @@
             "min": false,
             "rightSide": true,
             "show": true,
-            "sideWidth": 500,
+            "sideWidth": 250,
             "sort": "avg",
             "sortDesc": true,
             "total": false,
@@ -396,28 +396,42 @@
          "repeat": null,
          "seriesOverrides": [ ],
          "spaceLength": 10,
-         "stack": false,
+         "stack": true,
          "steppedLine": false,
          "targets": [
             {
-               "expr": "sum(rate(deck_http_request_duration_seconds_count[5m])) by (status)",
+               "expr": "sum(rate(deck_http_request_duration_seconds_count{status=~\"2..\", path=~\"$path\", method=~\"$method\"}[5m]))/sum(rate(deck_http_request_duration_seconds_count{path=~\"$path\", method=~\"$method\"}[5m]))",
                "format": "time_series",
                "intervalFactor": 2,
-               "legendFormat": "{{status}}",
+               "legendFormat": "2XX",
                "refId": "A"
             },
             {
-               "expr": "sum(rate(deck_http_request_duration_seconds_count{status!~\"2..\"}[5m]))",
+               "expr": "sum(rate(deck_http_request_duration_seconds_count{status=~\"3..\", path=~\"$path\", method=~\"$method\"}[5m]))/sum(rate(deck_http_request_duration_seconds_count{path=~\"$path\", method=~\"$method\"}[5m]))",
                "format": "time_series",
                "intervalFactor": 2,
-               "legendFormat": "non-2..",
+               "legendFormat": "3XX",
                "refId": "B"
+            },
+            {
+               "expr": "sum(rate(deck_http_request_duration_seconds_count{status=~\"4..\", path=~\"$path\", method=~\"$method\"}[5m]))/sum(rate(deck_http_request_duration_seconds_count{path=~\"$path\", method=~\"$method\"}[5m]))",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "4XX",
+               "refId": "C"
+            },
+            {
+               "expr": "sum(rate(deck_http_request_duration_seconds_count{status=~\"5..\", path=~\"$path\", method=~\"$method\"}[5m]))/sum(rate(deck_http_request_duration_seconds_count{path=~\"$path\", method=~\"$method\"}[5m]))",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "5XX",
+               "refId": "D"
             }
          ],
          "thresholds": [ ],
          "timeFrom": null,
          "timeShift": null,
-         "title": "traffic: couter by status",
+         "title": "status percentage with path ${path} and method ${method}",
          "tooltip": {
             "shared": true,
             "sort": 0,
@@ -436,16 +450,16 @@
                "format": "short",
                "label": null,
                "logBase": 1,
-               "max": null,
-               "min": null,
+               "max": "1",
+               "min": "0",
                "show": true
             },
             {
                "format": "short",
                "label": null,
                "logBase": 1,
-               "max": null,
-               "min": null,
+               "max": "1",
+               "min": "0",
                "show": true
             }
          ]
@@ -456,7 +470,7 @@
          "dashLength": 10,
          "dashes": false,
          "datasource": "prometheus",
-         "description": "sum(deck_http_request_duration_seconds_count{status=~\"<status_exp>\"})/sum(deck_http_request_duration_seconds_count)",
+         "description": "( sum(rate(deck_http_request_duration_seconds_bucket{le=\"2.5\", path=~\"${path}\", method=~\"${method}\", status=~\"${status}\"}[5m])) by (job) + sum(rate(deck_http_request_duration_seconds_bucket{le=\"10\", path=~\"${path}\", method=~\"${method}\", status=~\"${status}\"}[5m])) by (job) ) / 2 / sum(rate(deck_http_request_duration_seconds_count{path=~\"${path}\", method=~\"${method}\", status=~\"${status}\"}[5m])) by (job)",
          "fill": 1,
          "gridPos": {
             "h": 9,
@@ -467,229 +481,13 @@
          "id": 6,
          "legend": {
             "alignAsTable": true,
-            "avg": true,
-            "current": true,
-            "max": false,
-            "min": false,
-            "rightSide": true,
-            "show": true,
-            "sideWidth": 500,
-            "sort": "avg",
-            "sortDesc": true,
-            "total": false,
-            "values": true
-         },
-         "lines": true,
-         "linewidth": 1,
-         "links": [ ],
-         "nullPointMode": "null",
-         "percentage": false,
-         "pointradius": 5,
-         "points": false,
-         "renderer": "flot",
-         "repeat": null,
-         "seriesOverrides": [ ],
-         "spaceLength": 10,
-         "stack": false,
-         "steppedLine": false,
-         "targets": [
-            {
-               "expr": "sum(deck_http_request_duration_seconds_count{status=~\"2..\"})/sum(deck_http_request_duration_seconds_count)",
-               "format": "time_series",
-               "intervalFactor": 2,
-               "legendFormat": "2..",
-               "refId": "A"
-            },
-            {
-               "expr": "sum(deck_http_request_duration_seconds_count{status=~\"3..\"})/sum(deck_http_request_duration_seconds_count)",
-               "format": "time_series",
-               "intervalFactor": 2,
-               "legendFormat": "3..",
-               "refId": "B"
-            },
-            {
-               "expr": "sum(deck_http_request_duration_seconds_count{status=~\"4..\"})/sum(deck_http_request_duration_seconds_count)",
-               "format": "time_series",
-               "intervalFactor": 2,
-               "legendFormat": "4..",
-               "refId": "C"
-            },
-            {
-               "expr": "sum(deck_http_request_duration_seconds_count{status=~\"5..\"})/sum(deck_http_request_duration_seconds_count)",
-               "format": "time_series",
-               "intervalFactor": 2,
-               "legendFormat": "5..",
-               "refId": "D"
-            }
-         ],
-         "thresholds": [ ],
-         "timeFrom": null,
-         "timeShift": null,
-         "title": "status percentage",
-         "tooltip": {
-            "shared": true,
-            "sort": 0,
-            "value_type": "individual"
-         },
-         "type": "graph",
-         "xaxis": {
-            "buckets": null,
-            "mode": "time",
-            "name": null,
-            "show": true,
-            "values": [ ]
-         },
-         "yaxes": [
-            {
-               "format": "short",
-               "label": null,
-               "logBase": 1,
-               "max": null,
-               "min": null,
-               "show": true
-            },
-            {
-               "format": "short",
-               "label": null,
-               "logBase": 1,
-               "max": null,
-               "min": null,
-               "show": true
-            }
-         ]
-      },
-      {
-         "aliasColors": { },
-         "bars": false,
-         "dashLength": 10,
-         "dashes": false,
-         "datasource": "prometheus",
-         "description": "sum(deck_http_request_duration_seconds_count{status=~\"n..\", path=~\"$path\"})/sum(deck_http_request_duration_seconds_count{path=~\"$path\"})",
-         "fill": 1,
-         "gridPos": {
-            "h": 9,
-            "w": 24,
-            "x": 0,
-            "y": 0
-         },
-         "id": 7,
-         "legend": {
-            "alignAsTable": true,
-            "avg": true,
-            "current": true,
-            "max": false,
-            "min": false,
-            "rightSide": true,
-            "show": true,
-            "sideWidth": 500,
-            "sort": "avg",
-            "sortDesc": true,
-            "total": false,
-            "values": true
-         },
-         "lines": true,
-         "linewidth": 1,
-         "links": [ ],
-         "nullPointMode": "null",
-         "percentage": false,
-         "pointradius": 5,
-         "points": false,
-         "renderer": "flot",
-         "repeat": null,
-         "seriesOverrides": [ ],
-         "spaceLength": 10,
-         "stack": false,
-         "steppedLine": false,
-         "targets": [
-            {
-               "expr": "sum(deck_http_request_duration_seconds_count{status=~\"2..\", path=~\"$path\"})/sum(deck_http_request_duration_seconds_count{path=~\"$path\"})",
-               "format": "time_series",
-               "intervalFactor": 2,
-               "legendFormat": "2..",
-               "refId": "A"
-            },
-            {
-               "expr": "sum(deck_http_request_duration_seconds_count{status=~\"3..\", path=~\"$path\"})/sum(deck_http_request_duration_seconds_count{path=~\"$path\"})",
-               "format": "time_series",
-               "intervalFactor": 2,
-               "legendFormat": "3..",
-               "refId": "B"
-            },
-            {
-               "expr": "sum(deck_http_request_duration_seconds_count{status=~\"4..\", path=~\"$path\"})/sum(deck_http_request_duration_seconds_count{path=~\"$path\"})",
-               "format": "time_series",
-               "intervalFactor": 2,
-               "legendFormat": "4..",
-               "refId": "C"
-            },
-            {
-               "expr": "sum(deck_http_request_duration_seconds_count{status=~\"5..\", path=~\"$path\"})/sum(deck_http_request_duration_seconds_count{path=~\"$path\"})",
-               "format": "time_series",
-               "intervalFactor": 2,
-               "legendFormat": "5..",
-               "refId": "D"
-            }
-         ],
-         "thresholds": [ ],
-         "timeFrom": null,
-         "timeShift": null,
-         "title": "status percentage by selected path: ${path}",
-         "tooltip": {
-            "shared": true,
-            "sort": 0,
-            "value_type": "individual"
-         },
-         "type": "graph",
-         "xaxis": {
-            "buckets": null,
-            "mode": "time",
-            "name": null,
-            "show": true,
-            "values": [ ]
-         },
-         "yaxes": [
-            {
-               "format": "short",
-               "label": null,
-               "logBase": 1,
-               "max": null,
-               "min": null,
-               "show": true
-            },
-            {
-               "format": "short",
-               "label": null,
-               "logBase": 1,
-               "max": null,
-               "min": null,
-               "show": true
-            }
-         ]
-      },
-      {
-         "aliasColors": { },
-         "bars": false,
-         "dashLength": 10,
-         "dashes": false,
-         "datasource": "prometheus",
-         "description": "sum(deck_http_request_duration_seconds_count) - sum(deck_http_request_duration_seconds_count offset 1d)",
-         "fill": 1,
-         "gridPos": {
-            "h": 9,
-            "w": 24,
-            "x": 0,
-            "y": 0
-         },
-         "id": 8,
-         "legend": {
-            "alignAsTable": false,
             "avg": false,
             "current": true,
             "max": false,
             "min": false,
-            "rightSide": false,
+            "rightSide": true,
             "show": true,
-            "sideWidth": 500,
+            "sideWidth": 250,
             "total": false,
             "values": true
          },
@@ -708,7 +506,7 @@
          "steppedLine": false,
          "targets": [
             {
-               "expr": "sum(deck_http_request_duration_seconds_count) - sum(deck_http_request_duration_seconds_count offset 1d)",
+               "expr": "( sum(rate(deck_http_request_duration_seconds_bucket{le=\"2.5\", path=~\"${path}\", method=~\"${method}\", status=~\"${status}\"}[5m])) by (job) + sum(rate(deck_http_request_duration_seconds_bucket{le=\"10\", path=~\"${path}\", method=~\"${method}\", status=~\"${status}\"}[5m])) by (job) ) / 2 / sum(rate(deck_http_request_duration_seconds_count{path=~\"${path}\", method=~\"${method}\", status=~\"${status}\"}[5m])) by (job)",
                "format": "time_series",
                "intervalFactor": 2,
                "legendFormat": "",
@@ -718,7 +516,7 @@
          "thresholds": [ ],
          "timeFrom": null,
          "timeShift": null,
-         "title": "request couter today",
+         "title": "apdex score with target 2.5s and tolerance 10s, path ${path}, method ${method}, and status ${status}",
          "tooltip": {
             "shared": true,
             "sort": 0,
@@ -737,101 +535,16 @@
                "format": "short",
                "label": null,
                "logBase": 1,
-               "max": null,
-               "min": null,
+               "max": "1",
+               "min": "0",
                "show": true
             },
             {
                "format": "short",
                "label": null,
                "logBase": 1,
-               "max": null,
-               "min": null,
-               "show": true
-            }
-         ]
-      },
-      {
-         "aliasColors": { },
-         "bars": false,
-         "dashLength": 10,
-         "dashes": false,
-         "datasource": "prometheus",
-         "description": "( sum(rate(deck_http_request_duration_seconds_bucket{le=\"2.5\"}[5m])) by (job) + sum(rate(deck_http_request_duration_seconds_bucket{le=\"10\"}[5m])) by (job) ) / 2 / sum(rate(deck_http_request_duration_seconds_count[5m])) by (job)",
-         "fill": 1,
-         "gridPos": {
-            "h": 9,
-            "w": 24,
-            "x": 0,
-            "y": 0
-         },
-         "id": 9,
-         "legend": {
-            "alignAsTable": false,
-            "avg": false,
-            "current": true,
-            "max": false,
-            "min": false,
-            "rightSide": false,
-            "show": true,
-            "sideWidth": 500,
-            "total": false,
-            "values": true
-         },
-         "lines": true,
-         "linewidth": 1,
-         "links": [ ],
-         "nullPointMode": "null",
-         "percentage": false,
-         "pointradius": 5,
-         "points": false,
-         "renderer": "flot",
-         "repeat": null,
-         "seriesOverrides": [ ],
-         "spaceLength": 10,
-         "stack": false,
-         "steppedLine": false,
-         "targets": [
-            {
-               "expr": "( sum(rate(deck_http_request_duration_seconds_bucket{le=\"2.5\"}[5m])) by (job) + sum(rate(deck_http_request_duration_seconds_bucket{le=\"10\"}[5m])) by (job) ) / 2 / sum(rate(deck_http_request_duration_seconds_count[5m])) by (job)",
-               "format": "time_series",
-               "intervalFactor": 2,
-               "legendFormat": "",
-               "refId": "A"
-            }
-         ],
-         "thresholds": [ ],
-         "timeFrom": null,
-         "timeShift": null,
-         "title": "apdex score with target 2.5s and tolerance 10s",
-         "tooltip": {
-            "shared": true,
-            "sort": 0,
-            "value_type": "individual"
-         },
-         "type": "graph",
-         "xaxis": {
-            "buckets": null,
-            "mode": "time",
-            "name": null,
-            "show": true,
-            "values": [ ]
-         },
-         "yaxes": [
-            {
-               "format": "short",
-               "label": null,
-               "logBase": 1,
-               "max": null,
-               "min": null,
-               "show": true
-            },
-            {
-               "format": "short",
-               "label": null,
-               "logBase": 1,
-               "max": null,
-               "min": null,
+               "max": "1",
+               "min": "0",
                "show": true
             }
          ]
@@ -845,16 +558,56 @@
    "templating": {
       "list": [
          {
-            "allValue": null,
+            "allValue": ".*",
             "current": { },
             "datasource": "prometheus",
             "hide": 0,
-            "includeAll": false,
+            "includeAll": true,
             "label": "path",
             "multi": false,
             "name": "path",
             "options": [ ],
             "query": "label_values(deck_http_request_duration_seconds_count, path)",
+            "refresh": 2,
+            "regex": "",
+            "sort": 0,
+            "tagValuesQuery": "",
+            "tags": [ ],
+            "tagsQuery": "",
+            "type": "query",
+            "useTags": false
+         },
+         {
+            "allValue": ".*",
+            "current": { },
+            "datasource": "prometheus",
+            "hide": 0,
+            "includeAll": true,
+            "label": "method",
+            "multi": false,
+            "name": "method",
+            "options": [ ],
+            "query": "label_values(deck_http_request_duration_seconds_count, method)",
+            "refresh": 2,
+            "regex": "",
+            "sort": 0,
+            "tagValuesQuery": "",
+            "tags": [ ],
+            "tagsQuery": "",
+            "type": "query",
+            "useTags": false
+         },
+         {
+            "allValue": ".*",
+            "current": { },
+            "datasource": "prometheus",
+            "hide": 0,
+            "includeAll": true,
+            "label": "status",
+            "multi": false,
+            "name": "status",
+            "options": [ ],
+            "query": "label_values(deck_http_request_duration_seconds_count, status)",
             "refresh": 2,
             "regex": "",
             "sort": 0,
