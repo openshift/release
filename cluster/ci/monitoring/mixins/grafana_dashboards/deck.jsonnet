@@ -12,7 +12,7 @@ local legendConfig = {
 
 dashboard.new(
         'deck dashboard',
-        time_from='now-2d',
+        time_from='now-1h',
         schemaVersion=18,
       )
 .addPanel(
@@ -107,6 +107,8 @@ dashboard.new(
     x: 0,
     y: 0,
   })
+/* will cause slow UI up to the number of paths
+    TODO: try recording rules: https://prometheus.io/docs/prometheus/latest/configuration/recording_rules/
 .addPanel(
     (graphPanel.new(
         'latency by path: avg request duration',
@@ -129,6 +131,7 @@ dashboard.new(
     x: 0,
     y: 0,
   })
+*/
 .addPanel(
     (graphPanel.new(
         'latency of the selected path by status: ${path}',
@@ -221,6 +224,7 @@ dashboard.new(
     refresh='time',
   )
 )
+/* will cause slow UI up to the number of paths
 .addPanel(
     (graphPanel.new(
         'non-2.. rate by path',
@@ -243,6 +247,7 @@ dashboard.new(
     x: 0,
     y: 0,
   })
+*/
 .addPanel(
     (graphPanel.new(
         'status percentage by selected path: ${path}',
@@ -287,6 +292,22 @@ dashboard.new(
     ) + legendConfig)
     .addTarget(prometheus.target(
         'sum(deck_http_request_duration_seconds_count) - sum(deck_http_request_duration_seconds_count offset 1d)',
+    )), gridPos={
+    h: 9,
+    w: 24,
+    x: 0,
+    y: 0,
+  })
+.addPanel(
+    (graphPanel.new(
+        'apdex score with target 2.5s and tolerance 10s',
+        description='( sum(rate(deck_http_request_duration_seconds_bucket{le="2.5"}[5m])) by (job) + sum(rate(deck_http_request_duration_seconds_bucket{le="10"}[5m])) by (job) ) / 2 / sum(rate(deck_http_request_duration_seconds_count[5m])) by (job)',
+        datasource='prometheus',
+        legend_values=true,
+        legend_current=true,
+    ) + legendConfig)
+    .addTarget(prometheus.target(
+        '( sum(rate(deck_http_request_duration_seconds_bucket{le="2.5"}[5m])) by (job) + sum(rate(deck_http_request_duration_seconds_bucket{le="10"}[5m])) by (job) ) / 2 / sum(rate(deck_http_request_duration_seconds_count[5m])) by (job)',
     )), gridPos={
     h: 9,
     w: 24,
