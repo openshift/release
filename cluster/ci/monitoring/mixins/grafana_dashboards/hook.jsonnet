@@ -10,6 +10,10 @@ local legendConfig = {
         },
     };
 
+local dashboardConfig = {
+        uid: '6123f547a129441c2cdeac6c5ce802eb',
+    };
+
 dashboard.new(
         'hook dashboard',
         time_from='now-1h',
@@ -80,3 +84,4 @@ dashboard.new(
     x: 12,
     y: 13,
   })
++ dashboardConfig
