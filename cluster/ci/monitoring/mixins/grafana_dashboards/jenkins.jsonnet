@@ -9,6 +9,10 @@ local legendConfig = {
         },
     };
 
+local dashboardConfig = {
+        uid: '8302dd146d3a0f790ed94c3c5ce8035c',
+    };
+
 dashboard.new(
         'jenkins-operator dashboard',
         time_from='now-1h',
@@ -154,3 +158,4 @@ dashboard.new(
     x: 0,
     y: 54,
   })
++ dashboardConfig
