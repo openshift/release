@@ -10,6 +10,10 @@ local legendConfig = {
         },
     };
 
+local dashboardConfig = {
+        uid: '970b051d3adfd62eb592154c5ce80377',
+    };
+
 dashboard.new(
         'prow dashboard',
         time_from='now-1d',
@@ -32,4 +36,4 @@ dashboard.new(
     x: 0,
     y: 0,
   })
-
++ dashboardConfig

@@ -9,6 +9,10 @@ local legendConfig = {
         },
     };
 
+local dashboardConfig = {
+        uid: 'd69a91f76d8110d3e72885ee5ce8038e',
+    };
+
 dashboard.new(
         'tide dashboard',
         time_from='now-2d',
@@ -125,3 +129,4 @@ dashboard.new(
     x: 0,
     y: 45,
   })
++ dashboardConfig
