@@ -9,6 +9,10 @@ local legendConfig = {
             sideWidth: 250,
         },
     };
+    
+local dashboardConfig = {
+        uid: 'c27162ae7ad9ce08d2dcfa2d5ce7fee8',
+    };
 
 dashboard.new(
         'deck dashboard',
@@ -219,3 +223,4 @@ dashboard.new(
     x: 0,
     y: 0,
   })
++ dashboardConfig
