@@ -64,7 +64,7 @@ dashboard.new(
     h: 9,
     w: 24,
     x: 0,
-    y: 9,
+    y: 0,
   })
 .addPanel(
     (graphPanel.new(
@@ -83,7 +83,7 @@ dashboard.new(
     h: 9,
     w: 24,
     x: 0,
-    y: 18,
+    y: 0,
   })
 .addPanel(
     (graphPanel.new(
@@ -102,12 +102,12 @@ dashboard.new(
     h: 9,
     w: 24,
     x: 0,
-    y: 27,
+    y: 0,
   })
 .addPanel(
     (graphPanel.new(
-        'number of request reties for job ${job}',
-        description='sum(rate(jenkins_request_retries{job="${job}"}[1m]))',
+        'median number of request reties for job ${job}',
+        description='histogram_quantile(0.5, sum(rate(jenkins_request_latency_bucket{job="${job}"}[1m])) by (le))',
         datasource='prometheus',
         legend_alignAsTable=true,
         legend_rightSide=true,
@@ -115,37 +115,18 @@ dashboard.new(
         legend_current=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(rate(jenkins_request_retries{job="${job}"}[1m]))',
+        'histogram_quantile(0.5, sum(rate(jenkins_request_latency_bucket{job="${job}"}[1m])) by (le))',
         legendFormat='${job}',
     )), gridPos={
     h: 9,
     w: 24,
     x: 0,
-    y: 36,
+    y: 0,
   })
 .addPanel(
     (graphPanel.new(
-        'request latency for job ${job}',
-        description='sum(jenkins_request_latency_sum{job="${job}"}) by (verb)',
-        datasource='prometheus',
-        legend_alignAsTable=true,
-        legend_rightSide=true,
-        legend_values=true,
-        legend_current=true,        
-    ) + legendConfig)
-    .addTarget(prometheus.target(
-        'sum(jenkins_request_latency_sum{job="${job}"}) by (verb)',
-        legendFormat='{{verb}}',
-    )), gridPos={
-    h: 9,
-    w: 24,
-    x: 0,
-    y: 45,
-  })
-.addPanel(
-    (graphPanel.new(
-        'resync period for job ${job}',
-        description='sum(resync_period_seconds_sum{job="${job}"})',
+        'median resync period for job ${job}',
+        description='histogram_quantile(0.5, sum(rate(resync_period_seconds_bucket{job="${job}"}[1m])) by (le))',
         datasource='prometheus',
         legend_alignAsTable=true,
         legend_rightSide=true,
@@ -153,12 +134,12 @@ dashboard.new(
         legend_current=true, 
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(resync_period_seconds_sum{job="${job}"})',
+        'histogram_quantile(0.5, sum(rate(resync_period_seconds_bucket{job="${job}"}[1m])) by (le))',
         legendFormat='${job}',
     )), gridPos={
     h: 9,
     w: 24,
     x: 0,
-    y: 54,
+    y: 0,
   })
 + dashboardConfig
