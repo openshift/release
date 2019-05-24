@@ -2,10 +2,11 @@ local grafana = import 'grafonnet/grafana.libsonnet';
 local dashboard = grafana.dashboard;
 local graphPanel = grafana.graphPanel;
 local prometheus = grafana.prometheus;
+local template = grafana.template;
 
 local legendConfig = {
         legend+: {
-            sideWidth: 250
+            sideWidth: 200
         },
     };
 
@@ -18,17 +19,27 @@ dashboard.new(
         time_from='now-1h',
         schemaVersion=18,
       )
+.addTemplate(
+  template.new(
+    'job',
+    'prometheus',
+    'label_values(resync_period_seconds_count, job)',
+    label='job',
+    refresh='time',
+  )
+)
 .addPanel(
     (graphPanel.new(
-        'number of Prow jobs by type',
-        description='sum(prowjobs{exported_job="jenkins-operator"}) by (type)',
+        'number of Prow jobs by type for job ${job}',
+        description='sum(prowjobs{job="${job}"}) by (type)',
         datasource='prometheus',
         legend_alignAsTable=true,
         legend_rightSide=true,
-        
+        legend_values=true,
+        legend_current=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(prowjobs{exported_job="jenkins-operator"}) by (type)',
+        'sum(prowjobs{job="${job}"}) by (type)',
         legendFormat='{{type}}',
     )), gridPos={
     h: 9,
@@ -38,15 +49,16 @@ dashboard.new(
   })
 .addPanel(
     (graphPanel.new(
-        'number of Prow jobs by state',
-        description='sum(prowjobs{exported_job="jenkins-operator"}) by (state)',
+        'number of Prow jobs by state for job ${job}',
+        description='sum(prowjobs{job="${job}"}) by (state)',
         datasource='prometheus',
         legend_alignAsTable=true,
         legend_rightSide=true,
-        
+        legend_values=true,
+        legend_current=true,        
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(prowjobs{exported_job="jenkins-operator"}) by (state)',
+        'sum(prowjobs{job="${job}"}) by (state)',
         legendFormat='{{state}}',
     )), gridPos={
     h: 9,
@@ -56,15 +68,16 @@ dashboard.new(
   })
 .addPanel(
     (graphPanel.new(
-        'number of requests by verb',
-        description='sum(rate(jenkins_requests{exported_job="jenkins-operator"}[1m])) by (verb)',
+        'number of requests by verb for job ${job}',
+        description='sum(rate(jenkins_requests{job="${job}"}[1m])) by (verb)',
         datasource='prometheus',
         legend_alignAsTable=true,
         legend_rightSide=true,
-        
+        legend_values=true,
+        legend_current=true,        
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(rate(jenkins_requests{exported_job="jenkins-operator"}[1m])) by (verb)',
+        'sum(rate(jenkins_requests{job="${job}"}[1m])) by (verb)',
         legendFormat='{{verb}}',
     )), gridPos={
     h: 9,
@@ -74,15 +87,16 @@ dashboard.new(
   })
 .addPanel(
     (graphPanel.new(
-        'number of requests by code',
-        description='sum(rate(jenkins_requests{exported_job="jenkins-operator"}[1m])) by (code)',
+        'number of requests by code for job ${job}',
+        description='sum(rate(jenkins_requests{job="${job}"}[1m])) by (code)',
         datasource='prometheus',
         legend_alignAsTable=true,
         legend_rightSide=true,
-        
+        legend_values=true,
+        legend_current=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(rate(jenkins_requests{exported_job="jenkins-operator"}[1m])) by (code)',
+        'sum(rate(jenkins_requests{job="${job}"}[1m])) by (code)',
         legendFormat='{{code}}',
     )), gridPos={
     h: 9,
@@ -92,24 +106,17 @@ dashboard.new(
   })
 .addPanel(
     (graphPanel.new(
-        'number of request reties',
-        description='sum(rate(jenkins_request_retries{exported_instance=~"<jenkins-operator-name>-.*"}[1m]))',
+        'number of request reties for job ${job}',
+        description='sum(rate(jenkins_request_retries{job="${job}"}[1m]))',
         datasource='prometheus',
         legend_alignAsTable=true,
         legend_rightSide=true,
-        
+        legend_values=true,
+        legend_current=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(rate(jenkins_request_retries{exported_instance=~"kata-jenkins-operator-.*"}[1m]))',
-        legendFormat='kata-jenkins-operator',
-    ))
-    .addTarget(prometheus.target(
-        'sum(rate(jenkins_request_retries{exported_instance=~"jenkins-dev-operator-.*"}[1m]))',
-        legendFormat='jenkins-dev-operator',
-    ))
-    .addTarget(prometheus.target(
-        'sum(rate(jenkins_request_retries{exported_instance=~"jenkins-operator-.*"}[1m]))',
-        legendFormat='jenkins-operator',
+        'sum(rate(jenkins_request_retries{job="${job}"}[1m]))',
+        legendFormat='${job}',
     )), gridPos={
     h: 9,
     w: 24,
@@ -118,15 +125,16 @@ dashboard.new(
   })
 .addPanel(
     (graphPanel.new(
-        'request latency',
-        description='sum(jenkins_request_latency_sum) by (verb)',
+        'request latency for job ${job}',
+        description='sum(jenkins_request_latency_sum{job="${job}"}) by (verb)',
         datasource='prometheus',
         legend_alignAsTable=true,
         legend_rightSide=true,
-        
+        legend_values=true,
+        legend_current=true,        
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(jenkins_request_latency_sum) by (verb)',
+        'sum(jenkins_request_latency_sum{job="${job}"}) by (verb)',
         legendFormat='{{verb}}',
     )), gridPos={
     h: 9,
@@ -136,22 +144,17 @@ dashboard.new(
   })
 .addPanel(
     (graphPanel.new(
-        'resync period',
-        description='sum(resync_period_seconds_sum{exported_instance=~"<jenkins-operator-name>-.*"})',
+        'resync period for job ${job}',
+        description='sum(resync_period_seconds_sum{job="${job}"})',
         datasource='prometheus',
         legend_alignAsTable=true,
         legend_rightSide=true,
-        
+        legend_values=true,
+        legend_current=true, 
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(resync_period_seconds_sum{exported_instance=~"kata-jenkins-operator-.*"})',
-        legendFormat='kata-jenkins-operator',
-    )).addTarget(prometheus.target(
-        'sum(resync_period_seconds_sum{exported_instance=~"jenkins-dev-operator-.*"})',
-        legendFormat='jenkins-dev-operator',
-    )).addTarget(prometheus.target(
-        'sum(resync_period_seconds_sum{exported_instance=~"jenkins-operator-.*"})',
-        legendFormat='jenkins-operator',
+        'sum(resync_period_seconds_sum{job="${job}"})',
+        legendFormat='${job}',
     )), gridPos={
     h: 9,
     w: 24,
