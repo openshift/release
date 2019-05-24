@@ -234,6 +234,13 @@ update_secret generic "cluster-secrets-${target_cloud}"                  \
 	"$( format_attachment "packet.net" client.crt matchbox-client.crt )" \
 	"$( format_attachment "packet.net" client.key matchbox-client.key )"
 
+target_cloud="azure"
+update_secret generic "cluster-secrets-${target_cloud}"                                 \
+	"$( format_attachment "quay.io" pull-secret )"                                      \
+	"$( format_attachment "os4-installer.openshift-ci.azure" osServicePrincipal.json )" \
+	"$( format_attachment "jenkins-ci-iam" ssh-privatekey )"                            \
+	"$( format_attachment "jenkins-ci-iam" ssh-publickey )"
+
 # DSNs for tools reporting failures to Sentry
 update_secret generic "sentry-dsn" "$( format_field_value "sentry" "ci-operator" "ci-operator" )"
 
