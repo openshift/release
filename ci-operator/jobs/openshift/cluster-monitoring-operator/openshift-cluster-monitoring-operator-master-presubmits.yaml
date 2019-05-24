@@ -2,6 +2,25 @@ presubmits:
   openshift/cluster-monitoring-operator:
   - agent: kubernetes
     always_run: true
+    context: ci/prow/generate
+    decorate: true
+    name: pull-ci-openshift-cluster-monitoring-operator-generate
+    rerun_command: /test generate
+    spec:
+      containers:
+      - args:
+        - make generate && git diff --exit-code
+        command:
+        - sh
+        image: quay.io/coreos/jsonnet-ci
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+    trigger: (?m)^/test generate
+  - agent: kubernetes
+    always_run: true
     branches:
     - master
     context: ci/prow/e2e-aws
