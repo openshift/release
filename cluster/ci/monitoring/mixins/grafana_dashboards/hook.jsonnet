@@ -35,7 +35,6 @@ dashboard.new(
     y: 0,
   })
 .addPanel(
-    // no feeding of data on the hook server side yet
     singlestat.new(
         'webhook response codes',
         description='sum(prow_webhook_response_codes)',
