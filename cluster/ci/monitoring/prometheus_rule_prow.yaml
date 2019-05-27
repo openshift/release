@@ -124,3 +124,14 @@ spec:
       for: 5m
       labels:
         severity: slack
+  - name: abnormal webhook behaviors
+    rules:
+    - alert: no-webhook-calls
+      annotations:
+        message: There have been no webhook calls on working hours for 5 minutes
+      expr: |
+        sum(increase(prow_webhook_counter[1m])) == 0
+        and ( (day_of_week() > 0) and (day_of_week() < 6) and (hour() >= 7) )
+      for: 5m
+      labels:
+        severity: slack
