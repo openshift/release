@@ -11,7 +11,6 @@ prow-monitoring-deploy: ci-secret-deploy
 	oc apply -f ./jenkins-operator_service_monitor.yaml
 	oc apply -f ./plank_service_monitor.yaml
 	oc apply -f ./tide_service_monitor.yaml
-	oc apply -f ./pushgateway_service_monitor.yaml
 	oc apply -f ./prometheus_crd.yaml
 	oc apply -f ./prometheus_rule_prow.yaml
 	oc apply -f ./alert_manager_expose.yaml
@@ -69,7 +68,6 @@ prow-monitoring-cleanup:
 	oc delete -f ./jenkins-operator_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./plank_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./tide_service_monitor.yaml --ignore-not-found=true --as=system:admin
-	oc delete -f ./pushgateway_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./prometheus_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./alert_manager_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./grafana_service_monitor.yaml --ignore-not-found=true --as=system:admin
