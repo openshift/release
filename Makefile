@@ -10,7 +10,7 @@ applyTemplate:
 	oc process -f $(WHAT) | oc apply -f -
 .PHONY: applyTemplate
 
-postsubmit-update: prow-services origin-release ci-infra-imagestreams libpod prow-monitoring build-dashboards-validation-image image-mirror-setup prow-release-controller
+postsubmit-update: prow-services origin-release ci-infra-imagestreams libpod prow-monitoring build-dashboards-validation-image image-mirror-setup
 .PHONY: postsubmit-update
 
 all: roles prow projects
