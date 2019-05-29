@@ -61,8 +61,10 @@ dashboard.new(
         legend_rightSide=true,
         legend_values=true,
         legend_current=true,
+        legend_min=true,
         min='0',
         max='1',
+        formatY1='percentunit',
     ) + legendConfig)
     .addTarget(prometheus.target(
         'sum(prowjobs{job="plank",job_name=~".*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"})/sum(prowjobs{job="plank",job_name=~".*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"})',
@@ -114,8 +116,10 @@ dashboard.new(
         legend_rightSide=true,
         legend_values=true,
         legend_current=true,
+        legend_min=true,
         min='0',
         max='1',
+        formatY1='percentunit',
     ) + legendConfig)
     .addTarget(prometheus.target(
         'sum(prowjobs{job="plank",job_name=~"release-.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"})/sum(prowjobs{job="plank",job_name=~"release-.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"})',
@@ -139,8 +143,10 @@ dashboard.new(
         legend_rightSide=true,
         legend_values=true,
         legend_current=true,
+        legend_min=true,
         min='0',
         max='1',
+        formatY1='percentunit',
     ) + legendConfig)
     .addTarget(prometheus.target(
         'sum(prowjobs{job="plank", job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"^(master|release-4.[0-9]+|openshift-4.[0-9]+)$", state="success"}) by (base_ref)/sum(prowjobs{job="plank", job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"^(master|release-4.[0-9]+|openshift-4.[0-9]+)$", state=~"success|failure"})  by (base_ref)',
@@ -160,8 +166,10 @@ dashboard.new(
         legend_rightSide=true,
         legend_values=true,
         legend_current=true,
+        legend_min=true,
         min='0',
         max='1',
+        formatY1='percentunit',
     ) + legendConfig)
     .addTarget(prometheus.target(
         'sum(prowjobs{job="plank",job_name=~".*images",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"})/sum(prowjobs{job="plank",job_name=~".*images",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"})',
@@ -197,8 +205,10 @@ dashboard.new(
         legend_rightSide=true,
         legend_values=true,
         legend_current=true,
+        legend_min=true,
         min='0',
         max='1',
+        formatY1='percentunit',
     ) + legendConfig)
     .addTarget(prometheus.target(
         'sum(prowjobs{job="plank",job_name=~".*e2e-aws.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"})/sum(prowjobs{job="plank",job_name=~".*e2e-aws.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"})',
