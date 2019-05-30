@@ -165,12 +165,12 @@ objects:
           local rc=0
           shift
           for i in $(seq 0 $((ATTEMPTS-1))); do
-            echo "${@}"
+            echo "--> ${@}"
             set +e
             "${@}"
             rc="$?"
             set -e
-            echo "exit code: $rc"
+            echo "--> exit code: $rc"
             test "${rc}" = 0 && break
             sleep 10
           done
@@ -255,20 +255,23 @@ objects:
           done
 
           echo "Collect etcd names"
-          ETCD_CONN_STRING_TEMP=""
           for master in "${MASTERS[@]}"
           do
-            ETCD_NAME="etcd-member-$(bastion_ssh core@${master} hostname -f)"
-            ETCD_URI=$(bastion_ssh "core@${master}" 'source /run/etcd/environment && echo "https://${ETCD_DNS_NAME}:2380"')
-            ETCD_CONN_STRING_TEMP="${ETCD_CONN_STRING_TEMP}${ETCD_NAME}=${ETCD_URI},"
+            bastion_ssh "core@${master}" 'echo "etcd-member-$(hostname -f)" > /tmp/etcd_name && source /run/etcd/environment && echo "https://${ETCD_DNS_NAME}:2380" > /tmp/etcd_uri'
+            bastion_ssh "core@${FIRST_MASTER}" "mkdir -p /tmp/etcd/${master} && scp -o StrictHostKeyChecking=no core@${master}:/tmp/etcd_name /tmp/etcd/${master}/etcd_name && scp -o StrictHostKeyChecking=no core@${master}:/tmp/etcd_uri /tmp/etcd/${master}/etcd_uri"
+            bastion_ssh "core@${FIRST_MASTER}" "cat /tmp/etcd/${master}/etcd_name"
+            bastion_ssh "core@${FIRST_MASTER}" "cat /tmp/etcd/${master}/etcd_uri"
           done
-          ETCD_CONN_STRING=${ETCD_CONN_STRING_TEMP::-1}
+
+          echo "Assemble etcd connection string"
+          bastion_ssh "core@${FIRST_MASTER}" 'rm -rf /tmp/etcd/connstring && mapfile -t MASTERS < <(ls /tmp/etcd) && echo ${MASTERS[@]} && for master in "${MASTERS[@]}"; do echo -n "$(cat /tmp/etcd/${master}/etcd_name)=$(cat /tmp/etcd/${master}/etcd_uri)," >> /tmp/etcd/connstring; done && sed -i '"'$ s/.$//'"' /tmp/etcd/connstring'
 
           echo "Restore etcd cluster from snapshot"
           for master in "${MASTERS[@]}"
           do
             echo "Running /usr/local/bin/etcd-snapshot-restore.sh on ${master}"
-            bastion_ssh "core@${master}" "sudo -i  /bin/bash -x /usr/local/bin/etcd-snapshot-restore.sh /tmp/snapshot.db ${ETCD_CONN_STRING}"
+            bastion_ssh "core@${FIRST_MASTER}" "scp -o StrictHostKeyChecking=no /tmp/etcd/connstring core@${master}:/tmp/etcd_connstring"
+            bastion_ssh "core@${master}" 'sudo -i /bin/bash -x /usr/local/bin/etcd-snapshot-restore.sh /tmp/snapshot.db $(cat /tmp/etcd_connstring)'
           done
 
           echo "Wait for API server to come up"
@@ -300,11 +303,7 @@ objects:
           rc=0
           for master in "${MASTERS[@]}"
           do
-            ROLLBACK="$(bastion_ssh core@${master} "sudo -i cat /etc/rollback-test")"
-            if [[ "${ROLLBACK}" != "A" ]]; then
-              echo "Master ${master} rollback contents was ${ROLLBACK}"
-              rc=1
-            fi
+            bastion_ssh core@${master} 'sudo -i test "$(cat /etc/rollback-test)" == "A"'
           done
 
           if [[ "${rc}" == "1" ]]; then exit 1; fi
