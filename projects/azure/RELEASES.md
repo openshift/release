@@ -20,13 +20,9 @@ Automated upgrade paths testing for all versions:
 |Version   |Upgrade path testing|
 |----------|--------------------|
 |release-v3|                    |
-|release-v4|v3.2->v4.3/dev      |
-|release-v4|v3.2->v4.3/dev      |
-|release-v5|v3.2->v5.1/dev      |
 |release-v5|v4.2->v5.1/dev      |
 |release-v5|v4.3->v5.1/dev      |
 |release-v5|v4.4->v5.1/dev      |
-|master    |v3.2->v5.1/dev      |
 |master    |v4.2->v5.1/dev      |
 |master    |v4.3->v5.1/dev      |
 |master    |v4.4->v5.1/dev      |
