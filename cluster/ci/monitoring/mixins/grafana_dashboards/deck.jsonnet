@@ -78,7 +78,7 @@ dashboard.new(
         legendFormat='/data.js.*',
     ))
     .addTarget(prometheus.target(
-        'histogram_quantile(0.5, sum(rate(deck_http_request_duration_seconds_bucket{path=~"/tide.*", method=~"${method}", status=~"${status}"}[5m])) by (le))',
+        'histogram_quantile(0.5, sum(rate(deck_http_request_duration_seconds_bucket{path=~"/prowjobs.js.*", method=~"${method}", status=~"${status}"}[5m])) by (le))',
         legendFormat='/prowjobs.js.*',
     ))
     .addTarget(prometheus.target(
