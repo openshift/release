@@ -19,8 +19,6 @@ parameters:
 - name: RELEASE_IMAGE_LATEST
   required: true
 - name: BASE_DOMAIN
-  value: origin-ci-int-aws.dev.rhcloud.com
-  required: true
 
 objects:
 
@@ -97,6 +95,8 @@ objects:
       env:
       - name: AWS_SHARED_CREDENTIALS_FILE
         value: /tmp/cluster/.awscred
+      - name: AZURE_AUTH_LOCATION
+        value: /tmp/cluster/osServicePrincipal.json
       - name: ARTIFACT_DIR
         value: /tmp/artifacts
       - name: HOME
@@ -153,6 +153,12 @@ objects:
           export PROVIDER_ARGS="-provider=aws -gce-zone=us-east-1"
           # TODO: make openshift-tests auto-discover this from cluster config
           export TEST_PROVIDER='{"type":"aws","region":"us-east-1","zone":"us-east-1a","multizone":true,"multimaster":true}'
+          export KUBE_SSH_USER=core
+        elif [[ "${CLUSTER_TYPE}" == "azure" ]]; then
+          mkdir -p ~/.ssh
+          export PROVIDER_ARGS="-provider=azure -gce-zone=centralus"
+          # TODO: make openshift-tests auto-discover this from cluster config
+          export TEST_PROVIDER='{"type":"azure","region":"centralus","multizone":true,"multimaster":true}'
           export KUBE_SSH_USER=core
         fi
 
@@ -527,6 +533,10 @@ objects:
         value: /etc/openshift-installer/.awscred
       - name: AWS_REGION
         value: us-east-1
+      - name: AZURE_AUTH_LOCATION
+        value: /etc/openshift-installer/osServicePrincipal.json
+      - name: AZURE_REGION
+        value: centralus
       - name: CLUSTER_NAME
         value: ${NAMESPACE}-${JOB_NAME_HASH}
       - name: BASE_DOMAIN
@@ -567,8 +577,8 @@ objects:
 
         if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
             cat > /tmp/artifacts/installer/install-config.yaml << EOF
-        apiVersion: v1beta4
-        baseDomain: ${BASE_DOMAIN}
+        apiVersion: v1
+        baseDomain: ${BASE_DOMAIN:-origin-ci-int-aws.dev.rhcloud.com}
         metadata:
           name: ${CLUSTER_NAME}
         controlPlane:
@@ -592,6 +602,27 @@ objects:
             region:       ${AWS_REGION}
             userTags:
               expirationDate: ${EXPIRATION_DATE}
+        pullSecret: >
+          ${PULL_SECRET}
+        sshKey: |
+          ${SSH_PUB_KEY}
+        EOF
+        elif [[ "${CLUSTER_TYPE}" == "azure4" ]]; then
+            cat > /tmp/artifacts/installer/install-config.yaml << EOF
+        apiVersion: v1
+        baseDomain: ${BASE_DOMAIN:-ci.azure.devcluster.openshift.com}
+        metadata:
+          name: ${CLUSTER_NAME}
+        controlPlane:
+          name: master
+          replicas: 3
+        compute:
+        - name: worker
+          replicas: 3
+        platform:
+          azure:
+            baseDomainResourceGroupName: os4-common
+            region: ${AZURE_REGION}
         pullSecret: >
           ${PULL_SECRET}
         sshKey: |
@@ -621,6 +652,14 @@ objects:
         value: ${NAMESPACE}-${JOB_NAME_HASH}
       - name: TYPE
         value: ${CLUSTER_TYPE}
+      - name: AWS_SHARED_CREDENTIALS_FILE
+        value: /etc/openshift-installer/.awscred
+      - name: AWS_REGION
+        value: us-east-1
+      - name: AZURE_AUTH_LOCATION
+        value: /etc/openshift-installer/osServicePrincipal.json
+      - name: AZURE_REGION
+        value: centralus
       - name: KUBECONFIG
         value: /tmp/artifacts/installer/auth/kubeconfig
       command:
@@ -760,7 +799,6 @@ objects:
           wait
 
           echo "Deprovisioning cluster ..."
-          export AWS_SHARED_CREDENTIALS_FILE=/etc/openshift-installer/.awscred
           openshift-install --dir /tmp/artifacts/installer destroy cluster
         }
 
