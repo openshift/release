@@ -136,9 +136,11 @@ objects:
           break
         done
 
-        until oc --insecure-skip-tls-verify wait clusterversion/version --for condition=available 2>/dev/null; do
-          sleep 10 & wait
-        done
+        # if the cluster profile included an insights secret, install it to the cluster to
+        # report support data from the support-operator
+        if [[ -f /tmp/cluster/insights-live.yaml ]]; then
+          oc create -f /tmp/cluster/insights-live.yaml || true
+        fi
 
         # set up cloud-provider-specific env vars
         export KUBE_SSH_BASTION="$( oc --insecure-skip-tls-verify get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
