@@ -320,6 +320,15 @@ azure-secrets:
 	oc create secret generic codecov-token --from-literal=upload=${CODECOV_UPLOAD_TOKEN} -o yaml --dry-run | oc apply -n azure -f -
 .PHONY: azure-secrets
 
+azure4-secrets:
+	oc create secret generic cluster-secrets-azure4 \
+	--from-file=cluster/test-deploy/azure4/osServicePrincipal.json \
+	--from-file=cluster/test-deploy/azure4/pull-secret \
+	--from-file=cluster/test-deploy/azure4/ssh-privatekey \
+	--from-file=cluster/test-deploy/azure4/ssh-publickey \
+	-o yaml --dry-run | oc apply -n ocp -f -
+.PHONY: azure4-secrets
+
 metering:
 	$(MAKE) -C projects/metering
 .PHONY: metering
