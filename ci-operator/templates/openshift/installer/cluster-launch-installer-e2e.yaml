@@ -469,13 +469,12 @@ objects:
             get machines \
             -l machine.openshift.io/cluster-api-machine-role=master \
             -o jsonpath='{range .items[*]}{.status.addresses[?(@.type=="InternalDNS")].address}{"\n"}{end}'))
-          HOSTDOMAIN="$(bastion_ssh core@${SURVIVING_MASTER_NODE} "sudo -i hostname -d")"
           for master in ${MASTERS[@]}
           do
             if [[ "${master}" == ${SURVIVING_MASTER_NODE} ]]; then continue; fi
             echo "Recovering ${master}"
-            ETCD_HOSTNAME="etcd-member-${master}.${HOSTDOMAIN}"
-            bastion_ssh core@${master} "sudo -i env  SETUP_ETCD_ENVIRONMENT=${SETUP_ETCD_ENVIRONMENT} KUBE_CLIENT_AGENT=${KUBE_CLIENT_AGENT} /bin/bash -x  /usr/local/bin/etcd-member-recover.sh ${SURVIVING_MASTER_IP} ${ETCD_HOSTNAME}"
+            ETCD_HOSTNAME='etcd-member-$(hostname -f)'
+            bastion_ssh core@${master} "sudo -i env  SETUP_ETCD_ENVIRONMENT=${SETUP_ETCD_ENVIRONMENT} KUBE_CLIENT_AGENT=${KUBE_CLIENT_AGENT} /bin/bash -x /usr/local/bin/etcd-member-recover.sh ${SURVIVING_MASTER_IP} ${ETCD_HOSTNAME}"
           done
 
           for master in ${MASTERS[@]}
