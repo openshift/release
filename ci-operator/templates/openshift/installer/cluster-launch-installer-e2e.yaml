@@ -332,6 +332,9 @@ objects:
             MASTER_MACHINES_TO_REMOVE+=($(oc get ${master} -o jsonpath='{.metadata.annotations.machine\.openshift\.io\/machine}' | cut -d '/' -f 2))
           done
 
+          echo "Prepare etcd connstring"
+          bastion_ssh "core@${SURVIVING_MASTER_NODE}" 'source /run/etcd/environment && echo "etcd-member-$(hostname -f)=https://${ETCD_DNS_NAME}:2380" > /tmp/etcd_connstring'
+
           echo "Destroy two masters"
           # Scale down etcd quorum guard
           oc scale --replicas=0 deployment.apps/etcd-quorum-guard -n openshift-machine-config-operator
@@ -346,7 +349,7 @@ objects:
           oc --request-timeout=5s get nodes && exit 1
 
           echo "Restore single etcd - /usr/local/bin/etcd-snapshot-restore.sh"
-          bastion_ssh core@${SURVIVING_MASTER_NODE} "sudo -i /bin/bash -x /usr/local/bin/etcd-snapshot-restore.sh /root/assets/backup/etcd/member/snap/db"
+          bastion_ssh core@${SURVIVING_MASTER_NODE} 'sudo -i /bin/bash -x /usr/local/bin/etcd-snapshot-restore.sh /root/assets/backup/etcd/member/snap/db $(cat /tmp/etcd_connstring)'
 
           echo "Wait for API server to come up"
           retry 30 oc get nodes
