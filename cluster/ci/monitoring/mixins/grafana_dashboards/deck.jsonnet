@@ -108,6 +108,10 @@ dashboard.new(
     .addTarget(prometheus.target(
         'histogram_quantile(0.5, sum(rate(http_request_duration_seconds_bucket{path="/pr-history/", method=~"${method}", status=~"${status}"}[5m])) by (le))',
         legendFormat='/pr-history/',
+    ))
+    .addTarget(prometheus.target(
+        'histogram_quantile(0.5, sum(rate(http_request_duration_seconds_bucket{path="others", method=~"${method}", status=~"${status}"}[5m])) by (le))',
+        legendFormat='others',
     )), gridPos={
     h: 9,
     w: 24,
