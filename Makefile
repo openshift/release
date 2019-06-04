@@ -10,7 +10,7 @@ applyTemplate:
 	oc process -f $(WHAT) | oc apply -f -
 .PHONY: applyTemplate
 
-postsubmit-update: prow-services origin-release ci-infra-imagestreams libpod prow-monitoring build-dashboards-validation-image image-mirror-setup knative-image-mirror-setup toolchain-image-mirror-setup
+postsubmit-update: prow-services origin-release ci-infra-imagestreams libpod prow-monitoring build-dashboards-validation-image image-mirror-setup knative-image-mirror-setup toolchain-image-mirror-setup cincinnati
 .PHONY: postsubmit-update
 
 all: roles prow projects
@@ -358,6 +358,10 @@ check:
 libpod:
 	$(MAKE) apply WHAT=projects/libpod/libpod.yaml
 .PHONY: libpod
+
+cincinnati:
+	$(MAKE) apply WHAT=projects/cincinnati/cincinnati.yaml
+.PHONY: cincinnati
 
 prow-monitoring:
 	make -C cluster/ci/monitoring prow-monitoring-deploy
