@@ -115,6 +115,10 @@ function field_value() {
 	echo "$( jq ".[] | select(.name == \"${item}\") | .fields[] | select(.name == \"${field}\") | .value" --raw-output <"${secrets}")"
 }
 
+# Bugzilla API keys are stored as a text field named "API Key"
+server="bugzilla.redhat.com"
+update_secret generic "bugzilla-credentials-${server}" "$( format_field_value "${server}" "API Key" "api" )"
+
 # Jenkins credentials are stored as separate items in Bitwarden,
 # with the token recorded as the password for the account
 for master in "ci.openshift.redhat.com" "kata-jenkins-ci.westus2.cloudapp.azure.com"; do
