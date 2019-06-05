@@ -318,7 +318,6 @@ objects:
 
           echo "Removing ssh-bastion"
           oc delete project openshift-ssh-bastion
-          oc wait namespace/openshift-ssh-bastion --for delete --timeout=10m
 
           echo "Remove existing openshift-apiserver pods"
           # This would ensure "Pod 'openshift-apiserver/apiserver-xxx' is not healthy: container openshift-apiserver has restarted more than 5 times" test won't fail
@@ -339,6 +338,9 @@ objects:
             MASTER_MACHINES_TO_REMOVE+=($(oc get ${master} -o jsonpath='{.metadata.annotations.machine\.openshift\.io\/machine}' | cut -d '/' -f 2))
           done
 
+          echo "Prepare etcd connstring"
+          bastion_ssh "core@${SURVIVING_MASTER_NODE}" 'source /run/etcd/environment && echo "etcd-member-$(hostname -f)=https://${ETCD_DNS_NAME}:2380" > /tmp/etcd_connstring'
+
           echo "Destroy two masters"
           # Scale down etcd quorum guard
           oc scale --replicas=0 deployment.apps/etcd-quorum-guard -n openshift-machine-config-operator
@@ -353,7 +355,7 @@ objects:
           oc --request-timeout=5s get nodes && exit 1
 
           echo "Restore single etcd - /usr/local/bin/etcd-snapshot-restore.sh"
-          bastion_ssh core@${SURVIVING_MASTER_NODE} "sudo -i /bin/bash -x /usr/local/bin/etcd-snapshot-restore.sh /root/assets/backup/etcd/member/snap/db"
+          bastion_ssh core@${SURVIVING_MASTER_NODE} 'sudo -i /bin/bash -x /usr/local/bin/etcd-snapshot-restore.sh /root/assets/backup/etcd/member/snap/db $(cat /tmp/etcd_connstring)'
 
           echo "Wait for API server to come up"
           retry 30 oc get nodes
@@ -473,13 +475,12 @@ objects:
             get machines \
             -l machine.openshift.io/cluster-api-machine-role=master \
             -o jsonpath='{range .items[*]}{.status.addresses[?(@.type=="InternalDNS")].address}{"\n"}{end}'))
-          HOSTDOMAIN="$(bastion_ssh core@${SURVIVING_MASTER_NODE} "sudo -i hostname -d")"
           for master in ${MASTERS[@]}
           do
             if [[ "${master}" == ${SURVIVING_MASTER_NODE} ]]; then continue; fi
             echo "Recovering ${master}"
-            ETCD_HOSTNAME="etcd-member-${master}.${HOSTDOMAIN}"
-            bastion_ssh core@${master} "sudo -i env  SETUP_ETCD_ENVIRONMENT=${SETUP_ETCD_ENVIRONMENT} KUBE_CLIENT_AGENT=${KUBE_CLIENT_AGENT} /bin/bash -x  /usr/local/bin/etcd-member-recover.sh ${SURVIVING_MASTER_IP} ${ETCD_HOSTNAME}"
+            ETCD_HOSTNAME='etcd-member-$(hostname -f)'
+            bastion_ssh core@${master} "sudo -i env  SETUP_ETCD_ENVIRONMENT=${SETUP_ETCD_ENVIRONMENT} KUBE_CLIENT_AGENT=${KUBE_CLIENT_AGENT} /bin/bash -x /usr/local/bin/etcd-member-recover.sh ${SURVIVING_MASTER_IP} ${ETCD_HOSTNAME}"
           done
 
           for master in ${MASTERS[@]}
@@ -490,7 +491,6 @@ objects:
 
           echo "Removing ssh-bastion"
           retry 10 oc delete project openshift-ssh-bastion
-          retry 10 oc wait namespace/openshift-ssh-bastion --for delete --timeout=10m
 
           echo "Scale etcd-quorum guard"
           retry 10 oc scale --replicas=3 deployment.apps/etcd-quorum-guard -n openshift-machine-config-operator
