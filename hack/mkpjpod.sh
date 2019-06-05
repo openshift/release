@@ -21,11 +21,11 @@ run() {
         --rm \
         --volume "$PWD:/tmp/release:z" \
         --workdir /tmp/release \
-        registry.svc.ci.openshift.org/ci/test-infra:binaries \
-        bash -c '/go/bin/mkpj "$@" | /go/bin/mkpod --prow-job -' -- \
+        gcr.io/k8s-prow/mkpj \
         --config-path cluster/ci/config/prow/config.yaml \
         --job-config-path ci-operator/jobs/ \
-        "$@"
+        "$@" \
+        | docker run --interactive gcr.io/k8s-prow/mkpod --prow-job -
 }
 
 case "$#" in

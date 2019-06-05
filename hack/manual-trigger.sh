@@ -22,7 +22,7 @@ fi
 
 docker run -it -v "$(pwd)/$BASE/../cluster/ci/config/prow:/prow:z" \
   -v "$(pwd)/$BASE/../ci-operator/jobs/$ORG/$REPO:/jobs:z" \
-  registry.svc.ci.openshift.org/ci/test-infra:binaries /go/bin/mkpj --job "$JOB" \
+  gcr.io/k8s-prow/mkpj --job "$JOB" \
   --base-ref "$BRANCH" \
   --base-sha "$SHA" \
   --config-path /prow/config.yaml \
