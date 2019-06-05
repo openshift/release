@@ -56,7 +56,7 @@ prow-monitoring-pre-steps:
 	oc apply -f ./prometheus_project.yaml --as=system:admin
 	oc apply -f ./prometheus_rbac.yaml --as=system:admin
 	oc apply -f ./alert_manager_rbac.yaml --as=system:admin
-	oc apply -f ./grafana_rabc.yaml --as=system:admin
+	oc apply -f ./grafana_rbac.yaml --as=system:admin
 
 .PHONY : prow-monitoring-cleanup
 prow-monitoring-cleanup:
@@ -96,7 +96,7 @@ prow-monitoring-cleanup:
 	oc delete secret -n prow-monitoring grafana-config --ignore-not-found=true --as=system:admin
 	oc delete -f ./grafana_proxy_secret.yaml --as=system:admin
 	oc delete -f ./grafana_expose.yaml --ignore-not-found=true --ignore-not-found=true --as=system:admin
-	oc delete -f ./grafana_rabc.yaml --ignore-not-found=true --as=system:admin
+	oc delete -f ./grafana_rbac.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./client_rbac.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./ci_hook_rbac.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./prometheus_project.yaml --wait=true --ignore-not-found=true --as=system:admin
