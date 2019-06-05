@@ -22,7 +22,7 @@ prow-monitoring-deploy: ci-secret-deploy
 	oc apply -f ./grafana_expose.yaml
 	oc create -n prow-monitoring secret generic grafana-config --from-file=./grafana.ini --dry-run -o yaml | oc apply -f -
 	#Those config are deployed by config_uploader; we leave those here for manual debugging
-	#oc create -n prow-monitoring configmap grafana-datasources --from-file=./datasources.yaml --dry-run -o yaml | oc apply -f -
+	oc create -n prow-monitoring configmap grafana-datasources --from-file=./datasources.yaml --dry-run -o yaml | oc apply -f -
 	#oc create -n prow-monitoring configmap grafana-dashboards --from-file=./dashboards.yaml --dry-run -o yaml | oc apply -f -
 	#oc create -n prow-monitoring configmap grafana-dashboard-sinker --from-file=./sinker.json --dry-run -o yaml | oc apply -f -
 	#oc create -n prow-monitoring configmap grafana-dashboard-ghproxy --from-file=./ghproxy.json --dry-run -o yaml | oc apply -f -
