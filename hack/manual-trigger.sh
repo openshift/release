@@ -10,7 +10,8 @@ REPO="$2"
 BRANCH="$3"
 JOB="$4"
 
-BASE="$( dirname "${BASH_SOURCE[0]}")"
+BASE="$( dirname "${BASH_SOURCE[0]}" )"
+source "$BASE/images.sh"
 
 SHA="$( git ls-remote "https://github.com/$ORG/$REPO.git" "$BRANCH" | cut -f 1 )"
 
@@ -22,7 +23,7 @@ fi
 
 docker run -it -v "$(pwd)/$BASE/../cluster/ci/config/prow:/prow:z" \
   -v "$(pwd)/$BASE/../ci-operator/jobs/$ORG/$REPO:/jobs:z" \
-  gcr.io/k8s-prow/mkpj --job "$JOB" \
+  "$MKPJ_IMG" --job "$JOB" \
   --base-ref "$BRANCH" \
   --base-sha "$SHA" \
   --config-path /prow/config.yaml \

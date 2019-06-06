@@ -21,12 +21,15 @@ run() {
         --rm \
         --volume "$PWD:/tmp/release:z" \
         --workdir /tmp/release \
-        gcr.io/k8s-prow/mkpj \
+        "$MKPJ_IMG" \
         --config-path cluster/ci/config/prow/config.yaml \
         --job-config-path ci-operator/jobs/ \
         "$@" \
-        | docker run --interactive gcr.io/k8s-prow/mkpod --prow-job -
+        | docker run --interactive "$MKPOD_IMG" --prow-job -
 }
+
+BASE="$( dirname "${BASH_SOURCE[0]}" )"
+source "$BASE/images.sh"
 
 case "$#" in
 1) run --job "$1" \
