@@ -60,7 +60,7 @@ items:
         serviceAccountName: hook
         containers:
         - name: hook
-          image: gcr.io/k8s-prow/hook:v20190515-63ba1af83
+          image: gcr.io/k8s-prow/hook:v20190605-cc2fb1575
           args:
           - --config-path=/etc/config/config.yaml
           - --github-token-path=/etc/github/oauth
@@ -68,6 +68,8 @@ items:
           - --dry-run=false
           - --job-config-path=/etc/job-config
           - --github-endpoint=http://ghproxy
+          - --bugzilla-endpoint=https://bugzilla.redhat.com
+          - --bugzilla-api-key-path=/etc/bugzilla/api
           ports:
             - name: main
               containerPort: 8888
@@ -82,6 +84,9 @@ items:
             readOnly: true
           - name: config
             mountPath: /etc/config
+            readOnly: true
+          - name: bugzilla
+            mountPath: /etc/bugzilla
             readOnly: true
           - name: plugins
             mountPath: /etc/plugins
@@ -116,6 +121,9 @@ items:
         - name: oauth
           secret:
             secretName: github-credentials-openshift-ci-robot
+        - name: bugzilla
+          secret:
+            secretName: bugzilla-credentials-bugzilla.redhat.com
         - name: config
           configMap:
             name: config

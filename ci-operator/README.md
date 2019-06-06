@@ -316,8 +316,9 @@ the `ci-operator` call can be used.
 
 Prow has a utility to generate a ProwJob from its configuration files and
 another to turn that into a Pod ready to be executed. These utilities are
-available in the `registry.svc.ci.openshift.org/ci/test-infra:binaries` image
-or in the [upstream repository](https://github.com/kubernetes/test-infra/tree/master/prow/cmd#dev-tools).
+available in upstream container images (`gcr.io/k8s-prow/mkpj` and
+`gcr.io/k8s-prow/mkpod`) or can be compiled from the
+[upstream repository](https://github.com/kubernetes/test-infra/tree/master/prow/cmd#dev-tools).
 
 The [`mkpjpod.sh`](../hack/mkpjpod.sh) script can be used to streamline that
 process. This script outputs the yaml for a pod that runs the specified test job

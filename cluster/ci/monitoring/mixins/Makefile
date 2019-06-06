@@ -1,9 +1,18 @@
 #
+SHELL=/bin/bash -o pipefail
 
-all: hook.json jenkins_operator.json plank.json prow.json sinker.json tide.json
+all: build_cop.json deck.json hook.json jenkins_operator.json plank.json prow.json sinker.json tide.json prometheus_rule_prow.yaml
+
+build_cop.json:
+	@echo "Generating build_cop.json ..."
+	jsonnet -J vendor/ grafana_dashboards/build_cop.jsonnet > ../$@
+
+deck.json:
+	@echo "Generating deck.json ..."
+	jsonnet -J vendor/ grafana_dashboards/deck.jsonnet > ../$@
 
 hook.json:
-	@echo "Generating sinker.json ..."
+	@echo "Generating hook.json ..."
 	jsonnet -J vendor/ grafana_dashboards/hook.jsonnet > ../$@
 
 jenkins_operator.json:
@@ -25,6 +34,10 @@ sinker.json:
 tide.json:
 	@echo "Generating tide.json ..."
 	jsonnet -J vendor/ grafana_dashboards/tide.jsonnet > ../$@
+
+prometheus_rule_prow.yaml:
+	@echo "Generating prometheus_rule_prow.yaml ..."
+	jsonnet  ./prometheus/prometheus_rule_prow.jsonnet | gojsontoyaml > ../$@
 
 clean:
 	rm -rfv ./vendor

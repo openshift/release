@@ -52,6 +52,16 @@ items:
 - kind: Group
   apiVersion: v1
   metadata:
+    name: release-admins
+  users:
+  - smarterclayton
+  - jwforres
+  - derekwaynecarr
+  - eparis
+  - crawford
+- kind: Group
+  apiVersion: v1
+  metadata:
     name: patomic-ci-dev
   users:
   - ajeddeloh
@@ -207,6 +217,19 @@ items:
 - kind: RoleBinding
   apiVersion: rbac.authorization.k8s.io/v1beta1
   metadata:
+    name: edit
+    namespace: ocp
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: release-admins
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: edit    
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
     name: admin
     namespace: ci-stg
   subjects:
@@ -308,6 +331,81 @@ items:
     kind: ClusterRole
     apiGroup: rbac.authorization.k8s.io
     name: admin
+
+- kind: Namespace
+  apiVersion: v1
+  metadata:
+    name: fabric8-services
+- kind: Group
+  apiVersion: v1
+  metadata:
+    name: toolchain-dev
+  users:
+  - sbose78
+  - alexeykazakov
+  - MatousJobanek
+  - dipak-pawar
+  - xcoulon
+  - sbryzak
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: admin
+    namespace: fabric8-services
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: toolchain-dev
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: admin
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: image-puller
+    namespace: fabric8-services
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:unauthenticated
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:authenticated
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: system:image-puller
+
+- kind: Namespace
+  apiVersion: v1
+  metadata:
+    name: osde2e
+- kind: Group
+  apiVersion: v1
+  metadata:
+    name: osde2e
+  users:
+  - jeremyeder
+  - ethernetdan
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: admin
+    namespace: osde2e
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: osde2e
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: admin
+- kind: ServiceAccount
+  apiVersion: v1
+  metadata:
+    name: nightly-puller
+    namespace: osde2e
 
 - kind: Group
   apiVersion: v1

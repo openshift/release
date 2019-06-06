@@ -6,19 +6,52 @@ presubmits:
     - master
     context: ci/prow/cargo-test
     decorate: true
+    name: pull-ci-openshift-cincinnati-master-cargo-test
+    rerun_command: /test cargo-test
+    spec:
+      containers:
+      - command:
+        - dist/cargo_test.sh
+        env:
+        - name: CINCINNATI_TEST_CREDENTIALS_PATH
+          value: /usr/local/ci-secrets/quay/docker.config.json
+        - name: CINCINNATI_TEST_QUAY_API_TOKEN_PATH
+          value: /usr/local/ci-secrets/quay/api_access_token
+        image: registry.svc.ci.openshift.org/ci/cincinnati-build-root:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/ci-secrets/quay
+          name: secrets-quay
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: secrets-quay
+        secret:
+          secretName: cincinnati-secrets-quay
+    trigger: (?m)^/test( | .* )cargo-test,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/yaml-lint
+    decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-    name: pull-ci-openshift-cincinnati-master-cargo-test
-    rerun_command: /test cargo-test
+    name: pull-ci-openshift-cincinnati-master-yaml-lint
+    rerun_command: /test yaml-lint
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=cargo-test
+        - --target=yaml-lint
         command:
         - ci-operator
         env:
@@ -42,4 +75,4 @@ presubmits:
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-    trigger: '(?m)^/test (?:.*? )?cargo-test(?: .*?)?$'
+    trigger: (?m)^/test( | .* )yaml-lint,?($|\s.*)

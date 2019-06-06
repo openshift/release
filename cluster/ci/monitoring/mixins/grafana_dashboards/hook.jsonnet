@@ -10,6 +10,10 @@ local legendConfig = {
         },
     };
 
+local dashboardConfig = {
+        uid: '6123f547a129441c2cdeac6c5ce802eb',
+    };
+
 dashboard.new(
         'hook dashboard',
         time_from='now-1h',
@@ -31,7 +35,6 @@ dashboard.new(
     y: 0,
   })
 .addPanel(
-    // no feeding of data on the hook server side yet
     singlestat.new(
         'webhook response codes',
         description='sum(prow_webhook_response_codes)',
@@ -80,3 +83,4 @@ dashboard.new(
     x: 12,
     y: 13,
   })
++ dashboardConfig

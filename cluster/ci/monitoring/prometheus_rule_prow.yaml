@@ -8,98 +8,122 @@ metadata:
   namespace: prow-monitoring
 spec:
   groups:
+  - name: ci-absent
+    rules:
+    - alert: deckDown
+      annotations:
+        message: The service deck has been down for 5 minutes.
+      expr: |
+        absent(up{job="deck"} == 1)
+      for: 5m
+      labels:
+        severity: slack
+    - alert: ghproxyDown
+      annotations:
+        message: The service ghproxy has been down for 5 minutes.
+      expr: |
+        absent(up{job="ghproxy"} == 1)
+      for: 5m
+      labels:
+        severity: slack
+    - alert: hookDown
+      annotations:
+        message: The service hook has been down for 5 minutes.
+      expr: |
+        absent(up{job="hook"} == 1)
+      for: 5m
+      labels:
+        severity: slack
+    - alert: jenkins-dev-operatorDown
+      annotations:
+        message: The service jenkins-dev-operator has been down for 5 minutes.
+      expr: |
+        absent(up{job="jenkins-dev-operator"} == 1)
+      for: 5m
+      labels:
+        severity: slack
+    - alert: jenkins-operatorDown
+      annotations:
+        message: The service jenkins-operator has been down for 5 minutes.
+      expr: |
+        absent(up{job="jenkins-operator"} == 1)
+      for: 5m
+      labels:
+        severity: slack
+    - alert: kata-jenkins-operatorDown
+      annotations:
+        message: The service kata-jenkins-operator has been down for 5 minutes.
+      expr: |
+        absent(up{job="kata-jenkins-operator"} == 1)
+      for: 5m
+      labels:
+        severity: slack
+    - alert: plankDown
+      annotations:
+        message: The service plank has been down for 5 minutes.
+      expr: |
+        absent(up{job="plank"} == 1)
+      for: 5m
+      labels:
+        severity: slack
+    - alert: sinkerDown
+      annotations:
+        message: The service sinker has been down for 5 minutes.
+      expr: |
+        absent(up{job="sinker"} == 1)
+      for: 5m
+      labels:
+        severity: slack
+    - alert: tideDown
+      annotations:
+        message: The service tide has been down for 5 minutes.
+      expr: |
+        absent(up{job="tide"} == 1)
+      for: 5m
+      labels:
+        severity: slack
   - name: prow-monitoring-absent
     rules:
     - alert: ServiceLostHA
-      expr: sum(up{job=~"grafana|prometheus|alertmanager"}) by (job) <= 1
+      annotations:
+        message: The service {{ $labels.job }} has at most 1 instance for 5 minutes.
+      expr: |
+        sum(up{job=~"grafana|prometheus|alertmanager"}) by (job) <= 1
       for: 5m
       labels:
         severity: slack
+    - alert: grafanaDown
       annotations:
-        message: "The service {{ $labels.job }} has lost HA: at most 1 instance for 5 minutes."
-    - alert: PrometheusDown
-      expr: absent(up{job="prometheus"} == 1)
+        message: The service grafana has been down for 5 minutes.
+      expr: |
+        absent(up{job="grafana"} == 1)
       for: 5m
       labels:
         severity: slack
+    - alert: alertmanagerDown
       annotations:
-        message: "The service prometheus has been down for 5 minutes."
-    - alert: GrafanaDown
-      expr: absent(up{job="grafana"} == 1)
+        message: The service alertmanager has been down for 5 minutes.
+      expr: |
+        absent(up{job="alertmanager"} == 1)
       for: 5m
       labels:
         severity: slack
+    - alert: prometheusDown
       annotations:
-        message: "The service grafana has been down for 5 minutes."
-    - alert: AlertmanagerDown
-      expr: absent(up{job="alertmanager"} == 1)
+        message: The service prometheus has been down for 5 minutes.
+      expr: |
+        absent(up{job="prometheus"} == 1)
       for: 5m
       labels:
         severity: slack
-      annotations:
-        message: "The service alertmanager has been down for 5 minutes."
-  - name: ci-absent
+  - name: abnormal webhook behaviors
     rules:
-    - alert: SinkerDown
-      expr: absent(up{job="sinker"} == 1)
+    - alert: no-webhook-calls
+      annotations:
+        message: There have been no webhook calls on working hours for 5 minutes
+      expr: |
+        sum(increase(prow_webhook_counter[1m])) == 0
+        and ( (day_of_week() > 0) and (day_of_week() < 6) and (hour() >= 7) )
       for: 5m
       labels:
         severity: slack
-      annotations:
-        message: "The service sinker has been down for 5 minutes."
-    - alert: PushgatewayDown
-      expr: absent(up{job="pushgateway"} == 1)
-      for: 5m
-      labels:
-        severity: slack
-      annotations:
-        message: "The service pushgateway has been down for 5 minutes."
-    - alert: GHProxyDown
-      expr: absent(up{job="ghproxy"} == 1)
-      for: 5m
-      labels:
-        severity: slack
-      annotations:
-        message: "The service ghproxy has been down for 5 minutes."
-    - alert: JenkinsOperatorDown
-      expr: absent(up{job="jenkins-operator"} == 1)
-      for: 5m
-      labels:
-        severity: slack
-      annotations:
-        message: "The service jenkins-operator has been down for 5 minutes."
-    - alert: JenkinsDevOperatorDown
-      expr: absent(up{job="jenkins-dev-operator"} == 1)
-      for: 5m
-      labels:
-        severity: slack
-      annotations:
-        message: "The service jenkins-dev-operator has been down for 5 minutes."
-    - alert: KataJenkinsOperatorDown
-      expr: absent(up{job="kata-jenkins-operator"} == 1)
-      for: 5m
-      labels:
-        severity: slack
-      annotations:
-        message: "The service kata-jenkins-operator has been down for 5 minutes."
-    - alert: HookDown
-      expr: absent(up{job="hook"} == 1)
-      for: 5m
-      labels:
-        severity: slack
-      annotations:
-        message: "The service hook has been down for 5 minutes."
-    - alert: PlankDown
-      expr: absent(up{job="plank"} == 1)
-      for: 5m
-      labels:
-        severity: slack
-      annotations:
-        message: "The service plank has been down for 5 minutes."
-    - alert: TideDown
-      expr: absent(up{job="tide"} == 1)
-      for: 5m
-      labels:
-        severity: slack
-      annotations:
-        message: "The service tide has been down for 5 minutes."
