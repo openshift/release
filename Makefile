@@ -10,7 +10,7 @@ applyTemplate:
 	oc process -f $(WHAT) | oc apply -f -
 .PHONY: applyTemplate
 
-postsubmit-update: prow-services origin-release ci-infra-imagestreams libpod prow-monitoring build-dashboards-validation-image
+postsubmit-update: prow-services origin-release ci-infra-imagestreams libpod prow-monitoring build-dashboards-validation-image image-mirror-setup knative-image-mirror-setup toolchain-image-mirror-setup cincinnati
 .PHONY: postsubmit-update
 
 all: roles prow projects
@@ -82,7 +82,6 @@ prow-rbac:
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/horologium_rbac.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/jenkins_operator_rbac.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/plank_rbac.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/pushgateway_rbac.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/sinker_rbac.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/statusreconciler_rbac.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/tide_rbac.yaml
@@ -101,7 +100,6 @@ prow-services:
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/jenkins_operator.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/needs_rebase.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/plank.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/pushgateway.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/refresh.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/sinker.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/statusreconciler.yaml
@@ -133,13 +131,17 @@ prow-cluster-jobs:
 .PHONY: prow-cluster-jobs
 
 prow-ocp-rpm-secrets:
-	oc create secret generic base-4-0-repos \
-		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
-		--from-file=ci-operator/infra/openshift/release-controller/repos/ocp-4.0-default.repo \
-		-o yaml --dry-run | oc apply -n ocp -f -
 	oc create secret generic base-4-1-repos \
 		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
 		--from-file=ci-operator/infra/openshift/release-controller/repos/ocp-4.1-default.repo \
+		-o yaml --dry-run | oc apply -n ocp -f -
+	oc create secret generic base-4-2-repos \
+		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
+		--from-file=ci-operator/infra/openshift/release-controller/repos/ocp-4.2-default.repo \
+		-o yaml --dry-run | oc apply -n ocp -f -
+	oc create secret generic base-4-3-repos \
+		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
+		--from-file=ci-operator/infra/openshift/release-controller/repos/ocp-4.3-default.repo \
 		-o yaml --dry-run | oc apply -n ocp -f -
 .PHONY: prow-ocp-rpms-secrets
 
@@ -186,7 +188,7 @@ prow-release-controller-deploy:
 prow-release-controller: prow-release-controller-definitions prow-release-controller-deploy
 .PHONY: prow-release-controller
 
-projects: ci-ns gcsweb origin-stable origin-release test-bases image-mirror-setup image-pruner-setup publishing-bot content-mirror azure python-validation metering
+projects: ci-ns gcsweb origin-stable origin-release test-bases image-mirror-setup knative-image-mirror-setup toolchain-image-mirror-setup image-pruner-setup publishing-bot content-mirror azure python-validation metering
 .PHONY: projects
 
 ci-operator-config:
@@ -270,7 +272,7 @@ image-restore-from-mirror:
 
 # Regenerate the mirror files by looking at what we are publishing to the image stream.
 image-mirror-files:
-	BASE=quay.io/openshift/origin- VERSION=4.1 TAG=4.1,4.1.0,latest hack/mirror-file > cluster/ci/config/mirroring/origin_4_1
+	BASE=quay.io/openshift/origin- VERSION=4.1 TAG=4.1,4.1.0 hack/mirror-file > cluster/ci/config/mirroring/origin_4_1
 	BASE=quay.io/openshift/origin- VERSION=4.2 TAG=4.2,4.2.0,latest hack/mirror-file > cluster/ci/config/mirroring/origin_4_2
 .PHONY: image-mirror-files
 
@@ -278,6 +280,16 @@ image-mirror-setup:
 	oc create configmap image-mirror --from-file=cluster/ci/config/mirroring/ -o yaml --dry-run | oc apply -f -
 	$(MAKE) apply WHAT=cluster/ci/jobs/image-mirror.yaml
 .PHONY: image-mirror-setup
+
+knative-image-mirror-setup:
+	oc create configmap knative-image-mirror --from-file=cluster/ci/config/mirroring/knative -o yaml --dry-run | oc apply -f -
+	$(MAKE) apply WHAT=cluster/ci/jobs/knative-image-mirror.yaml
+.PHONY: knative-image-mirror-setup
+
+toolchain-image-mirror-setup:
+	oc create configmap toolchain-image-mirror --from-file=cluster/ci/config/mirroring/toolchain -o yaml --dry-run | oc apply -f -
+	$(MAKE) apply WHAT=cluster/ci/jobs/toolchain-image-mirror.yaml
+.PHONY: toolchain-image-mirror-setup
 
 cluster-operator-roles:
 	oc create ns openshift-cluster-operator --dry-run -o yaml | oc apply -f -
@@ -313,6 +325,15 @@ azure-secrets:
 	oc create secret generic codecov-token --from-literal=upload=${CODECOV_UPLOAD_TOKEN} -o yaml --dry-run | oc apply -n azure -f -
 .PHONY: azure-secrets
 
+azure4-secrets:
+	oc create secret generic cluster-secrets-azure4 \
+	--from-file=cluster/test-deploy/azure4/osServicePrincipal.json \
+	--from-file=cluster/test-deploy/azure4/pull-secret \
+	--from-file=cluster/test-deploy/azure4/ssh-privatekey \
+	--from-file=cluster/test-deploy/azure4/ssh-publickey \
+	-o yaml --dry-run | oc apply -n ocp -f -
+.PHONY: azure4-secrets
+
 metering:
 	$(MAKE) -C projects/metering
 .PHONY: metering
@@ -338,6 +359,10 @@ libpod:
 	$(MAKE) apply WHAT=projects/libpod/libpod.yaml
 .PHONY: libpod
 
+cincinnati:
+	$(MAKE) apply WHAT=projects/cincinnati/cincinnati.yaml
+.PHONY: cincinnati
+
 prow-monitoring:
 	make -C cluster/ci/monitoring prow-monitoring-deploy
 .PHONY: prow-monitoring
@@ -345,3 +370,8 @@ prow-monitoring:
 build-dashboards-validation-image:
 	oc apply -f projects/origin-release/dashboards-validation/dashboards-validation.yaml
 .PHONY: build-dashboards-validation-image
+
+logging:
+	$(MAKE) apply WHAT=cluster/ci/config/logging/fluentd-daemonset.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/logging/fluentd-configmap.yaml
+.PHONY: logging

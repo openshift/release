@@ -51,7 +51,6 @@ images:
       as:
       - build
       paths: null
-  optional: true
   to: openstack-installer
 promotion:
   name: "4.2"
@@ -129,6 +128,11 @@ tests:
   openshift_installer:
     cluster_profile: aws
     upgrade: false
+- as: e2e-azure
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer:
+    cluster_profile: azure4
+    upgrade: false
 - as: e2e-aws-upgrade
   commands: TEST_SUITE=all run-upgrade-tests
   openshift_installer:
@@ -138,10 +142,23 @@ tests:
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer_upi:
     cluster_profile: aws
-- as: e2e-rhel-scaleup
+- as: e2e-aws-scaleup-rhel7
   commands: TEST_SUITE=openshift/conformance run-tests
   openshift_ansible_40:
     cluster_profile: aws-centos-40
+- as: e2e-etcd-quorum-loss
+  commands: |
+    recover-from-etcd-quorum-loss
+    TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer:
+    cluster_profile: aws
+    upgrade: false
+- as: e2e-restore-cluster-state
+  commands: |
+    restore-cluster-state
+    TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer:
+    cluster_profile: aws
 - as: e2e-vsphere
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer_upi:

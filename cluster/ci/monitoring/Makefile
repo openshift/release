@@ -7,10 +7,10 @@ prow-monitoring-deploy: ci-secret-deploy
 	oc apply -f ./sinker_service_monitor.yaml
 	oc apply -f ./ghproxy_service_monitor.yaml
 	oc apply -f ./hook_service_monitor.yaml
+	oc apply -f ./deck_service_monitor.yaml
 	oc apply -f ./jenkins-operator_service_monitor.yaml
 	oc apply -f ./plank_service_monitor.yaml
 	oc apply -f ./tide_service_monitor.yaml
-	oc apply -f ./pushgateway_service_monitor.yaml
 	oc apply -f ./prometheus_crd.yaml
 	oc apply -f ./prometheus_rule_prow.yaml
 	oc apply -f ./alert_manager_expose.yaml
@@ -22,7 +22,7 @@ prow-monitoring-deploy: ci-secret-deploy
 	oc apply -f ./grafana_expose.yaml
 	oc create -n prow-monitoring secret generic grafana-config --from-file=./grafana.ini --dry-run -o yaml | oc apply -f -
 	#Those config are deployed by config_uploader; we leave those here for manual debugging
-	#oc create -n prow-monitoring configmap grafana-datasources --from-file=./datasources.yaml --dry-run -o yaml | oc apply -f -
+	oc create -n prow-monitoring configmap grafana-datasources --from-file=./datasources.yaml --dry-run -o yaml | oc apply -f -
 	#oc create -n prow-monitoring configmap grafana-dashboards --from-file=./dashboards.yaml --dry-run -o yaml | oc apply -f -
 	#oc create -n prow-monitoring configmap grafana-dashboard-sinker --from-file=./sinker.json --dry-run -o yaml | oc apply -f -
 	#oc create -n prow-monitoring configmap grafana-dashboard-ghproxy --from-file=./ghproxy.json --dry-run -o yaml | oc apply -f -
@@ -30,6 +30,9 @@ prow-monitoring-deploy: ci-secret-deploy
 	#oc create -n prow-monitoring configmap grafana-dashboard-hook --from-file=./hook.json --dry-run -o yaml | oc apply -f -
 	#oc create -n prow-monitoring configmap grafana-dashboard-plank --from-file=./plank.json --dry-run -o yaml | oc apply -f -
 	#oc create -n prow-monitoring configmap grafana-dashboard-jenkins-operator --from-file=./jenkins_operator.json --dry-run -o yaml | oc apply -f -
+	#oc create -n prow-monitoring configmap grafana-dashboard-deck --from-file=./deck.json --dry-run -o yaml | oc apply -f -
+	#oc create -n prow-monitoring configmap grafana-dashboard-build-cop --from-file=./build_cop.json --dry-run -o yaml | oc apply -f -
+	#oc create -n prow-monitoring configmap grafana-dashboard-prow --from-file=./prow.json --dry-run -o yaml | oc apply -f -
 	oc apply -f ./grafana_proxy_secret.yaml
 	oc apply -f ./grafana_deploy.yaml
 	oc apply -f ./grafana_service_monitor.yaml
@@ -53,7 +56,7 @@ prow-monitoring-pre-steps:
 	oc apply -f ./prometheus_project.yaml --as=system:admin
 	oc apply -f ./prometheus_rbac.yaml --as=system:admin
 	oc apply -f ./alert_manager_rbac.yaml --as=system:admin
-	oc apply -f ./grafana_rabc.yaml --as=system:admin
+	oc apply -f ./grafana_rbac.yaml --as=system:admin
 
 .PHONY : prow-monitoring-cleanup
 prow-monitoring-cleanup:
@@ -64,10 +67,10 @@ prow-monitoring-cleanup:
 	oc delete -f ./sinker_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./ghproxy_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./hook_service_monitor.yaml --ignore-not-found=true --as=system:admin
+	oc delete -f ./deck_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./jenkins-operator_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./plank_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./tide_service_monitor.yaml --ignore-not-found=true --as=system:admin
-	oc delete -f ./pushgateway_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./prometheus_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./alert_manager_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./grafana_service_monitor.yaml --ignore-not-found=true --as=system:admin
@@ -85,12 +88,15 @@ prow-monitoring-cleanup:
 	oc delete configmap -n prow-monitoring grafana-dashboard-hook --ignore-not-found=true --as=system:admin
 	oc delete configmap -n prow-monitoring grafana-dashboard-plank --ignore-not-found=true --as=system:admin
 	oc delete configmap -n prow-monitoring grafana-dashboard-jenkins-operator --ignore-not-found=true --as=system:admin
+	oc delete configmap -n prow-monitoring grafana-dashboard-deck --ignore-not-found=true --as=system:admin
+	oc delete configmap -n prow-monitoring grafana-dashboard-build-cop --ignore-not-found=true --as=system:admin
+	oc delete configmap -n prow-monitoring grafana-dashboard-prow --ignore-not-found=true --as=system:admin
 	oc delete configmap -n prow-monitoring grafana-dashboards --ignore-not-found=true --as=system:admin
 	oc delete configmap -n prow-monitoring grafana-datasources --ignore-not-found=true --as=system:admin
 	oc delete secret -n prow-monitoring grafana-config --ignore-not-found=true --as=system:admin
 	oc delete -f ./grafana_proxy_secret.yaml --as=system:admin
 	oc delete -f ./grafana_expose.yaml --ignore-not-found=true --ignore-not-found=true --as=system:admin
-	oc delete -f ./grafana_rabc.yaml --ignore-not-found=true --as=system:admin
+	oc delete -f ./grafana_rbac.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./client_rbac.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./ci_hook_rbac.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./prometheus_project.yaml --wait=true --ignore-not-found=true --as=system:admin

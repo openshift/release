@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: List
+items:
+- kind: ImageStream
+  apiVersion: v1
+  metadata:
+    name: cincinnati-build-root
+- kind: BuildConfig
+  apiVersion: v1
+  metadata:
+    name: cincinnati-build-root-latest
+    labels:
+      ci.openshift.io/source-repo: cincinnati
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: cincinnati-build-root:latest
+    source:
+      git:
+        uri: "https://github.com/openshift/cincinnati"
+    strategy:
+      dockerStrategy:
+        dockerfilePath: dist/openshift-release/Dockerfile.builder
+    triggers:
+      - type: ConfigChange
+      - type: GitHub
+        github:
+          secretReference:
+            name: github-deploymentconfig-trigger

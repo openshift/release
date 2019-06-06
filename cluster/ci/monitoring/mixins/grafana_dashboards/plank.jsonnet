@@ -9,6 +9,10 @@ local legendConfig = {
         },
     };
 
+local dashboardConfig = {
+        uid: 'e1778910572e3552a935c2035ce80369',
+    };
+
 dashboard.new(
         'plank dashboard',
         time_from='now-1h',
@@ -50,3 +54,4 @@ dashboard.new(
     x: 0,
     y: 9,
   })
++ dashboardConfig

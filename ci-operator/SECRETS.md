@@ -54,6 +54,15 @@ currently exist:
 | `metrics-int.key`             | Azure Geneva metrics authentication key |
 | `system-docker-config.json`   | Root/node/system level docker config.json file, currently holding access registry.redhat.io |
 
+#### `cluster-secrets-azure4`
+
+|       Key                         | Description |
+| ----------------------------------| ----------- |
+| `osServicePrincipal.json`     | Credentials for the Azure API. This is a json file that contains fields described in [upstream credentials doc](https://docs.microsoft.com/en-us/azure-stack/operator/azure-stack-create-service-principals#create-a-service-principal-using-a-client-secret). |
+| `pull-secret`    | Credentials for pulling OpenShift images from Quay and for authenticating to telemetry. Retrieved from [try.openshift.com](https://try.openshift.com) under the ccoleman+openshift-ci-test@redhat.com account, and has the service account token from the `ocp` namespace added with `oc registry login --to=/tmp/pull-secret -z default -n ocp`.|
+| `ssh-privatekey` | Private half of the SSH key, for connecting to Azure VMs. |
+| `ssh-publickey`  | Public half of the SSH key, for connecting to Azure VMs. |
+
 #### `cluster-secrets-vsphere`
 
 |       Key             | Description |

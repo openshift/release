@@ -3,6 +3,11 @@ local dashboard = grafana.dashboard;
 local graphPanel = grafana.graphPanel;
 local prometheus = grafana.prometheus;
 
+
+local dashboardConfig = {
+        uid: '950e4d81ca8c2272d9717cc35ce80381',
+    };
+
 dashboard.new(
         'sinker dashboard',
         time_from='now-1h',
@@ -96,3 +101,4 @@ dashboard.new(
     x: 12,
     y: 27,
   })
++ dashboardConfig

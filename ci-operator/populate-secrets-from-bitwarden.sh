@@ -115,6 +115,10 @@ function field_value() {
 	echo "$( jq ".[] | select(.name == \"${item}\") | .fields[] | select(.name == \"${field}\") | .value" --raw-output <"${secrets}")"
 }
 
+# Bugzilla API keys are stored as a text field named "API Key"
+server="bugzilla.redhat.com"
+update_secret generic "bugzilla-credentials-${server}" "$( format_field_value "${server}" "API Key" "api" )"
+
 # Jenkins credentials are stored as separate items in Bitwarden,
 # with the token recorded as the password for the account
 for master in "ci.openshift.redhat.com" "kata-jenkins-ci.westus2.cloudapp.azure.com"; do
@@ -180,7 +184,7 @@ done
 
 # Credentials for registries are stored as
 # separate fields on individual items
-for registry in "docker.io" "quay.io" "quay.io/openshift-knative"; do
+for registry in "docker.io" "quay.io" "quay.io/openshift-knative" "quay.io/openshiftio"; do
 	update_secret generic "registry-push-credentials-${registry//\//\-}" $( format_field_value "${registry}" "Push Credentials" "config.json" )
 	# we want to be able to build and push out to registries
 	oc secrets link builder "registry-push-credentials-${registry//\//\-}"
@@ -195,6 +199,7 @@ update_secret generic "ci-pull-credentials" --type=kubernetes.io/dockerconfigjso
 target_cloud="aws"
 update_secret generic "cluster-secrets-${target_cloud}"                         \
 	"$( format_attachment "quay.io" pull-secret )"                              \
+	"$( format_attachment "insights-ci-account" insights-live.yaml )"            \
 	"$( format_attachment "jenkins-ci-iam" .awscred )"                          \
 	"$( format_attachment "jenkins-ci-iam" ssh-privatekey )"                    \
 	"$( format_attachment "mirror.openshift.com" cert-key.pem ops-mirror.pem )" \
@@ -203,6 +208,7 @@ update_secret generic "cluster-secrets-${target_cloud}"                         
 target_cloud="gcp"
 update_secret generic "cluster-secrets-${target_cloud}"                         \
 	"$( format_attachment "quay.io" pull-secret )"                              \
+	"$( format_attachment "insights-ci-account" insights-live.yaml )"            \
 	"$( format_attachment "jenkins-ci-provisioner" credentials.json gce.json )" \
 	"$( format_attachment "jenkins-ci-provisioner" ssh-privatekey )"            \
 	"$( format_attachment "jenkins-ci-provisioner" ssh-publickey )"             \
@@ -213,12 +219,14 @@ target_cloud="openstack"
 update_secret generic "cluster-secrets-${target_cloud}"              \
 	--from-literal=pull-secret="$(merge_pull_secrets)"               \
 	"$( format_attachment "openstack" clouds.yaml )"                 \
+	"$( format_attachment "insights-ci-account" insights-live.yaml )" \
 	"$( format_attachment "jenkins-ci-provisioner" ssh-privatekey )" \
 	"$( format_attachment "jenkins-ci-provisioner" ssh-publickey )"
 
 target_cloud="vsphere"
 update_secret generic "cluster-secrets-${target_cloud}"          \
 	"$( format_attachment "quay.io" pull-secret )"               \
+	"$( format_attachment "insights-ci-account" insights-live.yaml )" \
 	"$( format_attachment "jenkins-ci-iam" .awscred )"           \
 	"$( format_attachment "jenkins-ci-iam" ssh-privatekey )"     \
 	"$( format_attachment "jenkins-ci-iam" ssh-publickey )"      \
@@ -227,6 +235,7 @@ update_secret generic "cluster-secrets-${target_cloud}"          \
 target_cloud="metal"
 update_secret generic "cluster-secrets-${target_cloud}"                  \
 	"$( format_attachment "quay.io" pull-secret )"                       \
+	"$( format_attachment "insights-ci-account" insights-live.yaml )"     \
 	"$( format_attachment "jenkins-ci-iam" .awscred )"                   \
 	"$( format_attachment "jenkins-ci-iam" ssh-privatekey )"             \
 	"$( format_attachment "jenkins-ci-iam" ssh-publickey )"              \
@@ -234,10 +243,17 @@ update_secret generic "cluster-secrets-${target_cloud}"                  \
 	"$( format_attachment "packet.net" client.crt matchbox-client.crt )" \
 	"$( format_attachment "packet.net" client.key matchbox-client.key )"
 
+target_cloud="azure"
+update_secret generic "cluster-secrets-${target_cloud}"                                 \
+	"$( format_attachment "quay.io" pull-secret )"                                      \
+	"$( format_attachment "os4-installer.openshift-ci.azure" osServicePrincipal.json )" \
+	"$( format_attachment "jenkins-ci-iam" ssh-privatekey )"                            \
+	"$( format_attachment "jenkins-ci-iam" ssh-publickey )"
+
 # DSNs for tools reporting failures to Sentry
 update_secret generic "sentry-dsn" "$( format_field_value "sentry" "ci-operator" "ci-operator" )"
 
 # Configuration for the .git-credentials used by the release controller to clone
 # private repositories to generate changelogs
-oc -n "ci-release" create secret generic "git-credentials" "--from-literal=.git-credentials=https://openshift-bot:$( field_value "openshift-bot" "GitHub OAuth Token" "oauth" )@github.com"
-oc -n "ci-release" label secret "git-credentials" "ci.openshift.io/managed=true"
+oc -n "ci-release" create secret generic "git-credentials" "--from-literal=.git-credentials=https://openshift-bot:$( field_value "openshift-bot" "GitHub OAuth Token" "oauth" )@github.com" --dry-run -o yaml | oc apply -f -
+oc -n "ci-release" label secret "git-credentials" "ci.openshift.io/managed=true" --overwrite

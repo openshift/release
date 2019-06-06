@@ -8,7 +8,7 @@ build_root:
     cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
-    tag: golang-1.10
+    tag: golang-1.12
 canonical_go_repository: github.com/openshift/machine-config-operator
 images:
 - dockerfile_path: Dockerfile.machine-config-controller
@@ -70,3 +70,9 @@ tests:
   commands: TEST_SUITE=openshift/conformance run-tests
   openshift_ansible_40:
     cluster_profile: aws-centos-40
+- as: e2e-restore-cluster-state
+  commands: |
+    restore-cluster-state
+    TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer:
+    cluster_profile: aws
