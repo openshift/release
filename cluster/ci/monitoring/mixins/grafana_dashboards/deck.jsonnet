@@ -66,53 +66,10 @@ dashboard.new(
         legend_sortDesc=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'histogram_quantile(0.5, sum(rate(http_request_duration_seconds_bucket{job="deck", path="/tide", method=~"${method}", status=~"${status}"}[5m])) by (le))',
-        legendFormat='/tide',
-    ))
-    .addTarget(prometheus.target(
-        'histogram_quantile(0.5, sum(rate(http_request_duration_seconds_bucket{job="deck", path="/plugin-help.js", method=~"${method}", status=~"${status}"}[5m])) by (le))',
-        legendFormat='/plugin-help.js',
-    ))
-    .addTarget(prometheus.target(
-        'histogram_quantile(0.5, sum(rate(http_request_duration_seconds_bucket{job="deck", path="/data.js", method=~"${method}", status=~"${status}"}[5m])) by (le))',
-        legendFormat='/data.js',
-    ))
-    .addTarget(prometheus.target(
-        'histogram_quantile(0.5, sum(rate(http_request_duration_seconds_bucket{job="deck", path="/prowjobs.js", method=~"${method}", status=~"${status}"}[5m])) by (le))',
-        legendFormat='/prowjobs.js',
-    ))
-    .addTarget(prometheus.target(
-        'histogram_quantile(0.5, sum(rate(http_request_duration_seconds_bucket{job="deck", path="/pr-data.js", method=~"${method}", status=~"${status}"}[5m])) by (le))',
-        legendFormat='/pr-data.js',
-    ))
-    .addTarget(prometheus.target(
-        'histogram_quantile(0.5, sum(rate(http_request_duration_seconds_bucket{job="deck", path="/log", method=~"${method}", status=~"${status}"}[5m])) by (le))',
-        legendFormat='/log',
-    ))
-    .addTarget(prometheus.target(
-        'histogram_quantile(0.5, sum(rate(http_request_duration_seconds_bucket{job="deck", path="/rerun", method=~"${method}", status=~"${status}"}[5m])) by (le))',
-        legendFormat='/rerun',
-    ))
-    .addTarget(prometheus.target(
-        'histogram_quantile(0.5, sum(rate(http_request_duration_seconds_bucket{job="deck", path="/spyglass/", method=~"${method}", status=~"${status}"}[5m])) by (le))',
-        legendFormat='/spyglass/',
-    ))
-    .addTarget(prometheus.target(
-        'histogram_quantile(0.5, sum(rate(http_request_duration_seconds_bucket{job="deck", path="/view/", method=~"${method}", status=~"${status}"}[5m])) by (le))',
-        legendFormat='/view/',
-    ))
-    .addTarget(prometheus.target(
-        'histogram_quantile(0.5, sum(rate(http_request_duration_seconds_bucket{job="deck", path="/job-history/", method=~"${method}", status=~"${status}"}[5m])) by (le))',
-        legendFormat='/job-history/',
-    ))
-    .addTarget(prometheus.target(
-        'histogram_quantile(0.5, sum(rate(http_request_duration_seconds_bucket{job="deck", path="/pr-history/", method=~"${method}", status=~"${status}"}[5m])) by (le))',
-        legendFormat='/pr-history/',
-    ))
-    .addTarget(prometheus.target(
-        'histogram_quantile(0.5, sum(rate(http_request_duration_seconds_bucket{path="others", method=~"${method}", status=~"${status}"}[5m])) by (le))',
-        legendFormat='others',
-    )), gridPos={
+        'histogram_quantile(0.5, sum(rate(http_request_duration_seconds_bucket{job="deck", path="%s", method=~"${method}", status=~"${status}"}[5m])) by (le))' % name,
+        legendFormat='%s' % name,
+    )) for name in ['deck', 'ghproxy']
+    , gridPos={
     h: 9,
     w: 24,
     x: 0,
