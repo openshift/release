@@ -1,0 +1,37 @@
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.12
+canonical_go_repository: github.com/openshift/source-to-image
+binary_build_commands: make build
+resources:
+  '*':
+    limits:
+      memory: 3Gi
+    requests:
+      cpu: "3"
+      memory: 1Gi
+tests:
+- artifact_dir: /tmp/artifacts
+  as: verify
+  commands: |
+    mkdir -p /tmp/artifacts
+    make verify > /tmp/artifacts/verify.log
+  container:
+    from: bin
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: |
+    mkdir -p /tmp/artifacts/coverage
+    make test-unit OUTPUT_COVERAGE=/tmp/artifacts/coverage > /tmp/artifacts/test-unit.log
+  container:
+    from: src
+- artifact_dir: /tmp/artifacts
+  as: integration
+  commands: |
+    mkdir -p /tmp/artifacts
+    make test-dockerfile > /tmp/artifacts/test-dockerfile.log
+  container:
+    from: bin
