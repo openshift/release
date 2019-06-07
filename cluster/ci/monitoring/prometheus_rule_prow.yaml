@@ -8,6 +8,62 @@ metadata:
   namespace: prow-monitoring
 spec:
   groups:
+  - name: build-cop-target-low
+    rules:
+    - alert: .*-master-e2e-awsLow
+      annotations:
+        message: The plank job has been below the target (75 percent) for job regex
+          .*-master-e2e-aws for 5 minutes.
+      expr: |
+        sum(prowjobs{job="plank",job_name=~".*-master-e2e-aws",job_name!~"rehearse.*",state="success"})/sum(prowjobs{job="plank",job_name=~".*-master-e2e-aws",job_name!~"rehearse.*",state=~"success|failure"}) < 0.75
+      for: 5m
+      labels:
+        severity: slack
+    - alert: .*-release-4.1-e2e-awsLow
+      annotations:
+        message: The plank job has been below the target (75 percent) for job regex
+          .*-release-4.1-e2e-aws for 5 minutes.
+      expr: |
+        sum(prowjobs{job="plank",job_name=~".*-release-4.1-e2e-aws",job_name!~"rehearse.*",state="success"})/sum(prowjobs{job="plank",job_name=~".*-release-4.1-e2e-aws",job_name!~"rehearse.*",state=~"success|failure"}) < 0.75
+      for: 5m
+      labels:
+        severity: slack
+    - alert: .*release-.*-origin-.*-e2e-aws.*Low
+      annotations:
+        message: The plank job has been below the target (75 percent) for job regex
+          .*release-.*-origin-.*-e2e-aws.* for 5 minutes.
+      expr: |
+        sum(prowjobs{job="plank",job_name=~".*release-.*-origin-.*-e2e-aws.*",job_name!~"rehearse.*",state="success"})/sum(prowjobs{job="plank",job_name=~".*release-.*-origin-.*-e2e-aws.*",job_name!~"rehearse.*",state=~"success|failure"}) < 0.75
+      for: 5m
+      labels:
+        severity: slack
+    - alert: .*release-.*-ocp-.*-e2e-aws.*Low
+      annotations:
+        message: The plank job has been below the target (75 percent) for job regex
+          .*release-.*-ocp-.*-e2e-aws.* for 5 minutes.
+      expr: |
+        sum(prowjobs{job="plank",job_name=~".*release-.*-ocp-.*-e2e-aws.*",job_name!~"rehearse.*",state="success"})/sum(prowjobs{job="plank",job_name=~".*release-.*-ocp-.*-e2e-aws.*",job_name!~"rehearse.*",state=~"success|failure"}) < 0.75
+      for: 5m
+      labels:
+        severity: slack
+    - alert: .*release-.*-e2e-aws-upgrade.*Low
+      annotations:
+        message: The plank job has been below the target (75 percent) for job regex
+          .*release-.*-e2e-aws-upgrade.* for 5 minutes.
+      expr: |
+        sum(prowjobs{job="plank",job_name=~".*release-.*-e2e-aws-upgrade.*",job_name!~"rehearse.*",state="success"})/sum(prowjobs{job="plank",job_name=~".*release-.*-e2e-aws-upgrade.*",job_name!~"rehearse.*",state=~"success|failure"}) < 0.75
+      for: 5m
+      labels:
+        severity: slack
+    - alert: .*-imagesLow
+      annotations:
+        message: The plank job has been below the target (97 percent) for job regex
+          .*-images for 5 minutes.
+      expr: |
+        sum(prowjobs{job="plank",job_name=~".*-images",job_name!~"rehearse.*",state="success"})/sum(prowjobs{job="plank",job_name=~".*-images",job_name!~"rehearse.*",state=~"success|failure"}) < 0.97
+      for: 5m
+      labels:
+        severity: slack
   - name: ci-absent
     rules:
     - alert: deckDown
