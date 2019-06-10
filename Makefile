@@ -89,6 +89,7 @@ prow-rbac:
 .PHONY: prow-rbac
 
 prow-services:
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/prow-priority-class.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/adapter_imagestreams.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/artifact-uploader.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/cherrypick.yaml
