@@ -355,3 +355,35 @@ items:
   - kind: ServiceAccount
     name: ci-operator
     namespace: ci
+
+- kind: Role
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: longlived-credential-editor
+    namespace: ci
+  rules:
+  - apiGroups:
+    - ""
+    resources:
+    - secrets
+    resourceNames:
+    - longlived-aws-cluster-credentials
+    verbs:
+    - get
+    - create
+    - update
+    - delete
+
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: longlived-credential-editor-ci-operator
+    namespace: ci
+  roleRef:
+    kind: Role
+    name: longlived-credential-editor
+    namespace: ci
+  subjects:
+  - kind: ServiceAccount
+    name: ci-operator
+    namespace: ci
