@@ -1,0 +1,37 @@
+presubmits:
+  openshift/openshift-azure:
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - openshift-v4
+    context: unit
+    decorate: true
+    name: pull-ci-azure-master-unit
+    rerun_command: /test unit
+    spec:
+      containers:
+      - args:
+        - make
+        - unit
+        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        name: ""
+        resources: {}
+      serviceAccountName: ci-operator
+    trigger: (?m)^/test( | .* )unit,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - openshift-v4
+    decorate: true
+    name: verify
+    rerun_command: /test verify
+    spec:
+      containers:
+      - args:
+        - make
+        - verify
+        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        name: ""
+        resources: {}
+      serviceAccountName: ci-operator
+    trigger: (?m)^/test( | .* )verify,?($|\s.*)
