@@ -1,5 +1,233 @@
 periodics:
 - agent: kubernetes
+  cron: 0 0 * * 1
+  decorate: true
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: endurance-upgrade-aws-4.1
+  spec:
+    containers:
+    - command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -euo pipefail
+
+        ci-operator --artifact-dir=$(ARTIFACTS) \
+          --secret-dir=/usr/local/pull-secret \
+          --secret-dir=/usr/local/ci-credentials \
+          --secret-dir=/usr/local/endurance-cluster-credentials-aws \
+          --template=/usr/local/endurance-test/endurance-test.yaml \
+          --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME) \
+          --target=endurance-test
+      env:
+      - name: RELEASE_IMAGE_LATEST
+        value: registry.svc.ci.openshift.org/ocp/release:4.1-ci
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: CONFIG_SPEC
+        value: |
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+          resources:
+            '*':
+              requests:
+                cpu: 10m
+          tests:
+          - as: endurance-upgrade-$(CLUSTER_TYPE)
+            commands: TEST_SUITE=all run-upgrade-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+      - name: JOB_NAME_SAFE
+        value: endurance-aws-upgrade
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/endurance-test
+        name: job-definition
+        subPath: endurance-test.yaml
+      - mountPath: /usr/local/ci-credentials
+        name: ci-credentials
+      - mountPath: /usr/local/pull-secret
+        name: pull-secret
+      - mountPath: /usr/local/endurance-cluster-credentials-aws
+        name: endurance-cluster-credentials-aws
+    serviceAccountName: ci-operator
+    volumes:
+    - configMap:
+        name: prow-job-endurance-test
+      name: job-definition
+    - name: ci-credentials
+      secret:
+        secretName: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: endurance-cluster-credentials-aws
+      secret:
+        secretName: endurance-cluster-credentials-aws
+- agent: kubernetes
+  cron: 0 12 * * 1-5
+  decorate: true
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: endurance-e2e-aws-4.1
+  spec:
+    containers:
+    - command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -euo pipefail
+
+        ci-operator --artifact-dir=$(ARTIFACTS) \
+          --secret-dir=/usr/local/pull-secret \
+          --secret-dir=/usr/local/endurance-cluster-credentials-aws \
+          --template=/usr/local/endurance-test/endurance-test.yaml \
+          --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME) \
+          --target=endurance-test
+      env:
+      - name: RELEASE_IMAGE_LATEST
+        value: registry.svc.ci.openshift.org/ocp/release:4.1-ci
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: CONFIG_SPEC
+        value: |
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+          resources:
+            '*':
+              requests:
+                cpu: 10m
+          tests:
+          - as: endurance-e2e-$(CLUSTER_TYPE)
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: false
+      - name: JOB_NAME_SAFE
+        value: endurance-e2e-aws
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/endurance-test
+        name: job-definition
+        subPath: endurance-test.yaml
+      - mountPath: /usr/local/pull-secret
+        name: pull-secret
+      - mountPath: /usr/local/endurance-cluster-credentials-aws
+        name: endurance-cluster-credentials-aws
+    serviceAccountName: ci-operator
+    volumes:
+    - configMap:
+        name: prow-job-endurance-test
+      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: endurance-cluster-credentials-aws
+      secret:
+        secretName: endurance-cluster-credentials-aws
+- agent: kubernetes
+  cron: 0 9 * * 1-5
+  decorate: true
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: endurance-aws-cluster-maintenance-4.1
+  spec:
+    containers:
+    - command:
+      - /bin/bash
+      - -c
+      - "#!/bin/bash\nset -euo pipefail\n\nexport PATH=$PATH:/tmp/bin\nmkdir /tmp/bin\ncurl
+        https://storage.googleapis.com/origin-ci-test/_tools/4.1.0/oc >/tmp/bin/oc
+        2>/dev/null\nchmod ug+x /tmp/bin/oc\n\nset +e\nci-operator --artifact-dir=$(ARTIFACTS)
+        \\\n  --secret-dir=/usr/local/pull-secret \\\n  --secret-dir=/usr/local/ci-credentials
+        \\\n  --secret-dir=/usr/local/endurance-cluster-credentials-aws \\\n  --secret-dir=/usr/local/aws-openshift-llc-account-credentials
+        \\\n  --template=/usr/local/endurance-install/endurance-install.yaml \\\n
+        \ --target=endurance-aws-install \\\n  --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME)
+        | tee /tmp/ci-operator.log      \nset -e\nnamespace=$(grep \"Using namespace\"
+        /tmp/ci-operator.log | awk '{print $NF}')\n\n# copy the cluster credentials
+        secret that was created in the job namespace, into the ci namespace\n# so
+        it is persisted for future runs.\noc get --export secret endurance-cluster-credentials-aws-new
+        -n $namespace -o yaml | grep -v namespace: > /tmp/secret.yaml\nsed -i s/endurance-cluster-credentials-aws-new/endurance-cluster-credentials-aws/
+        /tmp/secret.yaml\noc apply -f /tmp/secret.yaml -n ci\n"
+      env:
+      - name: RELEASE_IMAGE_LATEST
+        value: registry.svc.ci.openshift.org/ocp/release:4.1-ci
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: CONFIG_SPEC
+        value: |
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: endurance-install-$(CLUSTER_TYPE)
+            commands: sleep 9000 & wait
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: false
+      - name: JOB_NAME_SAFE
+        value: endurance-install-aws
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/endurance-install
+        name: job-definition
+      - mountPath: /usr/local/pull-secret
+        name: pull-secret
+      - mountPath: /usr/local/ci-credentials
+        name: ci-credentials
+      - mountPath: /usr/local/aws-openshift-llc-account-credentials
+        name: aws-openshift-llc-account-credentials
+        subPath: endurance-install.yaml
+      - mountPath: /usr/local/endurance-cluster-credentials-aws
+        name: endurance-cluster-credentials-aws
+    serviceAccountName: ci-operator
+    volumes:
+    - configMap:
+        name: prow-job-endurance-install
+      name: job-definition
+    - name: ci-credentials
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: aws-openshift-llc-account-credentials
+      secret:
+        secretName: aws-openshift-llc-account-credentials
+    - name: endurance-cluster-credentials-aws
+      secret:
+        secretName: endurance-cluster-credentials-aws
+- agent: kubernetes
   decorate: true
   interval: 15m
   labels:
