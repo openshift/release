@@ -10,7 +10,8 @@ ENV VERSION=1.12.5 \
     GOCACHE=/go/.cache \
     GOARM=5 \
     GOPATH=/go \
-    GOROOT=/usr/local/go
+    GOROOT=/usr/local/go \
+    LOGNAME=deadbeef
 ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
 
 COPY cbs-paas7-openshift-multiarch-el7-build.repo /etc/yum.repos.d/
