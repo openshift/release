@@ -198,6 +198,8 @@ objects:
         value: ${NAMESPACE}-${JOB_NAME_HASH}
       - name: BASE_DOMAIN
         value: ${BASE_DOMAIN}
+      - name: SSH_PRIV_KEY_PATH
+        value: /etc/openshift-installer/ssh-privatekey
       - name: SSH_PUB_KEY_PATH
         value: /etc/openshift-installer/ssh-publickey
       - name: PULL_SECRET_PATH
@@ -234,6 +236,10 @@ objects:
         export EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
         export SSH_PUB_KEY=$(cat "${SSH_PUB_KEY_PATH}")
         export PULL_SECRET=$(cat "${PULL_SECRET_PATH}")
+
+        ## move private key to ~/.ssh/ so that installer can use it to gather logs on bootstrap failure
+        mkdir -p ~/.ssh
+        cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
 
         if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
             cat > /tmp/artifacts/installer/install-config.yaml << EOF
