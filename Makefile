@@ -129,6 +129,7 @@ prow-cluster-jobs:
 	oc create configmap prow-job-cluster-launch-e2e-openshift-jenkins --from-file=ci-operator/templates/openshift/openshift-ansible/cluster-launch-e2e-openshift-jenkins.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap prow-job-cluster-launch-src --from-file=ci-operator/templates/openshift/openshift-ansible/cluster-launch-src.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap prow-job-cluster-launch-installer-e2e --from-file=ci-operator/templates/openshift/installer/cluster-launch-installer-e2e.yaml -o yaml --dry-run | oc apply -f -
+	oc create configmap prow-job-cluster-launch-installer-longlived --from-file=ci-operator/templates/openshift/installer/cluster-launch-installer-longlived.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap prow-job-cluster-launch-installer-libvirt-e2e --from-file=ci-operator/templates/openshift/installer/cluster-launch-installer-libvirt-e2e.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap prow-job-cluster-launch-installer-src --from-file=ci-operator/templates/openshift/installer/cluster-launch-installer-src.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap prow-job-cluster-launch-installer-console --from-file=ci-operator/templates/openshift/installer/cluster-launch-installer-console.yaml -o yaml --dry-run | oc apply -f -
