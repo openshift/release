@@ -16,11 +16,11 @@ OSA, from the Red Hat side, is comprised of a couple of different Github repos:
 In order to test and merge changes in these repositories, we use a couple of novel tools
 in our CI. Namely:
 
-* [ci-operator](https://github.com/openshift/ci-operator)
+* [ci-operator](https://github.com/openshift/ci-tools)
 
   This tool is responsible for running [jobs](#ci-operator-jobs) by using Openshift resources.
   There are a bunch of useful docs in the `ci-operator` repo, it is suggested to
-  go through at least [ONBOARD.md](https://github.com/openshift/ci-operator/blob/master/ONBOARD.md), [ARCHITECTURE.md](https://github.com/openshift/ci-operator/blob/master/ARCHITECTURE.md), and [CONFIGURATION.md](https://github.com/openshift/ci-operator/blob/master/CONFIGURATION.md).
+  go through at least [ONBOARD.md](https://github.com/openshift/ci-tools/blob/master/ONBOARD.md), [ARCHITECTURE.md](https://github.com/openshift/ci-tools/blob/master/ARCHITECTURE.md), and [CONFIGURATION.md](https://github.com/openshift/ci-tools/blob/master/CONFIGURATION.md).
   You should ensure you familiarize yourself with `ci-operator`.
 
 * [Prow](https://github.com/kubernetes/test-infra/blob/master/prow/getting_started_deploy.md)
@@ -57,7 +57,7 @@ There are three different places where we store `ci-operator` and Prow configura
   Hence, we use Openshift templates to do black-box testing with `ci-operator`.
   This directory contains the templates used by our e2e tests and by our image
   build processes. In order to learn more about writing tests using templates
-  refer to [TEMPLATES.md](https://github.com/openshift/ci-operator/blob/master/TEMPLATES.md)
+  refer to [TEMPLATES.md](https://github.com/openshift/ci-tools/blob/master/TEMPLATES.md)
 
   Currently, we maintain three different templates:
 
