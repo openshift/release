@@ -89,6 +89,7 @@ prow-rbac:
 .PHONY: prow-rbac
 
 prow-services:
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/prow-priority-class.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/adapter_imagestreams.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/artifact-uploader.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/cherrypick.yaml
@@ -188,7 +189,7 @@ prow-release-controller-deploy:
 prow-release-controller: prow-release-controller-definitions prow-release-controller-deploy
 .PHONY: prow-release-controller
 
-projects: ci-ns gcsweb origin-stable origin-release test-bases image-mirror-setup knative-image-mirror-setup tekton-image-mirror-setup toolchain-image-mirror-setup image-pruner-setup publishing-bot content-mirror azure python-validation metering
+projects: ci-ns gcsweb origin-stable origin-release image-mirror-setup knative-image-mirror-setup tekton-image-mirror-setup toolchain-image-mirror-setup image-pruner-setup publishing-bot content-mirror azure python-validation metering
 .PHONY: projects
 
 ci-operator-config:
@@ -253,10 +254,6 @@ service-idler:
 alert-buffer:
 	$(MAKE) apply WHAT=projects/prometheus/alert-buffer.yaml
 .PHONY: alert-buffer
-
-test-bases:
-	$(MAKE) apply WHAT=projects/test-bases/openshift/openshift-ansible.yaml
-.PHONY: test-bases
 
 image-pruner-setup:
 	oc create serviceaccount image-pruner -o yaml --dry-run | oc apply -f -

@@ -211,20 +211,20 @@ dashboard.new(
         formatY1='percentunit',
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(prowjobs{job="plank",job_name=~".*e2e-aws.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"})/sum(prowjobs{job="plank",job_name=~".*e2e-aws.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"})',
-        legendFormat='.*e2e-aws.*',
+        'sum(prowjobs{job="plank",job_name=~".*-aws.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"})/sum(prowjobs{job="plank",job_name=~".*-aws.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"})',
+        legendFormat='.*-aws.*',
     ))
     .addTarget(prometheus.target(
-        'sum(prowjobs{job="plank",job_name=~".*e2e-vsphere.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"})/sum(prowjobs{job="plank",job_name=~".*e2e-vsphere.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"})',
-        legendFormat='.*e2e-vsphere.*',
+        'sum(prowjobs{job="plank",job_name=~".*-vsphere.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"})/sum(prowjobs{job="plank",job_name=~".*-vsphere.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"})',
+        legendFormat='.*-vsphere.*',
     ))
     .addTarget(prometheus.target(
-        'sum(prowjobs{job="plank",job_name=~".*e2e-gcp.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"})/sum(prowjobs{job="plank",job_name=~".*e2e-gcp.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"})',
-        legendFormat='.*e2e-gcp.*',
+        'sum(prowjobs{job="plank",job_name=~".*-gcp.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"})/sum(prowjobs{job="plank",job_name=~".*-gcp.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"})',
+        legendFormat='.*-gcp.*',
     ))
     .addTarget(prometheus.target(
-        'sum(prowjobs{job="plank",job_name=~".*e2e-azure.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"})/sum(prowjobs{job="plank",job_name=~".*e2e-azure.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"})',
-        legendFormat='.*e2e-azure.*',
+        'sum(prowjobs{job="plank",job_name=~".*-azure.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"})/sum(prowjobs{job="plank",job_name=~".*-azure.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"})',
+        legendFormat='.*-azure.*',
     )), gridPos={
     h: 9,
     w: 24,
