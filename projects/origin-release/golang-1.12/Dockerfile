@@ -29,6 +29,7 @@ RUN yum install -y /tmp/origin-rpm/*.rpm && \
     yum clean all && \
     curl https://storage.googleapis.com/golang/go$VERSION.linux-amd64.tar.gz | tar -C /usr/local -xzf - && \
     go get golang.org/x/tools/cmd/cover \
+        github.com/Masterminds/glide \
         golang.org/x/tools/cmd/goimports \
         github.com/tools/godep \
         golang.org/x/lint/golint \
