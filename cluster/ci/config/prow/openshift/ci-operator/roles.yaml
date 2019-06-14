@@ -45,6 +45,38 @@ items:
   apiVersion: rbac.authorization.k8s.io/v1
   metadata:
     name: image-tagger
+    namespace: openshift-jenkins
+  rules:
+  - apiGroups:
+    - ""
+    - image.openshift.io
+    resources:
+    - imagestreamtags
+    - imagestreams
+    verbs:
+    - update
+    - patch
+    - get
+    - create
+
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: image-tagger-ci-operator
+    namespace: openshift-jenkins
+  roleRef:
+    kind: Role
+    name: image-tagger
+    namespace: openshift-jenkins
+  subjects:
+  - kind: ServiceAccount
+    name: ci-operator
+    namespace: ci
+
+- kind: Role
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: image-tagger
     namespace: ci
   rules:
   - apiGroups:
