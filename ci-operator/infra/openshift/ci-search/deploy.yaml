@@ -118,3 +118,32 @@ spec:
         - --interval=10m
         - --path=/var/lib/ci-search/
         - --deck-url=https://prow.svc.ci.openshift.org
+
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ci-hook
+  namespace: ci-search
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - create
+  - get
+  - update
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ci-hook
+  namespace: ci-search
+roleRef:
+  kind: Role
+  name: ci-hook
+subjects:
+- kind: ServiceAccount
+  name: hook
+  namespace: ci
