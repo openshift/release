@@ -142,13 +142,10 @@ plugins:
   openshift/ci-chat-bot:
   - approve
 
-  openshift/ci-operator:
-  - approve
-
-  openshift/ci-operator-prowgen:
-  - approve
-
   openshift/ci-search:
+  - approve
+
+  openshift/ci-tools:
   - approve
 
   openshift/ci-vm-operator:
@@ -727,6 +724,54 @@ plugins:
   - yuks
   - approve
 
+  codeready-toolchain/api:
+  - assign
+  - blunderbuss
+  - blockade
+  - cat
+  - dog
+  - heart
+  - golint
+  - help
+  - hold
+  - label
+  - lgtm
+  - lifecycle
+  - override
+  - shrug
+  - sigmention
+  - size
+  - skip
+  - trigger
+  - verify-owners
+  - wip
+  - yuks
+  - approve
+  
+  codeready-toolchain/member-operator:
+  - assign
+  - blunderbuss
+  - blockade
+  - cat
+  - dog
+  - heart
+  - golint
+  - help
+  - hold
+  - label
+  - lgtm
+  - lifecycle
+  - override
+  - shrug
+  - sigmention
+  - size
+  - skip
+  - trigger
+  - verify-owners
+  - wip
+  - yuks
+  - approve
+
   kubernetes-incubator:
   - trigger
 
@@ -799,6 +844,8 @@ approve:
   ignore_review_state: false
 - repos:
   - codeready-toolchain/host-operator
+  - codeready-toolchain/api
+  - codeready-toolchain/member-operator
   require_self_approval: false
   lgtm_acts_as_approve: false
   ignore_review_state: false
@@ -853,6 +900,8 @@ config_updater:
       name: job-config-misc
     ci-operator/jobs/**/*release-next*.yaml:
       name: job-config-misc
+    ci-operator/jobs/**/*openshift-v4*.yaml:
+      name: job-config-misc
     ci-operator/jobs/**/*release-3.*submits.yaml:
       name: job-config-3.x
     ci-operator/jobs/**/*enterprise-3.*submits.yaml:
@@ -884,6 +933,10 @@ config_updater:
       additional_namespaces:
       - ci-stg
     ci-operator/config/**/*release-v*.yaml:
+      name: ci-operator-misc-configs
+      additional_namespaces:
+      - ci-stg
+    ci-operator/config/**/*openshift-v4*.yaml:
       name: ci-operator-misc-configs
       additional_namespaces:
       - ci-stg
@@ -1149,6 +1202,20 @@ external_plugins:
     - name: needs-rebase
       events:
       - pull_request
+  codeready-toolchain/api:
+    - name: refresh
+      events:
+      - issue_comment
+    - name: needs-rebase
+      events:
+      - pull_request
+  codeready-toolchain/member-operator:
+    - name: refresh
+      events:
+      - issue_comment
+    - name: needs-rebase
+      events:
+      - pull_request
 
 bugzilla:
   default:
@@ -1165,3 +1232,7 @@ bugzilla:
     release-4.2:
       is_open: true
       target_release: 4.2.z
+
+label:
+  additional_labels:
+  - platform/libvirt
