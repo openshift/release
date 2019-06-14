@@ -1,32 +1,31 @@
 presubmits:
-  openshift/ci-operator-prowgen:
+  codeready-toolchain/member-operator:
   - agent: kubernetes
     always_run: true
     branches:
     - master
-    context: ci/prow/breaking-changes
+    context: ci/prow/build
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-    name: pull-ci-openshift-ci-operator-prowgen-master-breaking-changes
-    optional: true
-    rerun_command: /test breaking-changes
+    name: pull-ci-codeready-toolchain-member-operator-master-build
+    rerun_command: /test build
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=breaking-changes
+        - --target=build
         command:
         - ci-operator
         env:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-ci-operator-prowgen-master.yaml
+              key: codeready-toolchain-member-operator-master.yaml
               name: ci-operator-master-configs
         image: ci-operator:latest
         imagePullPolicy: Always
@@ -43,50 +42,7 @@ presubmits:
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )breaking-changes,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    context: ci/prow/format
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-    name: pull-ci-openshift-ci-operator-prowgen-master-format
-    rerun_command: /test format
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=format
-        command:
-        - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-ci-operator-prowgen-master.yaml
-              name: ci-operator-master-configs
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )format,?($|\s.*)
+    trigger: (?m)^/test( | .* )build,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -97,7 +53,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-    name: pull-ci-openshift-ci-operator-prowgen-master-images
+    name: pull-ci-codeready-toolchain-member-operator-master-images
     rerun_command: /test images
     spec:
       containers:
@@ -112,7 +68,7 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-ci-operator-prowgen-master.yaml
+              key: codeready-toolchain-member-operator-master.yaml
               name: ci-operator-master-configs
         image: ci-operator:latest
         imagePullPolicy: Always
@@ -134,56 +90,13 @@ presubmits:
     always_run: true
     branches:
     - master
-    context: ci/prow/integration
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-    name: pull-ci-openshift-ci-operator-prowgen-master-integration
-    rerun_command: /test integration
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=integration
-        command:
-        - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-ci-operator-prowgen-master.yaml
-              name: ci-operator-master-configs
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )integration,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
     context: ci/prow/lint
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-    name: pull-ci-openshift-ci-operator-prowgen-master-lint
+    name: pull-ci-codeready-toolchain-member-operator-master-lint
     rerun_command: /test lint
     spec:
       containers:
@@ -198,7 +111,7 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-ci-operator-prowgen-master.yaml
+              key: codeready-toolchain-member-operator-master.yaml
               name: ci-operator-master-configs
         image: ci-operator:latest
         imagePullPolicy: Always
@@ -220,28 +133,28 @@ presubmits:
     always_run: true
     branches:
     - master
-    context: ci/prow/unit
+    context: ci/prow/test
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-    name: pull-ci-openshift-ci-operator-prowgen-master-unit
-    rerun_command: /test unit
+    name: pull-ci-codeready-toolchain-member-operator-master-test
+    rerun_command: /test test
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=unit
+        - --target=test
         command:
         - ci-operator
         env:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-ci-operator-prowgen-master.yaml
+              key: codeready-toolchain-member-operator-master.yaml
               name: ci-operator-master-configs
         image: ci-operator:latest
         imagePullPolicy: Always
@@ -258,4 +171,4 @@ presubmits:
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )unit,?($|\s.*)
+    trigger: (?m)^/test( | .* )test,?($|\s.*)

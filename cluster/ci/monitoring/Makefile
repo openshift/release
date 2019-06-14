@@ -1,4 +1,5 @@
 ### --as=system:serviceaccount:ci:config-updater
+prometheus-k8s_token := $(shell oc get secret -n openshift-monitoring grafana-datasources -o "jsonpath={.data.prometheus\.yaml}" | base64 --decode | jq '.datasources[] | select(.name = "prometheus-k8s") .basicAuthPassword')
 .PHONY : prow-monitoring-deploy
 prow-monitoring-deploy: ci-secret-deploy
 	@echo "Deploying prow-monitoring stack ..."
@@ -21,8 +22,12 @@ prow-monitoring-deploy: ci-secret-deploy
 	#grafana
 	oc apply -f ./grafana_expose.yaml
 	oc create -n prow-monitoring secret generic grafana-config --from-file=./grafana.ini --dry-run -o yaml | oc apply -f -
-	#Those config are deployed by config_uploader; we leave those here for manual debugging
+
+	# Fill prometheus-k8s basicAuthPassword in datasources file.
+	sed -i -e "s|CHANGE_ME|$(prometheus-k8s_token)|g" ./datasources.yaml
 	oc create -n prow-monitoring configmap grafana-datasources --from-file=./datasources.yaml --dry-run -o yaml | oc apply -f -
+
+	#Those config are deployed by config_uploader; we leave those here for manual debugging
 	#oc create -n prow-monitoring configmap grafana-dashboards --from-file=./dashboards.yaml --dry-run -o yaml | oc apply -f -
 	#oc create -n prow-monitoring configmap grafana-dashboard-sinker --from-file=./sinker.json --dry-run -o yaml | oc apply -f -
 	#oc create -n prow-monitoring configmap grafana-dashboard-ghproxy --from-file=./ghproxy.json --dry-run -o yaml | oc apply -f -

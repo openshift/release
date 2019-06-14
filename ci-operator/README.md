@@ -55,7 +55,7 @@ tested on top of a Kubernetes cluster from an end-user perspective.
 The preferred way to write this type of tests is using `ci-operator`.  See the
 documentation for details on how to download, build, and execute it:
 
-https://github.com/openshift/ci-operator.git
+https://github.com/openshift/ci-tools.git
 
 ci-operator requires a configuration file for the repository being tested.
 These files are located in the [`config`](config/) directory.  The ci-operator
@@ -115,9 +115,9 @@ https://kubernetes.io/docs/tasks/administer-cluster/access-cluster-api
 
 The preferred way to add a test that uses a template is to add it to the
 `ci-operator` configuration file and use the configuration generator to
-[generate the job](https://github.com/openshift/ci-operator/blob/master/ONBOARD.md#add-prow-jobs).
+[generate the job](https://github.com/openshift/ci-tools/blob/master/ONBOARD.md#add-prow-jobs).
 The list of supported test types can be found in the
-[configuration documentation](https://github.com/openshift/ci-operator/blob/master/CONFIGURATION.md#tests).
+[configuration documentation](https://github.com/openshift/ci-tools/blob/master/CONFIGURATION.md#tests).
 
 The process for adding jobs manually is significantly more complex. For
 templates that are expected to be used by many jobs, it may be easier to add
@@ -130,7 +130,7 @@ used as a reference for jobs that are not in that category.
 This section covers the process of creating a new template when none of the
 existing ones provide the workflow required for a particular type of test — e.g.
 when a new installer needs to be supported. It supplements the `ci-operator`
-[template documentation](https://github.com/openshift/ci-operator/blob/master/TEMPLATES.md).
+[template documentation](https://github.com/openshift/ci-tools/blob/master/TEMPLATES.md).
 
 From the perspective of an end-to-end test, a `ci-operator` template is simply
 a way to create one or more pods and auxiliary objects to setup and clean up
@@ -245,7 +245,7 @@ specific cloud provider (the contents can be seen in the
 #### Inputs
 
 When instantiating the template, data about the pipeline is provided as
-[parameters](https://github.com/openshift/ci-operator/blob/master/TEMPLATES.md#parameters-available-to-templates).
+[parameters](https://github.com/openshift/ci-tools/blob/master/TEMPLATES.md#parameters-available-to-templates).
 The location of images and RPMs from both the release and the CI pipeline is
 available this way. Extra parameters can be provided via environment variables,
 which will have to be set by the Prow job.
@@ -283,7 +283,7 @@ The outputs of a template test are:
 - Artifacts.
 
 These are described in more detail in the
-[`ci-operator` documentation](https://github.com/openshift/ci-operator/blob/master/TEMPLATES.md#expected-output-from-templates).
+[`ci-operator` documentation](https://github.com/openshift/ci-tools/blob/master/TEMPLATES.md#expected-output-from-templates).
 
 
 ### Adding a template

@@ -1,16 +1,16 @@
 plank:
   allow_cancellations: true
-  job_url_prefix: 'https://openshift-gce-devel.appspot.com/build/'
-  job_url_template: 'https://openshift-gce-devel.appspot.com/build/origin-ci-test/{{if eq .Spec.Type "presubmit"}}pr-logs/pull{{else if eq .Spec.Type "batch"}}pr-logs/pull{{else}}logs{{end}}{{if ne .Spec.Refs.Repo "origin"}}/{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}{{end}}{{if eq .Spec.Type "presubmit"}}/{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}{{else if eq .Spec.Type "batch"}}/batch{{end}}/{{.Spec.Job}}/{{.Status.BuildID}}/'
-  report_template: '[Full PR test history](https://openshift-gce-devel.appspot.com/pr/{{if ne .Spec.Refs.Repo "origin"}}{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}/{{end}}{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://openshift-gce-devel.appspot.com/pr/{{with index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}). Please help us cut down on flakes by [linking to](https://github.com/kubernetes/community/blob/master/contributors/devel/flaky-tests.md#filing-issues-for-flaky-tests) an [open issue](https://github.com/{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}/issues?q=is:issue+is:open) when you hit one in your PR.'
+  job_url_prefix: 'https://prow.svc.ci.openshift.org/view/gcs/'
+  job_url_template: 'https://prow.svc.ci.openshift.org/view/gcs/origin-ci-test/{{if eq .Spec.Type "presubmit"}}pr-logs/pull{{else if eq .Spec.Type "batch"}}pr-logs/pull{{else}}logs{{end}}{{if ne .Spec.Refs.Repo "origin"}}/{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}{{end}}{{if eq .Spec.Type "presubmit"}}/{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}{{else if eq .Spec.Type "batch"}}/batch{{end}}/{{.Spec.Job}}/{{.Status.BuildID}}/'
+  report_template: '[Full PR test history](https://prow.svc.ci.openshift.org/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://prow.svc.ci.openshift.org/pr?query=is:pr+state:open+author:{{with index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}). Please help us cut down on flakes by [linking to](https://github.com/kubernetes/community/blob/master/contributors/devel/flaky-tests.md#filing-issues-for-flaky-tests) an [open issue](https://github.com/{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}/issues?q=is:issue+is:open) when you hit one in your PR.'
   default_decoration_config:
     timeout: 4h
     grace_period: 15s
     utility_images:
-      clonerefs: gcr.io/k8s-prow/clonerefs:v20190610-8ed4626f7
-      initupload: gcr.io/k8s-prow/initupload:v20190610-8ed4626f7
-      entrypoint: gcr.io/k8s-prow/entrypoint:v20190610-8ed4626f7
-      sidecar: gcr.io/k8s-prow/sidecar:v20190610-8ed4626f7
+      clonerefs: gcr.io/k8s-prow/clonerefs:v20190613-f23ec350f
+      initupload: gcr.io/k8s-prow/initupload:v20190613-f23ec350f
+      entrypoint: gcr.io/k8s-prow/entrypoint:v20190613-f23ec350f
+      sidecar: gcr.io/k8s-prow/sidecar:v20190613-f23ec350f
     gcs_configuration:
       bucket: origin-ci-test
       path_strategy: single
@@ -58,7 +58,7 @@ deck:
       - metadata
       "build-log.txt":
       - buildlog
-      "artifacts/junit.*\\.xml":
+      ".*\\.xml":
       - junit
   external_agent_logs:
   - agent: jenkins
@@ -256,9 +256,8 @@ tide:
     - openshift/ci-chat-bot
     - openshift/cincinnati
     - openshift/ci-ns-ttl-controller
-    - openshift/ci-operator
-    - openshift/ci-operator-prowgen
     - openshift/ci-search
+    - openshift/ci-tools
     - openshift/ci-vm-operator
     - openshift/client-go
     - openshift/cloud-credential-operator
@@ -495,6 +494,8 @@ tide:
     - do-not-merge/invalid-owners-file
   - repos:
     - codeready-toolchain/host-operator
+    - codeready-toolchain/api
+    - codeready-toolchain/member-operator
     labels:
     - lgtm
     - approved
@@ -577,7 +578,7 @@ branch-protection:
           protect: true
         cluster-autoscaler-operator:
           protect: true
-        ci-operator:
+        ci-tools:
           protect: true
         cluster-kube-scheduler-operator:
           protect: true
@@ -628,8 +629,6 @@ branch-protection:
         release-controller:
           protect: true
         origin-metrics:
-          protect: true
-        ci-operator-prowgen:
           protect: true
         ci-search:
           protect: true
