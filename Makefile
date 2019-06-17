@@ -1,3 +1,29 @@
+APPLY := oc apply
+
+.PHONY: check check-core dry-core-admin core-admin dry-core core
+
+check: check-core
+	@echo "Service config check: PASS"
+
+check-core:
+	make -C core-services check
+	@echo "Core service config check: PASS"
+
+dry-core-admin:
+	make core-admin APPLY="$(APPLY) --dry-run=true"
+
+core-admin:
+	make -C core-services admin-resources APPLY="$(APPLY) --as=system:admin"
+
+dry-core:
+	make core APPLY="$(APPLY) --dry-run=true"
+
+core:
+	make -C core-services resources APPLY="$(APPLY)"
+
+# LEGACY TARGETS
+# You should not need to add new targets here.
+
 export RELEASE_URL=https://github.com/openshift/release.git
 export RELEASE_REF=master
 export SKIP_PERMISSIONS_JOB=0
@@ -347,10 +373,10 @@ metal-secrets:
 	-o yaml --dry-run | oc apply -n ocp -f -
 .PHONY: metal-secrets
 
-check:
+check-prow-config:
 	# test that the prow config is parseable
 	mkpj --config-path cluster/ci/config/prow/config.yaml --job-config-path ci-operator/jobs/ --job branch-ci-origin-images --base-ref master --base-sha abcdef
-.PHONY: check
+.PHONY: check-prow-config
 
 libpod:
 	$(MAKE) apply WHAT=projects/libpod/libpod.yaml
