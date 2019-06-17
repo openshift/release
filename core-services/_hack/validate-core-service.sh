@@ -19,12 +19,6 @@ function validate_required_files() {
 
 validate_makefile() {
     local service_path="$1"
-    local makefile="$service_path/Makefile"
-    if [[ ! -s "$makefile" ]]; then
-        echo "[ERROR] Makefile not found: $makefile"
-        echo "[ERROR] All core services should have a Makefile"
-        return 1
-    fi
 
     for target in "resources" "admin-resources"; do
         if ! make -C "$service_path" "$target" --dry-run; then
