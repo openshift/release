@@ -114,13 +114,16 @@ grafana-debug-deploy:
 	# oc new-project prow-monitoring-stage --skip-config-write=true
 	oc get project prow-monitoring-stage
 	oc create -n prow-monitoring-stage configmap grafana-config --from-file=./debug/grafana.ini --dry-run -o yaml | oc apply -f -
+	sed -i -e "s|CHANGE_ME|$(grafana_password)|g" ./debug/grafana_secret.yaml
+	oc apply -f ./debug/grafana_secret.yaml
+	git checkout ./debug/grafana_secret.yaml
 	oc get secret -n openshift-monitoring --as system:admin grafana-datasources -o json | jq -r '.data["prometheus.yaml"]' | base64 -d | jq '.datasources[].name = "prometheus-k8s"' > /tmp/prometheus-k8s.yaml
 	oc create -n prow-monitoring-stage configmap grafana-datasources --from-file=datasources.yaml=./debug/grafana_datasources.yaml --from-file=prometheus-k8s.yaml=/tmp/prometheus-k8s.yaml --dry-run -o yaml | oc apply -f -
 	rm -fv /tmp/prometheus-k8s.yaml
-	sed -i -e "s|CHANGE_ME|$(grafana_password)|g" ./debug/grafana_deploy.yaml
 	oc apply -f ./debug/grafana_deploy.yaml
-	git checkout ./debug/grafana_deploy.yaml
-	oc get deployment -n prow-monitoring-stage grafana -o yaml | grep ": GF_SECURITY_ADMIN_PASSWORD" -A1 -B2
+	@echo "admin password:"
+	oc get secret -n prow-monitoring-stage grafana -o jsonpath='{.data.password}' | base64 -d
+	@echo ""
 
 .PHONY : grafana-debug-generate-k8s-dashboards
 grafana-debug-generate-k8s-dashboards:
