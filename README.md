@@ -26,23 +26,46 @@ and are split into the following categories:
    for general information on template tests.
  - [`ci-operator/infra`](./ci-operator/infra/) contains manifests for infrastructure
    components used by the `ci-operator`. Contact a CI Administrator if you feel
-   like one of these should be edited.
+   like one of these should be edited. (**legacy**: do not add new services
+   here. Use [`core-services`](./core-services) or [`projects`](./projects)
+   instead.)
 
-## Cluster Configuration Manifests
+## Cluster and Service Configuration Manifests
+
+### Core Services and Configuration
+
+Manifests for important services (like [OpenShift CI cluster](https://api.ci.openshift.org/)
+and the CI service components that run on it) are present in the
+[`core-services`](./core-services) directory. The services configured in this
+directory are critical for some part of the OpenShift project development
+workflow, must meet basic quality criteria and must be deployed to the cluster
+automatically by a postsubmit job. See its [README](./core-services/README.md)
+for details.
+
+### Cluster Configuration Manifests (legacy)
 
 Manifests for cluster provisioning and installation live under [`cluster/`](./cluster/).
 The [OpenShift CI cluster](https://api.ci.openshift.org/) is configured with the
-manifests under [`cluster/ci/`](./cluster/ci/); clusters that are created by the
-testing infrastructure for validating OpenShift are configured with the profiles
-under [`cluster/test-deploy/`](./cluster/test-deploy/). For directions on how to
-set up clusters for development, see the [README](./cluster/test-deploy/README.md).
+manifests under [`cluster/ci/`](./cluster/ci/). (**legacy**: do not add new
+services here. Use [`core-services`](./core-services) or
+[`projects`](./projects) instead.)
 
-## Component Project Build Manifests
+Clusters that are created by the testing infrastructure for validating OpenShift
+are configured with the profiles under [`cluster/test-deploy/`](./cluster/test-deploy/).
+For directions on how to set up clusters for development, see the [README](./cluster/test-deploy/README.md).
 
-Manifests for building container images for component repositories live under
-[`projects/`](./projects/). This directory is deprecated; authors of components
-built by manifests in this directory should remove them and ensure that their
-component is appropriately built by the `ci-operator` instead.
+### Custom and Legacy Service Configuration
+
+Manifests for services that are in development, experimental, legacy or not
+critical in some other way are present in the [`projects`](./projects)
+directory. Compared to the [core services configuration](#core-services-and-configuration),
+these projects do not need to follow any common structure or conventions other
+than clear ownership. They must not interfere with the core services in any way.
+
+Additionally, manifests for building container images for component repositories
+live under [`projects/`](./projects/). This purpose is deprecated; authors of
+components built by manifests in this directory should remove them and ensure
+that their component is appropriately built by the `ci-operator` instead.
 
 ## Tooling Build Manifests
 
