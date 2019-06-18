@@ -1,0 +1,56 @@
+canonical_go_repository: github.com/monstorak/monstorak-operator
+
+base_images:
+  os:
+    cluster: https://api.ci.openshift.org
+    name: centos
+    namespace: openshift
+    tag: '7'
+  operator-registry:
+    name: "4.0"
+    namespace: ocp
+    tag: operator-registry
+
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      memory: 250Mi
+      cpu: 100m
+
+images:
+- from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/monstorak/monstorak-operator/build/_output/bin/monstorak-operator 
+  dockerfile_path: openshift-ci/Dockerfile.deploy
+  to: monstorak-operator
+
+promotion:
+  cluster: https://api.ci.openshift.org
+  namespace: openshift
+  name: monstorak-0.0.1
+
+build_root:
+ project_image:
+   dockerfile_path: openshift-ci/Dockerfile.tools
+
+binary_build_commands: make build
+
+tag_specification:
+  name: "4.0"
+  namespace: ocp
+
+tests:
+- as: lint
+  commands: VERBOSE=2 make lint
+  container:
+    from: src
+- as: test
+  commands: make test
+  container:
+    from: src
+
