@@ -4,8 +4,9 @@ presubmits:
     always_run: true
     branches:
     - openshift-v4
+    context: create
     decorate: true
-    name: create
+    name: pull-ci-azure-openshift-v4-create
     rerun_command: /test create
     spec:
       containers:
@@ -23,7 +24,7 @@ presubmits:
     - openshift-v4
     context: unit
     decorate: true
-    name: pull-ci-azure-master-unit
+    name: pull-ci-azure-openshift-v4-unit
     rerun_command: /test unit
     spec:
       containers:
@@ -35,6 +36,24 @@ presubmits:
         resources: {}
       serviceAccountName: ci-operator
     trigger: (?m)^/test( | .* )unit,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - openshift-v4
+    context: verify
+    decorate: true
+    name: pull-ci-azure-openshift-v4-verify
+    rerun_command: /test verify
+    spec:
+      containers:
+      - args:
+        - make
+        - verify
+        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        name: ""
+        resources: {}
+      serviceAccountName: ci-operator
+    trigger: (?m)^/test( | .* )verify,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -78,20 +97,3 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )images,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - openshift-v4
-    decorate: true
-    name: verify
-    rerun_command: /test verify
-    spec:
-      containers:
-      - args:
-        - make
-        - verify
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
-        name: ""
-        resources: {}
-      serviceAccountName: ci-operator
-    trigger: (?m)^/test( | .* )verify,?($|\s.*)
