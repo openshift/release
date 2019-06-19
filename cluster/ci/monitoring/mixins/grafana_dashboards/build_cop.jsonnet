@@ -67,40 +67,20 @@ dashboard.new(
         formatY1='percentunit',
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(prowjobs{job="plank",job_name=~".*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"})/sum(prowjobs{job="plank",job_name=~".*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"})',
-        legendFormat='.*',
-    ))
-    .addTarget(prometheus.target(
-        'sum(prowjobs{job="plank",job_name=~".*-images",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"})/sum(prowjobs{job="plank",job_name=~".*-images",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"})',
+        'sum(prowjobs{job="plank",job_name=~"branch-.*-images",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"})/sum(prowjobs{job="plank",job_name=~"branch-.*-images",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"})',
         legendFormat='.*-images',
     ))
     .addTarget(prometheus.target(
-        'sum(prowjobs{job="plank",job_name=~".*-master-images",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"})/sum(prowjobs{job="plank",job_name=~".*-master-images",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"})',
+        'sum(prowjobs{job="plank",job_name=~"release-.*-4.1",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"})/sum(prowjobs{job="plank",job_name=~"release-.*-4.1",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"})',
         legendFormat='.*-master-images',
     ))
     .addTarget(prometheus.target(
-        'sum(prowjobs{job="plank",job_name=~".*-master-e2e-aws",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"})/sum(prowjobs{job="plank",job_name=~".*-master-e2e-aws",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"})',
+        'sum(prowjobs{job="plank",job_name=~"release-.*-4.2",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"})/sum(prowjobs{job="plank",job_name=~"release-.*-4.2",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"})',
         legendFormat='.*-master-e2e-aws',
     ))
     .addTarget(prometheus.target(
-        'sum(prowjobs{job="plank",job_name=~".*-release-.*-images",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"})/sum(prowjobs{job="plank",job_name=~".*-release-.*-images",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"})',
+        'sum(prowjobs{job="plank",job_name=~"release-.*-upgrade.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"})/sum(prowjobs{job="plank",job_name=~"release-.*-upgrade.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"})',
         legendFormat='.*-release-.*-images',
-    ))
-    .addTarget(prometheus.target(
-        'sum(prowjobs{job="plank",job_name=~".*e2e.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"})/sum(prowjobs{job="plank",job_name=~".*e2e.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"})',
-        legendFormat='.*e2e.*',
-    ))
-    .addTarget(prometheus.target(
-        'sum(prowjobs{job="plank",job_name=~".*release-.*-origin-.*-e2e-aws.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"})/sum(prowjobs{job="plank",job_name=~".*release-.*-origin-.*-e2e-aws.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"})',
-        legendFormat='.*release-.*-origin-.*-e2e-aws.*',
-    ))
-    .addTarget(prometheus.target(
-        'sum(prowjobs{job="plank",job_name=~".*release-.*-ocp-.*-e2e-aws.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"})/sum(prowjobs{job="plank",job_name=~".*release-.*-ocp-.*-e2e-aws.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"})',
-        legendFormat='.*release-.*-ocp-.*-e2e-aws.*',
-    ))
-    .addTarget(prometheus.target(
-        'sum(prowjobs{job="plank",job_name=~".*release-.*-e2e-aws-upgrade.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"})/sum(prowjobs{job="plank",job_name=~".*release-.*-e2e-aws-upgrade.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"})',
-        legendFormat='.*release-.*-e2e-aws-upgrade.*',
     )), gridPos={
     h: 9,
     w: 24,
