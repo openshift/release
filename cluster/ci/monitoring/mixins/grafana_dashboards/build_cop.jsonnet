@@ -68,19 +68,19 @@ dashboard.new(
     ) + legendConfig)
     .addTarget(prometheus.target(
         'sum(prowjobs{job="plank",job_name=~"branch-.*-images",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"})/sum(prowjobs{job="plank",job_name=~"branch-.*-images",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"})',
-        legendFormat='.*-images',
+        legendFormat='branch-.*-images',
     ))
     .addTarget(prometheus.target(
         'sum(prowjobs{job="plank",job_name=~"release-.*-4.1",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"})/sum(prowjobs{job="plank",job_name=~"release-.*-4.1",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"})',
-        legendFormat='.*-master-images',
+        legendFormat='release-.*-4.1',
     ))
     .addTarget(prometheus.target(
         'sum(prowjobs{job="plank",job_name=~"release-.*-4.2",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"})/sum(prowjobs{job="plank",job_name=~"release-.*-4.2",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"})',
-        legendFormat='.*-master-e2e-aws',
+        legendFormat='release-.*-4.2',
     ))
     .addTarget(prometheus.target(
         'sum(prowjobs{job="plank",job_name=~"release-.*-upgrade.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"})/sum(prowjobs{job="plank",job_name=~"release-.*-upgrade.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"})',
-        legendFormat='.*-release-.*-images',
+        legendFormat='release-.*-upgrade.*',
     )), gridPos={
     h: 9,
     w: 24,
