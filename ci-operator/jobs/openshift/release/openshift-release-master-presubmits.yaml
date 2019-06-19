@@ -75,6 +75,92 @@ presubmits:
     always_run: true
     branches:
     - master
+    context: ci/prow/core-dry
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+    name: pull-ci-openshift-release-master-core-dry
+    rerun_command: /test core-dry
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=core-dry
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-release-master.yaml
+              name: ci-operator-master-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )core-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/core-valid
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+    name: pull-ci-openshift-release-master-core-valid
+    rerun_command: /test core-valid
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=core-valid
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-release-master.yaml
+              name: ci-operator-master-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )core-valid,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
     context: ci/prow/correctly-sharded-config
     decorate: true
     name: pull-ci-openshift-release-master-correctly-sharded-config
