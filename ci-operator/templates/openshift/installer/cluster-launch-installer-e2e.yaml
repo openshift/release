@@ -140,7 +140,6 @@ objects:
         fi
 
         # set up cloud-provider-specific env vars
-        export KUBE_SSH_BASTION="$( oc --insecure-skip-tls-verify get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
         export KUBE_SSH_KEY_PATH=/tmp/cluster/ssh-privatekey
         if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
           export GOOGLE_APPLICATION_CREDENTIALS="/tmp/cluster/gce.json"
@@ -242,7 +241,8 @@ objects:
           wait_for_machineconfigpool_to_apply
 
           setup_ssh_bastion
-
+          # Set up kube ssh bastion to bastion host that was set up recently
+          export KUBE_SSH_BASTION=${BASTION_HOST}
           echo "Make etcd backup on first master - /usr/local/bin/etcd-snapshot-backup.sh"
           FIRST_MASTER=$(oc get node -l node-role.kubernetes.io/master= -o name | head -n1 | cut -d '/' -f 2)
           bastion_ssh "core@${FIRST_MASTER}" "sudo -i /bin/bash -x /usr/local/bin/etcd-snapshot-backup.sh /root/assets/backup/snapshot.db && sudo -i cp /root/assets/backup/snapshot.db /tmp/snapshot.db && sudo -i chown core:core /tmp/snapshot.db"
