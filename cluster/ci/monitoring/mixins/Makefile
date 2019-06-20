@@ -1,7 +1,7 @@
 #
 SHELL=/bin/bash -o pipefail
 
-all: build_cop.json deck.json hook.json jenkins_operator.json plank.json prow.json sinker.json tide.json prometheus_rule_prow.yaml
+all: build_cop.json deck.json ghproxy.json hook.json jenkins_operator.json plank.json prow.json sinker.json tide.json prometheus_rule_prow.yaml
 
 build_cop.json:
 	@echo "Generating build_cop.json ..."
@@ -10,6 +10,10 @@ build_cop.json:
 deck.json:
 	@echo "Generating deck.json ..."
 	jsonnet -J vendor/ grafana_dashboards/deck.jsonnet > ../$@
+
+ghproxy.json:
+	@echo "Generating ghproxy.json ..."
+	jsonnet -J vendor/ grafana_dashboards/ghproxy.jsonnet > ../$@
 
 hook.json:
 	@echo "Generating hook.json ..."
