@@ -66,41 +66,18 @@ periodics:
   spec:
     containers:
     - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --git-ref=openshift/openshift-azure@master
-      - --secret-dir=/usr/local/e2e-secrets/azure
-      - --target=[output:stable:azure]
-      - --target=cluster-launch-e2e-azure
-      - --template=/usr/local/cluster-launch-e2e-azure.yaml
-      command:
-      - ci-operator
+      - hack/tests/origin-conformance.sh
       env:
-      - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-openshift-azure-master.yaml
-            name: ci-operator-master-configs
-      - name: TEST_COMMAND
-        value: TEST_FOCUS=Suite:openshift/conformance/parallel run-tests
-      - name: TEST_IMAGE
-        value: registry.svc.ci.openshift.org/openshift/origin-v3.11:tests
-      image: ci-operator:latest
+      - name: TEST_SUITE
+        value: openshift/conformance/parallel/minimal
+      - name: TEST_NODES
+        value: "30"
+      image: registry.svc.ci.openshift.org/azure/ci-base:latest
       name: ""
-      resources: {}
-      volumeMounts:
-      - mountPath: /usr/local/e2e-secrets/azure
-        name: cluster-secrets-azure
-      - mountPath: /usr/local/cluster-launch-e2e-azure.yaml
-        name: job-definition
-        subPath: cluster-launch-e2e-azure.yaml
+      resources:
+        requests:
+          cpu: 10m
     serviceAccountName: ci-operator
-    volumes:
-    - name: cluster-secrets-azure
-      secret:
-        secretName: cluster-secrets-azure
-    - configMap:
-        name: prow-job-cluster-launch-e2e-azure
-      name: job-definition
 - agent: ""
   cron: ""
   decorate: true
