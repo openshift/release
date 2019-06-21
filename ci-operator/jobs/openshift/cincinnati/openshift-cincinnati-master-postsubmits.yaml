@@ -1,0 +1,31 @@
+postsubmits:
+  openshift/cincinnati:
+  - agent: kubernetes
+    branches:
+    - ^master$
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    name: branch-ci-openshift-cincinnati-master-ghp-updater
+    spec:
+      containers:
+      - command:
+        - dist/ghp_updater.sh
+        env:
+        - name: CINCINNATI_GITHUB_PUSH_TOKEN_PATH
+          value: /usr/local/ci-secrets/github/private_key
+        image: registry.svc.ci.openshift.org/ci/cincinnati-build-root:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/ci-secrets/github
+          name: secrets-push-github
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: secrets-push-github
+        secret:
+          secretName: cincinnati-secrets-github
