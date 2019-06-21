@@ -10,34 +10,29 @@ the cluster automatically by a postsubmit job.
 
 Create a new directory for your service, containing all [necessary files](#quality-criteria-and-conventions).
 You may copy the `_TEMPLATE` directory and start using the files there. Add
-manifests and other configuration as needed, and make sure the `Makefile` in
-your directory applies all config when its `resources` and `admin-resources` are
-built.
-
-Add the name of the directory to the `SERVICES` list in the [Makefile](./Makefile).
-You should not need to modify this or any other Makefile in any way.
+manifests and other configuration as needed.
 
 ## Quality criteria and conventions
 
-1. All directories should contain `OWNERS`, `README.md` and `Makefile` files.
-   This is enforced by `make check` locally and by the `ci/prow/core-valid`
-   check on pull requests.
-2. The `Makefile` should provide `resources` and `admin-resources` targets.
-   Calling the former should create all resources for which admin permissions
-   are not necessary. The `config-updater` service account in the `ci` namespace
-   must have permissions to perform all actions done in the `resources` targets.
-   Calling `admin-resources` should create all resources for which admin
-   permissions is necessary. Presence of these targets is enforced by
-   `make check` locally and by the `ci/prow/core-valid` check on pull requests.
-   Additionally, `make dry-core{-admin}` runs the appropriate target in dry-run
-   mode. Passing `make dry-core` is enforced by the `ci/prow/core-dry` check.
-3. Makefiles and scripts called by them should use `$(APPLY)` variable instead
-   of `oc apply`. This allows the universal dry-run to work.
-4. Destination namespaces should always be specified within a manifest, never
-   by a `-n/--namespace` option or by relying on a currently set OpenShift
-   project.
-5. All ConfigMaps need to be set up for automated updates by the
-   `config-updater` Prow plugin.
+1. All directories should contain `OWNERS` and `README.md` files. This is
+enforced by `make check` locally and by the `ci/prow/core-valid` check on
+pull requests.
+2. Config is applied to the cluster using the [`applyconfig`](../tools/applyconfig)
+tool. The tool applies all YAML files under your service subdirectory. All
+   YAML filenames should follow the following convention:
+    - All admin resources should be in `admin_*.yaml` files
+    - Names of YAML files that should not be applied to the cluster should start
+      with `_`.
+    - The remaining YAML files are considered "standard" resources.
+3. `applyconfig` applies files in lexicographical order. In the case when some
+resources need to be created before others, this needs to be reflected by the
+naming of the files (e.g. by including a numerical component).
+4. The `config-updater` service account in the `ci` namespace must have
+permissions to apply all standard resources.
+5. Destination namespaces should always be specified within a manifest, never
+rely on a currently set OpenShift project.
+6. All ConfigMaps need to be set up for automated updates by the
+`config-updater` Prow plugin.
 
 ## How to apply
 
@@ -63,3 +58,6 @@ ConfigMaps.
    to perform all necessary actions
 3. ConfigMaps can be manually created by the [config-bootstrapper](https://github.com/kubernetes/test-infra/tree/master/prow/cmd/config-bootstrapper)
    tool.
+
+Additionally, the [`applyconfig`](../tools/applyconfig) can be used directly.
+See its [README.md](../tools/applyconfig/README.md) for more details.
