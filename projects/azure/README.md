@@ -8,6 +8,9 @@ OSA, from the Red Hat side, is comprised of a couple of different Github repos:
 * [openshift/openshift-azure](https://github.com/openshift/openshift-azure/)
   This is the main code repository where all production code used by Microsoft
   is developed.
+* [openshift/azure-misc](https://github.com/openshift/azure-misc/)
+  This repo contains various tools used either in our CI or by SRE processes.
+  (NOTE: This repository is private.)
 * [openshift/azure-sop](https://github.com/openshift/azure-sop/)
   This repo contains various SOPs.
 * [openshift/openshift-ansible](https://github.com/openshift/openshift-ansible/)
@@ -64,6 +67,9 @@ There are three different places where we store `ci-operator` and Prow configura
   | Name | Description |
   | --- | --- |
   | cluster-launch-e2e-azure | Deploy an OSA cluster and run various types of tests (OSA, Origin Conformance, Bushslicer) |
+
+Similarly, you can find the CI configuration for `azure-misc` in `ci-operator/jobs/openshift/azure-misc/`
+and `ci-operator/config/openshift/azure-misc/`.
 
 All changes in `ci-operator/` are automatically applied in the CI cluster by Prow
 right after a pull request is merged.
