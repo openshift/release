@@ -1,0 +1,40 @@
+periodics:
+- agent: kubernetes
+  cron: ""
+  decorate: true
+  interval: "5m"
+  extra_refs: #not sure about extra ref, but keeping for testing
+  - base_ref: master
+    org: openshift
+    repo: tektoncd-pipeline-operator
+  labels:
+    job-env: aws #decide the right labels
+  name: openshift-tektoncd-pipeline-operator-nightly-release
+  rerun_command: /test images
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --give-pr-author-access-to-namespace=true
+      - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+      - --target=[images]
+      command:
+      - ci-operator
+      env:
+      - name: CONFIG_SPEC
+        valueFrom:
+          configMapKeyRef:
+            key: openshift-tektoncd-pipeline-operator-master.yaml
+            name: ci-operator-master-configs
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      volumeMounts:
+      - mountPath: /etc/sentry-dsn
+        name: sentry-dsn
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: sentry-dsn
+      secret:
+        secretName: sentry-dsn
