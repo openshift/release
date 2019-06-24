@@ -1,25 +1,21 @@
-base_images:
-  base:
-    name: "4.3"
-    namespace: ocp
-    tag: base
 build_root:
   image_stream_tag:
+    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
-    tag: golang-1.11
-canonical_go_repository: github.com/openshift/openshift-state-metrics
+    tag: golang-1.12
+canonical_go_repository: github.com/openshift/kubefed
 images:
 - dockerfile_path: Dockerfile
-  from: base
-  to: openshift-state-metrics
+  from: root
+  to: kubefed-controller
 promotion:
   name: "4.3"
   namespace: ocp
 resources:
   '*':
     limits:
-      memory: 4Gi
+      memory: 2Gi
     requests:
       cpu: 100m
       memory: 200Mi
@@ -27,15 +23,18 @@ tag_specification:
   name: "4.3"
   namespace: ocp
 tests:
-- as: gofmt
-  commands: make gofmtcheck
+- as: vet
+  commands: |
+    make -f openshift/Makefile.ci vet
   container:
     from: src
 - as: unit
-  commands: make test-unit
+  commands: |
+    make -f openshift/Makefile.ci unit
   container:
     from: src
-- as: doccheck
-  commands: make doccheck
+- as: managed-e2e
+  commands: |
+    make -f openshift/Makefile.ci managed-e2e
   container:
     from: src

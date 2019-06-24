@@ -18,7 +18,7 @@ build_root:
     cluster: https://api.ci.openshift.org
     name: src-cache-origin
     namespace: ci
-    tag: release-4.3
+    tag: master
 canonical_go_repository: github.com/openshift/origin
 images:
 - dockerfile_path: images/template-service-broker/Dockerfile.rhel
@@ -257,6 +257,11 @@ tests:
   openshift_installer:
     cluster_profile: aws
     upgrade: false
+- as: e2e-azure
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer:
+    cluster_profile: azure4
+    upgrade: false
 - as: e2e-aws-all
   commands: TEST_SUITE=openshift/conformance run-tests
   openshift_installer:
@@ -300,3 +305,13 @@ tests:
   commands: sleep 7200 & wait
   openshift_installer_upi:
     cluster_profile: vsphere
+- as: e2e-dr-snapshot-tests
+  commands: TEST_SUITE=openshift/conformance/parallel run-dr-snapshot-tests
+  openshift_installer:
+    cluster_profile: aws
+    upgrade: false
+- as: e2e-dr-quorum-tests
+  commands: TEST_SUITE=openshift/conformance/parallel run-dr-quorum-tests
+  openshift_installer:
+    cluster_profile: aws
+    upgrade: false

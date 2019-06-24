@@ -3,11 +3,10 @@ base_images:
     name: "4.2"
     namespace: ocp
     tag: ansible-operator
-  centos7:
-    cluster: https://api.ci.openshift.org
-    name: centos
-    namespace: openshift
-    tag: "7"
+  base:
+    name: "4.2"
+    namespace: ocp
+    tag: base
 binary_build_commands: make openshift-ci-make-rpm
 build_root:
   project_image:
@@ -17,13 +16,13 @@ images:
   dockerfile_path: build/Dockerfile
   from: ansible_operator
   to: ansible-service-broker-operator
-- dockerfile_path: build/Dockerfile-openshift
-  from: centos7
+- dockerfile_path: build/Dockerfile-ubi
+  from: base
   inputs:
-    bin:
-      paths:
-      - destination_dir: rpms
-        source_path: /tmp/rpms
+    root:
+      as:
+      - builder
+      paths: null
   to: ansible-service-broker
 promotion:
   disabled: true

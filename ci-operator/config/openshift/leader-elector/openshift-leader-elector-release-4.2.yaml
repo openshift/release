@@ -8,11 +8,12 @@ build_root:
     cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
-    tag: golang-1.12
-canonical_go_repository: github.com/openshift/cluster-machine-approver
+    tag: golang-1.10
+canonical_go_repository: github.com/openshift/leader-elector
 images:
-- from: base
-  to: cluster-machine-approver
+- dockerfile_path: Dockerfile
+  from: base
+  to: leader-elector
 promotion:
   disabled: true
   name: "4.2"
@@ -28,12 +29,7 @@ tag_specification:
   name: "4.2"
   namespace: ocp
 tests:
-- as: unit
-  commands: make test
+- as: verify
+  commands: test -z $(go fmt ./election/lib)
   container:
     from: src
-- as: e2e-aws
-  commands: TEST_SUITE=openshift/conformance/parallel run-tests
-  openshift_installer:
-    cluster_profile: aws
-    upgrade: false

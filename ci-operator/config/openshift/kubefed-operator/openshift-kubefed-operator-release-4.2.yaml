@@ -1,18 +1,14 @@
-base_images:
-  base:
-    name: "4.2"
-    namespace: ocp
-    tag: base
 build_root:
   image_stream_tag:
     cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.12
-canonical_go_repository: github.com/openshift/cluster-machine-approver
+canonical_go_repository: github.com/openshift/kubefed-operator
 images:
-- from: base
-  to: cluster-machine-approver
+- dockerfile_path: kubefed-operator-ci.Dockerfile
+  from: root
+  to: kubefed-operator
 promotion:
   disabled: true
   name: "4.2"
@@ -20,7 +16,7 @@ promotion:
 resources:
   '*':
     limits:
-      memory: 4Gi
+      memory: 2Gi
     requests:
       cpu: 100m
       memory: 200Mi
@@ -28,12 +24,18 @@ tag_specification:
   name: "4.2"
   namespace: ocp
 tests:
-- as: unit
-  commands: make test
+- as: vet
+  commands: |
+    make -f Makefile.ci vet
   container:
     from: src
-- as: e2e-aws
-  commands: TEST_SUITE=openshift/conformance/parallel run-tests
-  openshift_installer:
-    cluster_profile: aws
-    upgrade: false
+- as: unit
+  commands: |
+    make -f Makefile.ci unit
+  container:
+    from: src
+- as: olm-e2e
+  commands: |
+    make -f Makefile.ci olm-e2e
+  container:
+    from: src
