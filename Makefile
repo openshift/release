@@ -1,25 +1,23 @@
-APPLY := oc apply
-
 .PHONY: check check-core dry-core-admin core-admin dry-core core
 
 check: check-core
 	@echo "Service config check: PASS"
 
 check-core:
-	make -C core-services check
+	core-services/_hack/validate-core-services.sh core-services
 	@echo "Core service config check: PASS"
 
 dry-core-admin:
-	make core-admin APPLY="$(APPLY) --dry-run=true"
+	go run ./tools/applyconfig --config-dir core-services --level=admin
 
 core-admin:
-	make -C core-services admin-resources APPLY="$(APPLY) --as=system:admin"
+	go run ./tools/applyconfig --config-dir core-services --level=admin --confirm=true
 
 dry-core:
-	make core APPLY="$(APPLY) --dry-run=true"
+	go run ./tools/applyconfig --config-dir core-services
 
 core:
-	make -C core-services resources APPLY="$(APPLY)"
+	go run ./tools/applyconfig --config-dir core-services --confirm=true
 
 # LEGACY TARGETS
 # You should not need to add new targets here.
