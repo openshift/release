@@ -8,7 +8,7 @@ build_root:
     cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
-    tag: golang-1.10
+    tag: golang-1.12
 canonical_go_repository: github.com/openshift/telemeter
 images:
 - from: base
@@ -32,16 +32,16 @@ tag_specification:
   name: "4.3"
   namespace: ocp
 tests:
+- as: vendor
+  commands: GO111MODULE=on make vendor && git diff --exit-code
+  container:
+    from: src
 - as: unit
-  commands: make check
+  commands: make lint test-unit
   container:
     from: src
 - as: integration
   commands: make test-integration
-  container:
-    from: src
-- as: generate
-  commands: make test-generate
   container:
     from: src
 - as: e2e-aws
