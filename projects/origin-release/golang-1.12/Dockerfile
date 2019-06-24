@@ -39,7 +39,9 @@ RUN yum install -y /tmp/origin-rpm/*.rpm && \
     rm -rf $GOPATH/* $GOPATH/.cache && \
     mkdir $GOPATH/bin && \
     ln -s /usr/bin/imagebuilder $GOPATH/bin/imagebuilder && \
-    ln -s /usr/bin/goimports $GOPATH/bin/goimports
+    ln -s /usr/bin/goimports $GOPATH/bin/goimports && \
+    curl -L https://github.com/golang/dep/releases/download/v0.5.3/dep-linux-amd64 > /usr/bin/dep && \
+    chmod +x /usr/bin/dep
     # TODO: symlink for backwards compatibility with hack/build-images.sh only, remove
 
 RUN chmod g+xw -R $GOPATH && \
