@@ -100,7 +100,6 @@ presubmits:
         - name: TEST_COMMAND
           value: |
             mkdir -p /tmp/artifacts
-            go get -u github.com/openshift/release/tools/gotest2junit
             make test-e2e JUNITFILE=/tmp/artifacts/unit_report.xml
         image: ci-operator:latest
         imagePullPolicy: Always
@@ -311,3 +310,47 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )verify,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-4.2
+    context: ci/prow/verify-deps
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+    name: pull-ci-openshift-cluster-kube-apiserver-operator-release-4.2-verify-deps
+    optional: true
+    rerun_command: /test verify-deps
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=verify-deps
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-cluster-kube-apiserver-operator-release-4.2.yaml
+              name: ci-operator-4.2-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )verify-deps,?($|\s.*)
