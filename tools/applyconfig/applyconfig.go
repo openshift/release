@@ -48,10 +48,9 @@ func gatherOptions() *options {
 	flag.StringVar(&lvl, "level", "standard", "Select which config to apply (standard, admin, all)")
 	flag.StringVar(&opt.user, "as", "", "Username to impersonate while applying the config")
 	flag.StringVar(&opt.directory, "config-dir", "", "Directory with config to apply")
+	flag.Parse()
 
 	opt.level = level(lvl)
-
-	flag.Parse()
 
 	if !opt.level.isValid() {
 		fmt.Fprintf(os.Stderr, "--level: must be one of [standard, admin, all]\n")
