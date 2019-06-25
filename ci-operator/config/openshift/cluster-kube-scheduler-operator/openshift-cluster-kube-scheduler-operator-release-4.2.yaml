@@ -46,13 +46,16 @@ tests:
     cluster_profile: aws
 - as: verify
   commands: |
-    go get -u golang.org/x/tools/imports
     make verify -k
     make verify-bindata
     make verify-bindata-v3.11.0
     make verify-generated
-    HOME=/tmp
-    make verify-deps
+  container:
+    from: src
+- as: verify-deps
+  commands: |
+    HOME=$( mktemp -d )
+    make verify-deps -k --warn-undefined-variables
   container:
     from: src
 - as: e2e-aws-serial
