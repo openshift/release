@@ -291,27 +291,22 @@ image-mirror-files:
 
 image-mirror-setup:
 	oc create configmap image-mirror --from-file=cluster/ci/config/mirroring/ -o yaml --dry-run | oc apply -f -
-	$(MAKE) apply WHAT=cluster/ci/jobs/image-mirror.yaml
 .PHONY: image-mirror-setup
 
 knative-image-mirror-setup:
 	oc create configmap knative-image-mirror --from-file=cluster/ci/config/mirroring/knative -o yaml --dry-run | oc apply -f -
-	$(MAKE) apply WHAT=cluster/ci/jobs/knative-image-mirror.yaml
 .PHONY: knative-image-mirror-setup
 
 tekton-image-mirror-setup:
 	oc create configmap tekton-image-mirror --from-file=cluster/ci/config/mirroring/tekton -o yaml --dry-run | oc apply -f -
-	$(MAKE) apply WHAT=cluster/ci/jobs/tekton-image-mirror.yaml
 .PHONY: tekton-image-mirror-setup
 
 kubefed-image-mirror-setup:
 	oc create configmap kubefed-image-mirror --from-file=cluster/ci/config/mirroring/kubefed -o yaml --dry-run | oc apply -f -
-	$(MAKE) apply WHAT=cluster/ci/jobs/kubefed-image-mirror.yaml
 .PHONY: kubefed-image-mirror-setup
 
 toolchain-image-mirror-setup:
 	oc create configmap toolchain-image-mirror --from-file=cluster/ci/config/mirroring/toolchain -o yaml --dry-run | oc apply -f -
-	$(MAKE) apply WHAT=cluster/ci/jobs/toolchain-image-mirror.yaml
 .PHONY: toolchain-image-mirror-setup
 
 cluster-operator-roles:
