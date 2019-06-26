@@ -19,15 +19,15 @@ cp -r "${jobs_dir}" "${workdir}"
 
 if ! diff -Naupr -I '^[[:space:]]*#.*' "${workdir}/jobs" "${jobs_dir}"> "${workdir}/diff"; then
   cat << EOF
-[ERROR] This check enforces Prow Job configuration YAML file format (ordering,
-[ERROR] linebreaks, indentation) to be consistent over the whole repository. We have
-[ERROR] automation in place that manipulates these configs and consistent formatting
+ERROR: This check enforces Prow Job configuration YAML file format (ordering,
+ERROR: linebreaks, indentation) to be consistent over the whole repository. We have
+ERROR: automation in place that manipulates these configs and consistent formatting
 [ERORR] helps reviewing the changes the automation does.
 
-[ERROR] Run the following command to re-format the Prow jobs:
-[ERROR] $ docker run -it -v \$(pwd)/ci-operator/jobs:/jobs:z registry.svc.ci.openshift.org/ci/determinize-prow-jobs:latest --prow-jobs-dir /jobs
+ERROR: Run the following command to re-format the Prow jobs:
+ERROR: $ docker run -it -v \$(pwd)/ci-operator/jobs:/jobs:z registry.svc.ci.openshift.org/ci/determinize-prow-jobs:latest --prow-jobs-dir /jobs
 
-[ERROR] The following errors were found:
+ERROR: The following errors were found:
 
 EOF
   cat "${workdir}/diff"

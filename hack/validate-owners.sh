@@ -24,19 +24,19 @@ false_pos=$(comm -23 <(echo "$WHITELIST") <(echo "$no_owners"))
 
 if [[ "$false_neg" ]]; then
   cat << EOF
-[ERROR] This check enforces that component configuration files are accompanied by OWNERS
-[ERROR] files so that the appropriate team is able to self-service further configuration
-[ERROR] change pull requests.
+ERROR: This check enforces that component configuration files are accompanied by OWNERS
+ERROR: files so that the appropriate team is able to self-service further configuration
+ERROR: change pull requests.
 
-[ERROR] Run the following script to fetch OWNERS files from the component repositories:
+ERROR: Run the following script to fetch OWNERS files from the component repositories:
 
-[ERROR] $ ci-operator/populate-owners.sh
+ERROR: $ ci-operator/populate-owners.sh
 
-[ERROR] Please note that the script populates *all* ci-operator subdirectories, and it
-[ERROR] takes a long time to execute (tens of minutes). If the target repository does not
-[ERROR] contain an OWNERS file, it will need to be created manually.
+ERROR: Please note that the script populates *all* ci-operator subdirectories, and it
+ERROR: takes a long time to execute (tens of minutes). If the target repository does not
+ERROR: contain an OWNERS file, it will need to be created manually.
 
-[ERROR] The following component config directories do not have OWNERS files:
+ERROR: The following component config directories do not have OWNERS files:
 
 $false_neg
 
@@ -46,12 +46,12 @@ fi
 
 if [[ "$false_pos" ]]; then
   cat << EOF
-[ERROR] Directory that was previously whitelisted as not containing
-[ERROR] an OWNERS file is now containing the file, so it no longer
-[ERROR] needs to be whitelisted. Please remove the appropriate line
-[ERROR] from hack/validate-owners.sh script.
+ERROR: Directory that was previously whitelisted as not containing
+ERROR: an OWNERS file is now containing the file, so it no longer
+ERROR: needs to be whitelisted. Please remove the appropriate line
+ERROR: from hack/validate-owners.sh script.
 
-[ERROR] Directories to be removed from whitelist:
+ERROR: Directories to be removed from whitelist:
 
 $false_pos
 EOF
