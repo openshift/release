@@ -294,7 +294,7 @@ image-mirror-setup:
 	$(MAKE) apply WHAT=cluster/ci/jobs/image-mirror.yaml
 .PHONY: image-mirror-setup
 
-knative-image-miror-setup:
+knative-image-mirror-setup:
 	oc create configmap knative-image-mirror --from-file=cluster/ci/config/mirroring/knative -o yaml --dry-run | oc apply -f -
 	$(MAKE) apply WHAT=cluster/ci/jobs/knative-image-mirror.yaml
 .PHONY: knative-image-mirror-setup
