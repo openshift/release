@@ -23,12 +23,12 @@ def main():
     errors = []
 
     if not os.path.isdir(args.config_dir):
-        errors.append(f"[ERROR] {args.config_dir} directory doesn't exist.")
+        errors.append(f"ERROR: {args.config_dir} directory doesn't exist.")
 
     for root, _, files in os.walk(args.config_dir):
         for name in files:
             if name.endswith(".yml"):
-                print(f"[ERROR] Only .yaml extensions are allowed, not .yml as in {root_path}/{name}")
+                print(f"ERROR: Only .yaml extensions are allowed, not .yml as in {root_path}/{name}")
                 sys.exit(1)
             if name.endswith(".yaml"):
                 root_path = os.path.relpath(root, args.config_dir)
@@ -36,11 +36,11 @@ def main():
                 try:
                     org, repo = os.path.split(root_path)
                 except ValueError:
-                    print(f"[ERROR] Folder structure is not in $config_dir/$org/$repo/ format for file {root_path}/{name}")
+                    print(f"ERROR: Folder structure is not in $config_dir/$org/$repo/ format for file {root_path}/{name}")
                     sys.exit(1)
 
                 if not filename.startswith(f"{org}-{repo}-"):
-                    errors.append(f"[ERROR] File '{args.config_dir}/{root}/{name}' name should have '{org}-{repo}-$branch.yaml' format")
+                    errors.append(f"ERROR: File '{args.config_dir}/{root}/{name}' name should have '{org}-{repo}-$branch.yaml' format")
 
     if errors:
         print("\n".join(errors))

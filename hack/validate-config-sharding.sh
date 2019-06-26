@@ -14,11 +14,11 @@ base_dir="$( dirname "${BASH_SOURCE[0]}" )/../"
 
 if ! config-shard-validator --release-repo-dir="${base_dir}" > "${workdir}/output" 2>&1; then
 	cat << EOF
-[ERROR] This check enforces that configuration YAML files will be uploaded automatically
-[ERROR] as they change. You are adding a file that is not covered by the automatic upload.
-[ERROR] Contact an administrator to resolve this issue.
+ERROR: This check enforces that configuration YAML files will be uploaded automatically
+ERROR: as they change. You are adding a file that is not covered by the automatic upload.
+ERROR: Contact an administrator to resolve this issue.
 
-[ERROR] The following errors were found:
+ERROR: The following errors were found:
 
 EOF
 	cat "${workdir}/output"
