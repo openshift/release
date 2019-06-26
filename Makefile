@@ -34,7 +34,7 @@ applyTemplate:
 	oc process -f $(WHAT) | oc apply -f -
 .PHONY: applyTemplate
 
-postsubmit-update: prow-services origin-release ci-infra-imagestreams libpod prow-monitoring build-dashboards-validation-image image-mirror-setup knative-image-mirror-setup tekton-image-mirror-setup kubefed-image-mirror-setup toolchain-image-mirror-setup cincinnati
+postsubmit-update: prow-services origin-release libpod prow-monitoring build-dashboards-validation-image image-mirror-setup knative-image-mirror-setup tekton-image-mirror-setup kubefed-image-mirror-setup toolchain-image-mirror-setup cincinnati
 .PHONY: postsubmit-update
 
 all: roles prow projects
@@ -185,7 +185,6 @@ prow-artifacts:
 
 	oc create ns ci-rpms -o yaml --dry-run | oc apply -f -
 	oc apply -f ci-operator/infra/openshift/origin/
-	oc apply -n ci -f ci-operator/infra/src-cache-origin.yaml
 .PHONY: prow-artifacts
 
 prow-ci-chat-bot:
@@ -216,10 +215,6 @@ prow-release-controller: prow-release-controller-definitions prow-release-contro
 
 projects: ci-ns gcsweb origin-stable origin-release image-mirror-setup knative-image-mirror-setup tekton-image-mirror-setup kubefed-image-mirror-setup toolchain-image-mirror-setup image-pruner-setup publishing-bot content-mirror azure python-validation metering
 .PHONY: projects
-
-ci-operator-config:
-	$(MAKE) apply WHAT=ci-operator/infra/src-cache-origin.yaml
-.PHONY: ci-operator-config
 
 content-mirror:
 	$(MAKE) apply WHAT=projects/content-mirror/pipeline.yaml
@@ -255,10 +250,6 @@ origin-release:
 	$(MAKE) applyTemplate WHAT=projects/origin-release/pipeline.yaml
 	oc tag docker.io/centos/ruby-25-centos7:latest --scheduled openshift/release:ruby-25
 .PHONY: origin-release
-
-ci-infra-imagestreams:
-	$(MAKE) apply WHAT=ci-operator/infra/ansible-runner-imagestream.yaml
-.PHONY: ci-infra-imagestreams
 
 prometheus: node-exporter alert-buffer
 	$(MAKE) apply WHAT=projects/prometheus/prometheus.yaml
@@ -303,7 +294,7 @@ image-mirror-setup:
 	$(MAKE) apply WHAT=cluster/ci/jobs/image-mirror.yaml
 .PHONY: image-mirror-setup
 
-knative-image-mirror-setup:
+knative-image-miror-setup:
 	oc create configmap knative-image-mirror --from-file=cluster/ci/config/mirroring/knative -o yaml --dry-run | oc apply -f -
 	$(MAKE) apply WHAT=cluster/ci/jobs/knative-image-mirror.yaml
 .PHONY: knative-image-mirror-setup
