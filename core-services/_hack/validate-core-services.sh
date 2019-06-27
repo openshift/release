@@ -8,8 +8,8 @@ function validate_required_files() {
     for required in OWNERS README.md; do
         local required_path="$service_path/$required"
         if [[ ! -s "$required_path" ]]; then
-            echo "[ERROR] $required file not found: $required_path"
-            echo "[ERROR] All core services should have $required file"
+            echo "ERROR: $required file not found: $required_path"
+            echo "ERROR: All core services should have $required file"
             return 1
         fi
     done
@@ -19,7 +19,7 @@ function validate_required_files() {
 
 to_validate="$1"
 if [[ ! -d "$to_validate" ]]; then
-    echo "[ERROR] Directory not found: $to_validate"
+    echo "ERROR: Directory not found: $to_validate"
     echo "Usage: validate-core-services.sh DIRECTORY"
     exit 1
 fi

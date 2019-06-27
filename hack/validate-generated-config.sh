@@ -19,14 +19,14 @@ ci-operator-prowgen --from-dir "${ci_operator_dir}/config" --to-dir "${workdir}/
 
 if ! diff -Naupr "${ci_operator_dir}/jobs/" "${workdir}/ci-operator/jobs/"> "${workdir}/diff"; then
 	cat << EOF
-[ERROR] This check enforces that Prow Job configuration YAML files are generated
-[ERROR] correctly. We have automation in place that generates these configs and
-[ERROR] new changes to these job configurations should occur from a re-generation.
+ERROR: This check enforces that Prow Job configuration YAML files are generated
+ERROR: correctly. We have automation in place that generates these configs and
+ERROR: new changes to these job configurations should occur from a re-generation.
 
-[ERROR] Run the following command to re-generate the Prow jobs:
-[ERROR] $ docker run -it -v \$(pwd)/ci-operator:/ci-operator:z registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest --from-dir /ci-operator/config/ --to-dir /ci-operator/jobs
+ERROR: Run the following command to re-generate the Prow jobs:
+ERROR: $ docker run -it -v \$(pwd)/ci-operator:/ci-operator:z registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest --from-dir /ci-operator/config/ --to-dir /ci-operator/jobs
 
-[ERROR] The following errors were found:
+ERROR: The following errors were found:
 
 EOF
 	cat "${workdir}/diff"
