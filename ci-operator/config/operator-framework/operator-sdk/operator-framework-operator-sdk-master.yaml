@@ -4,6 +4,11 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.12
+base_images:
+  ansible-runner:
+    name: ansible-runner
+    namespace: openshift
+    tag: latest
 canonical_go_repository: github.com/operator-framework/operator-sdk
 test_binary_build_commands: ./hack/ci/setup-build-dependencies.sh
 resources:
@@ -13,6 +18,42 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+images:
+- from: root
+  dockerfile_path: ci/dockerfiles/builder.Dockerfile
+  to: osdk-builder
+- from: ansible-runner
+  dockerfile_path: ci/dockerfiles/ansible.Dockerfile
+  inputs:
+    osdk-builder:
+      as:
+      - osdk-builder
+      paths: null
+  to: ansible-operator
+- from: ansible-runner
+  dockerfile_path: ci/dockerfiles/ansible-e2e-hybrid.Dockerfile
+  inputs:
+    osdk-builder:
+      as:
+      - osdk-builder
+  to: osdk-ansible-e2e-hybrid
+- from: ansible-operator
+  dockerfile_path: ci/dockerfiles/ansible-e2e.Dockerfile
+  inputs:
+    osdk-builder:
+      as:
+      - osdk-builder
+  to: osdk-ansible-e2e
+promotion:
+  name: "4.2"
+  namespace: ocp
+  excluded_images:
+  - osdk-builder
+  - osdk-ansible-e2e
+  - osdk-ansible-e2e-hybrid
+tag_specification:
+  name: "4.2"
+  namespace: ocp
 tests:
 - as: marker
   commands: make test/markdown
@@ -26,3 +67,7 @@ tests:
   commands: make test/sanity
   container:
     from: test-bin
+- as: e2e-aws-ansible
+  commands: make test/e2e/ansible2
+  openshift_installer_src:
+    cluster_profile: aws
