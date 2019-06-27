@@ -93,9 +93,9 @@ func apply(path, user string, dry bool) error {
 	cmd := exec.Command("oc", args...)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		if _, ok := err.(*exec.ExitError); ok {
-			fmt.Printf("[ERROR] oc %s: failed to apply\n%s\n", strings.Join(args, " "), string(output))
+			fmt.Printf("ERROR: oc %s: failed to apply\n%s\n", strings.Join(args, " "), string(output))
 		} else {
-			fmt.Printf("[ERROR] oc %s: failed to execute: %v\n", strings.Join(args, " "), err)
+			fmt.Printf("ERROR: oc %s: failed to execute: %v\n", strings.Join(args, " "), err)
 		}
 		return fmt.Errorf("failed to apply config")
 	}
