@@ -24,52 +24,23 @@ presubmits:
     - master
     context: conformance
     decorate: true
-    decoration_config:
-      grace_period: 0s
-      skip_cloning: true
-      timeout: 0s
     name: pull-ci-azure-master-e2e-azure-conformance
     rerun_command: /test conformance
     spec:
       containers:
       - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/e2e-secrets/azure
-        - --target=[output:stable:azure]
-        - --target=cluster-launch-e2e-azure-conformance
-        - --template=/usr/local/cluster-launch-e2e-azure-conformance.yaml
-        command:
-        - ci-operator
+        - hack/tests/origin-conformance.sh
         env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-openshift-azure-master.yaml
-              name: ci-operator-master-configs
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance/parallel run-tests
-        - name: TEST_IMAGE
-          value: registry.svc.ci.openshift.org/openshift/origin-v3.11:tests
-        image: ci-operator:latest
+        - name: TEST_NODES
+          value: "30"
+        - name: TEST_SUITE
+          value: openshift/conformance/parallel/minimal
+        image: registry.svc.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources:
           requests:
             cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/e2e-secrets/azure
-          name: cluster-secrets-azure
-        - mountPath: /usr/local/cluster-launch-e2e-azure-conformance.yaml
-          name: job-definition
-          subPath: cluster-launch-e2e-azure.yaml
       serviceAccountName: ci-operator
-      volumes:
-      - name: cluster-secrets-azure
-        secret:
-          secretName: cluster-secrets-azure
-      - configMap:
-          name: prow-job-cluster-launch-e2e-azure
-        name: job-definition
     trigger: (?m)^/test( | .* )conformance,?($|\s.*)
   - agent: kubernetes
     always_run: false
