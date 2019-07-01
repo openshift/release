@@ -34,7 +34,7 @@ applyTemplate:
 	oc process -f $(WHAT) | oc apply -f -
 .PHONY: applyTemplate
 
-postsubmit-update: prow-services origin-release libpod prow-monitoring build-dashboards-validation-image kubefed-image-mirror-setup toolchain-image-mirror-setup cincinnati
+postsubmit-update: prow-services origin-release libpod prow-monitoring build-dashboards-validation-image kubefed-image-mirror-setup cincinnati
 .PHONY: postsubmit-update
 
 all: roles prow projects
@@ -213,7 +213,7 @@ prow-release-controller-deploy:
 prow-release-controller: prow-release-controller-definitions prow-release-controller-deploy
 .PHONY: prow-release-controller
 
-projects: ci-ns gcsweb origin-stable origin-release kubefed-image-mirror-setup toolchain-image-mirror-setup image-pruner-setup publishing-bot content-mirror azure python-validation metering
+projects: ci-ns gcsweb origin-stable origin-release kubefed-image-mirror-setup image-pruner-setup publishing-bot content-mirror azure python-validation metering
 .PHONY: projects
 
 content-mirror:
@@ -292,10 +292,6 @@ image-mirror-files:
 kubefed-image-mirror-setup:
 	oc create configmap kubefed-image-mirror --from-file=cluster/ci/config/mirroring/kubefed -o yaml --dry-run | oc apply -f -
 .PHONY: kubefed-image-mirror-setup
-
-toolchain-image-mirror-setup:
-	oc create configmap toolchain-image-mirror --from-file=cluster/ci/config/mirroring/toolchain -o yaml --dry-run | oc apply -f -
-.PHONY: toolchain-image-mirror-setup
 
 cluster-operator-roles:
 	oc create ns openshift-cluster-operator --dry-run -o yaml | oc apply -f -
