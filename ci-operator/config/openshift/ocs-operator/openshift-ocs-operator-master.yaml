@@ -1,0 +1,40 @@
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.12
+canonical_go_repository: github.com/openshift/ocs-operator
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: gofmt
+  commands: |
+    gofmt -s -l $(find . -path ./vendor -prune -o -type f -name '*.go' -print)
+  container:
+    from: src
+- as: golint
+  commands: |
+    golint -set_exit_status $(go list ./...)
+  container:
+    from: src
+- as: govet
+  commands: |
+    go vet ./...
+  container:
+    from: src
+- as: gotest
+  commands: |
+    go test -v ./...
+  container:
+    from: src
+- as: gobuild
+  commands: |
+    go build github.com/openshift/ocs-operator/cmd/manager
+  container:
+    from: src
