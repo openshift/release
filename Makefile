@@ -34,7 +34,7 @@ applyTemplate:
 	oc process -f $(WHAT) | oc apply -f -
 .PHONY: applyTemplate
 
-postsubmit-update: prow-services origin-release libpod prow-monitoring build-dashboards-validation-image knative-image-mirror-setup tekton-image-mirror-setup kubefed-image-mirror-setup toolchain-image-mirror-setup cincinnati
+postsubmit-update: prow-services origin-release libpod prow-monitoring build-dashboards-validation-image kubefed-image-mirror-setup tekton-image-mirror-setup toolchain-image-mirror-setup cincinnati
 .PHONY: postsubmit-update
 
 all: roles prow projects
@@ -213,7 +213,7 @@ prow-release-controller-deploy:
 prow-release-controller: prow-release-controller-definitions prow-release-controller-deploy
 .PHONY: prow-release-controller
 
-projects: ci-ns gcsweb origin-stable origin-release knative-image-mirror-setup tekton-image-mirror-setup kubefed-image-mirror-setup toolchain-image-mirror-setup image-pruner-setup publishing-bot content-mirror azure python-validation metering
+projects: ci-ns gcsweb origin-stable origin-release tekton-image-mirror-setup kubefed-image-mirror-setup toolchain-image-mirror-setup image-pruner-setup publishing-bot content-mirror azure python-validation metering
 .PHONY: projects
 
 content-mirror:
@@ -288,10 +288,6 @@ image-mirror-files:
 	BASE=quay.io/openshift/origin- VERSION=4.1 TAG=4.1,4.1.0 hack/mirror-file > cluster/ci/config/mirroring/origin_4_1
 	BASE=quay.io/openshift/origin- VERSION=4.2 TAG=4.2,4.2.0,latest hack/mirror-file > cluster/ci/config/mirroring/origin_4_2
 .PHONY: image-mirror-files
-
-knative-image-mirror-setup:
-	oc create configmap knative-image-mirror --from-file=cluster/ci/config/mirroring/knative -o yaml --dry-run | oc apply -f -
-.PHONY: knative-image-mirror-setup
 
 tekton-image-mirror-setup:
 	oc create configmap tekton-image-mirror --from-file=cluster/ci/config/mirroring/tekton -o yaml --dry-run | oc apply -f -
