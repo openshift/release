@@ -20,7 +20,7 @@ targets=( cluster/ci/config/prow ci-operator/ hack/images.sh )
 target_files=( $( find "${targets[@]}" -type f ) )
 for component in $( grep -Porh "(?<=gcr.io/k8s-prow/).*(?=:v)" "${target_files[@]}" | sort | uniq ); do
 	current_tag="$( grep -Porh "(?<=${component}:)v[0-9]{8}-[a-z0-9]+" "${target_files[@]}" | head -n 1 )"
-	latest_tag="$( gcloud container images list-tags "gcr.io/k8s-prow/${component}" --format='value(tags)' --limit 1 | grep -Po "v[0-9]+\-[a-z0-9]+" )"
+	latest_tag="$( gcloud container images list-tags "gcr.io/k8s-prow/${component}" --format='value(tags)' --limit 1 | grep -Po "v[0-9]+\-[a-z0-9]+" | head -n 1)"
 	if [[ -n "${new_tag}" && "${latest_tag}" != "${new_tag}" ]]; then
 		echo "[WARNING] For ${component} found the latest tag at ${latest_tag}, not ${new_tag} like other components."
 	fi
