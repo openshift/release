@@ -1,0 +1,97 @@
+kind: List
+apiVersion: v1
+items:
+- apiVersion: batch/v1beta1
+  kind: CronJob
+  metadata:
+    name: "image-mirror-host-operator-v0.1-quay"
+    labels:
+      app: "image-mirror-host-operator-v0.1-quay"
+  spec:
+    schedule: "0 * * * *"
+    concurrencyPolicy: Forbid
+    successfulJobsHistoryLimit: 1
+    failedJobsHistoryLimit: 2
+    jobTemplate:
+      spec:
+        template:
+          metadata:
+            name: "image-mirror-host-operator-v0.1-quay"
+            labels:
+              app: "image-mirror-host-operator-v0.1-quay"
+          spec:
+            restartPolicy: OnFailure
+            volumes:
+            - name: push
+              secret:
+                secretName: registry-push-credentials-quay.io-codeready-toolchain
+            - name: config
+              configMap:
+                name: codeready-toolchain-image-mirror
+            containers:
+            - name: "mirror"
+              image: "openshift/origin-cli:v4.0"
+              terminationMessagePolicy: FallbackToLogsOnError
+              volumeMounts:
+              - name: push
+                mountPath: /home/mirror/.docker/config.json
+                subPath: config.json
+              - name: config
+                mountPath: /etc/imagemirror
+              env:
+              - name: HOME
+                value: /home/mirror
+              command:
+              - oc
+              args:
+              - image
+              - mirror
+              - -f=/etc/imagemirror/host_v0_1_quay
+              - --skip-multiple-scopes # quay chokes when requesting multiple
+- apiVersion: batch/v1beta1
+  kind: CronJob
+  metadata:
+    name: "image-mirror-member-operator-v0.1-quay"
+    labels:
+      app: "image-mirror-member-operator-v0.1-quay"
+  spec:
+    schedule: "0 * * * *"
+    concurrencyPolicy: Forbid
+    successfulJobsHistoryLimit: 1
+    failedJobsHistoryLimit: 2
+    jobTemplate:
+      spec:
+        template:
+          metadata:
+            name: "image-mirror-member-operator-v0.1-quay"
+            labels:
+              app: "image-mirror-member-operator-v0.1-quay"
+          spec:
+            restartPolicy: OnFailure
+            volumes:
+            - name: push
+              secret:
+                secretName: registry-push-credentials-quay.io-codeready-toolchain
+            - name: config
+              configMap:
+                name: codeready-toolchain-image-mirror
+            containers:
+            - name: "mirror"
+              image: "openshift/origin-cli:v4.0"
+              terminationMessagePolicy: FallbackToLogsOnError
+              volumeMounts:
+              - name: push
+                mountPath: /home/mirror/.docker/config.json
+                subPath: config.json
+              - name: config
+                mountPath: /etc/imagemirror
+              env:
+              - name: HOME
+                value: /home/mirror
+              command:
+              - oc
+              args:
+              - image
+              - mirror
+              - -f=/etc/imagemirror/member_v0_1_quay
+              - --skip-multiple-scopes # quay chokes when requesting multiple
