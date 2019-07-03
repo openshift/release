@@ -23,6 +23,8 @@ parameters:
   required: true
 - name: CI_DNS_IP
   value: 128.31.27.48
+- name: KURYR_ENABLED
+  value: "false"
 
 objects:
 
@@ -40,14 +42,14 @@ objects:
   - kind: SystemGroup
     name: system:authenticated
 
-# Give edit access to a known bot
+# Give admin access to a known bot
 - kind: RoleBinding
   apiVersion: authorization.openshift.io/v1
   metadata:
-    name: ${JOB_NAME_SAFE}-namespace-editors
+    name: ${JOB_NAME_SAFE}-namespace-admins
     namespace: ${NAMESPACE}
   roleRef:
-    name: edit
+    name: admin
   subjects:
   - kind: ServiceAccount
     namespace: ci
@@ -270,7 +272,13 @@ objects:
           ${SSH_PUB_KEY}
         EOF
 
-
+        # What we're doing here is we generate manifests first and force that OpenShift SDN is configured. Kuryr is only
+        # allowed when KURYR_ENABLED variable is set to "true".
+        TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create manifests --log-level=debug
+        if [[ $KURYR_ENABLED != "true" ]]; then
+          echo "Forcing OpenShiftSDN by modifying manifests"
+          sed -i -e 's/networkType: .*$/networkType: OpenShiftSDN/g' /tmp/artifacts/installer/manifests/cluster-network-02-config.yml
+        fi
         TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create cluster --log-level=debug &
         wait "$!"
 
