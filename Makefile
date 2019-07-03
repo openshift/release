@@ -34,7 +34,7 @@ applyTemplate:
 	oc process -f $(WHAT) | oc apply -f -
 .PHONY: applyTemplate
 
-postsubmit-update: prow-services origin-release libpod prow-monitoring build-dashboards-validation-image image-mirror-setup knative-image-mirror-setup tekton-image-mirror-setup kubefed-image-mirror-setup toolchain-image-mirror-setup cincinnati
+postsubmit-update: prow-services origin-release libpod prow-monitoring build-dashboards-validation-image image-mirror-setup knative-image-mirror-setup tekton-image-mirror-setup kubefed-image-mirror-setup toolchain-image-mirror-setup codeready-toolchain-image-mirror-setup cincinnati
 .PHONY: postsubmit-update
 
 all: roles prow projects
@@ -213,7 +213,7 @@ prow-release-controller-deploy:
 prow-release-controller: prow-release-controller-definitions prow-release-controller-deploy
 .PHONY: prow-release-controller
 
-projects: ci-ns gcsweb origin-stable origin-release image-mirror-setup knative-image-mirror-setup tekton-image-mirror-setup kubefed-image-mirror-setup toolchain-image-mirror-setup image-pruner-setup publishing-bot content-mirror azure python-validation metering
+projects: ci-ns gcsweb origin-stable origin-release image-mirror-setup knative-image-mirror-setup tekton-image-mirror-setup kubefed-image-mirror-setup toolchain-image-mirror-setup codeready-toolchain-image-mirror-setup image-pruner-setup publishing-bot content-mirror azure python-validation metering
 .PHONY: projects
 
 content-mirror:
@@ -313,6 +313,11 @@ toolchain-image-mirror-setup:
 	oc create configmap toolchain-image-mirror --from-file=cluster/ci/config/mirroring/toolchain -o yaml --dry-run | oc apply -f -
 	$(MAKE) apply WHAT=cluster/ci/jobs/toolchain-image-mirror.yaml
 .PHONY: toolchain-image-mirror-setup
+
+codeready-toolchain-image-mirror-setup:
+	oc create configmap codeready-toolchain-image-mirror --from-file=cluster/ci/config/mirroring/codeready-toolchain -o yaml --dry-run | oc apply -f -
+	$(MAKE) apply WHAT=cluster/ci/jobs/codeready-toolchain-image-mirror.yaml
+.PHONY: codeready-toolchain-image-mirror-setup
 
 cluster-operator-roles:
 	oc create ns openshift-cluster-operator --dry-run -o yaml | oc apply -f -
