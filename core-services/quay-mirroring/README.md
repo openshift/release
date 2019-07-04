@@ -18,7 +18,7 @@ and an `OWNERS` file (so that you can maintain your mappings). The mapping files
 should follow the `mapping_$name$anything` naming convention to avoid conflicts
 when put to a ConfigMap.
 
-Additionally, you will need to add a new Periodic job [here](../../ci-operator/jobs/image-mirroring.yaml).
+Additionally, you will need to add a new Periodic job [here](../../ci-operator/jobs/infra-image-mirroring.yaml).
 You should not need to modify anything in the job besides the items marked as
 `FIXME`, where you just need to fill in the name of your image set (it should
 be the same as the name of the subdirectory here). The only exception to this is
