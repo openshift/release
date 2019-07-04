@@ -34,7 +34,7 @@ applyTemplate:
 	oc process -f $(WHAT) | oc apply -f -
 .PHONY: applyTemplate
 
-postsubmit-update: prow-services origin-release libpod prow-monitoring build-dashboards-validation-image image-mirror-setup cincinnati
+postsubmit-update: prow-services origin-release libpod prow-monitoring build-dashboards-validation-image cincinnati
 .PHONY: postsubmit-update
 
 all: roles prow projects
@@ -209,7 +209,7 @@ prow-release-controller-deploy:
 prow-release-controller: prow-release-controller-definitions prow-release-controller-deploy
 .PHONY: prow-release-controller
 
-projects: ci-ns gcsweb origin-stable origin-release image-mirror-setup image-pruner-setup publishing-bot content-mirror azure python-validation metering
+projects: ci-ns gcsweb origin-stable origin-release image-pruner-setup publishing-bot content-mirror azure python-validation metering
 .PHONY: projects
 
 content-mirror:
@@ -272,23 +272,6 @@ image-pruner-setup:
 	oc adm policy add-cluster-role-to-user system:image-pruner -z image-pruner
 	$(MAKE) apply WHAT=cluster/ci/jobs/image-pruner.yaml
 .PHONY: image-pruner-setup
-
-# Regenerate the on cluster image streams from the authoritative mirror
-image-restore-from-mirror:
-	cat cluster/ci/config/mirroring/origin_v3_11 | cut -d ' ' -f 1 | cut -d ':' -f 2 | xargs -L1 -I {} oc tag docker.io/openshift/origin-{}:v3.11 openshift/origin-v3.11:{}
-	cat cluster/ci/config/mirroring/origin_v4_0 | cut -d ' ' -f 1 | cut -d ':' -f 2 | xargs -L1 -I {} oc tag docker.io/openshift/origin-{}:v4.0 openshift/origin-v4.0:{}
-.PHONY: image-restore-from-mirror
-
-# Regenerate the mirror files by looking at what we are publishing to the image stream.
-image-mirror-files:
-	BASE=quay.io/openshift/origin- VERSION=4.1 TAG=4.1,4.1.0 hack/mirror-file > cluster/ci/config/mirroring/origin_4_1
-	BASE=quay.io/openshift/origin- VERSION=4.2 TAG=4.2,4.2.0,latest hack/mirror-file > cluster/ci/config/mirroring/origin_4_2
-.PHONY: image-mirror-files
-
-image-mirror-setup:
-	oc create configmap image-mirror --from-file=cluster/ci/config/mirroring/ -o yaml --dry-run | oc apply -f -
-	$(MAKE) apply WHAT=cluster/ci/jobs/image-mirror.yaml
-.PHONY: image-mirror-setup
 
 cluster-operator-roles:
 	oc create ns openshift-cluster-operator --dry-run -o yaml | oc apply -f -
