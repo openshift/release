@@ -195,7 +195,7 @@ periodics:
     labels:
       ci.openshift.io/role: image-mirroring
       ci.openshift.io/area: kubefed
-    cron: "@midnight"
+    cron: "@hourly"
     decorate: true
     name: periodic-image-mirroring-kubefed
     skip_cloning: true
@@ -207,8 +207,8 @@ periodics:
               set -o errexit
               failures=0
               for mapping in /etc/imagemirror/mapping_kubefed*; do
-                echo "Running: oc image mirror -f=$mapping --skip-multiple-scopes --dry-run=true"
-                if ! oc image mirror -f="$mapping" --skip-multiple-scopes --dry-run=true; then
+                echo "Running: oc image mirror -f=$mapping --skip-multiple-scopes"
+                if ! oc image mirror -f="$mapping" --skip-multiple-scopes; then
                   echo "ERROR: Failed to mirror images from $mapping"
                   failures=$((failures+1))
                 fi
