@@ -37,3 +37,49 @@ periodics:
     - name: sentry-dsn
       secret:
         secretName: sentry-dsn
+- agent: kubernetes
+  cron: ""
+  decorate: true
+  interval: "15m" #keeping for the testing purpose
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: tektoncd-pipeline-operator
+  labels:
+    job-env: aws
+  name: openshift-tektoncd-pipeline-operator-nightly-tests
+  rerun_command: /test e2e
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+      - --target=e2e
+      - --template=/usr/local/e2e
+      command:
+      - ci-operator
+      env:
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-tektoncd-pipeline-operator-master.yaml
+              name: ci-operator-master-configs
+        - name: JOB_NAME_SAFE
+          value: e2e
+        - name: TEST_COMMAND
+          value: make test-e2e
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      volumeMounts:
+      - mountPath: /etc/sentry-dsn
+        name: sentry-dsn
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: sentry-dsn
+      secret:
+        secretName: sentry-dsn
