@@ -1515,6 +1515,68 @@ presubmits:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - master
+    context: ci/prow/kuryr-e2e-openstack
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: kuryr
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-master-kuryr-e2e-openstack
+    optional: true
+    rerun_command: /test kuryr-e2e-openstack
+    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --secret-dir=/usr/local/e2e-openstack-cluster-profile
+        - --target=e2e-openstack
+        - --template=/usr/local/e2e-openstack
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: openstack
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-installer-master.yaml
+              name: ci-operator-master-configs
+        - name: JOB_NAME_SAFE
+          value: kuryr-e2e-openstack
+        - name: KURYR_ENABLED
+          value: "true"
+        - name: TEST_COMMAND
+          value: run-minimal-tests
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-openstack-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-openstack
+          name: job-definition
+          subPath: cluster-launch-installer-openstack-e2e.yaml
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-openstack
+      - configMap:
+          name: prow-job-cluster-launch-installer-openstack-e2e
+        name: job-definition
+    trigger: (?m)^/test( | .* )kuryr-e2e-openstack,?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - master
