@@ -15,7 +15,7 @@
               team: 'build-cop',
             },
             annotations: {
-              message: '@build-cop `%s` jobs have been below the target (100%%) for thirty minutes.' % job_name_regex,
+              message: '@build-cop `%s` jobs have been below (current value: {{ $value }}) the target (100%%) for thirty minutes.' % job_name_regex,
             },
           }
           for job_name_regex in ['branch-.*-images', 'release-.*-4.1', 'release-.*-4.2', 'release-.*-upgrade.*']
