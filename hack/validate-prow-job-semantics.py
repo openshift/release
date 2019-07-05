@@ -18,7 +18,7 @@ def main():
                 failed = True
             if not filename.endswith('.yaml'):
                 continue
-            if os.path.basename(filename) == "infra-periodics.yaml":
+            if os.path.basename(filename).startswith("infra-"):
                 continue
             path = os.path.join(root, filename)
             for file_check in [validate_filename, validate_file_structure]:
