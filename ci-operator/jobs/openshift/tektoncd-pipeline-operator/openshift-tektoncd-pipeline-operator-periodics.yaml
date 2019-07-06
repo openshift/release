@@ -1,85 +1,53 @@
+#build target for this job has to be different, so that it could
+#pull the latest release.yaml and bundle into to operator image
 periodics:
 - agent: kubernetes
   cron: ""
   decorate: true
   interval: "15m" #keeping for the testing purpose
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: tektoncd-pipeline-operator
-  labels:
-    job-env: aws
-  name: openshift-tektoncd-pipeline-operator-nightly-images
-  rerun_command: /test images
-  spec:
-    containers:
-    - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-      - --target=[images]
-      command:
-      - ci-operator
-      env:
-      - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-tektoncd-pipeline-operator-master.yaml
-            name: ci-operator-master-configs
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      volumeMounts:
-      - mountPath: /etc/sentry-dsn
-        name: sentry-dsn
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: sentry-dsn
-      secret:
-        secretName: sentry-dsn
-- agent: kubernetes
-  cron: ""
-  decorate: true
-  interval: "15m" #keeping for the testing purpose
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: tektoncd-pipeline-operator
-  labels:
-    job-env: aws
   name: openshift-tektoncd-pipeline-operator-nightly-tests
-  rerun_command: /test e2e
+  skip_cloning: true
   spec:
     containers:
     - args:
       - --artifact-dir=$(ARTIFACTS)
-      - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+      - --git-ref=openshift/tektoncd-pipeline-operator@master
+      - --secret-dir=/usr/local/e2e-cluster-profile
       - --target=e2e
       - --template=/usr/local/e2e
       command:
       - ci-operator
       env:
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-tektoncd-pipeline-operator-master.yaml
-              name: ci-operator-master-configs
-        - name: JOB_NAME_SAFE
-          value: e2e
-        - name: TEST_COMMAND
-          value: make test-e2e
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: CONFIG_SPEC
+        valueFrom:
+          configMapKeyRef:
+            key: openshift-tektoncd-pipeline-operator-master.yaml #may need to have different config for nightly jobs
+            name: ci-operator-master-configs
+      - name: JOB_NAME_SAFE
+        value: e2e
+      - name: TEST_COMMAND
+        value: make test-e2e
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
+      resources:
+        requests:
+          cpu: 10m
       volumeMounts:
-      - mountPath: /etc/sentry-dsn
-        name: sentry-dsn
-        readOnly: true
+      - mountPath: /usr/local/e2e-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/e2e
+        name: job-definition
+        subPath: cluster-launch-installer-src.yaml
     serviceAccountName: ci-operator
     volumes:
-    - name: sentry-dsn
-      secret:
-        secretName: sentry-dsn
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - configMap:
+        name: prow-job-cluster-launch-installer-src
+      name: job-definition
