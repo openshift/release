@@ -1,3 +1,4 @@
+local config =  import '../config.libsonnet';
 local grafana = import 'grafonnet/grafana.libsonnet';
 local dashboard = grafana.dashboard;
 local graphPanel = grafana.graphPanel;
@@ -11,7 +12,7 @@ local legendConfig = {
     };
 
 local dashboardConfig = {
-        uid: '6829209d59479d48073d09725ce807fa',
+        uid: config._config.grafanaDashboardIDs['build_cop.json'],
     };
 
 dashboard.new(
