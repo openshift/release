@@ -8,6 +8,8 @@ presubmits:
     decorate: true
     decoration_config:
       skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
     name: pull-ci-openshift-cluster-nfd-operator-master-e2e-aws
     rerun_command: /test e2e-aws
     spec:
@@ -16,6 +18,7 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
         - --secret-dir=/usr/local/e2e-aws-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=e2e-aws
         - --template=/usr/local/e2e-aws
         command:
@@ -27,7 +30,7 @@ presubmits:
           valueFrom:
             configMapKeyRef:
               key: openshift-cluster-nfd-operator-master.yaml
-              name: ci-operator-configs
+              name: ci-operator-master-configs
         - name: JOB_NAME_SAFE
           value: e2e-aws
         - name: TEST_COMMAND
@@ -44,6 +47,9 @@ presubmits:
         - mountPath: /usr/local/e2e-aws
           name: job-definition
           subPath: cluster-launch-installer-e2e.yaml
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
       - name: cluster-profile
@@ -54,7 +60,10 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-e2e
         name: job-definition
-    trigger: '(?m)^/test (?:.*? )?e2e-aws(?: .*?)?$'
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )e2e-aws,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -63,6 +72,8 @@ presubmits:
     decorate: true
     decoration_config:
       skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
     name: pull-ci-openshift-cluster-nfd-operator-master-images
     rerun_command: /test images
     spec:
@@ -70,6 +81,7 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=[images]
         - --target=[release:latest]
         command:
@@ -79,15 +91,23 @@ presubmits:
           valueFrom:
             configMapKeyRef:
               key: openshift-cluster-nfd-operator-master.yaml
-              name: ci-operator-configs
+              name: ci-operator-master-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
       serviceAccountName: ci-operator
-    trigger: '(?m)^/test (?:.*? )?images(?: .*?)?$'
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -96,6 +116,8 @@ presubmits:
     decorate: true
     decoration_config:
       skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
     name: pull-ci-openshift-cluster-nfd-operator-master-unit
     rerun_command: /test unit
     spec:
@@ -103,6 +125,7 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=unit
         command:
         - ci-operator
@@ -111,15 +134,23 @@ presubmits:
           valueFrom:
             configMapKeyRef:
               key: openshift-cluster-nfd-operator-master.yaml
-              name: ci-operator-configs
+              name: ci-operator-master-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
       serviceAccountName: ci-operator
-    trigger: '(?m)^/test (?:.*? )?unit(?: .*?)?$'
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )unit,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -128,6 +159,8 @@ presubmits:
     decorate: true
     decoration_config:
       skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
     name: pull-ci-openshift-cluster-nfd-operator-master-verify
     rerun_command: /test verify
     spec:
@@ -135,6 +168,7 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=verify
         command:
         - ci-operator
@@ -143,12 +177,20 @@ presubmits:
           valueFrom:
             configMapKeyRef:
               key: openshift-cluster-nfd-operator-master.yaml
-              name: ci-operator-configs
+              name: ci-operator-master-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
       serviceAccountName: ci-operator
-    trigger: '(?m)^/test (?:.*? )?verify(?: .*?)?$'
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )verify,?($|\s.*)
