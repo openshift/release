@@ -7,10 +7,11 @@ All Azure Red Hat OpenShift (ARO) versions:
 |release-v1|*         |deprecated |
 |release-v2|*         |deprecated |
 |release-v3|v3.2      |deprecated |
-|release-v4|v4.2      |live       |
-|release-v4|v4.3      |live       |
-|release-v4|v4.4      |pre-release|
-|release-v5|v5.1      |pre-release|
+|release-v4|v4.2      |deprecated |
+|release-v4|v4.3      |deprecated |
+|release-v4|v4.4      |deprecated |
+|release-v5|v5.1      |deprecated |
+|release-v5|v5.2      |live       |
 |master    |v6.0      |development|
 
 # Testing matrix
