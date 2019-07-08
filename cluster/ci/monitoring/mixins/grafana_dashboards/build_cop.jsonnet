@@ -1,3 +1,4 @@
+local config =  import '../config.libsonnet';
 local grafana = import 'grafonnet/grafana.libsonnet';
 local dashboard = grafana.dashboard;
 local graphPanel = grafana.graphPanel;
@@ -11,7 +12,7 @@ local legendConfig = {
     };
 
 local dashboardConfig = {
-        uid: '6829209d59479d48073d09725ce807fa',
+        uid: config._config.grafanaDashboardIDs['build_cop.json'],
     };
 
 dashboard.new(
@@ -111,6 +112,8 @@ dashboard.new(
         legend_values=true,
         legend_current=true,
         legend_min=true,
+        legend_sort='min',
+        legend_sortDesc=true,
         min='0',
         max='1',
         formatY1='percentunit',
@@ -146,6 +149,8 @@ dashboard.new(
         legend_values=true,
         legend_current=true,
         legend_min=true,
+        legend_sort='min',
+        legend_sortDesc=true,
         min='0',
         max='1',
         formatY1='percentunit',
@@ -173,6 +178,8 @@ dashboard.new(
         legend_values=true,
         legend_current=true,
         legend_min=true,
+        legend_sort='min',
+        legend_sortDesc=true,
         min='0',
         max='1',
         formatY1='percentunit',
@@ -196,6 +203,8 @@ dashboard.new(
         legend_values=true,
         legend_current=true,
         legend_min=true,
+        legend_sort='min',
+        legend_sortDesc=true,
         min='0',
         max='1',
         formatY1='percentunit',
@@ -235,6 +244,8 @@ dashboard.new(
         legend_values=true,
         legend_current=true,
         legend_min=true,
+        legend_sort='min',
+        legend_sortDesc=true,
         min='0',
         max='1',
         formatY1='percentunit',
