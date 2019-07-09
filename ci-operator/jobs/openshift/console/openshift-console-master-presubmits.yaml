@@ -239,6 +239,109 @@ presubmits:
     always_run: true
     branches:
     - master
+    context: ci/prow/e2e-console
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+    name: pull-ci-openshift-console-master-e2e-console
+    rerun_command: /test e2e-console
+    skip_report: true
+    spec:
+      containers:
+      - args:
+        - -c
+        - |
+          set -eux
+          target=$(awk < /usr/local/e2e-targets \
+              --assign "r=$RANDOM" \
+              'BEGIN { r /= 32767 } (r -= $1) <= 0 { print $2; exit }')
+          case "$target" in
+              aws) template=src; CLUSTER_TYPE=aws;;
+              azure) template=src; CLUSTER_TYPE=azure4;;
+              aws-upi) template=upi-src; CLUSTER_TYPE=aws;;
+              vsphere) template=upi-src; CLUSTER_TYPE=vsphere;;
+              *) echo >&2 "invalid target $target"; exit 1 ;;
+          esac
+          ln -s "/usr/local/job-definition/cluster-launch-installer-$template.yaml" /tmp/e2e-console
+          ln -s "/usr/local/cluster-profiles/$CLUSTER_TYPE" /tmp/e2e-console-cluster-profile
+          export CLUSTER_TYPE
+          exec ci-operator \
+              --artifact-dir=$(ARTIFACTS) \
+              --give-pr-author-access-to-namespace=true \
+              --secret-dir=/tmp/e2e-console-cluster-profile \
+              --sentry-dsn-path=/etc/sentry-dsn/ci-operator \
+              --target=e2e-console \
+              --template=/tmp/e2e-console
+        command:
+        - bash
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-console-master.yaml
+              name: ci-operator-master-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-console
+        - name: TEST_COMMAND
+          value: ./test-prow-e2e.sh
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/cluster-profiles/aws
+          name: cluster-profile-aws
+        - mountPath: /usr/local/cluster-profiles/azure4
+          name: cluster-profile-azure4
+        - mountPath: /usr/local/cluster-profiles/vsphere
+          name: cluster-profile-vsphere
+        - mountPath: /usr/local/e2e-targets
+          name: e2e-targets
+          subPath: e2e-targets
+        - mountPath: /usr/local/job-definition
+          name: job-definition
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile-aws
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - name: cluster-profile-azure4
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-azure4
+      - name: cluster-profile-vsphere
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-vsphere
+      - configMap:
+          name: e2e-targets
+        name: e2e-targets
+      - name: job-definition
+        projected:
+          sources:
+          - configMap:
+              name: prow-job-cluster-launch-installer-src
+          - configMap:
+              name: prow-job-cluster-launch-installer-upi-src
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )e2e-console,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
     context: ci/prow/frontend
     decorate: true
     decoration_config:
