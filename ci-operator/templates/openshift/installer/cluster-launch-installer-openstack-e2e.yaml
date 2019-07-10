@@ -304,6 +304,8 @@ objects:
         value: openstack-cloud
       - name: OS_CLIENT_CONFIG_FILE
         value: /etc/openshift-installer/clouds.yaml
+      - name: OPENSTACK_EXTERNAL_NETWORK
+        value: external
       command:
       - /bin/bash
       - -c
@@ -325,7 +327,6 @@ objects:
           fi
         }
         function nuke() {
-          export PREFIX=$(grep cluster_id /tmp/artifacts/installer/terraform.tfvars | cut -d '"' -f4)
           openstack server list -c ID -f value --name $PREFIX | xargs --no-run-if-empty openstack server delete
 
           openstack router remove subnet $PREFIX-external-router $PREFIX-service
@@ -358,6 +359,7 @@ objects:
           set +e
           touch /tmp/shared/exit
           export PATH=$PATH:/tmp/shared
+          export PREFIX=$(grep cluster_id /tmp/artifacts/installer/terraform.tfvars.json | cut -d '"' -f4)
 
           echo "Gathering artifacts ..."
           mkdir -p /tmp/artifacts/pods /tmp/artifacts/nodes /tmp/artifacts/metrics /tmp/artifacts/bootstrap /tmp/artifacts/network
@@ -365,15 +367,8 @@ objects:
 
           if [ -f /tmp/artifacts/installer/terraform.tfstate ]
           then
-              # TODO(trown): rework this to fetch bootstrap logs from openstack
-              # we don't have jq, so the python equivalent of
-              # jq '.modules[].resources."aws_instance.bootstrap".primary.attributes."public_ip" | select(.)'
-                #              bootstrap_ip=$(python -c \
-                #                  'import sys, json; d=reduce(lambda x,y: dict(x.items() + y.items()), map(lambda x: x["resources"], json.load(sys.stdin)["modules"])); k="aws_instance.bootstrap"; print d[k]["primary"]["attributes"]["public_ip"] if k in d else ""' \
-                #                  < /tmp/artifacts/installer/terraform.tfstate
-                #              )
-                #
-              if [ -n "${bootstrap_ip}" ]
+              bootstrap_ip=$(openstack floating ip create ${OPENSTACK_EXTERNAL_NETWORK} -c name -f value)
+              if openstack floating ip set --port ${PREFIX}-bootstrap-port ${bootstrap_ip} 
               then
                 for service in bootkube openshift kubelet crio
                 do
@@ -395,9 +390,10 @@ objects:
                 ssh-add /etc/openshift-installer/ssh-privatekey
                 ssh -A -o PreferredAuthentications=publickey -o StrictHostKeyChecking=false -o UserKnownHostsFile=/dev/null core@${bootstrap_ip} /bin/bash -x /usr/local/bin/installer-gather.sh
                 scp -o PreferredAuthentications=publickey -o StrictHostKeyChecking=false -o UserKnownHostsFile=/dev/null core@${bootstrap_ip}:log-bundle.tar.gz /tmp/artifacts/installer/bootstrap-logs.tar.gz
+              else
+                  echo "Could not set a floating ip on the bootstrap node. Skipping collection of bootstrap logs."
               fi
-          else
-              echo "No terraform statefile found. Skipping collection of bootstrap logs."
+              openstack floating ip delete ${bootstrap_ip}
           fi
           # WORKAROUND https://github.com/openshift/installer/issues/1467
           # We need this to be able to collect logs
