@@ -1,5 +1,5 @@
 ### --as=system:serviceaccount:ci:config-updater
-prometheus-k8s_token := $(shell oc get secret -n openshift-monitoring grafana-datasources -o "jsonpath={.data.prometheus\.yaml}" | base64 --decode | jq '.datasources[] | select(.name = "prometheus-k8s") .basicAuthPassword')
+prometheus-k8s_token := $(shell oc get --as=system:serviceaccount:ci:config-updater secret -n openshift-monitoring grafana-datasources -o "jsonpath={.data.prometheus\.yaml}" | base64 --decode | jq '.datasources[] | select(.name = "prometheus-k8s") .basicAuthPassword')
 .PHONY : prow-monitoring-deploy
 prow-monitoring-deploy: ci-secret-deploy
 	@echo "Deploying prow-monitoring stack ..."
@@ -121,7 +121,7 @@ grafana-debug-deploy:
 	oc create -n prow-monitoring-stage configmap grafana-datasources --from-file=datasources.yaml=./debug/grafana_datasources.yaml --from-file=prometheus-k8s.yaml=/tmp/prometheus-k8s.yaml --dry-run -o yaml | oc apply -f -
 	rm -fv /tmp/prometheus-k8s.yaml
 	oc apply -f ./debug/grafana_deploy.yaml
-	@echo "admin password: $(oc get secret -n prow-monitoring-stage grafana -o jsonpath='{.data.password}' | base64 -d)"
+	@echo "admin password: $$(oc get secret -n prow-monitoring-stage grafana -o jsonpath='{.data.password}' | base64 -d)"
 
 .PHONY : grafana-debug-generate-k8s-dashboards
 grafana-debug-generate-k8s-dashboards:
