@@ -21,7 +21,11 @@ when put to a ConfigMap.
 Additionally, you will need to add a new Periodic job [here](../../ci-operator/jobs/infra-image-mirroring.yaml).
 You should not need to modify anything in the job besides the items marked as
 `FIXME`, where you just need to fill in the name of your image set (it should
-be the same as the name of the subdirectory here). The only exception to this is
-the name of the secret that will allow the job to push your images to Quay. You
-need to talk to DPTP about storing this secret in DPTP vault from where it would
-be synced to the cluster.
+be the same as the name of the subdirectory here). To push images to Quay, the
+job needs credentials. These credentials need to be available in the cluster as
+a secret. The secrets are stored in DPTP Bitwarden vault and then synced to the
+cluster: [talk to DPTP on Slack](https://coreos.slack.com/messages/CBN38N3MW) about storing the credentials in Bitwarden.
+
+### For DPTP: How to create new push credential secrets
+
+See [SECRETS.md](../../ci-operator/SECRETS.md#push-credentials-for-image-mirroring-jobs).
