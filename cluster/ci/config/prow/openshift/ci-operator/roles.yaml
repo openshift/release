@@ -393,3 +393,35 @@ items:
     name: longlived-aws-cluster-credentials
   type: Opaque
 
+- kind: Role
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: image-tagger
+    namespace: codeready-toolchain
+  rules:
+  - apiGroups:
+    - ""
+    - image.openshift.io
+    attributeRestrictions: null
+    resources:
+    - imagestreamtags
+    - imagestreams
+    verbs:
+    - update
+    - patch
+    - get
+    - create
+
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: image-tagger-ci-operator
+    namespace: codeready-toolchain
+  roleRef:
+    kind: Role
+    name: image-tagger
+    namespace: codeready-toolchain
+  subjects:
+  - kind: ServiceAccount
+    name: ci-operator
+    namespace: ci
