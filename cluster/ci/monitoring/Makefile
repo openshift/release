@@ -121,7 +121,7 @@ grafana-debug-deploy:
 	oc create -n prow-monitoring-stage configmap grafana-datasources --from-file=datasources.yaml=./debug/grafana_datasources.yaml --from-file=prometheus-k8s.yaml=/tmp/prometheus-k8s.yaml --dry-run -o yaml | oc apply -f -
 	rm -fv /tmp/prometheus-k8s.yaml
 	oc apply -f ./debug/grafana_deploy.yaml
-	@echo "admin password: $$(oc get secret -n prow-monitoring-stage grafana -o jsonpath='{.data.password}' | base64 -d)"
+	@echo "admin password: $$(oc get secret -n prow-monitoring-stage --as system:admin grafana -o jsonpath='{.data.password}' | base64 -d)"
 
 .PHONY : grafana-debug-generate-k8s-dashboards
 grafana-debug-generate-k8s-dashboards:
