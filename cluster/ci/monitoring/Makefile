@@ -112,6 +112,7 @@ grafana_password := $(shell uuidgen)
 grafana-debug-deploy:
 	@echo "Running grafana-debug-deploy ... with password: $(grafana_password)"
 	# oc new-project prow-monitoring-stage --skip-config-write=true
+	# oc adm policy add-role-to-group admin ci-admins --as system:admin -n prow-monitoring-stage
 	oc get project prow-monitoring-stage
 	oc create -n prow-monitoring-stage configmap grafana-config --from-file=./debug/grafana.ini --dry-run -o yaml | oc apply -f -
 	sed -i -e "s|CHANGE_ME|$(grafana_password)|g" ./debug/grafana_secret.yaml
