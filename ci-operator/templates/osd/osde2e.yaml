@@ -1,0 +1,76 @@
+kind: Template
+apiVersion: template.openshift.io/v1
+
+parameters:
+  - name: JOB_NAME_SAFE
+    required: true
+  - name: JOB_NAME_HASH
+    required: true
+  - name: NAMESPACE
+    required: true
+  - name: RESOURCES_TEST
+    value: '{"requests": {"cpu": 1, "memory": "300Mi"}, "limits": {"memory": "2Gi"}}'
+
+  - name: OSDE2E_IMAGE
+    description: "Container image of https://github.com/openshift/osde2e to use"
+  - name: UHC_TOKEN
+    description: "Credential used to authenticate with OSD. Get at https://cloud.redhat.com/openshift/token"
+  - name: OSD_ENV
+    description: "Environment of OSD to connect to."
+  - name: DEBUG_OSD
+    value: 1
+  - name: CLUSTER_ID
+  - name: CLEAN_RUNS
+  - name: UPGRADE_RELEASE_STREAM
+  - name: TESTGRID_BUCKET
+  - name: TESTGRID_PREFIX
+  - name: TESTGRID_SERVICE_ACCOUNT
+
+objects:
+  - kind: Pod
+    apiVersion: v1
+    metadata:
+      name: ${JOB_NAME_SAFE}
+      namespace: ${NAMESPACE}
+      annotations:
+        # we want to gather the teardown logs no matter what
+        ci-operator.openshift.io/wait-for-container-artifacts: teardown
+        ci-operator.openshift.io/save-container-logs: "true"
+        ci-operator.openshift.io/container-sub-tests: "setup,test,teardown"
+    spec:
+      restartPolicy: Never
+      activeDeadlineSeconds: 14400
+      terminationGracePeriodSeconds: 900
+      containers:
+        - name: osde2e
+          image: ${OSDE2E_IMAGE}
+          terminationMessagePolicy: FallbackToLogsOnError
+          resources: ${{RESOURCES_TEST}}
+          env:
+            # OSD Configuration
+            - name: UHC_TOKEN
+              value: ${UHC_TOKEN}
+            - name: OSD_ENV
+              value: ${OSD_ENV}
+            - name: DEBUG_OSD
+              value: ${DEBUG_OSD}
+
+            # Cluster setup
+            - name: CLUSTER_ID
+              value: ${CLUSTER_ID}
+
+            # Flake Handling
+            - name: CLEAN_RUNS
+              value: ${CLEAN_RUNS}
+
+            # Upgrades
+            - name: UPGRADE_RELEASE_STREAM
+              value: ${UPGRADE_RELEASE_STREAM}
+
+            # TestGrid reporting
+            - name: TESTGRID_BUCKET
+              value: ${TESTGRID_BUCKET}
+            - name: TESTGRID_PREFIX
+              value: ${TESTGRID_PREFIX}
+            - name: TESTGRID_SERVICE_ACCOUNT
+              value: ${TESTGRID_SERVICE_ACCOUNT}
