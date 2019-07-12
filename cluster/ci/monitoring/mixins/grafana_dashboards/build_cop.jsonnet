@@ -271,4 +271,38 @@ dashboard.new(
     x: 0,
     y: 0,
   })
+.addPanel(
+    (graphPanel.new(
+        'Running Clusters by Platform',
+        description='sum(kube_pod_container_status_running{pod=~"e2e(-<regex>(-upgrade)?)?",container="teardown"})',
+        datasource='prometheus-k8s',
+        legend_alignAsTable=true,
+        legend_rightSide=true,
+        legend_values=true,
+        legend_current=true,
+        legend_max=true,
+        legend_sort='current',
+        legend_sortDesc=true,
+    ) + legendConfig)
+    .addTarget(prometheus.target(
+        'sum(kube_pod_container_status_running{pod=~"e2e(-aws(-upgrade)?)?",container="teardown"})',
+        legendFormat='aws',
+    ))
+    .addTarget(prometheus.target(
+        'sum(kube_pod_container_status_running{pod=~"e2e-vsphere(-upgrade)?",container="teardown"})',
+        legendFormat='vsphere',
+    ))
+    .addTarget(prometheus.target(
+        'sum(kube_pod_container_status_running{pod=~"e2e-gcp(-upgrade)?",container="teardown"})',
+        legendFormat='gcp',
+    ))
+    .addTarget(prometheus.target(
+        'sum(kube_pod_container_status_running{pod=~"e2e-azure(-upgrade)?",container="teardown"})',
+        legendFormat='azure',
+    )), gridPos={
+    h: 9,
+    w: 24,
+    x: 0,
+    y: 0,
+  })
 + dashboardConfig
