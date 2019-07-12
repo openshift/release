@@ -116,8 +116,8 @@ function field_value() {
 }
 
 # Bugzilla API keys are stored as a text field named "API Key"
-server="bugzilla.redhat.com"
-update_secret generic "bugzilla-credentials-${server}" "$( format_field_value "${server}" "API Key" "api" )"
+login="openshift-bugzilla-robot"
+update_secret generic "bugzilla-credentials-${login}" "$( format_field_value "${login}" "API Key" "api" )"
 
 # Jenkins credentials are stored as separate items in Bitwarden,
 # with the token recorded as the password for the account
