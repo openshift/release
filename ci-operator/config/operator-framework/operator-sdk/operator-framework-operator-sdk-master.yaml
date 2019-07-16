@@ -1,9 +1,3 @@
-build_root:
-  image_stream_tag:
-    cluster: https://api.ci.openshift.org
-    name: release
-    namespace: openshift
-    tag: golang-1.12
 base_images:
   ansible-runner:
     name: ansible-runner
@@ -13,59 +7,59 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "7"
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.12
 canonical_go_repository: github.com/operator-framework/operator-sdk
-test_binary_build_commands: ./hack/ci/setup-build-dependencies.sh
-resources:
-  '*':
-    limits:
-      memory: 4Gi
-    requests:
-      cpu: 100m
-      memory: 200Mi
 images:
-- from: root
-  dockerfile_path: ci/dockerfiles/builder.Dockerfile
+- dockerfile_path: ci/dockerfiles/builder.Dockerfile
+  from: root
   to: osdk-builder
-- from: ansible-runner
-  dockerfile_path: ci/dockerfiles/ansible.Dockerfile
+- dockerfile_path: ci/dockerfiles/ansible.Dockerfile
+  from: ansible-runner
   inputs:
     osdk-builder:
       as:
       - osdk-builder
       paths: null
   to: ansible-operator
-- from: ansible-runner
-  dockerfile_path: ci/dockerfiles/ansible-e2e-hybrid.Dockerfile
+- dockerfile_path: ci/dockerfiles/ansible-e2e-hybrid.Dockerfile
+  from: ansible-runner
   inputs:
     osdk-builder:
       as:
       - osdk-builder
+      paths: null
   to: osdk-ansible-e2e-hybrid
-- from: ansible-operator
-  dockerfile_path: ci/dockerfiles/ansible-e2e.Dockerfile
+- dockerfile_path: ci/dockerfiles/ansible-e2e.Dockerfile
+  from: ansible-operator
   inputs:
     osdk-builder:
       as:
       - osdk-builder
+      paths: null
   to: osdk-ansible-e2e
-- from: base
-  dockerfile_path: ci/dockerfiles/helm.Dockerfile
+- dockerfile_path: ci/dockerfiles/helm.Dockerfile
+  from: base
   inputs:
     osdk-builder:
       as:
       - osdk-builder
       paths: null
   to: helm-operator
-- from: base
-  dockerfile_path: ci/dockerfiles/helm-e2e-hybrid.Dockerfile
+- dockerfile_path: ci/dockerfiles/helm-e2e-hybrid.Dockerfile
+  from: base
   inputs:
     osdk-builder:
       as:
       - osdk-builder
       paths: null
   to: osdk-helm-e2e-hybrid
-- from: helm-operator
-  dockerfile_path: ci/dockerfiles/helm-e2e.Dockerfile
+- dockerfile_path: ci/dockerfiles/helm-e2e.Dockerfile
+  from: helm-operator
   inputs:
     osdk-builder:
       as:
@@ -73,17 +67,25 @@ images:
       paths: null
   to: osdk-helm-e2e
 promotion:
-  name: "4.2"
-  namespace: ocp
   excluded_images:
   - osdk-builder
   - osdk-ansible-e2e
   - osdk-ansible-e2e-hybrid
   - osdk-helm-e2e
   - osdk-helm-e2e-hybrid
+  name: "4.2"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
 tag_specification:
   name: "4.2"
   namespace: ocp
+test_binary_build_commands: ./hack/ci/setup-build-dependencies.sh
 tests:
 - as: marker
   commands: make test/markdown
