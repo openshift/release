@@ -109,7 +109,6 @@ prow-rbac:
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/sinker_rbac.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/statusreconciler_rbac.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/tide_rbac.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/tracer_rbac.yaml
 .PHONY: prow-rbac
 
 prow-services:
@@ -130,7 +129,6 @@ prow-services:
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/statusreconciler.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/tide.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/tot.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tracer.yaml
 .PHONY: prow-services
 
 prow-cluster-jobs:
