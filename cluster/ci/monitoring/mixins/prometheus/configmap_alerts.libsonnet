@@ -9,7 +9,7 @@
             expr: |||
               100 * ((1048576 - prow_configmap_size_bytes) / 1048576) < 15
               and
-              predict_linear(prow_configmap_size_bytes[12h], 7 * 24 * 3600) < 0
+              predict_linear(prow_configmap_size_bytes[12h], 7 * 24 * 3600) > 1048576
             |||,
             'for': '5m',
             labels: {
