@@ -10,7 +10,15 @@ by version.
 ## Configuring mirroring for new images
 
 Simply submit a PR adding the image to then appropriate mapping file. You will
-need an approval of an owner of the image set.
+need an approval of an owner of the image set. The following external repositories
+are currently targeted by existing mirroring jobs:
+
+ - [codeready-toolchain](./codeready-toolchain/): `quay.io/codeready-toolchain`
+ - [knative](./knative/): `quay.io/openshift-knative`
+ - [kubefed](./kubefed/): `quay.io/openshift/kubefed-*`
+ - [openshift](./openshift/): `quay.io/openshift`
+ - [tekton](./tekton/): `quay.io/openshift-pipeline`
+ - [toolchain](./toolchain/): `quay.io/openshiftio`
 
 ## Configuring mirroring for new sets of images
 
