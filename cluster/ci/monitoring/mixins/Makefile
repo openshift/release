@@ -1,5 +1,5 @@
 #
-SHELL=/bin/bash -o pipefail
+SHELL=/usr/bin/env bash -o pipefail
 
 all: build_cop.json deck.json ghproxy.json hook.json jenkins_operator.json plank.json prow.json sinker.json tide.json prometheus_rule_prow.yaml
 
