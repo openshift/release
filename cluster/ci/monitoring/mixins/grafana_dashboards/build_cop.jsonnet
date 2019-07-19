@@ -57,8 +57,8 @@ dashboard.new(
   {
         "allValue": null,
         "current": {
-          "text": "30m",
-          "value": "30m"
+          "text": "3h",
+          "value": "3h"
         },
         "hide": 0,
         "includeAll": false,
