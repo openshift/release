@@ -285,19 +285,19 @@ dashboard.new(
         legend_sortDesc=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(kube_pod_container_status_running{pod=~"e2e(-aws(-upgrade)?)?",container="teardown"})',
+        'sum(kube_pod_container_status_running{pod=~"(e2e|(.*-aws(-.*)?))",container="teardown"})',
         legendFormat='aws',
     ))
     .addTarget(prometheus.target(
-        'sum(kube_pod_container_status_running{pod=~"e2e-vsphere(-upgrade)?",container="teardown"})',
+        'sum(kube_pod_container_status_running{pod=~".*-vsphere(-.*)?",container="teardown"})',
         legendFormat='vsphere',
     ))
     .addTarget(prometheus.target(
-        'sum(kube_pod_container_status_running{pod=~"e2e-gcp(-upgrade)?",container="teardown"})',
+        'sum(kube_pod_container_status_running{pod=~".*-gcp(-.*)?",container="teardown"})',
         legendFormat='gcp',
     ))
     .addTarget(prometheus.target(
-        'sum(kube_pod_container_status_running{pod=~"e2e-azure(-upgrade)?",container="teardown"})',
+        'sum(kube_pod_container_status_running{pod=~".*-azure(-.*)?",container="teardown"})',
         legendFormat='azure',
     )), gridPos={
     h: 9,
