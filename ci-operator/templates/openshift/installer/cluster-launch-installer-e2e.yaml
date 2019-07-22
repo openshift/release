@@ -26,6 +26,7 @@ parameters:
 - name: ENABLE_PROXY
 - name: BUILD_ID
   required: false
+- name: ENABLE_MIRROR
 
 objects:
 
@@ -55,6 +56,18 @@ objects:
   - kind: ServiceAccount
     namespace: ci
     name: ci-chat-bot
+
+# Give the e2e pod edit access so it can update image streams
+- kind: RoleBinding
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: ${JOB_NAME_SAFE}-edit
+    namespace: ${NAMESPACE}
+  roleRef:
+    name: edit
+  subjects:
+  - kind: ServiceAccount
+    name: default
 
 # The e2e pod spins up a cluster, runs e2e tests, and then cleans up the cluster.
 - kind: Pod
@@ -174,6 +187,8 @@ objects:
         value: ${IMAGE_FORMAT}
       - name: KUBECONFIG
         value: /tmp/artifacts/installer/auth/kubeconfig
+      - name: MIRROR_BASE
+        value: registry.svc.ci.openshift.org/${NAMESPACE}/release
       command:
       - /bin/bash
       - -c
@@ -186,7 +201,65 @@ objects:
         trap 'touch /tmp/shared/exit' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
 
+        function patch_image_specs() {
+          cat >> /tmp/samples-patch.yaml << EOF
+        - op: add
+          path: /spec/skippedImagestreams
+          value:
+          - jenkins
+          - jenkins-agent-maven
+          - jenkins-agent-nodejs
+        EOF
+          echo "---samples patch-----"
+          cat /tmp/samples-patch.yaml
+          echo "--------------"
+          oc patch config.samples.operator.openshift.io cluster --type json -p "$(cat /tmp/samples-patch.yaml)"
+
+          NAMES='cli cli-artifacts installer installer-artifacts must-gather tests jenkins jenkins-agent-maven jenkins-agent-nodejs'
+
+          cat >> /tmp/version-patch.yaml << EOF
+        - op: add
+          path: /spec/overrides
+          value:
+        EOF
+        for NAME in ${NAMES}
+        do
+          cat >> /tmp/version-patch.yaml << EOF
+          - group: image.openshift.io/v1
+            kind: ImageStream
+            name: ${NAME}
+            namespace: openshift
+            unmanaged: true
+        EOF
+        done
+        echo "---version patch-----"
+        cat /tmp/version-patch.yaml
+        echo "--------------"
+        oc patch clusterversion version --type json -p "$(cat /tmp/version-patch.yaml)"
+
+        for NAME in ${NAMES}
+        do
+          echo "---in for loop for image stream-----"
+          DIGEST="$(oc adm release info --image-for="${NAME}" | sed 's/.*@//')"
+          echo "--- the digest is ${DIGEST} ----------"
+          cat >> /tmp/image-stream-new-source.yaml << EOF
+        - op: replace
+          path: /spec/tags/0/from
+          value:
+            kind: DockerImage
+            name: "registry.svc.ci.openshift.org/${NAMESPACE}/release@{DIGEST}"
+        EOF
+          echo "----image stream patch-----"
+          cat /tmp/image-stream-new-source.yaml
+          echo "------------"
+          oc -n openshift patch imagestream "${NAME}" --type json -p "$(cat /tmp/image-stream-new-source.yaml)"
+        done
+        }
+
         mkdir -p "${HOME}"
+
+        # Share oc with other containers
+        cp "$(command -v oc)" /tmp/shared
 
         # wait for the API to come up
         while true; do
@@ -678,10 +751,14 @@ objects:
         value: ${RELEASE_IMAGE_LATEST}
       - name: OPENSHIFT_INSTALL_INVOKER
         value: openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID}
+      - name: ENABLE_MIRROR
+        value: ${ENABLE_MIRROR}
       - name: USER
         value: test
       - name: HOME
         value: /tmp
+      - name: MIRROR_BASE
+        value: registry.svc.ci.openshift.org/${NAMESPACE}/release
       - name: INSTALL_INITIAL_RELEASE
       - name: RELEASE_IMAGE_INITIAL
       command:
@@ -713,6 +790,34 @@ objects:
         if [[ -n "${INSTALL_INITIAL_RELEASE}" && -n "${RELEASE_IMAGE_INITIAL}" ]]; then
           echo "Installing from initial release ${RELEASE_IMAGE_INITIAL}"
           OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_INITIAL}"
+        elif [[ "${ENABLE_MIRROR}" == "true" ]]; then
+          # export PATH=$PATH:/tmp  # gain access to oc
+          # while [ ! command -V oc ]; do sleep 1; done # poll to make sure that the test container has dropped oc into the shared volume
+          export PATH=$PATH:/tmp/bin
+          mkdir /tmp/bin
+          curl https://storage.googleapis.com/origin-ci-test/_tools/4.1.0/oc >/tmp/bin/oc 2>/dev/null
+          chmod ug+x /tmp/bin/oc
+
+          # mirror the release image and override the release image to point to the mirrored one
+          mkdir /tmp/.docker && cp /etc/openshift-installer/pull-secret /tmp/.docker/config.json
+          oc registry login
+          echo "-------release new-------"
+          oc adm release new --from-release ${RELEASE_IMAGE_LATEST} --to-image registry.svc.ci.openshift.org/${NAMESPACE}/mirrored:release --mirror registry.svc.ci.openshift.org/${NAMESPACE}/mirrored
+          echo "------------release mirror--------"
+          oc adm release mirror --from registry.svc.ci.openshift.org/${NAMESPACE}/mirrored:release --to registry.svc.ci.openshift.org/${NAMESPACE}/release --to-release-image registry.svc.ci.openshift.org/${NAMESPACE}/release:mirrored
+          echo "----------doing istag----------"
+          RELEASE_PAYLOAD_IMAGE_SHA=$(oc get istag release:mirrored -o=jsonpath="{.image.metadata.name}")
+          oc delete is/mirrored
+          echo "-------sha----- ${RELEASE_PAYLOAD_IMAGE_SHA} -------"
+          RELEASE_IMAGE_MIRROR="registry.svc.ci.openshift.org/${NAMESPACE}/mirrored@${RELEASE_PAYLOAD_IMAGE_SHA}"
+
+          # oc adm release new --from-release ${RELEASE_IMAGE_LATEST} --to-image ${MIRROR_BASE}-mirrored:release --mirror ${MIRROR_BASE}-mirrored
+          # oc adm release mirror --from ${MIRROR_BASE}-mirrored:release --to ${MIRROR_BASE} --to-release-image ${MIRROR_BASE}:mirrored
+          # RELEASE_PAYLOAD_IMAGE_SHA=$(oc get istag ${MIRROR_BASE}:mirrored -o=jsonpath="{.image.metadata.name}")
+          # oc delete is/${MIRROR_BASE}-mirrored # so the cluster-under-test will have to fall back to the mirrors
+          # RELEASE_IMAGE_MIRROR="${MIRROR_BASE}-mirrored@${RELEASE_PAYLOAD_IMAGE_SHA}"
+          echo "Installing from mirror override release ${RELEASE_IMAGE_MIRROR}"
+          OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_MIRROR}"
         else
           echo "Installing from release ${RELEASE_IMAGE_LATEST}"
         fi
@@ -892,6 +997,16 @@ objects:
         EOF
         fi
 
+        if [[ "${ENABLE_MIRROR}" == "true" ]]; then
+          cat >> /tmp/artifacts/installer/install-config.yaml << EOF
+        imageContentSources:
+        - source: "registry.svc.ci.openshift.org/${NAMESPACE}/mirrored"
+          mirrors:
+          - "registry.svc.ci.openshift.org/${NAMESPACE}/release"
+        EOF
+        fi
+
+
         # TODO: Replace with a more concise manifest injection approach
         if [[ -n "${CLUSTER_NETWORK_MANIFEST}" ]]; then
             openshift-install --dir=/tmp/artifacts/installer/ create manifests
@@ -925,6 +1040,8 @@ objects:
         value: /etc/openshift-installer/gce.json
       - name: KUBECONFIG
         value: /tmp/artifacts/installer/auth/kubeconfig
+      - name: ENABLE_MIRROR
+        value: ${ENABLE_MIRROR}
       command:
       - /bin/bash
       - -c
