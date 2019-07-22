@@ -237,6 +237,34 @@ periodics:
     ci.openshift.io/role: infra
   cron: ""
   decorate: true
+  decoration_config:
+    timeout: 8h
+  interval: 5m
+  name: periodic-ipi-deprovision
+  spec:
+    containers:
+    - command:
+      - run.sh
+      image: registry.svc.ci.openshift.org/ci/ipi-deprovision:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+          requests:
+            cpu: 500m
+      volumeMounts:
+      - mountPath: /usr/local/e2e-aws-cluster-profile
+        name: cluster-profile
+    volumes:
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+- agent: kubernetes
+  labels:
+    ci.openshift.io/role: infra
+  cron: ""
+  decorate: true
   interval: 30m
   name: periodic-branch-protector
   skip_cloning: true
