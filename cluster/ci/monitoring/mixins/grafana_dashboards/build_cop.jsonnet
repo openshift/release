@@ -65,37 +65,29 @@ dashboard.new(
         "label": "range",
         "multi": false,
         "name": "range",
-        "options": [
+        "options":
+        [
           {
             "selected": false,
-            "text": "3h",
-            "value": "3h"
+            "text": '%s' % r,
+            "value": '%s'% r,
           },
-          {
-            "selected": false,
-            "text": "1h",
-            "value": "1h"
-          },
+          for r in ['24h', '12h']
+        ] +
+        [
           {
             "selected": true,
-            "text": "30m",
-            "value": "30m"
-          },
-          {
-            "selected": false,
-            "text": "15m",
-            "value": "15m"
-          },
-          {
-            "selected": false,
-            "text": "10m",
-            "value": "10m"
-          },
-          {
-            "selected": false,
-            "text": "5m",
-            "value": "5m"
+            "text": '3h',
+            "value": '3h',
           }
+        ] +
+        [
+          {
+            "selected": false,
+            "text": '%s' % r,
+            "value": '%s'% r,
+          },
+          for r in ['1h', '30m', '15m', '10m', '5m']
         ],
         "query": "3h,1h,30m,15m,10m,5m",
         "skipUrlSync": false,
