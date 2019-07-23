@@ -244,10 +244,19 @@ periodics:
   spec:
     containers:
     - command:
-      - run.sh
+      - /usr/bin/ipi-deprovision.sh
       image: registry.svc.ci.openshift.org/ci/ipi-deprovision:latest
       imagePullPolicy: Always
-      name: ""
+      env:
+      - name: AWS_SHARED_CREDENTIALS_FILE
+        value: "/usr/local/e2e-aws-cluster-profile/.awscred"
+      - name: CLUSTER_TTL
+        value: "0 hours ago"
+      - name: AWS_REGIONS
+        value: "us-east-1"
+        #more than one region
+        #value: "us-east-1;us-west-1"
+      name: "ipi-deprovision"
       resources:
           requests:
             cpu: 500m
