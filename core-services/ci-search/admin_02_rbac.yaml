@@ -1,0 +1,62 @@
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  namespace: ci-search
+  name: image-tagger
+rules:
+- apiGroups:
+  - ""
+  - image.openshift.io
+  attributeRestrictions: null
+  resources:
+  - imagestreamtags
+  - imagestreams
+  verbs:
+  - update
+  - patch
+  - get
+  - create
+
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  namespace: ci-search
+  name: image-tagger-ci-operator
+roleRef:
+  kind: Role
+  name: image-tagger
+  namespace: ci-search
+subjects:
+- kind: ServiceAccount
+  name: ci-operator
+  namespace: ci
+
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ci-hook
+  namespace: ci-search
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - create
+  - get
+  - update
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ci-hook
+  namespace: ci-search
+roleRef:
+  kind: Role
+  name: ci-hook
+subjects:
+- kind: ServiceAccount
+  name: hook
+  namespace: ci

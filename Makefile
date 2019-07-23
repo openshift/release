@@ -50,7 +50,7 @@ roles: cluster-operator-roles cluster-roles
 prow: prow-ci-ns prow-ci-stg-ns prow-openshift-ns
 .PHONY: prow
 
-prow-ci-ns: ci-ns prow-crd prow-config prow-rbac prow-services prow-jobs prow-scaling prow-secrets prow-ci-search
+prow-ci-ns: ci-ns prow-crd prow-config prow-rbac prow-services prow-jobs prow-scaling prow-secrets
 .PHONY: prow-ci-ns
 
 prow-ci-stg-ns: ci-stg-ns prow-cluster-jobs
@@ -194,11 +194,6 @@ prow-artifacts:
 	oc create ns ci-rpms -o yaml --dry-run | oc apply -f -
 	oc apply -f ci-operator/infra/openshift/origin/
 .PHONY: prow-artifacts
-
-prow-ci-search:
-	$(MAKE) apply WHAT=ci-operator/infra/openshift/ci-search/deploy.yaml
-	oc create configmap job-config --from-file=ci-operator/infra/openshift/ci-search/config.yaml -o yaml --dry-run | oc apply -f - -n ci-search
-.PHONY: prow-ci-search
 
 prow-release-controller-definitions:
 	oc annotate -n origin is/4.1 "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/releases/release-origin-4.1.json)" --overwrite
