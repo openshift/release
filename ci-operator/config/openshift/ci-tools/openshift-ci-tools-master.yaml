@@ -1,14 +1,16 @@
 base_images:
   os:
-    cluster: https://api.ci.openshift.org
     name: centos
     namespace: openshift
     tag: '7'
   git:
-    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.11
+  hive:
+    name: hive-v4.0
+    namespace: openshift
+    tag: 'hive'
 binary_build_commands: make install
 images:
 - context_dir: images/ci-operator/
@@ -83,6 +85,9 @@ images:
       - destination_dir: .
         source_path: /go/bin/determinize-ci-operator
   to: determinize-ci-operator
+- dockerfile_path: images/ipi-deprovision/Dockerfile
+  from: hive
+  to: ipi-provisioner
 promotion:
   cluster: https://api.ci.openshift.org
   namespace: ci
