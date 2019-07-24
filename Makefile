@@ -212,7 +212,7 @@ prow-release-controller-deploy:
 prow-release-controller: prow-release-controller-definitions prow-release-controller-deploy
 .PHONY: prow-release-controller
 
-projects: ci-ns gcsweb origin-stable origin-release image-pruner-setup publishing-bot content-mirror azure python-validation metering
+projects: ci-ns gcsweb origin-stable origin-release publishing-bot content-mirror azure python-validation metering
 .PHONY: projects
 
 content-mirror:
@@ -269,12 +269,6 @@ service-idler:
 alert-buffer:
 	$(MAKE) apply WHAT=projects/prometheus/alert-buffer.yaml
 .PHONY: alert-buffer
-
-image-pruner-setup:
-	oc create serviceaccount image-pruner -o yaml --dry-run | oc apply -f -
-	oc adm policy add-cluster-role-to-user system:image-pruner -z image-pruner
-	$(MAKE) apply WHAT=cluster/ci/jobs/image-pruner.yaml
-.PHONY: image-pruner-setup
 
 cluster-operator-roles:
 	oc create ns openshift-cluster-operator --dry-run -o yaml | oc apply -f -
