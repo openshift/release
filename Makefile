@@ -100,6 +100,7 @@ prow-secrets:
 
 prow-rbac:
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/artifact-uploader_rbac.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/boskos_rbac.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/config_updater_rbac.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/deck_rbac.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/hook_rbac.yaml
@@ -114,6 +115,7 @@ prow-rbac:
 
 prow-services:
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/prow-priority-class.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/boskos.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/adapter_imagestreams.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/artifact-uploader.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/cherrypick.yaml
