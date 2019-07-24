@@ -141,11 +141,6 @@ running in PRs by default.
 | `/test scaleupdown` | scale up followed by a scale down of the cluster |
 | `/test etcdbackuprecovery` | backup a cluster, mutate state, then restore from the backup |
 | `/test keyrotation` | rotate all the certificates in a cluster |
-| `/test prod` | install a cluster using the production OSA RP |
-| `/test vnet` | install a cluster using a pre-existing vnet and the production OSA RP |
-
-Note that the tests using the production RP are not any useful to run in PRs unless
-you update the tests themselves.
 
 ### Run a job manually
 
