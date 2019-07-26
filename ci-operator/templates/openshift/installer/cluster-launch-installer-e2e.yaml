@@ -158,8 +158,13 @@ objects:
           curl https://raw.githubusercontent.com/eparis/ssh-bastion/master/deploy/deploy.sh | bash
           for i in $(seq 0 60)
           do
+            # AWS fills only .hostname of a service
             BASTION_HOST=$(oc get service -n "${SSH_BASTION_NAMESPACE}" ssh-bastion -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
             if [ ! -z "${BASTION_HOST}" ]; then break; fi
+            # Azure fills only .ip of a service. Use it as bastion host.
+            BASTION_HOST=$(oc get service -n "${SSH_BASTION_NAMESPACE}" ssh-bastion -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+            if [ ! -z "${BASTION_HOST}" ]; then break; fi
+            echo "Waiting for SSH bastion load balancer service"
             sleep 10
           done
         }
