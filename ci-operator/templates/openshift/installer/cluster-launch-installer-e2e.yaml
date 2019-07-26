@@ -147,11 +147,11 @@ objects:
         # set up SSH for the e2e tests + for this script
         function setup_ssh_bastion() {
           echo "Setting up ssh bastion"
-          mkdir -p ~/.ssh || true
+          mkdir -p ~/.ssh
           cp "${KUBE_SSH_KEY_PATH}" ~/.ssh/id_rsa
           chmod 0600 ~/.ssh/id_rsa
           if ! whoami &> /dev/null; then
-            if [ -w /etc/passwd ]; then
+            if [[ -w /etc/passwd ]]; then
               echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
             fi
           fi
@@ -160,10 +160,10 @@ objects:
           do
             # AWS fills only .hostname of a service
             BASTION_HOST=$(oc get service -n "${SSH_BASTION_NAMESPACE}" ssh-bastion -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-            if [ ! -z "${BASTION_HOST}" ]; then break; fi
+            if [[ -n "${BASTION_HOST}" ]]; then break; fi
             # Azure fills only .ip of a service. Use it as bastion host.
             BASTION_HOST=$(oc get service -n "${SSH_BASTION_NAMESPACE}" ssh-bastion -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-            if [ ! -z "${BASTION_HOST}" ]; then break; fi
+            if [[ -n "${BASTION_HOST}" ]]; then break; fi
             echo "Waiting for SSH bastion load balancer service"
             sleep 10
           done
