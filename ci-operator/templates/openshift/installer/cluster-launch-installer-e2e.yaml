@@ -144,9 +144,39 @@ objects:
           oc create -f /tmp/cluster/insights-live.yaml || true
         fi
 
-        # set up cloud-provider-specific env vars
-        export KUBE_SSH_BASTION="$( oc --insecure-skip-tls-verify get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
+        # set up SSH for the e2e tests + for this script
+        function setup_ssh_bastion() {
+          echo "Setting up ssh bastion"
+          mkdir -p ~/.ssh || true
+          cp "${KUBE_SSH_KEY_PATH}" ~/.ssh/id_rsa
+          chmod 0600 ~/.ssh/id_rsa
+          if ! whoami &> /dev/null; then
+            if [ -w /etc/passwd ]; then
+              echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+            fi
+          fi
+          curl https://raw.githubusercontent.com/eparis/ssh-bastion/master/deploy/deploy.sh | bash
+          for i in $(seq 0 60)
+          do
+            BASTION_HOST=$(oc get service -n "${SSH_BASTION_NAMESPACE}" ssh-bastion -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+            if [ ! -z "${BASTION_HOST}" ]; then break; fi
+            sleep 10
+          done
+        }
+
+        function bastion_ssh() {
+          retry 60 \
+            ssh -o LogLevel=error -o ConnectionAttempts=100 -o ConnectTimeout=30 -o StrictHostKeyChecking=no \
+                -o ProxyCommand="ssh -A -o StrictHostKeyChecking=no -o LogLevel=error -o ServerAliveInterval=30 -o ConnectionAttempts=100 -o ConnectTimeout=30 -W %h:%p core@${BASTION_HOST} 2>/dev/null" \
+                $@
+        }
+
+        export SSH_BASTION_NAMESPACE="testing-ssh-bastion"
         export KUBE_SSH_KEY_PATH=/tmp/cluster/ssh-privatekey
+        setup_ssh_bastion
+        export KUBE_SSH_BASTION="${BASTION_HOST}:22"
+
+        # set up cloud-provider-specific env vars
         if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
           export GOOGLE_APPLICATION_CREDENTIALS="/tmp/cluster/gce.json"
           export KUBE_SSH_USER=cloud-user
@@ -212,32 +242,6 @@ objects:
           if [ "${RETRY_IGNORE_EXIT_CODE}" != "" ]; then return 0; else return "${rc}"; fi
         }
 
-        function setup_ssh_bastion() {
-          echo "Setting up ssh bastion"
-          mkdir -p ~/.ssh || true
-          cp "${KUBE_SSH_KEY_PATH}" ~/.ssh/id_rsa
-          chmod 0600 ~/.ssh/id_rsa
-          if ! whoami &> /dev/null; then
-            if [ -w /etc/passwd ]; then
-              echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
-            fi
-          fi
-          curl https://raw.githubusercontent.com/eparis/ssh-bastion/master/deploy/deploy.sh | bash
-          for i in $(seq 0 60)
-          do
-            BASTION_HOST=$(oc get service -n openshift-ssh-bastion ssh-bastion -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-            if [ ! -z "${BASTION_HOST}" ]; then break; fi
-            sleep 10
-          done
-        }
-
-        function bastion_ssh() {
-          retry 60 \
-            ssh -o LogLevel=error -o ConnectionAttempts=100 -o ConnectTimeout=30 -o StrictHostKeyChecking=no \
-                -o ProxyCommand="ssh -A -o StrictHostKeyChecking=no -o LogLevel=error -o ServerAliveInterval=30 -o ConnectionAttempts=100 -o ConnectTimeout=30 -W %h:%p core@${BASTION_HOST} 2>/dev/null" \
-                $@
-        }
-
         function restore-cluster-state() {
           echo "Placing file /etc/rollback-test with contents A"
           cat > /tmp/machineconfig.yaml <<'EOF'
@@ -268,7 +272,6 @@ objects:
 
           wait_for_machineconfigpool_to_apply
 
-          setup_ssh_bastion
 
           echo "Make etcd backup on first master - /usr/local/bin/etcd-snapshot-backup.sh"
           FIRST_MASTER=$(oc get node -l node-role.kubernetes.io/master= -o name | head -n1 | cut -d '/' -f 2)
@@ -343,17 +346,12 @@ objects:
 
           if [[ "${rc}" == "1" ]]; then exit 1; fi
 
-          echo "Removing ssh-bastion"
-          oc delete project openshift-ssh-bastion
-
           echo "Remove existing openshift-apiserver pods"
           # This would ensure "Pod 'openshift-apiserver/apiserver-xxx' is not healthy: container openshift-apiserver has restarted more than 5 times" test won't fail
           oc delete pod --all -n openshift-apiserver
         }
 
         function recover-from-etcd-quorum-loss() {
-          setup_ssh_bastion
-
           # Machine API won't let the user to destroy the node which runs the controller
           echo "Finding two masters to destroy"
           MAPI_POD=$(oc get pod -l k8s-app=controller -n openshift-machine-api --no-headers -o name)
@@ -515,9 +513,6 @@ objects:
             retry 10 oc get pod/etcd-member-${master} -n openshift-etcd -o name
             retry 10 oc wait pod/etcd-member-${master} -n openshift-etcd --for condition=Ready
           done
-
-          echo "Removing ssh-bastion"
-          retry 10 oc delete project openshift-ssh-bastion
 
           echo "Scale etcd-quorum guard"
           retry 10 oc scale --replicas=3 deployment.apps/etcd-quorum-guard -n openshift-machine-config-operator
@@ -849,6 +844,9 @@ objects:
           echo "Running must-gather..."
           mkdir -p /tmp/artifacts/must-gather
           queue /tmp/artifacts/must-gather/must-gather.log oc --insecure-skip-tls-verify adm must-gather --dest-dir /tmp/artifacts/must-gather
+
+          echo "Removing ssh-bastion ..."
+          queue /dev/null oc --insecure-skip-tls-verify --request-timeout=5s delete project testing-ssh-bastion
 
           echo "Waiting for logs ..."
           wait
