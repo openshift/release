@@ -100,6 +100,8 @@ objects:
         value: /tmp/cluster/.awscred
       - name: AZURE_AUTH_LOCATION
         value: /tmp/cluster/osServicePrincipal.json
+      - name: GCP_SHARED_CREDENTIALS_FILE
+        value: /tmp/cluster/gce.json
       - name: ARTIFACT_DIR
         value: /tmp/artifacts
       - name: HOME
@@ -148,7 +150,7 @@ objects:
         export KUBE_SSH_BASTION="$( oc --insecure-skip-tls-verify get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
         export KUBE_SSH_KEY_PATH=/tmp/cluster/ssh-privatekey
         if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
-          export GOOGLE_APPLICATION_CREDENTIALS="/tmp/cluster/gce.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
           export KUBE_SSH_USER=cloud-user
           mkdir -p ~/.ssh
           cp /tmp/cluster/ssh-privatekey ~/.ssh/google_compute_engine || true
@@ -578,7 +580,7 @@ objects:
       - name: AZURE_REGION
         value: centralus
       - name: GCP_REGION
-        value: useast-1
+        value: us-east1
       - name: GCP_PROJECT
         value: openshift-gce-devel-ci
       - name: GOOGLE_CLOUD_KEYFILE_JSON
