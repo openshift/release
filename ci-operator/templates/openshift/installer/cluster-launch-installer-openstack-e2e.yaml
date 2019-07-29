@@ -252,9 +252,10 @@ objects:
         export SSH_PUB_KEY=$(cat "${SSH_PUB_KEY_PATH}")
         export PULL_SECRET=$(cat "${PULL_SECRET_PATH}")
 
-        ## move private key to ~/.ssh/ so that installer can use it to gather logs on bootstrap failure
+        # move private key to ~/.ssh/ so that installer can use it to gather logs on bootstrap failure
         mkdir -p ~/.ssh
-        cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
+        cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/id_rsa
+        chmod 0600 ~/.ssh/id_rsa
 
         # create a new floating ip tagged with CLUSTER_NAME so it can be deleted later
         LB_FIP=$(openstack floating ip create --description $CLUSTER_NAME $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address')
@@ -323,6 +324,12 @@ objects:
         value: openstack-cloud
       - name: OS_CLIENT_CONFIG_FILE
         value: /etc/openshift-installer/clouds.yaml
+      - name: SSH_PRIV_KEY_PATH
+        value: /etc/openshift-installer/ssh-privatekey
+      - name: USER
+        value: test
+      - name: HOME
+        value: /tmp
       command:
       - /bin/bash
       - -c
@@ -482,6 +489,15 @@ objects:
 
           echo "Snapshotting prometheus (may take 15s) ..."
           queue /tmp/artifacts/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring prometheus-k8s-0 -- tar cvzf - -C /prometheus .
+
+          # move private key to ~/.ssh/ so that installer can use it to gather logs
+          mkdir -p ~/.ssh
+          cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/id_rsa
+          chmod 0600 ~/.ssh/id_rsa
+
+          mkdir -p /tmp/artifacts/must-gather
+          echo "Running must-gather..."
+          queue /tmp/artifacts/must-gather/must-gather.log oc --insecure-skip-tls-verify adm must-gather --dest-dir /tmp/artifacts/must-gather/
 
           echo "Waiting for logs ..."
           wait
