@@ -253,6 +253,9 @@ update_secret generic "cluster-secrets-${target_cloud}"                         
 # DSNs for tools reporting failures to Sentry
 update_secret generic "sentry-dsn" "$( format_field_value "sentry" "ci-operator" "ci-operator" )"
 
+# codecov.io tokens we store for teams
+update_secret generic "redhat-developer-service-binding-operator-codecov-token" "$( format_field_value "codecov-tokens" redhat-developer-service-binding-operator token )"
+
 # Configuration for the .git-credentials used by the release controller to clone
 # private repositories to generate changelogs
 oc -n "ci-release" create secret generic "git-credentials" "--from-literal=.git-credentials=https://openshift-bot:$( field_value "openshift-bot" "GitHub OAuth Token" "oauth" )@github.com" --dry-run -o yaml | oc apply -f -
