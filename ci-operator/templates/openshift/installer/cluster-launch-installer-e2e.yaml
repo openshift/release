@@ -22,6 +22,7 @@ parameters:
 - name: BASE_DOMAIN
 - name: CLUSTER_NETWORK_MANIFEST
 - name: ENABLE_FIPS
+- name: ENABLE_PROXY
 
 objects:
 
@@ -803,6 +804,16 @@ objects:
         else
             echo "Unsupported cluster type '${CLUSTER_TYPE}'"
             exit 1
+        fi
+
+        # as a current stop gap -- this is pointing to a proxy hosted in
+        # the namespace "ci-test-ewolinet" on the ci cluster
+        if [[ "${ENABLE_PROXY}" == "true" ]]; then
+          cat >> /tmp/artifacts/installer/install-config.yaml << EOF
+        proxy:
+          httpsProxy: http://admin:admin@35.196.128.173:3128/
+          httpProxy: http://admin:admin@35.196.128.173:3128/
+        EOF
         fi
 
         # TODO: Replace with a more concise manifest injection approach
