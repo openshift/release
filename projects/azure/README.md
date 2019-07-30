@@ -384,7 +384,8 @@ image-mirror-openshift-azure-v3.11-quay   0 * * * *   False     0         56m   
 
 * _[`azure-purge`](./azure-purge)_ is responsible for cleaning up long-lived resource groups in our subscription (created either by our CI tests or for development purposes)
 * _[`image-mirror-openshift-azure-v3.11-quay`](./image-mirror)_ mirrors images from the `azure` CI namespace to `quay.io/openshift-on-azure`, the latter being used by our customers and developers alike
-* _[`secret-refresh`](./secret-refresh)_ refreshes a all azure dev secrets each weekend
+* _[`secret-refresh`](./secret-refresh)_ refreshes all azure dev secrets each weekend
+
 
 We need to check whether the above jobs are in a working state. Access to the cluster is granted
 to every member of the openshift github organization. Access to the `azure` namespace is controlled
