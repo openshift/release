@@ -151,7 +151,7 @@ presubmits:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )lint,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     context: ci/prow/unit
@@ -161,47 +161,6 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
     name: pull-ci-redhat-developer-service-binding-operator-master-unit
-    rerun_command: /test unit
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=unit
-        command:
-        - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: redhat-developer-service-binding-operator-master.yaml
-              name: ci-operator-master-configs
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )unit,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    context: ci/prow/unit-codecov
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    name: pull-ci-redhat-developer-service-binding-operator-master-unit-codecov
     rerun_command: /test unit
     spec:
       containers:
@@ -240,4 +199,4 @@ presubmits:
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )unit-codecov,?($|\s.*)
+    trigger: (?m)^/test( | .* )unit,?($|\s.*)
