@@ -34,7 +34,7 @@ applyTemplate:
 	oc process -f $(WHAT) | oc apply -f -
 .PHONY: applyTemplate
 
-postsubmit-update: prow-services origin-release libpod prow-monitoring build-dashboards-validation-image image-mirror-setup cincinnati
+postsubmit-update: prow-services origin-release libpod prow-monitoring build-dashboards-validation-image cincinnati
 .PHONY: postsubmit-update
 
 all: roles prow projects
@@ -50,7 +50,7 @@ roles: cluster-operator-roles cluster-roles
 prow: prow-ci-ns prow-ci-stg-ns prow-openshift-ns
 .PHONY: prow
 
-prow-ci-ns: ci-ns prow-crd prow-config prow-rbac prow-services prow-jobs prow-scaling prow-secrets prow-ci-search
+prow-ci-ns: ci-ns prow-crd prow-config prow-rbac prow-services prow-jobs prow-scaling prow-secrets
 .PHONY: prow-ci-ns
 
 prow-ci-stg-ns: ci-stg-ns prow-cluster-jobs
@@ -100,6 +100,7 @@ prow-secrets:
 
 prow-rbac:
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/artifact-uploader_rbac.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/boskos_rbac.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/config_updater_rbac.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/deck_rbac.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/hook_rbac.yaml
@@ -114,6 +115,8 @@ prow-rbac:
 
 prow-services:
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/prow-priority-class.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/boskos.yaml
+	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/boskos_reaper.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/adapter_imagestreams.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/artifact-uploader.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/cherrypick.yaml
@@ -151,7 +154,6 @@ prow-cluster-jobs:
 	oc create configmap prow-job-cluster-launch-installer-src --from-file=ci-operator/templates/openshift/installer/cluster-launch-installer-src.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap prow-job-cluster-launch-installer-console --from-file=ci-operator/templates/openshift/installer/cluster-launch-installer-console.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap prow-job-cluster-scaleup-openshift-ansible-e2e --from-file=ci-operator/templates/openshift/openshift-ansible/cluster-scaleup-e2e-40.yaml -o yaml --dry-run | oc apply -f -
-	oc create configmap prow-job-master-sidecar-4 --from-file=ci-operator/templates/master-sidecar-4.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap prow-job-master-sidecar-4.2 --from-file=ci-operator/templates/master-sidecar-4.2.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap prow-job-master-sidecar-3 --from-file=ci-operator/templates/master-sidecar-3.yaml -o yaml --dry-run | oc apply -f -
 .PHONY: prow-cluster-jobs
@@ -165,9 +167,17 @@ prow-ocp-rpm-secrets:
 		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
 		--from-file=ci-operator/infra/openshift/release-controller/repos/ocp-4.2-default.repo \
 		-o yaml --dry-run | oc apply -n ocp -f -
+	oc create secret generic base-openstack-4-2-repos \
+		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
+		--from-file=ci-operator/infra/openshift/release-controller/repos/ocp-4.2-openstack.repo \
+		-o yaml --dry-run | oc apply -n ocp -f -
 	oc create secret generic base-4-3-repos \
 		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
 		--from-file=ci-operator/infra/openshift/release-controller/repos/ocp-4.3-default.repo \
+		-o yaml --dry-run | oc apply -n ocp -f -
+	oc create secret generic base-openstack-4-3-repos \
+		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
+		--from-file=ci-operator/infra/openshift/release-controller/repos/ocp-4.3-openstack.repo \
 		-o yaml --dry-run | oc apply -n ocp -f -
 .PHONY: prow-ocp-rpms-secrets
 
@@ -187,11 +197,6 @@ prow-artifacts:
 	oc apply -f ci-operator/infra/openshift/origin/
 .PHONY: prow-artifacts
 
-prow-ci-search:
-	$(MAKE) apply WHAT=ci-operator/infra/openshift/ci-search/deploy.yaml
-	oc create configmap job-config --from-file=ci-operator/infra/openshift/ci-search/config.yaml -o yaml --dry-run | oc apply -f - -n ci-search
-.PHONY: prow-ci-search
-
 prow-release-controller-definitions:
 	oc annotate -n origin is/4.1 "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/releases/release-origin-4.1.json)" --overwrite
 	oc annotate -n ocp is/4.1-art-latest "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/releases/release-ocp-4.1.json)" --overwrite
@@ -209,7 +214,7 @@ prow-release-controller-deploy:
 prow-release-controller: prow-release-controller-definitions prow-release-controller-deploy
 .PHONY: prow-release-controller
 
-projects: ci-ns gcsweb origin-stable origin-release image-mirror-setup image-pruner-setup publishing-bot content-mirror azure python-validation metering
+projects: ci-ns gcsweb origin-stable origin-release publishing-bot content-mirror azure python-validation metering
 .PHONY: projects
 
 content-mirror:
@@ -266,29 +271,6 @@ service-idler:
 alert-buffer:
 	$(MAKE) apply WHAT=projects/prometheus/alert-buffer.yaml
 .PHONY: alert-buffer
-
-image-pruner-setup:
-	oc create serviceaccount image-pruner -o yaml --dry-run | oc apply -f -
-	oc adm policy add-cluster-role-to-user system:image-pruner -z image-pruner
-	$(MAKE) apply WHAT=cluster/ci/jobs/image-pruner.yaml
-.PHONY: image-pruner-setup
-
-# Regenerate the on cluster image streams from the authoritative mirror
-image-restore-from-mirror:
-	cat cluster/ci/config/mirroring/origin_v3_11 | cut -d ' ' -f 1 | cut -d ':' -f 2 | xargs -L1 -I {} oc tag docker.io/openshift/origin-{}:v3.11 openshift/origin-v3.11:{}
-	cat cluster/ci/config/mirroring/origin_v4_0 | cut -d ' ' -f 1 | cut -d ':' -f 2 | xargs -L1 -I {} oc tag docker.io/openshift/origin-{}:v4.0 openshift/origin-v4.0:{}
-.PHONY: image-restore-from-mirror
-
-# Regenerate the mirror files by looking at what we are publishing to the image stream.
-image-mirror-files:
-	BASE=quay.io/openshift/origin- VERSION=4.1 TAG=4.1,4.1.0 hack/mirror-file > cluster/ci/config/mirroring/origin_4_1
-	BASE=quay.io/openshift/origin- VERSION=4.2 TAG=4.2,4.2.0,latest hack/mirror-file > cluster/ci/config/mirroring/origin_4_2
-.PHONY: image-mirror-files
-
-image-mirror-setup:
-	oc create configmap image-mirror --from-file=cluster/ci/config/mirroring/ -o yaml --dry-run | oc apply -f -
-	$(MAKE) apply WHAT=cluster/ci/jobs/image-mirror.yaml
-.PHONY: image-mirror-setup
 
 cluster-operator-roles:
 	oc create ns openshift-cluster-operator --dry-run -o yaml | oc apply -f -

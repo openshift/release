@@ -1,5 +1,5 @@
 ### --as=system:serviceaccount:ci:config-updater
-prometheus-k8s_token := $(shell oc get secret -n openshift-monitoring grafana-datasources -o "jsonpath={.data.prometheus\.yaml}" | base64 --decode | jq '.datasources[] | select(.name = "prometheus-k8s") .basicAuthPassword')
+prometheus-k8s_token := $(shell oc get --as=system:serviceaccount:ci:config-updater secret -n openshift-monitoring grafana-datasources -o "jsonpath={.data.prometheus\.yaml}" | base64 --decode | jq '.datasources[] | select(.name = "prometheus-k8s") .basicAuthPassword')
 .PHONY : prow-monitoring-deploy
 prow-monitoring-deploy: ci-secret-deploy
 	@echo "Deploying prow-monitoring stack ..."
@@ -9,6 +9,7 @@ prow-monitoring-deploy: ci-secret-deploy
 	oc apply -f ./ghproxy_service_monitor.yaml
 	oc apply -f ./hook_service_monitor.yaml
 	oc apply -f ./deck_service_monitor.yaml
+	oc apply -f ./deck-internal_service_monitor.yaml
 	oc apply -f ./jenkins-operator_service_monitor.yaml
 	oc apply -f ./plank_service_monitor.yaml
 	oc apply -f ./tide_service_monitor.yaml
@@ -73,6 +74,7 @@ prow-monitoring-cleanup:
 	oc delete -f ./ghproxy_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./hook_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./deck_service_monitor.yaml --ignore-not-found=true --as=system:admin
+	oc delete -f ./deck-internal_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./jenkins-operator_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./plank_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./tide_service_monitor.yaml --ignore-not-found=true --as=system:admin
@@ -112,6 +114,7 @@ grafana_password := $(shell uuidgen)
 grafana-debug-deploy:
 	@echo "Running grafana-debug-deploy ... with password: $(grafana_password)"
 	# oc new-project prow-monitoring-stage --skip-config-write=true
+	# oc adm policy add-role-to-group admin ci-admins --as system:admin -n prow-monitoring-stage
 	oc get project prow-monitoring-stage
 	oc create -n prow-monitoring-stage configmap grafana-config --from-file=./debug/grafana.ini --dry-run -o yaml | oc apply -f -
 	sed -i -e "s|CHANGE_ME|$(grafana_password)|g" ./debug/grafana_secret.yaml
@@ -121,7 +124,7 @@ grafana-debug-deploy:
 	oc create -n prow-monitoring-stage configmap grafana-datasources --from-file=datasources.yaml=./debug/grafana_datasources.yaml --from-file=prometheus-k8s.yaml=/tmp/prometheus-k8s.yaml --dry-run -o yaml | oc apply -f -
 	rm -fv /tmp/prometheus-k8s.yaml
 	oc apply -f ./debug/grafana_deploy.yaml
-	@echo "admin password: $(oc get secret -n prow-monitoring-stage grafana -o jsonpath='{.data.password}' | base64 -d)"
+	@echo "admin password: $$(oc get secret -n prow-monitoring-stage grafana -o jsonpath='{.data.password}' | base64 -d)"
 
 .PHONY : grafana-debug-generate-k8s-dashboards
 grafana-debug-generate-k8s-dashboards:

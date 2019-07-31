@@ -64,6 +64,14 @@ spec:
       for: 5m
       labels:
         severity: slack
+    - alert: deck-internalDown
+      annotations:
+        message: The service deck-internal has been down for 5 minutes.
+      expr: |
+        absent(up{job="deck-internal"} == 1)
+      for: 5m
+      labels:
+        severity: slack
     - alert: ghproxyDown
       annotations:
         message: The service ghproxy has been down for 5 minutes.
@@ -168,8 +176,22 @@ spec:
       annotations:
         message: There have been no webhook calls on working hours for 5 minutes
       expr: |
-        sum(increase(prow_webhook_counter[1m])) == 0
+        (sum(increase(prow_webhook_counter[1m])) == 0 or absent(prow_webhook_counter))
         and ( (day_of_week() > 0) and (day_of_week() < 6) and (hour() >= 7) )
       for: 5m
       labels:
         severity: slack
+  - name: configmap-full
+    rules:
+    - alert: ConfigMapFullInOneWeek
+      annotations:
+        message: Based on recent sampling, the ConfigMap {{ $labels.name }} in Namespace
+          {{ $labels.namespace }} is expected to fill up within a week. Currently
+          {{ printf "%0.2f" $value }}% is available.
+      expr: |
+        100 * ((1048576 - prow_configmap_size_bytes) / 1048576) < 15
+        and
+        predict_linear(prow_configmap_size_bytes[12h], 7 * 24 * 3600) > 1048576
+      for: 5m
+      labels:
+        severity: critical

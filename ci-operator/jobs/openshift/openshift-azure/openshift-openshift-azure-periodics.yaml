@@ -68,6 +68,10 @@ periodics:
     - args:
       - hack/tests/origin-conformance.sh
       env:
+      - name: OS_GIT_MAJOR
+        value: "3"
+      - name: OS_GIT_MINOR
+        value: "11"
       - name: TEST_SUITE
         value: openshift/conformance/parallel/minimal
       - name: TEST_NODES
@@ -77,6 +81,28 @@ periodics:
       resources:
         requests:
           cpu: 10m
+    serviceAccountName: ci-operator
+- agent: ""
+  cron: ""
+  decorate: true
+  interval: 24h
+  extra_refs:
+    - org: openshift
+      repo: openshift-azure
+      base_ref: master
+  name: periodic-ci-azure-e2e-applysecurityupdates
+  spec:
+    containers:
+      - args:
+          - hack/tests/e2e-create.sh
+        env:
+          - name: FOCUS
+            value: \[ApplySecurityUpdates\]
+          - name: TIMEOUT
+            value: 120m
+        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        name: ""
+        resources: {}
     serviceAccountName: ci-operator
 - agent: ""
   cron: ""
@@ -93,26 +119,9 @@ periodics:
       - hack/tests/e2e-create.sh
       env:
       - name: FOCUS
-        value: \[ChangeLogLevel\]\[Fake\]
+        value: \[ChangeLogLevel\]
       - name: TIMEOUT
         value: 90m
-      image: registry.svc.ci.openshift.org/azure/ci-base:latest
-      name: ""
-      resources: {}
-    serviceAccountName: ci-operator
-- agent: ""
-  cron: ""
-  decorate: true
-  interval: 2h
-  extra_refs:
-  - org: openshift
-    repo: openshift-azure
-    base_ref: openshift-v4
-  name: periodic-ci-azure-openshift-v4-create
-  spec:
-    containers:
-    - args:
-      - hack/tests/create.sh
       image: registry.svc.ci.openshift.org/azure/ci-base:latest
       name: ""
       resources: {}
@@ -132,7 +141,7 @@ periodics:
       - hack/tests/e2e-create.sh
       env:
       - name: FOCUS
-        value: \[EtcdBackupRecovery\]\[Fake\]
+        value: \[EtcdBackupRecovery\]
       image: registry.svc.ci.openshift.org/azure/ci-base:latest
       name: ""
       resources: {}
@@ -152,7 +161,7 @@ periodics:
       - hack/tests/e2e-create.sh
       env:
       - name: FOCUS
-        value: \[ForceUpdate\]\[Fake\]
+        value: \[ForceUpdate\]
       image: registry.svc.ci.openshift.org/azure/ci-base:latest
       name: ""
       resources: {}
@@ -172,47 +181,7 @@ periodics:
       - hack/tests/e2e-create.sh
       env:
       - name: FOCUS
-        value: \[KeyRotation\]\[Fake\]
-      image: registry.svc.ci.openshift.org/azure/ci-base:latest
-      name: ""
-      resources: {}
-    serviceAccountName: ci-operator
-- agent: ""
-  cron: ""
-  decorate: true
-  interval: 24h
-  extra_refs:
-  - org: openshift
-    repo: openshift-azure
-    base_ref: master
-  name: periodic-ci-azure-e2e-prod
-  spec:
-    containers:
-    - args:
-      - hack/tests/e2e-prod.sh
-      env:
-      - name: FOCUS
-        value: \[Default\]\[Real\]
-      image: registry.svc.ci.openshift.org/azure/ci-base:latest
-      name: ""
-      resources: {}
-    serviceAccountName: ci-operator
-- agent: ""
-  cron: ""
-  decorate: true
-  interval: 24h
-  extra_refs:
-  - org: openshift
-    repo: openshift-azure
-    base_ref: master
-  name: periodic-ci-azure-e2e-prod-vnet
-  spec:
-    containers:
-    - args:
-      - hack/tests/e2e-prod.sh
-      env:
-      - name: FOCUS
-        value: \[Vnet\]\[Real\]
+        value: \[KeyRotation\]
       image: registry.svc.ci.openshift.org/azure/ci-base:latest
       name: ""
       resources: {}
@@ -232,7 +201,7 @@ periodics:
       - hack/tests/e2e-create.sh
       env:
       - name: FOCUS
-        value: \[ReimageVM\]\[Fake\]
+        value: \[ReimageVM\]
       image: registry.svc.ci.openshift.org/azure/ci-base:latest
       name: ""
       resources: {}
@@ -252,7 +221,7 @@ periodics:
       - hack/tests/e2e-create.sh
       env:
       - name: FOCUS
-        value: \[ScaleUpDown\]\[Fake\]
+        value: \[ScaleUpDown\]
       image: registry.svc.ci.openshift.org/azure/ci-base:latest
       name: ""
       resources: {}

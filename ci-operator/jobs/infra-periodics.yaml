@@ -36,7 +36,7 @@ periodics:
       - --random
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20190703-de259d503
+      image: gcr.io/k8s-prow/commenter:v20190730-f3698c9e2
       imagePullPolicy: Always
       name: ""
       resources:
@@ -81,7 +81,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20190703-de259d503
+      image: gcr.io/k8s-prow/commenter:v20190730-f3698c9e2
       imagePullPolicy: Always
       name: ""
       resources:
@@ -130,7 +130,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20190703-de259d503
+      image: gcr.io/k8s-prow/commenter:v20190730-f3698c9e2
       imagePullPolicy: Always
       name: ""
       resources:
@@ -178,7 +178,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20190703-de259d503
+      image: gcr.io/k8s-prow/commenter:v20190730-f3698c9e2
       imagePullPolicy: Always
       name: ""
       resources:
@@ -212,7 +212,7 @@ periodics:
       - --debug
       command:
       - /app/label_sync/app.binary
-      image: gcr.io/k8s-prow/label_sync:v20190703-de259d503
+      image: gcr.io/k8s-prow/label_sync:v20190730-f3698c9e2
       imagePullPolicy: Always
       name: ""
       resources:
@@ -237,6 +237,44 @@ periodics:
     ci.openshift.io/role: infra
   cron: ""
   decorate: true
+  decoration_config:
+    timeout: 8h
+  interval: 5m
+  name: periodic-ipi-deprovision
+  spec:
+    containers:
+    - command:
+      - /usr/bin/ipi-deprovision.sh
+      image: registry.svc.ci.openshift.org/ci/ipi-deprovision:latest
+      imagePullPolicy: Always
+      env:
+      - name: AWS_SHARED_CREDENTIALS_FILE
+        value: "/usr/local/e2e-aws-cluster-profile/.awscred"
+      - name: CLUSTER_TTL
+        value: "30 minutes ago"
+      - name: AWS_REGIONS
+        value: "us-east-1"
+        #more than one region
+        #value: "us-east-1;us-west-1"
+      name: "ipi-deprovision"
+      resources:
+          requests:
+            cpu: 500m
+      volumeMounts:
+      - mountPath: /usr/local/e2e-aws-cluster-profile
+        name: cluster-profile
+    volumes:
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    serviceAccountName: ipi-deprovisioner
+- agent: kubernetes
+  labels:
+    ci.openshift.io/role: infra
+  cron: ""
+  decorate: true
   interval: 30m
   name: periodic-branch-protector
   skip_cloning: true
@@ -250,7 +288,7 @@ periodics:
       - --github-endpoint=http://ghproxy
       command:
       - /app/prow/cmd/branchprotector/app.binary
-      image: gcr.io/k8s-prow/branchprotector:v20190703-de259d503
+      image: gcr.io/k8s-prow/branchprotector:v20190730-f3698c9e2
       imagePullPolicy: Always
       name: ""
       resources:
@@ -340,7 +378,7 @@ periodics:
       - --fix-team-repos
       command:
       - /app/prow/cmd/peribolos/app.binary
-      image: gcr.io/k8s-prow/peribolos:v20190703-de259d503
+      image: gcr.io/k8s-prow/peribolos:v20190730-f3698c9e2
       imagePullPolicy: Always
       name: ""
       resources:
@@ -360,3 +398,35 @@ periodics:
     - name: config
       configMap:
         name: org-config
+- agent: kubernetes
+  labels:
+    ci.openshift.io/role: infra
+    app: image-pruner
+  cron: "@daily"
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  name: periodic-ci-image-pruner
+  spec:
+    containers:
+    - args:
+      - adm
+      - prune
+      - images
+      - --certificate-authority=/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+      - --keep-tag-revisions=3
+      - --keep-younger-than=96h
+      - --confirm=true
+      command:
+      - oc
+      image: "quay.io/openshift/origin-cli:4.1"
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 1
+          memory: 4Gi
+        limits:
+          cpu: 2
+          memory: 8Gi
+    serviceAccountName: "image-pruner"

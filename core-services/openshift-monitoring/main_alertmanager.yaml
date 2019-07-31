@@ -1,0 +1,67 @@
+apiVersion: monitoring.coreos.com/v1
+kind: Alertmanager
+metadata:
+  creationTimestamp: 2018-10-18T18:30:32Z
+  generation: 1
+  labels:
+    alertmanager: main
+  name: main
+  namespace: openshift-monitoring
+  selfLink: /apis/monitoring.coreos.com/v1/namespaces/openshift-monitoring/alertmanagers/main
+spec:
+  baseImage: openshift/prometheus-alertmanager
+  containers:
+  - args:
+    - -provider=openshift
+    - -https-address=:9094
+    - -http-address=
+    - -email-domain=*
+    - -upstream=http://localhost:9093
+    - '-openshift-sar={"resource": "namespaces", "verb": "get"}'
+    - '-openshift-delegate-urls={"/": {"resource": "namespaces", "verb": "get"}}'
+    - -tls-cert=/etc/tls/private/tls.crt
+    - -tls-key=/etc/tls/private/tls.key
+    - -client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
+    - -cookie-secret-file=/etc/proxy/secrets/session_secret
+    - -openshift-service-account=alertmanager-main
+    - -openshift-ca=/etc/pki/tls/cert.pem
+    - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    - -skip-auth-regex=^/metrics
+    env:
+    - name: HTTP_PROXY
+    - name: HTTPS_PROXY
+    - name: NO_PROXY
+    image: openshift/oauth-proxy:v1.1.0
+    name: alertmanager-proxy
+    ports:
+    - containerPort: 9094
+      name: web
+    resources: {}
+    volumeMounts:
+    - mountPath: /etc/tls/private
+      name: secret-alertmanager-main-tls
+    - mountPath: /etc/proxy/secrets
+      name: secret-alertmanager-main-proxy
+  externalUrl: https://alertmanager-main-openshift-monitoring.svc.ci.openshift.org/
+  listenLocal: true
+  nodeSelector:
+    node-role.kubernetes.io/infra: "true"
+  replicas: 3
+  storage:
+      volumeClaimTemplate:
+        metadata:
+          name: prometheus
+        spec:
+          accessModes:
+          - "ReadWriteOnce"
+          storageClassName: "standard"
+          resources:
+            requests:
+              storage: 10Gi
+  resources: {}
+  secrets:
+  - alertmanager-main-tls
+  - alertmanager-main-proxy
+  securityContext: {}
+  serviceAccountName: alertmanager-main
+  version: v0.15.2

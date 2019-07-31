@@ -1,0 +1,93 @@
+### if the change is on fields other than 'replicas', 'template', and 'updateStrategy' of the underlying statefulset,
+### then we have do it manually: oc delete -f core-services/openshift-monitoring/k8s_prometheus.yaml --as system:admin
+### and then, oc apply -f core-services/openshift-monitoring/k8s_prometheus.yaml --as system:admin
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  generation: 1
+  labels:
+    prometheus: k8s
+  name: k8s
+  namespace: openshift-monitoring
+spec:
+  alerting:
+    alertmanagers:
+    - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+      name: alertmanager-main
+      namespace: openshift-monitoring
+      port: web
+      scheme: https
+      tlsConfig:
+        caFile: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+        serverName: alertmanager-main.openshift-monitoring.svc
+  baseImage: openshift/prometheus
+  containers:
+  - args:
+    - -provider=openshift
+    - -https-address=:9091
+    - -http-address=
+    - -email-domain=*
+    - -upstream=http://localhost:9090
+    - -htpasswd-file=/etc/proxy/htpasswd/auth
+    - -openshift-service-account=prometheus-k8s
+    - '-openshift-sar={"resource": "namespaces", "verb": "get"}'
+    - '-openshift-delegate-urls={"/": {"resource": "namespaces", "verb": "get"}}'
+    - -tls-cert=/etc/tls/private/tls.crt
+    - -tls-key=/etc/tls/private/tls.key
+    - -client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
+    - -cookie-secret-file=/etc/proxy/secrets/session_secret
+    - -openshift-ca=/etc/pki/tls/cert.pem
+    - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    - -skip-auth-regex=^/metrics
+    image: openshift/oauth-proxy:v1.1.0
+    name: prometheus-proxy
+    ports:
+    - containerPort: 9091
+      name: web
+    resources: {}
+    volumeMounts:
+    - mountPath: /etc/tls/private
+      name: secret-prometheus-k8s-tls
+    - mountPath: /etc/proxy/secrets
+      name: secret-prometheus-k8s-proxy
+    - mountPath: /etc/proxy/htpasswd
+      name: secret-prometheus-k8s-htpasswd
+  externalLabels:
+    cluster: api.ci.openshift.org
+  externalUrl: https://prometheus-k8s-openshift-monitoring.svc.ci.openshift.org/
+  listenLocal: true
+  nodeSelector:
+    node-role.kubernetes.io/infra: "true"
+  replicas: 2
+  storage:
+      volumeClaimTemplate:
+        metadata:
+          name: prometheus
+        spec:
+          accessModes:
+          - "ReadWriteOnce"
+          storageClassName: "standard"
+          resources:
+            requests:
+              storage: 400Gi
+  resources: {}
+  retention: 30d
+  ruleSelector:
+    matchLabels:
+      prometheus: k8s
+      role: alert-rules
+  secrets:
+  - prometheus-k8s-tls
+  - prometheus-k8s-proxy
+  - prometheus-k8s-htpasswd
+  securityContext: {}
+  serviceAccountName: prometheus-k8s
+  serviceMonitorNamespaceSelector:
+    matchExpressions:
+    - key: openshift.io/cluster-monitoring
+      operator: Exists
+  serviceMonitorSelector:
+    matchExpressions:
+    - key: k8s-app
+      operator: Exists
+  version: v2.3.2

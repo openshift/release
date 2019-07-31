@@ -254,6 +254,28 @@ presubmits:
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
     always_run: true
+    context: ci/prow/shellcheck
+    decorate: true
+    name: pull-ci-openshift-cluster-monitoring-operator-master-shellcheck
+    rerun_command: /test shellcheck
+    spec:
+      containers:
+      - args:
+        - ./hack/shellcheck.sh
+        command:
+        - sh
+        env:
+        - name: IS_CONTAINER
+          value: "TRUE"
+        image: koalaman/shellcheck-alpine:stable
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+    trigger: (?m)^/test shellcheck
+  - agent: kubernetes
+    always_run: true
     branches:
     - master
     context: ci/prow/unit

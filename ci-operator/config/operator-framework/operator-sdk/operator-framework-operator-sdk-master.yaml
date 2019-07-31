@@ -1,28 +1,24 @@
+base_images:
+  os:
+    name: ubi
+    namespace: ocp
+    tag: "7"
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "7"
 build_root:
   image_stream_tag:
     cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.12
-base_images:
-  ansible-runner:
-    name: ansible-runner
-    namespace: openshift
-    tag: latest
 canonical_go_repository: github.com/operator-framework/operator-sdk
-test_binary_build_commands: ./hack/ci/setup-build-dependencies.sh
-resources:
-  '*':
-    limits:
-      memory: 4Gi
-    requests:
-      cpu: 100m
-      memory: 200Mi
 images:
-- from: root
-  dockerfile_path: ci/dockerfiles/builder.Dockerfile
+- dockerfile_path: ci/dockerfiles/builder.Dockerfile
+  from: root
   to: osdk-builder
-- from: ansible-runner
+- from: os
   dockerfile_path: ci/dockerfiles/ansible.Dockerfile
   inputs:
     osdk-builder:
@@ -30,30 +26,75 @@ images:
       - osdk-builder
       paths: null
   to: ansible-operator
-- from: ansible-runner
+- from: os
   dockerfile_path: ci/dockerfiles/ansible-e2e-hybrid.Dockerfile
   inputs:
     osdk-builder:
       as:
       - osdk-builder
+      paths: null
   to: osdk-ansible-e2e-hybrid
-- from: ansible-operator
-  dockerfile_path: ci/dockerfiles/ansible-e2e.Dockerfile
+- dockerfile_path: ci/dockerfiles/ansible-e2e.Dockerfile
+  from: ansible-operator
   inputs:
     osdk-builder:
       as:
       - osdk-builder
+      paths: null
   to: osdk-ansible-e2e
+- dockerfile_path: ci/dockerfiles/helm.Dockerfile
+  from: base
+  inputs:
+    osdk-builder:
+      as:
+      - osdk-builder
+      paths: null
+  to: helm-operator
+- dockerfile_path: ci/dockerfiles/helm-e2e-hybrid.Dockerfile
+  from: base
+  inputs:
+    osdk-builder:
+      as:
+      - osdk-builder
+      paths: null
+  to: osdk-helm-e2e-hybrid
+- dockerfile_path: ci/dockerfiles/helm-e2e.Dockerfile
+  from: helm-operator
+  inputs:
+    osdk-builder:
+      as:
+      - osdk-builder
+      paths: null
+  to: osdk-helm-e2e
+- dockerfile_path: ci/dockerfiles/go-e2e.Dockerfile
+  from: base
+  inputs:
+    osdk-builder:
+      as:
+      - osdk-builder
+      paths: null
+  to: memcached-operator
 promotion:
-  name: "4.2"
-  namespace: ocp
   excluded_images:
   - osdk-builder
   - osdk-ansible-e2e
   - osdk-ansible-e2e-hybrid
+  - osdk-helm-e2e
+  - osdk-helm-e2e-hybrid
+  - memcached-operator
+  name: "4.2"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
 tag_specification:
   name: "4.2"
   namespace: ocp
+test_binary_build_commands: ./hack/ci/setup-build-dependencies.sh
 tests:
 - as: marker
   commands: make test/markdown
@@ -69,5 +110,13 @@ tests:
     from: test-bin
 - as: e2e-aws-ansible
   commands: make test/e2e/ansible2
+  openshift_installer_src:
+    cluster_profile: aws
+- as: e2e-aws-helm
+  commands: make test/e2e/helm2
+  openshift_installer_src:
+    cluster_profile: aws
+- as: e2e-aws-go
+  commands: make test/e2e/go2
   openshift_installer_src:
     cluster_profile: aws
