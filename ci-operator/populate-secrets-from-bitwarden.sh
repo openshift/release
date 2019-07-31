@@ -116,8 +116,8 @@ function field_value() {
 }
 
 # Bugzilla API keys are stored as a text field named "API Key"
-server="bugzilla.redhat.com"
-update_secret generic "bugzilla-credentials-${server}" "$( format_field_value "${server}" "API Key" "api" )"
+login="openshift-bugzilla-robot"
+update_secret generic "bugzilla-credentials-${login}" "$( format_field_value "${login}" "API Key" "api" )"
 
 # Jenkins credentials are stored as separate items in Bitwarden,
 # with the token recorded as the password for the account
@@ -184,7 +184,7 @@ done
 
 # Credentials for registries are stored as
 # separate fields on individual items
-for registry in "docker.io" "quay.io" "quay.io/openshift-knative" "quay.io/openshiftio" "quay.io/openshift-pipeline"; do
+for registry in "docker.io" "quay.io" "quay.io/openshift-knative" "quay.io/openshiftio" "quay.io/openshift-pipeline" "quay.io/codeready-toolchain"; do
 	update_secret generic "registry-push-credentials-${registry//\//\-}" $( format_field_value "${registry}" "Push Credentials" "config.json" )
 	# we want to be able to build and push out to registries
 	oc secrets link builder "registry-push-credentials-${registry//\//\-}"
@@ -252,6 +252,9 @@ update_secret generic "cluster-secrets-${target_cloud}"                         
 
 # DSNs for tools reporting failures to Sentry
 update_secret generic "sentry-dsn" "$( format_field_value "sentry" "ci-operator" "ci-operator" )"
+
+# codecov.io tokens we store for teams
+update_secret generic "redhat-developer-service-binding-operator-codecov-token" "$( format_field_value "codecov-tokens" redhat-developer-service-binding-operator token )"
 
 # Configuration for the .git-credentials used by the release controller to clone
 # private repositories to generate changelogs

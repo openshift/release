@@ -22,6 +22,28 @@ presubmits:
     always_run: false
     branches:
     - master
+    context: e2e-applysecurityupdates
+    decorate: true
+    name: pull-ci-azure-master-e2e-applysecurityupdates
+    rerun_command: /test e2e-applysecurityupdates
+    spec:
+      containers:
+      - args:
+        - hack/tests/e2e-create.sh
+        env:
+        - name: FOCUS
+          value: \[ApplySecurityUpdates\]
+        - name: TIMEOUT
+          value: 120m
+        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        name: ""
+        resources: {}
+      serviceAccountName: ci-operator
+    trigger: (?m)^/test( | .* )e2e-applysecurityupdates,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - master
     context: conformance
     decorate: true
     name: pull-ci-azure-master-e2e-azure-conformance
@@ -31,6 +53,10 @@ presubmits:
       - args:
         - hack/tests/origin-conformance.sh
         env:
+        - name: OS_GIT_MAJOR
+          value: "3"
+        - name: OS_GIT_MINOR
+          value: "11"
         - name: TEST_NODES
           value: "30"
         - name: TEST_SUITE
@@ -56,7 +82,7 @@ presubmits:
         - hack/tests/e2e-create.sh
         env:
         - name: FOCUS
-          value: \[ChangeLogLevel\]\[Fake\]
+          value: \[ChangeLogLevel\]
         - name: TIMEOUT
           value: 90m
         image: registry.svc.ci.openshift.org/azure/ci-base:latest
@@ -78,7 +104,7 @@ presubmits:
         - hack/tests/e2e-create.sh
         env:
         - name: FOCUS
-          value: \[Fake\]\[EveryPR\]
+          value: \[EveryPR\]
         image: registry.svc.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
@@ -98,7 +124,7 @@ presubmits:
         - hack/tests/e2e-create.sh
         env:
         - name: FOCUS
-          value: \[EtcdBackupRecovery\]\[Fake\]
+          value: \[EtcdBackupRecovery\]
         image: registry.svc.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
@@ -118,7 +144,7 @@ presubmits:
         - hack/tests/e2e-create.sh
         env:
         - name: FOCUS
-          value: \[ForceUpdate\]\[Fake\]
+          value: \[ForceUpdate\]
         image: registry.svc.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
@@ -138,7 +164,7 @@ presubmits:
         - hack/tests/e2e-create.sh
         env:
         - name: FOCUS
-          value: \[KeyRotation\]\[Fake\]
+          value: \[KeyRotation\]
         image: registry.svc.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
@@ -158,7 +184,7 @@ presubmits:
         - hack/tests/e2e-create.sh
         env:
         - name: FOCUS
-          value: \[ReimageVM\]\[Fake\]
+          value: \[ReimageVM\]
         image: registry.svc.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
@@ -178,7 +204,7 @@ presubmits:
         - hack/tests/e2e-create.sh
         env:
         - name: FOCUS
-          value: \[ScaleUpDown\]\[Fake\]
+          value: \[ScaleUpDown\]
         image: registry.svc.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}

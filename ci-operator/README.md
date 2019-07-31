@@ -100,12 +100,10 @@ as a reference:
   uses `openshift-installer` instead of `openshift-ansible`.
 - `cluster-launch-installer-src.yaml`: same as `cluster-launch-src.yaml`, but
   uses `openshift-installer` instead of `openshift-ansible`.
-- `master-sidecar-4.yaml`: spins up a simple openshift control plane as a sidecar
+- `master-sidecar-4.2.yaml`: spins up a simple openshift control plane as a sidecar
   and waits for the `COMMAND` specified to the template to be executed, before
   itself exiting. The test container is given access to the generated
   configuration and the `admin.kubeconfig`.
-- `master-sidecar-4.2.yaml`: spins up a simple openshift control plane as a sidecar
-  and same as `master-sidecar-4.2.yaml` but it is used for `4.2+` versions of origin.
 
 To access the cluster, the test should use the standard configuration loading
 rules, which are described in the upstream documentation:

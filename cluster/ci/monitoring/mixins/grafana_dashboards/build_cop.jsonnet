@@ -57,45 +57,37 @@ dashboard.new(
   {
         "allValue": null,
         "current": {
-          "text": "30m",
-          "value": "30m"
+          "text": "3h",
+          "value": "3h"
         },
         "hide": 0,
         "includeAll": false,
         "label": "range",
         "multi": false,
         "name": "range",
-        "options": [
+        "options":
+        [
           {
             "selected": false,
-            "text": "3h",
-            "value": "3h"
+            "text": '%s' % r,
+            "value": '%s'% r,
           },
-          {
-            "selected": false,
-            "text": "1h",
-            "value": "1h"
-          },
+          for r in ['24h', '12h']
+        ] +
+        [
           {
             "selected": true,
-            "text": "30m",
-            "value": "30m"
-          },
-          {
-            "selected": false,
-            "text": "15m",
-            "value": "15m"
-          },
-          {
-            "selected": false,
-            "text": "10m",
-            "value": "10m"
-          },
-          {
-            "selected": false,
-            "text": "5m",
-            "value": "5m"
+            "text": '3h',
+            "value": '3h',
           }
+        ] +
+        [
+          {
+            "selected": false,
+            "text": '%s' % r,
+            "value": '%s'% r,
+          },
+          for r in ['1h', '30m', '15m', '10m', '5m']
         ],
         "query": "3h,1h,30m,15m,10m,5m",
         "skipUrlSync": false,
@@ -265,6 +257,40 @@ dashboard.new(
     .addTarget(prometheus.target(
         'sum(rate(prowjob_state_transitions{job="plank",job_name=~".*-azure.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"}[${range}]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~".*-azure.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"}[${range}]))',
         legendFormat='.*-azure.*',
+    )), gridPos={
+    h: 9,
+    w: 24,
+    x: 0,
+    y: 0,
+  })
+.addPanel(
+    (graphPanel.new(
+        'Running Clusters by Platform',
+        description='sum(kube_pod_container_status_running{pod=~"e2e(-<regex>(-upgrade)?)?",container="teardown"})',
+        datasource='prometheus-k8s',
+        legend_alignAsTable=true,
+        legend_rightSide=true,
+        legend_values=true,
+        legend_current=true,
+        legend_max=true,
+        legend_sort='current',
+        legend_sortDesc=true,
+    ) + legendConfig)
+    .addTarget(prometheus.target(
+        'sum(kube_pod_container_status_running{pod=~"(e2e|(.*-aws(-.*)?))",container="teardown"})',
+        legendFormat='aws',
+    ))
+    .addTarget(prometheus.target(
+        'sum(kube_pod_container_status_running{pod=~".*-vsphere(-.*)?",container="teardown"})',
+        legendFormat='vsphere',
+    ))
+    .addTarget(prometheus.target(
+        'sum(kube_pod_container_status_running{pod=~".*-gcp(-.*)?",container="teardown"})',
+        legendFormat='gcp',
+    ))
+    .addTarget(prometheus.target(
+        'sum(kube_pod_container_status_running{pod=~".*-azure(-.*)?",container="teardown"})',
+        legendFormat='azure',
     )), gridPos={
     h: 9,
     w: 24,

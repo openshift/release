@@ -51,7 +51,7 @@ periodics:
     labels:
       ci.openshift.io/role: image-mirroring
       ci.openshift.io/area: openshift
-    cron: "@midnight"
+    cron: "@hourly"
     decorate: true
     name: periodic-image-mirroring-openshift
     skip_cloning: true
@@ -63,8 +63,8 @@ periodics:
               set -o errexit
               failures=0
               for mapping in /etc/imagemirror/mapping_origin*; do
-                echo "Running: oc image mirror -f=$mapping --skip-multiple-scopes --dry-run=true"
-                if ! oc image mirror -f="$mapping" --skip-multiple-scopes --dry-run=true; then
+                echo "Running: oc image mirror -f=$mapping --skip-multiple-scopes"
+                if ! oc image mirror -f="$mapping" --skip-multiple-scopes; then
                   echo "ERROR: Failed to mirror images from $mapping"
                   failures=$((failures+1))
                 fi
@@ -239,12 +239,61 @@ periodics:
         - name: config
           configMap:
             name: image-mirror-mappings
+  - agent: kubernetes
+    labels:
+      ci.openshift.io/role: image-mirroring
+      ci.openshift.io/area: codeready-toolchain
+    cron: "@hourly"
+    decorate: true
+    name: periodic-image-mirroring-codeready-toolchain
+    skip_cloning: true
+    spec:
+      containers:
+        - args:
+            - -c
+            - |
+              set -o errexit
+              failures=0
+              for mapping in /etc/imagemirror/mapping_codeready_toolchain*; do
+                echo "Running: oc image mirror -f=$mapping --skip-multiple-scopes"
+                if ! oc image mirror -f="$mapping" --skip-multiple-scopes; then
+                  echo "ERROR: Failed to mirror images from $mapping"
+                  failures=$((failures+1))
+                fi
+              done
+              exit $failures
+          command:
+            - /bin/bash
+          env:
+            - name: HOME
+              value: /home/mirror
+          image: "quay.io/openshift/origin-cli:4.1"
+          imagePullPolicy: Always
+          name: ""
+          resources:
+            requests:
+              cpu: 500m
+          volumeMounts:
+            - mountPath: /home/mirror/.docker/config.json
+              name: push
+              readOnly: true
+              subPath: config.json
+            - mountPath: /etc/imagemirror
+              name: config
+      volumes:
+        - name: push
+          secret:
+            secretName: registry-push-credentials-quay.io-codeready-toolchain
+        - name: config
+          configMap:
+            name: image-mirror-mappings
+
 # JOB TEMPLATE
 #  - agent: kubernetes
 #    labels:
 #      ci.openshift.io/role: image-mirroring
 #      ci.openshift.io/area: FIXME
-#    cron: "@midnight"
+#    cron: "@hourly"
 #    decorate: true
 #    name: periodic-image-mirroring-FIXME
 #    skip_cloning: true
@@ -284,7 +333,7 @@ periodics:
 #      volumes:
 #        - name: push
 #          secret:
-#            secretName: FIXME
+#            secretName: registry-push-credentials-quay.io-FIXME
 #        - name: config
 #          configMap:
 #            name: image-mirror-mappings

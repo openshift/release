@@ -150,6 +150,15 @@ For each, a `registry-pull-credentials-${registry_url}` secret holds the pull
 credentials in the `config.json` key and a `registry-push-credentials-${registry_url}`
 secret holds push credentials also in a `config.json` key.
 
+#### Push Credentials for Image Mirroring Jobs
+
+Team-specific credentials are used by [image mirroring jobs](../core-services/quay-mirroring/README.md)
+to push images to team orgs on Quay. In Bitwarden, these are called `quay.io/${THING}`
+and contain the credentials JSON in the `Push Credentials` field. They are
+synced to a corresponding `registry-push-credentials-quay.io-${THING}` secret,
+where the JSON is also placed in the `config.json` key. The `${THING}` part
+should identify the owning team and should correspond to a subdirectory of [core-services/quay-mirroring](../core-services/quay-mirroring).
+
 ### Jenkins Credentials
 
 The following Jenkins masters have their credentials stored in secrets on the
@@ -172,7 +181,6 @@ stored on the cluster
  - cluster-bot as `ci-chat-bot-slack-token`
 
 This token is granted access to talk to the Slack API for automation purposes.
-
 
 ## Secret Regeneration
 

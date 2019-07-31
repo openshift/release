@@ -4,7 +4,7 @@ tag_specification:
 promotion:
   cluster: https://api.ci.openshift.org
   namespace: openshift
-  name: release-next
+  name: release-next-ocp-41
 base_images:
   base:
     name: '4.1'
@@ -13,11 +13,11 @@ base_images:
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
-canonical_go_repository: github.com/knative/serving
+canonical_go_repository: knative.dev/serving
 binary_build_commands: make install
 test_binary_build_commands: make test-install
 tests:
-- as: e2e-aws
+- as: e2e-aws-ocp-41
   commands: "make test-e2e"
   openshift_installer_src:
     cluster_profile: aws
@@ -85,14 +85,6 @@ images:
       - destination_dir: .
         source_path: /go/bin/autoscaler
   to: knative-serving-autoscaler
-- dockerfile_path: openshift/ci-operator/knative-test-images/printport/Dockerfile
-  from: base
-  inputs:
-    test-bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/bin/printport
-  to: knative-serving-test-printport
 - dockerfile_path: openshift/ci-operator/knative-test-images/pizzaplanetv2/Dockerfile
   from: base
   inputs:
@@ -109,22 +101,6 @@ images:
       - destination_dir: .
         source_path: /go/bin/helloworld
   to: knative-serving-test-helloworld
-- dockerfile_path: openshift/ci-operator/knative-test-images/bloatingcow/Dockerfile
-  from: base
-  inputs:
-    test-bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/bin/bloatingcow
-  to: knative-serving-test-bloatingcow
-- dockerfile_path: openshift/ci-operator/knative-test-images/workingdir/Dockerfile
-  from: base
-  inputs:
-    test-bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/bin/workingdir
-  to: knative-serving-test-workingdir
 - dockerfile_path: openshift/ci-operator/knative-test-images/runtime/Dockerfile
   from: base
   inputs:
@@ -213,11 +189,3 @@ images:
       - destination_dir: .
         source_path: /go/bin/hellovolume
   to: knative-serving-test-hellovolume
-- dockerfile_path: openshift/ci-operator/knative-test-images/protocols/Dockerfile
-  from: base
-  inputs:
-    test-bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/bin/protocols
-  to: knative-serving-test-protocols

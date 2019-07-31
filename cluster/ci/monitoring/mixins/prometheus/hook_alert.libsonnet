@@ -8,7 +8,7 @@
             alert: 'no-webhook-calls',
             // utc time
             expr: |||
-              sum(increase(prow_webhook_counter[1m])) == 0
+              (sum(increase(prow_webhook_counter[1m])) == 0 or absent(prow_webhook_counter))
               and ( (day_of_week() > 0) and (day_of_week() < 6) and (hour() >= 7) )
             |||,
             'for': '5m',

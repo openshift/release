@@ -14,13 +14,17 @@ resources:
     requests:
       memory: 250Mi
       cpu: 100m
+promotion:
+  cluster: https://api.ci.openshift.org
+  namespace: codeready-toolchain
+  name: host-operator-v0.1
 images:
 - from: os
   inputs:
     bin:
       paths:
       - destination_dir: .
-        source_path: /go/src/github.com/codeready-toolchain/host-operator/out/operator
+        source_path: /go/src/github.com/codeready-toolchain/host-operator/build/_output/bin/host-operator
   dockerfile_path: openshift-ci/Dockerfile.deploy
   to: host-operator
 
@@ -41,7 +45,7 @@ tests:
   container:
     from: src
 - as: lint
-  commands: make lint
+  commands: make lint-yaml
   container:
     from: src
 - as: test

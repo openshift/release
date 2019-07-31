@@ -88,6 +88,9 @@ plugins:
   openshift/baremetal-operator:
   - approve
 
+  openshift/baremetal-runtimecfg:
+  - approve
+
   openshift/builder:
   - approve
 
@@ -103,6 +106,24 @@ plugins:
   openshift/sdn:
   - approve
 
+  openshift/kubernetes:
+  - approve
+
+  openshift/oc:
+  - approve
+
+  openshift/openshift-apiserver:
+  - approve
+
+  openshift/openshift-controller-manager:
+  - approve
+
+  openshift/template-service-broker:
+  - approve
+
+  openshift/oauth-server:
+  - approve
+
   openshift/cluster-machine-approver:
   - approve
 
@@ -110,6 +131,9 @@ plugins:
   - approve
 
   openshift/descheduler-operator:
+  - approve
+  
+  openshift/node-feature-discovery:
   - approve
 
   openshift/node-problem-detector-operator:
@@ -128,6 +152,9 @@ plugins:
   - approve
 
   openshift/cluster-logging-operator:
+  - approve
+
+  openshift/origin-aggregated-logging:
   - approve
 
   openshift/cluster-network-operator:
@@ -175,6 +202,12 @@ plugins:
   openshift/image-registry:
   - approve
 
+  openshift/ironic-inspector-image:
+  - approve
+
+  openshift/ironic-ipa-downloader:
+  - approve
+
   openshift/kubecsr:
   - approve
 
@@ -185,6 +218,9 @@ plugins:
   - approve
 
   openshift/library-go:
+  - approve
+
+  openshift/apiserver-library-go:
   - approve
 
   openshift/crd-schema-gen:
@@ -222,6 +258,9 @@ plugins:
   - approve
 
   openshift/service-catalog:
+  - approve
+
+  openshift/service-ca-operator:
   - approve
 
   openshift/cluster-monitoring-operator:
@@ -266,10 +305,19 @@ plugins:
   openshift/tektoncd-pipeline:
   - approve
 
+  openshift/tektoncd-cli:
+  - approve
+
   openshift/pipelines-catalog:
   - approve
 
   openshift/ansible-service-broker:
+  - approve
+
+  openshift/containernetworking-plugins:
+  - approve
+
+  openshift/multus-admission-controller:
   - approve
 
   openshift/multus-cni:
@@ -422,6 +470,9 @@ plugins:
   openshift/telemeter:
   - approve
 
+  openshift/thanos:
+  - approve
+
   openshift/support-operator:
   - approve
 
@@ -486,6 +537,9 @@ plugins:
   - approve
 
   openshift/configure-alertmanager-operator:
+  - approve
+
+  openshift/rbac-permissions-operator:
   - approve
 
   openshift/rhcos-tools:
@@ -858,6 +912,9 @@ plugins:
   openvswitch:
   - trigger
 
+  kubevirt/hyperconverged-cluster-operator:
+  - trigger
+
 triggers:
 - repos:
   - openshift
@@ -972,51 +1029,75 @@ config_updater:
       name: secret-mirroring
     ci-operator/jobs/**/infra-image-mirroring.yaml:
       name: job-config-misc
+      gzip: true
     ci-operator/jobs/**/periodics*.yaml:
       name: job-config-misc
+      gzip: true
     ci-operator/jobs/**/*periodics*.yaml:
       name: job-config-misc
+      gzip: true
     ci-operator/jobs/**/*master-presubmits.yaml:
       name: job-config-master-presubmits
+      gzip: true
     ci-operator/jobs/**/*master-postsubmits.yaml:
       name: job-config-master-postsubmits
+      gzip: true
     ci-operator/jobs/**/*release-0.*.yaml:
       name: job-config-misc
+      gzip: true
     ci-operator/jobs/**/*release-v*.yaml:
       name: job-config-misc
+      gzip: true
     ci-operator/jobs/**/*release-1.*.yaml:
       name: job-config-misc
+      gzip: true
     ci-operator/jobs/**/*release-next*.yaml:
       name: job-config-misc
+      gzip: true
     ci-operator/jobs/**/*openshift-v4*.yaml:
       name: job-config-misc
+      gzip: true
     ci-operator/jobs/**/*release-3.*submits.yaml:
       name: job-config-3.x
+      gzip: true
     ci-operator/jobs/**/*enterprise-3.*submits.yaml:
       name: job-config-3.x
+      gzip: true
     ci-operator/jobs/**/*openshift-3.*submits.yaml:
       name: job-config-3.x
+      gzip: true
     ci-operator/jobs/**/*release-4.1*submits.yaml:
       name: job-config-4.1
+      gzip: true
     ci-operator/jobs/**/*openshift-4.1*submits.yaml:
       name: job-config-4.1
+      gzip: true
     ci-operator/jobs/**/*release-4.2*submits.yaml:
       name: job-config-4.2
+      gzip: true
     ci-operator/jobs/**/*openshift-4.2*submits.yaml:
       name: job-config-4.2
+      gzip: true
     ci-operator/jobs/**/*release-4.3*submits.yaml:
       name: job-config-4.3
+      gzip: true
     ci-operator/jobs/**/*openshift-4.3*submits.yaml:
       name: job-config-4.3
+      gzip: true
+    ci-operator/jobs/openshift/kubernetes/*.yaml:
+      name: job-config-misc
+      gzip: true
     ci-operator/config/**/*master.yaml:
       name: ci-operator-master-configs
       additional_namespaces:
       - ci-stg
+    ci-operator/config/openshift/kubernetes/*.yaml:
+      name: ci-operator-misc-configs
     ci-operator/config/**/*release-0.*.yaml:
       name: ci-operator-misc-configs
       additional_namespaces:
       - ci-stg
-    ci-operator/config/**/*release-next.yaml:
+    ci-operator/config/**/*release-next*.yaml:
       name: ci-operator-misc-configs
       additional_namespaces:
       - ci-stg
@@ -1065,9 +1146,10 @@ config_updater:
       additional_namespaces:
       - ci-stg
 
-    ci-operator/infra/openshift/ci-search/config.yaml:
+    core-services/ci-search/_config.yaml:
       name: job-config
       namespace: ci-search
+      key: config.yaml
 
     cluster/test-deploy/gcp/*.yaml:
       name: cluster-profile-gcp
@@ -1166,6 +1248,10 @@ config_updater:
       name: prow-job-cluster-launch-installer-console
       additional_namespaces:
       - ci-stg
+    ci-operator/templates/openshift/installer/cluster-launch-installer-custom-test-image.yaml:
+      name: prow-job-cluster-launch-installer-custom-test-image
+      additional_namespaces:
+      - ci-stg
     ci-operator/templates/cluster-launch-src.yaml:
       name: prow-job-cluster-launch-src
       additional_namespaces:
@@ -1174,22 +1260,12 @@ config_updater:
       name: prow-job-master-sidecar-4.2
       additional_namespaces:
       - ci-stg
-    ci-operator/templates/master-sidecar-4.yaml:
-      name: prow-job-master-sidecar-4
-      additional_namespaces:
-      - ci-stg
     ci-operator/templates/master-sidecar-3.yaml:
       name: prow-job-master-sidecar-3
       additional_namespaces:
       - ci-stg
 
-    cluster/ci/config/mirroring/*_*:
-      name: image-mirror
-
-    cluster/ci/config/mirroring/codeready-toolchain/codeready_toolchain_*:
-      name: image-mirror
-
-    core-services/quay-mirroring/**/mapping_*:
+    core-services/image-mirroring/**/mapping_*:
       name: image-mirror-mappings
 
     cluster/ci/monitoring/dashboards.yaml:
@@ -1223,13 +1299,11 @@ config_updater:
       name: grafana-dashboard-build-cop
       namespace: prow-monitoring
 
+    cluster/ci/config/prow/boskos.yaml:
+      name: resources
+
 sigmention:
   regexp: (?m)@openshift/sig-([\w-]*)
-
-label:
-  additional_labels:
-  - do-not-merge/needs-signoff
-  - ga
 
 external_plugins:
   cri-o:
@@ -1344,6 +1418,7 @@ bugzilla:
       - ON_DEV
       - POST
       status_after_validation: POST
+      status_after_merge: MODIFIED
       add_external_link: true
       dependent_bug_statuses:
       - VERIFIED
@@ -1367,6 +1442,8 @@ label:
   additional_labels:
   - platform/aws
   - platform/azure
+  - platform/baremetal
   - platform/google
   - platform/libvirt
   - platform/openstack
+  - ga
