@@ -57,7 +57,7 @@ roles: cluster-operator-roles cluster-roles
 prow: prow-ci-ns prow-ci-stg-ns prow-openshift-ns
 .PHONY: prow
 
-prow-ci-ns: ci-ns prow-rbac prow-services prow-jobs prow-scaling prow-secrets
+prow-ci-ns: ci-ns prow-services prow-jobs prow-scaling prow-secrets
 .PHONY: prow-ci-ns
 
 prow-ci-stg-ns: ci-stg-ns prow-cluster-jobs
@@ -89,29 +89,8 @@ prow-secrets:
 	oc create configmap secret-mirroring --from-file=cluster/ci/config/secret-mirroring/mapping.yaml -o yaml --dry-run | oc apply -f -
 .PHONY: prow-secrets
 
-prow-rbac:
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/artifact-uploader_rbac.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/boskos_rbac.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/config_updater_rbac.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/deck_rbac.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/hook_rbac.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/horologium_rbac.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/jenkins_operator_rbac.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/plank_rbac.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/sinker_rbac.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/statusreconciler_rbac.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/tide_rbac.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/tracer_rbac.yaml
-.PHONY: prow-rbac
-
 prow-services:
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/prow-priority-class.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/boskos.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/boskos_reaper.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/boskos_metrics.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/adapter_imagestreams.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/artifact-uploader.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/cherrypick.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/deck.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/ghproxy.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/hook.yaml
