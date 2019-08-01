@@ -61,7 +61,7 @@ objects:
       # we want to gather the teardown logs no matter what
       ci-operator.openshift.io/wait-for-container-artifacts: teardown
       ci-operator.openshift.io/save-container-logs: "true"
-      ci-operator.openshift.io/container-sub-tests: "lease,setup,test,teardown"
+      ci-operator.openshift.io/container-sub-tests: "setup,test,teardown"
   spec:
     restartPolicy: Never
     activeDeadlineSeconds: 14400
@@ -86,67 +86,6 @@ objects:
       - /tmp/shared/oc
 
     containers:
-
-    - name: lease
-      image: registry.svc.ci.openshift.org/ci/boskoscli:latest
-      terminationMessagePolicy: FallbackToLogsOnError
-      resources:
-        requests:
-          cpu: 10m
-          memory: 10Mi
-        limits:
-          memory: 200Mi
-      volumeMounts:
-      - name: shared-tmp
-        mountPath: /tmp/shared
-      - name: cluster-profile
-        mountPath: /tmp/cluster
-      - name: artifacts
-        mountPath: /tmp/artifacts
-      env:
-      - name: CLUSTER_TYPE
-        value: ${CLUSTER_TYPE}
-      - name: CLUSTER_NAME
-        value: ${NAMESPACE}-${JOB_NAME_HASH}
-      command:
-      - /bin/bash
-      - -c
-      - |
-        #!/bin/bash
-        set -euo pipefail
-
-        trap 'rc=$?; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi; if test "${rc}" -ne 0; then touch /tmp/shared/exit; fi; exit "${rc}"' EXIT
-
-        if [[ "${CLUSTER_TYPE:-}" != "aws" ]]; then
-          echo "[WARNING] No resource leasing is defined for \"${CLUSTER_TYPE}\" clusters"
-          touch /tmp/shared/leased
-          exit 0
-        fi
-
-        # hack for bazel
-        function boskosctl() {
-          /app/boskos/cmd/cli/app.binary "${@}"
-        }
-
-        resource="$( boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" acquire --type aws-quota-slice --state clean --target-state leased --timeout 150m )"
-        touch /tmp/shared/leased
-
-        function release() {
-            local resource_name; resource_name="$( jq .name <<<"${resource}" )"
-            boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" release --name "${resource_name}" --target-state clean
-        }
-        trap release EXIT
-
-        boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" heartbeat --resource "${resource}" &
-
-        while true; do
-          if [[ -f /tmp/shared/exit ]]; then
-            echo "Another process exited" 2>&1
-            exit 0
-          fi
-
-          sleep 15 & wait $!
-        done
 
     # Once the cluster is up, executes shared tests
     - name: test
@@ -286,19 +225,6 @@ objects:
         #!/bin/sh
         trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/setup-success; else touch /tmp/exit; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-
-        while true; do
-          if [[ -f /tmp/exit ]]; then
-            echo "Another process exited" 2>&1
-            exit 1
-          fi
-          if [[ -f /tmp/leased ]]; then
-            echo "Lease acquired, installing..."
-            break
-          fi
-
-          sleep 15 & wait
-        done
 
         cp "$(command -v openshift-install)" /tmp
         mkdir /tmp/artifacts/installer
