@@ -21,12 +21,6 @@ parameters:
 - name: BASE_DOMAIN
   value: origin-ci-int-aws.dev.rhcloud.com
   required: true
-- name: IMAGE_EGRESS_HTTP_PROXY
-  required: true
-  value: registry.svc.ci.openshift.org/origin/4.2:egress-http-proxy
-- name: PROXY_ENABLED
-  required: true
-  value: "false"
 
 objects:
 
@@ -83,33 +77,6 @@ objects:
     ports:
     - port: 80
       targetPort: 8080
-
-# Route for Egress-proxy
-#- apiVersion: route.openshift.io/v1
-#  kind: Route
-#  metadata:
-#    name: ${JOB_NAME_SAFE}-egress-proxy
-#    namespace: ${NAMESPACE}
-#  spec:
-#    host: ${JOB_NAME_SAFE}-egress-proxy-${NAMESPACE}.svc.ci.openshift.org
-#    to:
-#      name: ${JOB_NAME_SAFE}-egress-proxy
-#    tls:
-#      termination: Edge
-#      insecureEdgeTerminationPolicy: Redirect
-
-# Service for Egress-proxy
-#- kind: Service
-#  apiVersion: v1
-#  metadata:
-#    name: ${JOB_NAME_SAFE}-egress-proxy
-#    namespace: ${NAMESPACE}
-#  spec:
-#    selector:
-#      app: ${JOB_NAME_SAFE}-egress-proxy
-#    ports:
-#    - port: 3128
-#      targetPort: 3128
 
 # The e2e pod spins up a cluster, runs e2e tests, and then cleans up the cluster.
 - kind: Pod
@@ -455,14 +422,6 @@ objects:
         else
             echo "Unsupported cluster type '${CLUSTER_TYPE}'"
             exit 1
-        fi
-
-        if [[ "${PROXY_ENABLED}" == "true" ]]; then
-          cat >> /tmp/artifacts/installer/install-config.yaml << EOF
-        proxy:
-          httpsProxy: http://${JOB_NAME_SAFE}-egress-proxy-${NAMESPACE}.svc.ci.openshift.org:3128/
-          httpProxy: http://${JOB_NAME_SAFE}-egress-proxy-${NAMESPACE}.svc.ci.openshift.org:3128/
-        EOF
         fi
 
         echo "Creating ignition configs"

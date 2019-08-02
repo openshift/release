@@ -22,8 +22,41 @@ parameters:
 - name: BASE_DOMAIN
 - name: CLUSTER_NETWORK_MANIFEST
 - name: ENABLE_FIPS
+- name: IMAGE_EGRESS_HTTP_PROXY
+  required: true
+  value: registry.svc.ci.openshift.org/origin/4.2:egress-http-proxy
+- name: PROXY_ENABLED
+  required: true
+  value: "false"
 
 objects:
+
+# Route for Egress-proxy
+- apiVersion: route.openshift.io/v1
+  kind: Route
+  metadata:
+    name: ${JOB_NAME_SAFE}-egress-proxy
+    namespace: ${NAMESPACE}
+  spec:
+    host: ${JOB_NAME_SAFE}-egress-proxy-${NAMESPACE}.svc.ci.openshift.org
+    to:
+      name: ${JOB_NAME_SAFE}-egress-proxy
+    tls:
+      termination: Edge
+      insecureEdgeTerminationPolicy: Redirect
+
+ # Service for Egress-proxy
+- kind: Service
+  apiVersion: v1
+  metadata:
+    name: ${JOB_NAME_SAFE}-egress-proxy
+    namespace: ${NAMESPACE}
+  spec:
+    selector:
+      app: ${JOB_NAME_SAFE}-egress-proxy
+    ports:
+    - port: 3128
+      targetPort: 3128
 
 # We want the cluster to be able to access these images
 - kind: RoleBinding
@@ -680,6 +713,14 @@ objects:
         else
             echo "Unsupported cluster type '${CLUSTER_TYPE}'"
             exit 1
+        fi
+
+        if [[ "${PROXY_ENABLED}" == "true" ]]; then
+          cat >> /tmp/artifacts/installer/install-config.yaml << EOF
+        proxy:
+          httpsProxy: http://${JOB_NAME_SAFE}-egress-proxy-${NAMESPACE}.svc.ci.openshift.org:3128/
+          httpProxy: http://${JOB_NAME_SAFE}-egress-proxy-${NAMESPACE}.svc.ci.openshift.org:3128/
+        EOF
         fi
 
         # TODO: Replace with a more concise manifest injection approach
