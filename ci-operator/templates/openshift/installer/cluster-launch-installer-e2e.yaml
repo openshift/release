@@ -22,6 +22,7 @@ parameters:
 - name: BASE_DOMAIN
 - name: CLUSTER_NETWORK_MANIFEST
 - name: ENABLE_FIPS
+- name: ENABLE_PROXY
 
 objects:
 
@@ -680,6 +681,14 @@ objects:
         else
             echo "Unsupported cluster type '${CLUSTER_TYPE}'"
             exit 1
+        fi
+
+        if [[ "${ENABLE_PROXY}" == "true" ]]; then
+          cat >> /tmp/artifacts/installer/install-config.yaml << EOF
+        proxy:
+          httpsProxy: http://${JOB_NAME_SAFE}-egress-proxy-${NAMESPACE}.svc.ci.openshift.org:3128/
+          httpProxy: http://${JOB_NAME_SAFE}-egress-proxy-${NAMESPACE}.svc.ci.openshift.org:3128/
+        EOF
         fi
 
         # TODO: Replace with a more concise manifest injection approach
