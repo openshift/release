@@ -7,17 +7,19 @@ check-core:
 	core-services/_hack/validate-core-services.sh core-services
 	@echo "Core service config check: PASS"
 
+# applyconfig is https://github.com/openshift/ci-tools/tree/master/cmd/applyconfig
+
 dry-core-admin:
-	go run ./tools/applyconfig --config-dir core-services --level=admin
+	applyconfig --config-dir core-services --level=admin
 
 core-admin:
-	go run ./tools/applyconfig --config-dir core-services --level=admin --confirm=true
+	applyconfig --config-dir core-services --level=admin --confirm=true
 
 dry-core:
-	go run ./tools/applyconfig --config-dir core-services
+	applyconfig --config-dir core-services
 
 core:
-	go run ./tools/applyconfig --config-dir core-services --confirm=true
+	applyconfig --config-dir core-services --confirm=true
 
 # LEGACY TARGETS
 # You should not need to add new targets here.
