@@ -297,4 +297,28 @@ dashboard.new(
     x: 0,
     y: 0,
   })
+.addPanel(
+    (graphPanel.new(
+        'AWS Quota Leases by State',
+        description='sum(boskos_resources{type="aws-quota-slice"}) by (state)',
+        datasource='prometheus',
+        legend_alignAsTable=true,
+        legend_rightSide=true,
+        legend_values=true,
+        legend_current=true,
+        legend_sort='current',
+        legend_sortDesc=true,
+        min='0',
+        max='120',
+        stack=true,
+    ) + legendConfig)
+    .addTarget(prometheus.target(
+        'sum(boskos_resources{type="aws-quota-slice"}) by (state)',
+        legendFormat='{{state}}',
+    )), gridPos={
+    h: 9,
+    w: 24,
+    x: 0,
+    y: 0,
+  })
 + dashboardConfig
