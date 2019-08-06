@@ -531,6 +531,17 @@ objects:
           sleep 60
         }
 
+        function setup-google-cloud-sdk() {
+          cd /tmp
+          curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
+          tar -xzf google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
+          export PATH=$PATH:/tmp/google-cloud-sdk/bin
+          mkdir gcloudconfig
+          export CLOUDSDK_CONFIG=/tmp/gcloudconfig
+          gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}"
+          gcloud config set project openshift-gce-devel-ci
+        }
+
         function run-dr-snapshot-tests() {
           openshift-tests run-dr restore-snapshot "${TEST_SUITE}" \
             --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
@@ -554,6 +565,10 @@ objects:
             --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
           exit 0
         }
+
+        if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
+          setup-google-cloud-sdk
+        fi
 
         ${TEST_COMMAND}
 
