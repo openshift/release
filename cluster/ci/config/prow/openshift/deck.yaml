@@ -82,7 +82,7 @@ objects:
           - --config-path=/etc/config/config.yaml
           - --cookie-secret=/etc/cookie/cookie
           - --github-oauth-config-file=/etc/github/config.json
-          - --github-token-path=/etc/github/oauth
+          - --github-token-path=/etc/oauth/oauth
           - --tide-url=http://tide/
           - --hook-url=http://hook:8888/plugin-help
           - --oauth-url=/github-login
@@ -103,6 +103,9 @@ objects:
             readOnly: true
           - name: oauth-config
             mountPath: /etc/github
+            readOnly: true
+          - name: oauth
+            mountPath: /etc/oauth
             readOnly: true
           - name: cookie-secret
             mountPath: /etc/cookie
@@ -145,6 +148,9 @@ objects:
         - name: oauth-config
           secret:
             secretName: github-app-credentials
+        - name: oauth
+          secret:
+            secretName: github-credentials-openshift-ci-robot
         - name: cookie-secret
           secret:
             secretName: cookie
@@ -261,7 +267,7 @@ objects:
           - -cookie-secret-file=/etc/proxy/secrets/session_secret
           - -tls-cert=/etc/tls/private/tls.crt
           - -tls-key=/etc/tls/private/tls.key
-          - --github-token-path=/etc/github/oauth
+          - --github-token-path=/etc/oauth/oauth
           volumeMounts:
           - mountPath: /etc/tls/private
             name: deck-internal-tls
@@ -284,6 +290,9 @@ objects:
           - name: config
             mountPath: /etc/config
             readOnly: true
+          - name: oauth
+            mountPath: /etc/oauth
+            readOnly: true
           resources:
             requests:
               memory: "6Gi"
@@ -292,6 +301,9 @@ objects:
         - name: config
           configMap:
             name: config
+        - name: oauth
+          secret:
+            secretName: github-credentials-openshift-ci-robot
         - name: session-secret
           secret:
             secretName: deck-internal-session-secret
