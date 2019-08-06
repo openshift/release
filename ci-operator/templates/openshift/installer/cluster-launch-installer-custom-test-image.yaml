@@ -124,12 +124,12 @@ objects:
           /app/boskos/cmd/cli/app.binary "${@}"
         }
 
-        resource="$( boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" acquire --type aws-quota-slice --state clean --target-state leased --timeout 150m )"
+        resource="$( boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" acquire --type aws-quota-slice --state free --target-state leased --timeout 150m )"
         touch /tmp/shared/leased
 
         function release() {
             local resource_name; resource_name="$( jq .name <<<"${resource}" )"
-            boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" release --name "${resource_name}" --target-state clean
+            boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" release --name "${resource_name}" --target-state free
         }
         trap release EXIT
 
