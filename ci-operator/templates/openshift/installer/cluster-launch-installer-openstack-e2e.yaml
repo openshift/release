@@ -284,6 +284,15 @@ objects:
         TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create cluster --log-level=debug &
         wait "$!"
 
+        INGRESS_PORT=$(openstack port list --format value -c Name | awk "/${CLUSTER_NAME}.*-ingress-port/ {print}")
+        if [ -n "$INGRESS_PORT" ]; then
+          # Assign a FIP to ingress port to allow getting to apps
+          # create a new floating ip tagged with CLUSTER_NAME so it can be deleted later
+          APPS_FIP=$(openstack floating ip create --description $CLUSTER_NAME $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address' --port $INGRESS_PORT)
+          # create A record for *.apps
+          curl -v -X POST $CI_DNS_IP:8080 -d '{"name": "'*.apps.$CLUSTER_NAME'", "ip": "'$APPS_FIP'"}'
+        fi
+
     # Performs cleanup of all created resources
     - name: teardown
       image: ${IMAGE_OPENSTACK_INSTALLER}
@@ -300,6 +309,8 @@ objects:
         value: ${CLUSTER_TYPE}
       - name: CLUSTER_NAME
         value: ${NAMESPACE}
+      - name: CI_DNS_IP
+        value: ${CI_DNS_IP}
       - name: KUBECONFIG
         value: /tmp/artifacts/installer/auth/kubeconfig
       - name: OS_CLOUD
@@ -475,6 +486,10 @@ objects:
           echo "Deprovisioning cluster ..."
           openshift-install --dir /tmp/artifacts/installer destroy cluster
           DELETE_FAIL=$?
+
+          echo "Removing entries from DNS ..."
+          curl -v -X POST $CI_DNS_IP:8080 -d '{"name": "'api.$CLUSTER_NAME'", "action":"remove"}'
+          curl -v -X POST $CI_DNS_IP:8080 -d '{"name": "'*.apps.$CLUSTER_NAME'", "action":"remove"}'
 
           echo "Nuking any resources left"
           nuke
