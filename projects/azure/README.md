@@ -48,11 +48,11 @@ There are three different places where we store `ci-operator` and Prow configura
   In order to deploy the `ci-operator` config, we need to use prowjobs and this
   is where we configure those. Prowjobs fall under three categories:
 
-  | Type | Description |
-  | --- | --- |
-  | presubmits | Pull request jobs |
-  | postsubmits | Branch jobs |
-  | periodics | Periodically-running jobs |
+  | Type        | Description               |
+  | ----------- | ------------------------- |
+  | presubmits  | Pull request jobs         |
+  | postsubmits | Branch jobs               |
+  | periodics   | Periodically-running jobs |
 
 3. `ci-operator/templates/openshift/openshift-azure`
 
@@ -64,8 +64,8 @@ There are three different places where we store `ci-operator` and Prow configura
 
   Currently, we maintain three different templates:
 
-  | Name | Description |
-  | --- | --- |
+  | Name                     | Description                                                                                |
+  | ------------------------ | ------------------------------------------------------------------------------------------ |
   | cluster-launch-e2e-azure | Deploy an OSA cluster and run various types of tests (OSA, Origin Conformance, Bushslicer) |
 
 Similarly, you can find the CI configuration for `azure-misc` in `ci-operator/jobs/openshift/azure-misc/`
@@ -116,12 +116,12 @@ $ ./ci-operator/populate-owners.sh
 
 The following CI jobs run automatically on every PR in `openshift-azure`.
 
-| Job | Description |
-| --- | --- |
-| `ci/prow/unit` | unit tests |
-| `ci/prow/verify` | verification tests |
+| Job              | Description                       |
+| ---------------- | --------------------------------- |
+| `ci/prow/unit`   | unit tests                        |
+| `ci/prow/verify` | verification tests                |
 | `ci/prow/images` | binary and container image builds |
-| `ci/prow/e2e` | e2e tests |
+| `ci/prow/e2e`    | e2e tests                         |
 
 When a test fails in your PR and the test failure is unrelated to your changes, you need to
 triage the failure, and compare it with the existing
@@ -136,11 +136,11 @@ team who is responsible for managing the OpenShift CI Infrastructure at [#forum-
 Optionally, you can request specific long-running tests to run that are not
 running in PRs by default.
 
-| Command | Description |
-| --- | --- |
-| `/test scaleupdown` | scale up followed by a scale down of the cluster |
+| Command                    | Description                                                  |
+| -------------------------- | ------------------------------------------------------------ |
+| `/test scaleupdown`        | scale up followed by a scale down of the cluster             |
 | `/test etcdbackuprecovery` | backup a cluster, mutate state, then restore from the backup |
-| `/test keyrotation` | rotate all the certificates in a cluster |
+| `/test keyrotation`        | rotate all the certificates in a cluster                     |
 
 ### Run a job manually
 
@@ -289,12 +289,12 @@ to initiate source branch by executing `prow v0.0`. This will CD you yo local co
 We use various OpenShift secrets in our CI. You can manage these secrets in the
 `azure` namespace in the CI cluster.
 
-| Secret name | Description |
-| --- | --- |
-| `cluster-secrets-azure` | contains all the necessary credentials for e2e and image build jobs |
-| `cluster-secrets-azure-env` | environment based secret. It can be injected to pod using pod spec (see azure-purge) |
-| `codecov-token` | used for pushing reports to Codecov |
-| `openshift-on-azure-openshiftci-secret` | quay robot secret used for mirroring images between the CI registry and quay |
+| Secret name                             | Description                                                                          |
+| --------------------------------------- | ------------------------------------------------------------------------------------ |
+| `cluster-secrets-azure`                 | contains all the necessary credentials for e2e and image build jobs                  |
+| `cluster-secrets-azure-env`             | environment based secret. It can be injected to pod using pod spec (see azure-purge) |
+| `codecov-token`                         | used for pushing reports to Codecov                                                  |
+| `openshift-on-azure-openshiftci-secret` | quay robot secret used for mirroring images between the CI registry and quay         |
 
 
 ### cluster-secrets-azure
@@ -320,17 +320,17 @@ export AZURE_SUBSCRIPTION_ID=<subscription id>
 You need to make sure you also have the rest of the credentials in place in order to create or
 update `cluster-secrets-azure`
 
-| Name | Description |
-| --- | --- |
-| `secret` | Azure credentials |
-| `ssh-privatekey` | SSH key (used by image builds - can be any SSH key) |
-| `certs.yaml` | Ops mirror certificates (used by image builds) |
-| `.dockerconfigjson` | Geneva images pull secret |
-| `system-docker-config.json` | Red Hat registry image pull secret |
-| `logging-int.cert` | Geneva logging certificate |
-| `logging-int.key` | Geneva logging key |
-| `metrics-int.cert` | Geneva metrics certificate |
-| `metrics-int.key` | Geneva metrics key |
+| Name                        | Description                                         |
+| --------------------------- | --------------------------------------------------- |
+| `secret`                    | Azure credentials                                   |
+| `ssh-privatekey`            | SSH key (used by image builds - can be any SSH key) |
+| `certs.yaml`                | Ops mirror certificates (used by image builds)      |
+| `.dockerconfigjson`         | Geneva images pull secret                           |
+| `system-docker-config.json` | Red Hat registry image pull secret                  |
+| `logging-int.cert`          | Geneva logging certificate                          |
+| `logging-int.key`           | Geneva logging key                                  |
+| `metrics-int.cert`          | Geneva metrics certificate                          |
+| `metrics-int.key`           | Geneva metrics key                                  |
 
 TODO: In the future, split this into separate secrets so in case we need to rotate the CI credentials
 we will not need to have the rest of the secrets in place.
@@ -380,12 +380,12 @@ $ oc get cj -n azure
 NAME                                      SCHEDULE    SUSPEND   ACTIVE    LAST SCHEDULE   AGE
 azure-purge                               0 * * * *   False     0         56m             45d
 image-mirror-openshift-azure-v3.11-quay   0 * * * *   False     0         56m             21d
-token-refresh                             0 0 * * *   False     1         44d             45d
 ```
 
 * _[`azure-purge`](./azure-purge)_ is responsible for cleaning up long-lived resource groups in our subscription (created either by our CI tests or for development purposes)
 * _[`image-mirror-openshift-azure-v3.11-quay`](./image-mirror)_ mirrors images from the `azure` CI namespace to `quay.io/openshift-on-azure`, the latter being used by our customers and developers alike
-* _[`token-refresh`](./token-refresh)_ refreshes a token from the AWS registry that we put inside node images built from Origin master to pull images for the cluster
+* _[`secret-refresh`](./secret-refresh)_ refreshes all azure dev secrets each weekend
+
 
 We need to check whether the above jobs are in a working state. Access to the cluster is granted
 to every member of the openshift github organization. Access to the `azure` namespace is controlled
