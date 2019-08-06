@@ -6,6 +6,7 @@ prow-monitoring-deploy: ci-secret-deploy
 	oc apply -f ./prometheus_expose.yaml
 	oc apply -f ./prometheus_operator_deploy.yaml
 	oc apply -f ./sinker_service_monitor.yaml
+	oc apply -f ./boskos_service_monitor.yaml
 	oc apply -f ./ghproxy_service_monitor.yaml
 	oc apply -f ./hook_service_monitor.yaml
 	oc apply -f ./deck_service_monitor.yaml
@@ -72,6 +73,7 @@ prow-monitoring-cleanup:
 	oc delete -f ./prometheus_crd.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./sinker_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./ghproxy_service_monitor.yaml --ignore-not-found=true --as=system:admin
+	oc delete -f ./boskos_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./hook_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./deck_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./deck-internal_service_monitor.yaml --ignore-not-found=true --as=system:admin
