@@ -150,15 +150,20 @@ objects:
           /app/boskos/cmd/cli/app.binary "${@}"
         }
 
+        echo "[INFO] Acquiring a lease ..."
         resource="$( boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" acquire --type aws-quota-slice --state free --target-state leased --timeout 150m )"
         touch /tmp/shared/leased
+        echo "[INFO] Lease acquired!"
+        echo "[INFO] Leased resource: ${resource}"
 
         function release() {
             local resource_name; resource_name="$( jq .name <<<"${resource}" --raw-output )"
+            echo "[INFO] Releasing the lease on resouce ${resource_name}..."
             boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" release --name "${resource_name}" --target-state free
         }
         trap release EXIT
 
+        echo "[INFO] Sending heartbeats to retain the lease..."
         boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" heartbeat --resource "${resource}" &
 
         while true; do
