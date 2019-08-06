@@ -94,6 +94,19 @@ objects:
               containerPort: 8080
             - name: metrics
               containerPort: 9090
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 3
+            periodSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz/ready
+              port: 8081
+            initialDelaySeconds: 10
+            periodSeconds: 3
+            timeoutSeconds: 600
           volumeMounts:
           - name: config
             mountPath: /etc/config
@@ -178,19 +191,6 @@ objects:
         - name: job-config-43
           configMap:
             name: job-config-4.3
-        livenessProbe:
-          httpGet:
-            path: /healthz
-            port: 8081
-          initialDelaySeconds: 3
-          periodSeconds: 3
-        readinessProbe:
-          httpGet:
-            path: /healthz/ready
-            port: 8081
-          initialDelaySeconds: 10
-          periodSeconds: 3
-          timeoutSeconds: 600
 - apiVersion: v1
   kind: Route
   metadata:
