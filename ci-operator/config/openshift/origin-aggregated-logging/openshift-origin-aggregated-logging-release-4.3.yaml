@@ -25,6 +25,9 @@ build_root:
     namespace: openshift
     tag: golang-1.10
 images:
+- dockerfile_path: test/unit/Dockerfile
+  from: ruby-25
+  to: logging-test-unit
 - context_dir: fluentd/
   dockerfile_path: Dockerfile.centos7
   from: ruby-25
@@ -69,6 +72,10 @@ tag_specification:
   name: "4.3"
   namespace: ocp
 tests:
+- as: unit
+  commands: /tmp/run.sh
+  container:
+    from: logging-test-unit
 - as: e2e-aws
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
