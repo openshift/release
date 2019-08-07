@@ -25,14 +25,6 @@ build_root:
     tag: master
 canonical_go_repository: github.com/openshift/origin
 images:
-- dockerfile_path: images/cli-artifacts/Dockerfile.rhel
-  from: cli
-  inputs:
-    bin:
-      as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
-      paths: null
-  to: cli-artifacts
 - dockerfile_path: images/hyperkube/Dockerfile.rhel
   from: base
   inputs:
@@ -204,6 +196,11 @@ tests:
     upgrade: false
 - as: e2e-aws-all
   commands: TEST_SUITE=openshift/conformance run-tests
+  openshift_installer:
+    cluster_profile: aws
+    upgrade: false
+- as: e2e-cmd
+  commands: TEST_SUITE=openshift/test-cmd run-tests
   openshift_installer:
     cluster_profile: aws
     upgrade: false
