@@ -1,47 +1,30 @@
-canonical_go_repository: github.com/kubevirt/hyperconverged-cluster-operator
-
-tag_specification:
-  name: '4.2'
-  namespace: ocp
-
 base_images:
   base:
     name: "4.2"
     namespace: ocp
     tag: base
-
+binary_build_commands: make install
 build_root:
   image_stream_tag:
     cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.12
-
-binary_build_commands: make install
-
+canonical_go_repository: github.com/kubevirt/hyperconverged-cluster-operator
 images:
-- from: base
-  dockerfile_path: build/Dockerfile.okd
+- dockerfile_path: build/Dockerfile.okd
+  from: base
   inputs:
     bin:
       paths:
       - destination_dir: .
         source_path: /go/bin/hyperconverged-cluster-operator
   to: hyperconverged-cluster-operator
-
 promotion:
   additional_images:
     hyperconverged-cluster-operator-tests: src
   name: "4.2"
   namespace: ocp
-
-tests:
-- as: hco-e2e-aws
-  commands: |
-    make start && make functest
-  openshift_installer_src:
-    cluster_profile: aws    
-
 resources:
   '*':
     limits:
@@ -49,3 +32,12 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tag_specification:
+  name: "4.2"
+  namespace: ocp
+tests:
+- as: hco-e2e-aws
+  commands: |
+    make start && make functest
+  openshift_installer_src:
+    cluster_profile: aws
