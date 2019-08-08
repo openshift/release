@@ -1,7 +1,7 @@
 #
 SHELL=/usr/bin/env bash -o pipefail
 
-dashboards = build_cop boskos deck dptp ghproxy hook jenkins_operator plank prow sinker tide
+dashboards = build_cop boskos canary deck dptp ghproxy hook jenkins_operator plank prow sinker tide
 
 all: $(dashboards) prometheus_rule_prow.yaml
 

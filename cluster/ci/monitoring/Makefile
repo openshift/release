@@ -42,6 +42,7 @@ prow-monitoring-deploy: ci-secret-deploy
 	#oc create -n prow-monitoring configmap grafana-dashboard-build-cop --from-file=./build_cop.json --dry-run -o yaml | oc apply -f -
 	#oc create -n prow-monitoring configmap grafana-dashboard-prow --from-file=./prow.json --dry-run -o yaml | oc apply -f -
 	#oc create -n prow-monitoring configmap grafana-dashboard-dptp --from-file=./dptp.json --dry-run -o yaml | oc apply -f -
+	#oc create -n prow-monitoring configmap grafana-dashboard-canary --from-file=./canary.json --dry-run -o yaml | oc apply -f -
 	oc apply -f ./grafana_proxy_secret.yaml
 	oc apply -f ./grafana_deploy.yaml
 	oc apply -f ./grafana_service_monitor.yaml
@@ -104,6 +105,7 @@ prow-monitoring-cleanup:
 	oc delete configmap -n prow-monitoring grafana-dashboard-build-cop --ignore-not-found=true --as=system:admin
 	oc delete configmap -n prow-monitoring grafana-dashboard-prow --ignore-not-found=true --as=system:admin
 	oc delete configmap -n prow-monitoring grafana-dashboard-dptp --ignore-not-found=true --as=system:admin
+	oc delete configmap -n prow-monitoring grafana-dashboard-canary --ignore-not-found=true --as=system:admin
 	oc delete configmap -n prow-monitoring grafana-dashboards --ignore-not-found=true --as=system:admin
 	oc delete configmap -n prow-monitoring grafana-datasources --ignore-not-found=true --as=system:admin
 	oc delete secret -n prow-monitoring grafana-config --ignore-not-found=true --as=system:admin
