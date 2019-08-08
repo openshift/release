@@ -321,4 +321,23 @@ dashboard.new(
     x: 0,
     y: 0,
   })
+.addPanel(
+    (graphPanel.new(
+        'IPI-Deprovision Failures',
+        description='rate(prowjobs{job_name="periodic-ipi-deprovision",state="failure"}[30m])',
+        datasource='prometheus',
+        legend_alignAsTable=true,
+        legend_rightSide=true,
+        legend_values=true,
+        legend_current=true,
+    ) + legendConfig)
+    .addTarget(prometheus.target(
+        'rate(prowjobs{job_name="periodic-ipi-deprovision",state="failure"}[30m])',
+        legendFormat='{{pod}}',
+    )), gridPos={
+    h: 9,
+    w: 24,
+    x: 0,
+    y: 0,
+  })
 + dashboardConfig
