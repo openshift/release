@@ -21,6 +21,24 @@
           for job_name_regex in ['branch-.*-images', 'release-.*-4.1', 'release-.*-4.2', 'release-.*-upgrade.*']
         ],
       },
+      {
+        name: 'ipi-deprovision',
+        rules: [
+          {
+            alert: 'ipi-deprovision-failures',
+            expr: |||
+              rate(prowjobs{job_name="periodic-ipi-deprovision",state="failure"}[30m]) > 0
+            |||,
+            'for': '1m',
+            labels: {
+              severity: 'slack',
+            },
+            annotations: {
+              message: 'ipi-deprovision has failures. Check on <https://grafana-prow-monitoring.svc.ci.openshift.org/d/6829209d59479d48073d09725ce807fa/build-cop-dashboard?orgId=1&fullscreen&panelId=9|grafana>',
+            },
+          }
+        ],
+      },
     ],
   },
 }
