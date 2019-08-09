@@ -220,8 +220,8 @@ update_secret generic "cluster-secrets-${target_cloud}"              \
 	--from-literal=pull-secret="$(merge_pull_secrets)"               \
 	"$( format_attachment "openstack" clouds.yaml )"                 \
 	"$( format_attachment "insights-ci-account" insights-live.yaml )" \
-	"$( format_attachment "jenkins-ci-provisioner" ssh-privatekey )" \
-	"$( format_attachment "jenkins-ci-provisioner" ssh-publickey )"
+	"$( format_attachment "openstack" ssh-privatekey )" \
+	"$( format_attachment "openstack" ssh-publickey )"
 
 target_cloud="vsphere"
 update_secret generic "cluster-secrets-${target_cloud}"          \
