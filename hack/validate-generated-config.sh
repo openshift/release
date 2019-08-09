@@ -24,7 +24,7 @@ ERROR: correctly. We have automation in place that generates these configs and
 ERROR: new changes to these job configurations should occur from a re-generation.
 
 ERROR: Run the following command to re-generate the Prow jobs:
-ERROR: $ docker run -it -v \$(pwd)/ci-operator:/ci-operator:z registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest --from-dir /ci-operator/config/ --to-dir /ci-operator/jobs
+ERROR: $ make jobs
 
 ERROR: The following errors were found:
 
