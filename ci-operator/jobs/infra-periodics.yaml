@@ -430,3 +430,50 @@ periodics:
           cpu: 2
           memory: 8Gi
     serviceAccountName: "image-pruner"
+- agent: kubernetes
+  labels:
+    ci.openshift.io/role: infra
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  cron: "@midnight"
+  decorate: true
+  interval: ""
+  name: periodic-owners-check
+  decoration_config:
+    skip_cloning: true
+  spec:
+    containers:
+      - args:
+          - --config-path=/etc/config/config.yaml
+          - --plugin-config=/etc/plugins/plugins.yaml
+          - --github-token-path=/etc/github/oauth
+          - --github-endpoint=http://ghproxy
+          - --warnings=verify-owners-presence
+          - --strict
+        command:
+          - /checkconfig
+        image: gcr.io/k8s-prow/checkconfig:v20190808-5e69697af
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+        volumeMounts:
+          - mountPath: /etc/github
+            name: token
+            readOnly: true
+          - mountPath: /etc/config
+            name: config
+            readOnly: true
+          - mountPath: /etc/plugins
+            name: plugins
+            readOnly: true
+    volumes:
+      - name: token
+        secret:
+          secretName: github-credentials-openshift-merge-robot
+      - name: config
+        configMap:
+          name: config
+      - name: plugins
+        configMap:
+          name: plugins
