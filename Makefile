@@ -91,19 +91,6 @@ prow-secrets:
 
 prow-services:
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/boskos_metrics.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/deck.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/ghproxy.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/hook.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/horologium.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/jenkins_operator.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/needs_rebase.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/plank.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/refresh.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/sinker.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/statusreconciler.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/tide.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/tot.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tracer.yaml
 .PHONY: prow-services
 
 prow-cluster-jobs:
