@@ -27,7 +27,7 @@
           {
             alert: 'ipi-deprovision-failures',
             expr: |||
-              rate(prowjobs{job_name="periodic-ipi-deprovision",state="failure"}[30m]) > 0
+              rate(prowjob_state_transitions{job_name="periodic-ipi-deprovision",state="failure"}[30m]) > 0
             |||,
             'for': '1m',
             labels: {
