@@ -1,43 +1,13 @@
 #
 SHELL=/usr/bin/env bash -o pipefail
 
-all: build_cop.json deck.json ghproxy.json hook.json jenkins_operator.json plank.json prow.json sinker.json tide.json prometheus_rule_prow.yaml
+dashboards = build_cop deck dptp ghproxy hook jenkins_operator plank prow sinker tide
 
-build_cop.json:
-	@echo "Generating build_cop.json ..."
-	jsonnet -J vendor/ grafana_dashboards/build_cop.jsonnet > ../$@
+all: $(dashboards) prometheus_rule_prow.yaml
 
-deck.json:
-	@echo "Generating deck.json ..."
-	jsonnet -J vendor/ grafana_dashboards/deck.jsonnet > ../$@
-
-ghproxy.json:
-	@echo "Generating ghproxy.json ..."
-	jsonnet -J vendor/ grafana_dashboards/ghproxy.jsonnet > ../$@
-
-hook.json:
-	@echo "Generating hook.json ..."
-	jsonnet -J vendor/ grafana_dashboards/hook.jsonnet > ../$@
-
-jenkins_operator.json:
-	@echo "Generating jenkins.json ..."
-	jsonnet -J vendor/ grafana_dashboards/jenkins.jsonnet > ../$@
-
-plank.json:
-	@echo "Generating plank.json ..."
-	jsonnet -J vendor/ grafana_dashboards/plank.jsonnet > ../$@
-
-prow.json:
-	@echo "Generating prow.json ..."
-	jsonnet -J vendor/ grafana_dashboards/prow.jsonnet > ../$@
-
-sinker.json:
-	@echo "Generating sinker.json ..."
-	jsonnet -J vendor/ grafana_dashboards/sinker.jsonnet > ../$@
-
-tide.json:
-	@echo "Generating tide.json ..."
-	jsonnet -J vendor/ grafana_dashboards/tide.jsonnet > ../$@
+$(dashboards):
+	@echo "Generating $@.json ..."
+	jsonnet -J vendor/ grafana_dashboards/$@.jsonnet > ../$@.json
 
 prometheus_rule_prow.yaml:
 	@echo "Generating prometheus_rule_prow.yaml ..."
