@@ -38,8 +38,8 @@ items:
       rules:
       - alert: OverCPURequests
         expr: |
-          100 * ( sum(label_replace(pod_name:container_cpu_usage:sum{namespace=~"ci-op-.*"}, "pod", "$1", "pod_name", "(.*)")) by (pod,namespace)
-          / sum(label_join(kube_pod_container_resource_requests_cpu_cores, "pod_name", "", "pod")) by (pod,namespace) ) > 150
+          100 * (sum by(pod,namespace)(sum by(pod)(label_replace(pod_name:container_cpu_usage:sum, "pod", "$1", "pod_name", "(.*)")) * on (pod) group_right(label_component) label_replace(kube_pod_labels{namespace=~"ci-op-.*",pod!="",label_created_by_ci!="true", label_openshift_io_build_name=""}, "pod", "$1", "pod", "(.*)")) 
+          / sum by(pod, namespace) (label_join(kube_pod_container_resource_requests_cpu_cores, "pod_name", "", "pod"))) > 150
         for: 5m
         labels:
           severity: warning
@@ -48,8 +48,8 @@ items:
 
       - alert: OverMemoryRequests
         expr: |
-          100 * ( sum(label_replace(container_memory_working_set_bytes{namespace=~"ci-op-.*"}, "pod", "$1", "pod_name", "(.*)")) by (pod,namespace)
-          / sum(label_join(kube_pod_container_resource_requests_memory_bytes, "pod_name", "", "pod")) by (pod,namespace) ) > 150
+          100 * (sum by(pod,namespace)(sum by(pod)(label_replace(container_memory_working_set_bytes, "pod", "$1", "pod_name", "(.*)")) * on (pod) group_right(label_component) label_replace(kube_pod_labels{namespace=~"ci-op-.*",pod!="",label_created_by_ci!="true", label_openshift_io_build_name=""}, "pod", "$1", "pod", "(.*)")) 
+          / sum by(pod, namespace) (label_join(kube_pod_container_resource_requests_memory_bytes, "pod_name", "", "pod"))) > 150
         for: 5m
         labels:
           severity: warning
