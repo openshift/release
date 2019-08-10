@@ -109,19 +109,13 @@ objects:
 
         trap 'rc=$?; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi; if test "${rc}" -ne 0; then touch /tmp/shared/exit; fi; exit "${rc}"' EXIT
 
-        if [[ "${CLUSTER_TYPE:-}" != "aws" ]]; then
-          echo "[WARNING] No resource leasing is defined for \"${CLUSTER_TYPE}\" clusters"
-          touch /tmp/shared/leased
-          exit 0
-        fi
-
         # hack for bazel
         function boskosctl() {
           /app/boskos/cmd/cli/app.binary "${@}"
         }
 
         echo "[INFO] Acquiring a lease ..."
-        resource="$( boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" acquire --type aws-quota-slice --state free --target-state leased --timeout 150m )"
+        resource="$( boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" acquire --type "${CLUSTER_TYPE}-quota-slice" --state free --target-state leased --timeout 150m )"
         touch /tmp/shared/leased
         echo "[INFO] Lease acquired!"
         echo "[INFO] Leased resource: ${resource}"

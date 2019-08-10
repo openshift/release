@@ -55,6 +55,45 @@ dashboard.new(
 )
 .addTemplate(
   {
+        "current": {
+          "text": "AWS",
+          "value": "aws"
+        },
+        "label": "IaaS Type",
+        "name": "iaas",
+        "options":
+        [
+          {
+            "selected": true,
+            "text": 'AWS',
+            "value": 'aws',
+          },
+          {
+            "selected": false,
+            "text": 'Azure',
+            "value": 'azure4',
+          },
+          {
+            "selected": false,
+            "text": 'GCP',
+            "value": 'gcp',
+          },
+          {
+            "selected": false,
+            "text": 'OpenStack',
+            "value": 'openstack',
+          },
+          {
+            "selected": false,
+            "text": 'vSphere',
+            "value": 'vsphere',
+          },
+        ],
+        "type": "custom"
+      }
+)
+.addTemplate(
+  {
         "allValue": null,
         "current": {
           "text": "3h",
@@ -96,7 +135,7 @@ dashboard.new(
 )
 .addPanel(
     (graphPanel.new(
-        'Job Success Rates for pre-defined job names and org/repo@branch ${org}:${repo}:${base_ref}',
+        'Job Success Rates for github.com/${org}/${repo}@${base_ref}',
         description='sum(rate(prowjob_state_transitions{job="plank",job_name=~"<job_name_expr>",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"}[${range}]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~"<job_name_expr>",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"}[${range}]))',
         datasource='prometheus',
         legend_alignAsTable=true,
@@ -133,7 +172,7 @@ dashboard.new(
   })
 .addPanel(
     (graphPanel.new(
-        'Release Job versus Pull Request Job Success Rates for org/repo@branch ${org}:${repo}:${base_ref}',
+        'Presubmit and Postsubmit Job Success Rates for github.com/${org}/${repo}@${base_ref}',
         description='sum(rate(prowjob_state_transitions{job="plank",job_name=~"<job_name_expr>",job_name!~"rehearse.*",state="success"}[${range}]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~"<job_name_expr>",job_name!~"rehearse.*",state=~"success|failure"}[${range}]))',
         datasource='prometheus',
         legend_alignAsTable=true,
@@ -162,7 +201,7 @@ dashboard.new(
   })
 .addPanel(
     (graphPanel.new(
-        'Job States by Branch for org/repo@branch ${org}:${repo}',
+        'Job States by Branch for github.com/${org}/${repo}',
         description='sum(rate(prowjob_state_transitions{job="plank", job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"^(master|release-4.[0-9]+|openshift-4.[0-9]+)$", state="success"}[${range}])) by (base_ref)/sum(rate(prowjob_state_transitions{job="plank", job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"^(master|release-4.[0-9]+|openshift-4.[0-9]+)$", state=~"success|failure"}[${range}]))  by (base_ref)',
         datasource='prometheus',
         legend_alignAsTable=true,
@@ -187,7 +226,7 @@ dashboard.new(
   })
 .addPanel(
     (graphPanel.new(
-        'Job States by Type for org/repo@branch ${org}:${repo}:${base_ref}',
+        'Job States by Type for github.com/${org}/${repo}@${base_ref}',
         description='sum(rate(prowjob_state_transitions{job="plank",job_name=~"<regex>",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"}[${range}]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~"<regex>",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"}[${range}]))',
         datasource='prometheus',
         legend_alignAsTable=true,
@@ -228,7 +267,7 @@ dashboard.new(
   })
 .addPanel(
     (graphPanel.new(
-        'Job States by Platform for org/repo@branch ${org}:${repo}:${base_ref}',
+        'Job States by Platform for github.com/${org}/${repo}@${base_ref}',
         description='sum(rate(prowjob_state_transitions{job="plank",job_name=~"<regex>",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"}[${range}]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~"<regex>",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"}[${range}]))',
         datasource='prometheus',
         legend_alignAsTable=true,
@@ -299,8 +338,8 @@ dashboard.new(
   })
 .addPanel(
     (graphPanel.new(
-        'AWS Quota Leases by State',
-        description='sum(boskos_resources{type="aws-quota-slice"}) by (state)',
+        'Quota Leases by State: ${iaas}',
+        description='sum(boskos_resources{type="${iaas}-quota-slice"}) by (state)',
         datasource='prometheus',
         legend_alignAsTable=true,
         legend_rightSide=true,
@@ -313,7 +352,7 @@ dashboard.new(
         stack=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(boskos_resources{type="aws-quota-slice"}) by (state)',
+        'sum(boskos_resources{type="${iaas}-quota-slice"}) by (state)',
         legendFormat='{{state}}',
     )), gridPos={
     h: 9,
