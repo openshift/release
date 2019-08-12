@@ -75,11 +75,9 @@ presubmits:
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-network-operator-master-e2e-aws-multitenant
     rerun_command: /test e2e-aws-multitenant
-    skip_report: true
     spec:
       containers:
       - args:
@@ -92,6 +90,17 @@ presubmits:
         command:
         - ci-operator
         env:
+        - name: CLUSTER_NETWORK_MANIFEST
+          value: |
+            apiVersion: operator.openshift.io/v1
+            kind: Network
+            metadata:
+              name: cluster
+            spec:
+              defaultNetwork:
+                type: OpenShiftSDN
+                openshiftSDNConfig:
+                  mode: Multitenant
         - name: CLUSTER_TYPE
           value: aws
         - name: CONFIG_SPEC
