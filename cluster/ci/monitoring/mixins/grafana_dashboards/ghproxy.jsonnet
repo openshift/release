@@ -180,4 +180,25 @@ dashboard.new(
     x: 0,
     y: 18,
   })
+.addPanel(
+    (graphPanel.new(
+        'Request Rates',
+        description='GitHub request rates by token identifier, path and status.',
+        datasource='prometheus',
+        legend_alignAsTable=true,
+        legend_rightSide=true,
+        legend_values=true,
+        legend_current=true,
+        legend_sort='current',
+        legend_sortDesc=true,
+    ) + legendConfig)
+    .addTarget(prometheus.target(
+        'label_replace(sum(rate(github_requests[5m])) by (token_hash, path, status), "token_hash_short", "$1", "token_hash", "([a-z0-9]{5})(.*)")',
+         legendFormat='{{api_version}}:{{token_hash_short}}:{{status}}',
+    )), gridPos={
+    h: 9,
+    w: 24,
+    x: 0,
+    y: 18,
+  })
 + dashboardConfig
