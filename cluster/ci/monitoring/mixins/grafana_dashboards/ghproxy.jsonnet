@@ -159,4 +159,25 @@ dashboard.new(
     x: 20,
     y: 0,
   })
+.addPanel(
+    (graphPanel.new(
+        'Token Usage',
+        description='GitHub token usage by token identifier and API version.',
+        datasource='prometheus',
+        legend_alignAsTable=true,
+        legend_rightSide=true,
+        legend_values=true,
+        legend_current=true,
+        min='0',
+        max='5000',
+    ) + legendConfig)
+    .addTarget(prometheus.target(
+        'label_replace(sum(github_token_usage) by (api_version, token_hash), "token_hash_short", "$1", "token_hash", "([a-z0-9]{5})(.*)")',
+         legendFormat='{{api_version}}:{{token_hash_short}}',
+    )), gridPos={
+    h: 9,
+    w: 24,
+    x: 0,
+    y: 18,
+  })
 + dashboardConfig
