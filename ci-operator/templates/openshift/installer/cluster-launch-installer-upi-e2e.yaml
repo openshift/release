@@ -261,6 +261,17 @@ objects:
           ZONE="$(oc get -o jsonpath='{.items[0].metadata.labels.failure-domain\.beta\.kubernetes\.io/zone}' nodes)"
           export TEST_PROVIDER="{\"type\":\"aws\",\"region\":\"${REGION}\",\"zone\":\"${ZONE}\",\"multizone\":true,\"multimaster\":true}"
           export KUBE_SSH_USER=core
+
+          if [[ "${CLUSTER_VARIANT}" =~ "proxy" ]]; then
+            # set proxy env vars required by extended test clients.
+            PROXY_IP="$(cat /tmp/artifacts/installer/proxyip)"
+            export HTTP_PROXY="$(oc get proxy/cluster -o jsonpath='{.status.httpProxy}' | sed "s/@.*:/@${PROXY_IP}:/")"
+            export HTTPS_PROXY="$(oc get proxy/cluster -o jsonpath='{.status.httpsProxy}' | sed "s/@.*:/@${PROXY_IP}:/")"
+            export NO_PROXY="$(oc get proxy/cluster -o jsonpath='{.status.noProxy}')"
+
+            #PROXY_DNS="squid.${NAMESPACE}-${JOB_NAME_HASH}.${BASE_DOMAIN}"
+            #echo "${PROXY_IP}  ${PROXY_DNS}" >> /etc/hosts
+          fi
         elif [[ "${CLUSTER_TYPE}" == "azure4" ]]; then
           export TEST_PROVIDER='azure'
         elif [[ "${CLUSTER_TYPE}" == "openstack" ]]; then
@@ -790,6 +801,697 @@ objects:
         EOF
         }
 
+        function generate_blackhole_template() {
+          cat > /tmp/01_blackhole_vpc.yaml << EOF
+        AWSTemplateFormatVersion: 2010-09-09
+        Description: Template for Best Practice VPC with 1-3 AZs
+
+        Parameters:
+          VpcCidr:
+            AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-4]))$
+            ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-24.
+            Default: 10.0.0.0/16
+            Description: CIDR block for VPC.
+            Type: String
+          AvailabilityZoneCount:
+            ConstraintDescription: "The number of availability zones. (Min: 1, Max: 3)"
+            MinValue: 1
+            MaxValue: 3
+            Default: 1
+            Description: "How many AZs to create VPC subnets for. (Min: 1, Max: 3)"
+            Type: Number
+          SubnetBits:
+            ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/19-27.
+            MinValue: 5
+            MaxValue: 13
+            Default: 12
+            Description: "Size of each subnet to create within the availability zones. (Min: 5 = /27, Max: 13 = /19)"
+            Type: Number
+
+        Metadata:
+          AWS::CloudFormation::Interface:
+            ParameterGroups:
+            - Label:
+                default: "Network Configuration"
+              Parameters:
+              - VpcCidr
+              - SubnetBits
+            - Label:
+                default: "Availability Zones"
+              Parameters:
+              - AvailabilityZoneCount
+            ParameterLabels:
+              AvailabilityZoneCount:
+                default: "Availability Zone Count"
+              VpcCidr:
+                default: "VPC CIDR"
+              SubnetBits:
+                default: "Bits Per Subnet"
+
+        Conditions:
+          DoAz3: !Equals [3, !Ref AvailabilityZoneCount]
+          DoAz2: !Or [!Equals [2, !Ref AvailabilityZoneCount], Condition: DoAz3]
+
+        Resources:
+          VPC:
+            Type: "AWS::EC2::VPC"
+            Properties:
+              EnableDnsSupport: "true"
+              EnableDnsHostnames: "true"
+              CidrBlock: !Ref VpcCidr
+          PublicSubnet:
+            Type: "AWS::EC2::Subnet"
+            Properties:
+              VpcId: !Ref VPC
+              CidrBlock: !Select [0, !Cidr [!Ref VpcCidr, 6, !Ref SubnetBits]]
+              AvailabilityZone: !Select
+              - 0
+              - Fn::GetAZs: !Ref "AWS::Region"
+          PublicSubnet2:
+            Type: "AWS::EC2::Subnet"
+            Condition: DoAz2
+            Properties:
+              VpcId: !Ref VPC
+              CidrBlock: !Select [1, !Cidr [!Ref VpcCidr, 6, !Ref SubnetBits]]
+              AvailabilityZone: !Select
+              - 1
+              - Fn::GetAZs: !Ref "AWS::Region"
+          PublicSubnet3:
+            Type: "AWS::EC2::Subnet"
+            Condition: DoAz3
+            Properties:
+              VpcId: !Ref VPC
+              CidrBlock: !Select [2, !Cidr [!Ref VpcCidr, 6, !Ref SubnetBits]]
+              AvailabilityZone: !Select
+              - 2
+              - Fn::GetAZs: !Ref "AWS::Region"
+          InternetGateway:
+            Type: "AWS::EC2::InternetGateway"
+          GatewayToInternet:
+            Type: "AWS::EC2::VPCGatewayAttachment"
+            Properties:
+              VpcId: !Ref VPC
+              InternetGatewayId: !Ref InternetGateway
+          PublicRouteTable:
+            Type: "AWS::EC2::RouteTable"
+            Properties:
+              VpcId: !Ref VPC
+          PublicRoute:
+            Type: "AWS::EC2::Route"
+            DependsOn: GatewayToInternet
+            Properties:
+              RouteTableId: !Ref PublicRouteTable
+              DestinationCidrBlock: 0.0.0.0/0
+              GatewayId: !Ref InternetGateway
+          PublicSubnetRouteTableAssociation:
+            Type: "AWS::EC2::SubnetRouteTableAssociation"
+            Properties:
+              SubnetId: !Ref PublicSubnet
+              RouteTableId: !Ref PublicRouteTable
+          PublicSubnetRouteTableAssociation2:
+            Type: "AWS::EC2::SubnetRouteTableAssociation"
+            Condition: DoAz2
+            Properties:
+              SubnetId: !Ref PublicSubnet2
+              RouteTableId: !Ref PublicRouteTable
+          PublicSubnetRouteTableAssociation3:
+            Condition: DoAz3
+            Type: "AWS::EC2::SubnetRouteTableAssociation"
+            Properties:
+              SubnetId: !Ref PublicSubnet3
+              RouteTableId: !Ref PublicRouteTable
+          PrivateSubnet:
+            Type: "AWS::EC2::Subnet"
+            Properties:
+              VpcId: !Ref VPC
+              CidrBlock: !Select [3, !Cidr [!Ref VpcCidr, 6, !Ref SubnetBits]]
+              AvailabilityZone: !Select
+              - 0
+              - Fn::GetAZs: !Ref "AWS::Region"
+          PrivateRouteTable:
+            Type: "AWS::EC2::RouteTable"
+            Properties:
+              VpcId: !Ref VPC
+          PrivateSubnetRouteTableAssociation:
+            Type: "AWS::EC2::SubnetRouteTableAssociation"
+            Properties:
+              SubnetId: !Ref PrivateSubnet
+              RouteTableId: !Ref PrivateRouteTable
+          PrivateSubnet2:
+            Type: "AWS::EC2::Subnet"
+            Condition: DoAz2
+            Properties:
+              VpcId: !Ref VPC
+              CidrBlock: !Select [4, !Cidr [!Ref VpcCidr, 6, !Ref SubnetBits]]
+              AvailabilityZone: !Select
+              - 1
+              - Fn::GetAZs: !Ref "AWS::Region"
+          PrivateRouteTable2:
+            Type: "AWS::EC2::RouteTable"
+            Condition: DoAz2
+            Properties:
+              VpcId: !Ref VPC
+          PrivateSubnetRouteTableAssociation2:
+            Type: "AWS::EC2::SubnetRouteTableAssociation"
+            Condition: DoAz2
+            Properties:
+              SubnetId: !Ref PrivateSubnet2
+              RouteTableId: !Ref PrivateRouteTable2
+          PrivateSubnet3:
+            Type: "AWS::EC2::Subnet"
+            Condition: DoAz3
+            Properties:
+              VpcId: !Ref VPC
+              CidrBlock: !Select [5, !Cidr [!Ref VpcCidr, 6, !Ref SubnetBits]]
+              AvailabilityZone: !Select
+              - 2
+              - Fn::GetAZs: !Ref "AWS::Region"
+          PrivateRouteTable3:
+            Type: "AWS::EC2::RouteTable"
+            Condition: DoAz3
+            Properties:
+              VpcId: !Ref VPC
+          PrivateSubnetRouteTableAssociation3:
+            Type: "AWS::EC2::SubnetRouteTableAssociation"
+            Condition: DoAz3
+            Properties:
+              SubnetId: !Ref PrivateSubnet3
+              RouteTableId: !Ref PrivateRouteTable3
+          S3Endpoint:
+            Type: AWS::EC2::VPCEndpoint
+            Properties:
+              PolicyDocument:
+                Version: 2012-10-17
+                Statement:
+                - Effect: Allow
+                  Principal: '*'
+                  Action:
+                  - '*'
+                  Resource:
+                  - '*'
+              RouteTableIds:
+              - !Ref PublicRouteTable
+              - !Ref PrivateRouteTable
+              - !If [DoAz2, !Ref PrivateRouteTable2, !Ref "AWS::NoValue"]
+              - !If [DoAz3, !Ref PrivateRouteTable3, !Ref "AWS::NoValue"]
+              ServiceName: !Join
+              - ''
+              - - com.amazonaws.
+                - !Ref 'AWS::Region'
+                - .s3
+              VpcId: !Ref VPC
+
+        Outputs:
+          VpcId:
+            Description: ID of the new VPC.
+            Value: !Ref VPC
+          PublicSubnetIds:
+            Description: Subnet IDs of the public subnets.
+            Value:
+              !Join [
+                ",",
+                [!Ref PublicSubnet, !If [DoAz2, !Ref PublicSubnet2, !Ref "AWS::NoValue"], !If [DoAz3, !Ref PublicSubnet3, !Ref "AWS::NoValue"]]
+              ]
+          PrivateSubnetIds:
+            Description: Subnet IDs of the private subnets.
+            Value:
+              !Join [
+                ",",
+                [!Ref PrivateSubnet, !If [DoAz2, !Ref PrivateSubnet2, !Ref "AWS::NoValue"], !If [DoAz3, !Ref PrivateSubnet3, !Ref "AWS::NoValue"]]
+              ]
+
+        EOF
+        }
+
+        function generate_proxy_infra_template() {
+          cat > /tmp/02_infra.yaml << EOF
+        AWSTemplateFormatVersion: 2010-09-09
+        Description: Template for OpenShift Cluster Network Elements (Route53 & LBs)
+
+        Parameters:
+          ClusterName:
+            AllowedPattern: ^([a-zA-Z][a-zA-Z0-9\-]{0,26})$
+            MaxLength: 27
+            MinLength: 1
+            ConstraintDescription: Cluster name must be alphanumeric, start with a letter, and have a maximum of 27 characters.
+            Description: A short, representative cluster name to use for host names and other identifying names.
+            Type: String
+          InfrastructureName:
+            AllowedPattern: ^([a-zA-Z][a-zA-Z0-9\-]{0,26})$
+            MaxLength: 27
+            MinLength: 1
+            ConstraintDescription: Infrastructure name must be alphanumeric, start with a letter, and have a maximum of 27 characters.
+            Description: A short, unique cluster ID used to tag cloud resources and identify items owned or used by the cluster.
+            Type: String
+          HostedZoneId:
+            Description: The Route53 public zone ID to register the targets with, such as Z21IXYZABCZ2A4.
+            Type: String
+          HostedZoneName:
+            Description: The Route53 zone to register the targets with, such as example.com. Omit the trailing period.
+            Type: String
+            Default: "example.com"
+          PublicSubnets:
+            Description: The internet-facing subnets.
+            Type: List<AWS::EC2::Subnet::Id>
+          PrivateSubnets:
+            Description: The internal subnets.
+            Type: List<AWS::EC2::Subnet::Id>
+          VpcId:
+            Description: The VPC-scoped resources will belong to this VPC.
+            Type: AWS::EC2::VPC::Id
+
+        Metadata:
+          AWS::CloudFormation::Interface:
+            ParameterGroups:
+            - Label:
+                default: "Cluster Information"
+              Parameters:
+              - ClusterName
+              - InfrastructureName
+            - Label:
+                default: "Network Configuration"
+              Parameters:
+              - VpcId
+              - PublicSubnets
+              - PrivateSubnets
+            - Label:
+                default: "DNS"
+              Parameters:
+              - HostedZoneName
+              - HostedZoneId
+            ParameterLabels:
+              ClusterName:
+                default: "Cluster Name"
+              InfrastructureName:
+                default: "Infrastructure Name"
+              VpcId:
+                default: "VPC ID"
+              PublicSubnets:
+                default: "Public Subnets"
+              PrivateSubnets:
+                default: "Private Subnets"
+              HostedZoneName:
+                default: "Public Hosted Zone Name"
+              HostedZoneId:
+                default: "Public Hosted Zone ID"
+
+        Resources:
+          ExtApiElb:
+            Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+            Properties:
+              Name: !Join ["-", [!Ref InfrastructureName, "ext"]]
+              IpAddressType: ipv4
+              Subnets: !Ref PublicSubnets
+              Type: network
+
+          IntApiElb:
+            Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+            Properties:
+              Name: !Join ["-", [!Ref InfrastructureName, "int"]]
+              Scheme: internal
+              IpAddressType: ipv4
+              Subnets: !Ref PrivateSubnets
+              Type: network
+
+          IntDns:
+            Type: "AWS::Route53::HostedZone"
+            Properties:
+              HostedZoneConfig:
+                Comment: "Managed by CloudFormation"
+              Name: !Join [".", [!Ref ClusterName, !Ref HostedZoneName]]
+              HostedZoneTags:
+              - Key: Name
+                Value: !Join ["-", [!Ref InfrastructureName, "int"]]
+              - Key: !Join ["", ["kubernetes.io/cluster/", !Ref InfrastructureName]]
+                Value: "owned"
+              VPCs:
+              - VPCId: !Ref VpcId
+                VPCRegion: !Ref "AWS::Region"
+
+          ExternalApiServerRecord:
+            Type: AWS::Route53::RecordSetGroup
+            Properties:
+              Comment: Alias record for the API server
+              HostedZoneId: !Ref HostedZoneId
+              RecordSets:
+              - Name:
+                  !Join [
+                    ".",
+                    ["api", !Ref ClusterName, !Join ["", [!Ref HostedZoneName, "."]]],
+                  ]
+                Type: A
+                AliasTarget:
+                  HostedZoneId: !GetAtt ExtApiElb.CanonicalHostedZoneID
+                  DNSName: !GetAtt ExtApiElb.DNSName
+
+          InternalApiServerRecord:
+            Type: AWS::Route53::RecordSetGroup
+            Properties:
+              Comment: Alias record for the API server
+              HostedZoneId: !Ref IntDns
+              RecordSets:
+              - Name:
+                  !Join [
+                    ".",
+                    ["api", !Ref ClusterName, !Join ["", [!Ref HostedZoneName, "."]]],
+                  ]
+                Type: A
+                AliasTarget:
+                  HostedZoneId: !GetAtt IntApiElb.CanonicalHostedZoneID
+                  DNSName: !GetAtt IntApiElb.DNSName
+              - Name:
+                  !Join [
+                    ".",
+                    ["api-int", !Ref ClusterName, !Join ["", [!Ref HostedZoneName, "."]]],
+                  ]
+                Type: A
+                AliasTarget:
+                  HostedZoneId: !GetAtt IntApiElb.CanonicalHostedZoneID
+                  DNSName: !GetAtt IntApiElb.DNSName
+
+          ProxyServerRecord:
+            Type: AWS::Route53::RecordSetGroup
+            Properties:
+              Comment: Alias record for the Proxy server
+              HostedZoneId: !Ref IntDns
+              RecordSets:
+              - Name:
+                  !Join [
+                    ".",
+                    ["squid", !Ref ClusterName, !Ref HostedZoneName],
+                  ]
+                Type: A
+                AliasTarget:
+                  HostedZoneId: !GetAtt IntApiElb.CanonicalHostedZoneID
+                  DNSName: !GetAtt IntApiElb.DNSName
+
+          ExternalApiListener:
+            Type: AWS::ElasticLoadBalancingV2::Listener
+            Properties:
+              DefaultActions:
+              - Type: forward
+                TargetGroupArn:
+                  Ref: ExternalApiTargetGroup
+              LoadBalancerArn:
+                Ref: ExtApiElb
+              Port: 6443
+              Protocol: TCP
+
+          ExternalApiTargetGroup:
+            Type: AWS::ElasticLoadBalancingV2::TargetGroup
+            Properties:
+              Port: 6443
+              Protocol: TCP
+              TargetType: ip
+              VpcId:
+                Ref: VpcId
+              TargetGroupAttributes:
+              - Key: deregistration_delay.timeout_seconds
+                Value: 60
+
+          InternalApiListener:
+            Type: AWS::ElasticLoadBalancingV2::Listener
+            Properties:
+              DefaultActions:
+              - Type: forward
+                TargetGroupArn:
+                  Ref: InternalApiTargetGroup
+              LoadBalancerArn:
+                Ref: IntApiElb
+              Port: 6443
+              Protocol: TCP
+
+          InternalApiTargetGroup:
+            Type: AWS::ElasticLoadBalancingV2::TargetGroup
+            Properties:
+              Port: 6443
+              Protocol: TCP
+              TargetType: ip
+              VpcId:
+                Ref: VpcId
+              TargetGroupAttributes:
+              - Key: deregistration_delay.timeout_seconds
+                Value: 60
+
+          InternalServiceInternalListener:
+            Type: AWS::ElasticLoadBalancingV2::Listener
+            Properties:
+              DefaultActions:
+              - Type: forward
+                TargetGroupArn:
+                  Ref: InternalServiceTargetGroup
+              LoadBalancerArn:
+                Ref: IntApiElb
+              Port: 22623
+              Protocol: TCP
+
+          InternalServiceTargetGroup:
+            Type: AWS::ElasticLoadBalancingV2::TargetGroup
+            Properties:
+              Port: 22623
+              Protocol: TCP
+              TargetType: ip
+              VpcId:
+                Ref: VpcId
+              TargetGroupAttributes:
+              - Key: deregistration_delay.timeout_seconds
+                Value: 60
+
+          SquidTargetGroup:
+            Type: AWS::ElasticLoadBalancingV2::TargetGroup
+            Properties:
+              Port: 3128
+              Protocol: TCP
+              TargetType: ip
+              VpcId:
+                Ref: VpcId
+              TargetGroupAttributes:
+              - Key: deregistration_delay.timeout_seconds
+                Value: 60
+
+          SquidTLSTargetGroup:
+            Type: AWS::ElasticLoadBalancingV2::TargetGroup
+            Properties:
+              Port: 3130
+              Protocol: TCP
+              TargetType: ip
+              VpcId:
+                Ref: VpcId
+              TargetGroupAttributes:
+              - Key: deregistration_delay.timeout_seconds
+                Value: 60
+
+          SquidLoadBalancerListener:
+            Type: AWS::ElasticLoadBalancingV2::Listener
+            Properties:
+              DefaultActions:
+              - Type: forward
+                TargetGroupArn:
+                  Ref: SquidTargetGroup
+              LoadBalancerArn:
+                Ref: IntApiElb
+              Port: 3128
+              Protocol: TCP
+
+          SquidLoadBalancerListenerTLS:
+            Type: AWS::ElasticLoadBalancingV2::Listener
+            Properties:
+              DefaultActions:
+              - Type: forward
+                TargetGroupArn:
+                  Ref: SquidTLSTargetGroup
+              LoadBalancerArn:
+                Ref: IntApiElb
+              Port: 3130
+              Protocol: TCP
+
+          RegisterTargetLambdaIamRole:
+            Type: AWS::IAM::Role
+            Properties:
+              RoleName: !Join ["-", [!Ref InfrastructureName, "nlb", "lambda", "role"]]
+              AssumeRolePolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                - Effect: "Allow"
+                  Principal:
+                    Service:
+                    - "lambda.amazonaws.com"
+                  Action:
+                  - "sts:AssumeRole"
+              Path: "/"
+              Policies:
+              - PolicyName: !Join ["-", [!Ref InfrastructureName, "master", "policy"]]
+                PolicyDocument:
+                  Version: "2012-10-17"
+                  Statement:
+                  - Effect: "Allow"
+                    Action:
+                      [
+                        "elasticloadbalancing:RegisterTargets",
+                        "elasticloadbalancing:DeregisterTargets",
+                      ]
+                    Resource: !Ref InternalApiTargetGroup
+                  - Effect: "Allow"
+                    Action:
+                      [
+                        "elasticloadbalancing:RegisterTargets",
+                        "elasticloadbalancing:DeregisterTargets",
+                      ]
+                    Resource: !Ref InternalServiceTargetGroup
+                  - Effect: "Allow"
+                    Action:
+                      [
+                        "elasticloadbalancing:RegisterTargets",
+                        "elasticloadbalancing:DeregisterTargets",
+                      ]
+                    Resource: !Ref ExternalApiTargetGroup
+                  - Effect: "Allow"
+                    Action:
+                      [
+                        "elasticloadbalancing:RegisterTargets",
+                        "elasticloadbalancing:DeregisterTargets",
+                      ]
+                    Resource: !Ref SquidTargetGroup
+                  - Effect: "Allow"
+                    Action:
+                      [
+                        "elasticloadbalancing:RegisterTargets",
+                        "elasticloadbalancing:DeregisterTargets",
+                      ]
+                    Resource: !Ref SquidTLSTargetGroup
+
+          RegisterNlbIpTargets:
+            Type: "AWS::Lambda::Function"
+            Properties:
+              Handler: "index.handler"
+              Role:
+                Fn::GetAtt:
+                - "RegisterTargetLambdaIamRole"
+                - "Arn"
+              Code:
+                ZipFile: |
+                  import json
+                  import boto3
+                  import cfnresponse
+                  def handler(event, context):
+                    elb = boto3.client('elbv2')
+                    if event['RequestType'] == 'Delete':
+                      elb.deregister_targets(TargetGroupArn=event['ResourceProperties']['TargetArn'],Targets=[{'Id': event['ResourceProperties']['TargetIp']}])
+                    elif event['RequestType'] == 'Create':
+                      elb.register_targets(TargetGroupArn=event['ResourceProperties']['TargetArn'],Targets=[{'Id': event['ResourceProperties']['TargetIp']}])
+                    responseData = {}
+                    cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData, event['ResourceProperties']['TargetArn']+event['ResourceProperties']['TargetIp'])
+              Runtime: "python3.7"
+              Timeout: 120
+
+          RegisterSubnetTagsLambdaIamRole:
+            Type: AWS::IAM::Role
+            Properties:
+              RoleName: !Join ["-", [!Ref InfrastructureName, "subnet-tags-lambda-role"]]
+              AssumeRolePolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                - Effect: "Allow"
+                  Principal:
+                    Service:
+                    - "lambda.amazonaws.com"
+                  Action:
+                  - "sts:AssumeRole"
+              Path: "/"
+              Policies:
+              - PolicyName: !Join ["-", [!Ref InfrastructureName, "subnet-tagging-policy"]]
+                PolicyDocument:
+                  Version: "2012-10-17"
+                  Statement:
+                  - Effect: "Allow"
+                    Action:
+                      [
+                        "ec2:DeleteTags",
+                        "ec2:CreateTags"
+                      ]
+                    Resource: "arn:aws:ec2:*:*:subnet/*"
+                  - Effect: "Allow"
+                    Action:
+                      [
+                        "ec2:DescribeSubnets",
+                        "ec2:DescribeTags"
+                      ]
+                    Resource: "*"
+
+          RegisterSubnetTags:
+            Type: "AWS::Lambda::Function"
+            Properties:
+              Handler: "index.handler"
+              Role:
+                Fn::GetAtt:
+                - "RegisterSubnetTagsLambdaIamRole"
+                - "Arn"
+              Code:
+                ZipFile: |
+                  import json
+                  import boto3
+                  import cfnresponse
+                  def handler(event, context):
+                    ec2_client = boto3.client('ec2')
+                    if event['RequestType'] == 'Delete':
+                      for subnet_id in event['ResourceProperties']['Subnets']:
+                        ec2_client.delete_tags(Resources=[subnet_id], Tags=[{'Key': 'kubernetes.io/cluster/' + event['ResourceProperties']['InfrastructureName']}]);
+                    elif event['RequestType'] == 'Create':
+                      for subnet_id in event['ResourceProperties']['Subnets']:
+                        ec2_client.create_tags(Resources=[subnet_id], Tags=[{'Key': 'kubernetes.io/cluster/' + event['ResourceProperties']['InfrastructureName'], 'Value': 'shared'}]);
+                    responseData = {}
+                    cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData, event['ResourceProperties']['InfrastructureName']+event['ResourceProperties']['Subnets'][0])
+              Runtime: "python3.7"
+              Timeout: 120
+
+          RegisterPublicSubnetTags:
+            Type: Custom::SubnetRegister
+            Properties:
+              ServiceToken: !GetAtt RegisterSubnetTags.Arn
+              InfrastructureName: !Ref InfrastructureName
+              Subnets: !Ref PublicSubnets
+
+          RegisterPrivateSubnetTags:
+            Type: Custom::SubnetRegister
+            Properties:
+              ServiceToken: !GetAtt RegisterSubnetTags.Arn
+              InfrastructureName: !Ref InfrastructureName
+              Subnets: !Ref PrivateSubnets
+
+        Outputs:
+          PrivateHostedZoneId:
+            Description: Hosted zone ID for the private DNS, which is required for private records.
+            Value: !Ref IntDns
+          ExternalApiLoadBalancerName:
+            Description: Full name of the external API load balancer.
+            Value: !GetAtt ExtApiElb.LoadBalancerFullName
+          InternalApiLoadBalancerName:
+            Description: Full name of the internal API load balancer.
+            Value: !GetAtt IntApiElb.LoadBalancerFullName
+          ApiServerDnsName:
+            Description: Full hostname of the API server, which is required for the Ignition config files.
+            Value: !Join [".", ["api-int", !Ref ClusterName, !Ref HostedZoneName]]
+          RegisterNlbIpTargetsLambda:
+            Description: Lambda ARN useful to help register or deregister IP targets for these load balancers.
+            Value: !GetAtt RegisterNlbIpTargets.Arn
+          ExternalApiTargetGroupArn:
+            Description: ARN of the external API target group.
+            Value: !Ref ExternalApiTargetGroup
+          InternalApiTargetGroupArn:
+            Description: ARN of the internal API target group.
+            Value: !Ref InternalApiTargetGroup
+          InternalServiceTargetGroupArn:
+            Description: ARN of the internal service target group.
+            Value: !Ref InternalServiceTargetGroup
+          SquidTargetGroupArn:
+            Description: ARN of the squid target group.
+            Value: !Ref SquidTargetGroup
+          SquidTLSTargetGroupArn:
+            Description: ARN of the squid tls target group.
+            Value: !Ref SquidTLSTargetGroup
+        EOF
+        }
+
         function generate_proxy_template() {
         cat > /tmp/04_cluster_proxy.yaml << EOF
         AWSTemplateFormatVersion: 2010-09-09
@@ -812,15 +1514,6 @@ objects:
             Default: 0.0.0.0/0
             Description: CIDR block to allow access to the proxy node.
             Type: String
-          PrivateHostedZoneId:
-            Description: The Route53 private zone ID to register the etcd targets with, such as Z21IXYZABCZ2A4.
-            Type: String
-          PrivateHostedZoneName:
-            Description: The Route53 zone to register the targets with, such as cluster.example.com. Omit the trailing period.
-            Type: String
-          ClusterName:
-            Description: The cluster name used to uniquely identify the proxy load balancer
-            Type: String
           PublicSubnet:
             Description: The public subnet to launch the proxy node into.
             Type: AWS::EC2::Subnet::Id
@@ -830,19 +1523,9 @@ objects:
           VpcId:
             Description: The VPC-scoped resources will belong to this VPC.
             Type: AWS::EC2::VPC::Id
-          PrivateSubnets:
-            Description: The internal subnets.
-            Type: List<AWS::EC2::Subnet::Id>
           ProxyIgnitionLocation:
             Default: s3://my-s3-bucket/proxy.ign
             Description: Ignition config file location.
-            Type: String
-          AutoRegisterDNS:
-            Default: "yes"
-            AllowedValues:
-            - "yes"
-            - "no"
-            Description: Do you want to invoke DNS etcd registration, which requires Hosted Zone information?
             Type: String
           AutoRegisterELB:
             Default: "yes"
@@ -854,14 +1537,11 @@ objects:
           RegisterNlbIpTargetsLambdaArn:
             Description: ARN for NLB IP target registration lambda.
             Type: String
-          ExternalApiTargetGroupArn:
-            Description: ARN for external API load balancer target group.
+          SquidTargetGroupArn:
+            Description: ARN for Squid load balancer target group.
             Type: String
-          InternalApiTargetGroupArn:
-            Description: ARN for internal API load balancer target group.
-            Type: String
-          InternalServiceTargetGroupArn:
-            Description: ARN for internal service load balancer target group.
+          SquidTLSTargetGroupArn:
+            Description: ARN for Squid load balancer target group.
             Type: String
 
         Metadata:
@@ -886,19 +1566,12 @@ objects:
               - PrivateSubnets
               - ClusterName
             - Label:
-                default: "DNS"
-              Parameters:
-              - AutoRegisterDNS
-              - PrivateHostedZoneId
-              - PrivateHostedZoneName
-            - Label:
                 default: "Load Balancer Automation"
               Parameters:
               - AutoRegisterELB
               - RegisterNlbIpTargetsLambdaArn
-              - ExternalApiTargetGroupArn
-              - InternalApiTargetGroupArn
-              - InternalServiceTargetGroupArn
+              - SquidTargetGroupArn
+              - SquidTLSTargetGroupArn
             ParameterLabels:
               InfrastructureName:
                 default: "Infrastructure Name"
@@ -908,8 +1581,6 @@ objects:
                 default: "Allowed ingress Source"
               PublicSubnet:
                 default: "Public Subnet"
-              PrivateSubnets:
-                default: "Private Subnets"
               RhcosAmi:
                 default: "Red Hat Enterprise Linux CoreOS AMI ID"
               ProxyIgnitionLocation:
@@ -918,18 +1589,9 @@ objects:
                 default: "Master Security Group ID"
               AutoRegisterDNS:
                 default: "Use Provided DNS Automation"
-              AutoRegisterELB:
-                default: "Use Provided ELB Automation"
-              PrivateHostedZoneName:
-                default: "Private Hosted Zone Name"
-              PrivateHostedZoneId:
-                default: "Private Hosted Zone ID"
-              ClusterName:
-                default: "Cluster name"
 
         Conditions:
           DoRegistration: !Equals ["yes", !Ref AutoRegisterELB]
-          DoDns: !Equals ["yes", !Ref AutoRegisterDNS]
 
         Resources:
           ProxyIamRole:
@@ -1004,16 +1666,21 @@ objects:
                   IgnitionLocation: !Ref ProxyIgnitionLocation
                 }
 
-          ProxyRecord:
-            Condition: DoDns
-            Type: AWS::Route53::RecordSet
+          RegisterProxyTarget:
+            Condition: DoRegistration
+            Type: Custom::NLBRegister
             Properties:
-              HostedZoneId: !Ref PrivateHostedZoneId
-              Name: !Join [".", ["squid", !Ref PrivateHostedZoneName]]
-              ResourceRecords:
-              - !GetAtt ProxyInstance.PublicIp
-              TTL: 60
-              Type: A
+              ServiceToken: !Ref RegisterNlbIpTargetsLambdaArn
+              TargetArn: !Ref SquidTargetGroupArn
+              TargetIp: !GetAtt ProxyInstance.PrivateIp
+
+          RegisterProxyTLSTarget:
+            Condition: DoRegistration
+            Type: Custom::NLBRegister
+            Properties:
+              ServiceToken: !Ref RegisterNlbIpTargetsLambdaArn
+              TargetArn: !Ref SquidTLSTargetGroupArn
+              TargetIp: !GetAtt ProxyInstance.PrivateIp
 
         Outputs:
           ProxyPublicIp:
@@ -1270,6 +1937,43 @@ objects:
             exit 1
         fi
 
+        if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
+
+          # FIXME: get epel-release or otherwise add awscli to our UPI image
+          export PATH="${HOME}/.local/bin:${PATH}"
+          easy_install --user pip  # our Python 2.7.5 is even too old for ensurepip
+          pip install --user awscli
+
+          if [[ "${CLUSTER_VARIANT}" =~ "proxy" ]]; then
+            # make control-plane nodes unschedulable
+            python -c \
+              'import yaml; path = "/tmp/artifacts/installer/manifests/cluster-scheduler-02-config.yml"; data = yaml.load(open(path)); data["spec"]["mastersSchedulable"] = False; open(path, "w").write(yaml.dump(data, default_flow_style=False))'
+
+            # to bypass the issue seen where the ingress operator cannot reach AWS when blackhole'd
+            python -c \
+              'import yaml; path = "/tmp/artifacts/installer/manifests/cluster-dns-02-config.yml"; data = yaml.load(open(path)); del data["spec"]["publicZone"]; del data["spec"]["privateZone"]; open(path, "w").write(yaml.dump(data, default_flow_style=False))'
+
+            # create internal lb for router
+            cat > /tmp/artifacts/installer/manifests/cluster-ingress-default-ingresscontroller.yaml << EOF
+        apiVersion: operator.openshift.io/v1
+        kind: IngressController
+        metadata:
+          creationTimestamp: null
+          name: default
+          namespace: openshift-ingress-operator
+        spec:
+          endpointPublishingStrategy:
+            loadBalancer:
+              scope: Internal
+            type: LoadBalancerService
+        status:
+          availableReplicas: 0
+          domain: ""
+          selector: ""
+        EOF
+          fi
+        fi
+
         echo "Creating ignition configs"
         openshift-install --dir=/tmp/artifacts/installer create ignition-configs &
         wait "$!"
@@ -1280,11 +1984,6 @@ objects:
         # begin bootstrapping
         if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
           RHCOS_AMI="$(jq -r .amis[\"${AWS_REGION}\"].hvm /var/lib/openshift-install/rhcos.json)"
-
-          # FIXME: get epel-release or otherwise add awscli to our UPI image
-          export PATH="${HOME}/.local/bin:${PATH}"
-          easy_install --user pip  # our Python 2.7.5 is even too old for ensurepip
-          pip install --user awscli
 
           export AWS_DEFAULT_REGION="${AWS_REGION}"  # CLI prefers the former
 
@@ -1297,11 +1996,13 @@ objects:
             --query "HostedZones[? Config.PrivateZone != \`true\` && Name == \`${base_domain}.\`].Id" \
             --output text)"
 
-          # If we are using a proxy, create a 'black-hole' private subnet vpc TODO
-          # For now this is just a placeholder...
+          # if we are using a proxy, create a 'black-hole' private subnet vpc
+          # TODO: move this into its own installer template instead?
+          # FIXME: configure using blackhole template -- in follow up
           if [[ "${CLUSTER_VARIANT}" =~ "proxy" ]]; then
+            generate_blackhole_template
             aws cloudformation create-stack  --stack-name "${CLUSTER_NAME}-vpc" \
-              --template-body "$(cat "/var/lib/openshift-install/upi/${CLUSTER_TYPE}/cloudformation/01_vpc.yaml")" \
+              --template-body "$(cat "/tmp/01_blackhole_vpc.yaml")" \
               --tags "${TAGS}" \
               --parameters \
                 ParameterKey=AvailabilityZoneCount,ParameterValue=3 &
@@ -1327,20 +2028,38 @@ objects:
           PRIVATE_SUBNET_2="$(echo "${PRIVATE_SUBNETS}" | sed 's/"//g' | cut -d, -f3)"
           PUBLIC_SUBNETS="$(echo "${VPC_JSON}" | jq '.[] | select(.OutputKey == "PublicSubnetIds").OutputValue')"  # explicitly keeping wrapping quotes
 
-          aws cloudformation create-stack \
-            --stack-name "${CLUSTER_NAME}-infra" \
-            --template-body "$(cat "/var/lib/openshift-install/upi/${CLUSTER_TYPE}/cloudformation/02_cluster_infra.yaml")" \
-            --tags "${TAGS}" \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --parameters \
-              ParameterKey=ClusterName,ParameterValue="${CLUSTER_NAME}" \
-              ParameterKey=InfrastructureName,ParameterValue="${INFRA_ID}" \
-              ParameterKey=HostedZoneId,ParameterValue="${HOSTED_ZONE}" \
-              ParameterKey=HostedZoneName,ParameterValue="${base_domain}" \
-              ParameterKey=VpcId,ParameterValue="${VPC_ID}" \
-              ParameterKey=PrivateSubnets,ParameterValue="${PRIVATE_SUBNETS}" \
-              ParameterKey=PublicSubnets,ParameterValue="${PUBLIC_SUBNETS}" &
-          wait "$!"
+          if [[ "${CLUSTER_VARIANT}" =~ "proxy" ]]; then
+            generate_proxy_infra_template
+            aws cloudformation create-stack \
+              --stack-name "${CLUSTER_NAME}-infra" \
+              --template-body "$(cat "/tmp/02_infra.yaml")" \
+              --tags "${TAGS}" \
+              --capabilities CAPABILITY_NAMED_IAM \
+              --parameters \
+                ParameterKey=ClusterName,ParameterValue="${CLUSTER_NAME}" \
+                ParameterKey=InfrastructureName,ParameterValue="${INFRA_ID}" \
+                ParameterKey=HostedZoneId,ParameterValue="${HOSTED_ZONE}" \
+                ParameterKey=HostedZoneName,ParameterValue="${base_domain}" \
+                ParameterKey=VpcId,ParameterValue="${VPC_ID}" \
+                ParameterKey=PrivateSubnets,ParameterValue="${PRIVATE_SUBNETS}" \
+                ParameterKey=PublicSubnets,ParameterValue="${PUBLIC_SUBNETS}" &
+            wait "$!"
+          else
+            aws cloudformation create-stack \
+              --stack-name "${CLUSTER_NAME}-infra" \
+              --template-body "$(cat "/var/lib/openshift-install/upi/${CLUSTER_TYPE}/cloudformation/02_cluster_infra.yaml")" \
+              --tags "${TAGS}" \
+              --capabilities CAPABILITY_NAMED_IAM \
+              --parameters \
+                ParameterKey=ClusterName,ParameterValue="${CLUSTER_NAME}" \
+                ParameterKey=InfrastructureName,ParameterValue="${INFRA_ID}" \
+                ParameterKey=HostedZoneId,ParameterValue="${HOSTED_ZONE}" \
+                ParameterKey=HostedZoneName,ParameterValue="${base_domain}" \
+                ParameterKey=VpcId,ParameterValue="${VPC_ID}" \
+                ParameterKey=PrivateSubnets,ParameterValue="${PRIVATE_SUBNETS}" \
+                ParameterKey=PublicSubnets,ParameterValue="${PUBLIC_SUBNETS}" &
+            wait "$!"
+          fi
 
           aws cloudformation wait stack-create-complete --stack-name "${CLUSTER_NAME}-infra" &
           wait "$!"
@@ -1352,6 +2071,9 @@ objects:
           INTERNAL_API_TARGET_GROUP="$(echo "${INFRA_JSON}" | jq -r '.[] | select(.OutputKey == "InternalApiTargetGroupArn").OutputValue')"
           INTERNAL_SERVICE_TARGET_GROUP="$(echo "${INFRA_JSON}" | jq -r '.[] | select(.OutputKey == "InternalServiceTargetGroupArn").OutputValue')"
           PRIVATE_HOSTED_ZONE="$(echo "${INFRA_JSON}" | jq -r '.[] | select(.OutputKey == "PrivateHostedZoneId").OutputValue')"
+
+          SQUID_TARGET_GROUP="$(echo "${INFRA_JSON}" | jq -r '.[] | select(.OutputKey == "SquidTargetGroupArn").OutputValue')"
+          SQUID_TLS_TARGET_GROUP="$(echo "${INFRA_JSON}" | jq -r '.[] | select(.OutputKey == "SquidTLSTargetGroupArn").OutputValue')"
 
           aws cloudformation create-stack \
             --stack-name "${CLUSTER_NAME}-security" \
@@ -1389,8 +2111,11 @@ objects:
         shutdown_lifetime 0
         auth_param basic program /usr/lib64/squid/basic_ncsa_auth /squid/passwords
         auth_param basic realm proxy
+        acl api_int_url dstdomain api-int.${CLUSTER_NAME}.${base_domain}
+        acl api_url dstdomain api.${CLUSTER_NAME}.${base_domain}
         acl authenticated proxy_auth REQUIRED
         http_access allow authenticated
+        http_access deny all
         pid_filename /tmp/proxy-setup
         EOF
         )"
@@ -1398,7 +2123,7 @@ objects:
             # define squid.sh
             SQUID_SH="$(base64 -w0 << EOF
         #!/bin/bash
-        podman run --entrypoint='["bash", "/squid/proxy.sh"]' --expose=3128 --net host --volume /tmp/squid:/squid:Z ${PROXY_IMAGE}
+        podman run --entrypoint='["bash", "/squid/proxy.sh"]' --expose=3128,3130 --net host --volume /tmp/squid:/squid:Z ${PROXY_IMAGE}
         EOF
         )"
 
@@ -1423,6 +2148,7 @@ objects:
 
             PROXY_URI="https://${JOB_NAME_SAFE}-bootstrap-exporter-${NAMESPACE}.svc.ci.openshift.org/proxy.ign"
 
+            # ParameterKey=AllowedProxyCidr,ParameterValue="${MACHINE_CIDR}" \
             aws cloudformation create-stack \
               --stack-name "${CLUSTER_NAME}-proxy" \
               --template-body "$(cat "/tmp/04_cluster_proxy.yaml")" \
@@ -1431,18 +2157,13 @@ objects:
               --parameters \
                 ParameterKey=InfrastructureName,ParameterValue="${INFRA_ID}" \
                 ParameterKey=RhcosAmi,ParameterValue="${RHCOS_AMI}" \
-                ParameterKey=PrivateHostedZoneId,ParameterValue="${PRIVATE_HOSTED_ZONE}" \
-                ParameterKey=PrivateHostedZoneName,ParameterValue="${CLUSTER_NAME}.${base_domain}" \
-                ParameterKey=ClusterName,ParameterValue="${CLUSTER_NAME}" \
                 ParameterKey=VpcId,ParameterValue="${VPC_ID}" \
                 ParameterKey=PublicSubnet,ParameterValue="${PUBLIC_SUBNETS%%,*}\"" \
                 ParameterKey=MasterSecurityGroupId,ParameterValue="${MASTER_SECURITY_GROUP}" \
                 ParameterKey=ProxyIgnitionLocation,ParameterValue="${PROXY_URI}" \
-                ParameterKey=PrivateSubnets,ParameterValue="${PRIVATE_SUBNETS}" \
                 ParameterKey=RegisterNlbIpTargetsLambdaArn,ParameterValue="${NLB_IP_TARGETS_LAMBDA}" \
-                ParameterKey=ExternalApiTargetGroupArn,ParameterValue="${EXTERNAL_API_TARGET_GROUP}" \
-                ParameterKey=InternalApiTargetGroupArn,ParameterValue="${INTERNAL_API_TARGET_GROUP}" \
-                ParameterKey=InternalServiceTargetGroupArn,ParameterValue="${INTERNAL_SERVICE_TARGET_GROUP}" &
+                ParameterKey=SquidTargetGroupArn,ParameterValue="${SQUID_TARGET_GROUP}" \
+                ParameterKey=SquidTLSTargetGroupArn,ParameterValue="${SQUID_TLS_TARGET_GROUP}" &
             wait "$!"
 
             aws cloudformation wait stack-create-complete --stack-name "${CLUSTER_NAME}-proxy" &
@@ -2154,6 +2875,27 @@ objects:
 
         if [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
           update_image_registry &
+        fi
+
+        if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
+          if [[ "${CLUSTER_VARIANT}" =~ "proxy" ]]; then
+            # As part of removing ingress operator's ability to add dns entries, manually add entries
+
+            while true; do
+              sleep 10
+              [ -n "$(oc -n openshift-ingress get service router-default -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')" ] && break
+            done
+
+            ROUTER_EXT_IP="$(oc -n openshift-ingress get service router-default -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
+            HOSTED_ZONE_ID="$(aws elb describe-load-balancers | jq -r '.LoadBalancerDescriptions[] | select(.DNSName == "'${ROUTER_EXT_IP}'").CanonicalHostedZoneNameID')"
+
+            aws route53 change-resource-record-sets --hosted-zone-id "${PRIVATE_HOSTED_ZONE}" --change-batch \
+              '{"Changes":[{"Action":"CREATE","ResourceRecordSet":{"Name":"*.apps.'${CLUSTER_NAME}'.'${base_domain}'","Type":"A","AliasTarget":{"HostedZoneId":"'${HOSTED_ZONE_ID}'","DNSName":"'${ROUTER_EXT_IP}'.","EvaluateTargetHealth":false}}}]}'
+
+            aws route53 change-resource-record-sets --hosted-zone-id "${HOSTED_ZONE}" --change-batch \
+              '{"Changes":[{"Action":"CREATE","ResourceRecordSet":{"Name":"*.apps.'${CLUSTER_NAME}'.'${base_domain}'","Type":"A","AliasTarget":{"HostedZoneId":"'${HOSTED_ZONE_ID}'","DNSName":"'${ROUTER_EXT_IP}'.","EvaluateTargetHealth":false}}}]}'
+
+          fi
         fi
 
         set +x
