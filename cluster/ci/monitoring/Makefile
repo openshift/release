@@ -32,6 +32,7 @@ prow-monitoring-deploy: ci-secret-deploy
 	#Those config are deployed by config_uploader; we leave those here for manual debugging
 	#oc create -n prow-monitoring configmap grafana-dashboards --from-file=./dashboards.yaml --dry-run -o yaml | oc apply -f -
 	#oc create -n prow-monitoring configmap grafana-dashboard-sinker --from-file=./sinker.json --dry-run -o yaml | oc apply -f -
+	#oc create -n prow-monitoring configmap grafana-dashboard-boskos --from-file=./boskos.json --dry-run -o yaml | oc apply -f -
 	#oc create -n prow-monitoring configmap grafana-dashboard-ghproxy --from-file=./ghproxy.json --dry-run -o yaml | oc apply -f -
 	#oc create -n prow-monitoring configmap grafana-dashboard-tide --from-file=./tide.json --dry-run -o yaml | oc apply -f -
 	#oc create -n prow-monitoring configmap grafana-dashboard-hook --from-file=./hook.json --dry-run -o yaml | oc apply -f -
@@ -92,6 +93,7 @@ prow-monitoring-cleanup:
 	oc delete -f ./alert_manager_rbac.yaml --as=system:admin
 	oc delete -f ./grafana_deploy.yaml --ignore-not-found=true --as=system:admin
 	oc delete configmap -n prow-monitoring grafana-dashboard-sinker --ignore-not-found=true --as=system:admin
+	oc delete configmap -n prow-monitoring grafana-dashboard-boskos --ignore-not-found=true --as=system:admin
 	oc delete configmap -n prow-monitoring grafana-dashboard-ghproxy --ignore-not-found=true --as=system:admin
 	oc delete configmap -n prow-monitoring grafana-dashboard-tide --ignore-not-found=true --as=system:admin
 	oc delete configmap -n prow-monitoring grafana-dashboard-hook --ignore-not-found=true --as=system:admin
