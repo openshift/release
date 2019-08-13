@@ -55,45 +55,6 @@ dashboard.new(
 )
 .addTemplate(
   {
-        "current": {
-          "text": "AWS",
-          "value": "aws"
-        },
-        "label": "IaaS Type",
-        "name": "iaas",
-        "options":
-        [
-          {
-            "selected": true,
-            "text": 'AWS',
-            "value": 'aws',
-          },
-          {
-            "selected": false,
-            "text": 'Azure',
-            "value": 'azure4',
-          },
-          {
-            "selected": false,
-            "text": 'GCP',
-            "value": 'gcp',
-          },
-          {
-            "selected": false,
-            "text": 'OpenStack',
-            "value": 'openstack',
-          },
-          {
-            "selected": false,
-            "text": 'vSphere',
-            "value": 'vsphere',
-          },
-        ],
-        "type": "custom"
-      }
-)
-.addTemplate(
-  {
         "allValue": null,
         "current": {
           "text": "3h",
@@ -296,64 +257,6 @@ dashboard.new(
     .addTarget(prometheus.target(
         'sum(rate(prowjob_state_transitions{job="plank",job_name=~".*-azure.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"}[${range}]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~".*-azure.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"}[${range}]))',
         legendFormat='.*-azure.*',
-    )), gridPos={
-    h: 9,
-    w: 24,
-    x: 0,
-    y: 0,
-  })
-.addPanel(
-    (graphPanel.new(
-        'Running Clusters by Platform',
-        description='sum(kube_pod_container_status_running{pod=~"e2e(-<regex>(-upgrade)?)?",container="teardown"})',
-        datasource='prometheus-k8s',
-        legend_alignAsTable=true,
-        legend_rightSide=true,
-        legend_values=true,
-        legend_current=true,
-        legend_max=true,
-        legend_sort='current',
-        legend_sortDesc=true,
-    ) + legendConfig)
-    .addTarget(prometheus.target(
-        'sum(kube_pod_container_status_running{pod=~"(e2e|(.*-aws(-.*)?))",container="teardown"})',
-        legendFormat='aws',
-    ))
-    .addTarget(prometheus.target(
-        'sum(kube_pod_container_status_running{pod=~".*-vsphere(-.*)?",container="teardown"})',
-        legendFormat='vsphere',
-    ))
-    .addTarget(prometheus.target(
-        'sum(kube_pod_container_status_running{pod=~".*-gcp(-.*)?",container="teardown"})',
-        legendFormat='gcp',
-    ))
-    .addTarget(prometheus.target(
-        'sum(kube_pod_container_status_running{pod=~".*-azure(-.*)?",container="teardown"})',
-        legendFormat='azure',
-    )), gridPos={
-    h: 9,
-    w: 24,
-    x: 0,
-    y: 0,
-  })
-.addPanel(
-    (graphPanel.new(
-        'Quota Leases by State: ${iaas}',
-        description='sum(boskos_resources{type="${iaas}-quota-slice"}) by (state)',
-        datasource='prometheus',
-        legend_alignAsTable=true,
-        legend_rightSide=true,
-        legend_values=true,
-        legend_current=true,
-        legend_sort='current',
-        legend_sortDesc=true,
-        min='0',
-        max='120',
-        stack=true,
-    ) + legendConfig)
-    .addTarget(prometheus.target(
-        'sum(boskos_resources{type="${iaas}-quota-slice"}) by (state)',
-        legendFormat='{{state}}',
     )), gridPos={
     h: 9,
     w: 24,
