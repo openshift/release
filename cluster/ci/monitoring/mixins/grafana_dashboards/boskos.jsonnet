@@ -22,8 +22,9 @@ local statePanel(iaas, displayName, maximum) = (graphPanel.new(
     legend_alignAsTable=true,
     legend_rightSide=true,
     legend_values=true,
+    legend_max=true,
+    legend_min=true,
     legend_current=true,
-    legend_sort='current',
     legend_sortDesc=true,
     min='0',
     max=maximum,
@@ -49,7 +50,7 @@ dashboard.new(
         legend_values=true,
         legend_current=true,
         legend_max=true,
-        legend_sort='current',
+        legend_min=true,
         legend_sortDesc=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
