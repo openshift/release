@@ -205,3 +205,43 @@ spec:
       for: 1m
       labels:
         severity: slack
+  - name: ghproxy
+    rules:
+    - alert: ghproxy-status-code-abnormal-3XX
+      annotations:
+        message: ghproxy has {{ $value | humanize }}% of status code 3XX for over
+          1 minute.
+      expr: |
+        sum(github_request_duration_count{status=~"3..", status!="304|404"})/sum(github_request_duration_count{status!="404"}) * 100 > 5
+      for: 1m
+      labels:
+        severity: slack
+    - alert: ghproxy-status-code-abnormal-4XX
+      annotations:
+        message: ghproxy has {{ $value | humanize }}% of status code 4XX for over
+          1 minute.
+      expr: |
+        sum(github_request_duration_count{status=~"4..", status!="304|404"})/sum(github_request_duration_count{status!="404"}) * 100 > 5
+      for: 1m
+      labels:
+        severity: slack
+    - alert: ghproxy-status-code-abnormal-5XX
+      annotations:
+        message: ghproxy has {{ $value | humanize }}% of status code 5XX for over
+          1 minute.
+      expr: |
+        sum(github_request_duration_count{status=~"5..", status!="304|404"})/sum(github_request_duration_count{status!="404"}) * 100 > 5
+      for: 1m
+      labels:
+        severity: slack
+    - alert: ghproxy-running-out-github-tokens-in-a-hour
+      annotations:
+        message: token {{ $labels.token_hash }} will run out of API quota before the
+          next reset.
+      expr: |
+        github_token_usage{job="ghproxy"} <  1500
+        and
+        predict_linear(github_token_usage{job="ghproxy"}[1h], 1 * 3600) < 0
+      for: 5m
+      labels:
+        severity: slack
