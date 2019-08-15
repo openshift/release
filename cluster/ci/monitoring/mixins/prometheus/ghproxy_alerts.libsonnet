@@ -6,13 +6,11 @@
         rules: [
           {
             alert: 'ghproxy-status-code-abnormal-%sXX' % code_prefix,
-            // excludeing 304 because 304 is not expected.
-            // https://developer.github.com/v3/#conditional-requests
             // excluding 404 because otherwise
             // "this is going to spam us just about 24/7 with the OWNERS thing"
             // TODO: Undo 404 after https://jira.coreos.com/browse/DPTP-447 is done
             expr: |||
-              sum(github_request_duration_count{status=~"%s..", status!="304|404"})/sum(github_request_duration_count{status!="404"}) * 100 > 5
+              sum(github_request_duration_count{status=~"%s..", status!="404"})/sum(github_request_duration_count{status!="404"}) * 100 > 5
             ||| % code_prefix,
             'for': '1m',
             labels: {
@@ -22,7 +20,7 @@
               message: 'ghproxy has {{ $value | humanize }}%% of status code %sXX for over 1 minute.' % code_prefix,
             },
           }
-          for code_prefix in ['3', '4', '5']
+          for code_prefix in ['4', '5']
         ] +
         [
           {
