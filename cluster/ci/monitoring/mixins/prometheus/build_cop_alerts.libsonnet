@@ -21,6 +21,25 @@
           for job_name_regex in ['branch-.*-images', 'release-.*-4.1', 'release-.*-4.2', 'release-.*-upgrade.*']
         ],
       },
+      {
+        name: 'mirroring-failures',
+        rules: [
+          {
+            alert: 'mirroring-failures',
+            expr: |||
+              increase(prowjob_state_transitions{job_name="periodic-image-mirroring-openshift",state="failure"}[5m]) > 0
+            |||,
+            'for': '1m',
+            labels: {
+              severity: 'slack',
+              team: 'build-cop',
+            },
+            annotations: {
+              message: '@build-cop image mirroring jobs have failed. View failed jobs at the <https://prow.svc.ci.openshift.org/?job=periodic-image-mirroring-openshift&state=failure|overview>.',
+            },
+          }
+        ],
+      },
     ],
   },
 }
