@@ -39,9 +39,11 @@ tests:
     # Instead of getting alias for cluster-api-provider-azure under
     # /go/src/sigs.k8s.io/cluster-api-provider-azure, I get https://github.com/openshift/release
     # instead. Recreate the alias directory until the issue is fixed.
-    rm -rf /go/src/sigs.k8s.io/cluster-api-provider-azure
-    cp -r /go/src/github.com/openshift/cluster-api-provider-azure/ /go/src/sigs.k8s.io/.
-    cd /go/src/sigs.k8s.io/cluster-api-provider-azure
+    if [ ! -e /go/src/sigs.k8s.io/cluster-api-provider-azure/pkg ]; then
+      rm -rf /go/src/sigs.k8s.io/cluster-api-provider-azure
+      cp -r /go/src/github.com/openshift/cluster-api-provider-azure/ /go/src/sigs.k8s.io/.
+      cd /go/src/sigs.k8s.io/cluster-api-provider-azure
+    fi
     IS_CONTAINER=TRUE make vet
   container:
     from: src
