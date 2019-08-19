@@ -11,7 +11,7 @@ $(dashboards):
 
 prometheus_rule_prow.yaml:
 	@echo "Generating prometheus_rule_prow.yaml ..."
-	jsonnet  ./prometheus/prometheus_rule_prow.jsonnet | gojsontoyaml > ../$@
+	jsonnet  ./prometheus/prometheus_rule_prow.jsonnet | gojsontoyaml > ./prometheus_out/$@
 
 clean:
 	rm -rfv ./vendor
