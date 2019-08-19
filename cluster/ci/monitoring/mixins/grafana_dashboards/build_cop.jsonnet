@@ -125,6 +125,10 @@ dashboard.new(
     .addTarget(prometheus.target(
         'sum(rate(prowjob_state_transitions{job="plank",job_name=~"release-.*-upgrade.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"}[${range}]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~"release-.*-upgrade.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"}[${range}]))',
         legendFormat='release-.*-upgrade.*',
+    ))
+    .addTarget(prometheus.target(
+        'sum(rate(prowjob_state_transitions{job="plank",job_name=~"release-.*4.1.*4.2.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"}[${range}]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~"release-.*4.1.*4.2.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"}[${range}]))',
+        legendFormat='release-.*4.1.*4.2.*',
     )), gridPos={
     h: 9,
     w: 24,

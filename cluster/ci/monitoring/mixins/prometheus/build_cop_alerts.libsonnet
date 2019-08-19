@@ -18,7 +18,7 @@
               message: '@build-cop `%s` jobs are passing at a rate of {{ $value | humanize }}%%, which is below the target (100%%). Check the <https://grafana-prow-monitoring.svc.ci.openshift.org/d/%s/build-cop-dashboard?orgId=1&fullscreen&panelId=2|dashboard> and <https://prow.svc.ci.openshift.org/?job=%s|deck-portal>.' % [job_name_regex, $._config.grafanaDashboardIDs['build_cop.json'], std.strReplace(job_name_regex, '.*', '*')],
             },
           }
-          for job_name_regex in ['branch-.*-images', 'release-.*-4.1', 'release-.*-4.2', 'release-.*-upgrade.*']
+          for job_name_regex in ['branch-.*-images', 'release-.*-4.1', 'release-.*-4.2', 'release-.*-upgrade.*', 'release-.*4.1.*4.2.*']
         ],
       },
       {
