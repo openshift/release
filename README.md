@@ -7,7 +7,7 @@ OCP.
 ## CI Workflow Configuration
 
 Configuration files for CI workflows live under [`ci-operator/`](./ci-operator/)
-and are split into the following categories:
+and are split into the following categories
 
  - [`ci-operator/config`](./ci-operator/config/) contains configuration for the
    `ci-operator`, detailing builds and tests for component repositories. See the
