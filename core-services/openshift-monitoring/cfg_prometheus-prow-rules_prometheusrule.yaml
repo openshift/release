@@ -38,20 +38,18 @@ items:
       rules:
       - alert: OverCPURequests
         expr: |
-          100 * ( sum(label_replace(pod_name:container_cpu_usage:sum{namespace=~"ci-op-.*"}, "pod", "$1", "pod_name", "(.*)")) by (pod,namespace)
-          / sum(label_join(kube_pod_container_resource_requests_cpu_cores, "pod_name", "", "pod")) by (pod,namespace) ) > 150
+         100 * (sum by(pod)(label_join(pod_name:container_cpu_usage:sum, "pod", "", "pod_name")) * on(pod) group_right(label_component) label_replace(kube_pod_labels {namespace=~"ci-op-.*", label_ci_openshift_io_refs_org!="", label_ci_openshift_io_refs_repo!="", label_ci_openshift_io_refs_branch!=""}, "pod", "$1", "pod", "(.*)")) / on (pod) group_left sum(label_replace(kube_pod_container_resource_requests_cpu_cores, "pod", "$1", "pod", "(.*)")) by (pod) > 150
         for: 5m
         labels:
-          severity: warning
+          severity: critical
         annotations:
-          message: Ci-Op Pod {{$labels.pod}} in namespace {{$labels.namespace}} has over 150% CPU usage than initially requested. Ci-Op Pod {{$labels.pod}} in namespace {{$labels.namespace}} has high CPU usage {{ printf "%0.0f" $value }}.
+          message: '{{$labels.label_ci_openshift_io_refs_org}}/{{$labels.label_ci_openshift_io_refs_repo}}@{{$labels.label_ci_openshift_io_refs_branch}} Pod {{$labels.pod}} in namespace {{$labels.namespace}} has over 150% CPU usage than initially requested. Ci-Op Pod {{$labels.pod}} in namespace {{$labels.namespace}} has high CPU usage {{ printf "%0.0f" $value }}.'
 
       - alert: OverMemoryRequests
         expr: |
-          100 * ( sum(label_replace(container_memory_working_set_bytes{namespace=~"ci-op-.*"}, "pod", "$1", "pod_name", "(.*)")) by (pod,namespace)
-          / sum(label_join(kube_pod_container_resource_requests_memory_bytes, "pod_name", "", "pod")) by (pod,namespace) ) > 150
+          100 * (sum by(pod)(label_join(container_memory_working_set_bytes, "pod", "", "pod_name")) * on(pod) group_right(label_component) label_replace(kube_pod_labels {namespace=~"ci-op-.*", label_ci_openshift_io_refs_org!="", label_ci_openshift_io_refs_repo!="", label_ci_openshift_io_refs_branch!=""}, "pod", "$1", "pod", "(.*)")) / on (pod) group_left sum(label_replace(kube_pod_container_resource_requests_memory_bytes, "pod", "$1", "pod", "(.*)")) by (pod) > 150
         for: 5m
         labels:
-          severity: warning
+          severity: critical
         annotations:
-          message: Ci-Op Pod {{$labels.pod}} in namespace {{$labels.namespace}} has over 150% memory usage than initially requested. Ci-Op Pod {{$labels.pod}} in namespace {{$labels.namespace}} has high memory usage {{ $ value | humanize1024 }}B.
+          message: '{{$labels.label_ci_openshift_io_refs_org}}/{{$labels.label_ci_openshift_io_refs_repo}}@{{$labels.label_ci_openshift_io_refs_branch}} Pod {{$labels.pod}} in namespace {{$labels.namespace}} has over 150% memory usage than initially requested. Ci-Op Pod {{$labels.pod}} in namespace {{$labels.namespace}} has high memory usage {{ $ value | humanize1024 }}B.'
