@@ -4,6 +4,10 @@ base_images:
     name: ansible-runner
     namespace: openshift
     tag: latest
+  os:
+    name: ubi
+    namespace: ocp
+    tag: "7"
 build_root:
   image_stream_tag:
     cluster: https://api.ci.openshift.org
@@ -11,10 +15,34 @@ build_root:
     namespace: openshift
     tag: golang-1.12
 images:
+- dockerfile_path: ci/dockerfiles/builder.Dockerfile
+  from: root
+  to: osdk-builder
 - dockerfile_path: upstream.Dockerfile
   from: ansible_runner
   to: ansible-operator
+- dockerfile_path: ci/dockerfiles/ansible-e2e-hybrid.Dockerfile
+  from: os
+  inputs:
+    osdk-builder:
+      as:
+      - osdk-builder
+      paths: null
+  to: osdk-ansible-e2e-hybrid
+- dockerfile_path: ci/dockerfiles/ansible-e2e.Dockerfile
+  from: ansible-operator
+  inputs:
+    osdk-builder:
+      as:
+      - osdk-builder
+      paths: null
+  to: osdk-ansible-e2e
 promotion:
+  excluded_images:
+  - osdk-builder
+  - osdk-ansible-e2e
+  - osdk-ansible-e2e-hybrid
+  - memcached-operator
   name: "4.2"
   namespace: ocp
 resources:
