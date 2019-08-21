@@ -14,7 +14,7 @@
               severity: 'slack',
             },
             annotations: {
-              message: 'ipi-deprovision has failures. Check on <https://grafana-prow-monitoring.svc.ci.openshift.org/d/8ce131e226b7fd2901c2fce45d4e21c1/dptp-dashboard?orgId=1&fullscreen&panelId=2|grafana>',
+              message: 'ipi-deprovision has failures. Check on <https://grafana-prow-monitoring.svc.ci.openshift.org/d/%s/dptp-dashboard?orgId=1&fullscreen&panelId=2|grafana> and <https://prow.svc.ci.openshift.org/?type=periodic&job=periodic-ipi-deprovision|deck>' % $._config.grafanaDashboardIDs['dptp.json'],
             },
           }
         ],
