@@ -26,7 +26,8 @@ prow-monitoring-deploy: ci-secret-deploy
 	oc create -n prow-monitoring secret generic grafana-config --from-file=./grafana.ini --dry-run -o yaml | oc apply -f -
 
 	# Fill prometheus-k8s basicAuthPassword in datasources file.
-	sed -i -e "s|CHANGE_ME|$(prometheus-k8s_token)|g" ./datasources.yaml
+	@echo "replacing the token in ./datasources.yaml ..."
+	@sed -i -e "s|CHANGE_ME|$(prometheus-k8s_token)|g" ./datasources.yaml
 	oc create -n prow-monitoring configmap grafana-datasources --from-file=./datasources.yaml --dry-run -o yaml | oc apply -f -
 
 	#Those config are deployed by config_uploader; we leave those here for manual debugging
@@ -42,7 +43,8 @@ slack_api_url := $(shell oc get secret -n ci ci-slack-api-url -o json | jq -r .d
 ci-secret-deploy:
 	@echo "deploy ci secret ..."
 	#TODO: reference a value should be doable with jsonnet
-	sed -e "s|{{ api_url }}|$(slack_api_url)|g" ./alertmanager.yaml > /tmp/alertmanager_with_secret.yaml
+	@echo "replacing the api_url in ./alertmanager.yaml ..."
+	@sed -e "s|{{ api_url }}|$(slack_api_url)|g" ./alertmanager.yaml > /tmp/alertmanager_with_secret.yaml
 	oc create -n prow-monitoring secret generic alertmanager-prow --from-file=alertmanager.yaml=/tmp/alertmanager_with_secret.yaml --from-file=./msg.tmpl --dry-run -o yaml | oc apply -f -
 	sha256sum /tmp/alertmanager_with_secret.yaml
 	rm -fv /tmp/alertmanager_with_secret.yaml
@@ -103,7 +105,8 @@ grafana-debug-deploy:
 	# oc adm policy add-role-to-group admin ci-admins --as system:admin -n prow-monitoring-stage
 	oc get project prow-monitoring-stage
 	oc create -n prow-monitoring-stage configmap grafana-config --from-file=./debug/grafana.ini --dry-run -o yaml | oc apply -f -
-	sed -i -e "s|CHANGE_ME|$(grafana_password)|g" ./debug/grafana_secret.yaml
+	@echo "replacing the password in ./debug/grafana_secret.yaml ..."
+	@sed -i -e "s|CHANGE_ME|$(grafana_password)|g" ./debug/grafana_secret.yaml
 	oc apply -f ./debug/grafana_secret.yaml
 	git checkout ./debug/grafana_secret.yaml
 	oc get secret -n openshift-monitoring --as system:admin grafana-datasources -o json | jq -r '.data["prometheus.yaml"]' | base64 -d | jq '.datasources[].name = "prometheus-k8s"' > /tmp/prometheus-k8s.yaml
