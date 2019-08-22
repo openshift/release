@@ -91,15 +91,6 @@ function format_attachment() {
 	echo "--from-file=${name}=$(get_attachment "${item}" "${attachment}")"
 }
 
-# merge all pull secret credentials into a single json
-# object
-function merge_pull_secrets() {
-	local quay_io
-	quay_io="$(get_field_value quay.io 'Pull Credentials')"
-	printf '%s\n' "${quay_io}" \
-		| jq --slurp --compact-output 'reduce .[] as $x ({}; . * $x)'
-}
-
 function update_secret() {
     local name
     name=$2
@@ -217,7 +208,7 @@ update_secret generic "cluster-secrets-${target_cloud}"                         
 
 target_cloud="openstack"
 update_secret generic "cluster-secrets-${target_cloud}"              \
-	--from-literal=pull-secret="$(merge_pull_secrets)"               \
+	"$( format_attachment "quay.io" pull-secret )"               \
 	"$( format_attachment "openstack" clouds.yaml )"                 \
 	"$( format_attachment "insights-ci-account" insights-live.yaml )" \
 	"$( format_attachment "jenkins-ci-provisioner" ssh-privatekey )" \
