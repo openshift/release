@@ -41,7 +41,7 @@ applyTemplate:
 	oc process -f $(WHAT) | oc apply -f -
 .PHONY: applyTemplate
 
-postsubmit-update: prow-services origin-release libpod prow-monitoring build-dashboards-validation-image cincinnati
+postsubmit-update: prow-services origin-release libpod prow-monitoring build-dashboards-validation-image cincinnati prow-release-controller-definitions
 .PHONY: postsubmit-update
 
 all: roles prow projects
