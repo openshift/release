@@ -15,10 +15,10 @@ items:
       rules:
       - alert: OverCPURequests
         expr: |
-          100 * (label_replace(pod_name:container_cpu_usage:sum, "pod", "$1", "pod_name", "(.*)")
-          * on (pod) label_replace(kube_pod_labels{pod!="",label_app="prow"}, "pod_name", "$1", "pod", "(.*)")
+          100 * (sum by(pod)(pod_name:container_cpu_usage:sum{namespace="ci",container_name!="POD"}
+          * on (pod_name) group_left(pod) label_replace(kube_pod_labels{pod!="",label_app="prow"}, "pod_name", "$1", "pod", "(.*)"))
           / sum(kube_pod_container_resource_requests_cpu_cores) by (pod)) > 150
-        for: 5m
+        for: 30m
         labels:
           severity: critical
         annotations:
@@ -29,7 +29,7 @@ items:
           100 * (sum by(pod)(container_memory_working_set_bytes{namespace="ci",container_name!="POD"}
           * on (pod_name) group_left(pod) label_replace(kube_pod_labels{pod!="",label_app="prow"}, "pod_name", "$1", "pod", "(.*)"))
           / sum(kube_pod_container_resource_requests_memory_bytes) by (pod)) > 150
-        for: 5m
+        for: 30m
         labels:
           severity: critical
         annotations:
