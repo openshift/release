@@ -5,63 +5,6 @@ periodics:
   decoration_config:
     skip_cloning: true
   interval: 24h
-  name: periodic-ci-azure-bushslicer
-  spec:
-    containers:
-    - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --git-ref=openshift/openshift-azure@master
-      - --secret-dir=/usr/local/e2e-secrets/azure
-      - --target=[output:stable:azure]
-      - --target=cluster-launch-e2e-azure
-      - --template=/usr/local/cluster-launch-e2e-azure.yaml
-      command:
-      - ci-operator
-      env:
-      - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-openshift-azure-master.yaml
-            name: ci-operator-master-configs
-      - name: TEST_IMAGE
-        value: quay.io/kwoodson/bushslicer
-      - name: TEST_COMMAND
-        value: tools/openshift-ci/verification_tests_ci_entrypoint.sh
-      - name: BUSHSLICER_TEST_ENVIRONMENT
-        value: online_starter
-      - name: BUSHSLICER_TEST_CONFIG
-        value: '{"global": {"browser": "firefox_marionette"}}'
-      - name: BUSHSLICER_TEST_FORMAT
-        value: html
-      - name: BUSHSLICER_TEST_RESULTS
-        value: /tmp/artifacts/bushslicer-report.html
-      - name: BUSHSLICER_USER
-        value: customer-cluster-admin
-      - name: BUSHSLICER_USER_PW_STRING
-        value: customerAdminPasswd
-      image: ci-operator:latest
-      name: ""
-      resources: {}
-      volumeMounts:
-      - mountPath: /usr/local/e2e-secrets/azure
-        name: cluster-secrets-azure
-      - mountPath: /usr/local/cluster-launch-e2e-azure.yaml
-        name: job-definition
-        subPath: cluster-launch-e2e-azure.yaml
-    serviceAccountName: ci-operator
-    volumes:
-    - name: cluster-secrets-azure
-      secret:
-        secretName: cluster-secrets-azure
-    - configMap:
-        name: prow-job-cluster-launch-e2e-azure
-      name: job-definition
-- agent: ""
-  cron: ""
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  interval: 24h
   name: periodic-ci-azure-conformance
   spec:
     containers:
