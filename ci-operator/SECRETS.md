@@ -78,8 +78,9 @@ currently exist:
 |        Key        | Description |
 | ----------------- | ----------- |
 | `clouds.yaml`     | Credentials for the openstack cloud. See the [Openstack docs](https://docs.openstack.org/python-openstackclient/pike/configuration/index.html). |
+| `ssh-privatekey`   | Private half of the SSH key, for connecting to OpenStack Nova VMs. |
 | `ssh-publickey`   | Public half of the SSH key, for connecting to OpenStack Nova VMs. |
-| `pull-secret`     | Credentials for pulling OpenShift images from Quay. |
+| `pull-secret`    | Credentials for pulling OpenShift images from Quay and for authenticating to telemetry. Retrieved from [try.openshift.com](https://try.openshift.com) under the ccoleman+openshift-ci-test@redhat.com account, and has the service account token from the `ocp` namespace added with `oc registry login --to=/tmp/pull-secret -z default -n ocp`.|
 
 #### `cluster-secrets-metal`
 
