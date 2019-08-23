@@ -131,3 +131,7 @@ grafana-debug-cleanup:
 generate-mixins:
 	@echo "generating mixins ..."
 	make -C mixins all
+
+.PHONY : staging-password
+staging-password:
+	oc get secret -n prow-monitoring-stage grafana -o jsonpath='{.data.password}' | base64 -d | xclip -sel c
