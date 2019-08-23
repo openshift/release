@@ -340,6 +340,8 @@ objects:
         value: ${BASE_DOMAIN}
       - name: SSH_PUB_KEY_PATH
         value: /etc/openshift-installer/ssh-publickey
+      - name: SSH_PRIVATE_KEY_PATH
+        value: /etc/openshift-installer/ssh-privatekey
       - name: PULL_SECRET_PATH
         value: /etc/openshift-installer/pull-secret
       - name: TFVARS_PATH
@@ -362,6 +364,15 @@ objects:
         set -e
         trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/setup-success; else touch /tmp/exit; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+
+        GATHER_BOOTSTRAP_ARGS=
+
+        function gather_bootstrap_and_fail() {
+          if test -n "${GATHER_BOOTSTRAP_ARGS}"; then
+            openshift-install --dir=/tmp/artifacts/installer gather bootstrap --key "${SSH_PRIVATE_KEY_PATH}" ${GATHER_BOOTSTRAP_ARGS}
+          fi
+          return 1
+        }
 
         while true; do
           if [[ -f /tmp/exit ]]; then
@@ -591,6 +602,7 @@ objects:
 
           BOOTSTRAP_IP="$(aws cloudformation describe-stacks --stack-name "${CLUSTER_NAME}-bootstrap" \
             --query 'Stacks[].Outputs[?OutputKey == `BootstrapPublicIp`].OutputValue' --output text)"
+          GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --bootstrap ${BOOTSTRAP_IP}"
 
           aws cloudformation create-stack \
             --stack-name "${CLUSTER_NAME}-control-plane" \
@@ -622,6 +634,7 @@ objects:
           CONTROL_PLANE_0_IP="$(echo "${CONTROL_PLANE_IPS}" | cut -d, -f1)"
           CONTROL_PLANE_1_IP="$(echo "${CONTROL_PLANE_IPS}" | cut -d, -f2)"
           CONTROL_PLANE_2_IP="$(echo "${CONTROL_PLANE_IPS}" | cut -d, -f3)"
+          GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --master ${CONTROL_PLANE_0_IP} --master ${CONTROL_PLANE_1_IP} --master ${CONTROL_PLANE_2_IP}"
 
           for INDEX in 0 1 2
           do
@@ -708,7 +721,7 @@ objects:
 
         echo "Waiting for bootstrap to complete"
         openshift-install --dir=/tmp/artifacts/installer wait-for bootstrap-complete &
-        wait "$!"
+        wait "$!" || gather_bootstrap_and_fail
 
         echo "Bootstrap complete, destroying bootstrap resources"
         if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
