@@ -60,6 +60,36 @@ dashboard.new(
 
 .addPanel(
   (graphPanel.new(
+     'CPU Saturation',
+     description='CPU Request Saturation',
+     datasource='prometheus-k8s',
+     legend_alignAsTable=true,
+     legend_rightSide=true,
+     legend_values=true,
+     legend_avg=true,
+     legend_max=true,
+     legend_sort='max',
+     legend_sortDesc=true,
+     min='1.5',
+     formatY1='percentunit',
+     logBase1Y='10',
+     fill=0,
+   ) + legendConfig)
+  .addTarget(
+    prometheus.target(
+      '(sum by(pod)(pod_name:container_cpu_usage:sum{namespace="ci",container_name!="POD"} * on (pod_name) group_left(pod) label_replace(kube_pod_labels{pod!="",label_app="prow"}, "pod_name", "$1", "pod", "(.*)"))/ sum(kube_pod_container_resource_requests_cpu_cores) by (pod)) > 1.5',
+      legendFormat='{{pod}}',
+    )
+  ), gridPos={
+    h: 9,
+    w: 24,
+    x: 0,
+    y: 0,
+  }
+)
+
+.addPanel(
+  (graphPanel.new(
      'Memory',
      description='Memory usage',
      datasource='prometheus-k8s',
@@ -71,6 +101,36 @@ dashboard.new(
     prometheus.target(
       'sum(container_memory_working_set_bytes{namespace="ci",container_name!="POD"} * on (pod_name) group_left(label_component) label_replace(kube_pod_labels{pod!="",label_app="prow"}, "pod_name", "$1", "pod", "(.*)")) by (label_component)',
       legendFormat='{{label_component}}'
+    )
+  ), gridPos={
+    h: 9,
+    w: 24,
+    x: 0,
+    y: 0,
+  }
+)
+
+.addPanel(
+  (graphPanel.new(
+     'Memory Saturation',
+     description='Memory Request Saturation',
+     datasource='prometheus-k8s',
+     legend_alignAsTable=true,
+     legend_rightSide=true,
+     legend_values=true,
+     legend_max=true,
+     legend_avg=true,
+     legend_sort='max',
+     legend_sortDesc=true,
+     min='1.5',
+     formatY1='percentunit',
+     logBase1Y='10',
+     fill=0,
+   ) + legendConfig)
+  .addTarget(
+    prometheus.target(
+      '(sum by(pod)(container_memory_working_set_bytes{namespace="ci",container_name!="POD"} * on (pod_name) group_left(pod) label_replace(kube_pod_labels{pod!="",label_app="prow"}, "pod_name", "$1", "pod", "(.*)"))/ sum(kube_pod_container_resource_requests_memory_bytes) by (pod)) > 1.5',
+      legendFormat='{{pod}}',
     )
   ), gridPos={
     h: 9,
