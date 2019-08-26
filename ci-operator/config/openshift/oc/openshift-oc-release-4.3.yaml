@@ -3,6 +3,10 @@ base_images:
     name: "4.3"
     namespace: ocp
     tag: base
+  tests-base:
+    name: "4.3"
+    namespace: ocp
+    tag: tests
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
@@ -19,6 +23,14 @@ images:
       - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
       paths: null
   to: cli
+- dockerfile_path: images/cli/Dockerfile.rhel
+  from: tests-base
+  inputs:
+    bin:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
+      paths: null
+  to: tests
 - context_dir: images/deployer/
   dockerfile_path: Dockerfile.rhel
   from: cli
@@ -32,6 +44,8 @@ images:
   from: cli
   to: recycler
 promotion:
+  excluded_images:
+  - tests
   name: "4.3"
   namespace: ocp
 resources:
