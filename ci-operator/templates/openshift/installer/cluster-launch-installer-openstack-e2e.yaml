@@ -432,10 +432,6 @@ objects:
           else
               echo "No terraform statefile found. Skipping collection of bootstrap logs."
           fi
-          # WORKAROUND https://github.com/openshift/installer/issues/1467
-          # We need this to be able to collect logs
-          oc --insecure-skip-tls-verify --request-timeout=5s get csr -o name | xargs oc --insecure-skip-tls-verify --request-timeout=5s adm certificate approve
-
           oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' > /tmp/nodes
           oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces --template '{{ range .items }}{{ $name := .metadata.name }}{{ $ns := .metadata.namespace }}{{ range .spec.containers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ range .spec.initContainers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ end }}' > /tmp/containers
           oc --insecure-skip-tls-verify --request-timeout=5s get pods -l openshift.io/component=api --all-namespaces --template '{{ range .items }}-n {{ .metadata.namespace }} {{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/pods-api
