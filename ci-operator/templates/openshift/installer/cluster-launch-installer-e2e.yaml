@@ -21,6 +21,7 @@ parameters:
   required: true
 - name: BASE_DOMAIN
 - name: CLUSTER_NETWORK_MANIFEST
+- name: DEBUG_INGRESS_LOGGING
 - name: CLUSTER_NETWORK_TYPE
 - name: ENABLE_FIPS
 - name: ENABLE_PROXY
@@ -840,9 +841,20 @@ objects:
         fi
 
         # TODO: Replace with a more concise manifest injection approach
-        if [[ -n "${CLUSTER_NETWORK_MANIFEST}" ]]; then
+        if [[ -n "${CLUSTER_NETWORK_MANIFEST}${DEBUG_INGRESS_LOGGING}" ]]; then
             openshift-install --dir=/tmp/artifacts/installer/ create manifests
-            echo "${CLUSTER_NETWORK_MANIFEST}" > /tmp/artifacts/installer/manifests/cluster-network-03-config.yml
+            if [[ -n "${CLUSTER_NETWORK_MANIFEST}" ]]; then
+                echo "${CLUSTER_NETWORK_MANIFEST}" > /tmp/artifacts/installer/manifests/cluster-network-03-config.yml
+            fi
+            if [[ -n "${DEBUG_INGRESS_LOGGING}" ]]; then
+                INGRESS_CONFIG_MANIFEST=/tmp/artifacts/installer/manifests/cluster-ingress-02-config.yml
+                if [[ -f  "${INGRESS_CONFIG_MANIFEST}" ]]; then
+                    if ! grep -q -e annotations: "${INGRESS_CONFIG_MANIFEST}"; then
+                        sed -i -e $'/metadata:/a \\\n  annotations:' "${INGRESS_CONFIG_MANIFEST}"
+                    fi
+                    sed -i -e $'/annotations:/a \\\n    ingress.operator.openshift.io/unsupported-logging: debug' "${INGRESS_CONFIG_MANIFEST}"
+                fi
+            fi
         fi
 
         TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create cluster &
