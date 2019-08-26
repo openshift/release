@@ -387,6 +387,10 @@ objects:
           touch /tmp/shared/exit
           export PATH=$PATH:/tmp/shared
 
+          echo "Removing entries from DNS ..."
+          curl -v -X POST $CI_DNS_IP:8080 -d '{"name": "'api.$CLUSTER_NAME'", "action":"remove"}'
+          curl -v -X POST $CI_DNS_IP:8080 -d '{"name": "'*.apps.$CLUSTER_NAME'", "action":"remove"}'
+
           echo "Gathering artifacts ..."
           mkdir -p /tmp/artifacts/pods /tmp/artifacts/nodes /tmp/artifacts/metrics /tmp/artifacts/bootstrap /tmp/artifacts/network
 
@@ -510,10 +514,6 @@ objects:
           echo "Deprovisioning cluster ..."
           openshift-install --dir /tmp/artifacts/installer destroy cluster
           DELETE_FAIL=$?
-
-          echo "Removing entries from DNS ..."
-          curl -v -X POST $CI_DNS_IP:8080 -d '{"name": "'api.$CLUSTER_NAME'", "action":"remove"}'
-          curl -v -X POST $CI_DNS_IP:8080 -d '{"name": "'*.apps.$CLUSTER_NAME'", "action":"remove"}'
 
           echo "Nuking any resources left"
           nuke
