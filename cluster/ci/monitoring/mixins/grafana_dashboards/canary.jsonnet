@@ -55,6 +55,22 @@ dashboard.new(
     .addTarget(prometheus.target(
         'sum(rate(prowjob_state_transitions{job="plank",job_name=~"canary-openshift-ocp-installer-e2e-gcp-fips.*-4.2",job_name!~"rehearse.*",state="success"}[48h]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~"canary-openshift-ocp-installer-e2e-gcp-fips.*-4.2",job_name!~"rehearse.*",state=~"success|failure"}[48h]))',
         legendFormat='GCP IPI FIPS',
+    ))
+    .addTarget(prometheus.target(
+        'sum(rate(prowjob_state_transitions{job="plank",job_name=~"canary-openshift-ocp-installer-e2e-aws-upi.*-4.2",job_name!~"rehearse.*",state="success"}[48h]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~"canary-openshift-ocp-installer-e2e-aws-upi.*-4.2",job_name!~"rehearse.*",state=~"success|failure"}[48h]))',
+        legendFormat='AWS UPI',
+    ))
+    .addTarget(prometheus.target(
+        'sum(rate(prowjob_state_transitions{job="plank",job_name=~"canary-openshift-ocp-installer-e2e-vsphere-upi.*-4.2",job_name!~"rehearse.*",state="success"}[48h]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~"canary-openshift-ocp-installer-e2e-vsphere-upi.*-4.2",job_name!~"rehearse.*",state=~"success|failure"}[48h]))',
+        legendFormat='VSphere UPI',
+    ))
+    .addTarget(prometheus.target(
+        'sum(rate(prowjob_state_transitions{job="plank",job_name=~"canary-openshift-ocp-installer-e2e-metal.*-4.2",job_name!~"rehearse.*",state="success"}[48h]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~"canary-openshift-ocp-installer-e2e-metal.*-4.2",job_name!~"rehearse.*",state=~"success|failure"}[48h]))',
+        legendFormat='Metal UPI',
+    ))
+    .addTarget(prometheus.target(
+        'sum(rate(prowjob_state_transitions{job="plank",job_name=~"canary-openshift-ocp-installer-e2e-openstack.*-4.2",job_name!~"rehearse.*",state="success"}[48h]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~"canary-openshift-ocp-installer-e2e-openstack.*-4.2",job_name!~"rehearse.*",state=~"success|failure"}[48h]))',
+        legendFormat='Openstack',
     )), gridPos={
     h: 9,
     w: 24,
