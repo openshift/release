@@ -47,8 +47,13 @@ promotion:
   disabled: true
   excluded_images:
   - tests
+  - oc-base-with-rpms
   name: "4.2"
   namespace: ocp
+raw_steps:
+- rpm_image_injection_step:
+    from: base
+    to: oc-base-with-rpms
 resources:
   '*':
     limits:
@@ -63,6 +68,10 @@ tag_specification:
   namespace: ocp
 test_binary_build_commands: make build GOFLAGS='-race' --warn-undefined-variables
 tests:
+- as: test-rpms
+  commands: "# noop, just to force the image to be built"
+  container:
+    from: oc-base-with-rpms
 - as: verify
   commands: |
     make verify -k --warn-undefined-variables
