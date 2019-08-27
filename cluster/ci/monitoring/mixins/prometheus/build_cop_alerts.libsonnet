@@ -7,7 +7,7 @@
           {
             alert: '%s-low' % job_name_regex,
             expr: |||
-              sum(rate(prowjob_state_transitions{job="plank",job_name=~"%s",job_name!~"rehearse.*",state="success"}[30m]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~"%s",job_name!~"rehearse.*",state=~"success|failure"}[30m])) * 100 < 100
+              sum(rate(prowjob_state_transitions{job="plank",job_name=~"%s",job_name!~"rehearse.*",state="success"}[30m]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~"%s",job_name!~"rehearse.*",state=~"success|failure"}[30m])) * 100 < 80
             ||| % [job_name_regex, job_name_regex],
             'for': '30m',
             labels: {
