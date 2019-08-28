@@ -2,7 +2,7 @@
   prometheusAlerts+:: {
     groups+: [
       {
-        name: 'configmap-full',
+        name: 'sinker-missing',
         rules: [
           {
             alert: 'SinkerNotRemovingPods',
