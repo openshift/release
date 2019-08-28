@@ -1,0 +1,33 @@
+base_images:
+  cosa:
+    cluster: https://api.ci.openshift.org
+    namespace: rhcos
+    name: coreos-assembler
+    tag: master
+
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    namespace: rhcos
+    name: coreos-assembler
+    tag: master
+
+images:
+- dockerfile_path: ci/prow/Dockerfile
+  from: cosa
+  to: rpm-ostree-ci
+
+tests:
+- as: sanity
+  commands: rpm-ostree --version
+  container:
+    from: rpm-ostree-ci
+
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+
