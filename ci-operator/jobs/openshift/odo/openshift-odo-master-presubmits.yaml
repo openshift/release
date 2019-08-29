@@ -4,15 +4,16 @@ presubmits:
     always_run: true
     branches:
     - master
-    context: ci/prow/benchmark
+    context: ci/prow/v4.1-benchmark
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: v4.1
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-odo-master-benchmark
-    rerun_command: /test benchmark
+    name: pull-ci-openshift-odo-master-v4.1-benchmark
+    rerun_command: /test v4.1-benchmark
     spec:
       containers:
       - args:
@@ -30,7 +31,7 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-odo-master.yaml
+              key: openshift-odo-master__v4.1.yaml
               name: ci-operator-master-configs
         - name: JOB_NAME_SAFE
           value: benchmark
@@ -64,20 +65,21 @@ presubmits:
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )benchmark,?($|\s.*)
+    trigger: (?m)^/test( | .* )v4.1-benchmark,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - master
-    context: ci/prow/e2e-scenarios
+    context: ci/prow/v4.1-e2e-scenarios
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: v4.1
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-odo-master-e2e-scenarios
-    rerun_command: /test e2e-scenarios
+    name: pull-ci-openshift-odo-master-v4.1-e2e-scenarios
+    rerun_command: /test v4.1-e2e-scenarios
     spec:
       containers:
       - args:
@@ -95,7 +97,7 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-odo-master.yaml
+              key: openshift-odo-master__v4.1.yaml
               name: ci-operator-master-configs
         - name: JOB_NAME_SAFE
           value: e2e-scenarios
@@ -129,20 +131,21 @@ presubmits:
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )e2e-scenarios,?($|\s.*)
+    trigger: (?m)^/test( | .* )v4.1-e2e-scenarios,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - master
-    context: ci/prow/integration
+    context: ci/prow/v4.1-integration
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: v4.1
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-odo-master-integration
-    rerun_command: /test integration
+    name: pull-ci-openshift-odo-master-v4.1-integration
+    rerun_command: /test v4.1-integration
     spec:
       containers:
       - args:
@@ -160,7 +163,7 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-odo-master.yaml
+              key: openshift-odo-master__v4.1.yaml
               name: ci-operator-master-configs
         - name: JOB_NAME_SAFE
           value: integration
@@ -194,21 +197,66 @@ presubmits:
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )integration,?($|\s.*)
+    trigger: (?m)^/test( | .* )v4.1-integration,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - master
-    context: ci/prow/variant-benchmark
+    context: ci/prow/v4.1-unit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: variant
+      ci-operator.openshift.io/variant: v4.1
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-odo-master-variant-benchmark
-    rerun_command: /test variant-benchmark
+    name: pull-ci-openshift-odo-master-v4.1-unit
+    rerun_command: /test v4.1-unit
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=unit
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-odo-master__v4.1.yaml
+              name: ci-operator-master-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )v4.1-unit,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/v4.2-benchmark
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: v4.2
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-odo-master-v4.2-benchmark
+    rerun_command: /test v4.2-benchmark
     spec:
       containers:
       - args:
@@ -226,7 +274,7 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-odo-master__variant.yaml
+              key: openshift-odo-master__v4.2.yaml
               name: ci-operator-master-configs
         - name: JOB_NAME_SAFE
           value: benchmark
@@ -260,21 +308,21 @@ presubmits:
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )variant-benchmark,?($|\s.*)
+    trigger: (?m)^/test( | .* )v4.2-benchmark,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - master
-    context: ci/prow/variant-e2e-scenarios
+    context: ci/prow/v4.2-e2e-scenarios
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: variant
+      ci-operator.openshift.io/variant: v4.2
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-odo-master-variant-e2e-scenarios
-    rerun_command: /test variant-e2e-scenarios
+    name: pull-ci-openshift-odo-master-v4.2-e2e-scenarios
+    rerun_command: /test v4.2-e2e-scenarios
     spec:
       containers:
       - args:
@@ -292,12 +340,12 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-odo-master__variant.yaml
+              key: openshift-odo-master__v4.2.yaml
               name: ci-operator-master-configs
         - name: JOB_NAME_SAFE
           value: e2e-scenarios
         - name: TEST_COMMAND
-          value: scripts/openshiftci-presubmit-e2e-scenarios.sh
+          value: scripts/openshiftci-presubmit-e2etests.sh
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -326,21 +374,21 @@ presubmits:
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )variant-e2e-scenarios,?($|\s.*)
+    trigger: (?m)^/test( | .* )v4.2-e2e-scenarios,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - master
-    context: ci/prow/variant-integration
+    context: ci/prow/v4.2-integration
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: variant
+      ci-operator.openshift.io/variant: v4.2
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-odo-master-variant-integration
-    rerun_command: /test variant-integration
+    name: pull-ci-openshift-odo-master-v4.2-integration
+    rerun_command: /test v4.2-integration
     spec:
       containers:
       - args:
@@ -358,12 +406,12 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-odo-master__variant.yaml
+              key: openshift-odo-master__v4.2.yaml
               name: ci-operator-master-configs
         - name: JOB_NAME_SAFE
           value: integration
         - name: TEST_COMMAND
-          value: make openshiftci-presubmit-e2e
+          value: scripts/openshiftci-presubmit-integrationtests.sh
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -392,49 +440,4 @@ presubmits:
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )variant-integration,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    context: ci/prow/variant-unit
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: variant
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-odo-master-variant-unit
-    rerun_command: /test variant-unit
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=unit
-        command:
-        - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-odo-master__variant.yaml
-              name: ci-operator-master-configs
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )variant-unit,?($|\s.*)
+    trigger: (?m)^/test( | .* )v4.2-integration,?($|\s.*)
