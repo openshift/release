@@ -40,6 +40,17 @@ tests:
     go test -v ./...
   container:
     from: src
+- as: verify-latest-csv
+  commands: |
+    RETVAL=0
+    CSV_CHECKSUM_ONLY=1 make gen-latest-csv || exit 1
+    if [[ -n "$(git status --porcelain)" ]]; then
+        echo "uncommitted CSV changes. run `make gen-latest-csv` and commit results."
+        exit 1
+    fi
+    exit 0
+  container:
+    from: src
 - as: gobuild
   commands: |
     go build github.com/openshift/ocs-operator/cmd/manager
