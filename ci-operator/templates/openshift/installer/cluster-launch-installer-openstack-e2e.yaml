@@ -354,35 +354,6 @@ objects:
             "${@}" >"${TARGET}" &
           fi
         }
-        function nuke() {
-          export PREFIX=$(grep cluster_id /tmp/artifacts/installer/terraform.tfvars | cut -d '"' -f4)
-          openstack server list -c ID -f value --name $PREFIX | xargs --no-run-if-empty openstack server delete
-
-          openstack router remove subnet $PREFIX-external-router $PREFIX-service
-          openstack router remove subnet $PREFIX-external-router $PREFIX-nodes
-          # delete interfaces from the router
-          openstack network trunk list -c Name -f value | grep $PREFIX | xargs --no-run-if-empty openstack network trunk delete
-          openstack port list --network $PREFIX-openshift -c ID -f value | xargs --no-run-if-empty openstack port delete
-
-          # delete interfaces from the router
-          PORT=$(openstack router show $PREFIX-external-router -c interfaces_info -f value | cut -d '"' -f 12)
-          openstack router remove port $PREFIX-external-router $PORT
-
-
-          openstack router unset --external-gateway $PREFIX-external-router
-          openstack router delete $PREFIX-external-router
-
-          openstack network delete $PREFIX-openshift
-
-          openstack security group delete $PREFIX-api
-          openstack security group delete $PREFIX-master
-          openstack security group delete $PREFIX-worker
-
-
-          CONTAINER=$PREFIX
-          openstack object list -f value $CONTAINER | xargs --no-run-if-empty openstack object delete $CONTAINER
-          openstack container delete $CONTAINER
-        }
 
         function teardown() {
           set +e
@@ -432,10 +403,6 @@ objects:
           else
               echo "No terraform statefile found. Skipping collection of bootstrap logs."
           fi
-          # WORKAROUND https://github.com/openshift/installer/issues/1467
-          # We need this to be able to collect logs
-          oc --insecure-skip-tls-verify --request-timeout=5s get csr -o name | xargs oc --insecure-skip-tls-verify --request-timeout=5s adm certificate approve
-
           oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' > /tmp/nodes
           oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces --template '{{ range .items }}{{ $name := .metadata.name }}{{ $ns := .metadata.namespace }}{{ range .spec.containers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ range .spec.initContainers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ end }}' > /tmp/containers
           oc --insecure-skip-tls-verify --request-timeout=5s get pods -l openshift.io/component=api --all-namespaces --template '{{ range .items }}-n {{ .metadata.namespace }} {{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/pods-api
@@ -516,13 +483,9 @@ objects:
 
           echo "Deprovisioning cluster ..."
           openshift-install --dir /tmp/artifacts/installer destroy cluster
-          DELETE_FAIL=$?
-
-          echo "Nuking any resources left"
-          nuke
         }
 
-        trap 'teardown; exit $DELETE_FAIL' EXIT
+        trap 'teardown' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
 
         for i in $(seq 1 180); do
