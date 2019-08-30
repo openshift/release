@@ -6,8 +6,16 @@ base_images:
     tag: "30"
 
 build_root:
-  project_image:
-    dockerfile_path: ci/prow/Dockerfile
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+
+images:
+- from: f30
+  dockerfile_path: ci/prow/Dockerfile
+  to: ostree-ci
 
 resources:
   '*':
@@ -24,7 +32,7 @@ resources:
       memory: 5Gi
 
 tests:
-- as: yaml-lint
-  commands: dist/prow_yaml_lint.sh
+- as: sanity
+  commands: ostree --version
   container:
-    from: src
+    from: ostree-ci
