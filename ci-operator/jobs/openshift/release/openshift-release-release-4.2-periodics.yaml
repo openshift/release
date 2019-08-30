@@ -2260,16 +2260,16 @@ periodics:
     job-release: '4.2'
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   interval: 4h
-  name: canary-openshift-ocp-installer-e2e-openstack-4.2
+  name: canary-openshift-ocp-installer-e2e-openstack-serial-4.2
   spec:
     containers:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
       - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-openstack-cluster-profile
-      - --target=e2e-openstack
-      - --template=/usr/local/e2e-openstack
+      - --secret-dir=/usr/local/e2e-openstack-serial-cluster-profile
+      - --target=e2e-openstack-serial
+      - --template=/usr/local/e2e-openstack-serial
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       command:
@@ -2298,8 +2298,12 @@ periodics:
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-serial
+            commands: TEST_SUITE=openshift/conformance/serial run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
       - name: JOB_NAME_SAFE
-        value: e2e-openstack
+        value: e2e-openstack-serial
       - name: KURYR_ENABLED
         value: "false"
       - name: TEST_COMMAND
@@ -2311,9 +2315,9 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /usr/local/e2e-openstack-cluster-profile
+      - mountPath: /usr/local/e2e-openstack-serial-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/e2e-openstack
+      - mountPath: /usr/local/e2e-openstack-serial
         name: job-definition
         subPath: cluster-launch-installer-openstack-e2e.yaml
       - mountPath: /usr/local/pull-secret
