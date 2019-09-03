@@ -13,7 +13,7 @@
             |||,
             'for': '5m',
             labels: {
-              severity: 'critical',
+              severity: 'slack',
             },
             annotations: {
               message: 'Based on recent sampling, the ConfigMap {{ $labels.name }} in Namespace {{ $labels.namespace }} is expected to fill up within a week. Currently {{ printf "%0.2f" $value }}% is available.',
