@@ -2331,3 +2331,72 @@ periodics:
     - name: pull-secret
       secret:
         secretName: ci-pull-credentials
+- agent: kubernetes
+  cron: ""
+  decorate: true
+  interval: 12h
+  extra_refs:
+  - base_ref: release-4.2
+    org: openshift
+    repo: openshift-ansible
+    workdir: true
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: canary-openshift-openshift-ansible-e2e-aws-scaleup-rhel7-4.2
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --give-pr-author-access-to-namespace=true
+      - --secret-dir=/usr/local/e2e-aws-scaleup-rhel7-cluster-profile
+      - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+      - --target=e2e-aws-scaleup-rhel7
+      - --template=/usr/local/e2e-aws-scaleup-rhel7
+      command:
+      - ci-operator
+      env:
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: CONFIG_SPEC
+        valueFrom:
+          configMapKeyRef:
+            key: openshift-openshift-ansible-release-4.2.yaml
+            name: ci-operator-4.2-configs
+      - name: JOB_NAME_SAFE
+        value: e2e-aws-scaleup-rhel7
+      - name: RPM_REPO_CRIO_DIR
+        value: 4.2-rhel-7
+      - name: RPM_REPO_OPENSHIFT_ORIGIN
+        value: https://rpms.svc.ci.openshift.org/openshift-origin-v4.2/
+      - name: TEST_COMMAND
+        value: TEST_SUITE=openshift/conformance/parallel run-tests
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/e2e-aws-scaleup-rhel7-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/e2e-aws-scaleup-rhel7
+        name: job-definition
+        subPath: cluster-scaleup-e2e-40.yaml
+      - mountPath: /etc/sentry-dsn
+        name: sentry-dsn
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+        - configMap:
+            name: cluster-profile-aws-centos-40
+    - configMap:
+        name: prow-job-cluster-scaleup-e2e-40
+      name: job-definition
+    - name: sentry-dsn
+      secret:
+        secretName: sentry-dsn
