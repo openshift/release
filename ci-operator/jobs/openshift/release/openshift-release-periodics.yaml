@@ -98,6 +98,384 @@ periodics:
   decorate: true
   interval: ""
   labels:
+    job-type: launch
+    job-env: azure
+    job-release: '4.2'
+  name: release-openshift-origin-installer-launch-azure
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --give-pr-author-access-to-namespace=true
+      - --secret-dir=/usr/local/pull-secret
+      - --secret-dir=/usr/local/launch-$(CLOUD_TYPE)-cluster-profile
+      - --target=launch-azure
+      - --template=/usr/local/launch-$(CLOUD_TYPE)
+      - --namespace=$(NAMESPACE)
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_DURATION
+        value: "9000"
+      - name: BRANCH
+        value: "4.2"
+      - name: CLOUD_TYPE
+        value: azure
+      - name: CLUSTER_TYPE
+        value: azure4
+      - name: CONFIG_SPEC
+        value: |
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-$(CLOUD_TYPE)
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLOUD_TYPE)-serial
+            commands: TEST_SUITE=openshift/conformance/serial run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLOUD_TYPE)-upgrade
+            commands: TEST_SUITE=all run-upgrade-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: launch-$(CLOUD_TYPE)
+            commands: sleep $(CLUSTER_DURATION) & wait
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+      - name: JOB_NAME_SAFE
+        value: launch-azure
+      - name: TEST_COMMAND
+        value: sleep $(CLUSTER_DURATION) & wait
+      - name: NAMESPACE
+        value: ""
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/launch-azure-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/launch-azure
+        name: job-definition
+        subPath: cluster-launch-installer-e2e.yaml
+      - mountPath: /usr/local/pull-secret
+        name: pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-azure4
+    - configMap:
+        name: prow-job-cluster-launch-installer-e2e
+      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
+  cron: '@yearly'
+  decorate: true
+  interval: ""
+  labels:
+    job-type: launch
+    job-env: gcp
+    job-release: '4.2'
+  name: release-openshift-origin-installer-launch-gcp
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --give-pr-author-access-to-namespace=true
+      - --secret-dir=/usr/local/pull-secret
+      - --secret-dir=/usr/local/launch-$(CLUSTER_TYPE)-cluster-profile
+      - --target=launch-gcp
+      - --template=/usr/local/launch-$(CLUSTER_TYPE)
+      - --namespace=$(NAMESPACE)
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_DURATION
+        value: "9000"
+      - name: BRANCH
+        value: "4.2"
+      - name: CLUSTER_TYPE
+        value: gcp
+      - name: CONFIG_SPEC
+        value: |
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-serial
+            commands: TEST_SUITE=openshift/conformance/serial run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-upgrade
+            commands: TEST_SUITE=all run-upgrade-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: launch-$(CLUSTER_TYPE)
+            commands: sleep $(CLUSTER_DURATION) & wait
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+      - name: JOB_NAME_SAFE
+        value: launch-gcp
+      - name: TEST_COMMAND
+        value: sleep $(CLUSTER_DURATION) & wait
+      - name: NAMESPACE
+        value: ""
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/launch-gcp-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/launch-gcp
+        name: job-definition
+        subPath: cluster-launch-installer-e2e.yaml
+      - mountPath: /usr/local/pull-secret
+        name: pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-gcp
+    - configMap:
+        name: prow-job-cluster-launch-installer-e2e
+      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
+  cron: '@yearly'
+  decorate: true
+  interval: ""
+  labels:
+    job-type: launch
+    job-env: metal
+    job-release: '4.2'
+  name: release-openshift-origin-installer-launch-metal
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --give-pr-author-access-to-namespace=true
+      - --secret-dir=/usr/local/pull-secret
+      - --secret-dir=/usr/local/launch-$(CLUSTER_TYPE)-cluster-profile
+      - --target=launch-metal
+      - --template=/usr/local/launch-$(CLUSTER_TYPE)
+      - --namespace=$(NAMESPACE)
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_DURATION
+        value: "9000"
+      - name: BRANCH
+        value: "4.2"
+      - name: CLUSTER_TYPE
+        value: metal
+      - name: CONFIG_SPEC
+        value: |
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "aws"
+          - as: e2e-$(CLUSTER_TYPE)-serial
+            commands: TEST_SUITE=openshift/conformance/serial run-tests
+            openshift_installer:
+              cluster_profile: "aws"
+          - as: e2e-$(CLUSTER_TYPE)-upgrade
+            commands: TEST_SUITE=all run-upgrade-tests
+            openshift_installer:
+              cluster_profile: "aws"
+              upgrade: true
+          - as: launch-$(CLUSTER_TYPE)
+            commands: sleep $(CLUSTER_DURATION) & wait
+            openshift_installer:
+              cluster_profile: "aws"
+      - name: JOB_NAME_SAFE
+        value: launch-metal
+      - name: TEST_COMMAND
+        value: sleep $(CLUSTER_DURATION) & wait
+      - name: NAMESPACE
+        value: ""
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/launch-metal-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/launch-metal
+        name: job-definition
+        subPath: cluster-launch-installer-metal-e2e.yaml
+      - mountPath: /usr/local/pull-secret
+        name: pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-metal
+    - configMap:
+        name: prow-job-cluster-launch-installer-metal-e2e
+      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
+  cron: '@yearly'
+  decorate: true
+  interval: ""
+  labels:
+    job-type: launch
+    job-env: vsphere
+    job-release: '4.2'
+  name: release-openshift-origin-installer-launch-vsphere
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --give-pr-author-access-to-namespace=true
+      - --secret-dir=/usr/local/pull-secret
+      - --secret-dir=/usr/local/launch-$(CLUSTER_TYPE)-cluster-profile
+      - --target=launch-vsphere
+      - --template=/usr/local/launch-$(CLUSTER_TYPE)
+      - --namespace=$(NAMESPACE)
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_DURATION
+        value: "9000"
+      - name: BRANCH
+        value: "4.2"
+      - name: CLUSTER_TYPE
+        value: vsphere
+      - name: CONFIG_SPEC
+        value: |
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-serial
+            commands: TEST_SUITE=openshift/conformance/serial run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-upgrade
+            commands: TEST_SUITE=all run-upgrade-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: launch-$(CLUSTER_TYPE)
+            commands: sleep $(CLUSTER_DURATION) & wait
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+      - name: JOB_NAME_SAFE
+        value: launch-vsphere
+      - name: TEST_COMMAND
+        value: sleep $(CLUSTER_DURATION) & wait
+      - name: NAMESPACE
+        value: ""
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/launch-vsphere-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/launch-vsphere
+        name: job-definition
+        subPath: cluster-launch-installer-upi-e2e.yaml
+      - mountPath: /usr/local/pull-secret
+        name: pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-vsphere
+    - configMap:
+        name: prow-job-cluster-launch-installer-upi-e2e
+      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
+  cron: '@yearly'
+  decorate: true
+  interval: ""
+  labels:
     job-type: upgrade
     job-env: aws
     job-test: e2e
