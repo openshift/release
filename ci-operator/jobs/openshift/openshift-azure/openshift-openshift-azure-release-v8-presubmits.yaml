@@ -1,30 +1,12 @@
 presubmits:
   openshift/openshift-azure:
   - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    context: codecov
-    decorate: true
-    name: pull-ci-azure-master-codecov
-    rerun_command: /test codecov
-    skip_report: true
-    spec:
-      containers:
-      - args:
-        - hack/tests/codecov.sh
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
-        name: ""
-        resources: {}
-      serviceAccountName: ci-operator
-    trigger: (?m)^/test( | .* )codecov,?($|\s.*)
-  - agent: kubernetes
     always_run: false
     branches:
-    - master
+    - release-v8
     context: e2e-applysecurityupdates
     decorate: true
-    name: pull-ci-azure-master-e2e-applysecurityupdates
+    name: pull-ci-azure-release-v8-e2e-applysecurityupdates
     rerun_command: /test e2e-applysecurityupdates
     spec:
       containers:
@@ -43,38 +25,65 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - master
+    - release-v8
     context: conformance
     decorate: true
-    name: pull-ci-azure-master-e2e-azure-conformance
+    decoration_config:
+      grace_period: 0s
+      skip_cloning: true
+      timeout: 0s
+    name: pull-ci-azure-release-v8-e2e-azure-conformance
     rerun_command: /test conformance
     spec:
       containers:
       - args:
-        - hack/tests/origin-conformance.sh
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --secret-dir=/usr/local/e2e-secrets/azure
+        - --target=[output:stable:azure]
+        - --target=cluster-launch-e2e-azure-conformance
+        - --template=/usr/local/cluster-launch-e2e-azure-conformance.yaml
+        command:
+        - ci-operator
         env:
-        - name: OS_GIT_MAJOR
-          value: "3"
-        - name: OS_GIT_MINOR
-          value: "11"
-        - name: TEST_NODES
-          value: "30"
-        - name: TEST_SUITE
-          value: openshift/conformance/parallel/minimal
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        - name: BRANCHVERSION
+          value: "6"
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-openshift-azure-release-v8.yaml
+              name: ci-operator-misc-configs
+        - name: TEST_COMMAND
+          value: TEST_SUITE=openshift/conformance/parallel run-tests
+        - name: TEST_IMAGE
+          value: registry.svc.ci.openshift.org/openshift/origin-v3.11:tests
+        image: ci-operator:latest
         name: ""
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-secrets/azure
+          name: cluster-secrets-azure
+        - mountPath: /usr/local/cluster-launch-e2e-azure-conformance.yaml
+          name: job-definition
+          subPath: cluster-launch-e2e-azure.yaml
       serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-secrets-azure
+        secret:
+          secretName: cluster-secrets-azure
+      - configMap:
+          name: prow-job-cluster-launch-e2e-azure
+        name: job-definition
     trigger: (?m)^/test( | .* )conformance,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - master
+    - release-v8
     context: e2e-changeloglevel
     decorate: true
-    name: pull-ci-azure-master-e2e-changeloglevel
+    name: pull-ci-azure-release-v8-e2e-changeloglevel
     rerun_command: /test e2e-changeloglevel
     spec:
       containers:
@@ -82,7 +91,7 @@ presubmits:
         - hack/tests/e2e-create.sh
         env:
         - name: FOCUS
-          value: \[ChangeLogLevel\]
+          value: \[ChangeLogLevel\]\[Fake\]
         - name: TIMEOUT
           value: 90m
         image: registry.svc.ci.openshift.org/azure/ci-base:latest
@@ -93,10 +102,10 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - release-v8
     context: e2e-create
     decorate: true
-    name: pull-ci-azure-master-e2e-create
+    name: pull-ci-azure-release-v8-e2e-create
     rerun_command: /test e2e-create
     spec:
       containers:
@@ -104,7 +113,7 @@ presubmits:
         - hack/tests/e2e-create.sh
         env:
         - name: FOCUS
-          value: \[EveryPR\]
+          value: \[Fake\]\[EveryPR\]
         image: registry.svc.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
@@ -113,10 +122,10 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - master
+    - release-v8
     context: e2e-etcdbackuprecovery
     decorate: true
-    name: pull-ci-azure-master-e2e-etcdbackuprecovery
+    name: pull-ci-azure-release-v8-e2e-etcdbackuprecovery
     rerun_command: /test e2e-etcdbackuprecovery
     spec:
       containers:
@@ -124,7 +133,7 @@ presubmits:
         - hack/tests/e2e-create.sh
         env:
         - name: FOCUS
-          value: \[EtcdBackupRecovery\]
+          value: \[EtcdBackupRecovery\]\[Fake\]
         image: registry.svc.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
@@ -133,10 +142,10 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - master
+    - release-v8
     context: e2e-forceupdate
     decorate: true
-    name: pull-ci-azure-master-e2e-forceupdate
+    name: pull-ci-azure-release-v8-e2e-forceupdate
     rerun_command: /test e2e-forceupdate
     spec:
       containers:
@@ -144,7 +153,7 @@ presubmits:
         - hack/tests/e2e-create.sh
         env:
         - name: FOCUS
-          value: \[ForceUpdate\]
+          value: \[ForceUpdate\]\[Fake\]
         image: registry.svc.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
@@ -153,10 +162,10 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - master
+    - release-v8
     context: e2e-keyrotation
     decorate: true
-    name: pull-ci-azure-master-e2e-keyrotation
+    name: pull-ci-azure-release-v8-e2e-keyrotation
     rerun_command: /test e2e-keyrotation
     spec:
       containers:
@@ -164,7 +173,7 @@ presubmits:
         - hack/tests/e2e-create.sh
         env:
         - name: FOCUS
-          value: \[KeyRotation\]
+          value: \[KeyRotation\]\[Fake\]
         image: registry.svc.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
@@ -173,10 +182,10 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - master
+    - release-v8
     context: e2e-reimagevm
     decorate: true
-    name: pull-ci-azure-master-e2e-reimagevm
+    name: pull-ci-azure-release-v8-e2e-reimagevm
     rerun_command: /test e2e-reimagevm
     spec:
       containers:
@@ -184,7 +193,7 @@ presubmits:
         - hack/tests/e2e-create.sh
         env:
         - name: FOCUS
-          value: \[ReimageVM\]
+          value: \[ReimageVM\]\[Fake\]
         image: registry.svc.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
@@ -193,10 +202,10 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - master
+    - release-v8
     context: e2e-scaleupdown
     decorate: true
-    name: pull-ci-azure-master-e2e-scaleupdown
+    name: pull-ci-azure-release-v8-e2e-scaleupdown
     rerun_command: /test e2e-scaleupdown
     spec:
       containers:
@@ -204,7 +213,7 @@ presubmits:
         - hack/tests/e2e-create.sh
         env:
         - name: FOCUS
-          value: \[ScaleUpDown\]
+          value: \[ScaleUpDown\]\[Fake\]
         image: registry.svc.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
@@ -213,10 +222,28 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - release-v8
+    context: e2e-scaleupdown-v8.0
+    decorate: true
+    name: pull-ci-azure-release-v8-e2e-scaleupdown-v8.0
+    rerun_command: /test e2e-scaleupdown-v8.0
+    spec:
+      containers:
+      - args:
+        - hack/tests/e2e-scaleupdown-previous.sh
+        - v8.0
+        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        name: ""
+        resources: {}
+      serviceAccountName: ci-operator
+    trigger: (?m)^/test( | .* )e2e-scaleupdown-v8.0,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-v8
     context: unit
     decorate: true
-    name: pull-ci-azure-master-unit
+    name: pull-ci-azure-release-v8-unit
     rerun_command: /test unit
     spec:
       containers:
@@ -229,12 +256,12 @@ presubmits:
       serviceAccountName: ci-operator
     trigger: (?m)^/test( | .* )unit,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
-    - master
+    - release-v8
     context: upgrade-v7.0
     decorate: true
-    name: pull-ci-azure-master-upgrade-v7.0
+    name: pull-ci-azure-release-v8-upgrade-v7.0
     rerun_command: /test upgrade-v7.0
     spec:
       containers:
@@ -249,43 +276,7 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
-    context: upgrade-v8.0
-    decorate: true
-    name: pull-ci-azure-master-upgrade-v8.0
-    rerun_command: /test upgrade-v8.0
-    spec:
-      containers:
-      - args:
-        - hack/tests/e2e-upgrade.sh
-        - v8.0
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
-        name: ""
-        resources: {}
-      serviceAccountName: ci-operator
-    trigger: (?m)^/test( | .* )upgrade-v8.0,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - master
-    context: vmimage
-    decorate: true
-    name: pull-ci-azure-master-vmimage
-    rerun_command: /test vmimage
-    spec:
-      containers:
-      - args:
-        - make
-        - vmimage
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
-        name: ""
-        resources: {}
-      serviceAccountName: ci-operator
-    trigger: (?m)^/test( | .* )vmimage,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
+    - release-v8
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -293,7 +284,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-openshift-azure-master-images
+    name: pull-ci-openshift-openshift-azure-release-v8-images
     rerun_command: /test images
     spec:
       containers:
@@ -308,8 +299,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-openshift-azure-master.yaml
-              name: ci-operator-master-configs
+              key: openshift-openshift-azure-release-v8.yaml
+              name: ci-operator-misc-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -329,7 +320,7 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - release-v8
     decorate: true
     name: verify
     rerun_command: /test verify
