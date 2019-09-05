@@ -6,8 +6,16 @@ base_images:
     tag: '7'
 
 build_root:
-  project_image:
-    dockerfile_path: dist/openshift-release/Dockerfile.builder
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+
+images:
+- dockerfile_path: dist/openshift-release/Dockerfile.builder
+  from: centos7
+  to: test-bin
 
 resources:
   '*':
@@ -27,4 +35,4 @@ tests:
 - as: yaml-lint
   commands: dist/prow_yaml_lint.sh
   container:
-    from: src
+    from: test-bin
