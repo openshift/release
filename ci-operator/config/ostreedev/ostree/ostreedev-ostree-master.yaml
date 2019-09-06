@@ -29,18 +29,28 @@ resources:
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
-      cat <<DOCKERFILE > ci/prow/Dockerfile.sanity
+      cat <<DOCKERFILE > /opt/Dockerfile.sanity
       FROM ostree-ci
       RUN make install
       DOCKERFILE
     from: ostree-ci
     to: ostree-ci-dockerfile
+- project_directory_image_build_step:
+    from: f30
+    inputs:
+      ostree-ci:
+        paths: null
+      ostree-ci-dockerfile:
+        paths:
+        - destination_dir: .
+          source_path: ci/prow/Dockerfile.sanity
+    to: ostree-ci-sanity
 
 images:
 - from: f30
   to: ostree-ci
   dockerfile_path: ci/prow/Dockerfile
-- from: ostree-ci
+- from: f30
   to: ostree-ci-sanity
   dockerfile_path: ci/prow/Dockerfile.sanity
 
