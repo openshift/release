@@ -366,43 +366,6 @@ objects:
           echo "Gathering artifacts ..."
           mkdir -p /tmp/artifacts/pods /tmp/artifacts/nodes /tmp/artifacts/metrics /tmp/artifacts/bootstrap /tmp/artifacts/network
 
-
-          if [ -f /tmp/artifacts/installer/terraform.tfstate ]
-          then
-              # TODO(trown): rework this to fetch bootstrap logs from openstack
-              # we don't have jq, so the python equivalent of
-              # jq '.modules[].resources."aws_instance.bootstrap".primary.attributes."public_ip" | select(.)'
-                #              bootstrap_ip=$(python -c \
-                #                  'import sys, json; d=reduce(lambda x,y: dict(x.items() + y.items()), map(lambda x: x["resources"], json.load(sys.stdin)["modules"])); k="aws_instance.bootstrap"; print d[k]["primary"]["attributes"]["public_ip"] if k in d else ""' \
-                #                  < /tmp/artifacts/installer/terraform.tfstate
-                #              )
-                #
-              if [ -n "${bootstrap_ip}" ]
-              then
-                for service in bootkube openshift kubelet crio
-                do
-                    queue "/tmp/artifacts/bootstrap/${service}.service" curl \
-                        --insecure \
-                        --silent \
-                        --connect-timeout 5 \
-                        --retry 3 \
-                        --cert /tmp/artifacts/installer/tls/journal-gatewayd.crt \
-                        --key /tmp/artifacts/installer/tls/journal-gatewayd.key \
-                        --url "https://${bootstrap_ip}:19531/entries?_SYSTEMD_UNIT=${service}.service"
-                done
-                if ! whoami &> /dev/null; then
-                  if [ -w /etc/passwd ]; then
-                    echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
-                  fi
-                fi
-                eval $(ssh-agent)
-                ssh-add /etc/openshift-installer/ssh-privatekey
-                ssh -A -o PreferredAuthentications=publickey -o StrictHostKeyChecking=false -o UserKnownHostsFile=/dev/null core@${bootstrap_ip} /bin/bash -x /usr/local/bin/installer-gather.sh
-                scp -o PreferredAuthentications=publickey -o StrictHostKeyChecking=false -o UserKnownHostsFile=/dev/null core@${bootstrap_ip}:log-bundle.tar.gz /tmp/artifacts/installer/bootstrap-logs.tar.gz
-              fi
-          else
-              echo "No terraform statefile found. Skipping collection of bootstrap logs."
-          fi
           oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' > /tmp/nodes
           oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces --template '{{ range .items }}{{ $name := .metadata.name }}{{ $ns := .metadata.namespace }}{{ range .spec.containers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ range .spec.initContainers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ end }}' > /tmp/containers
           oc --insecure-skip-tls-verify --request-timeout=5s get pods -l openshift.io/component=api --all-namespaces --template '{{ range .items }}-n {{ .metadata.namespace }} {{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/pods-api
