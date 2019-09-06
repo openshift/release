@@ -34,56 +34,56 @@ resources:
 # TODO move all these scripts to ci/prow
 tests:
 - as: sanity
-  commands: make install && ostree --version
+  commands: sudo make install && ostree --version
   container:
     from: ostree-ci
-- as: minimal
-  commands: |
-    export CONFIGOPTS='--without-curl --without-soup --disable-gtk-doc --disable-man --disable-rust --without-libarchive --without-selinux --without-smack --without-openssl --without-avahi --without-libmount --disable-rofiles-fuse --disable-experimental-api'
-    make clean
-    ci/build.sh
-  container:
-    from: ostree-ci
-- as: primary
-  commands: |
-    export CFLAGS='-fsanitize=undefined -fsanitize-undefined-trap-on-error -fsanitize=address -O2 -Wp,-D_FORTIFY_SOURCE=2'
-    export GI_SCANNERFLAGS='--warn-error'
-    export ASAN_OPTIONS='detect_leaks=0'
-    export CONFIGOPTS='--with-curl --with-openssl'
-    make clean
-    ci/ci-commitmessage-submodules.sh
-    ci/build-check.sh
-    ci/ci-release-build.sh
-    make dist-then-build
-  container:
-    from: ostree-ci
-- as: rust
-  commands: |
-    export CONFIGOPTS='--enable-rust'
-    make clean
-    ci/build.sh
-    make check TESTS=tests/test-rollsum
-  container:
-    from: ostree-ci
-- as: gnutls
-  commands: |
-    export CONFIGOPTS='--with-crypto=gnutls'
-    make clean
-    ci/build.sh
-    make check TESTS=tests/test-basic.sh
-  container:
-    from: ostree-ci
-- as: libsoup
-  commands: |
-    export CONFIGOPTS='--without-curl --without-openssl --with-soup'
-    make clean
-    ci/build-check.sh
-  container:
-    from: ostree-ci
-- as: introspection
-  commands: |
-    export INSTALLED_TESTS_PATTERN='libostree/test-sizes.js libostree/test-sysroot.js libostree/test-core.js'
-    make clean
-    ci/build-check.sh
-  container:
-    from: ostree-ci
+# - as: minimal
+#   commands: |
+#     export CONFIGOPTS='--without-curl --without-soup --disable-gtk-doc --disable-man --disable-rust --without-libarchive --without-selinux --without-smack --without-openssl --without-avahi --without-libmount --disable-rofiles-fuse --disable-experimental-api'
+#     make clean
+#     ci/build.sh
+#   container:
+#     from: ostree-ci
+# - as: primary
+#   commands: |
+#     export CFLAGS='-fsanitize=undefined -fsanitize-undefined-trap-on-error -fsanitize=address -O2 -Wp,-D_FORTIFY_SOURCE=2'
+#     export GI_SCANNERFLAGS='--warn-error'
+#     export ASAN_OPTIONS='detect_leaks=0'
+#     export CONFIGOPTS='--with-curl --with-openssl'
+#     make clean
+#     ci/ci-commitmessage-submodules.sh
+#     ci/build-check.sh
+#     ci/ci-release-build.sh
+#     make dist-then-build
+#   container:
+#     from: ostree-ci
+# - as: rust
+#   commands: |
+#     export CONFIGOPTS='--enable-rust'
+#     make clean
+#     ci/build.sh
+#     make check TESTS=tests/test-rollsum
+#   container:
+#     from: ostree-ci
+# - as: gnutls
+#   commands: |
+#     export CONFIGOPTS='--with-crypto=gnutls'
+#     make clean
+#     ci/build.sh
+#     make check TESTS=tests/test-basic.sh
+#   container:
+#     from: ostree-ci
+# - as: libsoup
+#   commands: |
+#     export CONFIGOPTS='--without-curl --without-openssl --with-soup'
+#     make clean
+#     ci/build-check.sh
+#   container:
+#     from: ostree-ci
+# - as: introspection
+#   commands: |
+#     export INSTALLED_TESTS_PATTERN='libostree/test-sizes.js libostree/test-sysroot.js libostree/test-core.js'
+#     make clean
+#     ci/build-check.sh
+#   container:
+#     from: ostree-ci
