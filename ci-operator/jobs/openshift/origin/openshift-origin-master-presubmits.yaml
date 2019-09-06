@@ -679,6 +679,11 @@ presubmits:
     - master
     context: ci/prow/e2e-conformance-k8s
     decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-master-e2e-conformance-k8s
     rerun_command: /test e2e-conformance-k8s
     spec:
@@ -687,6 +692,7 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
         - --secret-dir=/usr/local/e2e-conformance-k8s-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=e2e-conformance-k8s
         - --template=/usr/local/e2e-conformance-k8s
         command:
@@ -701,9 +707,6 @@ presubmits:
               name: ci-operator-master-configs
         - name: JOB_NAME_SAFE
           value: e2e-conformance-k8s
-        - name: RESOURCES_TEST
-          value: '{"requests": {"cpu": 1, "memory": "300Mi"}, "limits": {"cpu": 3,
-            "memory": "9Gi"}}'
         - name: TEST_COMMAND
           value: test/extended/conformance-k8s.sh
         image: ci-operator:latest
@@ -718,6 +721,9 @@ presubmits:
         - mountPath: /usr/local/e2e-conformance-k8s
           name: job-definition
           subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
       - name: cluster-profile
@@ -728,6 +734,9 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-src
         name: job-definition
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-conformance-k8s,?($|\s.*)
   - agent: kubernetes
     always_run: false
