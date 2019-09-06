@@ -12,11 +12,6 @@ build_root:
     namespace: openshift
     tag: golang-1.10
 
-images:
-- from: f30
-  dockerfile_path: ci/prow/Dockerfile
-  to: ostree-ci
-
 resources:
   '*':
     limits:
@@ -31,19 +26,30 @@ resources:
       cpu: '3'
       memory: 5Gi
 
-test_binary_build_commands: |
-  set -eo pipefail
-  chmod uga+w /etc/passwd
+raw_steps:
+- sanity_install:
+    commands: |
+      cat <<DOCKERFILE > /opt/Dockerfile
+      FROM ostree-ci
+      RUN make install
+      DOCKERFILE
+    from: ostree-ci
+    to: ostree-ci-sanity
+
+images:
+- from: f30
+  to: ostree-ci
+  dockerfile_path: ci/prow/Dockerfile
+- from: ostree-ci
+  to: ostree-ci-sanity
+  dockerfile_path: /opt/Dockerfile
 
 # TODO move all these scripts to ci/prow
 tests:
 - as: sanity
-  commands: |
-    set -o pipefail
-    echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
-    sudo make install && ostree --version
+  commands: ostree --version
   container:
-    from: test-bin
+    from: ostree-ci-sanity
 # - as: minimal
 #   commands: |
 #     export CONFIGOPTS='--without-curl --without-soup --disable-gtk-doc --disable-man --disable-rust --without-libarchive --without-selinux --without-smack --without-openssl --without-avahi --without-libmount --disable-rofiles-fuse --disable-experimental-api'
