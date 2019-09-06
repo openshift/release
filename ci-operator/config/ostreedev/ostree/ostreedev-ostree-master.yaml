@@ -27,14 +27,14 @@ resources:
       memory: 5Gi
 
 raw_steps:
-- sanity_install:
+- pipeline_image_cache_step:
     commands: |
-      cat <<DOCKERFILE > /opt/Dockerfile
+      cat <<DOCKERFILE > ci/prow/Dockerfile.sanity
       FROM ostree-ci
       RUN make install
       DOCKERFILE
     from: ostree-ci
-    to: ostree-ci-sanity
+    to: ostree-ci-dockerfile
 
 images:
 - from: f30
@@ -42,7 +42,7 @@ images:
   dockerfile_path: ci/prow/Dockerfile
 - from: ostree-ci
   to: ostree-ci-sanity
-  dockerfile_path: /opt/Dockerfile
+  dockerfile_path: ci/prow/Dockerfile.sanity
 
 # TODO move all these scripts to ci/prow
 tests:
