@@ -30,25 +30,27 @@ raw_steps:
 - pipeline_image_cache_step:
     commands: |
       cat <<DOCKERFILE > /src/ci/prow/Dockerfile.sanity
-      FROM ostree-ci
+      FROM buildroot
       RUN make install
       DOCKERFILE
     from: buildroot
     to: sanity-dockerfile
 - project_directory_image_build_step:
-    from: buildroot
+    from: f30
     inputs:
+      src:
+        paths: null
       sanity-dockerfile:
         paths:
         - destination_dir: .
           source_path: /src/ci/prow/Dockerfile.sanity
-    to: sanity-src
+    to: base
 
 images:
 - from: f30
   to: buildroot
   dockerfile_path: ci/prow/Dockerfile
-- from: sanity-src
+- from: sanity-dockerfile
   to: sanity
   dockerfile_path: ci/prow/Dockerfile.sanity
 
