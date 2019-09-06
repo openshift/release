@@ -1,9 +1,6 @@
 base_images:
-  cosa-buildroot:
+  f30:
     cluster: https://api.ci.openshift.org
-    # namespace: coreos
-    # name: cosa-buildroot
-    # tag: latest
     name: fedora
     namespace: rhcos
     tag: "30"
@@ -16,15 +13,18 @@ build_root:
     tag: golang-1.10
 
 images:
-- from: cosa-buildroot
-  dockerfile_path: ci/prow/Dockerfile
+- from: f30
+  dockerfile_path: Dockerfile
   to: rpm-ostree-ci
+- from: rpm-ostree-ci
+  dockerfile_path: Dockerfile.buildroot
+  to: rpm-ostree-buildroot
 
 tests:
 - as: sanity
   commands: rpm-ostree --version
   container:
-    from: rpm-ostree-ci
+    from: rpm-ostree-buildroot
 
 resources:
   '*':
