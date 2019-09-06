@@ -29,27 +29,27 @@ resources:
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
-      cat <<DOCKERFILE > /opt/Dockerfile.sanity
+      cat <<DOCKERFILE > /src/ci/prow/Dockerfile.sanity
       FROM ostree-ci
       RUN make install
       DOCKERFILE
-    from: ostree-ci
-    to: ostree-ci-dockerfile
+    from: buildroot
+    to: sanity-dockerfile
 - project_directory_image_build_step:
-    from: ostree-ci
+    from: buildroot
     inputs:
-      ostree-ci-dockerfile:
+      sanity-dockerfile:
         paths:
         - destination_dir: .
-          source_path: ci/prow/Dockerfile.sanity
-    to: ostree-ci-sanity
+          source_path: /src/ci/prow/Dockerfile.sanity
+    to: sanity-src
 
 images:
 - from: f30
-  to: ostree-ci
+  to: buildroot
   dockerfile_path: ci/prow/Dockerfile
-- from: ostree-ci
-  to: ostree-ci-sanity
+- from: sanity-src
+  to: sanity
   dockerfile_path: ci/prow/Dockerfile.sanity
 
 # TODO move all these scripts to ci/prow
@@ -57,7 +57,7 @@ tests:
 - as: sanity
   commands: ostree --version
   container:
-    from: ostree-ci-sanity
+    from: sanity
 # - as: minimal
 #   commands: |
 #     export CONFIGOPTS='--without-curl --without-soup --disable-gtk-doc --disable-man --disable-rust --without-libarchive --without-selinux --without-smack --without-openssl --without-avahi --without-libmount --disable-rofiles-fuse --disable-experimental-api'
