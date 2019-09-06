@@ -31,12 +31,19 @@ resources:
       cpu: '3'
       memory: 5Gi
 
+test_binary_build_commands: |
+  set -eo pipefail
+  chmod uga+w /etc/passwd
+
 # TODO move all these scripts to ci/prow
 tests:
 - as: sanity
-  commands: sudo make install && ostree --version
+  commands: |
+    set -o pipefail
+    echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
+    sudo make install && ostree --version
   container:
-    from: ostree-ci
+    from: test-bin
 # - as: minimal
 #   commands: |
 #     export CONFIGOPTS='--without-curl --without-soup --disable-gtk-doc --disable-man --disable-rust --without-libarchive --without-selinux --without-smack --without-openssl --without-avahi --without-libmount --disable-rofiles-fuse --disable-experimental-api'
