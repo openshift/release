@@ -277,6 +277,40 @@ periodics:
 - agent: kubernetes
   labels:
     ci.openshift.io/role: infra
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  cron: ""
+  decorate: true
+  interval: 12h
+  name: periodic-prow-image-autobump
+  spec:
+    containers:
+    - command:
+      - /usr/bin/autobumper
+      args:
+      - --github_token=/etc/github/oauth
+      - --git_name=openshift-bot
+      - --git_email=openshift-bot@redhat.com
+      - --target-dir=.
+      image: registry.svc.ci.openshift.org/ci/autobumper:latest
+      imagePullPolicy: Always
+      name: "autobump"
+      resources:
+          requests:
+            cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: token
+        readOnly: true
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-bot
+- agent: kubernetes
+  labels:
+    ci.openshift.io/role: infra
   cron: ""
   decorate: true
   interval: 30m
