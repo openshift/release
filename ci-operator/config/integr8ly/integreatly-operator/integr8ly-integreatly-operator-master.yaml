@@ -1,0 +1,48 @@
+base_images:
+  os:
+    cluster: https://api.ci.openshift.org
+    name: centos
+    namespace: openshift
+    tag: '7'
+
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      memory: 250Mi
+      cpu: 100m
+
+images:
+  - from: os
+    inputs:
+      bin:
+        paths:
+          - destination_dir: .
+            source_path: /go/src/github.com/integr8ly/integreatly-operator/build
+    dockerfile_path: build/Dockerfile
+    to: integreatly-operator
+
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.12
+
+binary_build_commands: make code/compile COMPILE_TARGET="./build/_output/bin/integreatly-operator"
+
+promotion:
+  cluster: https://api.ci.openshift.org
+  namespace: integr8ly
+  name: integreatly-operator
+
+tests:
+  - as: unit
+    commands: make test/unit
+    container:
+      from: src
+  - as: format
+    commands: make code/check
+    container:
+      from: src
