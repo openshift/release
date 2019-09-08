@@ -84,11 +84,26 @@ objects:
     dnsConfig:
       nameservers:
         - ${CI_DNS_IP}
+    initContainers:
+    - name: cp-shared
+      image: ${IMAGE_TESTS}
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      command:
+      - cp
+      - /usr/bin/openshift-tests
+      - /usr/bin/oc
+      - /tmp/shared/
     containers:
-
+    # NOTE openshift-tests requires access to openstackclient/cinder
+    # so we re-use the install image here which already contains
+    # the required binaries. The initContainer above is used to copy over
+    # the latest openshift-tests/oc binaries.
+    #
     # Once the cluster is up, executes shared tests
     - name: test
-      image: ${IMAGE_TESTS}
+      image: ${IMAGE_OPENSTACK_INSTALLER}
       terminationMessagePolicy: FallbackToLogsOnError
       resources:
         requests:
@@ -117,7 +132,7 @@ objects:
         #!/bin/bash
         set -euo pipefail
 
-        export PATH=/usr/libexec/origin:$PATH
+        export PATH=/tmp/shared:/usr/libexec/origin:$PATH
 
         trap 'touch /tmp/shared/exit' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
