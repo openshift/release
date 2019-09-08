@@ -170,6 +170,22 @@ objects:
         cp /tmp/cluster/ssh-privatekey ~/.ssh/kube_openstack_rsa || true
         export TEST_PROVIDER='{"type":"openstack"}'
 
+        # set up openstack env vars for testing
+        function get_clouds_param() {
+          cat /tmp/cluster/clouds.yaml | grep $1: | sed -e "s|.*$1: ||" | tr -d '"'
+        }
+
+        set +x #make extra sure we aren't echo'ing these to stdout
+        export OS_AUTH_URL="$(get_clouds_param 'auth_url')"
+        export OS_PROJECT_ID="$(get_clouds_param 'project_id')"
+        export OS_PROJECT_NAME="$(get_clouds_param 'project_name')"
+        export OS_USERNAME="$(get_clouds_param 'username')"
+        export OS_PASSWORD="$(get_clouds_param 'password')"
+        export OS_REGION_NAME="$(get_clouds_param 'region_name')"
+        export OS_ENDPOINT_TYPE="$(get_clouds_param 'interface')"
+        export OS_IDENTITY_API_VERSION="$(get_clouds_param 'identity_api_version')"
+        export OS_USER_DOMAIN_NAME="$(get_clouds_param 'user_domain_name')"
+
         mkdir -p /tmp/output
         cd /tmp/output
 
@@ -200,7 +216,8 @@ objects:
           exit 0
         }
 
-        ${TEST_COMMAND}
+        #${TEST_COMMAND}
+        TEST_SUITE=openshift/conformance/parallel run-tests
 
     # Runs an install
     - name: setup
