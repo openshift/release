@@ -1,41 +1,33 @@
 presubmits:
-  openshift/openshift-apiserver:
+  openshift/ocs-operator:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.3
-    context: ci/prow/e2e-aws
+    - release-4.2
+    context: ci/prow/gobuild
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-openshift-apiserver-release-4.3-e2e-aws
-    rerun_command: /test e2e-aws
+    name: pull-ci-openshift-ocs-operator-release-4.2-gobuild
+    rerun_command: /test gobuild
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/e2e-aws-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=e2e-aws
-        - --template=/usr/local/e2e-aws
+        - --target=gobuild
         command:
         - ci-operator
         env:
-        - name: CLUSTER_TYPE
-          value: aws
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-openshift-apiserver-release-4.3.yaml
-              name: ci-operator-4.3-configs
-        - name: JOB_NAME_SAFE
-          value: e2e-aws
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance/parallel run-tests
+              key: openshift-ocs-operator-release-4.2.yaml
+              name: ci-operator-4.2-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -43,57 +35,43 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/e2e-aws-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-aws
-          name: job-definition
-          subPath: cluster-launch-installer-e2e.yaml
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-e2e
-        name: job-definition
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )e2e-aws,?($|\s.*)
+    trigger: (?m)^/test( | .* )gobuild,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.3
-    context: ci/prow/e2e-aws-upgrade
+    - release-4.2
+    context: ci/prow/gofmt
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-openshift-apiserver-release-4.3-e2e-aws-upgrade
-    rerun_command: /test e2e-aws-upgrade
+    name: pull-ci-openshift-ocs-operator-release-4.2-gofmt
+    rerun_command: /test gofmt
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/e2e-aws-upgrade-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=e2e-aws-upgrade
+        - --target=gofmt
         command:
         - ci-operator
         env:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-openshift-apiserver-release-4.3.yaml
-              name: ci-operator-4.3-configs
+              key: openshift-ocs-operator-release-4.2.yaml
+              name: ci-operator-4.2-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -101,58 +79,43 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
-          name: cluster-profile
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )e2e-aws-upgrade,?($|\s.*)
+    trigger: (?m)^/test( | .* )gofmt,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.3
-    context: ci/prow/e2e-cmd
+    - release-4.2
+    context: ci/prow/golint
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-openshift-apiserver-release-4.3-e2e-cmd
-    rerun_command: /test e2e-cmd
+    name: pull-ci-openshift-ocs-operator-release-4.2-golint
+    rerun_command: /test golint
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/e2e-cmd-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=e2e-cmd
-        - --template=/usr/local/e2e-cmd
+        - --target=golint
         command:
         - ci-operator
         env:
-        - name: CLUSTER_TYPE
-          value: aws
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-openshift-apiserver-release-4.3.yaml
-              name: ci-operator-4.3-configs
-        - name: JOB_NAME_SAFE
-          value: e2e-cmd
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/test-cmd run-tests
+              key: openshift-ocs-operator-release-4.2.yaml
+              name: ci-operator-4.2-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -160,32 +123,107 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/e2e-cmd-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-cmd
-          name: job-definition
-          subPath: cluster-launch-installer-e2e.yaml
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-e2e
-        name: job-definition
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )e2e-cmd,?($|\s.*)
+    trigger: (?m)^/test( | .* )golint,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.3
+    - release-4.2
+    context: ci/prow/gotest
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ocs-operator-release-4.2-gotest
+    rerun_command: /test gotest
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=gotest
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-ocs-operator-release-4.2.yaml
+              name: ci-operator-4.2-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )gotest,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-4.2
+    context: ci/prow/govet
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ocs-operator-release-4.2-govet
+    rerun_command: /test govet
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=govet
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-ocs-operator-release-4.2.yaml
+              name: ci-operator-4.2-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )govet,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-4.2
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -193,7 +231,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-openshift-apiserver-release-4.3-images
+    name: pull-ci-openshift-ocs-operator-release-4.2-images
     rerun_command: /test images
     spec:
       containers:
@@ -202,15 +240,14 @@ presubmits:
         - --give-pr-author-access-to-namespace=true
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=[images]
-        - --target=[release:latest]
         command:
         - ci-operator
         env:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-openshift-apiserver-release-4.3.yaml
-              name: ci-operator-4.3-configs
+              key: openshift-ocs-operator-release-4.2.yaml
+              name: ci-operator-4.2-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -230,31 +267,40 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.3
-    context: ci/prow/unit
+    - release-4.2
+    context: ci/prow/ocs-operator-e2e-aws
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-openshift-apiserver-release-4.3-unit
-    rerun_command: /test unit
+    name: pull-ci-openshift-ocs-operator-release-4.2-ocs-operator-e2e-aws
+    rerun_command: /test ocs-operator-e2e-aws
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --secret-dir=/usr/local/ocs-operator-e2e-aws-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=unit
+        - --target=ocs-operator-e2e-aws
+        - --template=/usr/local/ocs-operator-e2e-aws
         command:
         - ci-operator
         env:
+        - name: CLUSTER_TYPE
+          value: aws
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-openshift-apiserver-release-4.3.yaml
-              name: ci-operator-4.3-configs
+              key: openshift-ocs-operator-release-4.2.yaml
+              name: ci-operator-4.2-configs
+        - name: JOB_NAME_SAFE
+          value: ocs-operator-e2e-aws
+        - name: TEST_COMMAND
+          value: |
+            make cluster-deploy && make functest
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -262,43 +308,56 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /usr/local/ocs-operator-e2e-aws-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/ocs-operator-e2e-aws
+          name: job-definition
+          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-src
+        name: job-definition
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )unit,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocs-operator-e2e-aws,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.3
-    context: ci/prow/verify
+    - release-4.2
+    context: ci/prow/verify-latest-csv
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-openshift-apiserver-release-4.3-verify
-    rerun_command: /test verify
+    name: pull-ci-openshift-ocs-operator-release-4.2-verify-latest-csv
+    rerun_command: /test verify-latest-csv
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=verify
+        - --target=verify-latest-csv
         command:
         - ci-operator
         env:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-openshift-apiserver-release-4.3.yaml
-              name: ci-operator-4.3-configs
+              key: openshift-ocs-operator-release-4.2.yaml
+              name: ci-operator-4.2-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -314,48 +373,4 @@ presubmits:
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )verify,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.3
-    context: ci/prow/verify-deps
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-openshift-apiserver-release-4.3-verify-deps
-    rerun_command: /test verify-deps
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=verify-deps
-        command:
-        - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-openshift-apiserver-release-4.3.yaml
-              name: ci-operator-4.3-configs
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )verify-deps,?($|\s.*)
+    trigger: (?m)^/test( | .* )verify-latest-csv,?($|\s.*)
