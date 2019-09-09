@@ -121,3 +121,63 @@ items:
               - --max-size=5g
               - --timeout=30m
               - /tmp/repos
+
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: openstack-beta-4-3
+    namespace: ocp
+  spec:
+    selector:
+      app: openstack-beta-4-3
+    ports:
+      - port: 80
+        targetPort: 8080
+    type: ClusterIP
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: openstack-beta-4-3
+    namespace: ocp
+    labels:
+      app: openstack-beta-4-3
+    annotations:
+      image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"content-mirror:latest","namespace":"ci"},"fieldPath":"spec.template.spec.containers[?(@.name==\"mirror\")].image"}]'
+  spec:
+    replicas: 2
+    selector:
+      matchLabels:
+        app: openstack-beta-4-3
+    template:
+      metadata:
+        labels:
+          app: openstack-beta-4-3
+      spec:
+        volumes:
+          - name: repos
+            secret:
+              secretName: base-openstack-beta-4-3-repos
+          - name: cache
+            emptyDir: {}
+          - name: run
+            emptyDir: {}
+        containers:
+          - name: mirror
+            ports:
+              - name: http
+                containerPort: 8080
+            volumeMounts:
+              - name: repos
+                mountPath: /tmp/repos
+                readOnly: true
+              - name: cache
+                mountPath: /tmp/cache
+            image: " "
+            workingDir: /tmp/repos
+            command:
+              - content-mirror
+              - --path=/tmp/config
+              - --max-size=5g
+              - --timeout=30m
+              - /tmp/repos
+
