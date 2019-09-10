@@ -1,0 +1,51 @@
+periodics:
+- agent: kubernetes
+  labels:
+    ci.openshift.io/role: infra
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: library
+    workdir: true
+  decorate: true
+  interval: 24h
+  name: periodic-openshift-library-import
+  spec:
+    containers:
+    - command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -e
+
+        # redirect to devnull so this doesn't print the value of $TOKEN on failure.
+        git remote add pushtarget https://openshift-merge-robot:$TOKEN@github.com/openshift/library &> /dev/null
+        git checkout -b import
+        python ./import_content.py --tags arch_x86_64 --dir arch/x86_64
+        python ./import_content.py --tags arch_ppc64le --dir arch/ppc64le
+        python ./import_content.py --match-all-tags okd,arch_x86_64 -d operator/okd-x86_64
+        python ./import_content.py --match-all-tags ocp,arch_x86_64 -d operator/ocp-x86_64
+        python ./import_content.py --match-all-tags ocp,arch_ppc64le -d operator/ocp-ppc64le
+        python ./import_content.py --match-all-tags online-starter,arch_x86_64 -d online/starter/x86_64
+        python ./import_content.py --match-all-tags online-professional,arch_x86_64 -d online/professional/x86_64
+        python ./import_content.py'
+        if [[ -n "$(git status --porcelain)" ]] ; then
+          git add -A ./community ./official ./arch ./operator ./online
+          git commit -m "$(printf 'Automatic update\n'\n')"
+        fi
+        # redirect to devnull so this doesn't print the value of $TOKEN on failure.
+        git push pushtarget import:master &> /dev/null
+
+    image: quay.io/bparees/importer:latest
+    imagePullPolicy: Always
+    name: ""
+    resources:
+      requests:
+        cpu: 500m
+    env: 
+    - name: TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: github-credentials-openshift-merge-robot
+          key: oauth
