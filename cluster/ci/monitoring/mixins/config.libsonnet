@@ -8,5 +8,12 @@
       'dptp.json': '8ce131e226b7fd2901c2fce45d4e21c1',
       'e2e_template_jobs.json': 'af88e642a76f37342fb52d475d52d965',
     },
+    buildCopSuccessRateTargets: {
+      'branch-.*-images': 100, 
+      'release-.*-4.1': 80,
+      'release-.*-4.2': 80,
+      'release-.*-upgrade.*': 80,
+      'release-.*4.1.*4.2.*': 80,
+    },
   },
 }
