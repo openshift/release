@@ -226,7 +226,7 @@ prow-release-controller-deploy:
 prow-release-controller: prow-release-controller-definitions prow-release-controller-deploy
 .PHONY: prow-release-controller
 
-projects: ci-ns gcsweb origin-stable origin-release publishing-bot content-mirror azure azure-private python-validation metering
+projects: ci-ns gcsweb origin-stable origin-release publishing-bot content-mirror azure azure-private python-validation metering coreos
 .PHONY: projects
 
 content-mirror:
@@ -351,6 +351,10 @@ check-prow-config:
 libpod:
 	$(MAKE) apply WHAT=projects/libpod/libpod.yaml
 .PHONY: libpod
+
+coreos:
+	$(MAKE) apply WHAT=projects/coreos/coreos.yaml
+.PHONY: coreos
 
 cincinnati:
 	$(MAKE) apply WHAT=projects/cincinnati/cincinnati.yaml
