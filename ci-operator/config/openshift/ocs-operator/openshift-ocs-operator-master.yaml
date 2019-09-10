@@ -1,9 +1,39 @@
+base_images:
+  operator-registry:
+    name: "4.2"
+    namespace: ocp
+    tag: operator-registry
+  os:
+    name: ubi
+    namespace: ocp
+    tag: "7"
+binary_build_commands: make ocs-operator-openshift-ci-build
 build_root:
   image_stream_tag:
     cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.12
+images:
+- dockerfile_path: openshift-ci/Dockerfile.deploy
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/ocs-operator/build/_output/bin/ocs-operator
+  to: ocs-operator
+- dockerfile_path: openshift-ci/Dockerfile.registry.intermediate
+  from: operator-registry
+  to: operator-registry-base
+- dockerfile_path: openshift-ci/Dockerfile.registry.build
+  from: operator-registry-base
+  to: ocs-registry
+promotion:
+  additional_images:
+    ocs-operator-tests: src
+  name: "4.2"
+  namespace: ocp
 resources:
   '*':
     limits:
@@ -11,6 +41,9 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tag_specification:
+  name: "4.2"
+  namespace: ocp
 tests:
 - as: gofmt
   commands: |
@@ -44,8 +77,8 @@ tests:
   commands: |
     RETVAL=0
     CSV_CHECKSUM_ONLY=1 make gen-latest-csv || exit 1
-    if [[ -n "$(git status --porcelain)" ]]; then
-        echo "uncommitted CSV changes. run `make gen-latest-csv` and commit results."
+    if [[ -n "$(git status --porcelain hack/latest-csv-checksum.md5)" ]]; then
+        echo "uncommitted CSV changes. run 'make gen-latest-csv' and commit results."
         exit 1
     fi
     exit 0
@@ -56,3 +89,8 @@ tests:
     go build github.com/openshift/ocs-operator/cmd/manager
   container:
     from: src
+- as: ocs-operator-e2e-aws
+  commands: |
+    make cluster-deploy && make functest
+  openshift_installer_src:
+    cluster_profile: aws

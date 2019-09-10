@@ -187,6 +187,10 @@ prow-ocp-rpm-secrets:
 		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
 		--from-file=ci-operator/infra/openshift/release-controller/repos/ocp-4.3-openstack.repo \
 		-o yaml --dry-run | oc apply -n ocp -f -
+	oc create secret generic base-openstack-beta-4-3-repos \
+		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
+		--from-file=ci-operator/infra/openshift/release-controller/repos/ocp-4.3-openstack-beta.repo \
+		-o yaml --dry-run | oc apply -n ocp -f -
 .PHONY: prow-ocp-rpms-secrets
 
 prow-jobs: prow-cluster-jobs prow-artifacts

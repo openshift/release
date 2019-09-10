@@ -50,6 +50,9 @@ plugins:
   - wip
   - yuks
 
+  openshift/community:
+  - approve
+
   openshift/config:
   - config-updater
   - approve
@@ -593,6 +596,12 @@ plugins:
   openshift/ocp-release-operator-sdk:
   - approve
 
+  openshift/windows-machine-config-operator:
+  - approve
+
+  openshift/enhancements:
+  - approve
+
   tnozicka/openshift-acme:
   - approve
   - assign
@@ -975,6 +984,30 @@ plugins:
   redhat-cop:
   - trigger
 
+  integr8ly/integreatly-operator:
+  - assign
+  - blunderbuss
+  - blockade
+  - cat
+  - dog
+  - heart
+  - golint
+  - help
+  - hold
+  - label
+  - lgtm
+  - lifecycle
+  - override
+  - shrug
+  - sigmention
+  - size
+  - skip
+  - trigger
+  - verify-owners
+  - wip
+  - yuks
+  - approve
+
 triggers:
 - repos:
   - openshift
@@ -1004,6 +1037,7 @@ approve:
   - openshift/cluster-api-provider-gcp
   - openshift/cluster-api-actuator-pkg
   - openshift/cluster-autoscaler-operator
+  - openshift/cluster-machine-approver
   require_self_approval: true
   lgtm_acts_as_approve: false
   ignore_review_state: true
@@ -1047,6 +1081,11 @@ approve:
   - codeready-toolchain/toolchain-common
   - codeready-toolchain/toolchain-e2e
   require_self_approval: false
+  lgtm_acts_as_approve: false
+  ignore_review_state: false
+- repos:
+  - integr8ly/integreatly-operator
+  require_self_approval: true
   lgtm_acts_as_approve: false
   ignore_review_state: false
 
@@ -1152,7 +1191,7 @@ config_updater:
       name: ci-operator-master-configs
       additional_namespaces:
       - ci-stg
-    ci-operator/config/**/*master__variant.yaml:
+    ci-operator/config/**/*master__*.yaml:
       name: ci-operator-master-configs
       additional_namespaces:
       - ci-stg
@@ -1455,6 +1494,13 @@ external_plugins:
     - name: needs-rebase
       events:
       - pull_request
+  integr8ly/integreatly-operator:
+    - name: refresh
+      events:
+      - issue_comment
+    - name: needs-rebase
+      events:
+      - pull_request
 
 bugzilla:
   default:
@@ -1499,3 +1545,6 @@ label:
   - platform/libvirt
   - platform/openstack
   - ga
+
+retitle:
+  allow_closed_issues: true
