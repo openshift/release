@@ -3,7 +3,6 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-set -o xtrace
 
 # This script uses a connection to Bitwarden to populate k8s secrets used for
 # the OKD CI infrastructure. To use this script, first get the BitWarden CLI at:
@@ -16,8 +15,31 @@ set -o xtrace
 #          content of the BitWarden vault after your current session was started,
 #          you will need to create a new session to be able to view those changes.
 
+CURRENT_OC_CONTEXT=$(oc config current-context)
+readonly CURRENT_OC_CONTEXT
+OC_PROJECT=$(echo ${CURRENT_OC_CONTEXT} | cut -d "/" -f1)
+readonly OC_PROJECT
+OC_CLUSTER=$(echo ${CURRENT_OC_CONTEXT} | cut -d "/" -f2)
+readonly OC_CLUSTER
+OC_USER=$(echo ${CURRENT_OC_CONTEXT} | cut -d "/" -f3)
+readonly OC_USER
+
+if [[ "${OC_CLUSTER}" != "api-ci-openshift-org:443" ]]; then
+	>&2 echo "[ERROR] current cluster ${OC_CLUSTER} is not our ci-cluster ... please run 'oc login https://api.ci.openshift.org' first!"
+	exit 1
+fi
+
+if [[ "${OC_PROJECT}" != "ci" ]]; then
+	>&2 echo "[WARNING] current project ${OC_PROJECT} is not 'ci'!"
+fi
+
+if ! oc auth can-i create secrets -n "${OC_PROJECT}" --quiet; then
+	>&2 echo "[ERROR] current user ${OC_USER} does not have permission to create secret in ${OC_PROJECT}"
+	exit 1
+fi
+
 if [[ -z "${BW_SESSION:-}" ]]; then
-	echo "[WARNING] Ensure you have an active BitWarden session and provide the session token with \$BW_SESSION"
+	>&2 echo "[ERROR] Ensure you have an active BitWarden session and provide the session token with \$BW_SESSION"
 	exit 1
 fi
 
