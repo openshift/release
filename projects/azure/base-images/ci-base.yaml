@@ -45,9 +45,20 @@ items:
             PyYAML \
             tar \
             wget \
-            which
+            which \
+            sudo \
+            chromedriver \
+            chromium-headless
+        # Install software collections and ruby packages for verification tests
+        RUN yum install -y --enablerepo=centosplus centos-release-scl scl-utils-build scl-utils
+        RUN yum install -y --enablerepo=centosplus rh-ruby24 rh-ror50-rubygem-nokogiri rh-ruby24-ruby-devel rh-git29 bsdtar
+        RUN ln -s /usr/lib64/chromium-browser/headless_shell /bin/chrome
+        RUN BRANCH=v3 VERIFICATION_TESTS_GIT=https://github.com/openshift/verification-tests.git && \
+        git clone --branch $BRANCH $VERIFICATION_TESTS_GIT
+        RUN scl enable rh-ror50 /verification-tests/tools/install_os_deps.sh
+        RUN scl enable rh-ror50 /verification-tests/tools/hack_bundle.rb
 
-        RUN yum clean all
+        RUN rm -rf /verification-tests && yum clean all
 
         ENV HOME=/home/prow
 
