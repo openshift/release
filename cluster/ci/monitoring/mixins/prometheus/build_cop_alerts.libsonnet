@@ -9,7 +9,7 @@
             expr: |||
               sum(rate(prowjob_state_transitions{job="plank",job_name=~"%s",job_name!~"rehearse.*",state="success"}[30m]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~"%s",job_name!~"rehearse.*",state=~"success|failure"}[30m])) * 100 < %s
             ||| % [job_name_regex, job_name_regex, $._config.buildCopSuccessRateTargets[job_name_regex]],
-            'for': '30m',
+            'for': '10m',
             labels: {
               severity: 'slack',
               team: 'build-cop',
