@@ -16,7 +16,7 @@ EOF
 
 new_tag=""
 
-targets=( cluster/ci/config/prow ci-operator/ hack/images.sh )
+targets=( cluster/ci/config/prow ci-operator/ hack/images.sh core-services/prow )
 target_files=( $( find "${targets[@]}" -type f ) )
 for component in $( grep -Porh "(?<=gcr.io/k8s-prow/).*(?=:v)" "${target_files[@]}" | sort | uniq ); do
 	current_tag="$( grep -Porh "(?<=${component}:)v[0-9]{8}-[a-z0-9]+" "${target_files[@]}" | head -n 1 )"
