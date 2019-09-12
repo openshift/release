@@ -113,7 +113,7 @@ prow-services:
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/artifact-uploader.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/cherrypick.yaml
 	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/deck.yaml
-	oc create secret generic deck-extensions --from-file=cluster/ci/config/prow/deck/extensions/ -o yaml --dry-run | oc apply -f - -n ci
+	oc create secret generic deck-extensions --from-file=core-services/prow/02_config/deck-extensions/ -o yaml --dry-run | oc apply -f - -n ci
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/ghproxy.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/hook.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/horologium.yaml
