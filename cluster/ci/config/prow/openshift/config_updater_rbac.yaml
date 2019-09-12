@@ -330,6 +330,49 @@ items:
         - create
         - update
         - patch
+- kind: Role
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: config-updater
+    namespace: ci-rpms
+  rules:
+  - apiGroups:
+    - apps
+    resources:
+    - deployments
+    verbs:
+    - get
+    - create
+    - update
+    - patch
+  - apiGroups:
+    - route.openshift.io
+    resources:
+    - routes
+    verbs:
+    - get
+    - create
+    - update
+    - patch
+  - apiGroups:
+    - ""
+    resources:
+    - services
+    - configmaps
+    verbs:
+    - get
+    - create
+    - update
+    - patch
+  - apiGroups:
+    - image.openshift.io
+    resources:
+    - imagestreams
+    verbs:
+    - get
+    - create
+    - update
+    - patch
 - kind: RoleBinding
   apiVersion: rbac.authorization.k8s.io/v1
   metadata:
@@ -343,6 +386,19 @@ items:
     - kind: ServiceAccount
       name: config-updater
       namespace: ci
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: config-updater
+    namespace: ci-rpms
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: Role
+    name: config-updater
+  subjects:
+  - kind: ServiceAccount
+    name: config-updater
+    namespace: ci
 - kind: ClusterRole
   apiVersion: rbac.authorization.k8s.io/v1
   metadata:
