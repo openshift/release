@@ -1,0 +1,263 @@
+kind: Template
+apiVersion: template.openshift.io/v1
+
+parameters:
+- name: JOB_NAME_SAFE
+  required: true
+- name: JOB_NAME_HASH
+  required: true
+- name: NAMESPACE
+  required: true
+- name: IMAGE_LIBVIRT_INSTALLER
+  required: true
+- name: IMAGE_UPI_INSTALLER
+  required: true
+- name: CLUSTER_TYPE
+  required: true
+- name: RELEASE_IMAGE_LATEST
+  required: true
+- name: BUILD_ID
+  required: false
+
+objects:
+
+# We want the cluster to be able to access these images
+- kind: RoleBinding
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: ${JOB_NAME_SAFE}-image-puller
+    namespace: ${NAMESPACE}
+  roleRef:
+    name: system:image-puller
+  subjects:
+  - kind: SystemGroup
+    name: system:unauthenticated
+  - kind: SystemGroup
+    name: system:authenticated
+
+# Give admin access to a known bot
+- kind: RoleBinding
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: ${JOB_NAME_SAFE}-namespace-admins
+    namespace: ${NAMESPACE}
+  roleRef:
+    name: admin
+  subjects:
+  - kind: ServiceAccount
+    namespace: ci
+    name: ci-chat-bot
+
+# The e2e pod spins up a cluster, runs e2e tests, and then cleans up the cluster.
+- kind: Pod
+  apiVersion: v1
+  metadata:
+    name: ${JOB_NAME_SAFE}
+    namespace: ${NAMESPACE}
+    annotations:
+      # we want to gather the teardown logs no matter what
+      ci-operator.openshift.io/wait-for-container-artifacts: teardown
+      ci-operator.openshift.io/save-container-logs: "true"
+  spec:
+    restartPolicy: Never
+    activeDeadlineSeconds: 14400
+    terminationGracePeriodSeconds: 900
+    volumes:
+    - name: shared-ignition-files
+      emptyDir: {}
+    - name: artifacts
+      emptyDir: {}
+    - name: shared-tmp
+      emptyDir: {}
+    - name: cluster-profile
+      secret:
+        secretName: ${JOB_NAME_SAFE}-cluster-profile
+
+    containers:
+
+    # Runs an install
+    - name: setup
+      image: ${IMAGE_UPI_INSTALLER}
+      terminationMessagePolicy: FallbackToLogsOnError
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp
+      - name: cluster-profile
+        mountPath: /etc/openshift-installer
+      - name: artifacts
+        mountPath: /tmp/artifacts
+      env:
+      - name: CLUSTER_NAME
+        value: ${NAMESPACE}-${JOB_NAME_HASH}
+      - name: SSH_PUB_KEY_PATH
+        value: /etc/openshift-installer/ssh-publickey
+      - name: SSH_PRIVATE_KEY_PATH
+        value: /etc/openshift-installer/ssh-privatekey
+      - name: PACKET_PROJECT_ID
+        value: b3c1623c-ce0b-45cf-9757-c61a71e06eac
+      - name: PULL_SECRET_PATH
+        value: /etc/openshift-installer/pull-secret
+      command:
+      - /bin/sh
+      - -c
+      - |
+        #!/bin/sh
+        set -e
+
+        set -x
+
+        finished()
+        {
+            set +e
+
+            echo "Deprovisioning cluster ..."
+            cd /tmp/artifacts/terraform
+            terraform init
+            for r in {1..5}; do terraform destroy -auto-approve && break ; done
+        }
+        trap finished EXIT TERM
+
+        mkdir -p /tmp/artifacts/terraform /tmp/shared || true
+        cd /tmp/artifacts/terraform
+
+        set +x
+        export PACKET_AUTH_TOKEN=$(cat /etc/openshift-installer/.packetcred)
+        set -x
+
+        cat > /tmp/artifacts/terraform/terraform.tf <<-EOF
+        provider "packet" {
+        }
+
+        resource "packet_device" "server" {
+          count            = "1"
+          project_id       = "$PACKET_PROJECT_ID"
+          hostname         = "ipi-$CLUSTER_NAME"
+          plan             = "c2.medium.x86"
+          facilities       = ["ewr1", "ewr1", "sjc1"]
+          operating_system = "centos_7"
+          billing_cycle    = "hourly"
+        }
+
+        EOF
+
+        terraform init
+        # Packet returns transients errors when creating devices.
+        # example, `Oh snap, something went wrong! We've logged the error and will take a look - please reach out to us if you continue having trouble.`
+        # therefore the terraform apply needs to be retried a few time before giving up.
+        rc=1
+        for r in {1..5}; do terraform apply -auto-approve && rc=0 && break ; done
+        if test "${rc}" -eq 1; then echo "failed to create the infra resources"; sleep 1; fi
+
+        jq -r '.modules[0].resources["packet_device.server"].primary.attributes.access_public_ipv4' terraform.tfstate > /tmp/IP
+
+        touch /tmp/ready
+        while [ ! -f /tmp/exit ] ; do sleep 1 ; done
+
+    # ssh container
+    - name: dotest
+      image: ${IMAGE_LIBVIRT_INSTALLER}
+      terminationMessagePolicy: FallbackToLogsOnError
+      resources:
+        requests:
+          cpu: 1
+          memory: 300Mi
+        limits:
+          memory: 3Gi
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp
+      - name: cluster-profile
+        mountPath: /etc/openshift-installer
+      - name: artifacts
+        mountPath: /tmp/artifacts
+      env:
+      - name: HOME
+        value: /tmp/packer
+      - name: SSH_PUB_KEY_PATH
+        value: /etc/openshift-installer/ssh-publickey
+      - name: SSH_PRIVATE_KEY_PATH
+        value: /etc/openshift-installer/ssh-privatekey
+      - name: NAMESPACE
+        value: ${NAMESPACE}
+      - name: PULL_SECRET_PATH
+        value: /etc/openshift-installer/pull-secret
+      - name: NSS_WRAPPER_PASSWD
+        value: /tmp/packer/passwd
+      - name: NSS_WRAPPER_GROUP
+        value: /tmp/packer/group
+      - name: NSS_USERNAME
+        value: packer
+      - name: NSS_GROUPNAME
+        value: packer
+      command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -xeuo pipefail
+
+        mkdir -p /tmp/packer
+        mock-nss.sh
+
+        export LD_PRELOAD=/usr/lib64/libnss_wrapper.so
+
+        for x in $(seq 120) ; do
+            test $x == 120 && exit 1
+            test -f /tmp/ready && break
+            sleep 10
+        done
+
+        finished()
+        {
+            set +e
+
+            if [ -n "$IP" ] ; then
+                echo "Getting logs"
+                ssh  $SSHOPTS root@$IP tar -czf - /root/dev-scripts/logs | tar -C /tmp/artifacts -xzf -
+                sed -i -e 's/.*auths.*/*** PULL_SECRET ***/g' /tmp/artifacts/root/dev-scripts/logs/*
+            fi
+
+            touch /tmp/exit
+        }
+
+        SSHOPTS="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i $SSH_PRIVATE_KEY_PATH"
+        trap finished EXIT
+
+
+        set +x
+        export PACKET_AUTH_TOKEN=$(cat /etc/openshift-installer/.packetcred)
+        set -x
+
+        export IP=$(cat /tmp/IP)
+
+        for x in $(seq 10) ; do
+            test $x == 10 && exit 1
+            ssh $SSHOPTS root@$IP hostname && break
+            sleep 10
+        done
+
+        scp $SSHOPTS ${PULL_SECRET_PATH} root@$IP:pull-secret
+        timeout -s 9 175m ssh $SSHOPTS root@$IP bash - << EOF
+        set -ex
+
+        yum install -y git
+
+        export OPENSHIFT_RELEASE_IMAGE=registry.svc.ci.openshift.org/$NAMESPACE/release:latest
+        set +x
+        export PULL_SECRET=\$(cat pull-secret)
+        set -x
+
+        # python2-cryptography needs to come from delorean-master-testing, priority of packet.repo overrides it
+        # remove the priority and instead ensure the packet repo is named first alphabetically
+        # this way it is prefered but it isn't a hard override when newer versions are found elsewhere
+        sed -i -e 's/priority.*//g' /etc/yum.repos.d/packet.repo
+        sed -i -e 's/packet-/a_packet-/g' /etc/yum.repos.d/packet.repo
+
+        export ADDN_DNS=\$(awk '/nameserver/ { print \$2;exit; }' /etc/resolv.conf)
+
+        git clone https://github.com/openshift-metal3/dev-scripts.git
+        cd dev-scripts
+        touch /root/dev-scripts/config_root.sh
+        timeout -s 9 105m make |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
+
+        EOF
