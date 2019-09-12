@@ -6,47 +6,47 @@ items:
 - apiVersion: route.openshift.io/v1
   kind: Route
   metadata:
-    name: artifacts-openshift-origin-master
+    name: artifacts-openshift-origin-release-3-11
     namespace: ci-rpms
   spec:
-    host: artifacts-openshift-master.svc.ci.openshift.org
+    host: artifacts-openshift-release-3-11.svc.ci.openshift.org
     to:
-      name: artifacts-openshift-origin-master
+      name: artifacts-openshift-origin-release-3-11
     tls:
       termination: Edge
       insecureEdgeTerminationPolicy: Redirect
 - apiVersion: v1
   kind: Service
   metadata:
-    name: artifacts-openshift-origin-master
+    name: artifacts-openshift-origin-release-3-11
     namespace: ci-rpms
   spec:
     selector:
-      app: artifacts-openshift-origin-master
+      app: artifacts-openshift-origin-release-3-11
     ports:
     - port: 80
       targetPort: 8080
 - apiVersion: apps/v1
   kind: Deployment
   metadata:
-    name: artifacts-openshift-origin-master
+    name: artifacts-openshift-origin-release-3-11
     namespace: ci-rpms
     annotations:
-      image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","namespace":"openshift","name":"origin-v4.0:artifacts"},"fieldPath":"spec.template.spec.containers[?(@.name==\"srv\")].image"}]'
+      image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","namespace":"openshift","name":"origin-v3.11:artifacts"},"fieldPath":"spec.template.spec.containers[?(@.name==\"srv\")].image"}]'
   spec:
     replicas: 2
     revisionHistoryLimit: 10
     selector:
       matchLabels:
-        app: artifacts-openshift-origin-master
+        app: artifacts-openshift-origin-release-3-11
     template:
       metadata:
         labels:
-          app: artifacts-openshift-origin-master
+          app: artifacts-openshift-origin-release-3-11
       spec:
         containers:
         - name: srv
-          image: registry.svc.ci.openshift.org/openshift/origin-v4.0:artifacts
+          image: " "
           command:
           - /bin/bash
           - -c
@@ -65,21 +65,21 @@ items:
 
             # Launch multiple listeners as threads
             class Thread(threading.Thread):
-            	def __init__(self, i):
-            		threading.Thread.__init__(self)
-            		self.i = i
-            		self.daemon = True
-            		self.start()
+              def __init__(self, i):
+                threading.Thread.__init__(self)
+                self.i = i
+                self.daemon = True
+                self.start()
 
-            	def run(self):
-            		httpd = BaseHTTPServer.HTTPServer(addr, SimpleHTTPServer.SimpleHTTPRequestHandler, False)
+              def run(self):
+                httpd = BaseHTTPServer.HTTPServer(addr, SimpleHTTPServer.SimpleHTTPRequestHandler, False)
 
-            		# Prevent the HTTP server from re-binding every handler.
-            		# https://stackoverflow.com/questions/46210672/
-            		httpd.socket = sock
-            		httpd.server_bind = self.server_close = lambda self: None
+                # Prevent the HTTP server from re-binding every handler.
+                # https://stackoverflow.com/questions/46210672/
+                httpd.socket = sock
+                httpd.server_bind = self.server_close = lambda self: None
 
-            		httpd.serve_forever()
+                httpd.serve_forever()
 
             [Thread(i) for i in range(100)]
             time.sleep(9e9)
