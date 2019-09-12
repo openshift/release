@@ -368,3 +368,7 @@ logging:
 	$(MAKE) apply WHAT=cluster/ci/config/logging/fluentd-daemonset.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/logging/fluentd-configmap.yaml
 .PHONY: logging
+
+bump-pr:
+	hack/bump-pr.sh
+.PHONY: bump-pr
