@@ -138,13 +138,16 @@ the environment and execute the test.
 
 While users should deal mostly with the `ci-operator` configuration file and
 generate Prow jobs automatically from it, the structure of the Prow jobs has to
-be taken into consideration when writing a template. The `e2e-conformance-k8s`
-job in `openshift/origin`, which uses the `cluster-launch-src.yaml` will be
-used as an example:
+be taken into consideration when writing a template.
+For example, the following snippet from [the configuration file](https://github.com/openshift/release/blob/master/ci-operator/config/openshift/origin/openshift-origin-master.yaml) of repo `openshift/origin` is used to generate the [presubmit job](https://github.com/openshift/release/blob/master/ci-operator/jobs/openshift/origin/openshift-origin-master-presubmits.yaml)  `pull-ci-openshift-origin-master-e2e-conformance-k8s`
+which uses the template [`cluster-launch-installer-src.yaml`](https://github.com/openshift/release/blob/master/ci-operator/templates/openshift/installer/cluster-launch-installer-src.yaml):
 
-https://github.com/openshift/release/blob/master/ci-operator/config/openshift/origin/openshift-origin-master.yaml
-https://github.com/openshift/release/blob/master/ci-operator/jobs/openshift/origin/openshift-origin-master-presubmits.yaml
-https://github.com/openshift/release/blob/master/ci-operator/templates/cluster-launch-src.yaml
+```
+- as: e2e-conformance-k8s
+  commands: test/extended/conformance-k8s.sh
+  openshift_installer_src:
+    cluster_profile: aws
+```
 
 The CI process begins when a webhook from Github triggers the creation of one
 or more Prow jobs. For a complete description of Prow jobs, see the
