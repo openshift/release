@@ -57,7 +57,7 @@ roles: cluster-operator-roles cluster-roles
 prow: prow-ci-ns prow-ci-stg-ns prow-openshift-ns
 .PHONY: prow
 
-prow-ci-ns: ci-ns prow-crd prow-config prow-rbac prow-services prow-jobs prow-scaling prow-secrets
+prow-ci-ns: ci-ns prow-config prow-rbac prow-services prow-jobs prow-scaling prow-secrets
 .PHONY: prow-ci-ns
 
 prow-ci-stg-ns: ci-stg-ns prow-cluster-jobs
@@ -79,11 +79,6 @@ ci-stg-ns:
 openshift-ns:
 	oc project openshift
 .PHONY: openshift-ns
-
-prow-crd:
-	$(MAKE) apply WHAT=cluster/ci/config/prow/prow_crd.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/prowjob_access.yaml
-.PHONY: prow-crd
 
 prow-scaling:
 	oc apply -n kube-system -f cluster/ci/config/cluster-autoscaler.yaml
