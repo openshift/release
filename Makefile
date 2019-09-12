@@ -41,7 +41,7 @@ applyTemplate:
 	oc process -f $(WHAT) | oc apply -f -
 .PHONY: applyTemplate
 
-postsubmit-update: prow-services origin-release libpod prow-monitoring build-dashboards-validation-image cincinnati prow-release-controller-definitions
+postsubmit-update: origin-release libpod prow-monitoring build-dashboards-validation-image cincinnati prow-release-controller-definitions
 .PHONY: postsubmit-update
 
 all: roles prow projects
@@ -57,7 +57,7 @@ roles: cluster-operator-roles cluster-roles
 prow: prow-ci-ns prow-ci-stg-ns prow-openshift-ns
 .PHONY: prow
 
-prow-ci-ns: ci-ns prow-services prow-jobs prow-scaling prow-secrets
+prow-ci-ns: ci-ns prow-jobs prow-scaling prow-secrets
 .PHONY: prow-ci-ns
 
 prow-ci-stg-ns: ci-stg-ns prow-cluster-jobs
@@ -88,10 +88,6 @@ prow-secrets:
 	ci-operator/populate-secrets-from-bitwarden.sh
 	oc create configmap secret-mirroring --from-file=cluster/ci/config/secret-mirroring/mapping.yaml -o yaml --dry-run | oc apply -f -
 .PHONY: prow-secrets
-
-prow-services:
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/boskos_metrics.yaml
-.PHONY: prow-services
 
 prow-cluster-jobs:
 	oc create configmap cluster-profile-gcp --from-file=cluster/test-deploy/gcp/vars.yaml --from-file=cluster/test-deploy/gcp/vars-origin.yaml -o yaml --dry-run | oc apply -f -
