@@ -11,7 +11,11 @@ parameters:
 - name: IMAGE_FORMAT
 - name: IMAGE_INSTALLER
   required: true
+- name: IMAGE_LIBVIRT_INSTALLER
+  required: true
 - name: IMAGE_TESTS
+  required: true
+- name: IMAGE_UPI_INSTALLER
   required: true
 - name: CLUSTER_TYPE
   required: true
@@ -97,7 +101,7 @@ objects:
       # we want to gather the teardown logs no matter what
       ci-operator.openshift.io/wait-for-container-artifacts: teardown
       ci-operator.openshift.io/save-container-logs: "true"
-      ci-operator.openshift.io/container-sub-tests: "lease,setup,test,teardown"
+      ci-operator.openshift.io/container-sub-tests: "lease,setup,test,teardown,setup-packet"
   spec:
     restartPolicy: Never
     activeDeadlineSeconds: 18000
@@ -140,6 +144,12 @@ objects:
       - |
         #!/bin/bash
         set -euo pipefail
+
+        # TODO(derekh): New metal type added to boskos.ci ???
+        if [ "${CLUSTER_TYPE}" == "metal" ] ; then
+            touch /tmp/shared/leased
+            exit 0
+        fi
 
         trap 'rc=$?; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi; if test "${rc}" -ne 0; then touch /tmp/shared/exit; fi; exit "${rc}"' EXIT
 
@@ -212,7 +222,7 @@ objects:
       - -c
       - |
         #!/bin/bash
-        set -euo pipefail
+        set -exuo pipefail
 
         export PATH=/usr/libexec/origin:$PATH
 
@@ -329,6 +339,13 @@ objects:
           export KUBE_SSH_USER=core
         elif [[ "${CLUSTER_TYPE}" == "azure4" ]]; then
           export TEST_PROVIDER='azure'
+        elif [ "${CLUSTER_TYPE}" == "metal" ] ; then
+          export HOME=/tmp/shared/nss_wrapper
+          export NSS_WRAPPER_PASSWD=$HOME/passwd NSS_WRAPPER_GROUP=$HOME/group NSS_USERNAME=nsswrapper NSS_GROUPNAME=nsswrapper LD_PRELOAD=/tmp/shared/libnss_wrapper.so
+          export IP=$(cat /tmp/shared/packet-server-ip)
+          SSHOPTS="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/cluster/ssh-privatekey"
+          scp $SSHOPTS /usr/bin/openshift-tests /usr/bin/kubectl root@$IP:/usr/local/bin
+          oc config  set-cluster ostest --server=https://api.ostest.test.metalkube.org:6443 --insecure-skip-tls-verify
         fi
 
         mkdir -p /tmp/output
@@ -383,6 +400,16 @@ objects:
         function run-tests() {
           openshift-tests run "${TEST_SUITE}" \
             --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
+        }
+
+        function run-remote-tests() {
+          set +e
+          ssh $SSHOPTS root@$IP openshift-tests run "${TEST_SUITE}" \
+            --provider "'${TEST_PROVIDER:-}'" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
+          rv=$?
+          ssh $SSHOPTS root@$IP tar -czf - /tmp/artifacts | tar -C / -xzf - 
+          set -e
+          return $rv
         }
 
         if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
@@ -449,6 +476,11 @@ objects:
       - |
         #!/bin/sh
         set -e
+
+        # setup/teardown is different for servers on packet.net (see setup-packet)
+        if [ "${CLUSTER_TYPE}" == "metal" ] ; then
+            exit 0
+        fi
 
         trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/setup-success; else touch /tmp/exit; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
@@ -786,6 +818,12 @@ objects:
       - -c
       - |
         #!/bin/bash
+
+        # setup/teardown is different for servers on packet.net (see setup-packet)
+        if [ "${CLUSTER_TYPE}" == "metal" ] ; then
+            exit 0
+        fi
+
         function queue() {
           local TARGET="${1}"
           shift
@@ -932,3 +970,150 @@ objects:
           fi
           sleep 60 & wait
         done
+
+    # The setup-packet and test containers need libnns_wrapper to use ssh
+    # TODO(derekh): investigate if it can be added to that container images
+    - name: nss-wrapper-hack
+      image: ${IMAGE_LIBVIRT_INSTALLER}
+      terminationMessagePolicy: FallbackToLogsOnError
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -xe
+        cp /bin/mock-nss.sh /usr/lib64/libnss_wrapper.so /tmp/shared/
+    # We need to have a seperate setup container for packet.net servers
+    # as we need an image with terrafrom
+    - name: setup-packet
+      image: ${IMAGE_UPI_INSTALLER}
+      terminationMessagePolicy: FallbackToLogsOnError
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      - name: cluster-profile
+        mountPath: /tmp/cluster
+      - name: artifacts
+        mountPath: /tmp/artifacts
+      env:
+      - name: CLUSTER_NAME
+        value: ${NAMESPACE}-${JOB_NAME_HASH}
+      - name: PACKET_PROJECT_ID
+        value: b3c1623c-ce0b-45cf-9757-c61a71e06eac
+      - name: PULL_SECRET_PATH
+        value: /tmp/cluster/pull-secret
+      - name: MIRROR_BASE
+        value: registry.svc.ci.openshift.org/${NAMESPACE}/release
+      command:
+      - /bin/sh
+      - -c
+      - |
+        #!/bin/sh
+        set -ex
+
+        if [ "${CLUSTER_TYPE}" != "metal" ] ; then
+            exit 0
+        fi
+
+        finished()
+        {
+            set +e
+
+            if [ -n "$IP" ] ; then
+                echo "Getting logs"
+                ssh $SSHOPTS root@$IP tar -czf - /root/dev-scripts/logs | tar -C /tmp/artifacts -xzf -
+                sed -i -e 's/.*auths.*/*** PULL_SECRET ***/g' /tmp/artifacts/root/dev-scripts/logs/*
+            fi
+
+            echo "Deprovisioning cluster ..."
+            cd /tmp/artifacts/terraform
+            terraform init
+            for r in {1..5}; do terraform destroy -auto-approve && break ; done
+            touch /tmp/shared/exit
+        }
+        trap finished EXIT TERM
+
+        mkdir -p /tmp/artifacts/terraform
+        cd /tmp/artifacts/terraform
+
+        set +x
+        export PACKET_AUTH_TOKEN=$(cat /tmp/cluster/.packetcred)
+        set -x
+
+        cat > /tmp/artifacts/terraform/terraform.tf <<-EOF
+        provider "packet" {
+        }
+
+        resource "packet_device" "server" {
+          count            = "1"
+          project_id       = "$PACKET_PROJECT_ID"
+          hostname         = "ipi-$CLUSTER_NAME"
+          plan             = "c2.medium.x86"
+          facilities       = ["ewr1", "ewr1", "sjc1"]
+          operating_system = "centos_7"
+          billing_cycle    = "hourly"
+        }
+
+        EOF
+
+        terraform init
+        # Packet returns transients errors when creating devices.
+        # example, `Oh snap, something went wrong! We've logged the error and will take a look - please reach out to us if you continue having trouble.`
+        # therefore the terraform apply needs to be retried a few time before giving up.
+        rc=1
+        for r in {1..5}; do terraform apply -auto-approve && rc=0 && break ; done
+        if test "${rc}" -eq 1; then echo "failed to create the infra resources"; sleep 1; fi
+
+        jq -r '.modules[0].resources["packet_device.server"].primary.attributes.access_public_ipv4' terraform.tfstate > /tmp/shared/packet-server-ip
+
+        export HOME=/tmp/shared/nss_wrapper
+        export NSS_WRAPPER_PASSWD=$HOME/passwd NSS_WRAPPER_GROUP=$HOME/group NSS_USERNAME=nsswrapper NSS_GROUPNAME=nsswrapper LD_PRELOAD=/tmp/shared/libnss_wrapper.so
+        mkdir -p $HOME
+        bash /tmp/shared/mock-nss.sh
+
+        SSHOPTS="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/cluster/ssh-privatekey"
+        export IP=$(cat /tmp/shared/packet-server-ip)
+
+        for x in $(seq 10) ; do
+            test $x == 10 && exit 1
+            ssh $SSHOPTS root@$IP hostname && break
+            sleep 10
+        done
+
+        scp $SSHOPTS ${PULL_SECRET_PATH} root@$IP:pull-secret
+        timeout -s 9 175m ssh $SSHOPTS root@$IP bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
+        set -ex
+
+        yum install -y git
+
+        # python2-cryptography needs to come from delorean-master-testing, priority of packet.repo overrides it
+        # remove the priority and instead ensure the packet repo is named first alphabetically
+        # this way it is prefered but it isn't a hard override when newer versions are found elsewhere
+        sed -i -e 's/priority.*//g' /etc/yum.repos.d/packet.repo
+        sed -i -e 's/packet-/a_packet-/g' /etc/yum.repos.d/packet.repo
+
+        mkdir -p /tmp/artifacts
+
+        git clone https://github.com/openshift-metal3/dev-scripts.git
+        cd dev-scripts
+
+        set +x
+        echo "export PULL_SECRET='\$(cat /root/pull-secret)'" > /root/dev-scripts/config_root.sh
+        set -x
+        # TODO(derekh): this needs to be commented back once ci images work
+        echo "export OPENSHIFT_RELEASE_IMAGE=$MIRROR_BASE:latest" >> /root/dev-scripts/config_root.sh
+        echo "export ADDN_DNS=\$(awk '/nameserver/ { print \$2;exit; }' /etc/resolv.conf)" >> /root/dev-scripts/config_root.sh
+        echo 'export KUBECONFIG=/root/dev-scripts/ocp/auth/kubeconfig' >> /root/.bashrc
+
+        timeout -s 9 105m make
+
+        EOF
+
+        mkdir -p /tmp/artifacts/installer/auth
+        scp $SSHOPTS root@$IP:./dev-scripts/ocp/auth/kubeconfig /tmp/artifacts/installer/auth/kubeconfig
+
+        touch /tmp/shared/setup-success
+        while [ ! -f /tmp/shared/exit ] ; do sleep 1 ; done
