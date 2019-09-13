@@ -46,7 +46,7 @@ ConfigMaps.
    [postsubmit](https://prow.svc.ci.openshift.org/?job=branch-ci-openshift-release-master-core-apply)
    after each PR is merged, and also [periodically](https://prow.svc.ci.openshift.org/?job=openshift-release-master-core-apply).
 3. ConfigMaps are automatically updated by the `config-updater` Prow plugin,
-   configured in its [config.yaml](../cluster/ci/config/prow/config.yaml) file.
+   configured in its [config.yaml](02_config/_config.yaml) file.
    Additionally, they are [periodically](https://prow.svc.ci.openshift.org/?job=openshift-release-master-config-bootstrapper)
    synced by a Prow job.
 
