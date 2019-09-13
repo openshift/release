@@ -57,7 +57,7 @@ roles: cluster-operator-roles cluster-roles
 prow: prow-ci-ns prow-ci-stg-ns prow-openshift-ns
 .PHONY: prow
 
-prow-ci-ns: ci-ns prow-config prow-rbac prow-services prow-jobs prow-scaling prow-secrets
+prow-ci-ns: ci-ns prow-rbac prow-services prow-jobs prow-scaling prow-secrets
 .PHONY: prow-ci-ns
 
 prow-ci-stg-ns: ci-stg-ns prow-cluster-jobs
@@ -83,17 +83,6 @@ openshift-ns:
 prow-scaling:
 	oc apply -n kube-system -f cluster/ci/config/cluster-autoscaler.yaml
 .PHONY: prow-scaling
-
-prow-config:
-	oc create cm config --from-file=config.yaml=cluster/ci/config/prow/config.yaml
-	oc create cm plugins --from-file=plugins.yaml=cluster/ci/config/prow/plugins.yaml
-.PHONY: prow-config
-
-prow-config-update:
-	oc create cm labels --from-file=cluster/ci/config/prow/labels.yaml -o yaml --dry-run | oc replace -f -
-	oc create cm config --from-file=config.yaml=cluster/ci/config/prow/config.yaml -o yaml --dry-run | oc replace -f -
-	oc create cm plugins --from-file=plugins.yaml=cluster/ci/config/prow/plugins.yaml -o yaml --dry-run | oc replace -f -
-.PHONY: prow-config-update
 
 prow-secrets:
 	ci-operator/populate-secrets-from-bitwarden.sh
@@ -337,11 +326,6 @@ metal-secrets:
 	--from-file=cluster/test-deploy/metal/pull-secret \
 	-o yaml --dry-run | oc apply -n ocp -f -
 .PHONY: metal-secrets
-
-check-prow-config:
-	# test that the prow config is parseable
-	mkpj --config-path cluster/ci/config/prow/config.yaml --job-config-path ci-operator/jobs/ --job branch-ci-origin-images --base-ref master --base-sha abcdef
-.PHONY: check-prow-config
 
 libpod:
 	$(MAKE) apply WHAT=projects/libpod/libpod.yaml

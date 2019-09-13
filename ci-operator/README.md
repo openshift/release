@@ -295,7 +295,7 @@ With the template file ready, the steps required to add it to the repository
 and make it available for CI jobs are:
 
 1. Create the yaml file in the `templates/` directory.
-2. Add the files to the [`config-updater` section of Prow's configuration file](https://github.com/openshift/release/blob/master/cluster/ci/config/prow/plugins.yaml)
+2. Add the files to the [`config-updater` section of Prow's configuration file](https://github.com/openshift/release/blob/master/core-services/prow/02_config/_plugins.yaml)
    to ensure they are added to a `ConfigMap` in the CI cluster.
 3. Optional: add a test type to `ci-operator` to enable automatic generation of
    jobs that use this template.
