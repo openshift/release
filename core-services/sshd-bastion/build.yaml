@@ -1,0 +1,38 @@
+kind: List
+apiVersion: v1
+items:
+- apiVersion: image.openshift.io/v1
+  kind: ImageStream
+  metadata:
+    name: sshd
+    namespace: ci
+  spec:
+    lookupPolicy:
+      local: true
+
+- kind: BuildConfig
+  apiVersion: v1
+  metadata:
+    name: sshd
+    namespace: ci
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: sshd:latest
+    source:
+      dockerfile: |
+        FROM docker.io/centos:7
+
+        RUN yum -y update && yum -y install openssh-server && yum clean all
+      type: Dockerfile
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: docker.io/centos:7
+        imageOptimizationPolicy: SkipLayers
+    triggers:
+    - type: ConfigChange
