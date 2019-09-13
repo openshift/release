@@ -12,6 +12,10 @@ base_images:
     name: "4.2"
     namespace: ocp
     tag: cli
+  oc-rpms:
+    name: "4.2"
+    namespace: ocp
+    tag: oc-rpms
   machine-os-content-base:
     name: "4.2"
     namespace: ocp
@@ -61,10 +65,16 @@ promotion:
   namespace: ocp
 raw_steps:
 - pipeline_image_cache_step:
-    commands: mkdir -p _output/local/releases; touch _output/local/releases/CHECKSUM;
-      echo $'FROM bin AS bin\nFROM rpms AS rpms\nFROM centos:7\nCOPY --from=bin /go/src/github.com/openshift/origin/_output/local/releases
-      /srv/zips/\nCOPY --from=rpms /go/src/github.com/openshift/origin/_output/local/releases/rpms/*
-      /srv/repo/' > _output/local/releases/Dockerfile; make build-cross
+    commands: >
+      mkdir -p _output/local/releases;
+      touch _output/local/releases/CHECKSUM;
+      echo $'FROM bin AS bin\nFROM rpms AS rpms\nFROM centos:7
+      \nCOPY --from=bin /go/src/github.com/openshift/origin/_output/local/releases /srv/zips/
+      \nCOPY --from=oc-rpms /go/src/github.com/openshift/oc/_rpmbuild/SOURCES/* /srv/zips/
+      \nCOPY --from=rpms /go/src/github.com/openshift/origin/_output/local/releases/rpms/* /srv/repo/
+      \nCOPY --from=oc-rpms /go/src/github.com/openshift/oc/_rpmbuild/RPMS/x86_64/* /srv/repo/
+      ' > _output/local/releases/Dockerfile;
+      make build-cross;
     from: bin
     to: bin-cross
 - project_directory_image_build_step:
@@ -80,6 +90,9 @@ raw_steps:
         as:
         - rpms
         paths: null
+      oc-rpms:
+        as:
+        - oc-rpms
       src:
         paths: null
     optional: true
@@ -104,6 +117,12 @@ resources:
     requests:
       cpu: 100m
       memory: 4Gi
+  artifacts:
+    limits:
+      memory: 1Gi
+    requests:
+      cpu: "100m"
+      memory: 100Mi
   bin:
     limits:
       memory: 12Gi
@@ -175,6 +194,10 @@ tag_specification:
   name: "4.2"
   namespace: ocp
 tests:
+- as: images-artifacts
+  commands: "# noop, just to force the building the `artifacts` image"
+  container:
+    from: artifacts
 - artifact_dir: /tmp/artifacts
   as: unit
   commands: TMPDIR=/tmp/volume GOTEST_FLAGS='-p 8' ARTIFACT_DIR=/tmp/artifacts TIMEOUT=180s
