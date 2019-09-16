@@ -139,12 +139,12 @@ objects:
         function run-tests() {
           if which openshift-tests && [[ -n "${TEST_SUITE-}" ]]; then
             openshift-tests run "${TEST_SUITE}" --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
-            exit 0
+            return 0
           fi
           # TODO: remove everything after this point once we fork templates by release - starting with 4.0
           if ! which extended.test; then
             echo "must provide TEST_SUITE variable"
-            exit 1
+            return 1
           fi
           if [[ -n "${TEST_FOCUS:-}" ]]; then
             ginkgo -v -noColor -nodes="${TEST_PARALLELISM:-30}" $( which extended.test ) -- \
@@ -158,7 +158,7 @@ objects:
               -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit/serial \
               -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
           fi
-          exit ${rc:-0}
+          return ${rc:-0}
         }
 
         ${TEST_COMMAND}
