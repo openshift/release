@@ -202,7 +202,7 @@ objects:
         trap 'kill $(jobs -p); exit 0' TERM
 
         function patch_image_specs() {
-          cat >> /tmp/samples-patch.yaml << EOF
+          cat <<EOF >samples-patch.yaml
         - op: add
           path: /spec/skippedImagestreams
           value:
@@ -210,50 +210,39 @@ objects:
           - jenkins-agent-maven
           - jenkins-agent-nodejs
         EOF
-          echo "---samples patch-----"
-          cat /tmp/samples-patch.yaml
-          echo "--------------"
-          oc patch config.samples.operator.openshift.io cluster --type json -p "$(cat /tmp/samples-patch.yaml)"
+          oc patch config.samples.operator.openshift.io cluster --type json -p "$(cat samples-patch.yaml)"
 
           NAMES='cli cli-artifacts installer installer-artifacts must-gather tests jenkins jenkins-agent-maven jenkins-agent-nodejs'
 
-          cat >> /tmp/version-patch.yaml << EOF
+          cat <<EOF >version-patch.yaml
         - op: add
           path: /spec/overrides
           value:
         EOF
-        for NAME in ${NAMES}
-        do
-          cat >> /tmp/version-patch.yaml << EOF
+          for NAME in ${NAMES}
+          do
+            cat <<EOF >>version-patch.yaml
           - group: image.openshift.io/v1
             kind: ImageStream
             name: ${NAME}
             namespace: openshift
             unmanaged: true
         EOF
-        done
-        echo "---version patch-----"
-        cat /tmp/version-patch.yaml
-        echo "--------------"
-        oc patch clusterversion version --type json -p "$(cat /tmp/version-patch.yaml)"
+          done
+          oc patch clusterversion version --type json -p "$(cat version-patch.yaml)"
 
-        for NAME in ${NAMES}
-        do
-          echo "---in for loop for image stream-----"
-          DIGEST="$(oc adm release info --image-for="${NAME}" | sed 's/.*@//')"
-          echo "--- the digest is ${DIGEST} ----------"
-          cat >> /tmp/image-stream-new-source.yaml << EOF
+          for NAME in ${NAMES}
+          do
+            DIGEST="$(oc adm release info --image-for="${NAME}" | sed 's/.*@//')"
+            cat <<EOF >image-stream-new-source.yaml
         - op: replace
           path: /spec/tags/0/from
           value:
             kind: DockerImage
-            name: "registry.svc.ci.openshift.org/${NAMESPACE}/release@{DIGEST}"
+            name: "${MIRROR_BASE}@${DIGEST}"
         EOF
-          echo "----image stream patch-----"
-          cat /tmp/image-stream-new-source.yaml
-          echo "------------"
-          oc -n openshift patch imagestream "${NAME}" --type json -p "$(cat /tmp/image-stream-new-source.yaml)"
-        done
+            oc -n openshift patch imagestream "${NAME}" --type json -p "$(cat image-stream-new-source.yaml)"
+          done
         }
 
         mkdir -p "${HOME}"
@@ -801,21 +790,11 @@ objects:
           # mirror the release image and override the release image to point to the mirrored one
           mkdir /tmp/.docker && cp /etc/openshift-installer/pull-secret /tmp/.docker/config.json
           oc registry login
-          echo "-------release new-------"
-          oc adm release new --from-release ${RELEASE_IMAGE_LATEST} --to-image registry.svc.ci.openshift.org/${NAMESPACE}/mirrored:release --mirror registry.svc.ci.openshift.org/${NAMESPACE}/mirrored
-          echo "------------release mirror--------"
-          oc adm release mirror --from registry.svc.ci.openshift.org/${NAMESPACE}/mirrored:release --to registry.svc.ci.openshift.org/${NAMESPACE}/release --to-release-image registry.svc.ci.openshift.org/${NAMESPACE}/release:mirrored
-          echo "----------doing istag----------"
-          RELEASE_PAYLOAD_IMAGE_SHA=$(oc get istag release:mirrored -o=jsonpath="{.image.metadata.name}")
-          oc delete is/mirrored
-          echo "-------sha----- ${RELEASE_PAYLOAD_IMAGE_SHA} -------"
-          RELEASE_IMAGE_MIRROR="registry.svc.ci.openshift.org/${NAMESPACE}/mirrored@${RELEASE_PAYLOAD_IMAGE_SHA}"
-
-          # oc adm release new --from-release ${RELEASE_IMAGE_LATEST} --to-image ${MIRROR_BASE}-mirrored:release --mirror ${MIRROR_BASE}-mirrored
-          # oc adm release mirror --from ${MIRROR_BASE}-mirrored:release --to ${MIRROR_BASE} --to-release-image ${MIRROR_BASE}:mirrored
-          # RELEASE_PAYLOAD_IMAGE_SHA=$(oc get istag ${MIRROR_BASE}:mirrored -o=jsonpath="{.image.metadata.name}")
-          # oc delete is/${MIRROR_BASE}-mirrored # so the cluster-under-test will have to fall back to the mirrors
-          # RELEASE_IMAGE_MIRROR="${MIRROR_BASE}-mirrored@${RELEASE_PAYLOAD_IMAGE_SHA}"
+          oc adm release new --from-release ${RELEASE_IMAGE_LATEST} --to-image "${MIRROR_BASE}-scratch:release" --mirror "${MIRROR_BASE}-scratch"
+          oc adm release mirror --from "${MIRROR_BASE}-scratch:release" --to "${MIRROR_BASE}" --to-release-image "${MIRROR_BASE}:release"
+          oc delete imagestream "$(basename "${MIRROR_BASE}-scratch")"  # so the cluster-under-test will have to fall back to the mirrors
+          RELEASE_PAYLOAD_IMAGE_SHA="$(oc get istag "${MIRROR_BASE##*/}:release" -o=jsonpath="{.image.metadata.name}")"
+          RELEASE_IMAGE_MIRROR="${MIRROR_BASE}@${RELEASE_PAYLOAD_IMAGE_SHA}"
           echo "Installing from mirror override release ${RELEASE_IMAGE_MIRROR}"
           OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_MIRROR}"
         else
@@ -1000,9 +979,9 @@ objects:
         if [[ "${ENABLE_MIRROR}" == "true" ]]; then
           cat >> /tmp/artifacts/installer/install-config.yaml << EOF
         imageContentSources:
-        - source: "registry.svc.ci.openshift.org/${NAMESPACE}/mirrored"
+        - source: "${MIRROR_BASE}-scratch"
           mirrors:
-          - "registry.svc.ci.openshift.org/${NAMESPACE}/release"
+          - "${MIRROR_BASE}"
         EOF
         fi
 
