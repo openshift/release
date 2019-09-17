@@ -127,6 +127,107 @@ periodics:
   cron: ""
   decorate: true
   interval: 12h
+  name: release-openshift-origin-installer-old-rhcos-e2e-aws-4.2
+  spec:
+    containers:
+    - command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -exuo pipefail
+
+        # prow doesn't allow init containers or a second container
+        export PATH=$PATH:/tmp/bin
+        export HOME=/tmp
+        mkdir $HOME/.docker/
+        cp /usr/local/pull-secret/.dockerconfigjson $HOME/.docker/config.json
+        mkdir $HOME/bin
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/ocp-dev-preview/4.2.0-0.nightly-2019-09-11-114314/openshift-client-linux-4.2.0-0.nightly-2019-09-11-114314.tar.gz | tar xvzf - -C $HOME/bin/
+        chmod ug+x $HOME/bin/oc
+
+        # create namespace and craft a release image without the machine operator
+        namespace="ci-op-$( echo "${JOB_NAME}-${BUILD_ID}" | md5sum -t | cut -c 1-8 )"
+        export RELEASE_IMAGE_INITIAL=registry.svc.ci.openshift.org/ocp/release:$(FROM_BRANCH)
+        export RELEASE_IMAGE_LATEST=registry.svc.ci.openshift.org/${namespace}/release:upgrade
+        export IMAGE_TESTS=registry.svc.ci.openshift.org/${namespace}/stable-initial:tests # use the older version of the payload
+        export TEST_UNSUPPORTED_ALLOW_VERSION_SKEW=1 # allows certain tests that verify payload integrity to be skipped
+        oc registry login
+        oc new-project ${namespace}
+        oc policy add-role-to-group system:image-puller -n ${namespace} system:unauthenticated system:authenticated
+        oc adm release new --from-release=registry.svc.ci.openshift.org/ocp/release:$(BRANCH) \
+          --to-image=registry.svc.ci.openshift.org/${namespace}/release:upgrade \
+          --exclude=machine-config-operator
+
+        # execute the test
+        ci-operator \
+          --artifact-dir=$(ARTIFACTS) \
+          --namespace=${namespace} \
+          --secret-dir=/usr/local/pull-secret \
+          --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile \
+          --target=e2e-$(CLUSTER_TYPE)-upgrade
+      env:
+      - name: FROM_BRANCH
+        value: "4.1"
+      - name: BRANCH
+        value: "4.2"
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: CONFIG_SPEC
+        value: |
+          tag_specification:
+            name: "none" # don't import anything to avoid a race between 4.1 latest and the chosen version
+            namespace: ocp
+          build_root:
+            image_stream_tag:
+              cluster: https://api.ci.openshift.org
+              name: release
+              namespace: openshift
+              tag: golang-1.12
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)-upgrade
+            commands: |
+              TEST_SUITE=all run-upgrade-tests
+              TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+      - name: JOB_NAME_SAFE
+        value: e2e-aws-upgrade
+      - name: TEST_COMMAND
+        value: ""
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/pull-secret
+        name: pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
+  cron: ""
+  decorate: true
+  interval: 12h
   name: release-openshift-origin-installer-e2e-aws-sdn-multitenant-4.2
   spec:
     containers:
