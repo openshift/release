@@ -439,7 +439,7 @@ periodics:
       - name: JOB_NAME_SAFE
         value: e2e-aws
       - name: TEST_COMMAND
-        value: TEST_SUITE=openshift/conformance/serial run-tests
+        value: TEST_SUITE=openshift/conformance/parallel run-tests
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -478,9 +478,9 @@ periodics:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
       - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-aws-cluster-profile
-      - --target=e2e-aws
-      - --template=/usr/local/e2e-aws
+      - --secret-dir=/usr/local/e2e-aws-serial-cluster-profile
+      - --target=e2e-aws-serial
+      - --template=/usr/local/e2e-aws-serial
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       command:
@@ -523,9 +523,9 @@ periodics:
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
       - name: JOB_NAME_SAFE
-        value: e2e-aws
+        value: e2e-aws-serial
       - name: TEST_COMMAND
-        value: TEST_SUITE=openshift/conformance/parallel run-tests
+        value: TEST_SUITE=openshift/conformance/serial run-tests
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -533,9 +533,9 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /usr/local/e2e-aws-cluster-profile
+      - mountPath: /usr/local/e2e-aws-serial-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/e2e-aws
+      - mountPath: /usr/local/e2e-aws-serial
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
       - mountPath: /usr/local/pull-secret
