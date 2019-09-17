@@ -1,0 +1,27 @@
+binary_build_commands: make
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.12
+resources:
+  '*':
+    limits:
+      memory: 12Gi
+    requests:
+      cpu: "3"
+      memory: 12Gi
+tests:
+- as: verify
+  commands: |
+    make verify -k
+  container:
+    from: bin
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: |
+    mkdir -p /tmp/artifacts
+    make test KUBE_JUNIT_REPORT_DIR=/tmp/artifacts/
+  container:
+    from: bin
