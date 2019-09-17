@@ -780,23 +780,22 @@ objects:
           echo "Installing from initial release ${RELEASE_IMAGE_INITIAL}"
           OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_INITIAL}"
         elif [[ "${ENABLE_MIRROR}" == "true" ]]; then
-          # export PATH=$PATH:/tmp  # gain access to oc
-          # while [ ! command -V oc ]; do sleep 1; done # poll to make sure that the test container has dropped oc into the shared volume
-          export PATH=$PATH:/tmp/bin
-          mkdir /tmp/bin
-          curl https://storage.googleapis.com/origin-ci-test/_tools/4.1.0/oc >/tmp/bin/oc 2>/dev/null
-          chmod ug+x /tmp/bin/oc
+          export PATH=$PATH:/tmp  # gain access to oc
+          while [ ! command -V oc ]; do sleep 1; done # wait for 1 second to make sure that the test container has dropped oc into the shared volume
+          oc version
 
           # mirror the release image and override the release image to point to the mirrored one
           mkdir /tmp/.docker && cp /etc/openshift-installer/pull-secret /tmp/.docker/config.json
           oc registry login
-          oc adm release new --from-release ${RELEASE_IMAGE_LATEST} --to-image "${MIRROR_BASE}-scratch:release" --mirror "${MIRROR_BASE}-scratch"
+          set -x
+          oc adm release new --from-release "${RELEASE_IMAGE_LATEST}" --to-image "${MIRROR_BASE}-scratch:release" --mirror "${MIRROR_BASE}-scratch"
           oc adm release mirror --from "${MIRROR_BASE}-scratch:release" --to "${MIRROR_BASE}" --to-release-image "${MIRROR_BASE}:release"
           oc delete imagestream "$(basename "${MIRROR_BASE}-scratch")"  # so the cluster-under-test will have to fall back to the mirrors
           RELEASE_PAYLOAD_IMAGE_SHA="$(oc get istag "${MIRROR_BASE##*/}:release" -o=jsonpath="{.image.metadata.name}")"
           RELEASE_IMAGE_MIRROR="${MIRROR_BASE}@${RELEASE_PAYLOAD_IMAGE_SHA}"
           echo "Installing from mirror override release ${RELEASE_IMAGE_MIRROR}"
           OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_MIRROR}"
+          set +x
         else
           echo "Installing from release ${RELEASE_IMAGE_LATEST}"
         fi
