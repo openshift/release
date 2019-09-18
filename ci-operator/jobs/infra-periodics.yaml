@@ -311,6 +311,71 @@ periodics:
 - agent: kubernetes
   labels:
     ci.openshift.io/role: infra
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  cron: "30 10 * * 1"  # Run at 10:30 UTC each Monday
+  decorate: true
+  name: periodic-prow-image-autoowners
+  spec:
+    containers:
+    - command:
+      - /usr/bin/autoowners
+      args:
+      - --github-token=/etc/github/oauth
+      - --git-name=openshift-bot
+      - --git-email=openshift-bot@redhat.com
+      - --target-dir=.
+      ### copied from https://github.com/openshift/release/blob/bc31bc6647941f999ceb968a6dc88e06be23905c/hack/validate-owners.sh#L8-L17
+      - --ignore-repo=ci-operator/config/openshift/kubernetes-metrics-server
+      - --ignore-repo=ci-operator/jobs/openshift/kubernetes-metrics-server
+      - --ignore-repo=ci-operator/config/openshift/origin-metrics
+      - --ignore-repo=ci-operator/jobs/openshift/origin-metrics
+      - --ignore-repo=ci-operator/config/openshift/origin-web-console
+      - --ignore-repo=ci-operator/jobs/openshift/origin-web-console
+      - --ignore-repo=ci-operator/config/openshift/origin-web-console-server
+      - --ignore-repo=ci-operator/jobs/openshift/origin-web-console-server
+      - --ignore-repo=ci-operator/jobs/openvswitch/ovn-kubernetes
+      ### violate /verify-owners: those repos are cloned from theirs upstreams
+      ### https://github.com/openshift/release/pull/5025#issuecomment-532185298
+      - --ignore-repo=ci-operator/config/openshift/cluster-api-provider-azure
+      - --ignore-repo=ci-operator/config/openshift/csi-driver-registrar
+      - --ignore-repo=ci-operator/config/openshift/csi-external-resizer
+      - --ignore-repo=ci-operator/config/openshift/csi-external-snapshotter
+      - --ignore-repo=ci-operator/config/openshift/csi-livenessprobe
+      - --ignore-repo=ci-operator/config/openshift/knative-build
+      - --ignore-repo=ci-operator/config/openshift/knative-client
+      - --ignore-repo=ci-operator/config/openshift/knative-serving
+      - --ignore-repo=ci-operator/config/openshift/kubernetes
+      - --ignore-repo=ci-operator/config/openshift/sig-storage-local-static-provisioner
+      - --ignore-repo=ci-operator/jobs/openshift/cluster-api-provider-azure
+      - --ignore-repo=ci-operator/jobs/openshift/csi-driver-registrar
+      - --ignore-repo=ci-operator/jobs/openshift/csi-external-resizer
+      - --ignore-repo=ci-operator/jobs/openshift/csi-external-snapshotter
+      - --ignore-repo=ci-operator/jobs/openshift/csi-livenessprobe
+      - --ignore-repo=ci-operator/jobs/openshift/knative-build
+      - --ignore-repo=ci-operator/jobs/openshift/knative-client
+      - --ignore-repo=ci-operator/jobs/openshift/knative-serving
+      - --ignore-repo=ci-operator/jobs/openshift/kubernetes
+      - --ignore-repo=ci-operator/jobs/openshift/sig-storage-local-static-provisioner
+      image: registry.svc.ci.openshift.org/ci/autoowners:latest
+      imagePullPolicy: Always
+      name: "autoowners"
+      resources:
+          requests:
+            cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: token
+        readOnly: true
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-bot
+- agent: kubernetes
+  labels:
+    ci.openshift.io/role: infra
   cron: ""
   decorate: true
   interval: 30m
