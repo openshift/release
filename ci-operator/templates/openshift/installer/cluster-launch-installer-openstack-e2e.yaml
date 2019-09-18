@@ -25,6 +25,8 @@ parameters:
   value: 128.31.27.48
 - name: KURYR_ENABLED
   value: "false"
+- name: OPENSTACK_FLAVOR
+  required: false
 - name: BUILD_ID
   required: false
 
@@ -257,8 +259,6 @@ objects:
         value: rhcos
       - name: OPENSTACK_REGION
         value: moc-kzn
-      - name: OPENSTACK_FLAVOR
-        value: m1.s2.xlarge
       - name: OPENSTACK_EXTERNAL_NETWORK
         value: external
       - name: OS_CLOUD
@@ -299,6 +299,9 @@ objects:
         export EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
         export SSH_PUB_KEY=$(cat "${SSH_PUB_KEY_PATH}")
         export PULL_SECRET=$(cat "${PULL_SECRET_PATH}")
+
+        # set default if the value is not provided
+        OPENSTACK_FLAVOR="${OPENSTACK_FLAVOR:-m1.s2.xlarge"}
 
         # move private key to ~/.ssh/ so that installer can use it to gather logs on bootstrap failure
         mkdir -p ~/.ssh
