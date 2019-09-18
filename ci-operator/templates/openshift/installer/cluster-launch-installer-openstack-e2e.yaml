@@ -404,9 +404,6 @@ objects:
           touch /tmp/shared/exit
           export PATH=$PATH:/tmp/shared
 
-          echo "Removing entries from DNS ..."
-          curl -v $CI_DNS_IP:8080/remove -d '{"cluster_name": "'$CLUSTER_NAME'"}'
-
           echo "Gathering artifacts ..."
           mkdir -p /tmp/artifacts/pods /tmp/artifacts/nodes /tmp/artifacts/metrics /tmp/artifacts/bootstrap /tmp/artifacts/network
 
@@ -484,6 +481,9 @@ objects:
 
           echo "Waiting for logs ..."
           wait
+
+          echo "Removing entries from DNS ..."
+          curl -v $CI_DNS_IP:8080/remove -d '{"cluster_name": "'$CLUSTER_NAME'"}'
 
           echo "Deleting service VM FIP ..."
           openstack floating ip list --long -f csv -c Description -c "Floating IP Address" | grep $CLUSTER_NAME | cut -f1 -d "," | xargs openstack floating ip delete
