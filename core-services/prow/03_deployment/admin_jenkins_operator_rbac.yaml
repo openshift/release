@@ -4,11 +4,13 @@ items:
 - apiVersion: v1
   kind: ServiceAccount
   metadata:
-    name: horologium
+    name: jenkins-operator
+    namespace: ci
 - kind: Role
   apiVersion: rbac.authorization.k8s.io/v1
   metadata:
-    name: horologium
+    name: jenkins-operator
+    namespace: ci
   rules:
     - apiGroups:
         - prow.k8s.io
@@ -17,14 +19,22 @@ items:
       verbs:
         - create
         - list
+        - update
+    - apiGroups:
+        - prow.k8s.io
+      resources:
+        - prowjobs/status
+      verbs:
+        - update
 - kind: RoleBinding
   apiVersion: rbac.authorization.k8s.io/v1
   metadata:
-    name: horologium
+    name: jenkins-operator
+    namespace: ci
   roleRef:
     apiGroup: rbac.authorization.k8s.io
     kind: Role
-    name: horologium
+    name: jenkins-operator
   subjects:
   - kind: ServiceAccount
-    name: horologium
+    name: jenkins-operator

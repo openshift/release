@@ -4,35 +4,33 @@ items:
 - apiVersion: apps/v1
   kind: Deployment
   metadata:
-    name: sinker
+    namespace: ci
+    name: horologium
     labels:
       app: prow
-      component: sinker
+      component: horologium
   spec:
     replicas: 1
     revisionHistoryLimit: 2
     selector:
       matchLabels:
         app: prow
-        component: sinker
+        component: horologium
     template:
       metadata:
         labels:
           app: prow
-          component: sinker
+          component: horologium
       spec:
-        serviceAccountName: sinker
+        serviceAccountName: horologium
         priorityClassName: prow-critical
         containers:
-        - name: sinker
-          image: gcr.io/k8s-prow/sinker:v20190918-7672de02b
+        - name: horologium
           args:
           - --config-path=/etc/config/config.yaml
           - --job-config-path=/etc/job-config
           - --dry-run=false
-          ports:
-          - name: metrics
-            containerPort: 9090
+          image: gcr.io/k8s-prow/horologium:v20190918-7672de02b
           volumeMounts:
           - name: config
             mountPath: /etc/config
@@ -63,8 +61,8 @@ items:
             readOnly: true
           resources:
             requests:
-              memory: "1.8Gi"
-              cpu: "50m"
+              memory: "1.5Gi"
+              cpu: "150m"
         volumes:
         - name: config
           configMap:
@@ -93,19 +91,3 @@ items:
         - name: job-config-43
           configMap:
             name: job-config-4.3
-- apiVersion: v1
-  kind: Service
-  metadata:
-    labels:
-      app: prow
-      component: sinker
-    name: sinker
-  spec:
-    ports:
-    - name: metrics
-      port: 9090
-      protocol: TCP
-      targetPort: 9090
-    selector:
-      app: prow
-      component: sinker
