@@ -4,12 +4,22 @@ items:
 - apiVersion: v1
   kind: ServiceAccount
   metadata:
-    name: artifact-uploader
+    annotations:
+      serviceaccounts.openshift.io/oauth-redirectreference.deck-internal: '{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"deck-internal"}}'
+    name: deck
+    namespace: ci
 - kind: Role
   apiVersion: rbac.authorization.k8s.io/v1
   metadata:
-    name: artifact-uploader
+    name: deck
+    namespace: ci
   rules:
+    - apiGroups:
+        - ""
+      resources:
+        - pods/log
+      verbs:
+        - get
     - apiGroups:
         - prow.k8s.io
       resources:
@@ -20,41 +30,41 @@ items:
 - kind: RoleBinding
   apiVersion: rbac.authorization.k8s.io/v1
   metadata:
-    name: artifact-uploader
+    name: deck
+    namespace: ci
   roleRef:
     apiGroup: rbac.authorization.k8s.io
     kind: Role
-    name: artifact-uploader
+    name: deck
   subjects:
   - kind: ServiceAccount
-    name: artifact-uploader
+    name: deck
 - kind: ClusterRole
   apiVersion: rbac.authorization.k8s.io/v1
   metadata:
-    name: artifact-uploader
+    name: deck-oauth
   rules:
     - apiGroups:
-        - ""
+      - authentication.k8s.io
       resources:
-        - pods/log
+      - tokenreviews
       verbs:
-        - get
+      - create
     - apiGroups:
-        - ""
+      - authorization.k8s.io
       resources:
-        - pods
+      - subjectaccessreviews
       verbs:
-        - list
-        - watch
+      - create
 - kind: ClusterRoleBinding
   apiVersion: rbac.authorization.k8s.io/v1
   metadata:
-    name: artifact-uploader
+    name: deck-oauth
   roleRef:
     apiGroup: rbac.authorization.k8s.io
     kind: ClusterRole
-    name: artifact-uploader
+    name: deck-oauth
   subjects:
   - kind: ServiceAccount
-    name: artifact-uploader
+    name: deck
     namespace: ci

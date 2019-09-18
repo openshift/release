@@ -4,11 +4,12 @@ items:
 - apiVersion: v1
   kind: Service
   metadata:
-    name: refresh
+    namespace: ci
+    name: needs-rebase
   spec:
     selector:
       app: prow
-      component: refresh
+      component: needs-rebase
     ports:
     - port: 80
       targetPort: 8888
@@ -16,31 +17,35 @@ items:
 - apiVersion: apps/v1
   kind: Deployment
   metadata:
-    name: refresh
+    namespace: ci
+    name: needs-rebase
     labels:
       app: prow
-      component: refresh
+      component: needs-rebase
   spec:
     replicas: 1
     revisionHistoryLimit: 2
     selector:
       matchLabels:
         app: prow
-        component: refresh
+        component: needs-rebase
     template:
       metadata:
         labels:
           app: prow
-          component: refresh
+          component: needs-rebase
       spec:
         containers:
-        - name: refresh
-          image: gcr.io/k8s-prow/refresh:v20190918-7672de02b
+        - name: needs-rebase
+          image: gcr.io/k8s-prow/needs-rebase:v20190918-7672de02b
           args:
           - --github-token-path=/etc/github/oauth
           - --hmac-secret-file=/etc/webhook/hmac
+          - --plugin-config=/etc/plugins/plugins.yaml
           - --dry-run=false
-          - --prow-url=https://prow.svc.ci.openshift.org
+          - --github-endpoint=http://ghproxy
+          - --github-endpoint=https://api.github.com
+          - --github-graphql-endpoint=http://ghproxy/graphql
           ports:
             - name: http
               containerPort: 8888
@@ -51,13 +56,13 @@ items:
           - name: oauth
             mountPath: /etc/github
             readOnly: true
-          - name: config
-            mountPath: /etc/config
+          - name: plugins
+            mountPath: /etc/plugins
             readOnly: true
           resources:
             requests:
-              memory: "250Mi"
-              cpu: "50m"
+              memory: "25Mi"
+              cpu: "10m"
         volumes:
         - name: hmac
           secret:
@@ -65,6 +70,6 @@ items:
         - name: oauth
           secret:
             secretName: github-credentials-openshift-ci-robot
-        - name: config
+        - name: plugins
           configMap:
-            name: config
+            name: plugins

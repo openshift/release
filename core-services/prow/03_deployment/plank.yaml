@@ -4,69 +4,68 @@ items:
 - apiVersion: v1
   kind: Service
   metadata:
-    name: tot
-  spec:
-    selector:
-      app: prow
-      component: tot
-    ports:
-    - port: 80
-      targetPort: 8888
-    type: ClusterIP
-- kind: PersistentVolumeClaim
-  apiVersion: v1
-  metadata:
+    namespace: ci
     labels:
       app: prow
-      component: tot
-    name: tot-storage
+      component: plank
+    name: plank
   spec:
-    accessModes:
-      - ReadWriteOnce
-    resources:
-      requests:
-        storage: 1Gi
-    storageClassName: ssd
+    ports:
+    - name: metrics
+      port: 9090
+      protocol: TCP
+      targetPort: 9090
+    selector:
+      app: prow
+      component: plank
 - apiVersion: apps/v1
   kind: Deployment
   metadata:
-    name: tot
+    namespace: ci
+    name: plank
     labels:
       app: prow
-      component: tot
+      component: plank
   spec:
+    # Do not scale up.
     replicas: 1
     revisionHistoryLimit: 2
+    strategy:
+      type: Recreate
     selector:
       matchLabels:
         app: prow
-        component: tot
-    strategy:
-      type: Recreate
+        component: plank
     template:
       metadata:
         labels:
           app: prow
-          component: tot
+          component: plank
       spec:
+        serviceAccountName: plank
         priorityClassName: prow-critical
         containers:
-        - name: tot
-          image: gcr.io/k8s-prow/tot:v20190918-7672de02b
+        - name: plank
+          image: gcr.io/k8s-prow/plank:v20190918-7672de02b
           args:
           - --config-path=/etc/config/config.yaml
-          - --fallback=true
-          - --fallback-bucket=http://gcsweb/gcs/origin-ci-test
-          - --storage=/storage/tot.json
+          - --tot-url=http://tot
+          - --dry-run=false
           - --job-config-path=/etc/job-config
+          - --github-token-path=/etc/github/oauth
+          - --github-endpoint=http://ghproxy
+          - --github-endpoint=https://api.github.com
+          - --github-graphql-endpoint=http://ghproxy/graphql
           ports:
-            - name: http
-              containerPort: 8888
+          - name: metrics
+            containerPort: 9090
           volumeMounts:
-          - name: tot-volume
-            mountPath: /storage
+          - name: oauth
+            mountPath: /etc/github
+            readOnly: true
           - name: config
             mountPath: /etc/config
+            readOnly: true
           - name: job-config-misc
             mountPath: /etc/job-config/misc
             readOnly: true
@@ -93,12 +92,12 @@ items:
             readOnly: true
           resources:
             requests:
-              memory: "250Mi"
-              cpu: "20m"
+              memory: "4Gi"
+              cpu: "600m"
         volumes:
-        - name: tot-volume
-          persistentVolumeClaim:
-            claimName: tot-storage
+        - name: oauth
+          secret:
+            secretName: github-credentials-openshift-ci-robot
         - name: config
           configMap:
             name: config
