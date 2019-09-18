@@ -717,6 +717,17 @@ objects:
 
           terraform apply -auto-approve -no-color &
           wait "$!"
+          # find bootstrap ip
+
+          BOOTSTRAP_IP=$(terraform state show 'module.bootstrap.external.ip_address' | grep ip_address | awk '{print $3}')
+
+          GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --bootstrap ${BOOTSTRAP_IP}"
+
+          CONTROL_PLANE_0_IP=$(terraform state show 'module.control_plane.external.ip_address[0]' | grep ip_address | awk '{print $3}')
+          CONTROL_PLANE_1_IP=$(terraform state show 'module.control_plane.external.ip_address[1]' | grep ip_address | awk '{print $3}')
+          CONTROL_PLANE_2_IP=$(terraform state show 'module.control_plane.external.ip_address[2]' | grep ip_address | awk '{print $3}')
+
+          GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --master ${CONTROL_PLANE_0_IP} --master ${CONTROL_PLANE_1_IP} --master ${CONTROL_PLANE_2_IP}"
         fi
 
         echo "Waiting for bootstrap to complete"
