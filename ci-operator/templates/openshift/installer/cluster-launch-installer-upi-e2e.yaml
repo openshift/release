@@ -23,6 +23,7 @@ parameters:
   required: true
 - name: BUILD_ID
   required: false
+- name: ENABLE_FIPS
 
 objects:
 
@@ -295,10 +296,34 @@ objects:
           # TODO: make openshift-tests auto-discover this from cluster config
           export TEST_PROVIDER='{"type":"aws","region":"us-east-1","zone":"us-east-1a","multizone":true,"multimaster":true}'
           export KUBE_SSH_USER=core
+        elif [[ "${CLUSTER_TYPE}" == "metal" ]]; then
+          mkdir -p ~/.ssh
+          cp /tmp/cluster/ssh-privatekey ~/.ssh/kube_metal_rsa || true
         fi
 
         mkdir -p /tmp/output
         cd /tmp/output
+
+        # create fips enable helper
+        function enable-fips() {
+          for name in $(oc get machineconfigpool --template='{{range .items}}{{.metadata.name}}{{"\n"}}{{end}}')
+          do
+            cat > /tmp/fips-mc.yaml <<'EOF'
+        apiVersion: machineconfiguration.openshift.io/v1
+        kind: MachineConfig
+        metadata:
+          labels:
+            machineconfiguration.openshift.io/role: "{{name}}"
+          name: 99-fips-"{{name}}"
+        spec:
+          fips: true
+        EOF
+            sed -i "s/\"{{name}}\"/${name}/g" /tmp/fips-mc.yaml
+            oc create -f /tmp/fips-mc.yaml
+          done
+          for i in $(seq 0 10); do oc wait machineconfigpool --all --for=condition=Updating --timeout=5m && break; done
+          for i in $(seq 0 10); do oc wait machineconfigpool --all --for=condition=Updated --timeout=5m && break; sleep 30; done
+        }
 
         function run-upgrade-tests() {
           openshift-tests run-upgrade "${TEST_SUITE}" --to-image "${RELEASE_IMAGE_LATEST}" \
@@ -311,6 +336,10 @@ objects:
             --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
           return 0
         }
+
+        if [[ "${ENABLE_FIPS}" == true ]]; then
+          enable-fips
+        fi
 
         ${TEST_COMMAND}
 
@@ -338,6 +367,14 @@ objects:
         value: ${NAMESPACE}-${JOB_NAME_HASH}
       - name: BASE_DOMAIN
         value: ${BASE_DOMAIN}
+      - name: KUBECONFIG
+        value: /tmp/artifacts/installer/auth/kubeconfig
+      - name: PACKET_PROJECT_ID
+        value: b3c1623c-ce0b-45cf-9757-c61a71e06eac
+      - name: MATCHBOX_CLIENT_CERT
+        value: /etc/openshift-installer/matchbox-client.crt
+      - name: MATCHBOX_CLIENT_KEY
+        value: /etc/openshift-installer/matchbox-client.key
       - name: SSH_PUB_KEY_PATH
         value: /etc/openshift-installer/ssh-publickey
       - name: SSH_PRIVATE_KEY_PATH
@@ -361,7 +398,7 @@ objects:
       - -c
       - |
         #!/bin/sh
-        set -e
+        set -ex
         trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/setup-success; else touch /tmp/exit; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -441,6 +478,25 @@ objects:
 
           openshift-install --dir=/tmp/artifacts/installer create manifests
           rm -f /tmp/artifacts/installer/openshift/99_openshift-cluster-api_master-machines-*.yaml /tmp/artifacts/installer/openshift/99_openshift-cluster-api_worker-machinesets-*.yaml
+        elif [[ "${CLUSTER_TYPE}" == "metal" ]]; then
+          cat > /tmp/artifacts/installer/install-config.yaml << EOF
+        apiVersion: v1
+        baseDomain: ${BASE_DOMAIN}
+        metadata:
+          name: ${CLUSTER_NAME}
+        compute:
+        - name: worker
+          replicas: 3
+        controlPlane:
+          name: master
+          replicas: 3
+        platform:
+          none: {}
+        pullSecret: >
+          ${PULL_SECRET}
+        sshKey: |
+          ${SSH_PUB_KEY}
+        EOF
         elif [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
             # Get user and password from TFVARS_PATH
             export VSPHERE_USER=$(grep -oP 'vsphere_user="\K[^"]+' ${TFVARS_PATH})
@@ -663,6 +719,48 @@ objects:
           done
 
           echo "bootstrap: ${BOOTSTRAP_IP} control-plane: ${CONTROL_PLANE_0_IP} ${CONTROL_PLANE_1_IP} ${CONTROL_PLANE_2_IP} compute: ${COMPUTE_0_IP} ${COMPUTE_1_IP}"
+        elif [[ "${CLUSTER_TYPE}" == "metal" ]]; then
+          mkdir /tmp/artifacts/terraform
+          cp -r /var/lib/openshift-install/upi/metal/* /tmp/artifacts/terraform/
+          cp /bin/terraform-provider-matchbox /tmp/artifacts/terraform/
+
+          PXE_INITRD_URL="$(jq -r '.baseURI + .images["initramfs"].path' /var/lib/openshift-install/rhcos.json)"
+          PXE_KERNEL_URL="$(jq -r '.baseURI + .images["kernel"].path' /var/lib/openshift-install/rhcos.json)"
+          PXE_OS_IMAGE_URL="$(jq -r '.baseURI + .images["metal-bios"].path' /var/lib/openshift-install/rhcos.json)"
+          cat > /tmp/artifacts/terraform/terraform.tfvars <<-EOF
+        cluster_id = "${CLUSTER_NAME}"
+        bootstrap_ign_file = "/tmp/artifacts/installer/bootstrap.ign"
+        cluster_domain = "${CLUSTER_NAME}.${BASE_DOMAIN}"
+        master_count = "3"
+        master_ign_file = "/tmp/artifacts/installer/master.ign"
+        matchbox_client_cert = "${MATCHBOX_CLIENT_CERT}"
+        matchbox_client_key = "${MATCHBOX_CLIENT_KEY}"
+        matchbox_http_endpoint = "http://http-matchbox.svc.ci.openshift.org"
+        matchbox_rpc_endpoint = "rpc.matchbox.svc.cluster.local:8081"
+        matchbox_trusted_ca_cert = "/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt"
+        packet_project_id = "${PACKET_PROJECT_ID}"
+        public_r53_zone = "${BASE_DOMAIN}"
+        pxe_initrd_url = "${PXE_INITRD_URL}"
+        pxe_kernel_url = "${PXE_KERNEL_URL}"
+        pxe_os_image_url = "${PXE_OS_IMAGE_URL}"
+        worker_count = "3"
+        worker_ign_file = "/tmp/artifacts/installer/worker.ign"
+        EOF
+
+          export PACKET_AUTH_TOKEN=$(cat /etc/openshift-installer/.packetcred)
+
+          echo "Creating resources using terraform"
+          (cd /tmp/artifacts/terraform && terraform init)
+
+          # Packet returns transients errors when creating devices.
+          # example, `Oh snap, something went wrong! We've logged the error and will take a look - please reach out to us if you continue having trouble.`
+          # therefore the terraform apply needs to be retried a few time before giving up.
+          rc=1
+          for r in {1..5}; do (cd /tmp/artifacts/terraform && terraform apply -auto-approve) && rc=0 && break ; done
+          if test "${rc}" -eq 1; then echo "failed to create the infra resources"; exit 1; fi
+
+          BOOTSTRAP_IP="$(terraform output -state /tmp/artifacts/terraform/terraform.tfstate -json | jq -r '.bootstrap_ip.value')"
+          GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --bootstrap ${BOOTSTRAP_IP}"
         elif [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
           mkdir -p /tmp/tf
 
@@ -741,6 +839,8 @@ objects:
 
           aws cloudformation wait stack-delete-complete --stack-name "${CLUSTER_NAME}-bootstrap" &
           wait "$!"
+        elif [[ "${CLUSTER_TYPE}" == "metal" ]]; then
+          (cd /tmp/artifacts/terraform && terraform apply -auto-approve=true -var=bootstrap_dns="false")
         elif [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
           terraform apply -auto-approve -var 'bootstrap_complete=true' -no-color &
           wait "$!"
@@ -767,7 +867,6 @@ objects:
         }
 
         echo "Approving pending CSRs"
-        export KUBECONFIG=/tmp/artifacts/installer/auth/kubeconfig
         approve_csrs &
 
         if [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
@@ -963,6 +1062,10 @@ objects:
             do
               aws cloudformation wait stack-delete-complete --stack-name "${CLUSTER_NAME}-${STACK_SUFFIX}"
             done
+          elif [[ "${CLUSTER_TYPE}" == "metal" ]]; then
+            export PACKET_AUTH_TOKEN=$(cat /etc/openshift-installer/.packetcred)
+            (cd /tmp/artifacts/terraform && terraform init)
+            for r in {1..3}; do (cd /tmp/artifacts/terraform && terraform destroy -auto-approve) && break ; done
           else
             cd /tmp/shared/tf
             rm -rf .terraform
