@@ -656,8 +656,6 @@ objects:
         value: us-east-1
       - name: AZURE_AUTH_LOCATION
         value: /etc/openshift-installer/osServicePrincipal.json
-      - name: AZURE_REGION
-        value: centralus
       - name: GCP_REGION
         value: us-east1
       - name: GCP_PROJECT
@@ -685,7 +683,7 @@ objects:
       - name: INSTALL_INITIAL_RELEASE
       - name: RELEASE_IMAGE_INITIAL
       command:
-      - /bin/sh
+      - /bin/bash
       - -c
       - |
         #!/bin/sh
@@ -759,6 +757,14 @@ objects:
           ${SSH_PUB_KEY}
         EOF
         elif [[ "${CLUSTER_TYPE}" == "azure4" ]]; then
+            case $((RANDOM % 4)) in
+            0) AZURE_REGION=centralus;;
+            1) AZURE_REGION=eastus;;
+            2) AZURE_REGION=eastus2;;
+            3) AZURE_REGION=westus;;
+            *) echo >&2 "invalid Azure region index"; exit 1;;
+            esac
+
             cat > /tmp/artifacts/installer/install-config.yaml << EOF
         apiVersion: v1
         baseDomain: ${BASE_DOMAIN:-ci.azure.devcluster.openshift.com}
