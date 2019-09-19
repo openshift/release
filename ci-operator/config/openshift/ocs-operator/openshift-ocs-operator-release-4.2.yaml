@@ -8,7 +8,7 @@ base_images:
     namespace: ocp
     tag: "7"
 
-binary_build_commands: make ocs-operator-openshift-ci-build
+binary_build_commands: make build
 
 build_root:
   image_stream_tag:
@@ -53,53 +53,9 @@ tag_specification:
   namespace: ocp
 
 tests:
-- as: gofmt
+- as: ocs-operator-ci
   commands: |
-    gofmt -s -l $(find . -path ./vendor -prune -o -type f -name '*.go' -print)
-  container:
-    from: src
-
-- as: golint
-  commands: |
-    RETVAL=0
-    GENERATED_FILES="zz_generated.*.go"
-    for file in $(find . -path ./vendor -prune -o -type f -name '*.go' -print | grep -E -v "$GENERATED_FILES"); do
-      golint -set_exit_status "$file"
-      if [[ $? -eq 1 ]]; then
-        RETVAL=1
-      fi
-    done
-    exit $RETVAL
-  container:
-    from: src
-
-- as: govet
-  commands: |
-    go vet ./...
-  container:
-    from: src
-
-- as: gotest
-  commands: |
-    go test -v ./...
-  container:
-    from: src
-
-- as: verify-latest-csv
-  commands: |
-    RETVAL=0
-    CSV_CHECKSUM_ONLY=1 make gen-latest-csv || exit 1
-    if [[ -n "$(git status --porcelain hack/latest-csv-checksum.md5)" ]]; then
-        echo "uncommitted CSV changes. run 'make gen-latest-csv' and commit results."
-        exit 1
-    fi
-    exit 0
-  container:
-    from: src
-
-- as: gobuild
-  commands: |
-    go build github.com/openshift/ocs-operator/cmd/manager
+    make ocs-operator-ci
   container:
     from: src
 
@@ -108,14 +64,3 @@ tests:
     make cluster-deploy && make functest
   openshift_installer_src:
     cluster_profile: aws
-
-- as: verify-operator-sdk-gen
-  commands: |
-    make update-generated || exit 1
-    if [[ -n "$(git status --porcelain pkg/apis deploy/crds)" ]]; then
-        echo "uncommitted generated files. run 'make update-generated' and commit results."
-        exit 1
-    fi
-    exit 0
-  container:
-    from: src
