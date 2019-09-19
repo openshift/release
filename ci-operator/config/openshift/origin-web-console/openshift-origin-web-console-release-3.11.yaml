@@ -1,0 +1,34 @@
+base_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: origin-v3.11
+    namespace: openshift
+    tag: base
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: origin-v3.11
+  namespace: openshift
+  tag: ''
+  tag_overrides: {}
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: nodejs-8-browser-tests
+test_binary_build_commands: npm install grunt; hack/install-deps.sh; chmod -R g+rwx
+  $HOME; chgrp -R 0 $HOME
+tests:
+- artifact_dir: /tmp/artifacts
+  as: e2e-console
+  commands: export PATH=$PATH:$(pwd)/node_modules/.bin; export ARTIFACT_DIR=/tmp/artifacts;
+    make test
+  container:
+    from: test-bin
