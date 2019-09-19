@@ -139,6 +139,9 @@ presubmits:
     decorate: true
     decoration_config:
       skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-openshift-controller-manager-master-e2e-aws-proxy
     optional: true
     rerun_command: /test e2e-aws-proxy
@@ -161,8 +164,6 @@ presubmits:
             configMapKeyRef:
               key: openshift-openshift-controller-manager-master.yaml
               name: ci-operator-master-configs
-        - name: ENABLE_PROXY
-          value: "true"
         - name: JOB_NAME_SAFE
           value: e2e-aws-proxy
         - name: TEST_COMMAND
@@ -178,9 +179,23 @@ presubmits:
           name: cluster-profile
         - mountPath: /usr/local/e2e-aws-proxy
           name: job-definition
-          subPath: cluster-launch-installer-src.yaml
+          subPath: cluster-launch-installer-e2e.yaml
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-e2e
+        name: job-definition
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-aws-proxy,?($|\s.*)
   - agent: kubernetes
     always_run: true
