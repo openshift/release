@@ -788,7 +788,11 @@ objects:
           mkdir /tmp/.docker && cp /etc/openshift-installer/pull-secret /tmp/.docker/config.json
           oc registry login
           set -x
+          oc adm release new --from-release "${RELEASE_IMAGE_LATEST}" --to-image "${MIRROR_BASE}-scratch:release" --mirror "${MIRROR_BASE}-scratch" ||
+          oc adm release new --from-release "${RELEASE_IMAGE_LATEST}" --to-image "${MIRROR_BASE}-scratch:release" --mirror "${MIRROR_BASE}-scratch" ||
+          oc adm release new --from-release "${RELEASE_IMAGE_LATEST}" --to-image "${MIRROR_BASE}-scratch:release" --mirror "${MIRROR_BASE}-scratch" ||
           oc adm release new --from-release "${RELEASE_IMAGE_LATEST}" --to-image "${MIRROR_BASE}-scratch:release" --mirror "${MIRROR_BASE}-scratch"
+
           oc adm release mirror --from "${MIRROR_BASE}-scratch:release" --to "${MIRROR_BASE}" --to-release-image "${MIRROR_BASE}:release"
           oc delete imagestream "$(basename "${MIRROR_BASE}-scratch")"  # so the cluster-under-test will have to fall back to the mirrors
           RELEASE_PAYLOAD_IMAGE_SHA="$(oc get istag "${MIRROR_BASE##*/}:release" -o=jsonpath="{.image.metadata.name}")"
