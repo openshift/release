@@ -18,16 +18,27 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --secret-dir=/usr/local/e2e-console-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=e2e-console
+        - --template=/usr/local/e2e-console
         command:
         - ci-operator
         env:
+        - name: CLUSTER_TYPE
+          value: gcp
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
               key: openshift-origin-web-console-enterprise-3.11.yaml
               name: ci-operator-3.x-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-console
+        - name: RPM_REPO_OPENSHIFT_ORIGIN
+          value: https://rpms.svc.ci.openshift.org/openshift-origin-v3.11/
+        - name: TEST_COMMAND
+          value: export PATH=$PATH:$(pwd)/node_modules/.bin; export ARTIFACT_DIR=/tmp/artifacts;
+            make test
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -35,11 +46,26 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /usr/local/e2e-console-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-console
+          name: job-definition
+          subPath: cluster-launch-src.yaml
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - configMap:
+          name: prow-job-cluster-launch-src
+        name: job-definition
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
