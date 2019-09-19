@@ -7,13 +7,16 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "7"
+
 binary_build_commands: make ocs-operator-openshift-ci-build
+
 build_root:
   image_stream_tag:
     cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.12
+
 images:
 - dockerfile_path: openshift-ci/Dockerfile.deploy
   from: os
@@ -29,11 +32,13 @@ images:
 - dockerfile_path: openshift-ci/Dockerfile.registry.build
   from: operator-registry-base
   to: ocs-registry
+
 promotion:
   additional_images:
     ocs-operator-tests: src
   name: "4.2"
   namespace: ocp
+
 resources:
   '*':
     limits:
@@ -41,15 +46,18 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+
 tag_specification:
   name: "4.2"
   namespace: ocp
+
 tests:
 - as: gofmt
   commands: |
     gofmt -s -l $(find . -path ./vendor -prune -o -type f -name '*.go' -print)
   container:
     from: src
+
 - as: golint
   commands: |
     RETVAL=0
@@ -63,16 +71,19 @@ tests:
     exit $RETVAL
   container:
     from: src
+
 - as: govet
   commands: |
     go vet ./...
   container:
     from: src
+
 - as: gotest
   commands: |
     go test -v ./...
   container:
     from: src
+
 - as: verify-latest-csv
   commands: |
     RETVAL=0
@@ -84,11 +95,13 @@ tests:
     exit 0
   container:
     from: src
+
 - as: gobuild
   commands: |
     go build github.com/openshift/ocs-operator/cmd/manager
   container:
     from: src
+
 - as: ocs-operator-e2e-aws
   commands: |
     make cluster-deploy && make functest
