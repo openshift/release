@@ -219,9 +219,9 @@ objects:
       resources:
         requests:
           cpu: 1
-          memory: 300Mi
+          memory: 600Mi
         limits:
-          memory: 3Gi
+          memory: 4Gi
       volumeMounts:
       - name: shared-tmp
         mountPath: /tmp/shared
@@ -236,6 +236,8 @@ objects:
         value: us-east-1
       - name: ARTIFACT_DIR
         value: /tmp/artifacts
+      - name: GCP_SHARED_CREDENTIALS_FILE
+        value: /tmp/cluster/gce.json
       - name: HOME
         value: /tmp/home
       - name: KUBECONFIG
@@ -280,12 +282,11 @@ objects:
         export KUBE_SSH_BASTION="$( oc --insecure-skip-tls-verify get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
         export KUBE_SSH_KEY_PATH=/tmp/cluster/ssh-privatekey
         if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
-          export GOOGLE_APPLICATION_CREDENTIALS="/tmp/cluster/gce.json"
-          export KUBE_SSH_USER=cloud-user
+          export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
+          export KUBE_SSH_USER=core
           mkdir -p ~/.ssh
           cp /tmp/cluster/ssh-privatekey ~/.ssh/google_compute_engine || true
-          export PROVIDER_ARGS='-provider=gce -gce-zone=us-east1-c -gce-project=openshift-gce-devel-ci'
-          export TEST_PROVIDER='{"type":"gce","zone":"us-east1-c","projectid":"openshift-gce-devel-ci"}'
+          export TEST_PROVIDER='{"type":"gce","region":"us-east1","multizone": true,"multimaster":true,"projectid":"openshift-gce-devel-ci"}'
         elif [[ "${CLUSTER_TYPE}" == "aws" ]]; then
           mkdir -p ~/.ssh
           cp /tmp/cluster/ssh-privatekey ~/.ssh/kube_aws_rsa || true
@@ -336,6 +337,12 @@ objects:
         value: ${NAMESPACE}-${JOB_NAME_HASH}
       - name: BASE_DOMAIN
         value: ${BASE_DOMAIN}
+      - name: GCP_PROJECT
+        value: openshift-gce-devel-ci
+      - name: GCP_REGION
+        value: us-east1
+      - name: GOOGLE_CLOUD_KEYFILE_JSON
+        value: /etc/openshift-installer/gce.json
       - name: SSH_PUB_KEY_PATH
         value: /etc/openshift-installer/ssh-publickey
       - name: SSH_PRIVATE_KEY_PATH
@@ -413,7 +420,6 @@ objects:
 
         if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
           base_domain="${BASE_DOMAIN:-origin-ci-int-aws.dev.rhcloud.com}"
-          echo "FIXME: Base domain: '${base_domain}"
           MACHINE_CIDR=10.0.0.0/16
           cat > /tmp/artifacts/installer/install-config.yaml << EOF
         apiVersion: v1
@@ -453,6 +459,33 @@ objects:
 
           openshift-install --dir=/tmp/artifacts/installer create manifests
           rm -f /tmp/artifacts/installer/openshift/99_openshift-cluster-api_master-machines-*.yaml /tmp/artifacts/installer/openshift/99_openshift-cluster-api_worker-machinesets-*.yaml
+        elif [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
+          base_domain="${BASE_DOMAIN:-origin-ci-int-gce.dev.openshift.com}"
+          cat > /tmp/artifacts/installer/install-config.yaml << EOF
+        apiVersion: v1
+        baseDomain: ${base_domain}
+        metadata:
+          name: ${CLUSTER_NAME}
+        controlPlane:
+          name: master
+          replicas: 3
+        compute:
+        - name: worker
+          replicas: 0
+        platform:
+          gcp:
+            projectID: ${GCP_PROJECT}
+            region: ${GCP_REGION}
+        pullSecret: >
+          ${PULL_SECRET}
+        sshKey: |
+          ${SSH_PUB_KEY}
+        EOF
+
+          openshift-install --dir=/tmp/artifacts/installer create manifests
+          rm -f /tmp/artifacts/installer/openshift/99_openshift-cluster-api_master-machines-*.yaml
+          rm -f /tmp/artifacts/installer/openshift/99_openshift-cluster-api_worker-machineset-*.yaml
+          sed -i "s;mastersSchedulable: true;mastersSchedulable: false;g" /tmp/artifacts/installer/manifests/cluster-scheduler-02-config.yml
         elif [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
             base_domain="${BASE_DOMAIN:-origin-ci-int-aws.dev.rhcloud.com}"
             # Get user and password from TFVARS_PATH
@@ -687,6 +720,247 @@ objects:
           done
 
           echo "bootstrap: ${BOOTSTRAP_IP} control-plane: ${CONTROL_PLANE_0_IP} ${CONTROL_PLANE_1_IP} ${CONTROL_PLANE_2_IP} compute: ${COMPUTE_0_IP} ${COMPUTE_1_IP}"
+        elif [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
+          mkdir -p ${HOME}/gcp
+
+          # Copy sample UPI files
+          cp -r /var/lib/openshift-install/upi/${CLUSTER_TYPE}/* ${HOME}/gcp
+
+          # Download, install, and configure gcloud
+          pushd ${HOME}
+          curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
+          tar -xzf google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
+          export PATH=${HOME}/google-cloud-sdk/bin:${PATH}
+          popd
+          mkdir -p ${HOME}/gcloudconfig
+          export CLOUDSDK_CONFIG=${HOME}/gcloudconfig
+          gcloud auth activate-service-account --key-file="${GOOGLE_CLOUD_KEYFILE_JSON}"
+          gcloud config set project openshift-gce-devel-ci
+
+          # Install pyopenssl
+          export PATH=${HOME}/.local/bin:${PATH}
+          easy_install --user pip
+          pip install --user pyopenssl
+
+          export BASE_DOMAIN_ZONE_NAME=`gcloud dns managed-zones list --filter "DNS_NAME=${base_domain}." --format json | jq -r .[0].name`
+          export NETWORK_CIDR='10.0.0.0/16'
+          export MASTER_SUBNET_CIDR='10.0.0.0/19'
+          export WORKER_SUBNET_CIDR='10.0.32.0/19'
+
+          export KUBECONFIG=${HOME}/artifacts/installer/auth/kubeconfig
+          export CLUSTER_NAME=`jq -r .clusterName ${HOME}/artifacts/installer/metadata.json`
+          export INFRA_ID=`jq -r .infraID ${HOME}/artifacts/installer/metadata.json`
+          export PROJECT_NAME=`jq -r .gcp.projectID ${HOME}/artifacts/installer/metadata.json`
+          export REGION=`jq -r .gcp.region ${HOME}/artifacts/installer/metadata.json`
+
+          pushd ${HOME}/gcp
+
+          # Deploy vpc
+          cat <<EOF > 01_vpc.yaml
+        imports:
+        - path: 01_vpc.py
+        resources:
+        - name: cluster-vpc
+          type: 01_vpc.py
+          properties:
+            infra_id: '${INFRA_ID}'
+            region: '${REGION}'
+            master_subnet_cidr: '${MASTER_SUBNET_CIDR}'
+            worker_subnet_cidr: '${WORKER_SUBNET_CIDR}'
+        EOF
+
+          gcloud deployment-manager deployments create ${CLUSTER_NAME}-vpc --config 01_vpc.yaml
+
+          # Deploy infra
+          export CLUSTER_NETWORK=`gcloud compute networks describe ${INFRA_ID}-network --format json | jq -r .selfLink`
+
+          cat <<EOF > 02_infra.yaml
+        imports:
+        - path: 02_infra.py
+        resources:
+        - name: cluster-infra
+          type: 02_infra.py
+          properties:
+            infra_id: '${INFRA_ID}'
+            region: '${REGION}'
+            cluster_domain: '${CLUSTER_NAME}.${base_domain}'
+            cluster_network: '${CLUSTER_NETWORK}'
+        EOF
+
+          gcloud deployment-manager deployments create ${CLUSTER_NAME}-infra --config 02_infra.yaml
+
+          export CLUSTER_IP=`gcloud compute addresses describe ${INFRA_ID}-cluster-public-ip --region=${REGION} --format json | jq -r .address`
+
+          # Add external DNS entries
+          if [ -f transaction.yaml ]; then rm transaction.yaml; fi
+          gcloud dns record-sets transaction start --zone ${BASE_DOMAIN_ZONE_NAME}
+          gcloud dns record-sets transaction add ${CLUSTER_IP} --name api.${CLUSTER_NAME}.${base_domain}. --ttl 60 --type A --zone ${BASE_DOMAIN_ZONE_NAME}
+          gcloud dns record-sets transaction execute --zone ${BASE_DOMAIN_ZONE_NAME}
+
+          # Add internal DNS entries
+          if [ -f transaction.yaml ]; then rm transaction.yaml; fi
+          gcloud dns record-sets transaction start --zone ${INFRA_ID}-private-zone
+          gcloud dns record-sets transaction add ${CLUSTER_IP} --name api.${CLUSTER_NAME}.${base_domain}. --ttl 60 --type A --zone ${INFRA_ID}-private-zone
+          gcloud dns record-sets transaction add ${CLUSTER_IP} --name api-int.${CLUSTER_NAME}.${base_domain}. --ttl 60 --type A --zone ${INFRA_ID}-private-zone
+          gcloud dns record-sets transaction execute --zone ${INFRA_ID}-private-zone
+
+          # Deploy security
+          export MASTER_NAT_IP=`gcloud compute addresses describe ${INFRA_ID}-master-nat-ip --region ${REGION} --format json | jq -r .address`
+          export WORKER_NAT_IP=`gcloud compute addresses describe ${INFRA_ID}-worker-nat-ip --region ${REGION} --format json | jq -r .address`
+
+          cat <<EOF > 03_security.yaml
+        imports:
+        - path: 03_security.py
+
+        resources:
+        - name: cluster-security
+          type: 03_security.py
+          properties:
+            infra_id: '${INFRA_ID}'
+            region: '${REGION}'
+            cluster_network: '${CLUSTER_NETWORK}'
+            network_cidr: '${NETWORK_CIDR}'
+            master_nat_ip: '${MASTER_NAT_IP}'
+            worker_nat_ip: '${WORKER_NAT_IP}'
+        EOF
+
+          gcloud deployment-manager deployments create ${CLUSTER_NAME}-security --config 03_security.yaml
+
+          export MASTER_SA=${INFRA_ID}-m@${PROJECT_NAME}.iam.gserviceaccount.com
+          gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${MASTER_SA}" --role "roles/compute.instanceAdmin"
+          gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${MASTER_SA}" --role "roles/compute.networkAdmin"
+          gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${MASTER_SA}" --role "roles/compute.securityAdmin"
+          gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${MASTER_SA}" --role "roles/iam.serviceAccountUser"
+          gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${MASTER_SA}" --role "roles/storage.admin"
+
+          export WORKER_SA=${INFRA_ID}-w@${PROJECT_NAME}.iam.gserviceaccount.com
+          gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${WORKER_SA}" --role "roles/compute.viewer"
+          gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${WORKER_SA}" --role "roles/storage.admin"
+
+          gcloud iam service-accounts keys create service-account-key.json --iam-account=${MASTER_SA}
+
+          # Deploy bootstrap
+          export IMAGE_SOURCE=`cat /var/lib/openshift-install/rhcos.json | jq -r .gcp.url`
+          gcloud compute images create "${INFRA_ID}-rhcos-image" --source-uri="${IMAGE_SOURCE}"
+
+          export CONTROL_SUBNET=`gcloud compute networks subnets describe ${INFRA_ID}-master-subnet --region=${REGION} --format json | jq -r .selfLink`
+          export CLUSTER_IMAGE=`gcloud compute images describe ${INFRA_ID}-rhcos-image --format json | jq -r .selfLink`
+          export ZONES=(`gcloud compute regions describe ${REGION} --format=json | jq -r .zones[] | cut -d "/" -f9`)
+
+          gsutil mb gs://${INFRA_ID}-bootstrap-ignition
+          gsutil cp ${HOME}/artifacts/installer/bootstrap.ign gs://${INFRA_ID}-bootstrap-ignition/
+
+          export BOOTSTRAP_IGN=`gsutil signurl -d 1h service-account-key.json gs://${INFRA_ID}-bootstrap-ignition/bootstrap.ign | grep "^gs:" | awk '{print $5}'`
+
+          cat <<EOF > 04_bootstrap.yaml
+        imports:
+        - path: 04_bootstrap.py
+        resources:
+        - name: cluster-bootstrap
+          type: 04_bootstrap.py
+          properties:
+            infra_id: '${INFRA_ID}'
+            region: '${REGION}'
+            zone: '${ZONES[0]}'
+            cluster_network: '${CLUSTER_NETWORK}'
+            control_subnet: '${CONTROL_SUBNET}'
+            image: '${CLUSTER_IMAGE}'
+            machine_type: 'n1-standard-4'
+            root_volume_size: '128'
+            bootstrap_ign: '${BOOTSTRAP_IGN}'
+        EOF
+
+          gcloud deployment-manager deployments create ${CLUSTER_NAME}-bootstrap --config 04_bootstrap.yaml
+
+          gcloud compute target-pools add-instances ${INFRA_ID}-api-target-pool --instances-zone="${ZONES[0]}" --instances=${INFRA_ID}-bootstrap
+          gcloud compute target-pools add-instances ${INFRA_ID}-ign-target-pool --instances-zone="${ZONES[0]}" --instances=${INFRA_ID}-bootstrap
+
+          BOOTSTRAP_IP=`gcloud compute instances describe ${INFRA_ID}-bootstrap --zone ${ZONES[0]} --format json | jq -r .networkInterfaces[0].networkIP`
+          GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --bootstrap ${BOOTSTRAP_IP}"
+
+          # Deploy control plane
+          export MASTER_SERVICE_ACCOUNT_EMAIL=`gcloud iam service-accounts list | grep "^${INFRA_ID}-master-node " | awk '{print $2}'`
+          export MASTER_IGNITION=`cat ${HOME}/artifacts/installer/master.ign`
+
+          cat <<EOF > 05_control_plane.yaml
+        imports:
+        - path: 05_control_plane.py
+        resources:
+        - name: cluster-control-plane
+          type: 05_control_plane.py
+          properties:
+            infra_id: '${INFRA_ID}'
+            region: '${REGION}'
+            zones:
+            - '${ZONES[0]}'
+            - '${ZONES[1]}'
+            - '${ZONES[2]}'
+            control_subnet: '${CONTROL_SUBNET}'
+            image: '${CLUSTER_IMAGE}'
+            machine_type: 'n1-standard-4'
+            root_volume_size: '128'
+            service_account_email: '${MASTER_SERVICE_ACCOUNT_EMAIL}'
+            ignition: '${MASTER_IGNITION}'
+        EOF
+
+          gcloud deployment-manager deployments create ${CLUSTER_NAME}-control-plane --config 05_control_plane.yaml
+
+          export MASTER0_IP=`gcloud compute instances describe ${INFRA_ID}-m-0 --zone ${ZONES[0]} --format json | jq -r .networkInterfaces[0].networkIP`
+          export MASTER1_IP=`gcloud compute instances describe ${INFRA_ID}-m-1 --zone ${ZONES[1]} --format json | jq -r .networkInterfaces[0].networkIP`
+          export MASTER2_IP=`gcloud compute instances describe ${INFRA_ID}-m-2 --zone ${ZONES[2]} --format json | jq -r .networkInterfaces[0].networkIP`
+          if [ -f transaction.yaml ]; then rm transaction.yaml; fi
+          gcloud dns record-sets transaction start --zone ${INFRA_ID}-private-zone
+          gcloud dns record-sets transaction add ${MASTER0_IP} --name etcd-0.${CLUSTER_NAME}.${base_domain}. --ttl 60 --type A --zone ${INFRA_ID}-private-zone
+          gcloud dns record-sets transaction add ${MASTER1_IP} --name etcd-1.${CLUSTER_NAME}.${base_domain}. --ttl 60 --type A --zone ${INFRA_ID}-private-zone
+          gcloud dns record-sets transaction add ${MASTER2_IP} --name etcd-2.${CLUSTER_NAME}.${base_domain}. --ttl 60 --type A --zone ${INFRA_ID}-private-zone
+          gcloud dns record-sets transaction add \
+            "0 10 2380 etcd-0.${CLUSTER_NAME}.${base_domain}." \
+            "0 10 2380 etcd-1.${CLUSTER_NAME}.${base_domain}." \
+            "0 10 2380 etcd-2.${CLUSTER_NAME}.${base_domain}." \
+            --name _etcd-server-ssl._tcp.${CLUSTER_NAME}.${base_domain}. --ttl 60 --type SRV --zone ${INFRA_ID}-private-zone
+          gcloud dns record-sets transaction execute --zone ${INFRA_ID}-private-zone
+
+          gcloud compute target-pools add-instances ${INFRA_ID}-api-target-pool --instances-zone="${ZONES[0]}" --instances=${INFRA_ID}-m-0
+          gcloud compute target-pools add-instances ${INFRA_ID}-api-target-pool --instances-zone="${ZONES[1]}" --instances=${INFRA_ID}-m-1
+          gcloud compute target-pools add-instances ${INFRA_ID}-api-target-pool --instances-zone="${ZONES[2]}" --instances=${INFRA_ID}-m-2
+          gcloud compute target-pools add-instances ${INFRA_ID}-ign-target-pool --instances-zone="${ZONES[0]}" --instances=${INFRA_ID}-m-0
+          gcloud compute target-pools add-instances ${INFRA_ID}-ign-target-pool --instances-zone="${ZONES[1]}" --instances=${INFRA_ID}-m-1
+          gcloud compute target-pools add-instances ${INFRA_ID}-ign-target-pool --instances-zone="${ZONES[2]}" --instances=${INFRA_ID}-m-2
+
+          GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --master ${MASTER0_IP} --master ${MASTER1_IP} --master ${MASTER2_IP}"
+
+          # Deploy compute
+          export COMPUTE_SUBNET=`gcloud compute networks subnets describe ${INFRA_ID}-worker-subnet --region=${REGION} --format json | jq -r .selfLink`
+          export WORKER_SERVICE_ACCOUNT_EMAIL=`gcloud iam service-accounts list | grep "^${INFRA_ID}-worker-node " | awk '{print $2}'`
+          export WORKER_IGNITION=`cat ${HOME}/artifacts/installer/worker.ign`
+
+          cat <<EOF > 06_worker.yaml
+        imports:
+        - path: 06_worker.py
+        resources:
+        EOF
+
+          for compute in {0..2}; do
+          cat <<EOF >> 06_worker.yaml
+        - name: 'w-${compute}'
+          type: 06_worker.py
+          properties:
+            infra_id: '${INFRA_ID}'
+            region: '${REGION}'
+            zone: '${ZONES[(( $compute % ${#ZONES[@]} ))]}'
+            compute_subnet: '${COMPUTE_SUBNET}'
+            image: '${CLUSTER_IMAGE}'
+            machine_type: 'n1-standard-4'
+            root_volume_size: '128'
+            service_account_email: '${WORKER_SERVICE_ACCOUNT_EMAIL}'
+            ignition: '${WORKER_IGNITION}'
+        EOF
+          done;
+
+          gcloud deployment-manager deployments create ${CLUSTER_NAME}-worker --config 06_worker.yaml
+
+          popd
+
         elif [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
           mkdir -p /tmp/tf
 
@@ -765,6 +1039,12 @@ objects:
 
           aws cloudformation wait stack-delete-complete --stack-name "${CLUSTER_NAME}-bootstrap" &
           wait "$!"
+        elif [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
+          gcloud compute target-pools remove-instances ${INFRA_ID}-api-target-pool --instances-zone="${ZONES[0]}" --instances=${INFRA_ID}-bootstrap
+          gcloud compute target-pools remove-instances ${INFRA_ID}-ign-target-pool --instances-zone="${ZONES[0]}" --instances=${INFRA_ID}-bootstrap
+          gsutil rm gs://${INFRA_ID}-bootstrap-ignition/bootstrap.ign
+          gsutil rb gs://${INFRA_ID}-bootstrap-ignition
+          gcloud deployment-manager deployments delete -q ${CLUSTER_NAME}-bootstrap
         elif [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
           terraform apply -auto-approve -var 'bootstrap_complete=true' -no-color &
           wait "$!"
@@ -827,6 +1107,8 @@ objects:
         value: /etc/openshift-installer/secret.auto.tfvars
       - name: AWS_REGION
         value: us-east-1
+      - name: GOOGLE_CLOUD_KEYFILE_JSON
+        value: /etc/openshift-installer/gce.json
       - name: USER
         value: test
       - name: HOME
@@ -987,6 +1269,11 @@ objects:
             do
               aws cloudformation wait stack-delete-complete --stack-name "${CLUSTER_NAME}-${STACK_SUFFIX}"
             done
+          elif [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
+            export PATH=${PATH}:${HOME}/shared/google-cloud-sdk/bin
+            export CLOUDSDK_CONFIG=${HOME}/shared/gcloudconfig
+            openshift-install --dir ${HOME}/artifacts/installer destroy cluster
+            gcloud deployment-manager deployments delete -q ${CLUSTER_NAME}-{worker,control-plane,bootstrap,security,infra,vpc}
           else
             cd /tmp/shared/tf
             rm -rf .terraform
