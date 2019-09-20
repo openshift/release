@@ -25,6 +25,8 @@ core:
 jobs:
 	docker pull registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest
 	docker run -it -v "${CURDIR}/ci-operator:/ci-operator" registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest --from-dir /ci-operator/config --to-dir /ci-operator/jobs
+	docker pull registry.svc.ci.openshift.org/ci/determinize-prow-jobs:latest
+	docker run -it -v "${CURDIR}/ci-operator/jobs:/ci-operator/jobs" registry.svc.ci.openshift.org/ci/determinize-prow-jobs:latest --prow-jobs-dir /ci-operator/jobs
 
 # LEGACY TARGETS
 # You should not need to add new targets here.
