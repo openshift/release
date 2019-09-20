@@ -2813,6 +2813,86 @@ periodics:
 - agent: kubernetes
   cron: ""
   decorate: true
+  decoration_config:
+    skip_cloning: true
+  interval: 4h
+  labels:
+    job-type: launch
+    job-env: openstack
+    job-release: '4.2'
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: canary-openshift-origin-installer-e2e-openstack-4.2
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --give-pr-author-access-to-namespace=true
+      - --secret-dir=/usr/local/pull-secret
+      - --secret-dir=/usr/local/e2e-openstack-cluster-profile
+      - --target=e2e-openstack
+      - --template=/usr/local/e2e-openstack
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      command:
+      - ci-operator
+      env:
+      - name: BRANCH
+        value: "4.2"
+      - name: CLUSTER_TYPE
+        value: openstack
+      - name: CONFIG_SPEC
+        value: |
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+      - name: JOB_NAME_SAFE
+        value: e2e-openstack
+      - name: KURYR_ENABLED
+        value: "false"
+      - name: TEST_COMMAND
+        value: TEST_SUITE=openshift/conformance/parallel run-tests
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/e2e-openstack-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/e2e-openstack
+        name: job-definition
+        subPath: cluster-launch-installer-openstack-e2e.yaml
+      - mountPath: /usr/local/pull-secret
+        name: pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-openstack
+    - configMap:
+        name: prow-job-cluster-launch-installer-openstack-e2e
+      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
+  cron: ""
+  decorate: true
   extra_refs:
   - base_ref: release-4.2
     org: openshift
