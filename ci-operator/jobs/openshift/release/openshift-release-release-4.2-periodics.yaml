@@ -153,7 +153,6 @@ periodics:
         export RELEASE_IMAGE_INITIAL=registry.svc.ci.openshift.org/ocp/release:$(FROM_BRANCH)
         export RELEASE_IMAGE_LATEST=registry.svc.ci.openshift.org/${namespace}/release:upgrade
         export IMAGE_TESTS=registry.svc.ci.openshift.org/${namespace}/stable-initial:tests # use the older version of the payload
-        export TEST_UNSUPPORTED_ALLOW_VERSION_SKEW=1 # allows certain tests that verify payload integrity to be skipped
         oc registry login
         oc new-project ${namespace}
         oc policy add-role-to-group system:image-puller -n ${namespace} system:unauthenticated system:authenticated
@@ -197,7 +196,7 @@ periodics:
           - as: e2e-$(CLUSTER_TYPE)-upgrade
             commands: |
               TEST_SUITE=all run-upgrade-tests
-              TEST_SUITE=openshift/conformance/parallel run-tests
+              TEST_SUITE=openshift/conformance/parallel TEST_UNSUPPORTED_ALLOW_VERSION_SKEW=1 run-tests
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
               upgrade: true
