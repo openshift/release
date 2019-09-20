@@ -82,7 +82,6 @@ prow-scaling:
 
 prow-secrets:
 	ci-operator/populate-secrets-from-bitwarden.sh
-	oc create configmap secret-mirroring --from-file=cluster/ci/config/secret-mirroring/mapping.yaml -o yaml --dry-run | oc apply -f -
 .PHONY: prow-secrets
 
 prow-cluster-jobs:

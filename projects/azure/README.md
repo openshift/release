@@ -349,7 +349,7 @@ we will not need to have the rest of the secrets in place.
   -o yaml --dry-run | oc apply -n azure -f -
 ```
 
-5. Ensure the secret is placed in the [ci-secret-mirroring-controller config](https://github.com/openshift/release/blob/master/cluster/ci/config/secret-mirroring/mapping.yaml). The controller will make sure to keep the secret in sync between the `azure` and the `ci` namespace where all CI tests run.
+5. Ensure the secret is placed in the [ci-secret-mirroring-controller config](https://github.com/openshift/release/blob/master/core-services/secret-mirroring/_mapping.yaml). The controller will make sure to keep the secret in sync between the `azure` and the `ci` namespace where all CI tests run.
 
 
 
@@ -370,7 +370,7 @@ This secret is used for pushing reports to [Codecov](https://codecov.io/).
 
 TODO: How to rotate this secret from Codecov?
 
-Ensure the secret is placed in the [ci-secret-mirroring-controller config](https://github.com/openshift/release/blob/master/cluster/ci/config/secret-mirroring/mapping.yaml). The controller will make sure to keep the secret in sync between the `azure` and the `ci` namespace where all CI tests run.
+Ensure the secret is placed in the [ci-secret-mirroring-controller config](https://github.com/openshift/release/blob/master/core-services/secret-mirroring/_mapping.yaml). The controller will make sure to keep the secret in sync between the `azure` and the `ci` namespace where all CI tests run.
 
 ## Other cron jobs
 
