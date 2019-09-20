@@ -105,6 +105,7 @@ prow-cluster-jobs:
 	oc create configmap prow-job-cluster-launch-installer-console --from-file=ci-operator/templates/openshift/installer/cluster-launch-installer-console.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap prow-job-cluster-scaleup-openshift-ansible-e2e --from-file=ci-operator/templates/openshift/openshift-ansible/cluster-scaleup-e2e-40.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap prow-job-master-sidecar-4.2 --from-file=ci-operator/templates/master-sidecar-4.2.yaml -o yaml --dry-run | oc apply -f -
+	oc create configmap prow-job-master-sidecar-4.3 --from-file=ci-operator/templates/master-sidecar-4.3.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap prow-job-master-sidecar-3 --from-file=ci-operator/templates/master-sidecar-3.yaml -o yaml --dry-run | oc apply -f -
 .PHONY: prow-cluster-jobs
 
@@ -158,6 +159,9 @@ prow-release-controller-definitions:
 	oc annotate -n origin is/4.2 "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/releases/release-origin-4.2.json)" --overwrite
 	oc annotate -n ocp is/4.2-art-latest "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/releases/release-ocp-4.2.json)" --overwrite
 	oc annotate -n ocp is/4.2 "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/releases/release-ocp-4.2-ci.json)" --overwrite
+	oc annotate -n origin is/4.3 "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/releases/release-origin-4.3.json)" --overwrite
+	oc annotate -n ocp is/4.3-art-latest "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/releases/release-ocp-4.3.json)" --overwrite
+	oc annotate -n ocp is/4.3 "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/releases/release-ocp-4.3-ci.json)" --overwrite
 	oc annotate -n ocp is/release "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/releases/release-ocp-4.y-stable.json)" --overwrite
 .PHONY: prow-release-controller-definitions
 
