@@ -207,6 +207,10 @@ registry="quay.io"
 update_secret generic "registry-pull-credentials-${registry}" $( format_field_value "${registry}" "Pull Credentials" "config.json" )
 update_secret generic "ci-pull-credentials" --type=kubernetes.io/dockerconfigjson $( format_field_value "${registry}" "Pull Credentials" ".dockerconfigjson" )
 
+update_secret generic "operator-manifests-test-credentials"     \
+	"$( format_attachment "operator-manifests" test.env.yaml )" \
+	"$( format_attachment "operator-manifests" quay-env.txt )"
+
 # Cluster credentials aggregate multiple items
 # of information for easy consumption by tests
 target_cloud="aws"
