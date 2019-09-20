@@ -4,6 +4,38 @@ postsubmits:
     branches:
     - ^master$
     decorate: true
+    name: branch-ci-openshift-release-master-config-change-trigger
+    spec:
+      containers:
+      - args:
+        - --candidate-path=.
+        - --token=/etc/github/oauth
+        - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --github-graphql-endpoint=http://ghproxy/graphql
+        - --github-graphql-endpoint=https://api.github.com/graphql
+        - --dry-run=false
+        command:
+        - config-change-trigger
+        image: registry.svc.ci.openshift.org/ci/config-change-trigger:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/github
+          name: token
+          readOnly: true
+      serviceAccountName: trigger
+      volumes:
+      - name: token
+        secret:
+          secretName: github-credentials-openshift-ci-robot
+  - agent: kubernetes
+    branches:
+    - ^master$
+    decorate: true
     name: branch-ci-openshift-release-master-config-updates
     spec:
       containers:
