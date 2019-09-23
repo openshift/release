@@ -290,7 +290,12 @@ periodics:
     - command:
       - /usr/bin/autobumper
       args:
-      - --github-token=/etc/github/oauth
+      - --github-token-path=/etc/github/oauth
+      - --github-endpoint=http://ghproxy
+      - --github-endpoint=https://api.github.com
+      - --github-graphql-endpoint=http://ghproxy/graphql
+      #- --github-graphql-endpoint=https://api.github.com/graphql
+      - --dry-run=false
       - --git-name=openshift-bot
       - --git-email=openshift-bot@redhat.com
       - --target-dir=.
@@ -315,15 +320,61 @@ periodics:
   - base_ref: master
     org: openshift
     repo: release
+  cron: ""
+  decorate: true
+  interval: 12h
+  name: periodic-prow-auto-config-brancher
+  spec:
+    containers:
+    - command:
+      - /usr/bin/autoconfigbrancher
+      args:
+      - --github-token-path=/etc/github/oauth
+      - --github-endpoint=http://ghproxy
+      - --github-endpoint=https://api.github.com
+      - --github-graphql-endpoint=http://ghproxy/graphql
+      #- --github-graphql-endpoint=https://api.github.com/graphql
+      - --dry-run=false
+      - --git-name=openshift-bot
+      - --git-email=openshift-bot@redhat.com
+      - --target-dir=.
+      - --current-release=4.3
+      - --future-release=4.4
+      image: registry.svc.ci.openshift.org/ci/auto-config-brancher:latest
+      imagePullPolicy: Always
+      name: "auto-config-brancher"
+      resources:
+          requests:
+            cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: token
+        readOnly: true
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-bot
+- agent: kubernetes
+  labels:
+    ci.openshift.io/role: infra
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
   cron: "30 10 * * 1"  # Run at 10:30 UTC each Monday
   decorate: true
-  name: periodic-prow-image-autoowners
+  name: periodic-prow-auto-owners
   spec:
     containers:
     - command:
       - /usr/bin/autoowners
       args:
-      - --github-token=/etc/github/oauth
+      - --github-token-path=/etc/github/oauth
+      - --github-endpoint=http://ghproxy
+      - --github-endpoint=https://api.github.com
+      - --github-graphql-endpoint=http://ghproxy/graphql
+      #- --github-graphql-endpoint=https://api.github.com/graphql
+      - --dry-run=false
       - --git-name=openshift-bot
       - --git-email=openshift-bot@redhat.com
       - --target-dir=.
