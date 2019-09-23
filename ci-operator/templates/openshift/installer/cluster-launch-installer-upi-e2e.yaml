@@ -721,8 +721,11 @@ objects:
 
         echo "Waiting for bootstrap to complete"
         openshift-install --dir=/tmp/artifacts/installer wait-for bootstrap-complete &
-        # if the first bootstrap-complete fails wait for again
-        wait "$!" || openshift-install --dir=/tmp/artifacts/installer wait-for bootstrap-complete &
+        # If this fails continue on to next wait-for
+        wait "$!" || true
+        # Perform another wait-for bootstrap-complete
+        # Should return quick if api is available or wait if not
+        openshift-install --dir=/tmp/artifacts/installer wait-for bootstrap-complete &
         wait "$!" || gather_bootstrap_and_fail
 
         echo "Bootstrap complete, destroying bootstrap resources"
