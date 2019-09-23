@@ -55,7 +55,6 @@ images:
 promotion:
   additional_images:
     logging-ci-test-runner: src
-  disabled: true
   name: "4.2"
   namespace: ocp
 resources:
@@ -81,6 +80,13 @@ tests:
     from: logging-test-unit
 - as: full-integ-aws
   commands: |
+    . openshift/ci-operator/build-image/setup-logging-for-e2e.sh
+  openshift_installer_src:
+    cluster_profile: aws
+- as: upgrade-full-integ-aws
+  commands: |
+    OPENSHIFT_BUILD_NAMESPACE= IMAGE_FORMAT= USE_CUSTOM_IMAGES=true hack/deploy-logging.sh
+    export LOGGING_DEPLOY_MODE=upgrade
     . openshift/ci-operator/build-image/setup-logging-for-e2e.sh
   openshift_installer_src:
     cluster_profile: aws
