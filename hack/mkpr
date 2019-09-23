@@ -1,0 +1,26 @@
+#!/bin/bash
+
+repo="${1}"
+ref="${2}"
+
+if [[ -z "${2}" ]]; then
+  echo "error: must specify branch" 1>&2
+  exit 1
+fi
+branch_ref="$( git ls-remote https://github.com/${repo}.git refs/heads/${ref} | cut -f 1 -d $'\t' )"
+if [[ -z "${branch_ref}" ]]; then
+  echo "error: no ref found for ${ref}" 1>&2
+  exit 1
+fi
+
+if [[ -n "${3-}" ]]; then
+  pr_ref="$( git ls-remote https://github.com/${repo}.git refs/pull/${3}/head | cut -f 1 -d $'\t' )"
+  if [[ -z "${pr_ref}" ]]; then
+    echo "error: no PR ref found for ${3}" 1>&2
+    exit 1
+  fi
+  echo "-base-ref ${ref} -base-sha ${branch_ref} -pull-author smarterclayton -pull-number ${3} -pull-sha ${pr_ref}"
+  exit 0
+fi
+
+echo "-base-ref ${ref} -base-sha ${branch_ref}"
