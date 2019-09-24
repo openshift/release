@@ -855,10 +855,16 @@ objects:
           then
               # we don't have jq, so the python equivalent of
               # jq '.modules[].resources."aws_instance.bootstrap".primary.attributes."public_ip" | select(.)'
+              #
+            if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
               bootstrap_ip=$(python -c \
                   'import sys, json; d=reduce(lambda x,y: dict(x.items() + y.items()), map(lambda x: x["resources"], json.load(sys.stdin)["modules"])); k="aws_instance.bootstrap"; print d[k]["primary"]["attributes"]["public_ip"] if k in d else ""' \
                   < /tmp/artifacts/installer/terraform.tfstate
               )
+            elif [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
+              bootstrap_ip=$(terraform state show -state=/tmp/artifacts/installer/terraform.tfstate 'module.bootstrap.external.ip_address' | grep ip_address | awk '{print $3}')
+            fi
+
 
               if [ -n "${bootstrap_ip}" ]
               then
