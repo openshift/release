@@ -1,0 +1,58 @@
+base_images:
+  base:
+    name: "4.4"
+    namespace: ocp
+    tag: base
+base_rpm_images:
+  rpm:
+    name: "4.4"
+    namespace: ocp
+    tag: base
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+images:
+- dockerfile_path: openshift-kuryr-tester.Dockerfile
+  from: src
+  optional: true
+  to: kuryr-tester
+- dockerfile_path: openshift-kuryr-cni-ci.Dockerfile
+  from: rpm-os
+  to: kuryr-cni
+- dockerfile_path: openshift-kuryr-controller-ci.Dockerfile
+  from: rpm-os
+  to: kuryr-controller
+promotion:
+  name: "4.4"
+  namespace: ocp
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      curl http://base-openstack-4-2.ocp.svc > /etc/yum.repos.d/base-openstack-4-2.repo
+    from: rpm
+    to: rpm-os
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+rpm_build_commands: tools/build-rpm.sh
+rpm_build_location: _output/RPMS/noarch
+tag_specification:
+  name: "4.4"
+  namespace: ocp
+tests:
+- as: unit
+  commands: tox -e py27
+  container:
+    from: kuryr-tester
+- as: verify
+  commands: sed -i -e "s/basepython = python3/basepython = python2.7/g" tox.ini &&
+    tox -e pep8
+  container:
+    from: kuryr-tester

@@ -1,0 +1,57 @@
+base_images:
+  operator-registry:
+    name: "4.4"
+    namespace: ocp
+    tag: operator-registry
+  os:
+    name: ubi
+    namespace: ocp
+    tag: "7"
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.12
+images:
+- dockerfile_path: openshift-ci/Dockerfile.deploy
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/ocs-operator/build/_output/bin/ocs-operator
+  to: ocs-operator
+- dockerfile_path: openshift-ci/Dockerfile.registry.intermediate
+  from: operator-registry
+  to: operator-registry-base
+- dockerfile_path: openshift-ci/Dockerfile.registry.build
+  from: operator-registry-base
+  to: ocs-registry
+promotion:
+  additional_images:
+    ocs-operator-tests: src
+  name: "4.4"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.4"
+  namespace: ocp
+tests:
+- as: ocs-operator-ci
+  commands: |
+    make ocs-operator-ci
+  container:
+    from: src
+- as: ocs-operator-e2e-aws
+  commands: |
+    make cluster-deploy && make functest
+  openshift_installer_src:
+    cluster_profile: aws

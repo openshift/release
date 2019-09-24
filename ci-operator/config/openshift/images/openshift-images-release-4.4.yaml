@@ -1,0 +1,63 @@
+base_images:
+  os:
+    name: ubi
+    namespace: ocp
+    tag: "7"
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+images:
+- context_dir: base/
+  dockerfile_path: Dockerfile.rhel
+  from: base-os
+  to: base
+- dockerfile_path: pod/Dockerfile.rhel
+  from: os
+  to: pod
+- context_dir: egress/router/
+  from: base
+  to: egress-router
+- context_dir: egress/http-proxy/
+  from: base
+  to: egress-http-proxy
+- context_dir: egress/dns-proxy/
+  from: base
+  to: egress-dns-proxy
+- context_dir: ipfailover/keepalived/
+  from: base
+  to: keepalived-ipfailover
+promotion:
+  additional_images:
+    base: base
+  name: "4.4"
+  namespace: ocp
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      rm -rf /etc/yum.repos.d/*
+      curl http://base-4-2.ocp.svc > /etc/yum.repos.d/content.repo
+    from: os
+    to: base-os
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.4"
+  namespace: ocp
+tests:
+- as: e2e-aws
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer:
+    cluster_profile: aws
+- as: e2e-aws-upgrade
+  commands: TEST_SUITE=all run-upgrade-tests
+  openshift_installer:
+    cluster_profile: aws
+    upgrade: true

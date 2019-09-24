@@ -1,0 +1,43 @@
+base_images:
+  ansible_operator:
+    name: "4.0"
+    namespace: ocp
+    tag: ansible-operator
+build_root:
+  project_image:
+    dockerfile_path: build/custom-ci-build-root.Dockerfile
+images:
+- dockerfile_path: build/Dockerfile
+  from: ansible_operator
+  to: template-service-broker-operator
+promotion:
+  name: "4.4"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 200m
+      memory: 200Mi
+tag_specification:
+  name: "4.4"
+  namespace: ocp
+test_binary_build_commands: make openshift-ci-test-container
+tests:
+- as: lint
+  commands: make openshift-ci-operator-lint
+  container:
+    from: test-bin
+- as: operator-molecule-e2e
+  commands: |
+    echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
+    molecule test -s cluster
+  openshift_installer_src:
+    cluster_profile: aws
+- as: operator-molecule-olm-e2e
+  commands: |
+    echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
+    molecule test -s cluster-olm
+  openshift_installer_src:
+    cluster_profile: aws
