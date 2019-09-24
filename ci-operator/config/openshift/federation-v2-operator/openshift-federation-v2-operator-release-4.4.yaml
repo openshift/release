@@ -1,0 +1,39 @@
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+images:
+- dockerfile_path: Dockerfile
+  from: root
+  to: federation-controller
+promotion:
+  name: "4.4"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 2Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.4"
+  namespace: ocp
+tests:
+- as: vet
+  commands: |
+    make -f Makefile.ci vet
+  container:
+    from: src
+- as: unit
+  commands: |
+    make -f Makefile.ci unit
+  container:
+    from: src
+- as: managed-e2e
+  commands: |
+    make -f Makefile.ci managed-e2e
+  container:
+    from: src
