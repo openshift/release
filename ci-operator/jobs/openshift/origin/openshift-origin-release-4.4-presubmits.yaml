@@ -1,37 +1,6 @@
 presubmits:
   openshift/origin:
   - agent: kubernetes
-    always_run: false
-    branches:
-    - master
-    context: ci/prow/artifacts
-    decorate: true
-    name: pull-ci-openshift-origin-release-4.4-artifacts
-    rerun_command: /test artifacts
-    run_if_changed: ^(hack/)|(Makefile)|(.*_(windows|linux|darwin|unsupported)(_test)?\.go)$
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --target=artifacts
-        command:
-        - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-origin-master.yaml
-              name: ci-operator-release-4.4-configs
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-      serviceAccountName: ci-operator
-    trigger: (?m)^/test( | .* )artifacts,?($|\s.*)
-  - agent: kubernetes
     always_run: true
     branches:
     - release-4.4
@@ -1247,33 +1216,3 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )verify,?($|\s.*)
-  - agent: jenkins
-    always_run: false
-    branches:
-    - master
-    context: ci/openshift-jenkins/extended_gssapi
-    labels:
-      master: ci.openshift.redhat.com
-    name: test_pull_request_origin_extended_gssapi
-    rerun_command: /test extended_gssapi
-    trigger: ((?m)^/test extended_gssapi,?(\s+|$))
-  - agent: jenkins
-    always_run: false
-    branches:
-    - master
-    context: ci/openshift-jenkins/extended_ldap_groups
-    labels:
-      master: ci.openshift.redhat.com
-    name: test_pull_request_origin_extended_ldap_groups
-    rerun_command: /test extended_ldap_groups
-    trigger: ((?m)^/test extended_ldap_groups,?(\s+|$))
-  - agent: jenkins
-    always_run: false
-    branches:
-    - master
-    context: ci/openshift-jenkins/extended_networking
-    labels:
-      master: ci.openshift.redhat.com
-    name: test_pull_request_origin_extended_networking
-    rerun_command: /test extended_networking
-    trigger: ((?m)^/test extended_networking,?(\s+|$))
