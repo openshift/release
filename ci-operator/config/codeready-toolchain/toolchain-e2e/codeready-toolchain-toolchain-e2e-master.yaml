@@ -14,11 +14,29 @@ resources:
       memory: 250Mi
       cpu: 100m
 
+images:
+- from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/codeready-toolchain/toolchain-e2e/build/_output/bin/host-operator
+  dockerfile_path: openshift-ci/Dockerfile.host.deploy
+  to: host-operator
+- from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/codeready-toolchain/toolchain-e2e/build/_output/bin/member-operator
+  dockerfile_path: openshift-ci/Dockerfile.member.deploy
+  to: member-operator
+
 build_root:
   project_image:
     dockerfile_path: openshift-ci/Dockerfile.tools
 
-binary_build_commands: make build
+binary_build_commands: make build-with-operators
 
 tag_specification:
   name: "4.2"
