@@ -1,0 +1,52 @@
+base_images:
+  os:
+    cluster: https://api.ci.openshift.org
+    name: centos
+    namespace: openshift
+    tag: "7"
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.12
+promotion:
+  name: "4.4"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 12Gi
+    requests:
+      cpu: "3"
+      memory: 8Gi
+tag_specification:
+  name: "4.4"
+  namespace: ocp
+test_binary_build_commands: make build GOFLAGS='-race' --warn-undefined-variables
+tests:
+- as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: bin
+- as: verify-deps
+  commands: |
+    HOME=$( mktemp -d )
+    make verify-deps -k --warn-undefined-variables
+  container:
+    from: src
+- as: verify-alpha-build-machinery
+  commands: |
+    HOME=$( mktemp -d )
+    make -C alpha-build-machinery/ verify -k --warn-undefined-variables
+  container:
+    from: src
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: |
+    mkdir -p /tmp/artifacts
+    make test-unit JUNITFILE=/tmp/artifacts/unit_report.xml --warn-undefined-variables
+  container:
+    from: test-bin
