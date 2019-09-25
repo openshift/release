@@ -155,3 +155,70 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )ocs-operator-e2e-aws,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-4.3
+    context: ci/prow/red-hat-storage-ocs-ci-e2e-aws
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ocs-operator-release-4.3-red-hat-storage-ocs-ci-e2e-aws
+    optional: true
+    rerun_command: /test red-hat-storage-ocs-ci-e2e-aws
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --secret-dir=/usr/local/red-hat-storage-ocs-ci-e2e-aws-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=red-hat-storage-ocs-ci-e2e-aws
+        - --template=/usr/local/red-hat-storage-ocs-ci-e2e-aws
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-ocs-operator-release-4.3.yaml
+              name: ci-operator-4.3-configs
+        - name: JOB_NAME_SAFE
+          value: red-hat-storage-ocs-ci-e2e-aws
+        - name: TEST_COMMAND
+          value: |
+            export REDHAT_OCS_CI_FORCE_TOOL_POD_INSTALL="true" && make cluster-deploy && make red-hat-storage-ocs-ci
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/red-hat-storage-ocs-ci-e2e-aws-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/red-hat-storage-ocs-ci-e2e-aws
+          name: job-definition
+          subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-src
+        name: job-definition
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )red-hat-storage-ocs-ci-e2e-aws,?($|\s.*)
