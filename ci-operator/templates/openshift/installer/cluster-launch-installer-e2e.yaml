@@ -337,339 +337,30 @@ objects:
         mkdir -p /tmp/output
         cd /tmp/output
 
-        function retry() {
-          local RETRY_IGNORE_EXIT_CODE="${RETRY_IGNORE_EXIT_CODE:-}"
-          local ATTEMPTS="${1}"
-          local rc=0
-          shift
-          for i in $(seq 0 $((ATTEMPTS-1))); do
-            echo "--> ${@}"
-            set +e
-            "${@}"
-            rc="$?"
-            set -e
-            echo "--> exit code: $rc"
-            test "${rc}" = 0 && break
-            sleep 10
-          done
-          if [ "${RETRY_IGNORE_EXIT_CODE}" != "" ]; then return 0; else return "${rc}"; fi
-        }
-
         function setup_ssh_bastion() {
+          SSH_BASTION_NAMESPACE=openshift-ssh-bastion
           echo "Setting up ssh bastion"
-          mkdir -p ~/.ssh || true
+          mkdir -p ~/.ssh
           cp "${KUBE_SSH_KEY_PATH}" ~/.ssh/id_rsa
           chmod 0600 ~/.ssh/id_rsa
           if ! whoami &> /dev/null; then
-            if [ -w /etc/passwd ]; then
+            if [[ -w /etc/passwd ]]; then
               echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
             fi
           fi
           curl https://raw.githubusercontent.com/eparis/ssh-bastion/master/deploy/deploy.sh | bash
-          for i in $(seq 0 60)
+          for i in $(seq 0 30)
           do
-            BASTION_HOST=$(oc get service -n openshift-ssh-bastion ssh-bastion -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-            if [ ! -z "${BASTION_HOST}" ]; then break; fi
+            # AWS fills only .hostname of a service
+            BASTION_HOST=$(oc get service -n "${SSH_BASTION_NAMESPACE}" ssh-bastion -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+            if [[ -n "${BASTION_HOST}" ]]; then break; fi
+            # Azure fills only .ip of a service. Use it as bastion host.
+            BASTION_HOST=$(oc get service -n "${SSH_BASTION_NAMESPACE}" ssh-bastion -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+            if [[ -n "${BASTION_HOST}" ]]; then break; fi
+            echo "Waiting for SSH bastion load balancer service"
             sleep 10
           done
-        }
-
-        function bastion_ssh() {
-          retry 60 \
-            ssh -o LogLevel=error -o ConnectionAttempts=100 -o ConnectTimeout=30 -o StrictHostKeyChecking=no \
-                -o ProxyCommand="ssh -A -o StrictHostKeyChecking=no -o LogLevel=error -o ServerAliveInterval=30 -o ConnectionAttempts=100 -o ConnectTimeout=30 -W %h:%p core@${BASTION_HOST} 2>/dev/null" \
-                $@
-        }
-
-        function restore-cluster-state() {
-          echo "Placing file /etc/rollback-test with contents A"
-          cat > /tmp/machineconfig.yaml <<'EOF'
-        apiVersion: machineconfiguration.openshift.io/v1
-        kind: MachineConfig
-        metadata:
-          labels:
-            machineconfiguration.openshift.io/role: master
-          name: 99-rollback-test
-        spec:
-          config:
-            ignition:
-              version: 2.2.0
-            storage:
-              files:
-              - contents:
-                  source: data:,A
-                filesystem: root
-                mode: 420
-                path: /etc/rollback-test
-        EOF
-          oc create -f /tmp/machineconfig.yaml
-
-          function wait_for_machineconfigpool_to_apply() {
-            for i in $(seq 0 10); do oc wait machineconfigpool/master --for=condition=Updating --timeout=5m && break; done
-            for i in $(seq 0 10); do oc wait machineconfigpool/master --for=condition=Updated --timeout=5m && break; sleep 30; done
-          }
-
-          wait_for_machineconfigpool_to_apply
-
-          setup_ssh_bastion
-
-          echo "Make etcd backup on first master - /usr/local/bin/etcd-snapshot-backup.sh"
-          FIRST_MASTER=$(oc get node -l node-role.kubernetes.io/master= -o name | head -n1 | cut -d '/' -f 2)
-          bastion_ssh "core@${FIRST_MASTER}" "sudo -i /bin/bash -x /usr/local/bin/etcd-snapshot-backup.sh /root/assets/backup/snapshot.db && sudo -i cp /root/assets/backup/snapshot.db /tmp/snapshot.db && sudo -i chown core:core /tmp/snapshot.db"
-
-          # TODO: upgrade conditionally here
-
-          echo "Update rollback-test machineconfig"
-          oc patch machineconfig 99-rollback-test -n openshift-machine-api --patch '{"spec":{"config":{"storage":{"files":[{"contents":{"source":"data:,B","verification":{}},"filesystem":"root","mode":420,"path":"/etc/rollback-test"}]}}}}' --type=merge
-          wait_for_machineconfigpool_to_apply
-
-          echo "Distribute snapshot across all masters"
-          mapfile -t MASTERS < <(oc get node -l node-role.kubernetes.io/master= -o name | cut -d '/' -f 2)
-          for master in "${MASTERS[@]}"
-          do
-            scp -o StrictHostKeyChecking=no -o ProxyCommand="ssh -A -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p core@${BASTION_HOST}" ${KUBE_SSH_KEY_PATH} "core@${master}":/home/core/.ssh/id_rsa
-            bastion_ssh "core@${master}" "sudo -i chmod 0600 /home/core/.ssh/id_rsa"
-            bastion_ssh "core@${FIRST_MASTER}" "scp -o StrictHostKeyChecking=no /tmp/snapshot.db core@${master}:/tmp/snapshot.db"
-          done
-
-          echo "Collect etcd names"
-          for master in "${MASTERS[@]}"
-          do
-            bastion_ssh "core@${master}" 'echo "etcd-member-$(hostname -f)" > /tmp/etcd_name && source /run/etcd/environment && echo "https://${ETCD_DNS_NAME}:2380" > /tmp/etcd_uri'
-            bastion_ssh "core@${FIRST_MASTER}" "mkdir -p /tmp/etcd/${master} && scp -o StrictHostKeyChecking=no core@${master}:/tmp/etcd_name /tmp/etcd/${master}/etcd_name && scp -o StrictHostKeyChecking=no core@${master}:/tmp/etcd_uri /tmp/etcd/${master}/etcd_uri"
-            bastion_ssh "core@${FIRST_MASTER}" "cat /tmp/etcd/${master}/etcd_name"
-            bastion_ssh "core@${FIRST_MASTER}" "cat /tmp/etcd/${master}/etcd_uri"
-          done
-
-          echo "Assemble etcd connection string"
-          bastion_ssh "core@${FIRST_MASTER}" 'rm -rf /tmp/etcd/connstring && mapfile -t MASTERS < <(ls /tmp/etcd) && echo ${MASTERS[@]} && for master in "${MASTERS[@]}"; do echo -n "$(cat /tmp/etcd/${master}/etcd_name)=$(cat /tmp/etcd/${master}/etcd_uri)," >> /tmp/etcd/connstring; done && sed -i '"'$ s/.$//'"' /tmp/etcd/connstring'
-
-          echo "Restore etcd cluster from snapshot"
-          for master in "${MASTERS[@]}"
-          do
-            echo "Running /usr/local/bin/etcd-snapshot-restore.sh on ${master}"
-            bastion_ssh "core@${FIRST_MASTER}" "scp -o StrictHostKeyChecking=no /tmp/etcd/connstring core@${master}:/tmp/etcd_connstring"
-            bastion_ssh "core@${master}" 'sudo -i /bin/bash -x /usr/local/bin/etcd-snapshot-restore.sh /tmp/snapshot.db $(cat /tmp/etcd_connstring)'
-          done
-
-          echo "Wait for API server to come up"
-          for i in $(seq 0 10)
-          do
-            oc get nodes && break
-            sleep 30
-          done
-
-          echo "Wait for MCO to rollout new configs"
-          for i in $(seq 0 10); do oc get machineconfigpool/master > /dev/null && break; sleep 30; done
-          wait_for_machineconfigpool_to_apply
-
-          echo "Wait for all kube-apiserver pods to come back"
-          for master in ${MASTERS[@]}
-          do
-            oc get pod/kube-apiserver-${master} -n openshift-kube-apiserver -o name
-            oc wait pod/kube-apiserver-${master} -n openshift-kube-apiserver --for condition=Ready --timeout=5m
-          done
-
-          echo "Verify 99-rollback-test machineconfig"
-          MC="$(oc get machineconfig/99-rollback-test -o jsonpath='{.spec.config.storage.files[0].contents.source}')"
-          if [[ "${MC}" != "data:,A" ]]; then
-            echo "Unexpected MachineConfig output: ${MC}"
-            exit 1
-          fi
-
-          echo "Verify /etc/rollback-test contents"
-          rc=0
-          for master in "${MASTERS[@]}"
-          do
-            bastion_ssh core@${master} 'sudo -i test "$(cat /etc/rollback-test)" == "A"'
-          done
-
-          if [[ "${rc}" == "1" ]]; then exit 1; fi
-
-          echo "Removing ssh-bastion"
-          oc delete project openshift-ssh-bastion
-
-          echo "Remove existing openshift-apiserver pods"
-          # This would ensure "Pod 'openshift-apiserver/apiserver-xxx' is not healthy: container openshift-apiserver has restarted more than 5 times" test won't fail
-          oc delete pod --all -n openshift-apiserver
-        }
-
-        function recover-from-etcd-quorum-loss() {
-          setup_ssh_bastion
-
-          # Machine API won't let the user to destroy the node which runs the controller
-          echo "Finding two masters to destroy"
-          MAPI_POD=$(oc get pod -l k8s-app=controller -n openshift-machine-api --no-headers -o name)
-          SURVIVING_MASTER_NODE=$(oc get ${MAPI_POD} -n openshift-machine-api -o jsonpath='{.spec.nodeName}')
-          mapfile -t MASTER_NODES_TO_REMOVE < <(oc get nodes -l node-role.kubernetes.io/master= -o name | grep -v "${SURVIVING_MASTER_NODE}")
-          MASTER_MACHINES_TO_REMOVE=()
-          for master in ${MASTER_NODES_TO_REMOVE[@]}
-          do
-            MASTER_MACHINES_TO_REMOVE+=($(oc get ${master} -o jsonpath='{.metadata.annotations.machine\.openshift\.io\/machine}' | cut -d '/' -f 2))
-          done
-
-          echo "Prepare etcd connstring"
-          bastion_ssh "core@${SURVIVING_MASTER_NODE}" 'source /run/etcd/environment && echo "etcd-member-$(hostname -f)=https://${ETCD_DNS_NAME}:2380" > /tmp/etcd_connstring'
-
-          echo "Destroy two masters"
-          # Scale down etcd quorum guard
-          oc scale --replicas=0 deployment.apps/etcd-quorum-guard -n openshift-machine-config-operator
-
-          for machine in ${MASTER_MACHINES_TO_REMOVE[@]}
-          do
-            retry 10 oc --request-timeout=5s -n openshift-machine-api delete machine ${machine}
-          done
-
-          echo "Confirm meltdown"
-          sleep 30
-          oc --request-timeout=5s get nodes && exit 1
-
-          echo "Restore single etcd - /usr/local/bin/etcd-snapshot-restore.sh"
-          bastion_ssh core@${SURVIVING_MASTER_NODE} 'sudo -i /bin/bash -x /usr/local/bin/etcd-snapshot-restore.sh /root/assets/backup/etcd/member/snap/db $(cat /tmp/etcd_connstring)'
-
-          echo "Wait for API server to come up"
-          retry 30 oc get nodes
-
-          # Workaround for https://bugzilla.redhat.com/show_bug.cgi?id=1707006
-          echo "Restart SDN"
-          retry 10 oc delete pods -l app=sdn -n openshift-sdn --wait=false
-
-          echo "Create two masters via Machine API"
-          retry 10 oc get machines -n openshift-machine-api
-          # Clone existing masters, update IDs and oc apply
-          SURVIVING_MASTER_MACHINE=$(oc get machine -l machine.openshift.io/cluster-api-machine-role=master -n openshift-machine-api -o name | cut -d '/' -f 2)
-          SURVIVING_MASTER_NUM=${SURVIVING_MASTER_MACHINE##*-}
-          SURVIVING_MASTER_PREFIX=${SURVIVING_MASTER_MACHINE%-*}
-          retry 10 sh -c 'oc get --export machine ${SURVIVING_MASTER_MACHINE} -n openshift-machine-api -o yaml > /tmp/machine.template'
-
-          MASTER_INDEX=0
-          for i in $(seq 0 1); do
-            if [[ "${MASTER_INDEX}" == "${SURVIVING_MASTER_NUM}" ]]; then MASTER_INDEX=$((MASTER_INDEX+1)); fi
-            cat /tmp/machine.template \
-              | sed 's;selfLink.*;;g' \
-              | sed "s;name: ${SURVIVING_MASTER_PREFIX}-${SURVIVING_MASTER_NUM};name: ${SURVIVING_MASTER_PREFIX}-${MASTER_INDEX};" > /tmp/machine_${i}.yaml
-              RETRY_IGNORE_EXIT_CODE=1 retry 5 oc create -n openshift-machine-api -f /tmp/machine_${i}.yaml
-              MASTER_INDEX=$((MASTER_INDEX+1))
-          done
-
-          echo "Waiting for machines to be created"
-          set +e
-          NEW_MASTER_IPS=()
-          for i in $(seq 0 60); do
-            NEW_MASTER_IPS=($(oc -n openshift-machine-api \
-              get machines \
-              -l machine.openshift.io/cluster-api-machine-role=master \
-              -o jsonpath='{range .items[*]}{.status.addresses[?(@.type=="InternalIP")].address}{"\n"}{end}' || true))
-            if [[ "${#NEW_MASTER_IPS[@]}" == "3" ]]; then break; fi
-            sleep 30
-          done
-          oc get machines -n openshift-machine-api
-          set -e
-          if [[ "${#NEW_MASTER_IPS[@]}" != "3" ]]; then
-            echo "${NEW_MASTER_IPS[@]}"
-            exit 1
-          fi
-
-          echo "Verify new master nodes have joined the cluster"
-          FOUND_MASTERS=0
-          for i in $(seq 1 60)
-          do
-            FOUND_MASTERS=($(oc --request-timeout=5s get nodes -l node-role.kubernetes.io/master= -o name --no-headers || true))
-            if [[ "${#FOUND_MASTERS[@]}" == "3" ]]; then break; fi
-            sleep 30
-          done
-          oc get nodes
-          if [[ "${#FOUND_MASTERS[@]}" != "3" ]]; then
-            echo "${FOUND_MASTERS[@]}"
-            exit 1
-          fi
-
-          echo "Update DNS and LB"
-          # aws cli magic
-          easy_install --user pip
-          ~/.local/bin/pip install --user boto3
-          cat > /tmp/update_route_53.py <<'PYTHON_EOF'
-        import boto3
-        import os
-        import sys
-
-        if len(sys.argv) < 4:
-            print("Usage: ./update_route_53.py <DOMAIN> <RECORD> <IP>")
-            sys.exit(1)
-
-        domain = sys.argv[1]
-        record = sys.argv[2]
-        ip = sys.argv[3]
-        print("record: %s" % record)
-        print("ip: %s" % ip)
-
-        client = boto3.client('route53')
-        r = client.list_hosted_zones_by_name(DNSName=domain, MaxItems="1")
-        zone_id = r['HostedZones'][0]['Id'].split('/')[-1]
-
-        response = client.change_resource_record_sets(
-            HostedZoneId=zone_id,
-            ChangeBatch= {
-                'Comment': 'add %s -> %s' % (record, ip),
-                'Changes': [
-                {
-                    'Action': 'UPSERT',
-                    'ResourceRecordSet': {
-                        'Name': record,
-                        'Type': 'A',
-                        'TTL': 60,
-                        'ResourceRecords': [{'Value': ip}]
-                    }
-                }]
-        })
-        PYTHON_EOF
-          DOMAIN=$(oc whoami --show-server | grep -oP "api.\\K([^\\:]*)")
-          for i in "${!NEW_MASTER_IPS[@]}"; do
-            ETCD_NAME="etcd-${i}.${DOMAIN}"
-            python /tmp/update_route_53.py "${DOMAIN}" "${ETCD_NAME}" "${NEW_MASTER_IPS[$i]}"
-          done
-
-          echo "Run etcd-signer"
-          SURVIVING_MASTER_NODE_SHORT=${SURVIVING_MASTER_NODE%%.*}
-          curl -O https://raw.githubusercontent.com/hexfusion/openshift-recovery/master/manifests/kube-etcd-cert-signer.yaml.template
-          sed "s;__MASTER_HOSTNAME__;${SURVIVING_MASTER_NODE_SHORT};g" kube-etcd-cert-signer.yaml.template > kube-etcd-cert-signer.yaml
-          retry 10 oc create -f kube-etcd-cert-signer.yaml
-          retry 10 oc get pod/etcd-signer -n openshift-config -o name
-          retry 10 oc wait pod/etcd-signer -n openshift-config --for condition=ready
-
-          echo "Grow etcd cluster to full membership"
-          SURVIVING_MASTER_IP=$(oc get nodes ${SURVIVING_MASTER_NODE} -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}')
-          SETUP_ETCD_ENVIRONMENT=$(oc adm release info --image-for setup-etcd-environment)
-          KUBE_CLIENT_AGENT=$(oc adm release info --image-for kube-client-agent)
-          MASTERS=($(oc -n openshift-machine-api \
-            get machines \
-            -l machine.openshift.io/cluster-api-machine-role=master \
-            -o jsonpath='{range .items[*]}{.status.addresses[?(@.type=="InternalDNS")].address}{"\n"}{end}'))
-          for master in ${MASTERS[@]}
-          do
-            if [[ "${master}" == ${SURVIVING_MASTER_NODE} ]]; then continue; fi
-            echo "Recovering ${master}"
-            ETCD_HOSTNAME='etcd-member-$(hostname -f)'
-            bastion_ssh core@${master} "sudo -i env  SETUP_ETCD_ENVIRONMENT=${SETUP_ETCD_ENVIRONMENT} KUBE_CLIENT_AGENT=${KUBE_CLIENT_AGENT} /bin/bash -x /usr/local/bin/etcd-member-recover.sh ${SURVIVING_MASTER_IP} ${ETCD_HOSTNAME}"
-          done
-
-          for master in ${MASTERS[@]}
-          do
-            retry 10 oc get pod/etcd-member-${master} -n openshift-etcd -o name
-            retry 10 oc wait pod/etcd-member-${master} -n openshift-etcd --for condition=Ready
-          done
-
-          echo "Removing ssh-bastion"
-          retry 10 oc delete project openshift-ssh-bastion
-
-          echo "Scale etcd-quorum guard"
-          retry 10 oc scale --replicas=3 deployment.apps/etcd-quorum-guard -n openshift-machine-config-operator
-
-          echo "Remove etcd-signer"
-          oc delete pod/etcd-signer -n openshift-config
-
-          echo "Sleeping for a minute to make sure Prometheus are no longer firing"
-          sleep 60
+          export KUBE_SSH_BASTION="${BASTION_HOST}:22"
         }
 
         function setup-google-cloud-sdk() {
@@ -682,18 +373,6 @@ objects:
           gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}"
           gcloud config set project openshift-gce-devel-ci
           popd
-        }
-
-        function run-dr-snapshot-tests() {
-          openshift-tests run-dr restore-snapshot "${TEST_SUITE}" \
-            --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
-          return 0
-        }
-
-        function run-dr-quorum-tests() {
-          openshift-tests run-dr quorum-restore "${TEST_SUITE}" \
-            --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
-          return 0
         }
 
         function run-upgrade-tests() {
