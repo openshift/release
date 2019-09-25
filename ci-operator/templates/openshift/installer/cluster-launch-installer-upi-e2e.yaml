@@ -369,6 +369,18 @@ objects:
           if test -n "${GATHER_BOOTSTRAP_ARGS}"; then
             openshift-install --dir=/tmp/artifacts/installer gather bootstrap --key "${SSH_PRIVATE_KEY_PATH}" ${GATHER_BOOTSTRAP_ARGS}
           fi
+
+          if [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
+            # list all the virtual machines in the folder/rp
+            clustervms=$(govc ls "/${GOVC_DATACENTER}/vm/${CLUSTER_NAME}")
+            for ipath in $clustervms; do
+              # split on /
+              IFS=/ read -a ipath_array <<< "$ipath";
+              # create png of the current console to determine if a virtual machine has a problem
+              govc vm.console -vm.ipath=$ipath -capture /tmp/artifacts/installer/${ipath_array[-1]}.png
+            done
+          fi
+
           return 1
         }
 
