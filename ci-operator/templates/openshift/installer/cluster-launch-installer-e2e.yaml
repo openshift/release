@@ -349,8 +349,7 @@ objects:
             fi
           fi
           curl https://raw.githubusercontent.com/eparis/ssh-bastion/master/deploy/deploy.sh | bash
-          for i in $(seq 0 30)
-          do
+          for i in $(seq 0 30); do
             # AWS fills only .hostname of a service
             BASTION_HOST=$(oc get service -n "${SSH_BASTION_NAMESPACE}" ssh-bastion -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
             if [[ -n "${BASTION_HOST}" ]]; then break; fi
@@ -360,6 +359,10 @@ objects:
             echo "Waiting for SSH bastion load balancer service"
             sleep 10
           done
+          if [[ -z "${BASTION_HOST}" ]]; then
+            echo "Failed to find bastion address, exiting"
+            exit 1
+          fi
           export KUBE_SSH_BASTION="${BASTION_HOST}:22"
         }
 
@@ -378,13 +381,11 @@ objects:
         function run-upgrade-tests() {
           openshift-tests run-upgrade "${TEST_SUITE}" --to-image "${RELEASE_IMAGE_LATEST}" \
             --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
-          return 0
         }
 
         function run-tests() {
           openshift-tests run "${TEST_SUITE}" \
             --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
-          return 0
         }
 
         if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
