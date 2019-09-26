@@ -384,6 +384,12 @@ objects:
           return 1
         }
 
+        function wait_time_is_it() {
+          echo "What time is it?"
+          date +%s
+          date
+        }
+
         while true; do
           if [[ -f /tmp/exit ]]; then
             echo "Another process exited" 2>&1
@@ -728,6 +734,8 @@ objects:
           terraform init -input=false -no-color &
           wait "$!"
 
+          what_time_is_it
+
           terraform apply -auto-approve -no-color &
           wait "$!"
           # find bootstrap ip
@@ -743,6 +751,8 @@ objects:
           GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --master ${CONTROL_PLANE_0_IP} --master ${CONTROL_PLANE_1_IP} --master ${CONTROL_PLANE_2_IP}"
         fi
 
+
+        what_time_is_it
         echo "Waiting for bootstrap to complete"
         openshift-install --dir=/tmp/artifacts/installer wait-for bootstrap-complete &
         wait "$!" || gather_bootstrap_and_fail
@@ -787,6 +797,7 @@ objects:
           update_image_registry &
         fi
 
+        what_time_is_it
         echo "Completing UPI setup"
         openshift-install --dir=/tmp/artifacts/installer wait-for install-complete &
         wait "$!"
