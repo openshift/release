@@ -458,6 +458,20 @@ objects:
             # Get user and password from TFVARS_PATH
             export VSPHERE_USER=$(grep -oP 'vsphere_user="\K[^"]+' ${TFVARS_PATH})
             export VSPHERE_PASSWORD=$(grep -oP 'vsphere_password="\K[^"]+' ${TFVARS_PATH})
+            export OVA_URL="$(jq -r '.baseURI + .images["vmware"].path' /var/lib/openshift-install/rhcos.json)"
+            export VM_TEMPLATE="${OVA_URL##*/}"
+            mkdir /tmp/rhcos
+
+            cat > /tmp/rhcos/rhcos.json << EOF
+        {
+           "DiskProvisioning": "thin",
+           "MarkAsTemplate": false,
+           "PowerOn": false,
+           "InjectOvfEnv": false,
+           "WaitForIP": false,
+           "Name": "${VM_TEMPLATE}"
+        }
+        EOF
             cat > /tmp/artifacts/installer/install-config.yaml << EOF
         apiVersion: v1beta4
         baseDomain: ${base_domain}
@@ -483,14 +497,11 @@ objects:
             export GOVC_INSECURE=1
             export GOVC_DATACENTER=dc1
             export GOVC_DATASTORE=nvme-ds1
-            export OVA_URL="$(jq -r '.baseURI + .images["vmware"].path' /var/lib/openshift-install/rhcos.json)"
-            export VM_TEMPLATE="${OVA_URL##*/}"
             if [[ "$(govc vm.info ${VM_TEMPLATE} | wc -c)" -eq 0 ]]
             then
                 echo "Creating a template for the VMs from ${OVA_URL}..."
-                mkdir /tmp/rhcos
                 curl -L -o /tmp/rhcos/rhcos.ova "${OVA_URL}"
-                govc import.ova -name="${VM_TEMPLATE}" /tmp/rhcos/rhcos.ova
+                govc import.ova -options=/tmp/rhcos/rhcos.json /tmp/rhcos/rhcos.ova
             fi
         else
             echo "Unsupported cluster type '${CLUSTER_TYPE}'"
