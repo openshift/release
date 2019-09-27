@@ -384,6 +384,30 @@ objects:
           return 1
         }
 
+        # https://stackoverflow.com/questions/47706024/docker-set-running-user-while-launch-container/57531352#57531352
+        function run_as_user() {
+					U=`id -u`
+					G=`id -g`
+
+					HOME_DIR=/tmp/user
+					PASSWD=/tmp/passwd
+					GROUP=/tmp/group
+
+					if [ ! -d "$HOME_DIR" ]; then
+					  mkdir "$HOME_DIR"
+					fi
+					if [ ! -f "$PASSWD" ]; then
+					  echo "user::$U:$G::$HOME_DIR:" > "$PASSWD"
+					fi
+					if [ ! -f "$GROUP" ]; then
+					  echo "user::$G:" > "$GROUP"
+					fi
+
+					LD_PRELOAD=libnss_wrapper.so NSS_WRAPPER_PASSWD="$PASSWD" NSS_WRAPPER_GROUP="$GROUP" "$1"
+				}
+
+
+
         function what_time_is_it() {
           echo "What time is it?"
           date +%s
@@ -771,10 +795,10 @@ objects:
 
           echo "time on bootstrap and control plane 0-2"
 
-          HOME=/tmp/home ssh core@${BOOTSTRAP_IP} -i "${SSH_PRIVATE_KEY_PATH}" timedatectl status
-          HOME=/tmp/home ssh core@${CONTROL_PLANE_0_IP} -i "${SSH_PRIVATE_KEY_PATH}" timedatectl status
-          HOME=/tmp/home ssh core@${CONTROL_PLANE_1_IP} -i "${SSH_PRIVATE_KEY_PATH}" timedatectl status
-          HOME=/tmp/home ssh core@${CONTROL_PLANE_1_IP} -i "${SSH_PRIVATE_KEY_PATH}" timedatectl status
+          run_as_user "ssh core@${BOOTSTRAP_IP} -i ${SSH_PRIVATE_KEY_PATH} chronyc ntpdata"
+          run_as_user "ssh core@${CONTROL_PLANE_0_IP} -i ${SSH_PRIVATE_KEY_PATH} chronyc ntpdata"
+          run_as_user "ssh core@${CONTROL_PLANE_1_IP} -i ${SSH_PRIVATE_KEY_PATH} chronyc ntpdata"
+          run_as_user "ssh core@${CONTROL_PLANE_1_IP} -i ${SSH_PRIVATE_KEY_PATH} chronyc ntpdata"
 
           terraform apply -auto-approve -var 'bootstrap_complete=true' -no-color &
           wait "$!"
