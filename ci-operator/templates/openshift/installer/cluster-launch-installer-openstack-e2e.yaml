@@ -271,11 +271,10 @@ objects:
         value: /tmp
       - name: CI_DNS_IP
         value: ${CI_DNS_IP}
-      # Control Plane Root Volumes: Until we fully support https://jira.coreos.com/browse/OSASINFRA-815 in 4.2.z release
-      # we must pass root volumes via terraform variables in order to avoid disk speed related etcd failures
-      - name: TF_VAR_openstack_master_root_volume_size
+      # we must boot from performance volumes to reduce disk speed related etcd failures
+      - name: OPENSTACK_MASTER_VOLUME_SIZE
         value: "25"
-      - name: TF_VAR_openstack_master_root_volume_type
+      - name: OPENSTACK_MASTER_VOLUME_TYPE
         value: "performance"
       - name: INSTALL_INITIAL_RELEASE
       - name: RELEASE_IMAGE_INITIAL
@@ -320,6 +319,13 @@ objects:
         cat > /tmp/artifacts/installer/install-config.yaml << EOF
         apiVersion: v1beta4
         baseDomain: ${BASE_DOMAIN}
+        controlPlane:
+          name: master
+          platform:
+            openstack:
+              rootVolume:
+                size: ${OPENSTACK_MASTER_VOLUME_SIZE}
+                type: ${OPENSTACK_MASTER_VOLUME_TYPE}
         metadata:
           name: ${CLUSTER_NAME}
         platform:
