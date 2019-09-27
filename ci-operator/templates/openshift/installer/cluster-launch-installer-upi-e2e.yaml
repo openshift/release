@@ -765,6 +765,16 @@ objects:
           aws cloudformation wait stack-delete-complete --stack-name "${CLUSTER_NAME}-bootstrap" &
           wait "$!"
         elif [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
+
+          what_time_is_it
+
+          echo "time on bootstrap and control plane 0-2"
+
+          ssh core@${BOOTSTRAP_IP} -i "${SSH_PRIVATE_KEY_PATH}" timedatectl status
+          ssh core@${CONTROL_PLANE_0_IP} -i "${SSH_PRIVATE_KEY_PATH}" timedatectl status
+          ssh core@${CONTROL_PLANE_1_IP} -i "${SSH_PRIVATE_KEY_PATH}" timedatectl status
+          ssh core@${CONTROL_PLANE_1_IP} -i "${SSH_PRIVATE_KEY_PATH}" timedatectl status
+
           terraform apply -auto-approve -var 'bootstrap_complete=true' -no-color &
           wait "$!"
         fi
