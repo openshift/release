@@ -826,6 +826,13 @@ objects:
           while IFS= read -r i; do
             mkdir -p /tmp/artifacts/nodes/$i
             queue /tmp/artifacts/nodes/$i/heap oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/debug/pprof/heap
+            # TODO make https://github.com/kubernetes/node-problem-detector nice and ship it by default
+            oc debug node/${i} -- ls -A /host/var/lib/systemd/coredump > coredumps.txt
+            if [ -s coredumps.txt ]; then
+              echo "Coredumps detected on node ${i}"
+              queue /tmp/artifacts/nodes/$i/coredumps.tar oc debug node/${i} -- /bin/sh -c 'chroot /host tar -c -C  /var/lib/systemd/coredump -f - .'
+            fi
+            rm -f coredumps.txt
           done < /tmp/nodes
 
           FILTER=gzip queue /tmp/artifacts/nodes/masters-journal.gz oc --insecure-skip-tls-verify adm node-logs --role=master --unify=false
