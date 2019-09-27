@@ -384,6 +384,9 @@ objects:
           return 1
         }
 
+        function run_ssh() {
+          /usr/bin/ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -t -i ${SSH_PRIVATE_KEY_PATH} $@
+        }
         # https://stackoverflow.com/questions/47706024/docker-set-running-user-while-launch-container/57531352#57531352
         # https://github.com/RHsyseng/container-rhel-examples/blob/master/starter-arbitrary-uid/bin/uid_entrypoint
         function create_user() {
@@ -396,7 +399,6 @@ objects:
 
         function what_time_is_it() {
           echo "What time is it?"
-          date +%s
           date
         }
 
@@ -779,13 +781,15 @@ objects:
           what_time_is_it
           mkdir /tmp/home
 
-          echo "time on bootstrap and control plane 0-2"
-
+          echo "Creating user"
           create_user
-          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -t -i ${SSH_PRIVATE_KEY_PATH} core@${BOOTSTRAP_IP} "sudo chronyc ntpdata; timedatectl"
-          ssh  -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -t -i ${SSH_PRIVATE_KEY_PATH} core@${CONTROL_PLANE_0_IP} "sudo chronyc ntpdata; timedatectl"
-          ssh  -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -t -i ${SSH_PRIVATE_KEY_PATH} core@${CONTROL_PLANE_1_IP} "sudo chronyc ntpdata; timedatectl"
-          ssh  -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -t -i ${SSH_PRIVATE_KEY_PATH} core@${CONTROL_PLANE_2_IP} "sudo chronyc ntpdata; timedatectl"
+          echo "Checking current time on bootstrap and control-plane nodes"
+          run_ssh core@${BOOTSTRAP_IP} "timedatectl"
+          run_ssh core@${BOOTSTRAP_IP} "/usr/bin/openssl x509 -in /opt/openshift/tls/root-ca.crt -noout -text"
+
+          run_ssh core@${CONTROL_PLANE_0_IP} "timedatectl"
+          run_ssh core@${CONTROL_PLANE_1_IP} "timedatectl"
+          run_ssh core@${CONTROL_PLANE_2_IP} "timedatectl"
 
           terraform apply -auto-approve -var 'bootstrap_complete=true' -no-color &
           wait "$!"
