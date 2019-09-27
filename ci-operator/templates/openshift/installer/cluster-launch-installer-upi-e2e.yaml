@@ -767,13 +767,14 @@ objects:
         elif [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
 
           what_time_is_it
+          mkdir /tmp/home
 
           echo "time on bootstrap and control plane 0-2"
 
-          ssh core@${BOOTSTRAP_IP} -i "${SSH_PRIVATE_KEY_PATH}" timedatectl status
-          ssh core@${CONTROL_PLANE_0_IP} -i "${SSH_PRIVATE_KEY_PATH}" timedatectl status
-          ssh core@${CONTROL_PLANE_1_IP} -i "${SSH_PRIVATE_KEY_PATH}" timedatectl status
-          ssh core@${CONTROL_PLANE_1_IP} -i "${SSH_PRIVATE_KEY_PATH}" timedatectl status
+          HOME=/tmp/home ssh core@${BOOTSTRAP_IP} -i "${SSH_PRIVATE_KEY_PATH}" timedatectl status
+          HOME=/tmp/home ssh core@${CONTROL_PLANE_0_IP} -i "${SSH_PRIVATE_KEY_PATH}" timedatectl status
+          HOME=/tmp/home ssh core@${CONTROL_PLANE_1_IP} -i "${SSH_PRIVATE_KEY_PATH}" timedatectl status
+          HOME=/tmp/home ssh core@${CONTROL_PLANE_1_IP} -i "${SSH_PRIVATE_KEY_PATH}" timedatectl status
 
           terraform apply -auto-approve -var 'bootstrap_complete=true' -no-color &
           wait "$!"
