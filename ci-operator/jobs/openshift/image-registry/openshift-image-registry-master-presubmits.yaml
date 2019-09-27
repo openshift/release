@@ -233,6 +233,11 @@ presubmits:
     - master
     context: ci/prow/integration
     decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-image-registry-master-integration
     rerun_command: /test integration
     spec:
@@ -240,19 +245,25 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --secret-dir=/usr/local/integration-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=integration
         - --template=/usr/local/integration
         command:
         - ci-operator
         env:
-        - name: COMMAND
-          value: TEST_KUBECONFIG=${KUBECONFIG} ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=true
-            make test-integration
+        - name: CLUSTER_TYPE
+          value: aws
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
               key: openshift-image-registry-master.yaml
               name: ci-operator-master-configs
+        - name: JOB_NAME_SAFE
+          value: integration
+        - name: TEST_COMMAND
+          value: TEST_KUBECONFIG=${KUBECONFIG} ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=true
+            make test-integration
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -260,14 +271,27 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /usr/local/integration-cluster-profile
+          name: cluster-profile
         - mountPath: /usr/local/integration
           name: job-definition
-          subPath: master-sidecar-4.3.yaml
+          subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
       - configMap:
-          name: prow-job-master-sidecar-4.3
+          name: prow-job-cluster-launch-installer-src
         name: job-definition
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
     trigger: (?m)^/test( | .* )integration,?($|\s.*)
   - agent: kubernetes
     always_run: true

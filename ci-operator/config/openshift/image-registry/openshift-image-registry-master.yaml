@@ -24,6 +24,12 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+  integration:
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
 tag_specification:
   name: "4.3"
   namespace: ocp
@@ -34,6 +40,11 @@ tests:
   commands: ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1 hack/test-go.sh
   container:
     from: test-bin
+- artifact_dir: /tmp/artifacts
+  as: integration
+  commands: TEST_KUBECONFIG=${KUBECONFIG} ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=true make test-integration
+  openshift_installer_src:
+    cluster_profile: aws
 - as: e2e-aws
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
