@@ -1,19 +1,43 @@
 tag_specification:
   name: '4.1'
   namespace: ocp
+
 promotion:
   namespace: openshift
   name: release-next
+
 base_images:
   base:
     name: '4.1'
     namespace: ocp
     tag: base
+  cli:
+    name: 'origin-cli'
+    namespace: tektoncd
+    tag: latest
+
 build_root:
   project_image:
     dockerfile_path: openshift/Dockerfile
-canonical_go_repository: ''
-binary_build_commands: ''
+
+images:
+- dockerfile_path: Dockerfile
+  from: cli
+  inputs:
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/tektoncd-catalog/openshift-client/.
+  to: tektoncd-catalog-openshift-client
+
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/tektoncd-catalog/s2i/.
+  to: tektoncd-catalog-s2i
 
 promotion:
   cluster: https://api.ci.openshift.org
