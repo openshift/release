@@ -9,11 +9,8 @@ base_images:
     tag: "7"
 binary_build_commands: make build
 build_root:
-  image_stream_tag:
-    cluster: https://api.ci.openshift.org
-    name: release
-    namespace: openshift
-    tag: golang-1.12
+  project_image:
+    dockerfile_path: openshift-ci/Dockerfile.tools
 images:
 - dockerfile_path: openshift-ci/Dockerfile.deploy
   from: os
@@ -53,5 +50,10 @@ tests:
 - as: ocs-operator-e2e-aws
   commands: |
     make cluster-deploy && make functest
+  openshift_installer_src:
+    cluster_profile: aws
+- as: red-hat-storage-ocs-ci-e2e-aws
+  commands: |
+    export REDHAT_OCS_CI_FORCE_TOOL_POD_INSTALL="true" && make cluster-deploy && make red-hat-storage-ocs-ci
   openshift_installer_src:
     cluster_profile: aws
