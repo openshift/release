@@ -1,5 +1,9 @@
 .PHONY: check check-core check-services dry-core-admin dry-services-admin core-admin services-admin dry-core core dry-services services all-admin all
 
+all: core-admin core services-admin services
+
+all-admin: core-admin services-admin
+
 check: check-core check-services
 	@echo "Service config check: PASS"
 
@@ -36,9 +40,6 @@ core:
 
 services:
 	applyconfig --config-dir services --confirm=true
-
-all-admin: core-admin services-admin
-all: core-admin core services-admin services
 
 # these are useful for devs
 jobs:
