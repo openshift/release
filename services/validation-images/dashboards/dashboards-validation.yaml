@@ -4,19 +4,23 @@ items:
 - apiVersion: v1
   kind: ImageStream
   metadata:
-    name: python-validation
+    name: dashboards-validation
+    namespace: ci
 - apiVersion: v1
   kind: BuildConfig
   metadata:
-    name: python-validation
+    name: dashboards-validation
+    namespace: ci
     labels:
       ci.openshift.io/source-repo: release
   spec:
+    triggers:
+    - type: "ConfigChange"
     failedBuildsHistoryLimit: 2
     output:
       to:
         kind: ImageStreamTag
-        name: python-validation:latest
+        name: dashboards-validation:latest
     runPolicy: Serial
     source:
       git:
@@ -25,4 +29,4 @@ items:
     strategy:
       dockerStrategy:
         imageOptimizationPolicy: SkipLayers
-        dockerfilePath: projects/origin-release/python-validation/Dockerfile
+        dockerfilePath: services/validation-images/dashboards/Dockerfile
