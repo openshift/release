@@ -62,7 +62,7 @@ applyTemplate:
 	oc process -f $(WHAT) | oc apply -f -
 .PHONY: applyTemplate
 
-postsubmit-update: origin-release libpod prow-monitoring build-dashboards-validation-image cincinnati prow-release-controller-definitions
+postsubmit-update: origin-release libpod prow-monitoring cincinnati prow-release-controller-definitions
 .PHONY: postsubmit-update
 
 all: roles prow projects
@@ -195,7 +195,7 @@ prow-release-controller-deploy:
 prow-release-controller: prow-release-controller-definitions prow-release-controller-deploy
 .PHONY: prow-release-controller
 
-projects: ci-ns gcsweb origin-stable origin-release publishing-bot content-mirror azure azure-private python-validation metering coreos
+projects: ci-ns gcsweb origin-stable origin-release publishing-bot content-mirror azure metering coreos
 .PHONY: projects
 
 content-mirror:
@@ -236,10 +236,6 @@ origin-release:
 prometheus: node-exporter alert-buffer
 	$(MAKE) apply WHAT=projects/prometheus/prometheus.yaml
 .PHONY: prometheus
-
-python-validation:
-	$(MAKE) apply WHAT=projects/origin-release/python-validation/python-validation.yaml
-.PHONY: python-validation
 
 node-exporter:
 	$(MAKE) apply WHAT=projects/prometheus/node_exporter.yaml
@@ -327,10 +323,6 @@ cincinnati:
 prow-monitoring:
 	make -C cluster/ci/monitoring prow-monitoring-deploy
 .PHONY: prow-monitoring
-
-build-dashboards-validation-image:
-	oc apply -f projects/origin-release/dashboards-validation/dashboards-validation.yaml
-.PHONY: build-dashboards-validation-image
 
 logging:
 	$(MAKE) apply WHAT=cluster/ci/config/logging/fluentd-daemonset.yaml
