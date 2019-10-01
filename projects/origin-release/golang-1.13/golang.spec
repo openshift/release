@@ -16,6 +16,6 @@ BuildArch:	noarch
 %files
 %defattr(-,root,root,-)
 %changelog
-* Wed Mar 20 2019 Markus Thömmes <mthoemme@redhat.com> 0.0-1
+* Tue Oct 1 2019 Markus Thömmes <mthoemme@redhat.com> 0.0-1
 - Initial change
 EOF
