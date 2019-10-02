@@ -26,6 +26,7 @@ parameters:
 - name: RELEASE_IMAGE_LATEST
   required: true
 - name: BASE_DOMAIN
+- name: CLUSTER_NETWORK_TYPE
 - name: BUILD_ID
   required: false
 
@@ -437,6 +438,13 @@ objects:
         else
             echo "Unsupported cluster type '${CLUSTER_TYPE}'"
             exit 1
+        fi
+        
+        if [[ -n "${CLUSTER_NETWORK_TYPE}" ]]; then
+          cat >> /tmp/artifacts/installer/install-config.yaml << EOF
+        networking:
+          networkType: ${CLUSTER_NETWORK_TYPE}
+        EOF
         fi
 
         TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create cluster &
