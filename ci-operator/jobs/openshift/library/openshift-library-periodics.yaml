@@ -1,14 +1,14 @@
 periodics:
 - agent: kubernetes
-  labels:
-    ci.openshift.io/role: infra
+  decorate: true
   extra_refs:
   - base_ref: master
     org: openshift
     repo: library
     workdir: true
-  decorate: true
   interval: 24h
+  labels:
+    ci.openshift.io/role: infra
   name: periodic-openshift-library-import
   spec:
     containers:
@@ -37,16 +37,15 @@ periodics:
         fi
         # redirect to devnull so this doesn't print the value of $TOKEN on failure.
         git push pushtarget import:master &> /dev/null
-
+      env:
+      - name: TOKEN
+        valueFrom:
+          secretKeyRef:
+            key: oauth
+            name: github-credentials-openshift-merge-robot
       image: quay.io/bparees/importer:latest
       imagePullPolicy: Always
       name: ""
       resources:
         requests:
           cpu: 500m
-      env: 
-      - name: TOKEN
-        valueFrom:
-          secretKeyRef:
-            name: github-credentials-openshift-merge-robot
-            key: oauth
