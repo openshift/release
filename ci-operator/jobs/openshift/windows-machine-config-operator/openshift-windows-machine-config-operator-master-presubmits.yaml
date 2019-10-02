@@ -48,6 +48,72 @@ presubmits:
     always_run: true
     branches:
     - master
+    context: ci/prow/test-e2e-tools
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-windows-machine-config-operator-master-test-e2e-tools
+    rerun_command: /test test-e2e-tools
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --secret-dir=/usr/local/test-e2e-tools-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=test-e2e-tools
+        - --template=/usr/local/test-e2e-tools
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_NETWORK_TYPE
+          value: OVNKubernetes
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-windows-machine-config-operator-master.yaml
+              name: ci-operator-master-configs
+        - name: JOB_NAME_SAFE
+          value: test-e2e-tools
+        - name: TEST_COMMAND
+          value: make test-e2e-tools
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/test-e2e-tools-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/test-e2e-tools
+          name: job-definition
+          subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-src
+        name: job-definition
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )test-e2e-tools,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
     context: ci/prow/verify
     decorate: true
     decoration_config:
