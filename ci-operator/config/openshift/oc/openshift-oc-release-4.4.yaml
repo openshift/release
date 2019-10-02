@@ -3,6 +3,10 @@ base_images:
     name: "4.4"
     namespace: ocp
     tag: base
+  must-gather-base:
+    name: "4.4"
+    namespace: ocp
+    tag: must-gather
   tests-base:
     name: "4.4"
     namespace: ocp
@@ -31,6 +35,14 @@ images:
       - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
       paths: null
   to: tests
+- dockerfile_path: images/cli/Dockerfile.rhel
+  from: must-gather-base
+  inputs:
+    bin:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
+      paths: null
+  to: must-gather
 - context_dir: images/deployer/
   dockerfile_path: Dockerfile.rhel
   from: cli
@@ -48,6 +60,7 @@ promotion:
     oc-rpms: rpms
   excluded_images:
   - tests
+  - must-gather
   - oc-base-with-rpms
   name: "4.4"
   namespace: ocp
