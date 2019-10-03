@@ -3,14 +3,14 @@ base_images:
     cluster: https://api.ci.openshift.org
     name: centos
     namespace: openshift
-    tag: '7'
+    tag: "7"
 
 build_root:
   project_image:
     dockerfile_path: dist/openshift-release/Dockerfile.builder
 
 resources:
-  '*':
+  "*":
     limits:
       memory: 4Gi
     requests:
@@ -20,11 +20,23 @@ resources:
     limits:
       memory: 9Gi
     requests:
-      cpu: '3'
+      cpu: "3"
       memory: 5Gi
 
 tests:
-- as: yaml-lint
-  commands: dist/prow_yaml_lint.sh
-  container:
-    from: src
+  - as: yaml-lint
+    commands: dist/prow_yaml_lint.sh
+    container:
+      from: src
+  - as: rustfmt-1.38.0
+    commands: dist/prow_rustfmt.sh 1.38.0
+    container:
+      from: src
+  - as: rustfmt-1.37.0
+    commands: dist/prow_rustfmt.sh 1.37.0
+    container:
+      from: src
+  - as: rustfmt-1.36.0
+    commands: dist/prow_rustfmt.sh 1.36.0
+    container:
+      from: src
