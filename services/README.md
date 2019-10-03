@@ -1,22 +1,25 @@
-# Core Services and Configuration
+# Additional Services and Configuration
 
-Manifests for important services (like [OpenShift CI cluster](https://api.ci.openshift.org/)
-and the CI service components that run on it) are present in this directory. The
-services configured here are critical for some part of the OpenShift project
-development workflow, must meet basic quality criteria and must be deployed to
-the cluster automatically by a postsubmit job.
+This directory contains manifests and configuration for additional services
+that:
+ 1. are running on [OpenShift CI cluster](https://api.ci.openshift.org/)
+ 2. are not critical for the development process of the whole OpenShift
+    organization (critical service configuration is in [core-services](../core-services)).
+ 3. want to follow the same quality criteria and automated check and deployment
+    process that the core services do (DPTP intends to support only these
+    additional services).
 
 ## How to add new service
 
 Create a new directory for your service, containing all [necessary files](#quality-criteria-and-conventions).
-You may copy the `_TEMPLATE` directory and start using the files there. Add
-manifests and other configuration as needed.
+You may copy the [_TEMPLATE](../core-services/_TEMPLATE) directory and start
+using the files there. Add manifests and other configuration as needed.
 
 ## Quality criteria and conventions
 
 1. All directories should contain `OWNERS` and `README.md` files. This is
-enforced by `make check` locally and by the `ci/prow/core-valid` check on
-pull requests.
+enforced by `make check-services` locally and by the `ci/prow/services-valid`
+check on pull requests.
 2. Config is applied to the cluster using the [`applyconfig`](https://github.com/openshift/ci-tools/tree/master/cmd/applyconfig)
 tool. The tool applies all YAML files under your service subdirectory. All
    YAML filenames should follow the following convention:
@@ -27,12 +30,12 @@ tool. The tool applies all YAML files under your service subdirectory. All
 3. `applyconfig` applies files in lexicographical order. In the case when some
 resources need to be created before others, this needs to be reflected by the
 naming of the files (e.g. by including a numerical component).
-4. The `config-updater` service account in the `ci` namespace must have
-permissions to apply all standard resources.
+4. The `config-updater` service account in the `ci` namespace [must have
+permissions](../core-services/prow/03_deployment/admin_config_updater_rbac.yaml)
+to apply all standard resources.
 5. Destination namespaces should always be specified within a manifest, never
 rely on a currently set OpenShift project.
-6. All ConfigMaps need to be set up for automated updates by the
-`config-updater` Prow plugin.
+6. All ConfigMaps need to be [set up for automated updates](../core-services/prow/02_config/_plugins.yaml) by the `config-updater` Prow plugin.
 
 ## How to apply
 
@@ -43,8 +46,8 @@ ConfigMaps.
 
 1. Admin resources are not automatically applied to the cluster.
 2. Other resources are automatically applied to the cluster by a Prow
-   [postsubmit](https://prow.svc.ci.openshift.org/?job=branch-ci-openshift-release-master-core-apply)
-   after each PR is merged, and also [periodically](https://prow.svc.ci.openshift.org/?job=openshift-release-master-core-apply).
+   [postsubmit](https://prow.svc.ci.openshift.org/?job=branch-ci-openshift-release-master-services-apply)
+   after each PR is merged, and also [periodically](https://prow.svc.ci.openshift.org/?job=openshift-release-master-services-apply).
 3. ConfigMaps are automatically updated by the `config-updater` Prow plugin,
    configured in its [config.yaml](02_config/_config.yaml) file.
    Additionally, they are [periodically](https://prow.svc.ci.openshift.org/?job=openshift-release-master-config-bootstrapper)
@@ -53,8 +56,8 @@ ConfigMaps.
 ### Manual
 
 1. Admin resources can be created by users with `--as=system:admin` rights by
-   `make core-admin`.
-2. Other resources can be created by `make core`, provided the user has rights
+   `make services-admin`.
+2. Other resources can be created by `make services`, provided the user has rights
    to perform all necessary actions
 3. ConfigMaps can be manually created by the [config-bootstrapper](https://github.com/kubernetes/test-infra/tree/master/prow/cmd/config-bootstrapper)
    tool.

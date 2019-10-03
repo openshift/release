@@ -42,23 +42,34 @@ workflow, must meet basic quality criteria and must be deployed to the cluster
 automatically by a postsubmit job. See its [README](./core-services/README.md)
 for details.
 
+### Additional Services and Configuration
+
+The [`services`](./services) directory contains manifests for services that run
+on [OpenShift CI cluster](https://api.ci.openshift.org/) and are not critical
+for the OpenShift project development workflow, but want to follow the same
+quality criteria and automated check and deployment process that the [core
+services](#core-services-and-configuration) do (DPTP intends to support only
+these additional services). See its [README](./services/README.md) for details.
+
 ### Cluster Configuration Manifests (legacy)
 
 Manifests for cluster provisioning and installation live under [`cluster/`](./cluster/).
 The [OpenShift CI cluster](https://api.ci.openshift.org/) is configured with the
 manifests under [`cluster/ci/`](./cluster/ci/). (**legacy**: do not add new
 services here. Use [`core-services`](./core-services) or
-[`projects`](./projects) instead.)
+[`services`](./services) instead.)
 
 Clusters that are created by the testing infrastructure for validating OpenShift
 are configured with the profiles under [`cluster/test-deploy/`](./cluster/test-deploy/).
-For directions on how to set up clusters for development, see the [README](./cluster/test-deploy/README.md).
+For directions on how to set up clusters for development, see the
+[README](./cluster/test-deploy/README.md).
 
-### Custom and Legacy Service Configuration
+### Legacy Service Configuration
 
 Manifests for services that are in development, experimental, legacy or not
 critical in some other way are present in the [`projects`](./projects)
-directory. Compared to the [core services configuration](#core-services-and-configuration),
+directory. Compared to the [core services](#core-services-and-configuration) and
+[services](#additional-services-and-configuration) configuration,
 these projects do not need to follow any common structure or conventions other
 than clear ownership. They must not interfere with the core services in any way.
 
