@@ -363,6 +363,57 @@ objects:
         sshKey: |
           ${SSH_PUB_KEY}
         EOF
+        elif [[ "${CLUSTER_TYPE}" == "azure4" ]]; then
+            case $((RANDOM % 4)) in
+            0) AZURE_REGION=centralus;;
+            1) AZURE_REGION=centralus;;
+            2) AZURE_REGION=centralus;;
+            3) AZURE_REGION=westus;;
+            *) echo >&2 "invalid Azure region index"; exit 1;;
+            esac
+            echo "Azure region: ${AZURE_REGION}"
+
+            cat > /tmp/artifacts/installer/install-config.yaml << EOF
+        apiVersion: v1
+        baseDomain: ${BASE_DOMAIN:-ci.azure.devcluster.openshift.com}
+        metadata:
+          name: ${CLUSTER_NAME}
+        controlPlane:
+          name: master
+          replicas: 3
+        compute:
+        - name: worker
+          replicas: 3
+        platform:
+          azure:
+            baseDomainResourceGroupName: os4-common
+            region: ${AZURE_REGION}
+        pullSecret: >
+          ${PULL_SECRET}
+        sshKey: |
+          ${SSH_PUB_KEY}
+        EOF
+        elif [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
+            cat > /tmp/artifacts/installer/install-config.yaml << EOF
+        apiVersion: v1
+        baseDomain: ${BASE_DOMAIN:-origin-ci-int-gce.dev.openshift.com}
+        metadata:
+          name: ${CLUSTER_NAME}
+        controlPlane:
+          name: master
+          replicas: 3
+        compute:
+        - name: worker
+          replicas: 3
+        platform:
+          gcp:
+            projectID: ${GCP_PROJECT}
+            region: ${GCP_REGION}
+        pullSecret: >
+          ${PULL_SECRET}
+        sshKey: |
+          ${SSH_PUB_KEY}
+        EOF
         else
             echo "Unsupported cluster type '${CLUSTER_TYPE}'"
             exit 1
