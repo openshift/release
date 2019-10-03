@@ -304,6 +304,73 @@ presubmits:
             cpu: 10m
     trigger: (?m)^/test( | .* )prow-config-semantics,?($|\s.*)
   - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/services-dry
+    decorate: true
+    name: pull-ci-openshift-release-master-services-dry
+    rerun_command: /test services-dry
+    spec:
+      containers:
+      - args:
+        - --config-dir
+        - services
+        command:
+        - applyconfig
+        image: registry.svc.ci.openshift.org/ci/applyconfig:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+      serviceAccountName: config-updater
+    trigger: (?m)^/test( | .* )services-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/services-valid
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-services-valid
+    rerun_command: /test services-valid
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=services-valid
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-release-master.yaml
+              name: ci-operator-master-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )services-valid,?($|\s.*)
+  - agent: kubernetes
     always_run: false
     branches:
     - master
