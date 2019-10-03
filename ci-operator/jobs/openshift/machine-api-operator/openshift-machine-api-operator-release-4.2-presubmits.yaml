@@ -10,6 +10,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-api-operator-release-4.2-e2e-aws
     rerun_command: /test e2e-aws
     spec:
@@ -74,6 +75,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-api-operator-release-4.2-e2e-aws-operator
     rerun_command: /test e2e-aws-operator
     spec:
@@ -138,6 +140,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-api-operator-release-4.2-e2e-aws-operator-tech-preview
     rerun_command: /test e2e-aws-operator-tech-preview
     spec:
@@ -196,12 +199,85 @@ presubmits:
     always_run: true
     branches:
     - release-4.2
+    context: ci/prow/e2e-aws-scaleup-rhel7
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-machine-api-operator-release-4.2-e2e-aws-scaleup-rhel7
+    optional: true
+    rerun_command: /test e2e-aws-scaleup-rhel7
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --secret-dir=/usr/local/e2e-aws-scaleup-rhel7-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=e2e-aws-scaleup-rhel7
+        - --template=/usr/local/e2e-aws-scaleup-rhel7
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-machine-api-operator-release-4.2.yaml
+              name: ci-operator-4.2-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-aws-scaleup-rhel7
+        - name: RPM_REPO_CRIO_DIR
+          value: 4.2-rhel-7
+        - name: RPM_REPO_OPENSHIFT_ORIGIN
+          value: https://rpms.svc.ci.openshift.org/openshift-origin-v4.2/
+        - name: TEST_COMMAND
+          value: TEST_SUITE=openshift/conformance/parallel run-tests
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-aws-scaleup-rhel7-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-aws-scaleup-rhel7
+          name: job-definition
+          subPath: cluster-scaleup-e2e-40.yaml
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+          - configMap:
+              name: cluster-profile-aws-centos-40
+      - configMap:
+          name: prow-job-cluster-scaleup-e2e-40
+        name: job-definition
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )e2e-aws-scaleup-rhel7,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-4.2
     context: ci/prow/e2e-aws-upgrade
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-api-operator-release-4.2-e2e-aws-upgrade
     rerun_command: /test e2e-aws-upgrade
     spec:
@@ -253,6 +329,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-api-operator-release-4.2-e2e-azure
     rerun_command: /test e2e-azure
     spec:
@@ -308,45 +385,42 @@ presubmits:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-azure,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - release-4.2
-    context: ci/prow/e2e-rhel-scaleup
+    context: ci/prow/e2e-azure-operator
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-    name: pull-ci-openshift-machine-api-operator-release-4.2-e2e-rhel-scaleup
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-machine-api-operator-release-4.2-e2e-azure-operator
     optional: true
-    rerun_command: /test e2e-rhel-scaleup
+    rerun_command: /test e2e-azure-operator
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/e2e-rhel-scaleup-cluster-profile
+        - --secret-dir=/usr/local/e2e-azure-operator-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=e2e-rhel-scaleup
-        - --template=/usr/local/e2e-rhel-scaleup
+        - --target=e2e-azure-operator
+        - --template=/usr/local/e2e-azure-operator
         command:
         - ci-operator
         env:
         - name: CLUSTER_TYPE
-          value: aws
+          value: azure4
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
               key: openshift-machine-api-operator-release-4.2.yaml
               name: ci-operator-4.2-configs
         - name: JOB_NAME_SAFE
-          value: e2e-rhel-scaleup
-        - name: RPM_REPO_CRIO_DIR
-          value: 4.2-rhel-7
-        - name: RPM_REPO_OPENSHIFT_ORIGIN
-          value: https://rpms.svc.ci.openshift.org/openshift-origin-v4.2/
+          value: e2e-azure-operator
         - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance run-tests
+          value: make test-e2e
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -354,11 +428,11 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/e2e-rhel-scaleup-cluster-profile
+        - mountPath: /usr/local/e2e-azure-operator-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-rhel-scaleup
+        - mountPath: /usr/local/e2e-azure-operator
           name: job-definition
-          subPath: cluster-scaleup-e2e-40.yaml
+          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
@@ -368,35 +442,34 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-aws
-          - configMap:
-              name: cluster-profile-aws-centos-40
+              name: cluster-secrets-azure4
       - configMap:
-          name: prow-job-cluster-scaleup-e2e-40
+          name: prow-job-cluster-launch-installer-src
         name: job-definition
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )e2e-rhel-scaleup,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-azure-operator,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - release-4.2
-    context: ci/prow/gofmt
+    context: ci/prow/goimports
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-    name: pull-ci-openshift-machine-api-operator-release-4.2-gofmt
-    rerun_command: /test gofmt
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-machine-api-operator-release-4.2-goimports
+    rerun_command: /test goimports
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=gofmt
+        - --target=goimports
         command:
         - ci-operator
         env:
@@ -420,7 +493,7 @@ presubmits:
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )gofmt,?($|\s.*)
+    trigger: (?m)^/test( | .* )goimports,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -431,6 +504,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-api-operator-release-4.2-golint
     rerun_command: /test golint
     spec:
@@ -474,6 +548,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-api-operator-release-4.2-govet
     rerun_command: /test govet
     spec:
@@ -517,6 +592,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-api-operator-release-4.2-images
     rerun_command: /test images
     spec:
@@ -526,6 +602,7 @@ presubmits:
         - --give-pr-author-access-to-namespace=true
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=[images]
+        - --target=[release:latest]
         command:
         - ci-operator
         env:
@@ -560,6 +637,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-api-operator-release-4.2-unit
     rerun_command: /test unit
     spec:

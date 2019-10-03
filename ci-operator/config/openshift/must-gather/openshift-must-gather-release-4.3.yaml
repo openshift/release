@@ -6,16 +6,15 @@ base_images:
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
-    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
-    tag: golang-1.10
-canonical_go_repository: github.com/openshift/must-gather
+    tag: golang-1.12
 images:
 - dockerfile_path: Dockerfile
   from: base
   to: must-gather
 promotion:
+  disabled: true
   name: "4.3"
   namespace: ocp
 resources:
@@ -36,13 +35,6 @@ tests:
     make verify -k --warn-undefined-variables
   container:
     from: bin
-- as: verify-deps
-  commands: |
-    HOME=$( mktemp -d )
-    go get -u github.com/Masterminds/glide
-    make verify-deps -k --warn-undefined-variables
-  container:
-    from: src
 - artifact_dir: /tmp/artifacts
   as: unit
   commands: |
@@ -55,4 +47,3 @@ tests:
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: aws
-    upgrade: false

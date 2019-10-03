@@ -10,7 +10,6 @@ base_rpm_images:
     tag: base
 build_root:
   image_stream_tag:
-    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.10
@@ -20,15 +19,20 @@ images:
   optional: true
   to: kuryr-tester
 - dockerfile_path: openshift-kuryr-cni-ci.Dockerfile
-  from: rpm
+  from: rpm-os
   to: kuryr-cni
 - dockerfile_path: openshift-kuryr-controller-ci.Dockerfile
-  from: rpm
+  from: rpm-os
   to: kuryr-controller
 promotion:
-  disabled: true
   name: "4.2"
   namespace: ocp
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      curl http://base-openstack-4-2.ocp.svc > /etc/yum.repos.d/base-openstack-4-2.repo
+    from: rpm
+    to: rpm-os
 resources:
   '*':
     limits:

@@ -1,15 +1,13 @@
 base_images:
   base:
-    name: "4.2"
+    name: "4.3"
     namespace: ocp
     tag: base
 build_root:
   image_stream_tag:
-    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.10
-canonical_go_repository: github.com/openshift/installer
 images:
 - dockerfile_path: images/installer/Dockerfile.ci
   from: base
@@ -34,7 +32,6 @@ images:
       as:
       - build
       paths: null
-  optional: true
   to: libvirt-installer
 - dockerfile_path: images/installer/Dockerfile.upi.ci
   from: base
@@ -52,8 +49,16 @@ images:
       - build
       paths: null
   to: openstack-installer
+- dockerfile_path: images/baremetal/Dockerfile.ci
+  from: base
+  inputs:
+    root:
+      as:
+      - build
+      paths: null
+  to: baremetal-installer
 promotion:
-  name: "4.2"
+  name: "4.3"
   namespace: ocp
 resources:
   '*':
@@ -62,6 +67,12 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+  baremetal-installer:
+    limits:
+      memory: 9Gi
+    requests:
+      cpu: "3"
+      memory: 5Gi
   installer:
     limits:
       memory: 9Gi
@@ -99,7 +110,7 @@ resources:
       cpu: "3"
       memory: 5Gi
 tag_specification:
-  name: "4.2"
+  name: "4.3"
   namespace: ocp
 tests:
 - as: unit
@@ -127,12 +138,14 @@ tests:
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: aws
-    upgrade: false
+- as: e2e-gcp
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer:
+    cluster_profile: gcp
 - as: e2e-azure
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: azure4
-    upgrade: false
 - as: e2e-aws-upgrade
   commands: TEST_SUITE=all run-upgrade-tests
   openshift_installer:
@@ -143,7 +156,7 @@ tests:
   openshift_installer_upi:
     cluster_profile: aws
 - as: e2e-aws-scaleup-rhel7
-  commands: TEST_SUITE=openshift/conformance run-tests
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_ansible_40:
     cluster_profile: aws-centos-40
 - as: e2e-etcd-quorum-loss
@@ -152,14 +165,12 @@ tests:
     TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: aws
-    upgrade: false
 - as: e2e-restore-cluster-state
   commands: |
     restore-cluster-state
     TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: aws
-    upgrade: false
 - as: e2e-vsphere
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer_upi:

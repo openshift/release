@@ -1,23 +1,52 @@
-.PHONY: check check-core dry-core-admin core-admin dry-core core
+.PHONY: check check-core check-services dry-core-admin dry-services-admin core-admin services-admin dry-core core dry-services services all-admin all
 
-check: check-core
+all: core-admin core services-admin services
+
+all-admin: core-admin services-admin
+
+check: check-core check-services
 	@echo "Service config check: PASS"
 
 check-core:
 	core-services/_hack/validate-core-services.sh core-services
 	@echo "Core service config check: PASS"
 
+check-services:
+	core-services/_hack/validate-core-services.sh services
+	@echo "Service config check: PASS"
+
+# applyconfig is https://github.com/openshift/ci-tools/tree/master/cmd/applyconfig
+
 dry-core-admin:
-	go run ./tools/applyconfig --config-dir core-services --level=admin
+	applyconfig --config-dir core-services --level=admin
+
+dry-services-admin:
+	applyconfig --config-dir services --level=admin
 
 core-admin:
-	go run ./tools/applyconfig --config-dir core-services --level=admin --confirm=true
+	applyconfig --config-dir core-services --level=admin --confirm=true
+
+services-admin:
+	applyconfig --config-dir services --level=admin --confirm=true
 
 dry-core:
-	go run ./tools/applyconfig --config-dir core-services
+	applyconfig --config-dir core-services
+
+dry-services:
+	applyconfig --config-dir services
 
 core:
-	go run ./tools/applyconfig --config-dir core-services --confirm=true
+	applyconfig --config-dir core-services --confirm=true
+
+services:
+	applyconfig --config-dir services --confirm=true
+
+# these are useful for devs
+jobs:
+	docker pull registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest
+	docker run -it -v "${CURDIR}/ci-operator:/ci-operator" registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest --from-dir /ci-operator/config --to-dir /ci-operator/jobs
+	docker pull registry.svc.ci.openshift.org/ci/determinize-prow-jobs:latest
+	docker run -it -v "${CURDIR}/ci-operator/jobs:/ci-operator/jobs" registry.svc.ci.openshift.org/ci/determinize-prow-jobs:latest --prow-jobs-dir /ci-operator/jobs
 
 # LEGACY TARGETS
 # You should not need to add new targets here.
@@ -34,7 +63,7 @@ applyTemplate:
 	oc process -f $(WHAT) | oc apply -f -
 .PHONY: applyTemplate
 
-postsubmit-update: prow-services origin-release libpod prow-monitoring build-dashboards-validation-image cincinnati
+postsubmit-update: origin-release libpod prow-monitoring cincinnati prow-release-controller-definitions
 .PHONY: postsubmit-update
 
 all: roles prow projects
@@ -47,19 +76,15 @@ cluster-roles:
 roles: cluster-operator-roles cluster-roles
 .PHONY: roles
 
-prow: prow-ci-ns prow-ci-stg-ns prow-openshift-ns
+prow: prow-ci-ns prow-ci-stg-ns
 .PHONY: prow
 
-prow-ci-ns: ci-ns prow-crd prow-config prow-rbac prow-services prow-jobs prow-scaling prow-secrets prow-ci-search
+prow-ci-ns: ci-ns prow-jobs prow-scaling prow-secrets
 .PHONY: prow-ci-ns
 
 prow-ci-stg-ns: ci-stg-ns prow-cluster-jobs
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/ci-operator/stage.yaml
 .PHONY: prow-ci-stg-ns
-
-prow-openshift-ns: openshift-ns
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/config_updater_rbac.yaml
-.PHONY: prow-openshift-ns
 
 ci-ns:
 	oc project ci
@@ -73,65 +98,13 @@ openshift-ns:
 	oc project openshift
 .PHONY: openshift-ns
 
-prow-crd:
-	$(MAKE) apply WHAT=cluster/ci/config/prow/prow_crd.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/prowjob_access.yaml
-.PHONY: prow-crd
-
 prow-scaling:
 	oc apply -n kube-system -f cluster/ci/config/cluster-autoscaler.yaml
 .PHONY: prow-scaling
 
-prow-config:
-	oc create cm config --from-file=config.yaml=cluster/ci/config/prow/config.yaml
-	oc create cm plugins --from-file=plugins.yaml=cluster/ci/config/prow/plugins.yaml
-.PHONY: prow-config
-
-prow-config-update:
-	oc create cm labels --from-file=cluster/ci/config/prow/labels.yaml -o yaml --dry-run | oc replace -f -
-	oc create cm config --from-file=config.yaml=cluster/ci/config/prow/config.yaml -o yaml --dry-run | oc replace -f -
-	oc create cm plugins --from-file=plugins.yaml=cluster/ci/config/prow/plugins.yaml -o yaml --dry-run | oc replace -f -
-.PHONY: prow-config-update
-
 prow-secrets:
 	ci-operator/populate-secrets-from-bitwarden.sh
-	oc create configmap secret-mirroring --from-file=cluster/ci/config/secret-mirroring/mapping.yaml -o yaml --dry-run | oc apply -f -
 .PHONY: prow-secrets
-
-prow-rbac:
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/artifact-uploader_rbac.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/config_updater_rbac.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/deck_rbac.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/hook_rbac.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/horologium_rbac.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/jenkins_operator_rbac.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/plank_rbac.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/sinker_rbac.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/statusreconciler_rbac.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/tide_rbac.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/tracer_rbac.yaml
-.PHONY: prow-rbac
-
-prow-services:
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/prow-priority-class.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/adapter_imagestreams.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/artifact-uploader.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/cherrypick.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/deck.yaml
-	oc create secret generic deck-extensions --from-file=cluster/ci/config/prow/deck/extensions/ -o yaml --dry-run | oc apply -f - -n ci
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/ghproxy.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/hook.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/horologium.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/jenkins_operator.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/needs_rebase.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/plank.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/refresh.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/sinker.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/statusreconciler.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/tide.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/tot.yaml
-	$(MAKE) applyTemplate WHAT=cluster/ci/config/prow/openshift/tracer.yaml
-.PHONY: prow-services
 
 prow-cluster-jobs:
 	oc create configmap cluster-profile-gcp --from-file=cluster/test-deploy/gcp/vars.yaml --from-file=cluster/test-deploy/gcp/vars-origin.yaml -o yaml --dry-run | oc apply -f -
@@ -151,8 +124,8 @@ prow-cluster-jobs:
 	oc create configmap prow-job-cluster-launch-installer-src --from-file=ci-operator/templates/openshift/installer/cluster-launch-installer-src.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap prow-job-cluster-launch-installer-console --from-file=ci-operator/templates/openshift/installer/cluster-launch-installer-console.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap prow-job-cluster-scaleup-openshift-ansible-e2e --from-file=ci-operator/templates/openshift/openshift-ansible/cluster-scaleup-e2e-40.yaml -o yaml --dry-run | oc apply -f -
-	oc create configmap prow-job-master-sidecar-4 --from-file=ci-operator/templates/master-sidecar-4.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap prow-job-master-sidecar-4.2 --from-file=ci-operator/templates/master-sidecar-4.2.yaml -o yaml --dry-run | oc apply -f -
+	oc create configmap prow-job-master-sidecar-4.3 --from-file=ci-operator/templates/master-sidecar-4.3.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap prow-job-master-sidecar-3 --from-file=ci-operator/templates/master-sidecar-3.yaml -o yaml --dry-run | oc apply -f -
 .PHONY: prow-cluster-jobs
 
@@ -173,9 +146,17 @@ prow-ocp-rpm-secrets:
 		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
 		--from-file=ci-operator/infra/openshift/release-controller/repos/ocp-4.3-default.repo \
 		-o yaml --dry-run | oc apply -n ocp -f -
+	oc create secret generic base-4-3-rhel8-repos \
+		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
+		--from-file=ci-operator/infra/openshift/release-controller/repos/ocp-4.3-rhel8.repo \
+		-o yaml --dry-run | oc apply -n ocp -f -
 	oc create secret generic base-openstack-4-3-repos \
 		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
 		--from-file=ci-operator/infra/openshift/release-controller/repos/ocp-4.3-openstack.repo \
+		-o yaml --dry-run | oc apply -n ocp -f -
+	oc create secret generic base-openstack-beta-4-3-repos \
+		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
+		--from-file=ci-operator/infra/openshift/release-controller/repos/ocp-4.3-openstack-beta.repo \
 		-o yaml --dry-run | oc apply -n ocp -f -
 .PHONY: prow-ocp-rpms-secrets
 
@@ -195,11 +176,6 @@ prow-artifacts:
 	oc apply -f ci-operator/infra/openshift/origin/
 .PHONY: prow-artifacts
 
-prow-ci-search:
-	$(MAKE) apply WHAT=ci-operator/infra/openshift/ci-search/deploy.yaml
-	oc create configmap job-config --from-file=ci-operator/infra/openshift/ci-search/config.yaml -o yaml --dry-run | oc apply -f - -n ci-search
-.PHONY: prow-ci-search
-
 prow-release-controller-definitions:
 	oc annotate -n origin is/4.1 "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/releases/release-origin-4.1.json)" --overwrite
 	oc annotate -n ocp is/4.1-art-latest "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/releases/release-ocp-4.1.json)" --overwrite
@@ -207,6 +183,9 @@ prow-release-controller-definitions:
 	oc annotate -n origin is/4.2 "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/releases/release-origin-4.2.json)" --overwrite
 	oc annotate -n ocp is/4.2-art-latest "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/releases/release-ocp-4.2.json)" --overwrite
 	oc annotate -n ocp is/4.2 "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/releases/release-ocp-4.2-ci.json)" --overwrite
+	oc annotate -n origin is/4.3 "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/releases/release-origin-4.3.json)" --overwrite
+	oc annotate -n ocp is/4.3-art-latest "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/releases/release-ocp-4.3.json)" --overwrite
+	oc annotate -n ocp is/4.3 "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/releases/release-ocp-4.3-ci.json)" --overwrite
 	oc annotate -n ocp is/release "release.openshift.io/config=$$(cat ci-operator/infra/openshift/release-controller/releases/release-ocp-4.y-stable.json)" --overwrite
 .PHONY: prow-release-controller-definitions
 
@@ -217,7 +196,7 @@ prow-release-controller-deploy:
 prow-release-controller: prow-release-controller-definitions prow-release-controller-deploy
 .PHONY: prow-release-controller
 
-projects: ci-ns gcsweb origin-stable origin-release image-pruner-setup publishing-bot content-mirror azure python-validation metering
+projects: ci-ns gcsweb origin-stable origin-release publishing-bot content-mirror azure metering coreos
 .PHONY: projects
 
 content-mirror:
@@ -259,10 +238,6 @@ prometheus: node-exporter alert-buffer
 	$(MAKE) apply WHAT=projects/prometheus/prometheus.yaml
 .PHONY: prometheus
 
-python-validation:
-	$(MAKE) apply WHAT=projects/origin-release/python-validation/python-validation.yaml
-.PHONY: python-validation
-
 node-exporter:
 	$(MAKE) apply WHAT=projects/prometheus/node_exporter.yaml
 .PHONY: node-exporter
@@ -274,12 +249,6 @@ service-idler:
 alert-buffer:
 	$(MAKE) apply WHAT=projects/prometheus/alert-buffer.yaml
 .PHONY: alert-buffer
-
-image-pruner-setup:
-	oc create serviceaccount image-pruner -o yaml --dry-run | oc apply -f -
-	oc adm policy add-cluster-role-to-user system:image-pruner -z image-pruner
-	$(MAKE) apply WHAT=cluster/ci/jobs/image-pruner.yaml
-.PHONY: image-pruner-setup
 
 cluster-operator-roles:
 	oc create ns openshift-cluster-operator --dry-run -o yaml | oc apply -f -
@@ -295,7 +264,7 @@ azure:
 	$(MAKE) apply WHAT=projects/azure/azure-purge/
 	$(MAKE) apply WHAT=projects/azure/base-images/
 	$(MAKE) apply WHAT=projects/azure/image-mirror/
-	$(MAKE) apply WHAT=projects/azure/token-refresh/
+	$(MAKE) apply WHAT=projects/azure/secret-refresh/
 .PHONY: azure
 
 azure-secrets:
@@ -310,9 +279,9 @@ azure-secrets:
 	--from-file=cluster/test-deploy/azure/metrics-int.cert \
 	--from-file=cluster/test-deploy/azure/metrics-int.key \
 	-o yaml --dry-run | oc apply -n azure -f -
-	oc create secret generic cluster-secrets-azure-env --from-literal=azure_client_id=${AZURE_CLIENT_ID} --from-literal=azure_client_secret=${AZURE_CLIENT_SECRET} --from-literal=azure_tenant_id=${AZURE_TENANT_ID} --from-literal=azure_subscription_id=${AZURE_SUBSCRIPTION_ID} -o yaml --dry-run | oc apply -n azure -f -
 	oc create secret generic aws-reg-master --from-literal=username=${AWS_REG_USERNAME} --from-literal=password=${AWS_REG_PASSWORD} -o yaml --dry-run | oc apply -n azure -f -
 	oc create secret generic codecov-token --from-literal=upload=${CODECOV_UPLOAD_TOKEN} -o yaml --dry-run | oc apply -n azure -f -
+	oc create secret generic cluster-secrets-azure-env --from-literal=azure_client_id=${AZURE_ROOT_CLIENT_ID} --from-literal=azure_client_secret=${AZURE_ROOT_CLIENT_SECRET} --from-literal=azure_tenant_id=${AZURE_ROOT_TENANT_ID} --from-literal=azure_subscription_id=${AZURE_ROOT_SUBSCRIPTION_ID} -o yaml --dry-run | oc apply -n azure-private -f -
 .PHONY: azure-secrets
 
 azure4-secrets:
@@ -340,14 +309,13 @@ metal-secrets:
 	-o yaml --dry-run | oc apply -n ocp -f -
 .PHONY: metal-secrets
 
-check-prow-config:
-	# test that the prow config is parseable
-	mkpj --config-path cluster/ci/config/prow/config.yaml --job-config-path ci-operator/jobs/ --job branch-ci-origin-images --base-ref master --base-sha abcdef
-.PHONY: check-prow-config
-
 libpod:
 	$(MAKE) apply WHAT=projects/libpod/libpod.yaml
 .PHONY: libpod
+
+coreos:
+	$(MAKE) apply WHAT=projects/coreos/coreos.yaml
+.PHONY: coreos
 
 cincinnati:
 	$(MAKE) apply WHAT=projects/cincinnati/cincinnati.yaml
@@ -357,11 +325,11 @@ prow-monitoring:
 	make -C cluster/ci/monitoring prow-monitoring-deploy
 .PHONY: prow-monitoring
 
-build-dashboards-validation-image:
-	oc apply -f projects/origin-release/dashboards-validation/dashboards-validation.yaml
-.PHONY: build-dashboards-validation-image
-
 logging:
 	$(MAKE) apply WHAT=cluster/ci/config/logging/fluentd-daemonset.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/logging/fluentd-configmap.yaml
 .PHONY: logging
+
+bump-pr:
+	hack/bump-pr.sh
+.PHONY: bump-pr

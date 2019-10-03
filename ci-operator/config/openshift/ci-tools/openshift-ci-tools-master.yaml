@@ -1,16 +1,30 @@
 base_images:
   os:
-    cluster: https://api.ci.openshift.org
     name: centos
     namespace: openshift
     tag: '7'
   git:
-    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
-    tag: golang-1.11
+    tag: golang-1.12
+  hive:
+    name: hive-v4.0
+    namespace: openshift
+    tag: 'hive'
+  cli:
+    name: "4.2"
+    namespace: ocp
+    tag: cli
 binary_build_commands: make install
 images:
+- context_dir: images/blocking-issue-creator/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/blocking-issue-creator
+  to: blocking-issue-creator
 - context_dir: images/ci-operator/
   from: os
   inputs:
@@ -67,6 +81,20 @@ images:
       - destination_dir: .
         source_path: /go/bin/config-brancher
   to: config-brancher
+- context_dir: images/autoconfigbrancher/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/autoconfigbrancher
+      - destination_dir: .
+        source_path: /go/bin/config-brancher
+      - destination_dir: .
+        source_path: /go/bin/determinize-ci-operator
+      - destination_dir: .
+        source_path: /go/bin/ci-operator-prowgen
+  to: auto-config-brancher
 - context_dir: images/repo-brancher/
   from: git
   inputs:
@@ -83,23 +111,81 @@ images:
       - destination_dir: .
         source_path: /go/bin/determinize-ci-operator
   to: determinize-ci-operator
+- dockerfile_path: images/ipi-deprovision/Dockerfile
+  from: hive
+  inputs:
+    cli:
+      paths:
+      - destination_dir: usr/bin
+        source_path: /usr/bin/oc
+  to: ipi-deprovision
+- context_dir: images/applyconfig
+  from: os
+  inputs:
+    bin:
+      paths:
+        - destination_dir: .
+          source_path: /go/bin/applyconfig
+    cli:
+      paths:
+      - destination_dir: usr/bin
+        source_path: /usr/bin/oc
+  to: applyconfig
+- context_dir: images/autobumper
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/autobumper
+  to: autobumper
+- context_dir: images/autoowners
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/autoowners
+  to: autoowners
+- context_dir: images/config-change-trigger
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/config-change-trigger
+  to: config-change-trigger
+- context_dir: images/testgrid-config-generator
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/testgrid-config-generator
+  to: testgrid-config-generator
+- context_dir: images/secret-wrapper
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/secret-wrapper
+  to: secret-wrapper
 promotion:
-  cluster: https://api.ci.openshift.org
   namespace: ci
   tag: latest
 resources:
   '*':
     limits:
-      memory: 6Gi
+      memory: 10Gi
     requests:
       cpu: 100m
       memory: 200Mi
 build_root:
   image_stream_tag:
-    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
-    tag: golang-1.11
+    tag: golang-1.12
 tests:
 - artifact_dir: /tmp/artifacts
   as: unit
@@ -126,3 +212,8 @@ tests:
   commands: ARTIFACT_DIR=/tmp/artifacts make check-breaking-changes
   container:
     from: bin
+- artifact_dir: /tmp/artifacts
+  as: validate-vendor
+  commands: ARTIFACT_DIR=/tmp/artifacts make validate-vendor
+  container:
+    from: src

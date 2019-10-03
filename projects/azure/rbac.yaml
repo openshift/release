@@ -3,6 +3,7 @@ apiVersion: v1
 kind: List
 items:
 
+# azure-team generic role-binding
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: RoleBinding
   metadata:
@@ -22,6 +23,41 @@ items:
     kind: ClusterRole
     apiGroup: rbac.authorization.k8s.io
     name: admin
+
+# azure-team-admins role-binding
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    name: azure-private-team-admin
+    namespace: azure-private
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: azure-team-admins
+  - kind: ServiceAccount
+    name: ci-operator
+    namespace: ci-stg
+  - kind: ServiceAccount
+    name: ci-operator
+    namespace: ci
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: admin
+
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    name: azure-team-view
+    namespace: azure-private
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: azure-team
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: view
 
 # Our test images need to be pulled from different CI systems
 - apiVersion: rbac.authorization.k8s.io/v1
@@ -48,7 +84,7 @@ items:
   apiVersion: rbac.authorization.k8s.io/v1
   metadata:
     namespace: azure
-    name: token-refresher
+    name: secret-refresher
   rules:
   - apiGroups: [""]
     resources: ["secrets"]
@@ -57,15 +93,15 @@ items:
 - kind: RoleBinding
   apiVersion: rbac.authorization.k8s.io/v1
   metadata:
-    name: token-refresher
+    name: secret-refresher
     namespace: azure
   subjects:
   - kind: ServiceAccount
-    name: jenkins-cicd
-    namespace: azure
+    name: secret-refresher
+    namespace: azure-private
   roleRef:
     kind: Role
-    name: token-refresher
+    name: secret-refresher
     namespace: azure
 
 # ci-operator can promote images in the azure namespace
@@ -86,6 +122,7 @@ items:
     - update
     - patch
     - get
+
 - kind: RoleBinding
   apiVersion: rbac.authorization.k8s.io/v1
   metadata:

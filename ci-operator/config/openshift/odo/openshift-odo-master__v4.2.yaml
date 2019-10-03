@@ -1,0 +1,33 @@
+
+resources:
+  '*':
+    requests:
+      memory: 5Gi
+      cpu: "3"
+
+build_root:
+  project_image:
+    dockerfile_path: openshift-ci/build-root/Dockerfile
+
+tag_specification:
+  name: '4.2'
+  namespace: ocp
+
+binary_build_commands: make bin
+
+tests:
+- artifacts_dir: /tmp/artifacts
+  as: integration
+  openshift_installer_src:
+    cluster_profile: aws
+  commands: scripts/openshiftci-presubmit-integrationtests.sh
+- artifacts_dir: /tmp/artifacts
+  as: e2e-scenarios
+  openshift_installer_src:
+    cluster_profile: aws
+  commands: scripts/openshiftci-presubmit-e2etests.sh
+- as: benchmark
+  artifacts_dir: /tmp/artifacts
+  commands: scripts/openshiftci-presubmit-benchmark.sh
+  openshift_installer_src:
+    cluster_profile: aws

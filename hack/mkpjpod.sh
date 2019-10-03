@@ -22,7 +22,7 @@ run() {
         --volume "$PWD:/tmp/release:z" \
         --workdir /tmp/release \
         "$MKPJ_IMG" \
-        --config-path cluster/ci/config/prow/config.yaml \
+        --config-path core-services/prow/02_config/_config.yaml \
         --job-config-path ci-operator/jobs/ \
         "$@" \
         | docker run --interactive "$MKPOD_IMG" --prow-job -

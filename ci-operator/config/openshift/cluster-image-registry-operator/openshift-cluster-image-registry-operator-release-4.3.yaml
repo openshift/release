@@ -5,15 +5,14 @@ base_images:
     tag: base
 build_root:
   image_stream_tag:
-    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.12
-canonical_go_repository: github.com/openshift/cluster-image-registry-operator
 images:
 - from: base
   to: cluster-image-registry-operator
 promotion:
+  disabled: true
   name: "4.3"
   namespace: ocp
 resources:
@@ -36,7 +35,6 @@ tests:
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: aws
-    upgrade: false
 - artifact_dir: /tmp/artifacts
   as: e2e-aws-operator
   commands: JUNIT_REPORT=1 make test-e2e
@@ -46,9 +44,30 @@ tests:
   commands: TEST_SUITE=openshift/image-registry run-tests
   openshift_installer:
     cluster_profile: aws
-    upgrade: false
 - as: e2e-aws-upgrade
   commands: TEST_SUITE=all run-upgrade-tests
   openshift_installer:
     cluster_profile: aws
     upgrade: true
+- as: e2e-gcp
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer:
+    cluster_profile: gcp
+- artifact_dir: /tmp/artifacts
+  as: e2e-gcp-operator
+  commands: JUNIT_REPORT=1 make test-e2e
+  openshift_installer_src:
+    cluster_profile: gcp
+- as: e2e-azure
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer:
+    cluster_profile: azure4
+- artifact_dir: /tmp/artifacts
+  as: e2e-azure-operator
+  commands: JUNIT_REPORT=1 make test-e2e
+  openshift_installer_src:
+    cluster_profile: azure4
+- as: verify
+  commands: make verify
+  container:
+    from: src

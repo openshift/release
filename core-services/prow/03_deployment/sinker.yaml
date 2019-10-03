@@ -1,0 +1,106 @@
+kind: List
+apiVersion: v1
+items:
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: sinker
+    labels:
+      app: prow
+      component: sinker
+  spec:
+    replicas: 1
+    revisionHistoryLimit: 2
+    selector:
+      matchLabels:
+        app: prow
+        component: sinker
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: sinker
+      spec:
+        serviceAccountName: sinker
+        priorityClassName: prow-critical
+        containers:
+        - name: sinker
+          image: gcr.io/k8s-prow/sinker:v20191003-4c085117a
+          args:
+          - --config-path=/etc/config/config.yaml
+          - --job-config-path=/etc/job-config
+          - --dry-run=false
+          ports:
+          - name: metrics
+            containerPort: 9090
+          volumeMounts:
+          - name: config
+            mountPath: /etc/config
+            readOnly: true
+          - name: job-config-misc
+            mountPath: /etc/job-config/misc
+            readOnly: true
+          - name: job-config-master
+            mountPath: /etc/job-config/master
+            readOnly: true
+          - name: job-config-3x
+            mountPath: /etc/job-config/3.x
+            readOnly: true
+          - name: job-config-40
+            mountPath: /etc/job-config/4.0
+            readOnly: true
+          - name: job-config-41
+            mountPath: /etc/job-config/4.1
+            readOnly: true
+          - name: job-config-42
+            mountPath: /etc/job-config/4.2
+            readOnly: true
+          - name: job-config-43
+            mountPath: /etc/job-config/4.3
+            readOnly: true
+          resources:
+            requests:
+              memory: "1.8Gi"
+              cpu: "50m"
+        volumes:
+        - name: config
+          configMap:
+            name: config
+        - name: job-config-misc
+          configMap:
+            name: job-config-misc
+        - name: job-config-master
+          configMap:
+            name: job-config-master
+        - name: job-config-3x
+          configMap:
+            name: job-config-3.x
+        - name: job-config-40
+          configMap:
+            name: job-config-4.0
+        - name: job-config-41
+          configMap:
+            name: job-config-4.1
+        - name: job-config-42
+          configMap:
+            name: job-config-4.2
+        - name: job-config-43
+          configMap:
+            name: job-config-4.3
+- apiVersion: v1
+  kind: Service
+  metadata:
+    namespace: ci
+    labels:
+      app: prow
+      component: sinker
+    name: sinker
+  spec:
+    ports:
+    - name: metrics
+      port: 9090
+      protocol: TCP
+      targetPort: 9090
+    selector:
+      app: prow
+      component: sinker

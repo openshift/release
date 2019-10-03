@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ci
+  name: statusreconciler
+  labels:
+    app: prow
+    component: statusreconciler
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: prow
+        component: statusreconciler
+    spec:
+      serviceAccountName: statusreconciler
+      terminationGracePeriodSeconds: 180
+      containers:
+      - name: statusreconciler
+        image: gcr.io/k8s-prow/status-reconciler:v20191003-4c085117a
+        imagePullPolicy: Always
+        args:
+        - --dry-run=false
+        - --continue-on-error=true
+        - --plugin-config=/etc/plugins/plugins.yaml
+        - --config-path=/etc/config/config.yaml
+        - --github-token-path=/etc/github/oauth
+        - --job-config-path=/etc/job-config
+        ports:
+          - name: http
+            containerPort: 8888
+        volumeMounts:
+        - name: oauth
+          mountPath: /etc/github
+          readOnly: true
+        - name: config
+          mountPath: /etc/config
+          readOnly: true
+        - name: job-config-misc
+          mountPath: /etc/job-config/misc
+          readOnly: true
+        - name: job-config-master
+          mountPath: /etc/job-config/master
+          readOnly: true
+        - name: job-config-3x
+          mountPath: /etc/job-config/3.x
+          readOnly: true
+        - name: job-config-40
+          mountPath: /etc/job-config/4.0
+          readOnly: true
+        - name: job-config-41
+          mountPath: /etc/job-config/4.1
+          readOnly: true
+        - name: job-config-42
+          mountPath: /etc/job-config/4.2
+          readOnly: true
+        - name: job-config-43
+          mountPath: /etc/job-config/4.3
+          readOnly: true
+        - name: plugins
+          mountPath: /etc/plugins
+          readOnly: true
+        resources:
+          requests:
+            memory: "200Mi"
+            cpu: "20m"
+      volumes:
+      - name: oauth
+        secret:
+          secretName: github-credentials-openshift-ci-robot
+      - name: config
+        configMap:
+          name: config
+      - name: job-config-misc
+        configMap:
+          name: job-config-misc
+      - name: job-config-master
+        configMap:
+          name: job-config-master
+      - name: job-config-3x
+        configMap:
+          name: job-config-3.x
+      - name: job-config-40
+        configMap:
+          name: job-config-4.0
+      - name: job-config-41
+        configMap:
+          name: job-config-4.1
+      - name: job-config-42
+        configMap:
+          name: job-config-4.2
+      - name: job-config-43
+        configMap:
+          name: job-config-4.3
+      - name: plugins
+        configMap:
+          name: plugins

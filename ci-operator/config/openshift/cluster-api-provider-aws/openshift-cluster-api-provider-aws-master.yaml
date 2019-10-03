@@ -1,12 +1,11 @@
 base_images:
   base:
-    name: "4.2"
+    name: "4.3"
     namespace: ocp
     tag: base
 binary_build_commands: NO_DOCKER=1 make build
 build_root:
   image_stream_tag:
-    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.12
@@ -16,7 +15,7 @@ images:
   from: base
   to: aws-machine-controllers
 promotion:
-  name: "4.2"
+  name: "4.3"
   namespace: ocp
 resources:
   '*':
@@ -26,15 +25,15 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.2"
+  name: "4.3"
   namespace: ocp
 tests:
 - as: unit
   commands: NO_DOCKER=1 make test
   container:
     from: src
-- as: gofmt
-  commands: IS_CONTAINER=TRUE make fmt
+- as: goimports
+  commands: IS_CONTAINER=TRUE make goimports
   container:
     from: src
 - as: govet
@@ -49,7 +48,6 @@ tests:
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: aws
-    upgrade: false
 - as: e2e-aws-operator
   commands: make test-e2e
   openshift_installer_src:

@@ -1,8 +1,10 @@
 periodics:
 - agent: kubernetes
-  cron: ""
   decorate: true
   interval: 15m
+  labels:
+    ci.openshift.io/release-type: informing
+    job-release: "4.2"
   name: release-promote-openshift-machine-os-content-e2e-aws-4.1
   spec:
     containers:
@@ -126,11 +128,11 @@ periodics:
 - agent: kubernetes
   cron: '@yearly'
   decorate: true
-  interval: ""
   labels:
+    ci.openshift.io/release-type: informing
     job-env: aws
+    job-release: "4.1"
     job-test: e2e
-    job-release: '4.1'
   name: release-openshift-origin-installer-e2e-aws-4.1
   spec:
     containers:
@@ -172,7 +174,6 @@ periodics:
             commands: TEST_SUITE=openshift/conformance/serial run-tests
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: false
           - as: e2e-$(CLUSTER_TYPE)-upgrade
             commands: TEST_SUITE=all run-upgrade-tests
             openshift_installer:
@@ -182,7 +183,6 @@ periodics:
             commands: sleep 9000 & wait
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: false
       - name: JOB_NAME_SAFE
         value: e2e-aws
       - name: TEST_COMMAND
@@ -217,12 +217,12 @@ periodics:
 - agent: kubernetes
   cron: '@yearly'
   decorate: true
-  interval: ""
   labels:
-    job-type: upgrade
+    ci.openshift.io/release-type: informing
     job-env: aws
+    job-release: "4.1"
     job-test: e2e
-    job-release: '4.1'
+    job-type: upgrade
   name: release-openshift-origin-installer-e2e-aws-upgrade-4.1
   spec:
     containers:
@@ -264,7 +264,6 @@ periodics:
             commands: TEST_SUITE=openshift/conformance/serial run-tests
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: false
           - as: e2e-$(CLUSTER_TYPE)-upgrade
             commands: TEST_SUITE=all run-upgrade-tests
             openshift_installer:
@@ -274,7 +273,6 @@ periodics:
             commands: sleep 9000 & wait
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: false
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -299,11 +297,11 @@ periodics:
 - agent: kubernetes
   cron: '@yearly'
   decorate: true
-  interval: ""
   labels:
+    ci.openshift.io/release-type: informing
     job-env: aws
+    job-release: "4.1"
     job-test: e2e-serial
-    job-release: '4.1'
   name: release-openshift-origin-installer-e2e-aws-serial-4.1
   spec:
     containers:
@@ -345,7 +343,6 @@ periodics:
             commands: TEST_SUITE=openshift/conformance/serial run-tests
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: false
           - as: e2e-$(CLUSTER_TYPE)-upgrade
             commands: TEST_SUITE=all run-upgrade-tests
             openshift_installer:
@@ -355,7 +352,6 @@ periodics:
             commands: sleep 9000 & wait
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: false
       - name: JOB_NAME_SAFE
         value: e2e-aws-serial
       - name: TEST_COMMAND
@@ -390,7 +386,9 @@ periodics:
 - agent: kubernetes
   cron: '@yearly'
   decorate: true
-  interval: ""
+  labels:
+    ci.openshift.io/release-type: informing
+    job-release: "4.1"
   name: release-openshift-ocp-installer-e2e-aws-4.1
   spec:
     containers:
@@ -407,7 +405,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:v4.1
+        value: registry.svc.ci.openshift.org/ocp/release:4.1
       - name: BRANCH
         value: "4.1"
       - name: CLUSTER_TYPE
@@ -433,7 +431,6 @@ periodics:
             commands: TEST_SUITE=openshift/conformance/serial run-tests
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: false
           - as: e2e-$(CLUSTER_TYPE)-upgrade
             commands: TEST_SUITE=all run-upgrade-tests
             openshift_installer:
@@ -443,95 +440,6 @@ periodics:
             commands: sleep 9000 & wait
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: false
-      - name: JOB_NAME_SAFE
-        value: e2e-aws
-      - name: TEST_COMMAND
-        value: TEST_SUITE=openshift/conformance/serial run-tests
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /usr/local/e2e-aws-cluster-profile
-        name: cluster-profile
-      - mountPath: /usr/local/e2e-aws
-        name: job-definition
-        subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /usr/local/pull-secret
-        name: pull-secret
-    serviceAccountName: ci-operator
-    volumes:
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws
-    - configMap:
-        name: prow-job-cluster-launch-installer-e2e
-      name: job-definition
-    - name: pull-secret
-      secret:
-        secretName: ci-pull-credentials
-- agent: kubernetes
-  cron: '@yearly'
-  decorate: true
-  interval: ""
-  name: release-openshift-ocp-installer-e2e-aws-serial-4.1
-  spec:
-    containers:
-    - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-aws-cluster-profile
-      - --target=e2e-aws
-      - --template=/usr/local/e2e-aws
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      command:
-      - ci-operator
-      env:
-      - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:v4.1
-      - name: BRANCH
-        value: "4.1"
-      - name: CLUSTER_TYPE
-        value: aws
-      - name: CONFIG_SPEC
-        value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
-          resources:
-            '*':
-              limits:
-                memory: 4Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tests:
-          - as: e2e-$(CLUSTER_TYPE)
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-$(CLUSTER_TYPE)-serial
-            commands: TEST_SUITE=openshift/conformance/serial run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: false
-          - as: e2e-$(CLUSTER_TYPE)-upgrade
-            commands: TEST_SUITE=all run-upgrade-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
-          - as: launch-$(CLUSTER_TYPE)
-            commands: sleep 9000 & wait
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: false
       - name: JOB_NAME_SAFE
         value: e2e-aws
       - name: TEST_COMMAND
@@ -564,13 +472,102 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cron: ""
+  cron: '@yearly'
+  decorate: true
+  labels:
+    ci.openshift.io/release-type: informing
+    job-release: "4.1"
+  name: release-openshift-ocp-installer-e2e-aws-serial-4.1
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --give-pr-author-access-to-namespace=true
+      - --secret-dir=/usr/local/pull-secret
+      - --secret-dir=/usr/local/e2e-aws-serial-cluster-profile
+      - --target=e2e-aws-serial
+      - --template=/usr/local/e2e-aws-serial
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_LATEST
+        value: registry.svc.ci.openshift.org/ocp/release:4.1
+      - name: BRANCH
+        value: "4.1"
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: CONFIG_SPEC
+        value: |
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-serial
+            commands: TEST_SUITE=openshift/conformance/serial run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-upgrade
+            commands: TEST_SUITE=all run-upgrade-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: launch-$(CLUSTER_TYPE)
+            commands: sleep 9000 & wait
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+      - name: JOB_NAME_SAFE
+        value: e2e-aws-serial
+      - name: TEST_COMMAND
+        value: TEST_SUITE=openshift/conformance/serial run-tests
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/e2e-aws-serial-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/e2e-aws-serial
+        name: job-definition
+        subPath: cluster-launch-installer-e2e.yaml
+      - mountPath: /usr/local/pull-secret
+        name: pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - configMap:
+        name: prow-job-cluster-launch-installer-e2e
+      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
   decorate: true
   interval: 8h
   labels:
-    job-type: upgrade
+    ci.openshift.io/release-type: informing
     job-env: aws
+    job-release: "4.1"
     job-test: e2e
+    job-type: upgrade
     release.openshift.io/verify: "true"
   name: release-openshift-origin-installer-e2e-aws-upgrade-4.1-to-nightly
   spec:
@@ -636,7 +633,6 @@ periodics:
             commands: TEST_SUITE=openshift/conformance/serial run-tests
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: false
           - as: e2e-$(CLUSTER_TYPE)-upgrade
             commands: TEST_SUITE=all run-upgrade-tests
             openshift_installer:
@@ -646,7 +642,6 @@ periodics:
             commands: sleep 9000 & wait
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: false
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -669,13 +664,14 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cron: ""
   decorate: true
   interval: 12h
   labels:
-    job-type: upgrade
+    ci.openshift.io/release-type: informing
     job-env: aws
+    job-release: "4.1"
     job-test: e2e
+    job-type: upgrade
   name: release-openshift-origin-installer-e2e-aws-upgrade-rollback-4.1
   spec:
     containers:

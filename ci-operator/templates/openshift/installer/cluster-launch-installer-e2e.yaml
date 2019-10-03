@@ -21,6 +21,12 @@ parameters:
   required: true
 - name: BASE_DOMAIN
 - name: CLUSTER_NETWORK_MANIFEST
+- name: CLUSTER_NETWORK_TYPE
+- name: ENABLE_FIPS
+- name: ENABLE_PROXY
+- name: BUILD_ID
+  required: false
+- name: ENABLE_MIRROR
 
 objects:
 
@@ -51,6 +57,35 @@ objects:
     namespace: ci
     name: ci-chat-bot
 
+# Role for giving the e2e pod permissions to update imagestreams
+- kind: Role
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: ${JOB_NAME_SAFE}-imagestream-updater
+    namespace: ${NAMESPACE}
+  rules:
+  - apiGroups: ["image.openshift.io"]
+    resources: ["imagestreams/layers"]
+    verbs: ["get", "update"]
+  - apiGroups: ["image.openshift.io"]
+    resources: ["imagestreams", "imagestreamtags"]
+    verbs: ["get", "create", "update", "delete", "list"]
+
+# Give the e2e pod access to the imagestream-updater role
+- kind: RoleBinding
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: ${JOB_NAME_SAFE}-imagestream-updater-binding
+    namespace: ${NAMESPACE}
+  roleRef:
+    kind: Role
+    namespace: ${NAMESPACE}
+    name: ${JOB_NAME_SAFE}-imagestream-updater
+  subjects:
+  - kind: ServiceAccount
+    namespace: ${NAMESPACE}
+    name: default
+
 # The e2e pod spins up a cluster, runs e2e tests, and then cleans up the cluster.
 - kind: Pod
   apiVersion: v1
@@ -61,7 +96,7 @@ objects:
       # we want to gather the teardown logs no matter what
       ci-operator.openshift.io/wait-for-container-artifacts: teardown
       ci-operator.openshift.io/save-container-logs: "true"
-      ci-operator.openshift.io/container-sub-tests: "setup,test,teardown"
+      ci-operator.openshift.io/container-sub-tests: "lease,setup,test,teardown"
   spec:
     restartPolicy: Never
     activeDeadlineSeconds: 14400
@@ -77,16 +112,76 @@ objects:
 
     containers:
 
+    - name: lease
+      image: registry.svc.ci.openshift.org/ci/boskoscli:latest
+      terminationMessagePolicy: FallbackToLogsOnError
+      resources:
+        requests:
+          cpu: 10m
+          memory: 10Mi
+        limits:
+          memory: 200Mi
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      - name: cluster-profile
+        mountPath: /tmp/cluster
+      - name: artifacts
+        mountPath: /tmp/artifacts
+      env:
+      - name: CLUSTER_TYPE
+        value: ${CLUSTER_TYPE}
+      - name: CLUSTER_NAME
+        value: ${NAMESPACE}-${JOB_NAME_HASH}
+      command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -euo pipefail
+
+        trap 'rc=$?; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi; if test "${rc}" -ne 0; then touch /tmp/shared/exit; fi; exit "${rc}"' EXIT
+
+        # hack for bazel
+        function boskosctl() {
+          /app/boskos/cmd/cli/app.binary "${@}"
+        }
+
+        echo "[INFO] Acquiring a lease ..."
+        resource="$( boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" acquire --type "${CLUSTER_TYPE}-quota-slice" --state free --target-state leased --timeout 150m )"
+        touch /tmp/shared/leased
+        echo "[INFO] Lease acquired!"
+        echo "[INFO] Leased resource: ${resource}"
+
+        function release() {
+            local resource_name; resource_name="$( jq .name --raw-output <<<"${resource}" )"
+            echo "[INFO] Releasing the lease on resouce ${resource_name}..."
+            boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" release --name "${resource_name}" --target-state free
+        }
+        trap release EXIT
+
+        echo "[INFO] Sending heartbeats to retain the lease..."
+        boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" heartbeat --resource "${resource}" &
+
+        while true; do
+          if [[ -f /tmp/shared/exit ]]; then
+            echo "Another process exited" 2>&1
+            exit 0
+          fi
+
+          sleep 15 & wait $!
+        done
+
     # Once the cluster is up, executes shared tests
     - name: test
       image: ${IMAGE_TESTS}
       terminationMessagePolicy: FallbackToLogsOnError
       resources:
         requests:
-          cpu: 1
-          memory: 300Mi
+          cpu: 3
+          memory: 600Mi
         limits:
-          memory: 3Gi
+          memory: 4Gi
       volumeMounts:
       - name: shared-tmp
         mountPath: /tmp/shared
@@ -99,6 +194,8 @@ objects:
         value: /tmp/cluster/.awscred
       - name: AZURE_AUTH_LOCATION
         value: /tmp/cluster/osServicePrincipal.json
+      - name: GCP_SHARED_CREDENTIALS_FILE
+        value: /tmp/cluster/gce.json
       - name: ARTIFACT_DIR
         value: /tmp/artifacts
       - name: HOME
@@ -107,6 +204,8 @@ objects:
         value: ${IMAGE_FORMAT}
       - name: KUBECONFIG
         value: /tmp/artifacts/installer/auth/kubeconfig
+      - name: MIRROR_BASE
+        value: registry.svc.ci.openshift.org/${NAMESPACE}/release
       command:
       - /bin/bash
       - -c
@@ -119,7 +218,53 @@ objects:
         trap 'touch /tmp/shared/exit' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
 
+        function patch_image_specs() {
+          cat <<EOF >samples-patch.yaml
+        - op: add
+          path: /spec/skippedImagestreams
+          value:
+          - jenkins
+          - jenkins-agent-maven
+          - jenkins-agent-nodejs
+        EOF
+          oc patch config.samples.operator.openshift.io cluster --type json -p "$(cat samples-patch.yaml)"
+
+          NAMES='cli cli-artifacts installer installer-artifacts must-gather tests jenkins jenkins-agent-maven jenkins-agent-nodejs'
+          cat <<EOF >version-patch.yaml
+        - op: add
+          path: /spec/overrides
+          value:
+        EOF
+          for NAME in ${NAMES}
+          do
+            cat <<EOF >>version-patch.yaml
+          - group: image.openshift.io/v1
+            kind: ImageStream
+            name: ${NAME}
+            namespace: openshift
+            unmanaged: true
+        EOF
+          done
+          oc patch clusterversion version --type json -p "$(cat version-patch.yaml)"
+
+          for NAME in ${NAMES}
+          do
+            DIGEST="$(oc adm release info --image-for="${NAME}" | sed 's/.*@//')"
+            cat <<EOF >image-stream-new-source.yaml
+        - op: replace
+          path: /spec/tags/0/from
+          value:
+            kind: DockerImage
+            name: "${MIRROR_BASE}@${DIGEST}"
+        EOF
+            oc -n openshift patch imagestream "${NAME}" --type json -p "$(cat image-stream-new-source.yaml)"
+          done
+        }
+
         mkdir -p "${HOME}"
+
+        # Share oc with other containers
+        cp "$(command -v oc)" /tmp/shared
 
         # wait for the API to come up
         while true; do
@@ -147,12 +292,11 @@ objects:
         export KUBE_SSH_BASTION="$( oc --insecure-skip-tls-verify get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
         export KUBE_SSH_KEY_PATH=/tmp/cluster/ssh-privatekey
         if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
-          export GOOGLE_APPLICATION_CREDENTIALS="/tmp/cluster/gce.json"
-          export KUBE_SSH_USER=cloud-user
+          export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
+          export KUBE_SSH_USER=core
           mkdir -p ~/.ssh
           cp /tmp/cluster/ssh-privatekey ~/.ssh/google_compute_engine || true
-          export PROVIDER_ARGS='-provider=gce -gce-zone=us-east1-c -gce-project=openshift-gce-devel-ci'
-          export TEST_PROVIDER='{"type":"gce","zone":"us-east1-c","projectid":"openshift-gce-devel-ci"}'
+          export TEST_PROVIDER='{"type":"gce","region":"us-east1","multizone": true,"multimaster":true,"projectid":"openshift-gce-devel-ci"}'
         elif [[ "${CLUSTER_TYPE}" == "aws" ]]; then
           mkdir -p ~/.ssh
           cp /tmp/cluster/ssh-privatekey ~/.ssh/kube_aws_rsa || true
@@ -164,367 +308,89 @@ objects:
           export TEST_PROVIDER='azure'
         fi
 
-        mkdir -p /tmp/output
-        cd /tmp/output
-
-        function retry() {
-          local RETRY_IGNORE_EXIT_CODE="${RETRY_IGNORE_EXIT_CODE:-}"
-          local ATTEMPTS="${1}"
-          local rc=0
-          shift
-          for i in $(seq 0 $((ATTEMPTS-1))); do
-            echo "--> ${@}"
-            set +e
-            "${@}"
-            rc="$?"
-            set -e
-            echo "--> exit code: $rc"
-            test "${rc}" = 0 && break
-            sleep 10
-          done
-          if [ "${RETRY_IGNORE_EXIT_CODE}" != "" ]; then return 0; else return "${rc}"; fi
-        }
-
-        function setup_ssh_bastion() {
-          echo "Setting up ssh bastion"
-          mkdir -p ~/.ssh || true
-          cp "${KUBE_SSH_KEY_PATH}" ~/.ssh/id_rsa
-          chmod 0600 ~/.ssh/id_rsa
-          if ! whoami &> /dev/null; then
-            if [ -w /etc/passwd ]; then
-              echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
-            fi
-          fi
-          curl https://raw.githubusercontent.com/eparis/ssh-bastion/master/deploy/deploy.sh | bash
-          for i in $(seq 0 60)
-          do
-            BASTION_HOST=$(oc get service -n openshift-ssh-bastion ssh-bastion -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-            if [ ! -z "${BASTION_HOST}" ]; then break; fi
-            sleep 10
-          done
-        }
-
-        function bastion_ssh() {
-          retry 60 \
-            ssh -o LogLevel=error -o ConnectionAttempts=100 -o ConnectTimeout=30 -o StrictHostKeyChecking=no \
-                -o ProxyCommand="ssh -A -o StrictHostKeyChecking=no -o LogLevel=error -o ServerAliveInterval=30 -o ConnectionAttempts=100 -o ConnectTimeout=30 -W %h:%p core@${BASTION_HOST} 2>/dev/null" \
-                $@
-        }
-
-        function restore-cluster-state() {
-          echo "Placing file /etc/rollback-test with contents A"
-          cat > /tmp/machineconfig.yaml <<'EOF'
+        # create fips enable helper
+        function enable_fips() {
+            for name in $(oc get machineconfigpool --template='{{range .items}}{{.metadata.name}}{{"\n"}}{{end}}')
+            do
+              cat > /tmp/fips-mc.yaml <<'EOF'
         apiVersion: machineconfiguration.openshift.io/v1
         kind: MachineConfig
         metadata:
           labels:
-            machineconfiguration.openshift.io/role: master
-          name: 99-rollback-test
+            machineconfiguration.openshift.io/role: "{{name}}"
+          name: 99-fips-"{{name}}"
         spec:
-          config:
-            ignition:
-              version: 2.2.0
-            storage:
-              files:
-              - contents:
-                  source: data:,A
-                filesystem: root
-                mode: 420
-                path: /etc/rollback-test
+          fips: true
         EOF
-          oc create -f /tmp/machineconfig.yaml
+              sed -i "s/\"{{name}}\"/${name}/g" /tmp/fips-mc.yaml
+              oc create -f /tmp/fips-mc.yaml
+            done
 
-          function wait_for_machineconfigpool_to_apply() {
-            for i in $(seq 0 10); do oc wait machineconfigpool/master --for=condition=Updating --timeout=5m && break; done
-            for i in $(seq 0 10); do oc wait machineconfigpool/master --for=condition=Updated --timeout=5m && break; sleep 30; done
-          }
-
-          wait_for_machineconfigpool_to_apply
-
-          setup_ssh_bastion
-
-          echo "Make etcd backup on first master - /usr/local/bin/etcd-snapshot-backup.sh"
-          FIRST_MASTER=$(oc get node -l node-role.kubernetes.io/master= -o name | head -n1 | cut -d '/' -f 2)
-          bastion_ssh "core@${FIRST_MASTER}" "sudo -i /bin/bash -x /usr/local/bin/etcd-snapshot-backup.sh /root/assets/backup/snapshot.db && sudo -i cp /root/assets/backup/snapshot.db /tmp/snapshot.db && sudo -i chown core:core /tmp/snapshot.db"
-
-          # TODO: upgrade conditionally here
-
-          echo "Update rollback-test machineconfig"
-          oc patch machineconfig 99-rollback-test -n openshift-machine-api --patch '{"spec":{"config":{"storage":{"files":[{"contents":{"source":"data:,B","verification":{}},"filesystem":"root","mode":420,"path":"/etc/rollback-test"}]}}}}' --type=merge
-          wait_for_machineconfigpool_to_apply
-
-          echo "Distribute snapshot across all masters"
-          mapfile -t MASTERS < <(oc get node -l node-role.kubernetes.io/master= -o name | cut -d '/' -f 2)
-          for master in "${MASTERS[@]}"
-          do
-            scp -o StrictHostKeyChecking=no -o ProxyCommand="ssh -A -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p core@${BASTION_HOST}" ${KUBE_SSH_KEY_PATH} "core@${master}":/home/core/.ssh/id_rsa
-            bastion_ssh "core@${master}" "sudo -i chmod 0600 /home/core/.ssh/id_rsa"
-            bastion_ssh "core@${FIRST_MASTER}" "scp -o StrictHostKeyChecking=no /tmp/snapshot.db core@${master}:/tmp/snapshot.db"
-          done
-
-          echo "Collect etcd names"
-          for master in "${MASTERS[@]}"
-          do
-            bastion_ssh "core@${master}" 'echo "etcd-member-$(hostname -f)" > /tmp/etcd_name && source /run/etcd/environment && echo "https://${ETCD_DNS_NAME}:2380" > /tmp/etcd_uri'
-            bastion_ssh "core@${FIRST_MASTER}" "mkdir -p /tmp/etcd/${master} && scp -o StrictHostKeyChecking=no core@${master}:/tmp/etcd_name /tmp/etcd/${master}/etcd_name && scp -o StrictHostKeyChecking=no core@${master}:/tmp/etcd_uri /tmp/etcd/${master}/etcd_uri"
-            bastion_ssh "core@${FIRST_MASTER}" "cat /tmp/etcd/${master}/etcd_name"
-            bastion_ssh "core@${FIRST_MASTER}" "cat /tmp/etcd/${master}/etcd_uri"
-          done
-
-          echo "Assemble etcd connection string"
-          bastion_ssh "core@${FIRST_MASTER}" 'rm -rf /tmp/etcd/connstring && mapfile -t MASTERS < <(ls /tmp/etcd) && echo ${MASTERS[@]} && for master in "${MASTERS[@]}"; do echo -n "$(cat /tmp/etcd/${master}/etcd_name)=$(cat /tmp/etcd/${master}/etcd_uri)," >> /tmp/etcd/connstring; done && sed -i '"'$ s/.$//'"' /tmp/etcd/connstring'
-
-          echo "Restore etcd cluster from snapshot"
-          for master in "${MASTERS[@]}"
-          do
-            echo "Running /usr/local/bin/etcd-snapshot-restore.sh on ${master}"
-            bastion_ssh "core@${FIRST_MASTER}" "scp -o StrictHostKeyChecking=no /tmp/etcd/connstring core@${master}:/tmp/etcd_connstring"
-            bastion_ssh "core@${master}" 'sudo -i /bin/bash -x /usr/local/bin/etcd-snapshot-restore.sh /tmp/snapshot.db $(cat /tmp/etcd_connstring)'
-          done
-
-          echo "Wait for API server to come up"
-          for i in $(seq 0 10)
-          do
-            oc get nodes && break
-            sleep 30
-          done
-
-          echo "Wait for MCO to rollout new configs"
-          for i in $(seq 0 10); do oc get machineconfigpool/master > /dev/null && break; sleep 30; done
-          wait_for_machineconfigpool_to_apply
-
-          echo "Wait for all kube-apiserver pods to come back"
-          for master in ${MASTERS[@]}
-          do
-            oc get pod/kube-apiserver-${master} -n openshift-kube-apiserver -o name
-            oc wait pod/kube-apiserver-${master} -n openshift-kube-apiserver --for condition=Ready --timeout=5m
-          done
-
-          echo "Verify 99-rollback-test machineconfig"
-          MC="$(oc get machineconfig/99-rollback-test -o jsonpath='{.spec.config.storage.files[0].contents.source}')"
-          if [[ "${MC}" != "data:,A" ]]; then
-            echo "Unexpected MachineConfig output: ${MC}"
-            exit 1
-          fi
-
-          echo "Verify /etc/rollback-test contents"
-          rc=0
-          for master in "${MASTERS[@]}"
-          do
-            bastion_ssh core@${master} 'sudo -i test "$(cat /etc/rollback-test)" == "A"'
-          done
-
-          if [[ "${rc}" == "1" ]]; then exit 1; fi
-
-          echo "Removing ssh-bastion"
-          oc delete project openshift-ssh-bastion
-
-          echo "Remove existing openshift-apiserver pods"
-          # This would ensure "Pod 'openshift-apiserver/apiserver-xxx' is not healthy: container openshift-apiserver has restarted more than 5 times" test won't fail
-          oc delete pod --all -n openshift-apiserver
+            for i in $(seq 0 10); do oc wait machineconfigpool --all --for=condition=Updating --timeout=5m && break; done
+            for i in $(seq 0 10); do oc wait machineconfigpool --all --for=condition=Updated --timeout=5m && break; sleep 30; done
         }
 
-        function recover-from-etcd-quorum-loss() {
-          setup_ssh_bastion
+        if [[ "${ENABLE_FIPS}" == true ]]; then
+          enable_fips
+        fi
 
-          # Machine API won't let the user to destroy the node which runs the controller
-          echo "Finding two masters to destroy"
-          MAPI_POD=$(oc get pod -l k8s-app=controller -n openshift-machine-api --no-headers -o name)
-          SURVIVING_MASTER_NODE=$(oc get ${MAPI_POD} -n openshift-machine-api -o jsonpath='{.spec.nodeName}')
-          mapfile -t MASTER_NODES_TO_REMOVE < <(oc get nodes -l node-role.kubernetes.io/master= -o name | grep -v "${SURVIVING_MASTER_NODE}")
-          MASTER_MACHINES_TO_REMOVE=()
-          for master in ${MASTER_NODES_TO_REMOVE[@]}
-          do
-            MASTER_MACHINES_TO_REMOVE+=($(oc get ${master} -o jsonpath='{.metadata.annotations.machine\.openshift\.io\/machine}' | cut -d '/' -f 2))
+        mkdir -p /tmp/output
+        cd /tmp/output
+
+        function setup_ssh_bastion() {
+          export SSH_BASTION_NAMESPACE=test-ssh-bastion
+          echo "Setting up ssh bastion"
+          mkdir -p ~/.ssh
+          cp "${KUBE_SSH_KEY_PATH}" ~/.ssh/id_rsa
+          chmod 0600 ~/.ssh/id_rsa
+          if ! whoami &> /dev/null; then
+            if [[ -w /etc/passwd ]]; then
+              echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+            fi
+          fi
+          curl https://raw.githubusercontent.com/eparis/ssh-bastion/master/deploy/deploy.sh | bash
+          for i in $(seq 0 30); do
+            # AWS fills only .hostname of a service
+            BASTION_HOST=$(oc get service -n "${SSH_BASTION_NAMESPACE}" ssh-bastion -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+            if [[ -n "${BASTION_HOST}" ]]; then break; fi
+            # Azure fills only .ip of a service. Use it as bastion host.
+            BASTION_HOST=$(oc get service -n "${SSH_BASTION_NAMESPACE}" ssh-bastion -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+            if [[ -n "${BASTION_HOST}" ]]; then break; fi
+            echo "Waiting for SSH bastion load balancer service"
+            sleep 10
           done
-
-          echo "Prepare etcd connstring"
-          bastion_ssh "core@${SURVIVING_MASTER_NODE}" 'source /run/etcd/environment && echo "etcd-member-$(hostname -f)=https://${ETCD_DNS_NAME}:2380" > /tmp/etcd_connstring'
-
-          echo "Destroy two masters"
-          # Scale down etcd quorum guard
-          oc scale --replicas=0 deployment.apps/etcd-quorum-guard -n openshift-machine-config-operator
-
-          for machine in ${MASTER_MACHINES_TO_REMOVE[@]}
-          do
-            retry 10 oc --request-timeout=5s -n openshift-machine-api delete machine ${machine}
-          done
-
-          echo "Confirm meltdown"
-          sleep 30
-          oc --request-timeout=5s get nodes && exit 1
-
-          echo "Restore single etcd - /usr/local/bin/etcd-snapshot-restore.sh"
-          bastion_ssh core@${SURVIVING_MASTER_NODE} 'sudo -i /bin/bash -x /usr/local/bin/etcd-snapshot-restore.sh /root/assets/backup/etcd/member/snap/db $(cat /tmp/etcd_connstring)'
-
-          echo "Wait for API server to come up"
-          retry 30 oc get nodes
-
-          # Workaround for https://bugzilla.redhat.com/show_bug.cgi?id=1707006
-          echo "Restart SDN"
-          retry 10 oc delete pods -l app=sdn -n openshift-sdn --wait=false
-
-          echo "Create two masters via Machine API"
-          retry 10 oc get machines -n openshift-machine-api
-          # Clone existing masters, update IDs and oc apply
-          SURVIVING_MASTER_MACHINE=$(oc get machine -l machine.openshift.io/cluster-api-machine-role=master -n openshift-machine-api -o name | cut -d '/' -f 2)
-          SURVIVING_MASTER_NUM=${SURVIVING_MASTER_MACHINE##*-}
-          SURVIVING_MASTER_PREFIX=${SURVIVING_MASTER_MACHINE%-*}
-          retry 10 sh -c 'oc get --export machine ${SURVIVING_MASTER_MACHINE} -n openshift-machine-api -o yaml > /tmp/machine.template'
-
-          MASTER_INDEX=0
-          for i in $(seq 0 1); do
-            if [[ "${MASTER_INDEX}" == "${SURVIVING_MASTER_NUM}" ]]; then MASTER_INDEX=$((MASTER_INDEX+1)); fi
-            cat /tmp/machine.template \
-              | sed 's;selfLink.*;;g' \
-              | sed "s;name: ${SURVIVING_MASTER_PREFIX}-${SURVIVING_MASTER_NUM};name: ${SURVIVING_MASTER_PREFIX}-${MASTER_INDEX};" > /tmp/machine_${i}.yaml
-              RETRY_IGNORE_EXIT_CODE=1 retry 5 oc create -n openshift-machine-api -f /tmp/machine_${i}.yaml
-              MASTER_INDEX=$((MASTER_INDEX+1))
-          done
-
-          echo "Waiting for machines to be created"
-          set +e
-          NEW_MASTER_IPS=()
-          for i in $(seq 0 60); do
-            NEW_MASTER_IPS=($(oc -n openshift-machine-api \
-              get machines \
-              -l machine.openshift.io/cluster-api-machine-role=master \
-              -o jsonpath='{range .items[*]}{.status.addresses[?(@.type=="InternalIP")].address}{"\n"}{end}' || true))
-            if [[ "${#NEW_MASTER_IPS[@]}" == "3" ]]; then break; fi
-            sleep 30
-          done
-          oc get machines -n openshift-machine-api
-          set -e
-          if [[ "${#NEW_MASTER_IPS[@]}" != "3" ]]; then
-            echo "${NEW_MASTER_IPS[@]}"
+          if [[ -z "${BASTION_HOST}" ]]; then
+            echo "Failed to find bastion address, exiting"
             exit 1
           fi
-
-          echo "Verify new master nodes have joined the cluster"
-          FOUND_MASTERS=0
-          for i in $(seq 1 60)
-          do
-            FOUND_MASTERS=($(oc --request-timeout=5s get nodes -l node-role.kubernetes.io/master= -o name --no-headers || true))
-            if [[ "${#FOUND_MASTERS[@]}" == "3" ]]; then break; fi
-            sleep 30
-          done
-          oc get nodes
-          if [[ "${#FOUND_MASTERS[@]}" != "3" ]]; then
-            echo "${FOUND_MASTERS[@]}"
-            exit 1
-          fi
-
-          echo "Update DNS and LB"
-          # aws cli magic
-          easy_install --user pip
-          ~/.local/bin/pip install --user boto3
-          cat > /tmp/update_route_53.py <<'PYTHON_EOF'
-        import boto3
-        import os
-        import sys
-
-        if len(sys.argv) < 4:
-            print("Usage: ./update_route_53.py <DOMAIN> <RECORD> <IP>")
-            sys.exit(1)
-
-        domain = sys.argv[1]
-        record = sys.argv[2]
-        ip = sys.argv[3]
-        print("record: %s" % record)
-        print("ip: %s" % ip)
-
-        client = boto3.client('route53')
-        r = client.list_hosted_zones_by_name(DNSName=domain, MaxItems="1")
-        zone_id = r['HostedZones'][0]['Id'].split('/')[-1]
-
-        response = client.change_resource_record_sets(
-            HostedZoneId=zone_id,
-            ChangeBatch= {
-                'Comment': 'add %s -> %s' % (record, ip),
-                'Changes': [
-                {
-                    'Action': 'UPSERT',
-                    'ResourceRecordSet': {
-                        'Name': record,
-                        'Type': 'A',
-                        'TTL': 60,
-                        'ResourceRecords': [{'Value': ip}]
-                    }
-                }]
-        })
-        PYTHON_EOF
-          DOMAIN=$(oc whoami --show-server | grep -oP "api.\\K([^\\:]*)")
-          for i in "${!NEW_MASTER_IPS[@]}"; do
-            ETCD_NAME="etcd-${i}.${DOMAIN}"
-            python /tmp/update_route_53.py "${DOMAIN}" "${ETCD_NAME}" "${NEW_MASTER_IPS[$i]}"
-          done
-
-          echo "Run etcd-signer"
-          SURVIVING_MASTER_NODE_SHORT=${SURVIVING_MASTER_NODE%%.*}
-          curl -O https://raw.githubusercontent.com/hexfusion/openshift-recovery/master/manifests/kube-etcd-cert-signer.yaml.template
-          sed "s;__MASTER_HOSTNAME__;${SURVIVING_MASTER_NODE_SHORT};g" kube-etcd-cert-signer.yaml.template > kube-etcd-cert-signer.yaml
-          retry 10 oc create -f kube-etcd-cert-signer.yaml
-          retry 10 oc get pod/etcd-signer -n openshift-config -o name
-          retry 10 oc wait pod/etcd-signer -n openshift-config --for condition=ready
-
-          echo "Grow etcd cluster to full membership"
-          SURVIVING_MASTER_IP=$(oc get nodes ${SURVIVING_MASTER_NODE} -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}')
-          SETUP_ETCD_ENVIRONMENT=$(oc adm release info --image-for setup-etcd-environment)
-          KUBE_CLIENT_AGENT=$(oc adm release info --image-for kube-client-agent)
-          MASTERS=($(oc -n openshift-machine-api \
-            get machines \
-            -l machine.openshift.io/cluster-api-machine-role=master \
-            -o jsonpath='{range .items[*]}{.status.addresses[?(@.type=="InternalDNS")].address}{"\n"}{end}'))
-          for master in ${MASTERS[@]}
-          do
-            if [[ "${master}" == ${SURVIVING_MASTER_NODE} ]]; then continue; fi
-            echo "Recovering ${master}"
-            ETCD_HOSTNAME='etcd-member-$(hostname -f)'
-            bastion_ssh core@${master} "sudo -i env  SETUP_ETCD_ENVIRONMENT=${SETUP_ETCD_ENVIRONMENT} KUBE_CLIENT_AGENT=${KUBE_CLIENT_AGENT} /bin/bash -x /usr/local/bin/etcd-member-recover.sh ${SURVIVING_MASTER_IP} ${ETCD_HOSTNAME}"
-          done
-
-          for master in ${MASTERS[@]}
-          do
-            retry 10 oc get pod/etcd-member-${master} -n openshift-etcd -o name
-            retry 10 oc wait pod/etcd-member-${master} -n openshift-etcd --for condition=Ready
-          done
-
-          echo "Removing ssh-bastion"
-          retry 10 oc delete project openshift-ssh-bastion
-
-          echo "Scale etcd-quorum guard"
-          retry 10 oc scale --replicas=3 deployment.apps/etcd-quorum-guard -n openshift-machine-config-operator
-
-          echo "Remove etcd-signer"
-          oc delete pod/etcd-signer -n openshift-config
-
-          echo "Sleeping for a minute to make sure Prometheus are no longer firing"
-          sleep 60
+          export KUBE_SSH_BASTION="${BASTION_HOST}:22"
         }
 
-        function run-dr-snapshot-tests() {
-          openshift-tests run-dr restore-snapshot "${TEST_SUITE}" \
-            --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
-          exit 0
-        }
-
-        function run-dr-quorum-tests() {
-          openshift-tests run-dr quorum-restore "${TEST_SUITE}" \
-            --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
-          exit 0
+        function setup-google-cloud-sdk() {
+          pushd /tmp
+          curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
+          tar -xzf google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
+          export PATH=$PATH:/tmp/google-cloud-sdk/bin
+          mkdir gcloudconfig
+          export CLOUDSDK_CONFIG=/tmp/gcloudconfig
+          gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}"
+          gcloud config set project openshift-gce-devel-ci
+          popd
         }
 
         function run-upgrade-tests() {
           openshift-tests run-upgrade "${TEST_SUITE}" --to-image "${RELEASE_IMAGE_LATEST}" \
             --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
-          exit 0
         }
 
         function run-tests() {
           openshift-tests run "${TEST_SUITE}" \
             --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
-          exit 0
         }
+
+        if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
+          setup-google-cloud-sdk
+        fi
 
         ${TEST_COMMAND}
 
@@ -548,8 +414,12 @@ objects:
         value: us-east-1
       - name: AZURE_AUTH_LOCATION
         value: /etc/openshift-installer/osServicePrincipal.json
-      - name: AZURE_REGION
-        value: centralus
+      - name: GCP_REGION
+        value: us-east1
+      - name: GCP_PROJECT
+        value: openshift-gce-devel-ci
+      - name: GOOGLE_CLOUD_KEYFILE_JSON
+        value: /etc/openshift-installer/gce.json
       - name: CLUSTER_NAME
         value: ${NAMESPACE}-${JOB_NAME_HASH}
       - name: BASE_DOMAIN
@@ -562,19 +432,40 @@ objects:
         value: /etc/openshift-installer/pull-secret
       - name: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
         value: ${RELEASE_IMAGE_LATEST}
+      - name: OPENSHIFT_INSTALL_INVOKER
+        value: openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID}
+      - name: ENABLE_MIRROR
+        value: ${ENABLE_MIRROR}
       - name: USER
         value: test
       - name: HOME
         value: /tmp
+      - name: MIRROR_BASE
+        value: registry.svc.ci.openshift.org/${NAMESPACE}/release
       - name: INSTALL_INITIAL_RELEASE
       - name: RELEASE_IMAGE_INITIAL
       command:
-      - /bin/sh
+      - /bin/bash
       - -c
       - |
         #!/bin/sh
+        set -e
+
         trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/setup-success; else touch /tmp/exit; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+
+        while true; do
+          if [[ -f /tmp/exit ]]; then
+            echo "Another process exited" 2>&1
+            exit 1
+          fi
+          if [[ -f /tmp/leased ]]; then
+            echo "Lease acquired, installing..."
+            break
+          fi
+
+          sleep 15 & wait
+        done
 
         cp "$(command -v openshift-install)" /tmp
         mkdir /tmp/artifacts/installer
@@ -582,6 +473,21 @@ objects:
         if [[ -n "${INSTALL_INITIAL_RELEASE}" && -n "${RELEASE_IMAGE_INITIAL}" ]]; then
           echo "Installing from initial release ${RELEASE_IMAGE_INITIAL}"
           OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_INITIAL}"
+        elif [[ "${ENABLE_MIRROR}" == "true" ]]; then
+          export PATH=$PATH:/tmp  # gain access to oc
+          while [ ! command -V oc ]; do sleep 1; done # poll to make sure that the test container has dropped oc into the shared volume
+
+          # mirror the release image and override the release image to point to the mirrored one
+          mkdir /tmp/.docker && cp /etc/openshift-installer/pull-secret /tmp/.docker/config.json
+          oc registry login
+          oc adm release new --from-release ${RELEASE_IMAGE_LATEST} --to-image ${MIRROR_BASE}-scratch:release --mirror ${MIRROR_BASE}-scratch || echo 'ignore: the release could not be reproduced from its inputs'
+          oc adm release mirror --from ${MIRROR_BASE}-scratch:release --to ${MIRROR_BASE} --to-release-image ${MIRROR_BASE}:mirrored
+          RELEASE_PAYLOAD_IMAGE_SHA=$(oc get istag ${MIRROR_BASE##*/}:mirrored -o=jsonpath="{.image.metadata.name}")
+          oc delete imagestream "$(basename "${MIRROR_BASE}-scratch")"
+          RELEASE_IMAGE_MIRROR="${MIRROR_BASE}@${RELEASE_PAYLOAD_IMAGE_SHA}"
+
+          echo "Installing from mirror override release ${RELEASE_IMAGE_MIRROR}"
+          OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_MIRROR}"
         else
           echo "Installing from release ${RELEASE_IMAGE_LATEST}"
         fi
@@ -628,6 +534,15 @@ objects:
           ${SSH_PUB_KEY}
         EOF
         elif [[ "${CLUSTER_TYPE}" == "azure4" ]]; then
+            case $((RANDOM % 4)) in
+            0) AZURE_REGION=centralus;;
+            1) AZURE_REGION=centralus;;
+            2) AZURE_REGION=centralus;;
+            3) AZURE_REGION=westus;;
+            *) echo >&2 "invalid Azure region index"; exit 1;;
+            esac
+            echo "Azure region: ${AZURE_REGION}"
+
             cat > /tmp/artifacts/installer/install-config.yaml << EOF
         apiVersion: v1
         baseDomain: ${BASE_DOMAIN:-ci.azure.devcluster.openshift.com}
@@ -648,14 +563,136 @@ objects:
         sshKey: |
           ${SSH_PUB_KEY}
         EOF
+        elif [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
+            cat > /tmp/artifacts/installer/install-config.yaml << EOF
+        apiVersion: v1
+        baseDomain: ${BASE_DOMAIN:-origin-ci-int-gce.dev.openshift.com}
+        metadata:
+          name: ${CLUSTER_NAME}
+        controlPlane:
+          name: master
+          replicas: 3
+        compute:
+        - name: worker
+          replicas: 3
+        platform:
+          gcp:
+            projectID: ${GCP_PROJECT}
+            region: ${GCP_REGION}
+        pullSecret: >
+          ${PULL_SECRET}
+        sshKey: |
+          ${SSH_PUB_KEY}
+        EOF
         else
             echo "Unsupported cluster type '${CLUSTER_TYPE}'"
             exit 1
         fi
 
+        # as a current stop gap -- this is pointing to a proxy hosted in
+        # the namespace "ci-test-ewolinet" on the ci cluster
+        if [[ "${ENABLE_PROXY}" == "true" ]]; then
+
+        # FIXME: due to https://bugzilla.redhat.com/show_bug.cgi?id=1750650 we need to
+        # use a http endpoint for the httpsProxy value
+        # TODO: revert back to using https://ewolinet:5f6ccbbbafc66013d012839921ada773@35.231.5.161:3128/
+
+          cat >> /tmp/artifacts/installer/install-config.yaml << EOF
+        proxy:
+          httpsProxy: http://ewolinet:5f6ccbbbafc66013d012839921ada773@35.196.128.173:3128/
+          httpProxy: http://ewolinet:5f6ccbbbafc66013d012839921ada773@35.196.128.173:3128/
+        additionalTrustBundle: |
+          -----BEGIN CERTIFICATE-----
+          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
+          GtklzYOidGtxo1MT
+          -----END CERTIFICATE-----
+          -----BEGIN CERTIFICATE-----
+          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
+          Q/6M
+          -----END CERTIFICATE-----
+        EOF
+        fi
+
+        if [[ -n "${CLUSTER_NETWORK_TYPE}" ]]; then
+          cat >> /tmp/artifacts/installer/install-config.yaml << EOF
+        networking:
+          networkType: ${CLUSTER_NETWORK_TYPE}
+        EOF
+        fi
+
+        if [[ "${ENABLE_MIRROR}" == "true" ]]; then
+          cat >> /tmp/artifacts/installer/install-config.yaml << EOF
+        imageContentSources:
+        - source: "${MIRROR_BASE}-scratch"
+          mirrors:
+          - "${MIRROR_BASE}"
+        EOF
+        fi
+
         # TODO: Replace with a more concise manifest injection approach
         if [[ -n "${CLUSTER_NETWORK_MANIFEST}" ]]; then
-            openshift-install --dir=/tmp/artifacts/installer/create manifests
+            openshift-install --dir=/tmp/artifacts/installer/ create manifests
             echo "${CLUSTER_NETWORK_MANIFEST}" > /tmp/artifacts/installer/manifests/cluster-network-03-config.yml
         fi
 
@@ -680,12 +717,10 @@ objects:
         value: ${CLUSTER_TYPE}
       - name: AWS_SHARED_CREDENTIALS_FILE
         value: /etc/openshift-installer/.awscred
-      - name: AWS_REGION
-        value: us-east-1
       - name: AZURE_AUTH_LOCATION
         value: /etc/openshift-installer/osServicePrincipal.json
-      - name: AZURE_REGION
-        value: centralus
+      - name: GOOGLE_CLOUD_KEYFILE_JSON
+        value: /etc/openshift-installer/gce.json
       - name: KUBECONFIG
         value: /tmp/artifacts/installer/auth/kubeconfig
       command:

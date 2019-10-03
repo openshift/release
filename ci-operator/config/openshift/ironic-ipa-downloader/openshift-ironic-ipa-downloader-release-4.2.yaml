@@ -5,18 +5,22 @@ base_images:
     tag: base
 build_root:
   image_stream_tag:
-    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.10
 images:
 - dockerfile_path: Dockerfile.ocp
-  from: base
+  from: base-os
   to: ironic-ipa-downloader
 promotion:
-  disabled: true
   name: "4.2"
   namespace: ocp
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      curl http://base-openstack-4-2.ocp.svc > /etc/yum.repos.d/base-openstack-4-2.repo
+    from: base
+    to: base-os
 resources:
   '*':
     limits:

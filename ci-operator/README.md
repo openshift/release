@@ -100,12 +100,10 @@ as a reference:
   uses `openshift-installer` instead of `openshift-ansible`.
 - `cluster-launch-installer-src.yaml`: same as `cluster-launch-src.yaml`, but
   uses `openshift-installer` instead of `openshift-ansible`.
-- `master-sidecar-4.yaml`: spins up a simple openshift control plane as a sidecar
+- `master-sidecar-4.2.yaml`: spins up a simple openshift control plane as a sidecar
   and waits for the `COMMAND` specified to the template to be executed, before
   itself exiting. The test container is given access to the generated
   configuration and the `admin.kubeconfig`.
-- `master-sidecar-4.2.yaml`: spins up a simple openshift control plane as a sidecar
-  and same as `master-sidecar-4.2.yaml` but it is used for `4.2+` versions of origin.
 
 To access the cluster, the test should use the standard configuration loading
 rules, which are described in the upstream documentation:
@@ -140,13 +138,16 @@ the environment and execute the test.
 
 While users should deal mostly with the `ci-operator` configuration file and
 generate Prow jobs automatically from it, the structure of the Prow jobs has to
-be taken into consideration when writing a template. The `e2e-conformance-k8s`
-job in `openshift/origin`, which uses the `cluster-launch-src.yaml` will be
-used as an example:
+be taken into consideration when writing a template.
+For example, the following snippet from [the configuration file](https://github.com/openshift/release/blob/master/ci-operator/config/openshift/origin/openshift-origin-master.yaml) of repo `openshift/origin` is used to generate the [presubmit job](https://github.com/openshift/release/blob/master/ci-operator/jobs/openshift/origin/openshift-origin-master-presubmits.yaml)  `pull-ci-openshift-origin-master-e2e-conformance-k8s`
+which uses the template [`cluster-launch-installer-src.yaml`](https://github.com/openshift/release/blob/master/ci-operator/templates/openshift/installer/cluster-launch-installer-src.yaml):
 
-https://github.com/openshift/release/blob/master/ci-operator/config/openshift/origin/openshift-origin-master.yaml
-https://github.com/openshift/release/blob/master/ci-operator/jobs/openshift/origin/openshift-origin-master-presubmits.yaml
-https://github.com/openshift/release/blob/master/ci-operator/templates/cluster-launch-src.yaml
+```
+- as: e2e-conformance-k8s
+  commands: test/extended/conformance-k8s.sh
+  openshift_installer_src:
+    cluster_profile: aws
+```
 
 The CI process begins when a webhook from Github triggers the creation of one
 or more Prow jobs. For a complete description of Prow jobs, see the
@@ -294,7 +295,7 @@ With the template file ready, the steps required to add it to the repository
 and make it available for CI jobs are:
 
 1. Create the yaml file in the `templates/` directory.
-2. Add the files to the [`config-updater` section of Prow's configuration file](https://github.com/openshift/release/blob/master/cluster/ci/config/prow/plugins.yaml)
+2. Add the files to the [`config-updater` section of Prow's configuration file](https://github.com/openshift/release/blob/master/core-services/prow/02_config/_plugins.yaml)
    to ensure they are added to a `ConfigMap` in the CI cluster.
 3. Optional: add a test type to `ci-operator` to enable automatic generation of
    jobs that use this template.

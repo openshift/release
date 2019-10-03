@@ -6,15 +6,14 @@ base_images:
 binary_build_commands: NO_DOCKER=1 make build
 build_root:
   image_stream_tag:
-    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
-    tag: golang-1.10
-canonical_go_repository: github.com/openshift/machine-api-operator
+    tag: golang-1.12
 images:
 - from: base
   to: machine-api-operator
 promotion:
+  disabled: true
   name: "4.3"
   namespace: ocp
 resources:
@@ -32,8 +31,8 @@ tests:
   commands: NO_DOCKER=1 make test
   container:
     from: src
-- as: gofmt
-  commands: IS_CONTAINER=TRUE make fmt
+- as: goimports
+  commands: IS_CONTAINER=TRUE make goimports
   container:
     from: src
 - as: govet
@@ -48,12 +47,10 @@ tests:
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: aws
-    upgrade: false
 - as: e2e-azure
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: azure4
-    upgrade: false
 - as: e2e-aws-operator
   commands: make test-e2e
   openshift_installer_src:
@@ -67,7 +64,11 @@ tests:
   openshift_installer:
     cluster_profile: aws
     upgrade: true
-- as: e2e-rhel-scaleup
-  commands: TEST_SUITE=openshift/conformance run-tests
+- as: e2e-aws-scaleup-rhel7
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_ansible_40:
     cluster_profile: aws-centos-40
+- as: e2e-azure-operator
+  commands: make test-e2e
+  openshift_installer_src:
+    cluster_profile: azure4

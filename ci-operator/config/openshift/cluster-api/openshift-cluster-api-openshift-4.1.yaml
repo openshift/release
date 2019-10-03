@@ -1,0 +1,64 @@
+base_images:
+  base:
+    name: '4.1'
+    namespace: ocp
+    tag: base
+binary_build_commands: make manager clusterctl
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  to: cluster-api
+promotion:
+  name: "4.1"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  unit:
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 100m
+      memory: 400Mi
+tag_specification:
+  name: '4.1'
+  namespace: ocp
+tests:
+- as: unit
+  commands: |
+    go get -u github.com/golang/dep/cmd/dep
+    wget -q https://github.com/bazelbuild/bazel/releases/download/0.18.0/bazel-0.18.0-linux-x86_64 -O bazel
+    chmod +x bazel
+    export PATH="$(pwd):${PATH}"
+    export USER=root
+    export TEST_TMPDIR="$(pwd)/_output/.cache"
+    pwd
+    ls -a
+    KUBEBUILDER_CONTROLPLANE_START_TIMEOUT=10m scripts/ci-test.sh
+  container:
+    from: src
+- as: gofmt
+  commands: |
+    pwd
+    ls -a
+    make fmt
+  container:
+    from: src
+- as: govet
+  commands: make vet
+  container:
+    from: src
+- as: git-history
+  commands: ./hack/verify_history.sh
+  container:
+    from: src

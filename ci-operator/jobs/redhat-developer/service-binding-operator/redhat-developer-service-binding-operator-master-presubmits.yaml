@@ -10,6 +10,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-redhat-developer-service-binding-operator-master-e2e
     rerun_command: /test e2e
     spec:
@@ -74,6 +75,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-redhat-developer-service-binding-operator-master-images
     rerun_command: /test images
     spec:
@@ -117,6 +119,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-redhat-developer-service-binding-operator-master-lint
     rerun_command: /test lint
     spec:
@@ -160,6 +163,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-redhat-developer-service-binding-operator-master-unit
     rerun_command: /test unit
     spec:
@@ -167,6 +171,7 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --secret-dir=/usr/local/redhat-developer-service-binding-operator-codecov-token
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=unit
         command:
@@ -184,11 +189,17 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /usr/local/redhat-developer-service-binding-operator-codecov-token
+          name: redhat-developer-service-binding-operator-codecov-token
+          readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: redhat-developer-service-binding-operator-codecov-token
+        secret:
+          secretName: redhat-developer-service-binding-operator-codecov-token
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn

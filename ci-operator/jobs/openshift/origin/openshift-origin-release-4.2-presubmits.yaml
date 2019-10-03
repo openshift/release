@@ -4,55 +4,13 @@ presubmits:
     always_run: true
     branches:
     - release-4.2
-    context: ci/prow/cmd
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-    name: pull-ci-openshift-origin-release-4.2-cmd
-    rerun_command: /test cmd
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=cmd
-        command:
-        - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-origin-release-4.2.yaml
-              name: ci-operator-4.2-configs
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )cmd,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.2
     context: ci/prow/e2e-aws
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-release-4.2-e2e-aws
     rerun_command: /test e2e-aws
     spec:
@@ -117,6 +75,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-release-4.2-e2e-aws-all
     optional: true
     rerun_command: /test e2e-aws-all
@@ -182,6 +141,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-release-4.2-e2e-aws-builds
     rerun_command: /test e2e-aws-builds
     run_if_changed: ^(pkg/oc/cli/startbuild/startbuild.go)|^(pkg/build)|^(staging/src/.*/pkg/.*build)|^(pkg/cmd/infra/builder)|^(test/extended/builds)|^(test/extended/testdata/builds)|^(test/extended/util)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)
@@ -241,12 +201,80 @@ presubmits:
     always_run: false
     branches:
     - release-4.2
+    context: ci/prow/e2e-aws-disruptive
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-origin-release-4.2-e2e-aws-disruptive
+    optional: true
+    rerun_command: /test e2e-aws-disruptive
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --secret-dir=/usr/local/e2e-aws-disruptive-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=e2e-aws-disruptive
+        - --template=/usr/local/e2e-aws-disruptive
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-origin-release-4.2.yaml
+              name: ci-operator-4.2-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-aws-disruptive
+        - name: TEST_COMMAND
+          value: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance/parallel
+            run-tests
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-aws-disruptive-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-aws-disruptive
+          name: job-definition
+          subPath: cluster-launch-installer-e2e.yaml
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-e2e
+        name: job-definition
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )e2e-aws-disruptive,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - release-4.2
     context: ci/prow/e2e-aws-image-ecosystem
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-release-4.2-e2e-aws-image-ecosystem
     rerun_command: /test e2e-aws-image-ecosystem
     run_if_changed: ^(test/extended/image_ecosystem)|^(examples/db-templates)|^(examples/quickstarts)|^(examples/image-streams)|^(examples/jenkins)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)
@@ -312,6 +340,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-release-4.2-e2e-aws-image-registry
     rerun_command: /test e2e-aws-image-registry
     run_if_changed: ^(pkg/image)|^(test/extended/registry)|^(test/extended/images)|^(test/extended/imageapis)|^(vendor/github.com/docker/distribution)
@@ -377,6 +406,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-release-4.2-e2e-aws-jenkins
     rerun_command: /test e2e-aws-jenkins
     spec:
@@ -441,6 +471,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-release-4.2-e2e-aws-serial
     rerun_command: /test e2e-aws-serial
     spec:
@@ -505,6 +536,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-release-4.2-e2e-aws-upgrade
     rerun_command: /test e2e-aws-upgrade
     spec:
@@ -556,6 +588,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-release-4.2-e2e-azure
     rerun_command: /test e2e-azure
     spec:
@@ -614,23 +647,24 @@ presubmits:
     always_run: true
     branches:
     - release-4.2
-    context: ci/prow/e2e-dr-quorum-tests
+    context: ci/prow/e2e-cmd
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-    name: pull-ci-openshift-origin-release-4.2-e2e-dr-quorum-tests
-    rerun_command: /test e2e-dr-quorum-tests
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-origin-release-4.2-e2e-cmd
+    rerun_command: /test e2e-cmd
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/e2e-dr-quorum-tests-cluster-profile
+        - --secret-dir=/usr/local/e2e-cmd-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=e2e-dr-quorum-tests
-        - --template=/usr/local/e2e-dr-quorum-tests
+        - --target=e2e-cmd
+        - --template=/usr/local/e2e-cmd
         command:
         - ci-operator
         env:
@@ -642,9 +676,9 @@ presubmits:
               key: openshift-origin-release-4.2.yaml
               name: ci-operator-4.2-configs
         - name: JOB_NAME_SAFE
-          value: e2e-dr-quorum-tests
+          value: e2e-cmd
         - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance/parallel run-dr-quorum-tests
+          value: TEST_SUITE=openshift/test-cmd run-tests
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -652,9 +686,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/e2e-dr-quorum-tests-cluster-profile
+        - mountPath: /usr/local/e2e-cmd-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-dr-quorum-tests
+        - mountPath: /usr/local/e2e-cmd
           name: job-definition
           subPath: cluster-launch-installer-e2e.yaml
         - mountPath: /etc/sentry-dsn
@@ -673,28 +707,29 @@ presubmits:
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )e2e-dr-quorum-tests,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-cmd,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - release-4.2
-    context: ci/prow/e2e-dr-snapshot-tests
+    context: ci/prow/e2e-conformance-k8s
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-    name: pull-ci-openshift-origin-release-4.2-e2e-dr-snapshot-tests
-    rerun_command: /test e2e-dr-snapshot-tests
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-origin-release-4.2-e2e-conformance-k8s
+    rerun_command: /test e2e-conformance-k8s
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/e2e-dr-snapshot-tests-cluster-profile
+        - --secret-dir=/usr/local/e2e-conformance-k8s-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=e2e-dr-snapshot-tests
-        - --template=/usr/local/e2e-dr-snapshot-tests
+        - --target=e2e-conformance-k8s
+        - --template=/usr/local/e2e-conformance-k8s
         command:
         - ci-operator
         env:
@@ -706,9 +741,9 @@ presubmits:
               key: openshift-origin-release-4.2.yaml
               name: ci-operator-4.2-configs
         - name: JOB_NAME_SAFE
-          value: e2e-dr-snapshot-tests
+          value: e2e-conformance-k8s
         - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance/parallel run-dr-snapshot-tests
+          value: test/extended/conformance-k8s.sh
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -716,11 +751,11 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/e2e-dr-snapshot-tests-cluster-profile
+        - mountPath: /usr/local/e2e-conformance-k8s-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-dr-snapshot-tests
+        - mountPath: /usr/local/e2e-conformance-k8s
           name: job-definition
-          subPath: cluster-launch-installer-e2e.yaml
+          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
@@ -732,12 +767,79 @@ presubmits:
           - secret:
               name: cluster-secrets-aws
       - configMap:
+          name: prow-job-cluster-launch-installer-src
+        name: job-definition
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )e2e-conformance-k8s,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-4.2
+    context: ci/prow/e2e-gcp
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-origin-release-4.2-e2e-gcp
+    rerun_command: /test e2e-gcp
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --secret-dir=/usr/local/e2e-gcp-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=e2e-gcp
+        - --template=/usr/local/e2e-gcp
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: gcp
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-origin-release-4.2.yaml
+              name: ci-operator-4.2-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-gcp
+        - name: TEST_COMMAND
+          value: TEST_SUITE=openshift/conformance/parallel run-tests
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-gcp-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-gcp
+          name: job-definition
+          subPath: cluster-launch-installer-e2e.yaml
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - configMap:
           name: prow-job-cluster-launch-installer-e2e
         name: job-definition
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )e2e-dr-snapshot-tests,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-gcp,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -748,6 +850,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-release-4.2-e2e-vsphere
     optional: true
     rerun_command: /test e2e-vsphere
@@ -813,6 +916,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-release-4.2-images
     rerun_command: /test images
     spec:
@@ -822,6 +926,7 @@ presubmits:
         - --give-pr-author-access-to-namespace=true
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=[images]
+        - --target=[release:latest]
         command:
         - ci-operator
         env:
@@ -850,21 +955,22 @@ presubmits:
     always_run: true
     branches:
     - release-4.2
-    context: ci/prow/integration
+    context: ci/prow/images-artifacts
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-    name: pull-ci-openshift-origin-release-4.2-integration
-    rerun_command: /test integration
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-origin-release-4.2-images-artifacts
+    rerun_command: /test images-artifacts
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=integration
+        - --target=images-artifacts
         command:
         - ci-operator
         env:
@@ -888,7 +994,7 @@ presubmits:
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )integration,?($|\s.*)
+    trigger: (?m)^/test( | .* )images-artifacts,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -899,6 +1005,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-release-4.2-launch-vsphere
     optional: true
     rerun_command: /test launch-vsphere
@@ -964,6 +1071,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-release-4.2-unit
     rerun_command: /test unit
     spec:
@@ -1007,6 +1115,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-release-4.2-verify
     rerun_command: /test verify
     spec:

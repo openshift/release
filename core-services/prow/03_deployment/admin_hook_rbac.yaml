@@ -1,0 +1,41 @@
+kind: List
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    name: hook
+    namespace: ci
+- kind: Role
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: hook
+    namespace: ci
+  rules:
+    - apiGroups:
+        - prow.k8s.io
+      resources:
+        - prowjobs
+      verbs:
+        - create
+        - get
+    - apiGroups:
+        - ""
+      resources:
+        - configmaps
+      verbs:
+        - get
+        - update
+        - create
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: hook
+    namespace: ci
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: Role
+    name: hook
+  subjects:
+  - kind: ServiceAccount
+    name: hook

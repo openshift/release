@@ -8,7 +8,7 @@ parameters:
   required: true
 - name: NAMESPACE
   required: true
-- name: LOCAL_IMAGE_LIBVIRT_INSTALLER
+- name: IMAGE_LIBVIRT_INSTALLER
   required: true
 - name: IMAGE_TESTS
   required: true
@@ -18,6 +18,8 @@ parameters:
   required: true
 - name: RELEASE_IMAGE_LATEST
   required: true
+- name: BUILD_ID
+  required: false
 
 objects:
 
@@ -86,7 +88,7 @@ objects:
 
     # Once the cluster is up, executes shared tests
     - name: test
-      image: ${LOCAL_IMAGE_LIBVIRT_INSTALLER}
+      image: ${IMAGE_LIBVIRT_INSTALLER}
       terminationMessagePolicy: FallbackToLogsOnError
       resources:
         requests:
@@ -154,7 +156,7 @@ objects:
 
     # Runs an install
     - name: setup
-      image: ${LOCAL_IMAGE_LIBVIRT_INSTALLER}
+      image: ${IMAGE_LIBVIRT_INSTALLER}
       volumeMounts:
       - name: shared-tmp
         mountPath: /home/packer
@@ -196,7 +198,7 @@ objects:
         function run-tests() {
           openshift-tests run "${TEST_SUITE}" \
             -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
-          exit 0
+          return 0
         }
 
         ${TEST_COMMAND}
@@ -244,11 +246,11 @@ objects:
         LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
           --zone "${GOOGLE_COMPUTE_ZONE}" \
           packer@"${INSTANCE_PREFIX}" \
-          --command 'export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_LATEST}" && timeout 4800 bash -ce "create-cluster installer"'
+          --command 'export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_LATEST}" OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID} && timeout 4800 bash -ce "create-cluster installer"'
 
    # Performs cleanup of all created resources and upload the artifacts
     - name: teardown
-      image: ${LOCAL_IMAGE_LIBVIRT_INSTALLER}
+      image: ${IMAGE_LIBVIRT_INSTALLER}
       volumeMounts:
       - name: shared-tmp
         mountPath: /home/packer

@@ -10,6 +10,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-samples-operator-release-4.3-e2e-aws
     rerun_command: /test e2e-aws
     spec:
@@ -68,12 +69,78 @@ presubmits:
     always_run: true
     branches:
     - release-4.3
+    context: ci/prow/e2e-aws-builds
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-samples-operator-release-4.3-e2e-aws-builds
+    rerun_command: /test e2e-aws-builds
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --secret-dir=/usr/local/e2e-aws-builds-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=e2e-aws-builds
+        - --template=/usr/local/e2e-aws-builds
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-cluster-samples-operator-release-4.3.yaml
+              name: ci-operator-4.3-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-aws-builds
+        - name: TEST_COMMAND
+          value: TEST_SUITE=openshift/build run-tests
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-aws-builds-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-aws-builds
+          name: job-definition
+          subPath: cluster-launch-installer-e2e.yaml
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-e2e
+        name: job-definition
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )e2e-aws-builds,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-4.3
     context: ci/prow/e2e-aws-image-ecosystem
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-samples-operator-release-4.3-e2e-aws-image-ecosystem
     rerun_command: /test e2e-aws-image-ecosystem
     spec:
@@ -132,12 +199,78 @@ presubmits:
     always_run: true
     branches:
     - release-4.3
+    context: ci/prow/e2e-aws-jenkins
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-samples-operator-release-4.3-e2e-aws-jenkins
+    rerun_command: /test e2e-aws-jenkins
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --secret-dir=/usr/local/e2e-aws-jenkins-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=e2e-aws-jenkins
+        - --template=/usr/local/e2e-aws-jenkins
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-cluster-samples-operator-release-4.3.yaml
+              name: ci-operator-4.3-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-aws-jenkins
+        - name: TEST_COMMAND
+          value: TEST_SUITE=openshift/jenkins-e2e run-tests
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-aws-jenkins-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-aws-jenkins
+          name: job-definition
+          subPath: cluster-launch-installer-e2e.yaml
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-e2e
+        name: job-definition
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )e2e-aws-jenkins,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-4.3
     context: ci/prow/e2e-aws-operator
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-samples-operator-release-4.3-e2e-aws-operator
     rerun_command: /test e2e-aws-operator
     spec:
@@ -202,6 +335,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-samples-operator-release-4.3-e2e-aws-upgrade
     rerun_command: /test e2e-aws-upgrade
     spec:
@@ -253,6 +387,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-samples-operator-release-4.3-images
     rerun_command: /test images
     spec:
@@ -262,7 +397,6 @@ presubmits:
         - --give-pr-author-access-to-namespace=true
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=[images]
-        - --target=[release:latest]
         command:
         - ci-operator
         env:
@@ -297,6 +431,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-samples-operator-release-4.3-unit
     rerun_command: /test unit
     spec:

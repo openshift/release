@@ -56,3 +56,15 @@ To abort/remove a release tag:
 * `releases/release-*.json` - definitions of the build and publishing rules for sets of images
 * `repos/ocp-*-*.repo` - definitions where RPMs are loaded from for OCP builds
 * `rpms-*.yaml` - definitions of the services that exposed mirrored RPMs within the clutser
+
+### RPM Mirrors
+
+To get RPMs into the build system, OpenShift uses base images that have an injected `.repo` file pointing to an in-cluster proxy that has permissions to pull from the correct OCP RPM repos for each release.
+
+These proxies (one per core configuration) run from the `ocp` namespace and have the DNS names in cluster `base-4-Y.ocp.svc` on port 80. Each proxy performs authentication to https://mirror.openshift.com/enterprise/reposync/* to access mirrors of the content repos from Red Hat Brew. When image builds within OpenShift CI try to install RPMs, they are using these mirrors exclusively (so that no RPMs that aren't part of the official builds can be consumed).
+
+See `rpms-ocp-*.yaml` for the definition of each proxy service, `ocp-*.repo` for each set of mirrored repos, and the root `Makefile` in the repo for the script that creates the Makefiles.
+
+In general, new RPMs should be added to the correct Brew tags at Red Hat for OCP first (since we need those to eventualyl build). Those are mirrored nightly by the SRE team to `https://mirror.openshift.com/enterprise/reposync/4.Y`.  If a set of RPMs need to be added (a separate brew tag) that is compatible with the existing RPM sets, then we would add it to the appropriate `ocp-4.Y-default.repo` (which all images can use). If the repo is incompatible with any of the RPMs in the default repos (like the OpenStack project), a new type of `ocp-4.Y-NAME.repo` has to be created (similar to `ocp-4.2-openstack.repo`) that points to the correct mirrors. Then the images that want to use that as a base have to inject the correct RPM repo (TODO: future changes will mount these automatically) and then depend on that base. For an example, see the `kuryr` ci-operator definitions.
+
+See the OWNERS file in this directory for approvers.

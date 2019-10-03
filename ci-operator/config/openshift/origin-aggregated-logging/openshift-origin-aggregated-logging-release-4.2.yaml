@@ -4,27 +4,26 @@ base_images:
     namespace: ocp
     tag: base
   base-npm:
-    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: nodejs-8
   base_centos:
-    cluster: https://api.ci.openshift.org
     name: centos
     namespace: openshift
     tag: "7"
   ruby-25:
-    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: ruby-25
 build_root:
   image_stream_tag:
-    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.10
 images:
+- dockerfile_path: test/unit/Dockerfile
+  from: ruby-25
+  to: logging-test-unit
 - context_dir: fluentd/
   dockerfile_path: Dockerfile.centos7
   from: ruby-25
@@ -50,7 +49,8 @@ images:
   from: base
   to: logging-rsyslog
 promotion:
-  disabled: true
+  additional_images:
+    logging-ci-test-runner: src
   name: "4.2"
   namespace: ocp
 resources:
@@ -70,13 +70,19 @@ tag_specification:
   name: "4.2"
   namespace: ocp
 tests:
-- as: e2e-aws
-  commands: TEST_SUITE=openshift/conformance/parallel run-tests
-  openshift_installer:
-    cluster_profile: aws
-    upgrade: false
+- as: unit
+  commands: /tmp/run.sh
+  container:
+    from: logging-test-unit
 - as: full-integ-aws
   commands: |
+    . openshift/ci-operator/build-image/setup-logging-for-e2e.sh
+  openshift_installer_src:
+    cluster_profile: aws
+- as: upgrade-full-integ-aws
+  commands: |
+    OPENSHIFT_BUILD_NAMESPACE= IMAGE_FORMAT= USE_CUSTOM_IMAGES=true hack/deploy-logging.sh
+    export LOGGING_DEPLOY_MODE=upgrade
     . openshift/ci-operator/build-image/setup-logging-for-e2e.sh
   openshift_installer_src:
     cluster_profile: aws

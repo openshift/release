@@ -19,8 +19,8 @@ parameters:
 - name: RELEASE_IMAGE_LATEST
   required: true
 - name: BASE_DOMAIN
-  value: origin-ci-int-aws.dev.rhcloud.com
-  required: true
+- name: BUILD_ID
+  required: false
 
 objects:
 
@@ -88,7 +88,7 @@ objects:
       # we want to gather the teardown logs no matter what
       ci-operator.openshift.io/wait-for-container-artifacts: teardown
       ci-operator.openshift.io/save-container-logs: "true"
-      ci-operator.openshift.io/container-sub-tests: "setup,test,teardown"
+      ci-operator.openshift.io/container-sub-tests: "lease,setup,test,teardown"
     labels:
       app: ${JOB_NAME_SAFE}-bootstrap-exporter
   spec:
@@ -107,6 +107,67 @@ objects:
         secretName: ${JOB_NAME_SAFE}-cluster-profile
 
     containers:
+
+
+    - name: lease
+      image: registry.svc.ci.openshift.org/ci/boskoscli:latest
+      terminationMessagePolicy: FallbackToLogsOnError
+      resources:
+        requests:
+          cpu: 10m
+          memory: 10Mi
+        limits:
+          memory: 200Mi
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      - name: cluster-profile
+        mountPath: /tmp/cluster
+      - name: artifacts
+        mountPath: /tmp/artifacts
+      env:
+      - name: CLUSTER_TYPE
+        value: ${CLUSTER_TYPE}
+      - name: CLUSTER_NAME
+        value: ${NAMESPACE}-${JOB_NAME_HASH}
+      command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -euo pipefail
+
+        trap 'rc=$?; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi; if test "${rc}" -ne 0; then touch /tmp/shared/exit; fi; exit "${rc}"' EXIT
+
+        # hack for bazel
+        function boskosctl() {
+          /app/boskos/cmd/cli/app.binary "${@}"
+        }
+
+        echo "[INFO] Acquiring a lease ..."
+        resource="$( boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" acquire --type "${CLUSTER_TYPE}-quota-slice" --state free --target-state leased --timeout 150m )"
+        touch /tmp/shared/leased
+        echo "[INFO] Lease acquired!"
+        echo "[INFO] Leased resource: ${resource}"
+
+        function release() {
+            local resource_name; resource_name="$( jq .name --raw-output <<<"${resource}" )"
+            echo "[INFO] Releasing the lease on resouce ${resource_name}..."
+            boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" release --name "${resource_name}" --target-state free
+        }
+        trap release EXIT
+
+        echo "[INFO] Sending heartbeats to retain the lease..."
+        boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" heartbeat --resource "${resource}" &
+
+        while true; do
+          if [[ -f /tmp/shared/exit ]]; then
+            echo "Another process exited" 2>&1
+            exit 0
+          fi
+
+          sleep 15 & wait $!
+        done
 
     - name: ignition-exporter
       image: registry.svc.ci.openshift.org/openshift/origin-v4.0:artifacts
@@ -240,13 +301,13 @@ objects:
         function run-upgrade-tests() {
           openshift-tests run-upgrade "${TEST_SUITE}" --to-image "${RELEASE_IMAGE_LATEST}" \
             --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
-          exit 0
+          return 0
         }
 
         function run-tests() {
           openshift-tests run "${TEST_SUITE}" \
             --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
-          exit 0
+          return 0
         }
 
         ${TEST_COMMAND}
@@ -277,12 +338,16 @@ objects:
         value: ${BASE_DOMAIN}
       - name: SSH_PUB_KEY_PATH
         value: /etc/openshift-installer/ssh-publickey
+      - name: SSH_PRIVATE_KEY_PATH
+        value: /etc/openshift-installer/ssh-privatekey
       - name: PULL_SECRET_PATH
         value: /etc/openshift-installer/pull-secret
       - name: TFVARS_PATH
         value: /etc/openshift-installer/secret.auto.tfvars
       - name: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
         value: ${RELEASE_IMAGE_LATEST}
+      - name: OPENSHIFT_INSTALL_INVOKER
+        value: openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID}
       - name: USER
         value: test
       - name: HOME
@@ -297,6 +362,40 @@ objects:
         set -e
         trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/setup-success; else touch /tmp/exit; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+
+        GATHER_BOOTSTRAP_ARGS=
+
+        function gather_bootstrap_and_fail() {
+          if test -n "${GATHER_BOOTSTRAP_ARGS}"; then
+            openshift-install --dir=/tmp/artifacts/installer gather bootstrap --key "${SSH_PRIVATE_KEY_PATH}" ${GATHER_BOOTSTRAP_ARGS}
+          fi
+
+          if [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
+            # list all the virtual machines in the folder/rp
+            clustervms=$(govc ls "/${GOVC_DATACENTER}/vm/${CLUSTER_NAME}")
+            for ipath in $clustervms; do
+              # split on /
+              IFS=/ read -a ipath_array <<< "$ipath";
+              # create png of the current console to determine if a virtual machine has a problem
+              govc vm.console -vm.ipath=$ipath -capture /tmp/artifacts/installer/${ipath_array[-1]}.png
+            done
+          fi
+
+          return 1
+        }
+
+        while true; do
+          if [[ -f /tmp/exit ]]; then
+            echo "Another process exited" 2>&1
+            exit 1
+          fi
+          if [[ -f /tmp/leased ]]; then
+            echo "Lease acquired, installing..."
+            break
+          fi
+
+          sleep 15 & wait
+        done
 
         cp "$(command -v openshift-install)" /tmp
         mkdir /tmp/artifacts/installer
@@ -313,10 +412,12 @@ objects:
         export PULL_SECRET=$(cat "${PULL_SECRET_PATH}")
 
         if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
+          base_domain="${BASE_DOMAIN:-origin-ci-int-aws.dev.rhcloud.com}"
+          echo "FIXME: Base domain: '${base_domain}"
           MACHINE_CIDR=10.0.0.0/16
           cat > /tmp/artifacts/installer/install-config.yaml << EOF
         apiVersion: v1
-        baseDomain: ${BASE_DOMAIN}
+        baseDomain: ${base_domain}
         metadata:
           name: ${CLUSTER_NAME}
         controlPlane:
@@ -353,12 +454,27 @@ objects:
           openshift-install --dir=/tmp/artifacts/installer create manifests
           rm -f /tmp/artifacts/installer/openshift/99_openshift-cluster-api_master-machines-*.yaml /tmp/artifacts/installer/openshift/99_openshift-cluster-api_worker-machinesets-*.yaml
         elif [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
+            base_domain="${BASE_DOMAIN:-origin-ci-int-aws.dev.rhcloud.com}"
             # Get user and password from TFVARS_PATH
             export VSPHERE_USER=$(grep -oP 'vsphere_user="\K[^"]+' ${TFVARS_PATH})
             export VSPHERE_PASSWORD=$(grep -oP 'vsphere_password="\K[^"]+' ${TFVARS_PATH})
+            export OVA_URL="$(jq -r '.baseURI + .images["vmware"].path' /var/lib/openshift-install/rhcos.json)"
+            export VM_TEMPLATE="${OVA_URL##*/}"
+            mkdir /tmp/rhcos
+
+            cat > /tmp/rhcos/rhcos.json << EOF
+        {
+           "DiskProvisioning": "thin",
+           "MarkAsTemplate": false,
+           "PowerOn": false,
+           "InjectOvfEnv": false,
+           "WaitForIP": false,
+           "Name": "${VM_TEMPLATE}"
+        }
+        EOF
             cat > /tmp/artifacts/installer/install-config.yaml << EOF
         apiVersion: v1beta4
-        baseDomain: ${BASE_DOMAIN}
+        baseDomain: ${base_domain}
         metadata:
           name: ${CLUSTER_NAME}
         networking:
@@ -381,14 +497,11 @@ objects:
             export GOVC_INSECURE=1
             export GOVC_DATACENTER=dc1
             export GOVC_DATASTORE=nvme-ds1
-            export OVA_URL="$(jq -r '.baseURI + .images["vmware"].path' /var/lib/openshift-install/rhcos.json)"
-            export VM_TEMPLATE="${OVA_URL##*/}"
             if [[ "$(govc vm.info ${VM_TEMPLATE} | wc -c)" -eq 0 ]]
             then
                 echo "Creating a template for the VMs from ${OVA_URL}..."
-                mkdir /tmp/rhcos
                 curl -L -o /tmp/rhcos/rhcos.ova "${OVA_URL}"
-                govc import.ova -name="${VM_TEMPLATE}" /tmp/rhcos/rhcos.ova
+                govc import.ova -options=/tmp/rhcos/rhcos.json /tmp/rhcos/rhcos.ova
             fi
         else
             echo "Unsupported cluster type '${CLUSTER_TYPE}'"
@@ -418,8 +531,8 @@ objects:
           IGNITION_CA="$(jq '.ignition.security.tls.certificateAuthorities[0].source' /tmp/artifacts/installer/master.ign)"  # explicitly keeping wrapping quotes
 
           HOSTED_ZONE="$(aws route53 list-hosted-zones-by-name \
-            --dns-name "${BASE_DOMAIN}" \
-            --query "HostedZones[? Config.PrivateZone != \`true\` && Name == \`${BASE_DOMAIN}.\`].Id" \
+            --dns-name "${base_domain}" \
+            --query "HostedZones[? Config.PrivateZone != \`true\` && Name == \`${base_domain}.\`].Id" \
             --output text)"
 
           aws cloudformation create-stack  --stack-name "${CLUSTER_NAME}-vpc" \
@@ -450,7 +563,7 @@ objects:
               ParameterKey=ClusterName,ParameterValue="${CLUSTER_NAME}" \
               ParameterKey=InfrastructureName,ParameterValue="${INFRA_ID}" \
               ParameterKey=HostedZoneId,ParameterValue="${HOSTED_ZONE}" \
-              ParameterKey=HostedZoneName,ParameterValue="${BASE_DOMAIN}" \
+              ParameterKey=HostedZoneName,ParameterValue="${base_domain}" \
               ParameterKey=VpcId,ParameterValue="${VPC_ID}" \
               ParameterKey=PrivateSubnets,ParameterValue="${PRIVATE_SUBNETS}" \
               ParameterKey=PublicSubnets,ParameterValue="${PUBLIC_SUBNETS}" &
@@ -513,6 +626,7 @@ objects:
 
           BOOTSTRAP_IP="$(aws cloudformation describe-stacks --stack-name "${CLUSTER_NAME}-bootstrap" \
             --query 'Stacks[].Outputs[?OutputKey == `BootstrapPublicIp`].OutputValue' --output text)"
+          GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --bootstrap ${BOOTSTRAP_IP}"
 
           aws cloudformation create-stack \
             --stack-name "${CLUSTER_NAME}-control-plane" \
@@ -522,12 +636,12 @@ objects:
               ParameterKey=InfrastructureName,ParameterValue="${INFRA_ID}" \
               ParameterKey=RhcosAmi,ParameterValue="${RHCOS_AMI}" \
               ParameterKey=PrivateHostedZoneId,ParameterValue="${PRIVATE_HOSTED_ZONE}" \
-              ParameterKey=PrivateHostedZoneName,ParameterValue="${CLUSTER_NAME}.${BASE_DOMAIN}" \
+              ParameterKey=PrivateHostedZoneName,ParameterValue="${CLUSTER_NAME}.${base_domain}" \
               ParameterKey=Master0Subnet,ParameterValue="${PRIVATE_SUBNET_0}" \
               ParameterKey=Master1Subnet,ParameterValue="${PRIVATE_SUBNET_1}" \
               ParameterKey=Master2Subnet,ParameterValue="${PRIVATE_SUBNET_2}" \
               ParameterKey=MasterSecurityGroupId,ParameterValue="${MASTER_SECURITY_GROUP}" \
-              ParameterKey=IgnitionLocation,ParameterValue="https://api-int.${CLUSTER_NAME}.${BASE_DOMAIN}:22623/config/master" \
+              ParameterKey=IgnitionLocation,ParameterValue="https://api-int.${CLUSTER_NAME}.${base_domain}:22623/config/master" \
               ParameterKey=CertificateAuthorities,ParameterValue="${IGNITION_CA}" \
               ParameterKey=MasterInstanceProfileName,ParameterValue="${MASTER_INSTANCE_PROFILE}" \
               ParameterKey=RegisterNlbIpTargetsLambdaArn,ParameterValue="${NLB_IP_TARGETS_LAMBDA}" \
@@ -544,6 +658,7 @@ objects:
           CONTROL_PLANE_0_IP="$(echo "${CONTROL_PLANE_IPS}" | cut -d, -f1)"
           CONTROL_PLANE_1_IP="$(echo "${CONTROL_PLANE_IPS}" | cut -d, -f2)"
           CONTROL_PLANE_2_IP="$(echo "${CONTROL_PLANE_IPS}" | cut -d, -f3)"
+          GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --master ${CONTROL_PLANE_0_IP} --master ${CONTROL_PLANE_1_IP} --master ${CONTROL_PLANE_2_IP}"
 
           for INDEX in 0 1 2
           do
@@ -557,7 +672,7 @@ objects:
                 ParameterKey=RhcosAmi,ParameterValue="${RHCOS_AMI}" \
                 ParameterKey=Subnet,ParameterValue="${!SUBNET}" \
                 ParameterKey=WorkerSecurityGroupId,ParameterValue="${WORKER_SECURITY_GROUP}" \
-                ParameterKey=IgnitionLocation,ParameterValue="https://api-int.${CLUSTER_NAME}.${BASE_DOMAIN}:22623/config/worker" \
+                ParameterKey=IgnitionLocation,ParameterValue="https://api-int.${CLUSTER_NAME}.${base_domain}:22623/config/worker" \
                 ParameterKey=CertificateAuthorities,ParameterValue="${IGNITION_CA}" \
                 ParameterKey=WorkerInstanceType,ParameterValue=m4.xlarge \
                 ParameterKey=WorkerInstanceProfileName,ParameterValue="${WORKER_INSTANCE_PROFILE}" &
@@ -599,9 +714,9 @@ objects:
 
           cluster_id = "${CLUSTER_NAME}"
 
-          base_domain = "${BASE_DOMAIN}"
+          base_domain = "${base_domain}"
 
-          cluster_domain = "${CLUSTER_NAME}.${BASE_DOMAIN}"
+          cluster_domain = "${CLUSTER_NAME}.${base_domain}"
 
           bootstrap_ignition_url = "${BOOTSTRAP_URI}"
 
@@ -626,11 +741,22 @@ objects:
 
           terraform apply -auto-approve -no-color &
           wait "$!"
+          # find bootstrap ip
+
+          BOOTSTRAP_IP=$(terraform state show 'module.bootstrap.external.ip_address' | grep ip_address | awk '{print $3}')
+
+          GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --bootstrap ${BOOTSTRAP_IP}"
+
+          CONTROL_PLANE_0_IP=$(terraform state show 'module.control_plane.external.ip_address[0]' | grep ip_address | awk '{print $3}')
+          CONTROL_PLANE_1_IP=$(terraform state show 'module.control_plane.external.ip_address[1]' | grep ip_address | awk '{print $3}')
+          CONTROL_PLANE_2_IP=$(terraform state show 'module.control_plane.external.ip_address[2]' | grep ip_address | awk '{print $3}')
+
+          GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --master ${CONTROL_PLANE_0_IP} --master ${CONTROL_PLANE_1_IP} --master ${CONTROL_PLANE_2_IP}"
         fi
 
         echo "Waiting for bootstrap to complete"
         openshift-install --dir=/tmp/artifacts/installer wait-for bootstrap-complete &
-        wait "$!"
+        wait "$!" || gather_bootstrap_and_fail
 
         echo "Bootstrap complete, destroying bootstrap resources"
         if [[ "${CLUSTER_TYPE}" == "aws" ]]; then

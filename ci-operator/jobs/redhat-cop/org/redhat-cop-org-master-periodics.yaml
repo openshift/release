@@ -1,0 +1,41 @@
+periodics:
+- agent: kubernetes
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: redhat-cop
+    repo: org
+  interval: 6h
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-org-sync-redhat-cop
+  spec:
+    containers:
+    - args:
+      - --config-path=./config.yaml
+      - --confirm=true
+      - --github-token-path=/etc/github/oauth
+      - --github-endpoint=http://ghproxy
+      - --github-endpoint=https://api.github.com
+      - --github-graphql-endpoint=http://ghproxy/graphql
+      - --fix-org
+      - --fix-org-members
+      - --fix-teams
+      - --fix-team-members
+      - --fix-team-repos
+      command:
+      - /app/prow/cmd/peribolos/app.binary
+      image: gcr.io/k8s-prow/peribolos:v20191003-4c085117a
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: token
+        readOnly: true
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-merge-robot

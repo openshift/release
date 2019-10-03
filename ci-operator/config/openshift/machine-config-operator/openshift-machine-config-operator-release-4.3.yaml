@@ -5,16 +5,15 @@ base_images:
     tag: base
 build_root:
   image_stream_tag:
-    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.12
-canonical_go_repository: github.com/openshift/machine-config-operator
 images:
 - dockerfile_path: Dockerfile
   from: base
   to: machine-config-operator
 promotion:
+  disabled: true
   name: "4.3"
   namespace: ocp
 resources:
@@ -36,12 +35,8 @@ tests:
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: aws
-    upgrade: false
 - as: verify
   commands: |
-    go get -u github.com/go-bindata/go-bindata/...
-    go get -u github.com/golangci/golangci-lint/cmd/golangci-lint
-    go get -u github.com/securego/gosec/cmd/gosec
     make verify
   container:
     from: src
@@ -54,8 +49,8 @@ tests:
   openshift_installer:
     cluster_profile: aws
     upgrade: true
-- as: e2e-rhel-scaleup
-  commands: TEST_SUITE=openshift/conformance run-tests
+- as: e2e-aws-scaleup-rhel7
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_ansible_40:
     cluster_profile: aws-centos-40
 - as: e2e-etcd-quorum-loss
@@ -64,11 +59,9 @@ tests:
     TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: aws
-    upgrade: false
 - as: e2e-restore-cluster-state
   commands: |
     restore-cluster-state
     TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: aws
-    upgrade: false

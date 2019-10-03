@@ -24,20 +24,66 @@ items:
       spec:
         serviceAccountName: ci-chat-bot
         volumes:
-        - name: prow-config
-          configMap:
+        - configMap:
+            defaultMode: 420
             name: config
-        - name: job-config
-          configMap:
+          name: config
+        - configMap:
+            defaultMode: 420
             name: job-config-misc
+          name: job-config-misc
+        - configMap:
+            defaultMode: 420
+            name: job-config-master
+          name: job-config-master
+        - configMap:
+            defaultMode: 420
+            name: job-config-3.x
+          name: job-config-3x
+        - configMap:
+            defaultMode: 420
+            name: job-config-4.0
+          name: job-config-40
+        - configMap:
+            defaultMode: 420
+            name: job-config-4.1
+          name: job-config-41
+        - configMap:
+            defaultMode: 420
+            name: job-config-4.2
+          name: job-config-42
+        - configMap:
+            defaultMode: 420
+            name: job-config-4.3
+          name: job-config-43
         containers:
         - name: bot
           image: ci-chat-bot:latest
           volumeMounts:
-          - name: prow-config
-            mountPath: /etc/prow/
-          - name: job-config
-            mountPath: /etc/jobs/
+          - mountPath: /etc/config
+            name: config
+            readOnly: true
+          - mountPath: /etc/job-config/misc
+            name: job-config-misc
+            readOnly: true
+          - mountPath: /etc/job-config/master
+            name: job-config-master
+            readOnly: true
+          - mountPath: /etc/job-config/3.x
+            name: job-config-3x
+            readOnly: true
+          - mountPath: /etc/job-config/4.0
+            name: job-config-40
+            readOnly: true
+          - mountPath: /etc/job-config/4.1
+            name: job-config-41
+            readOnly: true
+          - mountPath: /etc/job-config/4.2
+            name: job-config-42
+            readOnly: true
+          - mountPath: /etc/job-config/4.3
+            name: job-config-43
+            readOnly: true
           env:
           - name: BOT_TOKEN
             valueFrom:
@@ -46,7 +92,8 @@ items:
                 key: token
           command:
           - /usr/bin/ci-chat-bot
-          - --prow-config=/etc/prow/config.yaml
-          - --job-config=/etc/jobs
+          - --prow-config=/etc/config/config.yaml
+          - --job-config=/etc/job-config
           - --github-endpoint=http://ghproxy
+          - --github-endpoint=https://api.github.com
           - --force-pr-owner=system:serviceaccount:ci:ci-chat-bot

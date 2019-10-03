@@ -47,104 +47,38 @@ dashboard.new(
    ) + legendConfig)
   .addTarget(
     prometheus.target(
-      'sum(pod_name:container_cpu_usage:sum{namespace="ci"} * on (pod_name) label_replace(kube_pod_labels{pod!="",label_app="prow", label_component="hook"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='hook',
+      'sum(pod_name:container_cpu_usage:sum{namespace="ci",container_name!="POD"} * on (pod_name) group_left(label_component) label_replace(kube_pod_labels{pod!="",label_app="prow"}, "pod_name", "$1", "pod", "(.*)")) by (label_component)',
+      legendFormat='{{label_component}}',
     )
-  )
+  ), gridPos={
+    h: 9,
+    w: 24,
+    x: 0,
+    y: 0,
+  }
+)
+
+.addPanel(
+  (graphPanel.new(
+     'CPU Saturation',
+     description='CPU Request Saturation',
+     datasource='prometheus-k8s',
+     legend_alignAsTable=true,
+     legend_rightSide=true,
+     legend_values=true,
+     legend_avg=true,
+     legend_max=true,
+     legend_sort='max',
+     legend_sortDesc=true,
+     min='1.5',
+     formatY1='percentunit',
+     logBase1Y='10',
+     fill=0,
+   ) + legendConfig)
   .addTarget(
     prometheus.target(
-      'sum(pod_name:container_cpu_usage:sum{namespace="ci"} * on (pod_name) label_replace(kube_pod_labels{pod!="",label_app="prow", label_component="tide"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='tide'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(pod_name:container_cpu_usage:sum{namespace="ci"} * on (pod_name) label_replace(kube_pod_labels{pod!="",label_app="prow", label_component="deck"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='deck'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(pod_name:container_cpu_usage:sum{namespace="ci"} * on (pod_name) label_replace(kube_pod_labels{pod!="",label_app="prow", label_component="deck-internal"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='deck-internal'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(pod_name:container_cpu_usage:sum{namespace="ci"} * on (pod_name) label_replace(kube_pod_labels{pod!="",label_app="prow", label_component="plank"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='plank'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(pod_name:container_cpu_usage:sum{namespace="ci"} * on (pod_name) label_replace(kube_pod_labels{pod!="",label_app="prow", label_component="sinker"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='sinker'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(pod_name:container_cpu_usage:sum{namespace="ci"} * on (pod_name) label_replace(kube_pod_labels{pod!="",label_app="prow", label_component="statusreconciler"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='statusreconciler'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(pod_name:container_cpu_usage:sum{namespace="ci"} * on (pod_name) label_replace(kube_pod_labels{pod!="",label_app="prow", label_component="ghproxy"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='ghproxy'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(pod_name:container_cpu_usage:sum{namespace="ci"} * on (pod_name) label_replace(kube_pod_labels{pod!="",label_app="prow", label_component="horologium"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='horologium'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(pod_name:container_cpu_usage:sum{namespace="ci"} * on (pod_name) label_replace(kube_pod_labels{pod!="",label_app="prow", label_component="tot"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='tot'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(pod_name:container_cpu_usage:sum{namespace="ci"} * on (pod_name) label_replace(kube_pod_labels{pod!="",label_app="prow", label_component="needs-rebase"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='needs-rebase'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(pod_name:container_cpu_usage:sum{namespace="ci"} * on (pod_name) label_replace(kube_pod_labels{pod!="",label_app="prow", label_component="kata-jenkins-operator"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='kata-jenkins-operator'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(pod_name:container_cpu_usage:sum{namespace="ci"} * on (pod_name) label_replace(kube_pod_labels{pod!="",label_app="prow", label_component="jenkins-dev-operator"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='jenkins-dev-operator'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(pod_name:container_cpu_usage:sum{namespace="ci"} * on (pod_name) label_replace(kube_pod_labels{pod!="",label_app="prow", label_component="jenkins-operator"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='jenkins-operator'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(pod_name:container_cpu_usage:sum{namespace="ci"} * on (pod_name) label_replace(kube_pod_labels{pod!="",label_app="prow", label_component="artifact-uploader"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='artifact-uploader'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(pod_name:container_cpu_usage:sum{namespace="ci"} * on (pod_name) label_replace(kube_pod_labels{pod!="",label_app="prow", label_component="refresh"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='refresh'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(pod_name:container_cpu_usage:sum{namespace="ci"} * on (pod_name) label_replace(kube_pod_labels{pod!="",label_app="prow", label_component="cherrypick"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='cherrypick'
+      '(sum by(pod)(pod_name:container_cpu_usage:sum{namespace="ci",container_name!="POD"} * on (pod_name) group_left(pod) label_replace(kube_pod_labels{pod!="",label_app="prow"}, "pod_name", "$1", "pod", "(.*)"))/ sum(kube_pod_container_resource_requests_cpu_cores) by (pod)) > 1.5',
+      legendFormat='{{pod}}',
     )
   ), gridPos={
     h: 9,
@@ -165,104 +99,38 @@ dashboard.new(
    ) + legendConfig)
   .addTarget(
     prometheus.target(
-      'sum(container_memory_working_set_bytes{namespace="ci",container_name!="POD"} * on (pod_name) group_left(pod) label_replace(kube_pod_labels{pod!="",label_app="prow", label_component="hook"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='hook'
+      'sum(container_memory_working_set_bytes{namespace="ci",container_name!="POD"} * on (pod_name) group_left(label_component) label_replace(kube_pod_labels{pod!="",label_app="prow"}, "pod_name", "$1", "pod", "(.*)")) by (label_component)',
+      legendFormat='{{label_component}}'
     )
-  )
+  ), gridPos={
+    h: 9,
+    w: 24,
+    x: 0,
+    y: 0,
+  }
+)
+
+.addPanel(
+  (graphPanel.new(
+     'Memory Saturation',
+     description='Memory Request Saturation',
+     datasource='prometheus-k8s',
+     legend_alignAsTable=true,
+     legend_rightSide=true,
+     legend_values=true,
+     legend_max=true,
+     legend_avg=true,
+     legend_sort='max',
+     legend_sortDesc=true,
+     min='1.5',
+     formatY1='percentunit',
+     logBase1Y='10',
+     fill=0,
+   ) + legendConfig)
   .addTarget(
     prometheus.target(
-      'sum(container_memory_working_set_bytes{namespace="ci",container_name!="POD"} * on (pod_name) group_left(pod) label_replace(kube_pod_labels{pod!="",label_app="prow", label_component="tide"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='tide'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(container_memory_working_set_bytes{namespace="ci",container_name!="POD"} * on (pod_name) group_left(pod) label_replace(kube_pod_labels{pod!="",label_app="prow", label_component="deck"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='deck'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(container_memory_working_set_bytes{namespace="ci",container_name!="POD"} * on (pod_name) group_left(pod) label_replace(kube_pod_labels{pod!="",label_app="prow", label_component="deck-internal"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='deck-internal'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(container_memory_working_set_bytes{namespace="ci",container_name!="POD"} * on (pod_name) group_left(pod) label_replace(kube_pod_labels{pod!="",label_app="prow", label_component="plank"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='plank'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(container_memory_working_set_bytes{namespace="ci",container_name!="POD"} * on (pod_name) group_left(pod) label_replace(kube_pod_labels{pod!="",label_app="prow", label_component="sinker"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='sinker'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(container_memory_working_set_bytes{namespace="ci",container_name!="POD"} * on (pod_name) group_left(pod) label_replace(kube_pod_labels{pod!="",label_app="prow", label_component="statusreconciler"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='statusreconciler'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(container_memory_working_set_bytes{namespace="ci",container_name!="POD"} * on (pod_name) group_left(pod) label_replace(kube_pod_labels{pod!="",label_app="prow", label_component="ghproxy"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='ghproxy'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(container_memory_working_set_bytes{namespace="ci",container_name!="POD"} * on (pod_name) group_left(pod) label_replace(kube_pod_labels{pod!="",label_app="prow", label_component="horologium"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='horologium'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(container_memory_working_set_bytes{namespace="ci",container_name!="POD"} * on (pod_name) group_left(pod) label_replace(kube_pod_labels{pod!="",label_app="prow", label_component="tot"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='tot'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(container_memory_working_set_bytes{namespace="ci",container_name!="POD"} * on (pod_name) group_left(pod) label_replace(kube_pod_labels{pod!="",label_app="prow", label_component="needs-rebase"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='needs-rebase'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(container_memory_working_set_bytes{namespace="ci",container_name!="POD"} * on (pod_name) group_left(pod) label_replace(kube_pod_labels{pod!="",label_app="prow", label_component="kata-jenkins-operator"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='kata-jenkins-operator'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(container_memory_working_set_bytes{namespace="ci",container_name!="POD"} * on (pod_name) group_left(pod) label_replace(kube_pod_labels{pod!="",label_app="prow", label_component="jenkins-dev-operator"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='jenkins-dev-operator'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(container_memory_working_set_bytes{namespace="ci",container_name!="POD"} * on (pod_name) group_left(pod) label_replace(kube_pod_labels{pod!="",label_app="prow", label_component="jenkins-operator"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='jenkins-operator'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(container_memory_working_set_bytes{namespace="ci",container_name!="POD"} * on (pod_name) group_left(pod) label_replace(kube_pod_labels{pod!="",label_app="prow", label_component="artifact-uploader"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='artifact-uploader'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(container_memory_working_set_bytes{namespace="ci",container_name!="POD"} * on (pod_name) group_left(pod) label_replace(kube_pod_labels{pod!="",label_app="prow", label_component="refresh"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='refresh'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(container_memory_working_set_bytes{namespace="ci",container_name!="POD"} * on (pod_name) group_left(pod) label_replace(kube_pod_labels{pod!="",label_app="prow", label_component="cherrypick"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='cherrypick'
+      '(sum by(pod)(container_memory_working_set_bytes{namespace="ci",container_name!="POD"} * on (pod_name) group_left(pod) label_replace(kube_pod_labels{pod!="",label_app="prow"}, "pod_name", "$1", "pod", "(.*)"))/ sum(kube_pod_container_resource_requests_memory_bytes) by (pod)) > 1.5',
+      legendFormat='{{pod}}',
     )
   ), gridPos={
     h: 9,
@@ -283,104 +151,8 @@ dashboard.new(
    ) + legendConfig)
   .addTarget(
     prometheus.target(
-      'sum(pod_name:container_fs_usage_bytes:sum{namespace="ci"} * on (pod_name, namespace) label_replace(kube_pod_labels{pod!="",label_app="prow",label_component="hook"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='hook',
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(pod_name:container_fs_usage_bytes:sum{namespace="ci"} * on (pod_name, namespace) label_replace(kube_pod_labels{pod!="",label_app="prow",label_component="tide"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='tide'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(pod_name:container_fs_usage_bytes:sum{namespace="ci"} * on (pod_name, namespace) label_replace(kube_pod_labels{pod!="",label_app="prow",label_component="deck"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='deck'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(pod_name:container_fs_usage_bytes:sum{namespace="ci"} * on (pod_name, namespace) label_replace(kube_pod_labels{pod!="",label_app="prow",label_component="deck-internal"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='deck-internal'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(pod_name:container_fs_usage_bytes:sum{namespace="ci"} * on (pod_name, namespace) label_replace(kube_pod_labels{pod!="",label_app="prow",label_component="plank"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='plank'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(pod_name:container_fs_usage_bytes:sum{namespace="ci"} * on (pod_name, namespace) label_replace(kube_pod_labels{pod!="",label_app="prow",label_component="sinker"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='sinker'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(pod_name:container_fs_usage_bytes:sum{namespace="ci"} * on (pod_name, namespace) label_replace(kube_pod_labels{pod!="",label_app="prow",label_component="statusreconciler"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='statusreconciler'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(pod_name:container_fs_usage_bytes:sum{namespace="ci"} * on (pod_name, namespace) label_replace(kube_pod_labels{pod!="",label_app="prow",label_component="ghproxy"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='ghproxy'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(pod_name:container_fs_usage_bytes:sum{namespace="ci"} * on (pod_name, namespace) label_replace(kube_pod_labels{pod!="",label_app="prow",label_component="horologium"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='horologium'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(pod_name:container_fs_usage_bytes:sum{namespace="ci"} * on (pod_name, namespace) label_replace(kube_pod_labels{pod!="",label_app="prow",label_component="tot"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='tot'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(pod_name:container_fs_usage_bytes:sum{namespace="ci"} * on (pod_name, namespace) label_replace(kube_pod_labels{pod!="",label_app="prow",label_component="needs-rebase"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='needs-rebase'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(pod_name:container_fs_usage_bytes:sum{namespace="ci"} * on (pod_name, namespace) label_replace(kube_pod_labels{pod!="",label_app="prow",label_component="kata-jenkins-operator"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='kata-jenkins-operator'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(pod_name:container_fs_usage_bytes:sum{namespace="ci"} * on (pod_name, namespace) label_replace(kube_pod_labels{pod!="",label_app="prow",label_component="jenkins-dev-operator"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='jenkins-dev-operator'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(pod_name:container_fs_usage_bytes:sum{namespace="ci"} * on (pod_name, namespace) label_replace(kube_pod_labels{pod!="",label_app="prow",label_component="jenkins-operator"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='jenkins-operator'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(pod_name:container_fs_usage_bytes:sum{namespace="ci"} * on (pod_name, namespace) label_replace(kube_pod_labels{pod!="",label_app="prow",label_component="artifact-uploader"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='artifact-uploader'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(pod_name:container_fs_usage_bytes:sum{namespace="ci"} * on (pod_name, namespace) label_replace(kube_pod_labels{pod!="",label_app="prow",label_component="refresh"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='refresh'
-    )
-  )
-  .addTarget(
-    prometheus.target(
-      'sum(pod_name:container_fs_usage_bytes:sum{namespace="ci"} * on (pod_name, namespace) label_replace(kube_pod_labels{pod!="",label_app="prow",label_component="cherrypick"}, "pod_name", "$1", "pod", "(.*)"))',
-      legendFormat='cherrypick'
+      'sum(pod_name:container_fs_usage_bytes:sum{namespace="ci",container_name!="POD"} * on (pod_name) group_left(label_component) label_replace(kube_pod_labels{pod!="",label_app="prow"}, "pod_name", "$1", "pod", "(.*)")) by (label_component)',
+      legendFormat='{{label_component}}',
     )
   ), gridPos={
     h: 9,

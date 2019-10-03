@@ -46,17 +46,19 @@ presubmits:
     - master
     context: ci/prow/config
     decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-release-master-config
     rerun_command: /test config
     spec:
       containers:
       - args:
         - --config-path
-        - ./cluster/ci/config/prow/config.yaml
+        - ./core-services/prow/02_config/_config.yaml
         - --job-config-path
         - ./ci-operator/jobs/
         - --plugin-config
-        - ./cluster/ci/config/prow/plugins.yaml
+        - ./core-services/prow/02_config/_plugins.yaml
         - --strict
         - --exclude-warning
         - long-job-names
@@ -64,7 +66,7 @@ presubmits:
         - mismatched-tide-lenient
         command:
         - /checkconfig
-        image: gcr.io/k8s-prow/checkconfig:v20190718-3415f1ca2
+        image: gcr.io/k8s-prow/checkconfig:v20191003-4c085117a
         imagePullPolicy: Always
         name: ""
         resources:
@@ -82,10 +84,11 @@ presubmits:
     spec:
       containers:
       - args:
-        - dry-core
+        - --config-dir
+        - core-services
         command:
-        - make
-        image: registry.svc.ci.openshift.org/ci/origin-release:cli
+        - applyconfig
+        image: registry.svc.ci.openshift.org/ci/applyconfig:latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -103,6 +106,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-release-master-core-valid
     rerun_command: /test core-valid
     spec:
@@ -250,6 +254,7 @@ presubmits:
         - --dry-run=false
         - --allow-volumes=true
         - --metrics-output=$(ARTIFACTS)/rehearse-metrics.json
+        - --rehearsal-limit=35
         command:
         - /bin/pj-rehearse
         image: pj-rehearse:latest
@@ -298,6 +303,73 @@ presubmits:
           requests:
             cpu: 10m
     trigger: (?m)^/test( | .* )prow-config-semantics,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/services-dry
+    decorate: true
+    name: pull-ci-openshift-release-master-services-dry
+    rerun_command: /test services-dry
+    spec:
+      containers:
+      - args:
+        - --config-dir
+        - services
+        command:
+        - applyconfig
+        image: registry.svc.ci.openshift.org/ci/applyconfig:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+      serviceAccountName: config-updater
+    trigger: (?m)^/test( | .* )services-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/services-valid
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-services-valid
+    rerun_command: /test services-valid
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=services-valid
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-release-master.yaml
+              name: ci-operator-master-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )services-valid,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:

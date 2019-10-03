@@ -12,7 +12,7 @@ parameters:
   required: true
 - name: IMAGE_TESTS
   required: true
-- name: LOCAL_IMAGE_UPI_INSTALLER
+- name: IMAGE_UPI_INSTALLER
   required: true
 - name: CLUSTER_TYPE
   value: "metal"
@@ -24,6 +24,9 @@ parameters:
 - name: BASE_DOMAIN
   value: origin-ci-int-aws.dev.rhcloud.com
   required: true
+- name: BUILD_ID
+  required: false
+- name: ENABLE_FIPS
 
 objects:
 
@@ -152,26 +155,51 @@ objects:
         mkdir -p ~/.ssh
         cp /tmp/cluster/ssh-privatekey ~/.ssh/kube_metal_rsa || true
 
+        # create fips enable helper
+        function enable_fips() {
+            for name in $(oc get machineconfigpool --template='{{range .items}}{{.metadata.name}}{{"\n"}}{{end}}')
+            do
+              cat > /tmp/fips-mc.yaml <<'EOF'
+        apiVersion: machineconfiguration.openshift.io/v1
+        kind: MachineConfig
+        metadata:
+          labels:
+            machineconfiguration.openshift.io/role: "{{name}}"
+          name: 99-fips-"{{name}}"
+        spec:
+          fips: true
+        EOF
+              sed -i "s/\"{{name}}\"/${name}/g" /tmp/fips-mc.yaml
+              oc create -f /tmp/fips-mc.yaml
+            done
+            for i in $(seq 0 10); do oc wait machineconfigpool --all --for=condition=Updating --timeout=5m && break; done
+            for i in $(seq 0 10); do oc wait machineconfigpool --all --for=condition=Updated --timeout=5m && break; sleep 30; done
+        }
+
+        if [[ "${ENABLE_FIPS}" == true ]]; then
+          enable_fips
+        fi
+
         mkdir -p /tmp/output
         cd /tmp/output
 
         function run-upgrade-tests() {
           openshift-tests run-upgrade "${TEST_SUITE}" --to-image "${RELEASE_IMAGE_LATEST}" \
             --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
-          exit 0
+          return 0
         }
 
         function run-tests() {
           openshift-tests run "${TEST_SUITE}" \
             --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
-          exit 0
+          return 0
         }
 
         ${TEST_COMMAND}
 
     # Runs an install
     - name: setup
-      image: ${LOCAL_IMAGE_UPI_INSTALLER}
+      image: ${IMAGE_UPI_INSTALLER}
       terminationMessagePolicy: FallbackToLogsOnError
       volumeMounts:
       - name: shared-tmp
@@ -203,6 +231,8 @@ objects:
         value: /etc/openshift-installer/pull-secret
       - name: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
         value: ${RELEASE_IMAGE_LATEST}
+      - name: OPENSHIFT_INSTALL_INVOKER
+        value: openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID}
       - name: USER
         value: test
       - name: HOME
@@ -324,7 +354,7 @@ objects:
 
     # Performs cleanup of all created resources
     - name: teardown
-      image: ${LOCAL_IMAGE_UPI_INSTALLER}
+      image: ${IMAGE_UPI_INSTALLER}
       terminationMessagePolicy: FallbackToLogsOnError
       volumeMounts:
       - name: shared-tmp

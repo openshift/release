@@ -56,7 +56,7 @@ _Note_ that the serviemonitor has to have label `prow-app` as key (value could b
 
 ### Debugging for a new grafana dashboard
 
-We create a new grafana instance for debugging and developing purpose. _Note_ that this instance could be cleaned up anytime. Please save the json files of panels in development frequently to avoid data loss.
+We create a new grafana instance for debugging and developing purpose. _Note_ that this instance could be cleaned up anytime.
 
 ```
 $ make grafana-debug-deploy
@@ -64,12 +64,10 @@ $ make grafana-debug-deploy
 ```
 
 Play with [the grafana instance for debugging](https://grafana-prow-monitoring-stage.svc.ci.openshift.org) which already connects to the prometheus service in prow-monitoring.
-Add a dashboard manually and debug it until it looks satisfying.
-Then,
 
-* Export the dashboard and save it in this folder.
-* Update [Makefile](./Makefile) and [grafana_deploy.yaml](./grafana_deploy.yaml) and test it manually.
-* Update the [plugins.yaml](../config/prow/plugins.yaml) to generate the configMap.
+* Create the `jsonnet` file in [`mixins/grafana_dashboards`](mixins/grafana_dashboards) folder.
+* Update [Makefile](./Makefile) to include the new target to generate the `json` file.
+* Login [grafana-staging](https://grafana-prow-monitoring-stage.svc.ci.openshift.org) and import manually the generated `json` file until it looks satisfying.
 * Push the rest of changes.
 
 Clean up:

@@ -5,15 +5,14 @@ base_images:
     tag: base
 build_root:
   image_stream_tag:
-    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.12
-canonical_go_repository: github.com/openshift/cluster-ingress-operator
 images:
 - from: base
   to: cluster-ingress-operator
 promotion:
+  disabled: true
   name: "4.3"
   namespace: ocp
 resources:
@@ -35,7 +34,10 @@ tests:
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: aws
-    upgrade: false
+- as: e2e-azure
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer:
+    cluster_profile: azure4
 - as: e2e-aws-operator
   commands: make test-e2e
   openshift_installer_src:

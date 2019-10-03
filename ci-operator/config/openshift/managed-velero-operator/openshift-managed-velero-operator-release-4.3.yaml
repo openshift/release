@@ -1,0 +1,40 @@
+base_images:
+  base:
+    name: "4.3"
+    namespace: ocp
+    tag: base
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.12
+images:
+- dockerfile_path: build/Dockerfile
+  from: base
+  to: managed-velero-operator
+promotion:
+  disabled: true
+  name: "4.3"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.3"
+  namespace: ocp
+tests:
+- as: verify
+  commands: |
+    curl -sfL https://github.com/golangci/golangci-lint/releases/download/v1.17.1/golangci-lint-1.17.1-linux-amd64.tar.gz | tar -C /go/bin -zx --strip-components=1 golangci-lint-1.17.1-linux-amd64/golangci-lint
+    GOPROXY=https://proxy.golang.org make verify
+  container:
+    from: src
+- as: test
+  commands: |
+    make test
+  container:
+    from: src

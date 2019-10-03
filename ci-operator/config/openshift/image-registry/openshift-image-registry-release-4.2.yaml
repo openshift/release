@@ -6,16 +6,14 @@ base_images:
 binary_build_commands: make build
 build_root:
   image_stream_tag:
-    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
-    tag: golang-1.10
+    tag: golang-1.12
 images:
 - dockerfile_path: Dockerfile
   from: base
   to: docker-registry
 promotion:
-  disabled: true
   name: "4.2"
   namespace: ocp
 resources:
@@ -39,14 +37,16 @@ tests:
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: aws
-    upgrade: false
 - as: e2e-aws-image-registry
   commands: TEST_SUITE=openshift/image-registry run-tests
   openshift_installer:
     cluster_profile: aws
-    upgrade: false
 - as: e2e-aws-upgrade
   commands: TEST_SUITE=all run-upgrade-tests
   openshift_installer:
     cluster_profile: aws
     upgrade: true
+- as: verify
+  commands: make verify
+  container:
+    from: src

@@ -1,19 +1,15 @@
 base_images:
   os:
-    cluster: https://api.ci.openshift.org
     name: centos
     namespace: openshift
     tag: "7"
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
-    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.12
-canonical_go_repository: github.com/openshift/library-go
 promotion:
-  disabled: true
   name: "4.2"
   namespace: ocp
 resources:
@@ -41,6 +37,7 @@ tests:
     from: src
 - as: verify-alpha-build-machinery
   commands: |
+    HOME=$( mktemp -d )
     make -C alpha-build-machinery/ verify -k --warn-undefined-variables
   container:
     from: src

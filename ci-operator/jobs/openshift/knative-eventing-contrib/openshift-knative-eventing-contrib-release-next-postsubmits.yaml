@@ -9,6 +9,7 @@ postsubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
     name: branch-ci-openshift-knative-eventing-contrib-release-next-images
+    path_alias: knative.dev/eventing-contrib
     spec:
       containers:
       - args:
@@ -24,6 +25,48 @@ postsubmits:
           valueFrom:
             configMapKeyRef:
               key: openshift-knative-eventing-contrib-release-next.yaml
+              name: ci-operator-misc-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+  - agent: kubernetes
+    branches:
+    - ^release-next$
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: variant
+    name: branch-ci-openshift-knative-eventing-contrib-release-next-variant-images
+    path_alias: knative.dev/eventing-contrib
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --promote
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=[images]
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-knative-eventing-contrib-release-next__variant.yaml
               name: ci-operator-misc-configs
         image: ci-operator:latest
         imagePullPolicy: Always

@@ -4,63 +4,28 @@ base_images:
     namespace: ocp
     tag: base
   base-machine:
-    cluster: https://api.ci.openshift.org
     name: fedora
     namespace: openshift
     tag: "29"
+  cli:
+    name: "4.3"
+    namespace: ocp
+    tag: cli
   machine-os-content-base:
     name: "4.3"
     namespace: ocp
     tag: machine-os-content
-binary_build_commands: make build WHAT='cmd/hypershift vendor/k8s.io/kubernetes/cmd/hyperkube'
+  oc-rpms:
+    name: "4.3"
+    namespace: ocp
+    tag: oc-rpms
+binary_build_commands: make build WHAT='vendor/k8s.io/kubernetes/cmd/hyperkube'
 build_root:
   image_stream_tag:
-    cluster: https://api.ci.openshift.org
     name: src-cache-origin
     namespace: ci
     tag: master
-canonical_go_repository: github.com/openshift/origin
 images:
-- dockerfile_path: images/template-service-broker/Dockerfile.rhel
-  from: base
-  inputs:
-    bin:
-      as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
-      paths: null
-  to: template-service-broker
-- dockerfile_path: images/oauth-server/Dockerfile.rhel
-  from: base
-  inputs:
-    bin:
-      as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
-      paths: null
-  to: oauth-server
-- dockerfile_path: images/cli/Dockerfile.rhel
-  from: base
-  inputs:
-    bin:
-      as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
-      paths: null
-  to: cli
-- dockerfile_path: images/cli-artifacts/Dockerfile.rhel
-  from: cli
-  inputs:
-    bin:
-      as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
-      paths: null
-  to: cli-artifacts
-- dockerfile_path: images/hypershift/Dockerfile.rhel
-  from: base
-  inputs:
-    bin:
-      as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
-      paths: null
-  to: hypershift
 - dockerfile_path: images/hyperkube/Dockerfile.rhel
   from: base
   inputs:
@@ -69,14 +34,6 @@ images:
       - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
       paths: null
   to: hyperkube
-- dockerfile_path: images/kube-proxy/Dockerfile.rhel
-  from: hyperkube
-  inputs:
-    bin:
-      as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
-      paths: null
-  to: kube-proxy
 - dockerfile_path: images/tests/Dockerfile.rhel
   from: cli
   inputs:
@@ -85,22 +42,6 @@ images:
       - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
       paths: null
   to: tests
-- context_dir: images/deployer/
-  dockerfile_path: Dockerfile.rhel
-  from: cli
-  to: deployer
-- context_dir: images/recycler/
-  dockerfile_path: Dockerfile.rhel
-  from: cli
-  to: recycler
-- dockerfile_path: images/sdn/Dockerfile.rhel
-  from: base
-  inputs:
-    bin:
-      as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
-      paths: null
-  to: node
 - context_dir: images/os/
   from: base
   inputs:
@@ -116,16 +57,15 @@ images:
 promotion:
   additional_images:
     artifacts: artifacts
+  disabled: true
   excluded_images:
   - machine-os-content
   name: "4.3"
   namespace: ocp
 raw_steps:
 - pipeline_image_cache_step:
-    commands: mkdir -p _output/local/releases; touch _output/local/releases/CHECKSUM;
-      echo $'FROM bin AS bin\nFROM rpms AS rpms\nFROM centos:7\nCOPY --from=bin /go/src/github.com/openshift/origin/_output/local/releases
-      /srv/zips/\nCOPY --from=rpms /go/src/github.com/openshift/origin/_output/local/releases/rpms/*
-      /srv/repo/' > _output/local/releases/Dockerfile; make build-cross
+    commands: |
+      mkdir -p _output/local/releases; touch _output/local/releases/CHECKSUM; echo $'FROM bin AS bin\nFROM rpms AS rpms\nFROM centos:7 \nCOPY --from=bin /go/src/github.com/openshift/origin/_output/local/releases /srv/zips/ \nCOPY --from=oc-rpms /go/src/github.com/openshift/oc/_rpmbuild/SOURCES/* /srv/zips/ \nCOPY --from=rpms /go/src/github.com/openshift/origin/_output/local/releases/rpms/* /srv/repo/ \nCOPY --from=oc-rpms /go/src/github.com/openshift/oc/_rpmbuild/RPMS/x86_64/* /srv/repo/ ' > _output/local/releases/Dockerfile; make build-cross;
     from: bin
     to: bin-cross
 - project_directory_image_build_step:
@@ -137,6 +77,10 @@ raw_steps:
         paths:
         - destination_dir: .
           source_path: /go/src/github.com/openshift/origin/_output/local/releases/Dockerfile
+      oc-rpms:
+        as:
+        - oc-rpms
+        paths: null
       rpms:
         as:
         - rpms
@@ -165,6 +109,12 @@ resources:
     requests:
       cpu: 100m
       memory: 4Gi
+  artifacts:
+    limits:
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 100Mi
   bin:
     limits:
       memory: 12Gi
@@ -183,6 +133,12 @@ resources:
     requests:
       cpu: "4"
       memory: 8Gi
+  e2e-conformance-k8s:
+    limits:
+      memory: 9Gi
+    requests:
+      cpu: "1"
+      memory: 300Mi
   hyperkube:
     limits:
       memory: 12Gi
@@ -230,14 +186,10 @@ tag_specification:
   name: "4.3"
   namespace: ocp
 tests:
-- artifact_dir: /tmp/artifacts
-  as: cmd
-  commands: TMPDIR=/tmp/volume ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1 KUBERNETES_SERVICE_HOST=
-    make test-cmd -k
+- as: images-artifacts
+  commands: '# noop, just to force the building the `artifacts` image'
   container:
-    from: bin
-    memory_backed_volume:
-      size: 4Gi
+    from: artifacts
 - artifact_dir: /tmp/artifacts
   as: unit
   commands: TMPDIR=/tmp/volume GOTEST_FLAGS='-p 8' ARTIFACT_DIR=/tmp/artifacts TIMEOUT=180s
@@ -247,54 +199,52 @@ tests:
     memory_backed_volume:
       size: 4Gi
 - artifact_dir: /tmp/artifacts
-  as: integration
-  commands: GOMAXPROCS=8 TMPDIR=/tmp/volume ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1
-    KUBERNETES_SERVICE_HOST= make test-integration
-  container:
-    from: bin
-    memory_backed_volume:
-      size: 4Gi
-- artifact_dir: /tmp/artifacts
   as: verify
   commands: ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1 KUBERNETES_SERVICE_HOST= make
     verify -k
   container:
     from: bin
+- as: e2e-gcp
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer:
+    cluster_profile: gcp
 - as: e2e-aws
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: aws
-    upgrade: false
 - as: e2e-azure
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: azure4
-    upgrade: false
 - as: e2e-aws-all
   commands: TEST_SUITE=openshift/conformance run-tests
   openshift_installer:
     cluster_profile: aws
-    upgrade: false
+- as: e2e-cmd
+  commands: TEST_SUITE=openshift/test-cmd run-tests
+  openshift_installer:
+    cluster_profile: aws
 - as: e2e-aws-builds
   commands: TEST_SUITE=openshift/build run-tests
   openshift_installer:
     cluster_profile: aws
-    upgrade: false
+- as: e2e-aws-disruptive
+  commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance/parallel
+    run-tests
+  openshift_installer:
+    cluster_profile: aws
 - as: e2e-aws-jenkins
   commands: TEST_SUITE=openshift/jenkins-e2e run-tests
   openshift_installer:
     cluster_profile: aws
-    upgrade: false
 - as: e2e-aws-image-ecosystem
   commands: TEST_SUITE=openshift/image-ecosystem run-tests
   openshift_installer:
     cluster_profile: aws
-    upgrade: false
 - as: e2e-aws-image-registry
   commands: TEST_SUITE=openshift/image-registry run-tests
   openshift_installer:
     cluster_profile: aws
-    upgrade: false
 - as: e2e-aws-upgrade
   commands: TEST_SUITE=all run-upgrade-tests
   openshift_installer:
@@ -304,7 +254,6 @@ tests:
   commands: TEST_SUITE=openshift/conformance/serial run-tests
   openshift_installer:
     cluster_profile: aws
-    upgrade: false
 - as: e2e-vsphere
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer_upi:
@@ -313,13 +262,7 @@ tests:
   commands: sleep 7200 & wait
   openshift_installer_upi:
     cluster_profile: vsphere
-- as: e2e-dr-snapshot-tests
-  commands: TEST_SUITE=openshift/conformance/parallel run-dr-snapshot-tests
-  openshift_installer:
+- as: e2e-conformance-k8s
+  commands: test/extended/conformance-k8s.sh
+  openshift_installer_src:
     cluster_profile: aws
-    upgrade: false
-- as: e2e-dr-quorum-tests
-  commands: TEST_SUITE=openshift/conformance/parallel run-dr-quorum-tests
-  openshift_installer:
-    cluster_profile: aws
-    upgrade: false

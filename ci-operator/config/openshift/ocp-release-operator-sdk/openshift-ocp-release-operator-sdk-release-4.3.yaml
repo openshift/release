@@ -1,20 +1,43 @@
 base_images:
-  ansible_runner:
-    cluster: https://api.ci.openshift.org
-    name: ansible-runner
-    namespace: openshift
-    tag: latest
+  os:
+    name: ubi
+    namespace: ocp
+    tag: "7"
 build_root:
   image_stream_tag:
-    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
-    tag: golang-1.10
+    tag: golang-1.12
 images:
-- dockerfile_path: upstream.Dockerfile
-  from: ansible_runner
+- dockerfile_path: ci/dockerfiles/builder.Dockerfile
+  from: root
+  to: osdk-builder
+- dockerfile_path: upstream.ubi7.Dockerfile
+  from: os
   to: ansible-operator
+- dockerfile_path: ci/dockerfiles/ansible-e2e-hybrid.Dockerfile
+  from: os
+  inputs:
+    osdk-builder:
+      as:
+      - osdk-builder
+      paths: null
+  to: osdk-ansible-e2e-hybrid
+- dockerfile_path: ci/dockerfiles/ansible-e2e.Dockerfile
+  from: ansible-operator
+  inputs:
+    osdk-builder:
+      as:
+      - osdk-builder
+      paths: null
+  to: osdk-ansible-e2e
 promotion:
+  disabled: true
+  excluded_images:
+  - osdk-builder
+  - osdk-ansible-e2e
+  - osdk-ansible-e2e-hybrid
+  - memcached-operator
   name: "4.3"
   namespace: ocp
 resources:
@@ -40,12 +63,17 @@ tests:
     from: src
 - as: sanity
   commands: |
+    export GO111MODULE=on
+    export GOFLAGS=-mod=vendor
     mkdir -p $GOPATH/src/github.com/operator-framework/operator-sdk
     cp -r ./* $GOPATH/src/github.com/operator-framework/operator-sdk/
     cd $GOPATH/src/github.com/operator-framework/operator-sdk
-    rm -rf vendor/github.com/operator-framework/operator-sdk
     go vet ./...
     ./hack/check_license.sh
     ./hack/check_error_log_msg_format.sh
   container:
     from: src
+- as: e2e-aws-ansible
+  commands: make test/e2e/ansible2
+  openshift_installer_src:
+    cluster_profile: aws

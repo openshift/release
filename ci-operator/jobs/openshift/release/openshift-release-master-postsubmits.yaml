@@ -4,6 +4,38 @@ postsubmits:
     branches:
     - ^master$
     decorate: true
+    name: branch-ci-openshift-release-master-config-change-trigger
+    spec:
+      containers:
+      - args:
+        - --candidate-path=.
+        - --github-token-path=/etc/github/oauth
+        - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --github-graphql-endpoint=http://ghproxy/graphql
+        - --github-graphql-endpoint=https://api.github.com/graphql
+        - --dry-run=false
+        command:
+        - config-change-trigger
+        image: registry.svc.ci.openshift.org/ci/config-change-trigger:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/github
+          name: token
+          readOnly: true
+      serviceAccountName: hook
+      volumes:
+      - name: token
+        secret:
+          secretName: github-credentials-openshift-ci-robot
+  - agent: kubernetes
+    branches:
+    - ^master$
+    decorate: true
     name: branch-ci-openshift-release-master-config-updates
     spec:
       containers:
@@ -26,10 +58,13 @@ postsubmits:
     spec:
       containers:
       - args:
-        - core
+        - --config-dir
+        - core-services
+        - --confirm
+        - "true"
         command:
-        - make
-        image: registry.svc.ci.openshift.org/ci/origin-release:cli
+        - applyconfig
+        image: registry.svc.ci.openshift.org/ci/applyconfig:latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -46,11 +81,11 @@ postsubmits:
     labels:
       ci.openshift.io/role: infra
     name: branch-ci-openshift-release-master-label-sync
-    run_if_changed: cluster/ci/config/prow/labels.yaml
+    run_if_changed: core-services/prow/02_config/_labels.yaml
     spec:
       containers:
       - args:
-        - --config=./cluster/ci/config/prow/labels.yaml
+        - --config=./core-services/prow/02_config/_labels.yaml
         - --confirm=true
         - --orgs=openshift,cri-o,operator-framework
         - --token=/etc/github/oauth
@@ -58,7 +93,7 @@ postsubmits:
         - --debug
         command:
         - /app/label_sync/app.binary
-        image: gcr.io/k8s-prow/label_sync:v20190718-3415f1ca2
+        image: gcr.io/k8s-prow/label_sync:v20191003-4c085117a
         imagePullPolicy: Always
         name: ""
         resources:
@@ -72,3 +107,24 @@ postsubmits:
       - name: token
         secret:
           secretName: github-credentials-openshift-ci-robot
+  - agent: kubernetes
+    branches:
+    - ^master$
+    decorate: true
+    name: branch-ci-openshift-release-master-services-apply
+    spec:
+      containers:
+      - args:
+        - --config-dir
+        - services
+        - --confirm
+        - "true"
+        command:
+        - applyconfig
+        image: registry.svc.ci.openshift.org/ci/applyconfig:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+      serviceAccountName: config-updater

@@ -1,13 +1,12 @@
 tag_specification:
-  name: '4.1'
+  name: '4.2'
   namespace: ocp
 promotion:
-  cluster: https://api.ci.openshift.org
   namespace: openshift
-  name: release-next
+  name: knative-nightly
 base_images:
   base:
-    name: '4.1'
+    name: '4.2'
     namespace: ocp
     tag: base
 build_root:
@@ -17,7 +16,7 @@ canonical_go_repository: knative.dev/serving
 binary_build_commands: make install
 test_binary_build_commands: make test-install
 tests:
-- as: e2e-aws
+- as: e2e-aws-ocp-42
   commands: "make test-e2e"
   openshift_installer_src:
     cluster_profile: aws
@@ -53,6 +52,14 @@ images:
       - destination_dir: .
         source_path: /go/bin/istio
   to: knative-serving-istio
+- dockerfile_path: openshift/ci-operator/knative-images/nscert/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/nscert
+  to: knative-serving-nscert
 - dockerfile_path: openshift/ci-operator/knative-images/controller/Dockerfile
   from: base
   inputs:
@@ -61,6 +68,14 @@ images:
       - destination_dir: .
         source_path: /go/bin/controller
   to: knative-serving-controller
+- dockerfile_path: openshift/ci-operator/knative-images/autoscaler-hpa/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/autoscaler-hpa
+  to: knative-serving-autoscaler-hpa
 - dockerfile_path: openshift/ci-operator/knative-images/certmanager/Dockerfile
   from: base
   inputs:

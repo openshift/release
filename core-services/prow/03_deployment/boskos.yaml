@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: boskos
+  namespace: ci
+  labels:
+    app: prow
+    component: boskos
+spec:
+  replicas: 1  # one canonical source of resources
+  selector:
+    matchLabels:
+      app: prow
+      component: boskos
+  template:
+    metadata:
+      labels:
+        app: prow
+        component: boskos
+      namespace: ci
+    spec:
+      serviceAccountName: boskos
+      priorityClassName: prow-critical
+      terminationGracePeriodSeconds: 30
+      containers:
+      - name: boskos
+        image: gcr.io/k8s-prow/boskos/boskos:v20190910-3d026cf14
+        args:
+        - --config=/etc/config/boskos.yaml
+        - --namespace=ci
+        ports:
+          - containerPort: 8080
+            protocol: TCP
+        volumeMounts:
+        - name: boskos-config
+          mountPath: /etc/config
+          readOnly: true
+      volumes:
+        - name: boskos-config
+          configMap:
+            name: resources
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: boskos
+  namespace: ci
+spec:
+  selector:
+    app: prow
+    component: boskos
+  ports:
+  - name: default
+    protocol: TCP
+    port: 80
+    targetPort: 8080

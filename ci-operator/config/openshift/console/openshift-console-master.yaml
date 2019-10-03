@@ -1,27 +1,25 @@
 base_images:
   base:
-    name: "4.2"
+    name: "4.3"
     namespace: ocp
     tag: base
 build_root:
   image_stream_tag:
-    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: tectonic-console-builder
-canonical_go_repository: github.com/openshift/console
 images:
 - from: base
   inputs:
     root:
       as:
-      - build
+      - quay.io/coreos/tectonic-console-builder:v17
       paths: null
   to: console
 promotion:
   additional_images:
     console-tests: src
-  name: "4.2"
+  name: "4.3"
   namespace: ocp
 resources:
   '*':
@@ -32,12 +30,24 @@ resources:
       memory: 200Mi
   console:
     limits:
-      memory: 8Gi
+      memory: 12Gi
     requests:
       cpu: "1"
-      memory: 5Gi
+      memory: 8Gi
+  frontend:
+    limits:
+      memory: 15Gi
+    requests:
+      cpu: "1"
+      memory: 10Gi
+  test-bin:
+    limits:
+      memory: 15Gi
+    requests:
+      cpu: "1"
+      memory: 10Gi
 tag_specification:
-  name: "4.2"
+  name: "4.3"
   namespace: ocp
 test_binary_build_commands: ./build.sh
 tests:
@@ -65,4 +75,3 @@ tests:
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: aws
-    upgrade: false

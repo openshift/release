@@ -1,26 +1,25 @@
 base_images:
   base:
-    name: "4.2"
+    name: "4.3"
     namespace: ocp
     tag: base
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
-    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.12
-canonical_go_repository: github.com/openshift/template-service-broker
 images:
 - dockerfile_path: images/Dockerfile.rhel
   from: base
   inputs:
     bin:
       as:
-        - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
+      paths: null
   to: template-service-broker
 promotion:
-  name: "4.2"
+  name: "4.3"
   namespace: ocp
 resources:
   '*':
@@ -30,7 +29,7 @@ resources:
       cpu: "3"
       memory: 6Gi
 tag_specification:
-  name: "4.2"
+  name: "4.3"
   namespace: ocp
 test_binary_build_commands: make build GOFLAGS='-race' --warn-undefined-variables
 tests:
@@ -56,7 +55,6 @@ tests:
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: aws
-    upgrade: false
 - as: e2e-aws-upgrade
   commands: TEST_SUITE=all run-upgrade-tests
   openshift_installer:

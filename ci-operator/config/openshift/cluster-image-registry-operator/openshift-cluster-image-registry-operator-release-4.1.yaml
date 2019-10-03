@@ -5,11 +5,9 @@ base_images:
     tag: base
 build_root:
   image_stream_tag:
-    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.10
-canonical_go_repository: github.com/openshift/cluster-image-registry-operator
 images:
 - from: base
   to: cluster-image-registry-operator
@@ -36,7 +34,6 @@ tests:
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: aws
-    upgrade: false
 - artifact_dir: /tmp/artifacts
   as: e2e-aws-operator
   commands: JUNIT_REPORT=1 make test-e2e
@@ -46,9 +43,12 @@ tests:
   commands: TEST_SUITE=openshift/image-registry run-tests
   openshift_installer:
     cluster_profile: aws
-    upgrade: false
 - as: e2e-aws-upgrade
   commands: TEST_SUITE=all run-upgrade-tests
   openshift_installer:
     cluster_profile: aws
     upgrade: true
+- as: verify
+  commands: make verify
+  container:
+    from: src

@@ -25,6 +25,8 @@ parameters:
   value: 128.31.27.48
 - name: KURYR_ENABLED
   value: "false"
+- name: BUILD_ID
+  required: false
 
 objects:
 
@@ -82,18 +84,34 @@ objects:
     dnsConfig:
       nameservers:
         - ${CI_DNS_IP}
+    initContainers:
+    - name: cp-shared
+      image: ${IMAGE_TESTS}
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      command:
+      - cp
+      - /usr/bin/openshift-tests
+      - /usr/bin/oc
+      - /usr/bin/kubectl
+      - /tmp/shared/
     containers:
-
+    # NOTE openshift-tests requires access to openstackclient/cinder
+    # so we re-use the install image here which already contains
+    # the required binaries. The initContainer above is used to copy over
+    # the latest openshift-tests/oc binaries.
+    #
     # Once the cluster is up, executes shared tests
     - name: test
-      image: ${IMAGE_TESTS}
+      image: ${IMAGE_OPENSTACK_INSTALLER}
       terminationMessagePolicy: FallbackToLogsOnError
       resources:
         requests:
-          cpu: 1
-          memory: 300Mi
+          cpu: 3
+          memory: 600Mi
         limits:
-          memory: 3Gi
+          memory: 4Gi
       volumeMounts:
       - name: shared-tmp
         mountPath: /tmp/shared
@@ -115,7 +133,7 @@ objects:
         #!/bin/bash
         set -euo pipefail
 
-        export PATH=/usr/libexec/origin:$PATH
+        export PATH=/tmp/shared:/usr/libexec/origin:$PATH
 
         trap 'touch /tmp/shared/exit' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
@@ -147,8 +165,33 @@ objects:
         # set up env vars
         export KUBE_SSH_BASTION="$( oc --insecure-skip-tls-verify get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
         export KUBE_SSH_KEY_PATH=/tmp/cluster/ssh-privatekey
+        export KUBE_SSH_USER=core
         mkdir -p ~/.ssh
         cp /tmp/cluster/ssh-privatekey ~/.ssh/kube_openstack_rsa || true
+        export TEST_PROVIDER='{"type":"openstack"}'
+
+        # set up openstack env vars for testing
+        function get_clouds_param() {
+          awk '/^\s+'$1':/ { print $2 }' /tmp/cluster/clouds.yaml | sed -e 's/^"//' -e 's/"$//'
+        }
+
+        XTRACE_ENABLED=0
+        if set -o | grep xtrace.*on &>/dev/null; then
+          XTRACE_ENABLED=1
+        fi
+        set +x #make extra sure we aren't echo'ing these to stdout
+        export OS_AUTH_URL="$(get_clouds_param 'auth_url')"
+        export OS_PROJECT_ID="$(get_clouds_param 'project_id')"
+        export OS_PROJECT_NAME="$(get_clouds_param 'project_name')"
+        export OS_USERNAME="$(get_clouds_param 'username')"
+        export OS_PASSWORD="$(get_clouds_param 'password')"
+        export OS_REGION_NAME="$(get_clouds_param 'region_name')"
+        export OS_ENDPOINT_TYPE="$(get_clouds_param 'interface')"
+        export OS_IDENTITY_API_VERSION="$(get_clouds_param 'identity_api_version')"
+        export OS_USER_DOMAIN_NAME="$(get_clouds_param 'user_domain_name')"
+        if [[ "$XTRACE_ENABLED" == 1 ]]; then
+          set -x
+        fi
 
         mkdir -p /tmp/output
         cd /tmp/output
@@ -156,13 +199,13 @@ objects:
         function run-upgrade-tests() {
           openshift-tests run-upgrade "${TEST_SUITE}" --to-image "${RELEASE_IMAGE_LATEST}" \
             --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
-          exit 0
+          return 0
         }
 
         function run-tests() {
           openshift-tests run "${TEST_SUITE}" \
             --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
-          exit 0
+          return 0
         }
 
         function run-minimal-tests() {
@@ -171,13 +214,13 @@ objects:
             grep 'Smoke' |
           openshift-tests run -o /tmp/artifacts/e2e.log \
             --junit-dir /tmp/artifacts/junit -f -
-          exit 0
+          return 0
         }
 
         function run-no-tests() {
           # This can be used if we just want to check the installer exits 0
           echo "WARNING: No tests were run against the installed cluster"
-          exit 0
+          return 0
         }
 
         ${TEST_COMMAND}
@@ -197,15 +240,19 @@ objects:
       - name: TYPE
         value: ${CLUSTER_TYPE}
       - name: CLUSTER_NAME
-        value: ${NAMESPACE}
+        value: ${NAMESPACE}-${JOB_NAME_HASH}
       - name: BASE_DOMAIN
         value: ${BASE_DOMAIN}
       - name: SSH_PUB_KEY_PATH
         value: /etc/openshift-installer/ssh-publickey
+      - name: SSH_PRIV_KEY_PATH
+        value: /etc/openshift-installer/ssh-privatekey
       - name: PULL_SECRET_PATH
         value: /etc/openshift-installer/pull-secret
       - name: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
         value: ${RELEASE_IMAGE_LATEST}
+      - name: OPENSHIFT_INSTALL_INVOKER
+        value: openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID}
       - name: OPENSTACK_IMAGE
         value: rhcos
       - name: OPENSTACK_REGION
@@ -224,6 +271,11 @@ objects:
         value: /tmp
       - name: CI_DNS_IP
         value: ${CI_DNS_IP}
+      # we must boot from performance volumes to reduce disk speed related etcd failures
+      - name: OPENSTACK_MASTER_VOLUME_SIZE
+        value: "25"
+      - name: OPENSTACK_MASTER_VOLUME_TYPE
+        value: "performance"
       - name: INSTALL_INITIAL_RELEASE
       - name: RELEASE_IMAGE_INITIAL
       command:
@@ -231,10 +283,16 @@ objects:
       - -c
       - |
         #!/bin/sh
+        set -e
         trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/setup-success; else touch /tmp/exit; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
         cp "$(command -v openshift-install)" /tmp
         mkdir /tmp/artifacts/installer
+
+        # We have to truncate cluster name to 14 chars, because there is a limitation in the install-config
+        # Now it looks like "ci-op-rl6z646h-65230".
+        # We will remove "ci-op-" prefix from there to keep just last 14 characters.
+        export CLUSTER_NAME=${CLUSTER_NAME: -14}
 
         if [[ -n "${INSTALL_INITIAL_RELEASE}" && -n "${RELEASE_IMAGE_INITIAL}" ]]; then
           echo "Installing from initial release ${RELEASE_IMAGE_INITIAL}"
@@ -247,20 +305,31 @@ objects:
         export SSH_PUB_KEY=$(cat "${SSH_PUB_KEY_PATH}")
         export PULL_SECRET=$(cat "${PULL_SECRET_PATH}")
 
+        # move private key to ~/.ssh/ so that installer can use it to gather logs on bootstrap failure
+        mkdir -p ~/.ssh
+        cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/id_rsa
+        chmod 0600 ~/.ssh/id_rsa
+
         # create a new floating ip tagged with CLUSTER_NAME so it can be deleted later
         LB_FIP=$(openstack floating ip create --description $CLUSTER_NAME $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address')
 
         # create A record for the api
-        curl -v -X POST $CI_DNS_IP:8080 -d '{"name": "'api.$CLUSTER_NAME'", "ip": "'$LB_FIP'"}'
+        curl -v $CI_DNS_IP:8080/add -d '{"cluster_name": "'$CLUSTER_NAME'", "lb_fip": "'$LB_FIP'"}'
 
         cat > /tmp/artifacts/installer/install-config.yaml << EOF
         apiVersion: v1beta4
         baseDomain: ${BASE_DOMAIN}
+        controlPlane:
+          name: master
+          platform:
+            openstack:
+              rootVolume:
+                size: ${OPENSTACK_MASTER_VOLUME_SIZE}
+                type: ${OPENSTACK_MASTER_VOLUME_TYPE}
         metadata:
           name: ${CLUSTER_NAME}
         platform:
           openstack:
-            baseImage:        ${OPENSTACK_IMAGE}
             cloud:            ${OS_CLOUD}
             externalNetwork:  ${OPENSTACK_EXTERNAL_NETWORK}
             computeFlavor:    ${OPENSTACK_FLAVOR}
@@ -282,6 +351,15 @@ objects:
         TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create cluster --log-level=debug &
         wait "$!"
 
+        INGRESS_PORT=$(openstack port list --format value -c Name | awk "/${CLUSTER_NAME}.*-ingress-port/ {print}")
+        if [ -n "$INGRESS_PORT" ]; then
+          # Assign a FIP to ingress port to allow getting to apps
+          # create a new floating ip tagged with CLUSTER_NAME so it can be deleted later
+          APPS_FIP=$(openstack floating ip create --description $CLUSTER_NAME $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address' --port $INGRESS_PORT)
+          # create A record for *.apps
+          curl -v $CI_DNS_IP:8080/add -d '{"cluster_name": "'$CLUSTER_NAME'", "apps_fip": "'$APPS_FIP'"}'
+        fi
+
     # Performs cleanup of all created resources
     - name: teardown
       image: ${IMAGE_OPENSTACK_INSTALLER}
@@ -297,13 +375,21 @@ objects:
       - name: TYPE
         value: ${CLUSTER_TYPE}
       - name: CLUSTER_NAME
-        value: ${NAMESPACE}
+        value: ${NAMESPACE}-${JOB_NAME_HASH}
+      - name: CI_DNS_IP
+        value: ${CI_DNS_IP}
       - name: KUBECONFIG
         value: /tmp/artifacts/installer/auth/kubeconfig
       - name: OS_CLOUD
         value: openstack-cloud
       - name: OS_CLIENT_CONFIG_FILE
         value: /etc/openshift-installer/clouds.yaml
+      - name: SSH_PRIV_KEY_PATH
+        value: /etc/openshift-installer/ssh-privatekey
+      - name: USER
+        value: test
+      - name: HOME
+        value: /tmp
       command:
       - /bin/bash
       - -c
@@ -324,35 +410,6 @@ objects:
             "${@}" >"${TARGET}" &
           fi
         }
-        function nuke() {
-          export PREFIX=$(grep cluster_id /tmp/artifacts/installer/terraform.tfvars | cut -d '"' -f4)
-          openstack server list -c ID -f value --name $PREFIX | xargs --no-run-if-empty openstack server delete
-
-          openstack router remove subnet $PREFIX-external-router $PREFIX-service
-          openstack router remove subnet $PREFIX-external-router $PREFIX-nodes
-          # delete interfaces from the router
-          openstack network trunk list -c Name -f value | grep $PREFIX | xargs --no-run-if-empty openstack network trunk delete
-          openstack port list --network $PREFIX-openshift -c ID -f value | xargs --no-run-if-empty openstack port delete
-
-          # delete interfaces from the router
-          PORT=$(openstack router show $PREFIX-external-router -c interfaces_info -f value | cut -d '"' -f 12)
-          openstack router remove port $PREFIX-external-router $PORT
-
-
-          openstack router unset --external-gateway $PREFIX-external-router
-          openstack router delete $PREFIX-external-router
-
-          openstack network delete $PREFIX-openshift
-
-          openstack security group delete $PREFIX-api
-          openstack security group delete $PREFIX-master
-          openstack security group delete $PREFIX-worker
-
-
-          CONTAINER=$PREFIX
-          openstack object list -f value $CONTAINER | xargs --no-run-if-empty openstack object delete $CONTAINER
-          openstack container delete $CONTAINER
-        }
 
         function teardown() {
           set +e
@@ -362,59 +419,20 @@ objects:
           echo "Gathering artifacts ..."
           mkdir -p /tmp/artifacts/pods /tmp/artifacts/nodes /tmp/artifacts/metrics /tmp/artifacts/bootstrap /tmp/artifacts/network
 
-
-          if [ -f /tmp/artifacts/installer/terraform.tfstate ]
-          then
-              # TODO(trown): rework this to fetch bootstrap logs from openstack
-              # we don't have jq, so the python equivalent of
-              # jq '.modules[].resources."aws_instance.bootstrap".primary.attributes."public_ip" | select(.)'
-                #              bootstrap_ip=$(python -c \
-                #                  'import sys, json; d=reduce(lambda x,y: dict(x.items() + y.items()), map(lambda x: x["resources"], json.load(sys.stdin)["modules"])); k="aws_instance.bootstrap"; print d[k]["primary"]["attributes"]["public_ip"] if k in d else ""' \
-                #                  < /tmp/artifacts/installer/terraform.tfstate
-                #              )
-                #
-              if [ -n "${bootstrap_ip}" ]
-              then
-                for service in bootkube openshift kubelet crio
-                do
-                    queue "/tmp/artifacts/bootstrap/${service}.service" curl \
-                        --insecure \
-                        --silent \
-                        --connect-timeout 5 \
-                        --retry 3 \
-                        --cert /tmp/artifacts/installer/tls/journal-gatewayd.crt \
-                        --key /tmp/artifacts/installer/tls/journal-gatewayd.key \
-                        --url "https://${bootstrap_ip}:19531/entries?_SYSTEMD_UNIT=${service}.service"
-                done
-                if ! whoami &> /dev/null; then
-                  if [ -w /etc/passwd ]; then
-                    echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
-                  fi
-                fi
-                eval $(ssh-agent)
-                ssh-add /etc/openshift-installer/ssh-privatekey
-                ssh -A -o PreferredAuthentications=publickey -o StrictHostKeyChecking=false -o UserKnownHostsFile=/dev/null core@${bootstrap_ip} /bin/bash -x /usr/local/bin/installer-gather.sh
-                scp -o PreferredAuthentications=publickey -o StrictHostKeyChecking=false -o UserKnownHostsFile=/dev/null core@${bootstrap_ip}:log-bundle.tar.gz /tmp/artifacts/installer/bootstrap-logs.tar.gz
-              fi
-          else
-              echo "No terraform statefile found. Skipping collection of bootstrap logs."
-          fi
-          # WORKAROUND https://github.com/openshift/installer/issues/1467
-          # We need this to be able to collect logs
-          oc --insecure-skip-tls-verify --request-timeout=5s get csr -o name | xargs oc --insecure-skip-tls-verify --request-timeout=5s adm certificate approve
-
           oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' > /tmp/nodes
           oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces --template '{{ range .items }}{{ $name := .metadata.name }}{{ $ns := .metadata.namespace }}{{ range .spec.containers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ range .spec.initContainers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ end }}' > /tmp/containers
           oc --insecure-skip-tls-verify --request-timeout=5s get pods -l openshift.io/component=api --all-namespaces --template '{{ range .items }}-n {{ .metadata.namespace }} {{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/pods-api
 
+          queue /tmp/artifacts/config-resources.json oc --insecure-skip-tls-verify --request-timeout=5s get apiserver.config.openshift.io authentication.config.openshift.io build.config.openshift.io console.config.openshift.io dns.config.openshift.io featuregate.config.openshift.io image.config.openshift.io infrastructure.config.openshift.io ingress.config.openshift.io network.config.openshift.io oauth.config.openshift.io project.config.openshift.io scheduler.config.openshift.io -o json
           queue /tmp/artifacts/apiservices.json oc --insecure-skip-tls-verify --request-timeout=5s get apiservices -o json
           queue /tmp/artifacts/clusteroperators.json oc --insecure-skip-tls-verify --request-timeout=5s get clusteroperators -o json
           queue /tmp/artifacts/clusterversion.json oc --insecure-skip-tls-verify --request-timeout=5s get clusterversion -o json
           queue /tmp/artifacts/configmaps.json oc --insecure-skip-tls-verify --request-timeout=5s get configmaps --all-namespaces -o json
+          queue /tmp/artifacts/credentialsrequests.json oc --insecure-skip-tls-verify --request-timeout=5s get credentialsrequests --all-namespaces -o json
           queue /tmp/artifacts/csr.json oc --insecure-skip-tls-verify --request-timeout=5s get csr -o json
           queue /tmp/artifacts/endpoints.json oc --insecure-skip-tls-verify --request-timeout=5s get endpoints --all-namespaces -o json
-          queue /tmp/artifacts/deployments.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get deployments --all-namespaces -o json
-          queue /tmp/artifacts/daemonsets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get daemonsets --all-namespaces -o json
+          FILTER=gzip queue /tmp/artifacts/deployments.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get deployments --all-namespaces -o json
+          FILTER=gzip queue /tmp/artifacts/daemonsets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get daemonsets --all-namespaces -o json
           queue /tmp/artifacts/events.json oc --insecure-skip-tls-verify --request-timeout=5s get events --all-namespaces -o json
           queue /tmp/artifacts/kubeapiserver.json oc --insecure-skip-tls-verify --request-timeout=5s get kubeapiserver -o json
           queue /tmp/artifacts/kubecontrollermanager.json oc --insecure-skip-tls-verify --request-timeout=5s get kubecontrollermanager -o json
@@ -426,11 +444,11 @@ objects:
           queue /tmp/artifacts/pods.json oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces -o json
           queue /tmp/artifacts/persistentvolumes.json oc --insecure-skip-tls-verify --request-timeout=5s get persistentvolumes --all-namespaces -o json
           queue /tmp/artifacts/persistentvolumeclaims.json oc --insecure-skip-tls-verify --request-timeout=5s get persistentvolumeclaims --all-namespaces -o json
-          queue /tmp/artifacts/replicasets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get replicasets --all-namespaces -o json
+          FILTER=gzip queue /tmp/artifacts/replicasets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get replicasets --all-namespaces -o json
           queue /tmp/artifacts/rolebindings.json oc --insecure-skip-tls-verify --request-timeout=5s get rolebindings --all-namespaces -o json
           queue /tmp/artifacts/roles.json oc --insecure-skip-tls-verify --request-timeout=5s get roles --all-namespaces -o json
           queue /tmp/artifacts/services.json oc --insecure-skip-tls-verify --request-timeout=5s get services --all-namespaces -o json
-          queue /tmp/artifacts/statefulsets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get statefulsets --all-namespaces -o json
+          FILTER=gzip queue /tmp/artifacts/statefulsets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get statefulsets --all-namespaces -o json
 
           FILTER=gzip queue /tmp/artifacts/openapi.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get --raw /openapi/v2
 
@@ -464,21 +482,34 @@ objects:
           echo "Snapshotting prometheus (may take 15s) ..."
           queue /tmp/artifacts/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring prometheus-k8s-0 -- tar cvzf - -C /prometheus .
 
+          # move private key to ~/.ssh/ so that installer can use it to gather logs
+          mkdir -p ~/.ssh
+          cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/id_rsa
+          chmod 0600 ~/.ssh/id_rsa
+
+          echo "Running must-gather..."
+          mkdir -p /tmp/artifacts/must-gather
+          queue /tmp/artifacts/must-gather/must-gather.log oc --insecure-skip-tls-verify adm must-gather --dest-dir /tmp/artifacts/must-gather
+
           echo "Waiting for logs ..."
           wait
+
+          echo "Removing entries from DNS ..."
+          curl -v $CI_DNS_IP:8080/remove -d '{"cluster_name": "'$CLUSTER_NAME'"}'
 
           echo "Deleting service VM FIP ..."
           openstack floating ip list --long -f csv -c Description -c "Floating IP Address" | grep $CLUSTER_NAME | cut -f1 -d "," | xargs openstack floating ip delete
 
           echo "Deprovisioning cluster ..."
           openshift-install --dir /tmp/artifacts/installer destroy cluster
-          DELETE_FAIL=$?
-
-          echo "Nuking any resources left"
-          nuke
         }
 
-        trap 'teardown; exit $DELETE_FAIL' EXIT
+        # We have to truncate cluster name to 14 chars, because there is a limitation in the install-config
+        # Now it looks like "ci-op-rl6z646h-65230".
+        # We will remove "ci-op-" prefix from there to keep just last 14 characters.
+        export CLUSTER_NAME=${CLUSTER_NAME: -14}
+
+        trap 'teardown' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
 
         for i in $(seq 1 180); do

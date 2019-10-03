@@ -49,6 +49,9 @@ items:
   - bparees
   - mfojtik
   - hongkailiu
+  - AlexNPavel
+  - jupierce
+  - bradmwilliams
 - kind: Group
   apiVersion: v1
   metadata:
@@ -406,6 +409,39 @@ items:
 - kind: Namespace
   apiVersion: v1
   metadata:
+    name: hive-integration-access
+    annotations:
+      purpose: "Allows Hive integration environment access to latest build artifacts."
+- kind: Group
+  apiVersion: v1
+  metadata:
+    name: hive-integration-access
+  users:
+  - dgoodwin
+  - jeremyeder
+  - ethernetdan
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: admin
+    namespace: hive-integration-access
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: hive-integration-access
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: admin
+- kind: ServiceAccount
+  apiVersion: v1
+  metadata:
+    name: registry-access
+    namespace: hive-integration-access
+
+- kind: Namespace
+  apiVersion: v1
+  metadata:
     name: osde2e
 - kind: Group
   apiVersion: v1
@@ -562,6 +598,7 @@ items:
     name: prowjob-readers
   users:
   - ankitathomas
+  - bradmwilliams
 - kind: RoleBinding
   apiVersion: rbac.authorization.k8s.io/v1
   metadata:
@@ -610,6 +647,47 @@ items:
   metadata:
     name: image-puller
     namespace: codeready-toolchain
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:unauthenticated
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:authenticated
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: system:image-puller
+
+- kind: Namespace
+  apiVersion: v1
+  metadata:
+    name: integr8ly
+- kind: Group
+  apiVersion: v1
+  metadata:
+    name: integr8ly-dev
+  users:
+  - mikenairn
+  - pmccarthy
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: admin
+    namespace: integr8ly
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: integr8ly-dev
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: admin
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: image-puller
+    namespace: integr8ly
   subjects:
   - kind: Group
     apiGroup: rbac.authorization.k8s.io

@@ -1,0 +1,130 @@
+base_images:
+  base:
+    name: "4.4"
+    namespace: ocp
+    tag: base
+  must-gather-base:
+    name: "4.4"
+    namespace: ocp
+    tag: must-gather
+  tests-base:
+    name: "4.4"
+    namespace: ocp
+    tag: tests
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.12
+images:
+- dockerfile_path: images/cli/Dockerfile.rhel
+  from: base
+  inputs:
+    bin:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
+      paths: null
+  to: cli
+- dockerfile_path: images/cli/Dockerfile.rhel
+  from: tests-base
+  inputs:
+    bin:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
+      paths: null
+  to: tests
+- dockerfile_path: images/cli/Dockerfile.rhel
+  from: must-gather-base
+  inputs:
+    bin:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
+      paths: null
+  to: must-gather
+- context_dir: images/deployer/
+  dockerfile_path: Dockerfile.rhel
+  from: cli
+  to: deployer
+- context_dir: .
+  dockerfile_path: images/cli-artifacts/Dockerfile.rhel
+  from: cli
+  to: cli-artifacts
+- context_dir: images/recycler/
+  dockerfile_path: Dockerfile.rhel
+  from: cli
+  to: recycler
+promotion:
+  additional_images:
+    oc-rpms: rpms
+  excluded_images:
+  - tests
+  - must-gather
+  - oc-base-with-rpms
+  name: "4.4"
+  namespace: ocp
+raw_steps:
+- rpm_image_injection_step:
+    from: base
+    to: oc-base-with-rpms
+resources:
+  '*':
+    limits:
+      memory: 9Gi
+    requests:
+      cpu: "3"
+      memory: 6Gi
+  build-rpms-from-tar:
+    limits:
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 100Mi
+rpm_build_commands: |-
+  TMPDIR=$( mktemp -d )
+  RPMBUILD_DIR=_rpmbuild/
+  mkdir -p ${RPMBUILD_DIR}/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+  tar -czf "${TMPDIR}/openshift-clients-0.0.1.tar.gz" --exclude='.git' --transform='s|^.|openshift-clients-0.0.1|' --exclude='openshift-clients-0.0.1.tar.gz' ./
+  cp ./oc.spec "${RPMBUILD_DIR}/SPECS/"
+  cp "${TMPDIR}/openshift-clients-0.0.1.tar.gz" "${RPMBUILD_DIR}/SOURCES/"
+  rpmbuild -ba --nodeps --define "_topdir $( pwd )/${RPMBUILD_DIR}" ${RPMBUILD_DIR}/SPECS/oc.spec --define 'os_git_vars ignore'
+rpm_build_location: _rpmbuild/RPMS/
+tag_specification:
+  name: "4.4"
+  namespace: ocp
+test_binary_build_commands: make build GOFLAGS='-race' --warn-undefined-variables
+tests:
+- as: build-rpms-from-tar
+  commands: '# noop, just to force the building the `rpms` target'
+  container:
+    from: oc-base-with-rpms
+- as: rpm-build
+  commands: |
+    make rpm-build
+  container:
+    from: src
+- as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: bin
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: |
+    mkdir -p /tmp/artifacts
+    make test-unit JUNITFILE=/tmp/artifacts/unit_report.xml --warn-undefined-variables
+  container:
+    from: test-bin
+- as: e2e-aws
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer:
+    cluster_profile: aws
+- as: e2e-cmd
+  commands: TEST_SUITE=openshift/test-cmd run-tests
+  openshift_installer:
+    cluster_profile: aws
+- as: e2e-aws-upgrade
+  commands: TEST_SUITE=all run-upgrade-tests
+  openshift_installer:
+    cluster_profile: aws
+    upgrade: true

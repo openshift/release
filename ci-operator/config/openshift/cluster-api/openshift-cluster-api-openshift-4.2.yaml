@@ -10,7 +10,6 @@ base_images:
     namespace: ocp
     tag: base
 binary_build_commands: make manager clusterctl
-canonical_go_repository: github.com/openshift/cluster-api
 images:
 - dockerfile_path: Dockerfile
   from: base
@@ -30,10 +29,9 @@ resources:
       memory: 400Mi
 build_root:
   image_stream_tag:
-    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
-    tag: golang-1.10
+    tag: golang-1.12
 tests:
 - as: unit
   commands: |
@@ -46,8 +44,8 @@ tests:
     KUBEBUILDER_CONTROLPLANE_START_TIMEOUT=10m scripts/ci-test.sh
   container:
     from: src
-- as: gofmt
-  commands: make fmt
+- as: goimports
+  commands: IS_CONTAINER=TRUE make goimports
   container:
     from: src
 - as: govet

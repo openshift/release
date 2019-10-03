@@ -78,8 +78,9 @@ currently exist:
 |        Key        | Description |
 | ----------------- | ----------- |
 | `clouds.yaml`     | Credentials for the openstack cloud. See the [Openstack docs](https://docs.openstack.org/python-openstackclient/pike/configuration/index.html). |
+| `ssh-privatekey`   | Private half of the SSH key, for connecting to OpenStack Nova VMs. |
 | `ssh-publickey`   | Public half of the SSH key, for connecting to OpenStack Nova VMs. |
-| `pull-secret`     | Credentials for pulling OpenShift images from Quay. |
+| `pull-secret`    | Credentials for pulling OpenShift images from Quay and for authenticating to telemetry. Retrieved from [try.openshift.com](https://try.openshift.com) under the ccoleman+openshift-ci-test@redhat.com account, and has the service account token from the `ocp` namespace added with `oc registry login --to=/tmp/pull-secret -z default -n ocp`.|
 
 #### `cluster-secrets-metal`
 
@@ -212,3 +213,11 @@ $ oc get secrets --selector=ci.openshift.io/managed=true --export -o yaml -n ci 
 $ oc get secrets --selector=ci.openshift.io/managed=true --export -o yaml -n $TEST_NS > proposed.yaml
 $ diff prod.yaml proposed.yaml
 ```
+
+# Self-Managed Secrets
+
+In order to provide custom secrets to jobs without putting the secret management
+into the hands of the Developer Productivity (Test Platform) team, it is possible
+to create the secrets in the cluster and have them automatically mirrored to be
+available for jobs. See the [doc](../core-services/secret-mirroring/README.md#self-managed-secrets)
+for details and instructions.

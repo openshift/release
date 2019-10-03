@@ -1,0 +1,53 @@
+base_images:
+  base:
+    name: origin-v3.11
+    namespace: openshift
+    tag: base
+base_rpm_images:
+  rpm:
+    name: origin-v3.11
+    namespace: openshift
+    tag: base
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+images:
+- dockerfile_path: openshift-kuryr-tester.Dockerfile
+  from: src
+  optional: true
+  to: kuryr-tester
+- dockerfile_path: openshift-kuryr-cni-ci.Dockerfile
+  from: rpm
+  to: kuryr-cni
+- dockerfile_path: openshift-kuryr-controller-ci.Dockerfile
+  from: rpm
+  to: kuryr-controller
+promotion:
+  name: origin-v3.11
+  namespace: openshift
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+rpm_build_commands: tools/build-rpm.sh
+rpm_build_location: _output/RPMS/noarch
+tag_specification:
+  name: origin-v3.11
+  namespace: openshift
+  tag: ''
+  tag_overrides: {}
+tests:
+- as: unit
+  commands: tox -e py27
+  container:
+    from: kuryr-tester
+- as: verify
+  commands: sed -i -e "s/basepython = python3/basepython = python2.7/g" tox.ini &&
+    tox -e pep8
+  container:
+    from: kuryr-tester

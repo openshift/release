@@ -25,9 +25,9 @@ parameters:
   required: true
 - name: RELEASE_IMAGE_LATEST
   required: true
-- name: RESOURCES_TEST
-  value: '{"requests": {"cpu": 1, "memory": "300Mi"}, "limits": {"memory": "3Gi"}}'
 - name: BASE_DOMAIN
+- name: BUILD_ID
+  required: false
 
 objects:
 
@@ -55,7 +55,7 @@ objects:
       # we want to gather the teardown logs no matter what
       ci-operator.openshift.io/wait-for-container-artifacts: teardown
       ci-operator.openshift.io/save-container-logs: "true"
-      ci-operator.openshift.io/container-sub-tests: "setup,test,teardown"
+      ci-operator.openshift.io/container-sub-tests: "lease,setup,test,teardown"
   spec:
     restartPolicy: Never
     activeDeadlineSeconds: 14400
@@ -81,11 +81,71 @@ objects:
 
     containers:
 
+
+    - name: lease
+      image: registry.svc.ci.openshift.org/ci/boskoscli:latest
+      terminationMessagePolicy: FallbackToLogsOnError
+      resources:
+        requests:
+          cpu: 10m
+          memory: 10Mi
+        limits:
+          memory: 200Mi
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      - name: cluster-profile
+        mountPath: /tmp/cluster
+      - name: artifacts
+        mountPath: /tmp/artifacts
+      env:
+      - name: CLUSTER_TYPE
+        value: ${CLUSTER_TYPE}
+      - name: CLUSTER_NAME
+        value: ${NAMESPACE}-${JOB_NAME_HASH}
+      command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -euo pipefail
+
+        trap 'rc=$?; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi; if test "${rc}" -ne 0; then touch /tmp/shared/exit; fi; exit "${rc}"' EXIT
+
+        # hack for bazel
+        function boskosctl() {
+          /app/boskos/cmd/cli/app.binary "${@}"
+        }
+
+        echo "[INFO] Acquiring a lease ..."
+        resource="$( boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" acquire --type "${CLUSTER_TYPE}-quota-slice" --state free --target-state leased --timeout 150m )"
+        touch /tmp/shared/leased
+        echo "[INFO] Lease acquired!"
+        echo "[INFO] Leased resource: ${resource}"
+
+        function release() {
+            local resource_name; resource_name="$( jq .name --raw-output <<<"${resource}" )"
+            echo "[INFO] Releasing the lease on resouce ${resource_name}..."
+            boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" release --name "${resource_name}" --target-state free
+        }
+        trap release EXIT
+
+        echo "[INFO] Sending heartbeats to retain the lease..."
+        boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" heartbeat --resource "${resource}" &
+
+        while true; do
+          if [[ -f /tmp/shared/exit ]]; then
+            echo "Another process exited" 2>&1
+            exit 0
+          fi
+
+          sleep 15 & wait $!
+        done
+
     # Once the cluster is up, executes shared tests
     - name: test
       image: ${LOCAL_IMAGE_SRC}
       terminationMessagePolicy: FallbackToLogsOnError
-      resources: ${{RESOURCES_TEST}}
       volumeMounts:
       - name: shared-tmp
         mountPath: /tmp/shared
@@ -98,6 +158,8 @@ objects:
         value: /tmp/cluster/.awscred
       - name: AZURE_AUTH_LOCATION
         value: /tmp/cluster/osServicePrincipal.json
+      - name: GCP_SHARED_CREDENTIALS_FILE
+        value: /tmp/cluster/gce.json
       - name: ARTIFACT_DIR
         value: /tmp/artifacts
       - name: HOME
@@ -142,16 +204,27 @@ objects:
           oc create -f /tmp/cluster/insights-live.yaml || true
         fi
 
+        function setup-google-cloud-sdk() {
+          pushd /tmp
+          curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
+          tar -xzf google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
+          export PATH=$PATH:/tmp/google-cloud-sdk/bin
+          mkdir gcloudconfig
+          export CLOUDSDK_CONFIG=/tmp/gcloudconfig
+          gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}"
+          gcloud config set project openshift-gce-devel-ci
+          popd
+        }
+
         # set up cloud-provider-specific env vars
         export KUBE_SSH_BASTION="$( oc --insecure-skip-tls-verify get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
         export KUBE_SSH_KEY_PATH=/tmp/cluster/ssh-privatekey
         if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
-          export GOOGLE_APPLICATION_CREDENTIALS="/tmp/cluster/gce.json"
-          export KUBE_SSH_USER=cloud-user
+          export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
+          export KUBE_SSH_USER=core
           mkdir -p ~/.ssh
           cp /tmp/cluster/ssh-privatekey ~/.ssh/google_compute_engine || true
-          export PROVIDER_ARGS='-provider=gce -gce-zone=us-east1-c -gce-project=openshift-gce-devel-ci'
-          export TEST_PROVIDER='{"type":"gce","zone":"us-east1-c","projectid":"openshift-gce-devel-ci"}'
+          export TEST_PROVIDER='{"type":"gce","region":"us-east1","multizone": true,"multimaster":true,"projectid":"openshift-gce-devel-ci"}'
         elif [[ "${CLUSTER_TYPE}" == "aws" ]]; then
           mkdir -p ~/.ssh
           cp /tmp/cluster/ssh-privatekey ~/.ssh/kube_aws_rsa || true
@@ -164,6 +237,10 @@ objects:
         elif [[ "${CLUSTER_TYPE}" == "openstack" ]]; then
           mkdir -p ~/.ssh
           cp /tmp/cluster/ssh-privatekey ~/.ssh/kube_openstack_rsa || true
+        fi
+
+        if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
+          setup-google-cloud-sdk
         fi
 
         ${TEST_COMMAND}
@@ -188,8 +265,12 @@ objects:
         value: us-east-1
       - name: AZURE_AUTH_LOCATION
         value: /etc/openshift-installer/osServicePrincipal.json
-      - name: AZURE_REGION
-        value: centralus
+      - name: GCP_REGION
+        value: us-east1
+      - name: GCP_PROJECT
+        value: openshift-gce-devel-ci
+      - name: GOOGLE_CLOUD_KEYFILE_JSON
+        value: /etc/openshift-installer/gce.json
       - name: CLUSTER_NAME
         value: ${NAMESPACE}-${JOB_NAME_HASH}
       - name: BASE_DOMAIN
@@ -202,6 +283,8 @@ objects:
         value: /etc/openshift-installer/pull-secret
       - name: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
         value: ${RELEASE_IMAGE_LATEST}
+      - name: OPENSHIFT_INSTALL_INVOKER
+        value: openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID}
       - name: OPENSTACK_IMAGE
         value: rhcos
       - name: OPENSTACK_REGION
@@ -219,12 +302,25 @@ objects:
       - name: HOME
         value: /tmp
       command:
-      - /bin/sh
+      - /bin/bash
       - -c
       - |
         #!/bin/sh
         trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/setup-success; else touch /tmp/exit; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+
+        while true; do
+          if [[ -f /tmp/exit ]]; then
+            echo "Another process exited" 2>&1
+            exit 1
+          fi
+          if [[ -f /tmp/leased ]]; then
+            echo "Lease acquired, installing..."
+            break
+          fi
+
+          sleep 15 & wait
+        done
 
         cp "$(command -v openshift-install)" /tmp
         mkdir /tmp/artifacts/installer
@@ -271,6 +367,15 @@ objects:
           ${SSH_PUB_KEY}
         EOF
         elif [[ "${CLUSTER_TYPE}" == "azure4" ]]; then
+            case $((RANDOM % 4)) in
+            0) AZURE_REGION=centralus;;
+            1) AZURE_REGION=centralus;;
+            2) AZURE_REGION=centralus;;
+            3) AZURE_REGION=westus;;
+            *) echo >&2 "invalid Azure region index"; exit 1;;
+            esac
+            echo "Azure region: ${AZURE_REGION}"
+
             cat > /tmp/artifacts/installer/install-config.yaml << EOF
         apiVersion: v1
         baseDomain: ${BASE_DOMAIN:-ci.azure.devcluster.openshift.com}
@@ -308,6 +413,27 @@ objects:
         sshKey: |
           ${SSH_PUB_KEY}
         EOF
+        elif [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
+            cat > /tmp/artifacts/installer/install-config.yaml << EOF
+        apiVersion: v1
+        baseDomain: ${BASE_DOMAIN:-origin-ci-int-gce.dev.openshift.com}
+        metadata:
+          name: ${CLUSTER_NAME}
+        controlPlane:
+          name: master
+          replicas: 3
+        compute:
+        - name: worker
+          replicas: 3
+        platform:
+          gcp:
+            projectID: ${GCP_PROJECT}
+            region: ${GCP_REGION}
+        pullSecret: >
+          ${PULL_SECRET}
+        sshKey: |
+          ${SSH_PUB_KEY}
+        EOF
         else
             echo "Unsupported cluster type '${CLUSTER_TYPE}'"
             exit 1
@@ -334,12 +460,10 @@ objects:
         value: ${CLUSTER_TYPE}
       - name: AWS_SHARED_CREDENTIALS_FILE
         value: /etc/openshift-installer/.awscred
-      - name: AWS_REGION
-        value: us-east-1
       - name: AZURE_AUTH_LOCATION
         value: /etc/openshift-installer/osServicePrincipal.json
-      - name: AZURE_REGION
-        value: centralus
+      - name: GOOGLE_CLOUD_KEYFILE_JSON
+        value: /etc/openshift-installer/gce.json
       - name: KUBECONFIG
         value: /tmp/artifacts/installer/auth/kubeconfig
       command:

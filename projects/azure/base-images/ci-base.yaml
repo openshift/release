@@ -21,8 +21,8 @@ items:
         name: ci-base:latest
     source:
       git:
-        uri: "https://github.com/jim-minter/release"
-        ref: "quay"
+        uri: "https://github.com/openshift/release"
+        ref: "master"
       contextDir: "projects/azure/base-images/ci-base"
       dockerfile: |
         FROM docker.io/centos:7
@@ -45,9 +45,20 @@ items:
             PyYAML \
             tar \
             wget \
-            which
+            which \
+            sudo \
+            chromedriver \
+            chromium-headless
+        # Install software collections and ruby packages for verification tests
+        RUN yum install -y --enablerepo=centosplus centos-release-scl scl-utils-build scl-utils
+        RUN yum install -y --enablerepo=centosplus rh-ruby24 rh-ror50-rubygem-nokogiri rh-ruby24-ruby-devel rh-git29 bsdtar
+        RUN ln -s /usr/lib64/chromium-browser/headless_shell /bin/chrome
+        RUN BRANCH=v3 VERIFICATION_TESTS_GIT=https://github.com/openshift/verification-tests.git && \
+        git clone --branch $BRANCH $VERIFICATION_TESTS_GIT
+        RUN scl enable rh-ror50 /verification-tests/tools/install_os_deps.sh
+        RUN scl enable rh-ror50 /verification-tests/tools/hack_bundle.rb
 
-        RUN yum clean all
+        RUN rm -rf /verification-tests && yum clean all
 
         ENV HOME=/home/prow
 
@@ -59,16 +70,8 @@ items:
         RUN go get github.com/golang/mock/mockgen
         RUN go get github.com/Masterminds/glide
         RUN go get github.com/onsi/ginkgo/ginkgo
-
-        # pin go-bindata to 41975c0, master got broken on 1/4/2019
-        RUN go get -d github.com/go-bindata/go-bindata/go-bindata
-        RUN cd $HOME/go/src/github.com/go-bindata/go-bindata && git checkout -q 41975c0
-        RUN go install github.com/go-bindata/go-bindata/go-bindata
-
-        # pin goimports to 04b5d21e, see discussion https://github.com/openshift/openshift-azure/pull/862
-        RUN go get -d golang.org/x/tools/cmd/goimports
-        RUN cd $HOME/go/src/golang.org/x/tools && git checkout -q 04b5d21e
-        RUN go install golang.org/x/tools/cmd/goimports
+        RUN go get github.com/go-bindata/go-bindata/go-bindata
+        RUN go get golang.org/x/tools/cmd/goimports
 
         RUN mv $HOME/go/bin/* /usr/local/bin
 

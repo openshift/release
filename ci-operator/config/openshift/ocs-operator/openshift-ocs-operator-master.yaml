@@ -1,10 +1,36 @@
+base_images:
+  operator-registry:
+    name: "4.3"
+    namespace: ocp
+    tag: operator-registry
+  os:
+    name: ubi
+    namespace: ocp
+    tag: "7"
+binary_build_commands: make build
 build_root:
-  image_stream_tag:
-    cluster: https://api.ci.openshift.org
-    name: release
-    namespace: openshift
-    tag: golang-1.12
-canonical_go_repository: github.com/openshift/ocs-operator
+  project_image:
+    dockerfile_path: openshift-ci/Dockerfile.tools
+images:
+- dockerfile_path: openshift-ci/Dockerfile.deploy
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/ocs-operator/build/_output/bin/ocs-operator
+  to: ocs-operator
+- dockerfile_path: openshift-ci/Dockerfile.registry.intermediate
+  from: operator-registry
+  to: operator-registry-base
+- dockerfile_path: openshift-ci/Dockerfile.registry.build
+  from: operator-registry-base
+  to: ocs-registry
+promotion:
+  additional_images:
+    ocs-operator-tests: src
+  name: "4.3"
+  namespace: ocp
 resources:
   '*':
     limits:
@@ -12,29 +38,22 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tag_specification:
+  name: "4.3"
+  namespace: ocp
 tests:
-- as: gofmt
+- as: ocs-operator-ci
   commands: |
-    gofmt -s -l $(find . -path ./vendor -prune -o -type f -name '*.go' -print)
+    make ocs-operator-ci
   container:
     from: src
-- as: golint
+- as: ocs-operator-e2e-aws
   commands: |
-    golint -set_exit_status $(go list ./...)
-  container:
-    from: src
-- as: govet
+    make cluster-deploy && make functest
+  openshift_installer_src:
+    cluster_profile: aws
+- as: red-hat-storage-ocs-ci-e2e-aws
   commands: |
-    go vet ./...
-  container:
-    from: src
-- as: gotest
-  commands: |
-    go test -v ./...
-  container:
-    from: src
-- as: gobuild
-  commands: |
-    go build github.com/openshift/ocs-operator/cmd/manager
-  container:
-    from: src
+    export REDHAT_OCS_CI_FORCE_TOOL_POD_INSTALL="true" && make cluster-deploy && make red-hat-storage-ocs-ci
+  openshift_installer_src:
+    cluster_profile: aws

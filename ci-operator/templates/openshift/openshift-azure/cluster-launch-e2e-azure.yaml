@@ -65,8 +65,6 @@ parameters:
 # 3. Bushslicer
 - name: TEST_IMAGE
   value: "registry.svc.ci.openshift.org/azure/test-base:latest"
-# If set to "true", it means the production OSA RP is going to be used.
-- name: TEST_IN_PRODUCTION
 - name: BRANCHVERSION
   value: "master"
 
@@ -155,8 +153,6 @@ objects:
         value: e2e-${RESOURCEGROUP_SUFFIX}
       - name: RUNNING_UNDER_TEST
         value: ${RUNNING_UNDER_TEST}
-      - name: TEST_IN_PRODUCTION
-        value: ${TEST_IN_PRODUCTION}
       command:
       - /bin/bash
       - -c
@@ -189,12 +185,12 @@ objects:
         function run-tests() {
           if which openshift-tests && [[ -n "${TEST_SUITE-}" ]]; then
             openshift-tests run "${TEST_SUITE}" --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
-            exit 0
+            return 0
           fi
           # TODO: remove everything after this point once we fork templates by release - starting with 4.0
           if ! which extended.test; then
             echo "must provide TEST_SUITE variable"
-            exit 1
+            return 1
           fi
           if [[ -n "${TEST_FOCUS:-}" ]]; then
             ginkgo -v -noColor -nodes="${TEST_PARALLELISM:-30}" $( which extended.test ) -- \
@@ -208,7 +204,7 @@ objects:
               -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit/serial \
               -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
           fi
-          exit ${rc:-0}
+          return ${rc:-0}
         }
 
         # bushslicer specific code
@@ -263,8 +259,6 @@ objects:
         value: ${IMAGE_SYNC}
       - name: STARTUP_IMAGE
         value: ${IMAGE_STARTUP}
-      - name: TEST_IN_PRODUCTION
-        value: ${TEST_IN_PRODUCTION}
       - name: TLSPROXY_IMAGE
         value: ${IMAGE_TLSPROXY}
       - name: CANARY_IMAGE
@@ -279,13 +273,6 @@ objects:
       - |
        #!/bin/bash
         set -euo pipefail
-
-        # skip setting up the fake rp in case we are testing in production
-        if [[ -n $TEST_IN_PRODUCTION ]]; then
-            cp -r /go/src/github.com/openshift/openshift-azure /tmp/shared
-            touch /tmp/shared/created
-            exit 0
-        fi
 
         trap 'rc=$?; if [[ $rc -ne 0 ]]; then
           cp -r /go/src/github.com/openshift/openshift-azure /tmp/shared
@@ -369,8 +356,6 @@ objects:
         value: ${NO_WAIT}
       - name: RESOURCEGROUP
         value: e2e-${RESOURCEGROUP_SUFFIX}
-      - name: TEST_IN_PRODUCTION
-        value: ${TEST_IN_PRODUCTION}
       command:
       - /bin/bash
       - -c
@@ -380,27 +365,25 @@ objects:
         # teardown is collecting debug data and deleting all used resources
         function teardown() {
           # Gather artifacts
-          if [[ -z "$TEST_IN_PRODUCTION" ]]; then
-            export KUBECONFIG=/tmp/shared/openshift-azure/_data/_out/admin.kubeconfig
-            oc get po --all-namespaces -o wide > /tmp/artifacts/pods
-            oc get deployments --all-namespaces -o wide > /tmp/artifacts/deployments
-            oc get statefulsets --all-namespaces -o wide > /tmp/artifacts/statefulsets
-            oc get daemonsets --all-namespaces -o wide > /tmp/artifacts/daemonsets
-            oc get no -o wide > /tmp/artifacts/nodes
-            oc get events --all-namespaces > /tmp/artifacts/events
-            oc logs sync-master-000000 -n kube-system > /tmp/artifacts/sync.log
-            oc logs master-api-master-000000 -n kube-system > /tmp/artifacts/api-master-000000.log
-            oc logs master-api-master-000001 -n kube-system > /tmp/artifacts/api-master-000001.log
-            oc logs master-api-master-000002 -n kube-system > /tmp/artifacts/api-master-000002.log
-            oc logs master-etcd-master-000000 -n kube-system > /tmp/artifacts/etcd-master-000000.log
-            oc logs master-etcd-master-000001 -n kube-system > /tmp/artifacts/etcd-master-000001.log
-            oc logs master-etcd-master-000002 -n kube-system > /tmp/artifacts/etcd-master-000002.log
-            cm_leader=$(oc get cm -n kube-system kube-controller-manager -o yaml | grep -o 00000[0-3])
-            oc logs controllers-master-$cm_leader -n kube-system > /tmp/artifacts/controller-manager.log
-            oc logs deploy/prometheus-operator -n openshift-monitoring > /tmp/artifacts/prometheus-operator.log
-            oc exec -n openshift-monitoring -it $(oc get po -n openshift-monitoring -l k8s-app=prometheus-operator --no-headers | awk '{print $1}') wget -- -O - localhost:8080/debug/pprof/goroutine?debug=2 >  /tmp/artifacts/prometheus-operator-pprof-goroutine
-            oc logs deploy/cluster-monitoring-operator -n openshift-monitoring > /tmp/artifacts/cluster-monitoring-operator.log
-          fi
+          export KUBECONFIG=/tmp/shared/openshift-azure/_data/_out/admin.kubeconfig
+          oc get po --all-namespaces -o wide > /tmp/artifacts/pods
+          oc get deployments --all-namespaces -o wide > /tmp/artifacts/deployments
+          oc get statefulsets --all-namespaces -o wide > /tmp/artifacts/statefulsets
+          oc get daemonsets --all-namespaces -o wide > /tmp/artifacts/daemonsets
+          oc get no -o wide > /tmp/artifacts/nodes
+          oc get events --all-namespaces > /tmp/artifacts/events
+          oc logs sync-master-000000 -n kube-system > /tmp/artifacts/sync.log
+          oc logs master-api-master-000000 -n kube-system > /tmp/artifacts/api-master-000000.log
+          oc logs master-api-master-000001 -n kube-system > /tmp/artifacts/api-master-000001.log
+          oc logs master-api-master-000002 -n kube-system > /tmp/artifacts/api-master-000002.log
+          oc logs master-etcd-master-000000 -n kube-system > /tmp/artifacts/etcd-master-000000.log
+          oc logs master-etcd-master-000001 -n kube-system > /tmp/artifacts/etcd-master-000001.log
+          oc logs master-etcd-master-000002 -n kube-system > /tmp/artifacts/etcd-master-000002.log
+          cm_leader=$(oc get cm -n kube-system kube-controller-manager -o yaml | grep -o 00000[0-3])
+          oc logs controllers-master-$cm_leader -n kube-system > /tmp/artifacts/controller-manager.log
+          oc logs deploy/prometheus-operator -n openshift-monitoring > /tmp/artifacts/prometheus-operator.log
+          oc exec -n openshift-monitoring -it $(oc get po -n openshift-monitoring -l k8s-app=prometheus-operator --no-headers | awk '{print $1}') wget -- -O - localhost:8080/debug/pprof/goroutine?debug=2 >  /tmp/artifacts/prometheus-operator-pprof-goroutine
+          oc logs deploy/cluster-monitoring-operator -n openshift-monitoring > /tmp/artifacts/cluster-monitoring-operator.log
 
           cp -r /tmp/shared/openshift-azure/_data /go/src/github.com/openshift/openshift-azure/
           cd /go/src/github.com/openshift/openshift-azure/

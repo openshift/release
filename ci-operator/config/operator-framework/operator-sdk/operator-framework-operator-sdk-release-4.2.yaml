@@ -1,25 +1,23 @@
 base_images:
-  ansible-runner:
-    name: ansible-runner
-    namespace: openshift
-    tag: latest
   base:
     name: ubi-minimal
     namespace: ocp
-    tag: "7"
+    tag: "8"
+  os:
+    name: ubi
+    namespace: ocp
+    tag: "8"
 build_root:
   image_stream_tag:
-    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.12
-canonical_go_repository: github.com/operator-framework/operator-sdk
 images:
 - dockerfile_path: ci/dockerfiles/builder.Dockerfile
   from: root
   to: osdk-builder
 - dockerfile_path: ci/dockerfiles/ansible.Dockerfile
-  from: ansible-runner
+  from: os
   inputs:
     osdk-builder:
       as:
@@ -27,7 +25,7 @@ images:
       paths: null
   to: ansible-operator
 - dockerfile_path: ci/dockerfiles/ansible-e2e-hybrid.Dockerfile
-  from: ansible-runner
+  from: os
   inputs:
     osdk-builder:
       as:
@@ -66,14 +64,31 @@ images:
       - osdk-builder
       paths: null
   to: osdk-helm-e2e
+- dockerfile_path: ci/dockerfiles/go-e2e.Dockerfile
+  from: base
+  inputs:
+    osdk-builder:
+      as:
+      - osdk-builder
+      paths: null
+  to: memcached-operator
+- dockerfile_path: ci/dockerfiles/scorecard-proxy.Dockerfile
+  from: base
+  inputs:
+    osdk-builder:
+      as:
+      - osdk-builder
+      paths: null
+  to: scorecard-proxy
 promotion:
-  disabled: true
   excluded_images:
   - osdk-builder
+  - ansible-operator
   - osdk-ansible-e2e
   - osdk-ansible-e2e-hybrid
   - osdk-helm-e2e
   - osdk-helm-e2e-hybrid
+  - memcached-operator
   name: "4.2"
   namespace: ocp
 resources:
@@ -101,10 +116,18 @@ tests:
   container:
     from: test-bin
 - as: e2e-aws-ansible
-  commands: make test/e2e/ansible2
+  commands: make -f ci/prow.Makefile test/e2e/ansible
   openshift_installer_src:
     cluster_profile: aws
 - as: e2e-aws-helm
-  commands: make test/e2e/helm2
+  commands: make -f ci/prow.Makefile test/e2e/helm
+  openshift_installer_src:
+    cluster_profile: aws
+- as: e2e-aws-go
+  commands: make -f ci/prow.Makefile test/e2e/go
+  openshift_installer_src:
+    cluster_profile: aws
+- as: e2e-aws-subcommand
+  commands: make -f ci/prow.Makefile test/subcommand
   openshift_installer_src:
     cluster_profile: aws

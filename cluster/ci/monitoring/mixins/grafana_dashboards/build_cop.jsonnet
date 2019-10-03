@@ -15,6 +15,35 @@ local dashboardConfig = {
         uid: config._config.grafanaDashboardIDs['build_cop.json'],
     };
 
+
+local myPanel(title, description) = (graphPanel.new(
+        title,
+        description=description,
+        datasource='prometheus',
+        legend_alignAsTable=true,
+        legend_rightSide=true,
+        legend_values=true,
+        legend_current=true,
+        legend_min=true,
+        legend_sort='min',
+        legend_sortDesc=true,
+        min='0',
+        max='1',
+        formatY1='percentunit',
+    ) + legendConfig);
+
+local myPrometheusTarget(regex) = prometheus.target(
+        std.format('sum(rate(prowjob_state_transitions{job="plank",job_name=~"%s",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"}[${range}]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~"%s",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"}[${range}]))', [regex, regex]),
+        legendFormat=regex,
+    );
+
+local defaultGridPos={
+    h: 9,
+    w: 24,
+    x: 0,
+    y: 0,
+  };
+
 dashboard.new(
         'build-cop dashboard',
         time_from='now-1d',
@@ -57,45 +86,37 @@ dashboard.new(
   {
         "allValue": null,
         "current": {
-          "text": "30m",
-          "value": "30m"
+          "text": "3h",
+          "value": "3h"
         },
         "hide": 0,
         "includeAll": false,
         "label": "range",
         "multi": false,
         "name": "range",
-        "options": [
+        "options":
+        [
           {
             "selected": false,
-            "text": "3h",
-            "value": "3h"
+            "text": '%s' % r,
+            "value": '%s'% r,
           },
-          {
-            "selected": false,
-            "text": "1h",
-            "value": "1h"
-          },
+          for r in ['24h', '12h']
+        ] +
+        [
           {
             "selected": true,
-            "text": "30m",
-            "value": "30m"
-          },
-          {
-            "selected": false,
-            "text": "15m",
-            "value": "15m"
-          },
-          {
-            "selected": false,
-            "text": "10m",
-            "value": "10m"
-          },
-          {
-            "selected": false,
-            "text": "5m",
-            "value": "5m"
+            "text": '3h',
+            "value": '3h',
           }
+        ] +
+        [
+          {
+            "selected": false,
+            "text": '%s' % r,
+            "value": '%s'% r,
+          },
+          for r in ['1h', '30m', '15m', '10m', '5m']
         ],
         "query": "3h,1h,30m,15m,10m,5m",
         "skipUrlSync": false,
@@ -103,206 +124,44 @@ dashboard.new(
       }
 )
 .addPanel(
-    (graphPanel.new(
-        'Job Success Rates for pre-defined job names and org/repo@branch ${org}:${repo}:${base_ref}',
-        description='sum(rate(prowjob_state_transitions{job="plank",job_name=~"<job_name_expr>",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"}[${range}]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~"<job_name_expr>",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"}[${range}]))',
-        datasource='prometheus',
-        legend_alignAsTable=true,
-        legend_rightSide=true,
-        legend_values=true,
-        legend_current=true,
-        legend_min=true,
-        legend_sort='min',
-        legend_sortDesc=true,
-        min='0',
-        max='1',
-        formatY1='percentunit',
-    ) + legendConfig)
-    .addTarget(prometheus.target(
-        'sum(rate(prowjob_state_transitions{job="plank",job_name=~"branch-.*-images",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"}[${range}]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~"branch-.*-images",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"}[${range}]))',
-        legendFormat='branch-.*-images',
-    ))
-    .addTarget(prometheus.target(
-        'sum(rate(prowjob_state_transitions{job="plank",job_name=~"release-.*-4.1",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"}[${range}]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~"release-.*-4.1",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"}[${range}]))',
-        legendFormat='release-.*-4.1',
-    ))
-    .addTarget(prometheus.target(
-        'sum(rate(prowjob_state_transitions{job="plank",job_name=~"release-.*-4.2",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"}[${range}]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~"release-.*-4.2",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"}[${range}]))',
-        legendFormat='release-.*-4.2',
-    ))
-    .addTarget(prometheus.target(
-        'sum(rate(prowjob_state_transitions{job="plank",job_name=~"release-.*-upgrade.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"}[${range}]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~"release-.*-upgrade.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"}[${range}]))',
-        legendFormat='release-.*-upgrade.*',
-    )), gridPos={
-    h: 9,
-    w: 24,
-    x: 0,
-    y: 0,
-  })
+    myPanel('Job Success Rates for github.com/${org}/${repo}@${base_ref}',
+        description='Job success rate for the org/repo/base_ref selected in the templates. Those regexes define our targets for the build-cop.'
+        )
+    .addTarget(myPrometheusTarget('branch-.*-images'))
+    .addTarget(myPrometheusTarget('release-.*-4.1'))
+    .addTarget(myPrometheusTarget('release-.*-4.2'))
+    .addTarget(myPrometheusTarget('release-.*-upgrade.*'))
+    .addTarget(myPrometheusTarget('release-.*4.1.*4.2.*')), defaultGridPos)
 .addPanel(
-    (graphPanel.new(
-        'Release Job versus Pull Request Job Success Rates for org/repo@branch ${org}:${repo}:${base_ref}',
-        description='sum(rate(prowjob_state_transitions{job="plank",job_name=~"<job_name_expr>",job_name!~"rehearse.*",state="success"}[${range}]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~"<job_name_expr>",job_name!~"rehearse.*",state=~"success|failure"}[${range}]))',
-        datasource='prometheus',
-        legend_alignAsTable=true,
-        legend_rightSide=true,
-        legend_values=true,
-        legend_current=true,
-        legend_min=true,
-        legend_sort='min',
-        legend_sortDesc=true,
-        min='0',
-        max='1',
-        formatY1='percentunit',
-    ) + legendConfig)
-    .addTarget(prometheus.target(
-        'sum(rate(prowjob_state_transitions{job="plank",job_name=~"release-.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"}[${range}]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~"release-.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"}[${range}]))',
-        legendFormat='release-.*',
-    ))
-    .addTarget(prometheus.target(
-        'sum(rate(prowjob_state_transitions{job="plank",job_name=~"pull-ci-.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"}[${range}]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~"pull-ci-.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"}[${range}]))',
-        legendFormat='pull-ci-.*',
-    )), gridPos={
-    h: 9,
-    w: 24,
-    x: 0,
-    y: 0,
-  })
+    myPanel(
+        'Presubmit and Postsubmit Job Success Rates for github.com/${org}/${repo}@${base_ref}',
+        description='Job success rate for the org/repo/base_ref selected in the templates. Those regexes filter out presubmit and postsubmit jobs.',
+        )
+    .addTarget(myPrometheusTarget('release-.*'))
+    .addTarget(myPrometheusTarget('pull-ci-.*')), defaultGridPos)
 .addPanel(
-    (graphPanel.new(
-        'Job States by Branch for org/repo@branch ${org}:${repo}',
-        description='sum(rate(prowjob_state_transitions{job="plank", job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"^(master|release-4.[0-9]+|openshift-4.[0-9]+)$", state="success"}[${range}])) by (base_ref)/sum(rate(prowjob_state_transitions{job="plank", job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"^(master|release-4.[0-9]+|openshift-4.[0-9]+)$", state=~"success|failure"}[${range}]))  by (base_ref)',
-        datasource='prometheus',
-        legend_alignAsTable=true,
-        legend_rightSide=true,
-        legend_values=true,
-        legend_current=true,
-        legend_min=true,
-        legend_sort='min',
-        legend_sortDesc=true,
-        min='0',
-        max='1',
-        formatY1='percentunit',
-    ) + legendConfig)
+    myPanel('Job States by Branch for github.com/${org}/${repo}',
+        description='Job success rate for all branches and the org/repo selected in the templates.',
+        )
     .addTarget(prometheus.target(
         'sum(rate(prowjob_state_transitions{job="plank", job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"^(master|release-4.[0-9]+|openshift-4.[0-9]+)$", state="success"}[${range}])) by (base_ref)/sum(rate(prowjob_state_transitions{job="plank", job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"^(master|release-4.[0-9]+|openshift-4.[0-9]+)$", state=~"success|failure"}[${range}]))  by (base_ref)',
         legendFormat='{{base_ref}}',
-    )), gridPos={
-    h: 9,
-    w: 24,
-    x: 0,
-    y: 0,
-  })
+    )), defaultGridPos)
 .addPanel(
-    (graphPanel.new(
-        'Job States by Type for org/repo@branch ${org}:${repo}:${base_ref}',
-        description='sum(rate(prowjob_state_transitions{job="plank",job_name=~"<regex>",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"}[${range}]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~"<regex>",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"}[${range}]))',
-        datasource='prometheus',
-        legend_alignAsTable=true,
-        legend_rightSide=true,
-        legend_values=true,
-        legend_current=true,
-        legend_min=true,
-        legend_sort='min',
-        legend_sortDesc=true,
-        min='0',
-        max='1',
-        formatY1='percentunit',
-    ) + legendConfig)
-    .addTarget(prometheus.target(
-        'sum(rate(prowjob_state_transitions{job="plank",job_name=~".*images",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"}[${range}]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~".*images",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"}[${range}]))',
-        legendFormat='.*images',
-    ))
-    .addTarget(prometheus.target(
-        'sum(rate(prowjob_state_transitions{job="plank",job_name=~".*e2e.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"}[${range}]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~".*e2e.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"}[${range}]))',
-        legendFormat='.*e2e.*',
-    ))
-    .addTarget(prometheus.target(
-        'sum(rate(prowjob_state_transitions{job="plank",job_name=~".*upgrade.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"}[${range}]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~".*upgrade.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"}[${range}]))',
-        legendFormat='.*upgrade.*',
-    ))
-    .addTarget(prometheus.target(
-        'sum(rate(prowjob_state_transitions{job="plank",job_name=~".*unit.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"}[${range}]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~".*unit.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"}[${range}]))',
-        legendFormat='.*unit.*',
-    ))
-    .addTarget(prometheus.target(
-        'sum(rate(prowjob_state_transitions{job="plank",job_name=~".*integration.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"}[${range}]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~".*integration.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"}[${range}]))',
-        legendFormat='.*integration.*',
-    )), gridPos={
-    h: 9,
-    w: 24,
-    x: 0,
-    y: 0,
-  })
+    myPanel('Job States by Type for github.com/${org}/${repo}@${base_ref}',
+        description='Job success rate for the org/repo/base_ref selected in the templates. Those regexes filter out various types of tests.',
+        )
+    .addTarget(myPrometheusTarget('.*images'))
+    .addTarget(myPrometheusTarget('.*e2e.*'))
+    .addTarget(myPrometheusTarget('.*upgrade.*'))
+    .addTarget(myPrometheusTarget('.*unit.*'))
+    .addTarget(myPrometheusTarget('.*integration.*')), defaultGridPos)
 .addPanel(
-    (graphPanel.new(
-        'Job States by Platform for org/repo@branch ${org}:${repo}:${base_ref}',
-        description='sum(rate(prowjob_state_transitions{job="plank",job_name=~"<regex>",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"}[${range}]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~"<regex>",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"}[${range}]))',
-        datasource='prometheus',
-        legend_alignAsTable=true,
-        legend_rightSide=true,
-        legend_values=true,
-        legend_current=true,
-        legend_min=true,
-        legend_sort='min',
-        legend_sortDesc=true,
-        min='0',
-        max='1',
-        formatY1='percentunit',
-    ) + legendConfig)
-    .addTarget(prometheus.target(
-        'sum(rate(prowjob_state_transitions{job="plank",job_name=~".*-aws.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"}[${range}]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~".*-aws.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"}[${range}]))',
-        legendFormat='.*-aws.*',
-    ))
-    .addTarget(prometheus.target(
-        'sum(rate(prowjob_state_transitions{job="plank",job_name=~".*-vsphere.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"}[${range}]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~".*-vsphere.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"}[${range}]))',
-        legendFormat='.*-vsphere.*',
-    ))
-    .addTarget(prometheus.target(
-        'sum(rate(prowjob_state_transitions{job="plank",job_name=~".*-gcp.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"}[${range}]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~".*-gcp.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"}[${range}]))',
-        legendFormat='.*-gcp.*',
-    ))
-    .addTarget(prometheus.target(
-        'sum(rate(prowjob_state_transitions{job="plank",job_name=~".*-azure.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"}[${range}]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~".*-azure.*",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"}[${range}]))',
-        legendFormat='.*-azure.*',
-    )), gridPos={
-    h: 9,
-    w: 24,
-    x: 0,
-    y: 0,
-  })
-.addPanel(
-    (graphPanel.new(
-        'Running Clusters by Platform',
-        description='sum(kube_pod_container_status_running{pod=~"e2e(-<regex>(-upgrade)?)?",container="teardown"})',
-        datasource='prometheus-k8s',
-        legend_alignAsTable=true,
-        legend_rightSide=true,
-        legend_values=true,
-        legend_current=true,
-        legend_max=true,
-        legend_sort='current',
-        legend_sortDesc=true,
-    ) + legendConfig)
-    .addTarget(prometheus.target(
-        'sum(kube_pod_container_status_running{pod=~"e2e(-aws(-upgrade)?)?",container="teardown"})',
-        legendFormat='aws',
-    ))
-    .addTarget(prometheus.target(
-        'sum(kube_pod_container_status_running{pod=~"e2e-vsphere(-upgrade)?",container="teardown"})',
-        legendFormat='vsphere',
-    ))
-    .addTarget(prometheus.target(
-        'sum(kube_pod_container_status_running{pod=~"e2e-gcp(-upgrade)?",container="teardown"})',
-        legendFormat='gcp',
-    ))
-    .addTarget(prometheus.target(
-        'sum(kube_pod_container_status_running{pod=~"e2e-azure(-upgrade)?",container="teardown"})',
-        legendFormat='azure',
-    )), gridPos={
-    h: 9,
-    w: 24,
-    x: 0,
-    y: 0,
-  })
+    myPanel('Job States by Platform for github.com/${org}/${repo}@${base_ref}',
+        description='Job success rate for the org/repo/base_ref selected in the templates. Those regexes filter out various types of testing platforms.',
+        )
+    .addTarget(myPrometheusTarget('.*-aws.*'))
+    .addTarget(myPrometheusTarget('.*-vsphere.*'))
+    .addTarget(myPrometheusTarget('.*-gcp.*'))
+    .addTarget(myPrometheusTarget('.*-azure.*')), defaultGridPos)
 + dashboardConfig

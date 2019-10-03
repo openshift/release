@@ -1,0 +1,150 @@
+tag_specification:
+  name: '4.1'
+  namespace: ocp
+promotion:
+  namespace: openshift
+  name: knative-v0.8.2
+base_images:
+  base:
+    name: '4.1'
+    namespace: ocp
+    tag: base
+build_root:
+  project_image:
+    dockerfile_path: openshift/ci-operator/build-image/Dockerfile
+canonical_go_repository: github.com/knative/eventing-contrib
+binary_build_commands: make install
+test_binary_build_commands: make test-install
+tests:
+- as: e2e-aws-ocp-41
+  commands: "make test-e2e"
+  openshift_installer_src:
+    cluster_profile: aws
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+images:
+- dockerfile_path: openshift/ci-operator/knative-images/heartbeats/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/heartbeats
+  to: knative-eventing-sources-heartbeats
+- dockerfile_path: openshift/ci-operator/knative-images/kafka-source-controller/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/kafka-source-controller
+  to: knative-eventing-sources-kafka-source-controller
+- dockerfile_path: openshift/ci-operator/knative-images/github-source-controller/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/github-source-controller
+  to: knative-eventing-sources-github-source-controller
+- dockerfile_path: openshift/ci-operator/knative-images/kafka-channel-dispatcher/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/kafka-channel-dispatcher
+  to: knative-eventing-sources-kafka-channel-dispatcher
+- dockerfile_path: openshift/ci-operator/knative-images/heartbeats_receiver/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/heartbeats_receiver
+  to: knative-eventing-sources-heartbeats-receiver
+- dockerfile_path: openshift/ci-operator/knative-images/kafka-ccp-channel-controller/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/kafka-ccp-channel-controller
+  to: knative-eventing-sources-kafka-ccp-channel-controller
+- dockerfile_path: openshift/ci-operator/knative-images/event_display/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/event_display
+  to: knative-eventing-sources-event-display
+- dockerfile_path: openshift/ci-operator/knative-images/kafka-source-adapter/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/kafka-source-adapter
+  to: knative-eventing-sources-kafka-source-adapter
+- dockerfile_path: openshift/ci-operator/knative-images/kafka-ccp-channel-dispatcher/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/kafka-ccp-channel-dispatcher
+  to: knative-eventing-sources-kafka-ccp-channel-dispatcher
+- dockerfile_path: openshift/ci-operator/knative-images/camel-source-controller/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/camel-source-controller
+  to: knative-eventing-sources-camel-source-controller
+- dockerfile_path: openshift/ci-operator/knative-images/websocketsource/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/websocketsource
+  to: knative-eventing-sources-websocketsource
+- dockerfile_path: openshift/ci-operator/knative-images/kafka-channel-controller/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/kafka-channel-controller
+  to: knative-eventing-sources-kafka-channel-controller
+- dockerfile_path: openshift/ci-operator/knative-images/github-receive-adapter/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/github-receive-adapter
+  to: knative-eventing-sources-github-receive-adapter
+- dockerfile_path: openshift/ci-operator/knative-images/kafka-channel-webhook/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/kafka-channel-webhook
+  to: knative-eventing-sources-kafka-channel-webhook
+- dockerfile_path: openshift/ci-operator/knative-test-images/k8sevents/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/k8sevents
+  to: knative-eventing-sources-test-k8sevents

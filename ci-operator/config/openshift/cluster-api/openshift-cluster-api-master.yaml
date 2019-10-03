@@ -1,20 +1,21 @@
-tag_specification:
-  name: '4.0'
-  namespace: ocp
-promotion:
-  name: cluster-api
-  namespace: ocp-future
 base_images:
   base:
-    name: '4.0'
+    name: "4.3"
     namespace: ocp
     tag: base
 binary_build_commands: make manager clusterctl
-canonical_go_repository: github.com/openshift/cluster-api
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.12
 images:
 - dockerfile_path: Dockerfile
   from: base
   to: cluster-api
+promotion:
+  name: "4.3"
+  namespace: ocp
 resources:
   '*':
     limits:
@@ -28,12 +29,9 @@ resources:
     requests:
       cpu: 100m
       memory: 400Mi
-build_root:
-  image_stream_tag:
-    cluster: https://api.ci.openshift.org
-    name: release
-    namespace: openshift
-    tag: golang-1.10
+tag_specification:
+  name: "4.3"
+  namespace: ocp
 tests:
 - as: unit
   commands: |
@@ -58,4 +56,3 @@ tests:
   commands: ./hack/verify_history.sh
   container:
     from: src
-

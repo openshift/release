@@ -28,13 +28,10 @@ ERROR: This check enforces that component configuration files are accompanied by
 ERROR: files so that the appropriate team is able to self-service further configuration
 ERROR: change pull requests.
 
-ERROR: Run the following script to fetch OWNERS files from the component repositories:
+ERROR: Please copy and paste the OWNERS files from the component repositories.
 
-ERROR: $ ci-operator/populate-owners.sh
-
-ERROR: Please note that the script populates *all* ci-operator subdirectories, and it
-ERROR: takes a long time to execute (tens of minutes). If the target repository does not
-ERROR: contain an OWNERS file, it will need to be created manually.
+ERROR: If the target repository does not contain an OWNERS file, it will need to be created manually.
+ERROR: See https://github.com/kubernetes/community/blob/master/contributors/guide/owners.md for details.
 
 ERROR: The following component config directories do not have OWNERS files:
 

@@ -1,20 +1,18 @@
 base_images:
   base:
-    name: "4.2"
+    name: "4.3"
     namespace: ocp
     tag: base
 build_root:
   image_stream_tag:
-    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.12
-canonical_go_repository: github.com/openshift/cluster-authentication-operator
 images:
 - from: base
   to: cluster-authentication-operator
 promotion:
-  name: "4.2"
+  name: "4.3"
   namespace: ocp
 resources:
   '*':
@@ -24,20 +22,29 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.2"
+  name: "4.3"
   namespace: ocp
 tests:
-- as: unit
-  commands: make check
+- as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: src
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: |
+    mkdir -p /tmp/artifacts
+    make test-unit JUNITFILE=/tmp/artifacts/unit_report.xml --warn-undefined-variables
   container:
     from: src
 - as: e2e-aws
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: aws
-    upgrade: false
 - as: e2e-aws-operator
-  commands: make test-e2e
+  commands: |
+    mkdir -p /tmp/artifacts
+    make test-e2e JUNITFILE=/tmp/artifacts/unit_report.xml
   openshift_installer_src:
     cluster_profile: aws
 - as: e2e-aws-upgrade
@@ -48,5 +55,6 @@ tests:
 - artifact_dir: /tmp/artifacts
   as: e2e-aws-console-login
   commands: ./test-prow-e2e.sh login
-  openshift_installer_console:
+  openshift_installer_custom_test_image:
     cluster_profile: aws
+    from: stable:console-tests

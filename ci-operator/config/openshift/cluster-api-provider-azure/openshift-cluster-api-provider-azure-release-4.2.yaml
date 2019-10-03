@@ -6,7 +6,6 @@ base_images:
 binary_build_commands: go build -o bin/manager sigs.k8s.io/cluster-api-provider-azure/cmd/manager/
 build_root:
   image_stream_tag:
-    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.12
@@ -16,7 +15,6 @@ images:
   from: base
   to: azure-machine-controllers
 promotion:
-  disabled: true
   name: "4.2"
   namespace: ocp
 resources:
@@ -30,37 +28,21 @@ tag_specification:
   name: "4.2"
   namespace: ocp
 tests:
-- as: gofmt
-  commands: |
-    go get -u github.com/golang/dep/cmd/dep
-    wget -q https://github.com/bazelbuild/bazel/releases/download/0.22.0/bazel-0.22.0-linux-x86_64 -O bazel
-    chmod +x bazel
-    export PATH="$(pwd):${PATH}"
-    export USER=root
-    export TEST_TMPDIR="$(pwd)/_output/.cache"
-    make fmt
+- as: goimports
+  commands: IS_CONTAINER=TRUE make goimports
   container:
     from: src
 - as: govet
   commands: |
-    go get -u github.com/golang/dep/cmd/dep
-    wget -q https://github.com/bazelbuild/bazel/releases/download/0.22.0/bazel-0.22.0-linux-x86_64 -O bazel
-    chmod +x bazel
-    export PATH="$(pwd):${PATH}"
-    export USER=root
-    export TEST_TMPDIR="$(pwd)/_output/.cache"
-    make vet
-  container:
-    from: src
-- as: bazel-verify
-  commands: |
-    go get -u github.com/golang/dep/cmd/dep
-    wget -q https://github.com/bazelbuild/bazel/releases/download/0.22.0/bazel-0.22.0-linux-x86_64 -O bazel
-    chmod +x bazel
-    export PATH="$(pwd):${PATH}"
-    export USER=root
-    export TEST_TMPDIR="$(pwd)/_output/.cache"
-    hack/verify-bazel.sh
+    # Instead of getting alias for cluster-api-provider-azure under
+    # /go/src/sigs.k8s.io/cluster-api-provider-azure, I get https://github.com/openshift/release
+    # instead. Recreate the alias directory until the issue is fixed.
+    if [ ! -e /go/src/sigs.k8s.io/cluster-api-provider-azure/pkg ]; then
+      rm -rf /go/src/sigs.k8s.io/cluster-api-provider-azure
+      cp -r /go/src/github.com/openshift/cluster-api-provider-azure/ /go/src/sigs.k8s.io/.
+      cd /go/src/sigs.k8s.io/cluster-api-provider-azure
+    fi
+    IS_CONTAINER=TRUE make vet
   container:
     from: src
 - as: unit
@@ -72,15 +54,11 @@ tests:
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: azure4
-    upgrade: false
-- as: bazel-build
-  commands: |
-    go get -u github.com/golang/dep/cmd/dep
-    wget -q https://github.com/bazelbuild/bazel/releases/download/0.22.0/bazel-0.22.0-linux-x86_64 -O bazel
-    chmod +x bazel
-    export PATH="$(pwd):${PATH}"
-    export USER=root
-    export TEST_TMPDIR="$(pwd)/_output/.cache"
-    scripts/ci-bazel-build.sh
+- as: e2e-azure-operator
+  commands: make test-e2e
+  openshift_installer_src:
+    cluster_profile: azure4
+- as: git-history
+  commands: ./hack/verify_history.sh
   container:
     from: src

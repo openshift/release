@@ -1,0 +1,847 @@
+plank:
+  allow_cancellations: true
+  job_url_prefix_config:
+    '*': 'https://prow.svc.ci.openshift.org/view/gcs/'
+  job_url_template: 'https://prow.svc.ci.openshift.org/view/gcs/origin-ci-test/{{if eq .Spec.Type "presubmit"}}pr-logs/pull{{else if eq .Spec.Type "batch"}}pr-logs/pull{{else}}logs{{end}}{{if ne .Spec.Refs.Repo "origin"}}/{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}{{end}}{{if eq .Spec.Type "presubmit"}}/{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}{{else if eq .Spec.Type "batch"}}/batch{{end}}/{{.Spec.Job}}/{{.Status.BuildID}}/'
+  report_template: '[Full PR test history](https://prow.svc.ci.openshift.org/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://prow.svc.ci.openshift.org/pr?query=is:pr+state:open+author:{{with index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}). Please help us cut down on flakes by [linking to](https://github.com/kubernetes/community/blob/master/contributors/devel/flaky-tests.md#filing-issues-for-flaky-tests) an [open issue](https://github.com/{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}/issues?q=is:issue+is:open) when you hit one in your PR.'
+  default_decoration_config:
+    timeout: 4h
+    grace_period: 15s
+    utility_images:
+      clonerefs: gcr.io/k8s-prow/clonerefs:v20191003-4c085117a
+      initupload: gcr.io/k8s-prow/initupload:v20191003-4c085117a
+      entrypoint: gcr.io/k8s-prow/entrypoint:v20191003-4c085117a
+      sidecar: gcr.io/k8s-prow/sidecar:v20191003-4c085117a
+    gcs_configuration:
+      bucket: origin-ci-test
+      path_strategy: single
+      default_org: openshift
+      default_repo: origin
+      mediaTypes:
+        log: text/plain
+    gcs_credentials_secret: gce-sa-credentials-gcs-publisher
+
+jenkins_operators:
+- label_selector: master=ci.openshift.redhat.com
+  max_concurrency: 150
+  max_goroutines: 20
+  allow_cancellations: true
+  job_url_template: 'https://openshift-gce-devel.appspot.com/build/origin-{{if eq .Spec.Type "presubmit"}}{{if eq .Spec.Refs.Org "kubernetes"}}federated-results{{else if eq .Spec.Refs.Org "kubernetes-incubator"}}federated-results{{else if eq .Spec.Refs.Org "cri-o"}}federated-results{{else}}ci-test{{end}}{{else}}ci-test{{end}}/{{if eq .Spec.Type "presubmit"}}pr-logs/pull{{else if eq .Spec.Type "batch"}}pr-logs/pull{{else}}logs{{end}}{{if ne .Spec.Refs.Repo "origin"}}/{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}{{end}}{{if eq .Spec.Type "presubmit"}}/{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}{{else if eq .Spec.Type "batch"}}/batch{{end}}/{{.Spec.Job}}/{{.Status.JenkinsBuildID}}/'
+  report_template: '[Full PR test history](https://openshift-gce-devel.appspot.com/pr/{{if ne .Spec.Refs.Repo "origin"}}{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}/{{end}}{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://openshift-gce-devel.appspot.com/pr/{{with index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}). Please help us cut down on flakes by [linking to](https://github.com/kubernetes/community/blob/master/contributors/devel/flaky-tests.md#filing-issues-for-flaky-tests) an [open issue](https://github.com/{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}/issues?q=is:issue+is:open) when you hit one in your PR.'
+- label_selector: master=ci.dev.openshift.redhat.com
+  max_concurrency: 25
+  max_goroutines: 20
+  allow_cancellations: true
+  job_url_template: 'https://ci.dev.openshift.redhat.com/jenkins/job/{{.Spec.Job}}/{{.Status.JenkinsBuildID}}'
+- label_selector: master=jenkins.katacontainers.io
+  max_concurrency: 10
+  max_goroutines: 20
+  allow_cancellations: true
+  job_url_template: 'http://jenkins.katacontainers.io/job/{{.Spec.Job}}/{{.Status.JenkinsBuildID}}'
+- label_selector: master=jenkins-tectonic.prod.coreos.systems
+  max_concurrency: 1
+  max_goroutines: 1
+  allow_cancellations: true
+  job_url_template: 'https://jenkins-tectonic.prod.coreos.systems/job/{{.Spec.Job}}/{{.Status.JenkinsBuildID}}'
+
+sinker:
+  resync_period: 5m
+  max_prowjob_age: 24h
+  max_pod_age: 6h
+
+deck:
+  spyglass:
+    gcs_browser_prefix: https://gcsweb-ci.svc.ci.openshift.org/gcs/
+    announcement: "The old job viewer, Gubernator, has been deprecated in favour of this page, Spyglass.{{if .ArtifactPath}} For now, the old page is <a href='https://openshift-gce-devel.appspot.com/build/{{.ArtifactPath}}'>still available</a>.{{end}} Please send feedback to #forum-testplatform."
+    size_limit: 500000000 # 500MB
+    viewers:
+      "started.json|finished.json":
+      - metadata
+      "build-log.txt":
+      - buildlog
+      ".*\\.xml":
+      - junit
+  external_agent_logs:
+  - agent: jenkins
+    selector: master=ci.openshift.redhat.com
+    url_template: 'http://jenkins-operator/job/{{.Spec.Job}}/{{.Status.JenkinsBuildID}}/consoleText'
+  branding:
+    logo: "/static/extensions/logo.png"
+    favicon: "/static/extensions/favicon.ico"
+    header_color: "black"
+  hidden_repos:
+  - openshift/ose
+  - openshift/online-registration
+  rerun_auth_config:
+    github_users:
+    - stevekuznetsov
+    - petr-muller
+    - droslean
+    - bbguimaraes
+    - hongkailiu
+    - vikaslaad
+
+owners_dir_blacklist:
+  default:
+  - vendor/.*
+
+tide:
+  blocker_label: tide/merge-blocker
+  squash_label: tide/merge-method-squash
+  rebase_label: tide/merge-method-rebase
+  merge_label: tide/merge-method-merge
+  merge_method:
+    openshift/jenkins-plugin: rebase
+    openshift/jenkins-sync-plugin: rebase
+    openshift/jenkins-client-plugin: rebase
+    openshift/jenkins-openshift-login-plugin: rebase
+    openshift/ansible-service-broker: squash
+    openshift/template-service-broker-operator: squash
+    openshift/cluster-api: rebase
+    openshift/cluster-api-provider-azure: rebase
+    openshift/custom-resource-status: squash
+    openshift/odo: squash
+    openshift/odo-init-image: squash
+    codeready-toolchain/host-operator: squash
+    codeready-toolchain/api: squash
+    codeready-toolchain/member-operator: squash
+    codeready-toolchain/toolchain-common: squash
+    codeready-toolchain/toolchain-e2e: squash
+    redhat-developer/service-binding-operator: squash
+    redhat-developer/openshift-jenkins-operator: rebase
+    coreos/rpm-ostree: rebase
+  pr_status_base_url: https://prow.svc.ci.openshift.org/pr
+  queries:
+  - repos:
+    - openshift/ansible-service-broker
+    - openshift/api
+    - openshift/apiserver-library-go
+    - openshift/aws-account-operator
+    - openshift/baremetal-operator
+    - openshift/baremetal-runtimecfg
+    - openshift/builder
+    - openshift/certman-operator
+    - openshift/client-go
+    - openshift/cloud-credential-operator
+    - openshift/cloud-provider-openstack
+    - openshift/cluster-api-provider-aws
+    - openshift/cluster-api-provider-azure
+    - openshift/cluster-api-provider-baremetal
+    - openshift/cluster-api-provider-gcp
+    - openshift/cluster-api-provider-kubemark
+    - openshift/cluster-api-provider-libvirt
+    - openshift/cluster-api-provider-openstack
+    - openshift/cluster-authentication-operator
+    - openshift/cluster-autoscaler-operator
+    - openshift/cluster-bootstrap
+    - openshift/cluster-config-operator
+    - openshift/cluster-dns-operator
+    - openshift/cluster-image-registry-operator
+    - openshift/cluster-ingress-operator
+    - openshift/cluster-kube-apiserver-operator
+    - openshift/cluster-kube-controller-manager-operator
+    - openshift/cluster-kube-scheduler-operator
+    - openshift/cluster-logging-operator
+    - openshift/cluster-machine-approver
+    - openshift/cluster-monitoring-operator
+    - openshift/cluster-network-operator
+    - openshift/cluster-nfd-operator
+    - openshift/cluster-node-tuning-operator
+    - openshift/cluster-openshift-apiserver-operator
+    - openshift/cluster-openshift-controller-manager-operator
+    - openshift/cluster-policy-controller
+    - openshift/cluster-samples-operator
+    - openshift/cluster-storage-operator
+    - openshift/cluster-svcat-apiserver-operator
+    - openshift/cluster-svcat-controller-manager-operator
+    - openshift/cluster-update-keys
+    - openshift/cluster-version-operator
+    - openshift/configmap-reload
+    - openshift/configure-alertmanager-operator
+    - openshift/console
+    - openshift/console-operator
+    - openshift/csi-cluster-driver-registrar
+    - openshift/csi-driver-registrar
+    - openshift/csi-external-attacher
+    - openshift/csi-external-provisioner
+    - openshift/csi-external-resizer
+    - openshift/csi-external-snapshotter
+    - openshift/csi-livenessprobe
+    - openshift/csi-node-driver-registrar
+    - openshift/csi-operator
+    - openshift/custom-resource-status
+    - openshift/deadmanssnitch-operator
+    - openshift/dedicated-admin-operator
+    - openshift/descheduler-operator
+    - openshift/elasticsearch-operator
+    - openshift/elasticsearch-proxy
+    - openshift/etcd
+    - openshift/external-storage
+    - openshift/federation-v2-operator
+    - openshift/grafana
+    - openshift/image-registry
+    - openshift/images
+    - openshift/insights-operator
+    - openshift/installer
+    - openshift/ironic-image
+    - openshift/ironic-inspector-image
+    - openshift/ironic-ipa-downloader
+    - openshift/ironic-rhcos-downloader
+    - openshift/ironic-static-ip-manager
+    - openshift/jenkins
+    - openshift/k8s-prometheus-adapter
+    - openshift/kubecsr
+    - openshift/kubernetes
+    - openshift/kube-rbac-proxy
+    - openshift/kube-state-metrics
+    - openshift/kube-storage-version-migrator
+    - openshift/kuryr-kubernetes
+    - openshift/leader-elector
+    - openshift/library-go
+    - openshift/local-storage-operator
+    - openshift/loki
+    - openshift/metal3-smart-exporter
+    - openshift/sig-storage-local-static-provisioner
+    - openshift/machine-api-operator
+    - openshift/machine-config-operator
+    - openshift/managed-cluster-config
+    - openshift/managed-velero-operator
+    - openshift/mdns-publisher
+    - openshift/multus-cni
+    - openshift/must-gather
+    - openshift/node_exporter
+    - openshift/node-feature-discovery
+    - openshift/node-problem-detector
+    - openshift/node-problem-detector-operator
+    - openshift/oauth-proxy
+    - openshift/oauth-server
+    - openshift/oc
+    - openshift/ocs-operator
+    - openshift/openshift-ansible
+    - openshift/openshift-apiserver
+    - openshift/openshift-controller-manager
+    - openshift/openshift-state-metrics
+    - openshift/openshift-tuned
+    - openshift/origin
+    - openshift/origin-aggregated-logging
+    - openshift/ovn-kubernetes
+    - openshift/pagerduty-operator
+    - openshift/prometheus
+    - openshift/prometheus-alertmanager
+    - openshift/prometheus-operator
+    - openshift/prom-label-proxy
+    - openshift/rbac-permissions-operator
+    - openshift/router
+    - openshift/runtime-utils
+    - openshift/sdn
+    - openshift/service-catalog
+    - openshift/service-ca-operator
+    - openshift/telemeter
+    - openshift/template-service-broker
+    - openshift/template-service-broker-operator
+    - openshift/thanos
+    - openshift/vertical-pod-autoscaler-operator
+    - openshift/windows-machine-config-operator
+    - operator-framework/ghostunnel
+    - operator-framework/hadoop
+    - operator-framework/helm
+    - operator-framework/hive
+    - operator-framework/operator-lifecycle-manager
+    - operator-framework/operator-marketplace
+    - operator-framework/operator-metering
+    - operator-framework/operator-registry
+    - operator-framework/presto
+    includedBranches:
+    - release-4.0
+    - release-4.1
+    - release-4.2
+    - release-4.3
+    - release-4.4
+    - openshift-4.1
+    labels:
+    - lgtm
+    - approved
+    - bugzilla/valid-bug
+    - cherry-pick-approved
+    missingLabels:
+    - needs-rebase
+    - do-not-merge/blocked-paths
+    - do-not-merge/hold
+    - do-not-merge/work-in-progress
+    - do-not-merge/invalid-owners-file
+    - bugzilla/invalid-bug
+  - repos:
+    - openshift/cluster-capacity
+    - openshift/containernetworking-plugins
+    - openshift/coredns
+    - openshift/descheduler
+    - openshift/kubernetes-autoscaler
+    - openshift/multus-admission-controller
+    - openshift/ocp-release-operator-sdk
+    - openshift/service-ca-operator
+    - openshift/sriov-cni
+    - openshift/sriov-dp-admission-controller
+    - openshift/sriov-network-device-plugin
+    - openshift/sriov-network-operator
+    includedBranches:
+    - release-4.0
+    - release-4.1
+    - release-4.2
+    - release-4.3
+    - release-4.4
+    - openshift-4.1
+    labels:
+    - lgtm
+    - bugzilla/valid-bug
+    - cherry-pick-approved
+    missingLabels:
+    - needs-rebase
+    - do-not-merge/blocked-paths
+    - do-not-merge/hold
+    - do-not-merge/work-in-progress
+    - do-not-merge/invalid-owners-file
+    - bugzilla/invalid-bug
+  - repos:
+    - openshift/ansible-service-broker
+    - openshift/api
+    - openshift/apiserver-library-go
+    - openshift/autoheal
+    - openshift/aws-account-operator
+    - openshift/azure-misc
+    - openshift/baremetal-operator
+    - openshift/baremetal-runtimecfg
+    - openshift/builder
+    - openshift/certman-operator
+    - openshift/ci-chat-bot
+    - openshift/cincinnati
+    - openshift/ci-ns-ttl-controller
+    - openshift/ci-search
+    - openshift/ci-secret-mirroring-controller
+    - openshift/ci-tools
+    - openshift/ci-vm-operator
+    - openshift/client-go
+    - openshift/cloud-credential-operator
+    - openshift/cloud-provider-openstack
+    - openshift/cluster-api
+    - openshift/cluster-api-actuator-pkg
+    - openshift/cluster-api-provider-aws
+    - openshift/cluster-api-provider-azure
+    - openshift/cluster-api-provider-baremetal
+    - openshift/cluster-api-provider-gcp
+    - openshift/cluster-api-provider-kubemark
+    - openshift/cluster-api-provider-libvirt
+    - openshift/cluster-api-provider-openstack
+    - openshift/cluster-authentication-operator
+    - openshift/cluster-autoscaler-operator
+    - openshift/cluster-bootstrap
+    - openshift/cluster-config-operator
+    - openshift/cluster-dns-operator
+    - openshift/cluster-etcd-operator
+    - openshift/cluster-image-registry-operator
+    - openshift/cluster-ingress-operator
+    - openshift/cluster-kube-apiserver-operator
+    - openshift/cluster-kube-controller-manager-operator
+    - openshift/cluster-kube-scheduler-operator
+    - openshift/cluster-logging-operator
+    - openshift/cluster-machine-approver
+    - openshift/cluster-monitoring-operator
+    - openshift/cluster-network-operator
+    - openshift/cluster-nfd-operator
+    - openshift/cluster-node-tuning-operator
+    - openshift/cluster-openshift-apiserver-operator
+    - openshift/cluster-openshift-controller-manager-operator
+    - openshift/cluster-samples-operator
+    - openshift/cluster-storage-operator
+    - openshift/cluster-svcat-apiserver-operator
+    - openshift/cluster-svcat-controller-manager-operator
+    - openshift/cluster-update-keys
+    - openshift/cluster-version-operator
+    - openshift/config
+    - openshift/configmap-reload
+    - openshift/configure-alertmanager-operator
+    - openshift/console
+    - openshift/console-operator
+    - openshift/containernetworking-plugins
+    - openshift/crd-schema-gen
+    - openshift/csi-cluster-driver-registrar
+    - openshift/csi-driver-registrar
+    - openshift/csi-external-attacher
+    - openshift/csi-external-provisioner
+    - openshift/csi-external-resizer
+    - openshift/csi-external-snapshotter
+    - openshift/csi-livenessprobe
+    - openshift/csi-node-driver-registrar
+    - openshift/csi-operator
+    - openshift/custom-resource-status
+    - openshift/deadmanssnitch-operator
+    - openshift/dedicated-admin-operator
+    - openshift/descheduler-operator
+    - openshift/elasticsearch-operator
+    - openshift/elasticsearch-proxy
+    - openshift/enhancements
+    - openshift/etcd
+    - openshift/external-dns
+    - openshift/external-storage
+    - openshift/federation-v2-operator
+    - openshift/grafana
+    - openshift/hive
+    - openshift/imagebuilder
+    - openshift/image-registry
+    - openshift/images
+    - openshift/insights-operator
+    - openshift/installer
+    - openshift/ironic-image
+    - openshift/ironic-inspector-image
+    - openshift/ironic-ipa-downloader
+    - openshift/ironic-rhcos-downloader
+    - openshift/ironic-static-ip-manager
+    - openshift/jenkins
+    - openshift/jenkins-client-plugin
+    - openshift/jenkins-openshift-login-plugin
+    - openshift/jenkins-plugin
+    - openshift/jenkins-sync-plugin
+    - openshift/k8s-prometheus-adapter
+    - openshift/knative-build
+    - openshift/knative-caching
+    - openshift/knative-eventing
+    - openshift/knative-eventing-contrib
+    - openshift/knative-pkg
+    - openshift/knative-serving
+    - openshift/knative-client
+    - openshift/kubecsr
+    - openshift/kube-rbac-proxy
+    - openshift/kube-storage-version-migrator
+    - openshift/kubernetes
+    - openshift/kubernetes-metrics-server
+    - openshift/kubefed
+    - openshift/kubefed-operator
+    - openshift/kube-state-metrics
+    - openshift/kuryr-kubernetes
+    - openshift/leader-elector
+    - openshift/library
+    - openshift/library-go
+    - openshift/local-storage-operator
+    - openshift/loki
+    - openshift/metal3-smart-exporter
+    - openshift/sig-storage-local-static-provisioner
+    - openshift/machine-api-operator
+    - openshift/machine-config-operator
+    - openshift/managed-cluster-config
+    - openshift/managed-velero-operator
+    - openshift/mdns-publisher
+    - openshift/monitor-project-lifecycle
+    - openshift/multus-admission-controller
+    - openshift/multus-cni
+    - openshift/must-gather
+    - openshift/node_exporter
+    - openshift/node-feature-discovery
+    - openshift/node-problem-detector
+    - openshift/node-problem-detector-operator
+    - openshift/oauth-proxy
+    - openshift/oauth-server
+    - openshift/oc
+    - openshift/ocp-release-operator-sdk
+    - openshift/ocs-operator
+    - openshift/odo
+    - openshift/odo-init-image
+    - openshift/online-console-extensions
+    - openshift/online-hibernation
+    - openshift/openshift-ansible
+    - openshift/openshift-apiserver
+    - openshift/openshift-controller-manager
+    - openshift/openshift-state-metrics
+    - openshift/openshift-tuned
+    - openshift/origin
+    - openshift/origin-aggregated-logging
+    - openshift/origin-branding
+    - openshift/ovn-kubernetes
+    - openshift/pagerduty-operator
+    - openshift/pipelines-catalog
+    - openshift/pod-checkpointer-operator
+    - openshift/prometheus
+    - openshift/prometheus-alertmanager
+    - openshift/prometheus-client_golang
+    - openshift/prometheus-operator
+    - openshift/prom-label-proxy
+    - openshift/rbac-permissions-operator
+    - openshift/release
+    - openshift/release-controller
+    - openshift/rhcos-tools
+    - openshift/router
+    - openshift/runtime-utils
+    - openshift-s2i/s2i-wildfly
+    - openshift/sdn
+    - openshift/service-catalog
+    - openshift/service-ca-operator
+    - openshift/tektoncd-pipeline
+    - openshift/tektoncd-cli
+    - openshift/tektoncd-catalog
+    - openshift/telemeter
+    - openshift/template-service-broker
+    - openshift/template-service-broker-operator
+    - openshift/thanos
+    - openshift/verification-tests
+    - openshift/vertical-pod-autoscaler-operator
+    - openshift/windows-machine-config-operator
+    - openshift-knative/serverless-operator
+    - operator-framework/ghostunnel
+    - operator-framework/hadoop
+    - operator-framework/helm
+    - operator-framework/hive
+    - operator-framework/operator-lifecycle-manager
+    - operator-framework/operator-marketplace
+    - operator-framework/operator-metering
+    - operator-framework/operator-registry
+    - operator-framework/presto
+    excludedBranches:
+    - release-4.0
+    - release-4.1
+    - release-4.2
+    - release-4.3
+    - release-4.4
+    - openshift-4.1
+    labels:
+    - lgtm
+    - approved
+    missingLabels:
+    - needs-rebase
+    - do-not-merge/blocked-paths
+    - do-not-merge/hold
+    - do-not-merge/work-in-progress
+    - do-not-merge/invalid-owners-file
+    - bugzilla/invalid-bug
+  - repos:
+    - openshift/online-registration
+    - openshift/enterprise-images
+    - openshift/ose
+    - openshift/source-to-image
+    labels:
+    - lgtm
+    - approved
+    missingLabels:
+    - needs-rebase
+    - do-not-merge/blocked-paths
+    - do-not-merge/hold
+    - do-not-merge/work-in-progress
+    - do-not-merge/invalid-owners-file
+    - bugzilla/invalid-bug
+  - repos:
+    - openshift/azure-sop
+    - openshift/origin-metrics
+    - openshift/origin-web-console
+    - openshift/origin-web-console-server
+    - openshift/cluster-operator
+    - openshift/os
+    - openshift/redhat-release-coreos
+    - openshift/cluster-capacity
+    - openshift/descheduler
+    - openshift/kubernetes-autoscaler
+    - openshift/openshift-restclient-java
+    - openshift/coredns
+    - openshift/service-ca-operator
+    - openshift/sriov-cni
+    - openshift/sriov-dp-admission-controller
+    - openshift/sriov-network-device-plugin
+    - openshift/sriov-network-operator
+    excludedBranches:
+    - release-4.0
+    - release-4.1
+    - release-4.2
+    - release-4.3
+    - release-4.4
+    - openshift-4.1
+    labels:
+    - lgtm
+    missingLabels:
+    - needs-rebase
+    - do-not-merge/blocked-paths
+    - do-not-merge/hold
+    - do-not-merge/work-in-progress
+    - do-not-merge/invalid-owners-file
+    - bugzilla/invalid-bug
+  - repos:
+    - openshift/openshift-azure
+    labels:
+    - lgtm
+    - approved
+    missingLabels:
+    - needs-rebase
+    - do-not-merge/blocked-paths
+    - do-not-merge/hold
+    - do-not-merge/work-in-progress
+    - do-not-merge/invalid-owners-file
+    - do-not-merge/needs-signoff
+    - do-not-merge/release-note-label-needed
+    - bugzilla/invalid-bug
+  - repos:
+    - tnozicka/openshift-acme
+    labels:
+    - lgtm
+    - approved
+    missingLabels:
+    - needs-rebase
+    - do-not-merge/blocked-paths
+    - do-not-merge/hold
+    - do-not-merge/work-in-progress
+    - do-not-merge/invalid-owners-file
+    - do-not-merge/release-note-label-needed
+  - repos:
+    - fabric8-services/toolchain-operator
+    - containers/libpod
+    - coreos/rpm-ostree
+    - kiegroup/kie-cloud-operator
+    labels:
+    - lgtm
+    - approved
+    missingLabels:
+    - needs-rebase
+    - do-not-merge/blocked-paths
+    - do-not-merge/hold
+    - do-not-merge/work-in-progress
+    - do-not-merge/invalid-owners-file
+  - repos:
+    - codeready-toolchain/host-operator
+    - codeready-toolchain/api
+    - codeready-toolchain/member-operator
+    - codeready-toolchain/toolchain-common
+    - codeready-toolchain/toolchain-e2e
+    labels:
+    - lgtm
+    - approved
+    missingLabels:
+    - needs-rebase
+    - do-not-merge/blocked-paths
+    - do-not-merge/hold
+    - do-not-merge/work-in-progress
+    - do-not-merge/invalid-owners-file
+  - repos:
+    - redhat-developer/service-binding-operator
+    labels:
+    - lgtm
+    - approved
+    missingLabels:
+    - needs-rebase
+    - do-not-merge/blocked-paths
+    - do-not-merge/hold
+    - do-not-merge/work-in-progress
+    - do-not-merge/invalid-owners-file
+  - repos:
+    - redhat-developer/openshift-jenkins-operator
+    labels:
+    - lgtm
+    - approved
+    missingLabels:
+    - needs-rebase
+    - do-not-merge/blocked-paths
+    - do-not-merge/hold
+    - do-not-merge/work-in-progress
+    - do-not-merge/invalid-owners-file
+  - repos:
+    - openshift/community
+    labels:
+    - lgtm
+    - approved
+    missingLabels:
+    - needs-rebase
+    - do-not-merge/blocked-paths
+    - do-not-merge/hold
+    - do-not-merge/work-in-progress
+    - do-not-merge/invalid-owners-file
+    - bugzilla/invalid-bug
+  - repos:
+    - integr8ly/integreatly-operator
+    labels:
+    - lgtm
+    - approved
+    missingLabels:
+    - needs-rebase
+    - do-not-merge/blocked-paths
+    - do-not-merge/hold
+    - do-not-merge/work-in-progress
+    - do-not-merge/invalid-owners-file
+  - orgs:
+    - cri-o
+    labels:
+    - lgtm
+    - approved
+    - "dco-signoff: yes"
+    missingLabels:
+    - needs-rebase
+    - do-not-merge/blocked-paths
+    - do-not-merge/hold
+    - do-not-merge/work-in-progress
+    - do-not-merge/invalid-owners-file
+    - "dco-signoff: no"
+  context_options:
+    from-branch-protection: true
+    orgs:
+      cri-o:
+        repos:
+          cri-o:
+            skip-unknown-contexts: true # to make codecov jobs not blocking
+      openshift:
+        repos:
+          release:
+            skip-unknown-contexts: true # to make rehearsal jobs not blocking
+      redhat-developer:
+        repos:
+          service-binding-operator:
+            skip-unknown-contexts: true # to make codecov jobs not blocking
+
+prowjob_namespace: ci
+pod_namespace: ci
+log_level: debug
+
+branch-protection:
+  protect-tested-repos: true
+  allow_disabled_policies: true
+  allow_disabled_job_policies: true
+  orgs:
+    cri-o:
+      required_status_checks:
+        contexts:
+        - dco
+    openshift:
+      repos:
+        ose:
+          restrictions:
+            teams:
+            - team-release-admins
+        jenkins-openshift-login-plugin:
+          restrictions:
+            teams:
+            - team-jenkins
+        jenkins-client-plugin:
+          restrictions:
+            teams:
+            - team-jenkins
+        jenkins-plugin:
+          restrictions:
+            teams:
+            - team-jenkins
+        jenkins-sync-plugin:
+          restrictions:
+            teams:
+            - team-jenkins
+        azure-sop:
+          restrictions:
+            teams:
+            - team-azure-committers
+        azure-misc:
+          restrictions:
+            teams:
+            - team-azure-committers
+        openshift-azure:
+          restrictions:
+            teams:
+            - team-azure-committers
+        cluster-capacity:
+          required_status_checks:
+            contexts:
+            - continuous-integration/travis-ci/pr
+        openshift-restclient-java:
+          required_status_checks:
+            contexts:
+            - continuous-integration/travis-ci/pr
+        knative-client:
+          branches:
+            release-next:
+               protect: false
+            release-next-ci:
+               protect: false
+        knative-eventing-contrib:
+          branches:
+            release-next:
+               protect: false
+            release-next-ci:
+               protect: false
+        knative-eventing:
+          branches:
+            release-next:
+               protect: false
+            release-next-ci:
+               protect: false
+        knative-serving:
+          branches:
+            release-next:
+               protect: false
+            release-next-ci:
+               protect: false
+        tektoncd-pipeline:
+          branches:
+            release-next:
+               protect: false
+            release-next-ci:
+               protect: false
+        tektoncd-cli:
+          branches:
+            release-next:
+               protect: false
+            release-next-ci:
+               protect: false
+        tektoncd-catalog:
+          branches:
+            release-next:
+               protect: false
+            release-next-ci:
+               protect: false
+    openshift-s2i:
+      repos:
+        s2i-wildfly:
+          required_status_checks:
+            contexts:
+            - continuous-integration/travis-ci/pr
+    fabric8-services:
+      repos:
+        toolchain-operator:
+          protect: false
+    containers:
+      repos:
+        libpod:
+          protect: false
+    kiegroup:
+      repos:
+        kie-cloud-operator:
+          protect: false
+    monstorak:
+      repos:
+        monstorak-operator:
+          protect: false
+    kubernetes-incubator:
+      repos:
+        descheduler:
+          protect: false
+    tnozicka:
+      repos:
+        openshift-acme:
+          protect: false
+    operator-framework:
+      repos:
+        operator-sdk:
+          protect: false
+        community-operators:
+          protect: false
+    codeready-toolchain:
+      repos:
+        member-operator:
+          protect: false
+        host-operator:
+          protect: false
+        api:
+          protect: false
+        toolchain-common:
+          protect: false
+        toolchain-e2e:
+          protect: false
+    kubevirt:
+      repos:
+        hyperconverged-cluster-operator:
+          protect: false
+    redhat-developer:
+      repos:
+        devconsole-git:
+          protect: false
+        devconsole-operator:
+          protect: false
+        devconsole-api:
+          protect: false

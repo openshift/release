@@ -1,0 +1,93 @@
+periodics:
+- agent: jenkins
+  interval: 24h
+  labels:
+    master: ci.openshift.redhat.com
+  name: ami_build_origin_int_rhel_base
+- agent: jenkins
+  interval: 2h
+  labels:
+    master: ci.openshift.redhat.com
+  name: ci-kubernetes-conformance-node-e2e-containerized-rhel
+- agent: jenkins
+  interval: 2h
+  labels:
+    master: ci.openshift.redhat.com
+  name: ci-kubernetes-conformance-node-e2e-rhel
+- agent: kubernetes
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: origin
+  interval: 24h
+  name: periodic-ci-origin-conformance-k8s
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --give-pr-author-access-to-namespace=true
+      - --secret-dir=/usr/local/e2e-conformance-k8s-cluster-profile
+      - --target=e2e-conformance-k8s
+      - --template=/usr/local/e2e-conformance-k8s
+      command:
+      - ci-operator
+      env:
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: CONFIG_SPEC
+        valueFrom:
+          configMapKeyRef:
+            key: openshift-origin-master.yaml
+            name: ci-operator-master-configs
+      - name: JOB_NAME_SAFE
+        value: e2e-conformance-k8s
+      - name: TEST_COMMAND
+        value: test/extended/conformance-k8s.sh
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/e2e-conformance-k8s-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/e2e-conformance-k8s
+        name: job-definition
+        subPath: cluster-launch-installer-src.yaml
+    serviceAccountName: ci-operator
+    volumes:
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - configMap:
+        name: prow-job-cluster-launch-installer-src
+      name: job-definition
+- agent: jenkins
+  interval: 24h
+  labels:
+    master: ci.openshift.redhat.com
+  name: test_branch_origin_extended_clusterup
+- agent: jenkins
+  interval: 24h
+  labels:
+    master: ci.openshift.redhat.com
+  name: test_branch_origin_extended_conformance_k8s_310
+- agent: jenkins
+  interval: 24h
+  labels:
+    master: ci.openshift.redhat.com
+  name: test_branch_origin_extended_gssapi
+- agent: jenkins
+  interval: 24h
+  labels:
+    master: ci.openshift.redhat.com
+  name: test_branch_origin_extended_ldap_groups
+- agent: jenkins
+  interval: 24h
+  labels:
+    master: ci.openshift.redhat.com
+  name: test_origin_device_manager_plugin_gpu

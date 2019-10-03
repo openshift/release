@@ -1,22 +1,20 @@
 base_images:
   base:
-    name: "4.2"
+    name: "4.3"
     namespace: ocp
     tag: base
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
-    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.12
-canonical_go_repository: github.com/openshift/oauth-server
 images:
 - dockerfile_path: images/Dockerfile.rhel
   from: base
   to: oauth-server
 promotion:
-  name: "4.2"
+  name: "4.3"
   namespace: ocp
 resources:
   '*':
@@ -26,7 +24,7 @@ resources:
       cpu: "3"
       memory: 6Gi
 tag_specification:
-  name: "4.2"
+  name: "4.3"
   namespace: ocp
 test_binary_build_commands: make build GOFLAGS='-race' --warn-undefined-variables
 tests:
@@ -35,12 +33,6 @@ tests:
     make verify -k --warn-undefined-variables
   container:
     from: bin
-- as: verify-deps
-  commands: |
-    HOME=$( mktemp -d )
-    make verify-deps -k --warn-undefined-variables
-  container:
-    from: src
 - artifact_dir: /tmp/artifacts
   as: unit
   commands: |
@@ -52,7 +44,6 @@ tests:
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: aws
-    upgrade: false
 - as: e2e-aws-upgrade
   commands: TEST_SUITE=all run-upgrade-tests
   openshift_installer:

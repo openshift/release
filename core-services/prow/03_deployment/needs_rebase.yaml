@@ -1,0 +1,75 @@
+kind: List
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    namespace: ci
+    name: needs-rebase
+  spec:
+    selector:
+      app: prow
+      component: needs-rebase
+    ports:
+    - port: 80
+      targetPort: 8888
+    type: ClusterIP
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    namespace: ci
+    name: needs-rebase
+    labels:
+      app: prow
+      component: needs-rebase
+  spec:
+    replicas: 1
+    revisionHistoryLimit: 2
+    selector:
+      matchLabels:
+        app: prow
+        component: needs-rebase
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: needs-rebase
+      spec:
+        containers:
+        - name: needs-rebase
+          image: gcr.io/k8s-prow/needs-rebase:v20191003-4c085117a
+          args:
+          - --github-token-path=/etc/github/oauth
+          - --hmac-secret-file=/etc/webhook/hmac
+          - --plugin-config=/etc/plugins/plugins.yaml
+          - --dry-run=false
+          - --github-endpoint=http://ghproxy
+          - --github-endpoint=https://api.github.com
+          - --github-graphql-endpoint=http://ghproxy/graphql
+          ports:
+            - name: http
+              containerPort: 8888
+          volumeMounts:
+          - name: hmac
+            mountPath: /etc/webhook
+            readOnly: true
+          - name: oauth
+            mountPath: /etc/github
+            readOnly: true
+          - name: plugins
+            mountPath: /etc/plugins
+            readOnly: true
+          resources:
+            requests:
+              memory: "75Mi"
+              cpu: "30m"
+        volumes:
+        - name: hmac
+          secret:
+            secretName: github-webhook-credentials
+        - name: oauth
+          secret:
+            secretName: github-credentials-openshift-ci-robot
+        - name: plugins
+          configMap:
+            name: plugins

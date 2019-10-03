@@ -6,16 +6,15 @@ base_images:
 binary_build_commands: make build
 build_root:
   image_stream_tag:
-    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.12
-canonical_go_repository: github.com/openshift/cluster-kube-scheduler-operator
 images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
   to: cluster-kube-scheduler-operator
 promotion:
+  disabled: true
   name: "4.3"
   namespace: ocp
 resources:
@@ -38,7 +37,6 @@ tests:
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: aws
-    upgrade: false
 - as: e2e-aws-operator
   commands: make e2e
   openshift_installer_src:
@@ -46,9 +44,6 @@ tests:
 - as: verify
   commands: |
     make verify -k
-    make verify-bindata
-    make verify-bindata-v3.11.0
-    make verify-generated
   container:
     from: src
 - as: verify-deps
@@ -61,7 +56,6 @@ tests:
   commands: TEST_SUITE=openshift/conformance/serial run-tests
   openshift_installer:
     cluster_profile: aws
-    upgrade: false
 - as: e2e-aws-upgrade
   commands: TEST_SUITE=all run-upgrade-tests
   openshift_installer:

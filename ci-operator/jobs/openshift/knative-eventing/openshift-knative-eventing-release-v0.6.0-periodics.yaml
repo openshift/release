@@ -1,0 +1,49 @@
+periodics:
+- agent: kubernetes
+  decorate: true
+  interval: 24h
+  name: periodic-ci-openshift-knative-eventing-release-v0.6.0-e2e-aws
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --git-ref=openshift/knative-eventing@release-v0.6.0
+      - --secret-dir=/usr/local/e2e-aws-cluster-profile
+      - --target=e2e-aws
+      - --template=/usr/local/e2e-aws
+      command:
+      - ci-operator
+      env:
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: CONFIG_SPEC
+        valueFrom:
+          configMapKeyRef:
+            key: openshift-knative-eventing-release-v0.6.0.yaml
+            name: ci-operator-misc-configs
+      - name: JOB_NAME_SAFE
+        value: e2e-aws
+      - name: TEST_COMMAND
+        value: TEST_ORIGIN_CONFORMANCE=true make test-e2e
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/e2e-aws-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/e2e-aws
+        name: job-definition
+        subPath: cluster-launch-installer-src.yaml
+    serviceAccountName: ci-operator
+    volumes:
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - configMap:
+        name: prow-job-cluster-launch-installer-src
+      name: job-definition

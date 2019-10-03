@@ -5,11 +5,9 @@ base_images:
     tag: "7"
 build_root:
   image_stream_tag:
-    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.10
-canonical_go_repository: github.com/openshift/images
 images:
 - context_dir: base/
   dockerfile_path: Dockerfile.rhel
@@ -33,7 +31,6 @@ images:
 promotion:
   additional_images:
     base: base
-  disabled: true
   name: "4.2"
   namespace: ocp
 raw_steps:
@@ -41,8 +38,6 @@ raw_steps:
     commands: |
       rm -rf /etc/yum.repos.d/*
       curl http://base-4-2.ocp.svc > /etc/yum.repos.d/content.repo
-      echo '#!/bin/sh' > /usr/bin/yum-config-manager
-      chmod ug+x /usr/bin/yum-config-manager
     from: os
     to: base-os
 resources:
@@ -60,7 +55,6 @@ tests:
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: aws
-    upgrade: false
 - as: e2e-aws-upgrade
   commands: TEST_SUITE=all run-upgrade-tests
   openshift_installer:

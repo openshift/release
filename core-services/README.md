@@ -17,7 +17,7 @@ manifests and other configuration as needed.
 1. All directories should contain `OWNERS` and `README.md` files. This is
 enforced by `make check` locally and by the `ci/prow/core-valid` check on
 pull requests.
-2. Config is applied to the cluster using the [`applyconfig`](../tools/applyconfig)
+2. Config is applied to the cluster using the [`applyconfig`](https://github.com/openshift/ci-tools/tree/master/cmd/applyconfig)
 tool. The tool applies all YAML files under your service subdirectory. All
    YAML filenames should follow the following convention:
     - All admin resources should be in `admin_*.yaml` files
@@ -46,7 +46,7 @@ ConfigMaps.
    [postsubmit](https://prow.svc.ci.openshift.org/?job=branch-ci-openshift-release-master-core-apply)
    after each PR is merged, and also [periodically](https://prow.svc.ci.openshift.org/?job=openshift-release-master-core-apply).
 3. ConfigMaps are automatically updated by the `config-updater` Prow plugin,
-   configured in its [config.yaml](../cluster/ci/config/prow/config.yaml) file.
+   configured in its [config.yaml](02_config/_config.yaml) file.
    Additionally, they are [periodically](https://prow.svc.ci.openshift.org/?job=openshift-release-master-config-bootstrapper)
    synced by a Prow job.
 
@@ -59,5 +59,5 @@ ConfigMaps.
 3. ConfigMaps can be manually created by the [config-bootstrapper](https://github.com/kubernetes/test-infra/tree/master/prow/cmd/config-bootstrapper)
    tool.
 
-Additionally, the [`applyconfig`](../tools/applyconfig) can be used directly.
-See its [README.md](../tools/applyconfig/README.md) for more details.
+Additionally, the [`applyconfig`](https://github.com/openshift/ci-tools/tree/master/cmd/applyconfig) can be used directly.
+See its [README.md](https://github.com/openshift/ci-tools/blob/master/cmd/applyconfig/README.md) for more details.
