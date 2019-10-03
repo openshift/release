@@ -461,11 +461,8 @@ periodics:
       - name: job-config-misc
         mountPath: /etc/job-config/misc
         readOnly: true
-      - name: job-config-master-presubmits
-        mountPath: /etc/job-config/master/presubmits
-        readOnly: true
-      - name: job-config-master-postsubmits
-        mountPath: /etc/job-config/master/postsubmits
+      - name: job-config-master
+        mountPath: /etc/job-config/master
         readOnly: true
       - name: job-config-3x
         mountPath: /etc/job-config/3.x
@@ -492,12 +489,9 @@ periodics:
     - name: job-config-misc
       configMap:
         name: job-config-misc
-    - name: job-config-master-presubmits
+    - name: job-config-master
       configMap:
-        name: job-config-master-presubmits
-    - name: job-config-master-postsubmits
-      configMap:
-        name: job-config-master-postsubmits
+        name: job-config-master
     - name: job-config-3x
       configMap:
         name: job-config-3.x
@@ -636,3 +630,139 @@ periodics:
       - name: plugins
         configMap:
           name: plugins
+- agent: kubernetes
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 12h
+  name: openshift-release-master-core-apply
+  spec:
+    containers:
+    - args:
+      - --config-dir
+      - core-services
+      - --confirm
+      - "true"
+      command:
+      - applyconfig
+      image: registry.svc.ci.openshift.org/ci/applyconfig:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+    serviceAccountName: config-updater
+- agent: kubernetes
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 12h
+  name: openshift-release-master-config-updates
+  spec:
+    containers:
+    - args:
+      - postsubmit-update
+      command:
+      - make
+      image: registry.svc.ci.openshift.org/ci/origin-release:cli
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+    serviceAccountName: config-updater
+- agent: kubernetes
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 1h
+  name: openshift-release-master-config-bootstrapper
+  spec:
+    containers:
+    - args:
+      - --dry-run=false
+      - --source-path=.
+      - --config-path=core-services/prow/02_config/_config.yaml
+      - --plugin-config=core-services/prow/02_config/_plugins.yaml
+      command:
+      - /app/prow/cmd/config-bootstrapper/app.binary
+      image: gcr.io/k8s-prow/config-bootstrapper:v20191002-dde1bedde
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+    serviceAccountName: config-updater
+- agent: kubernetes
+  cron: '@hourly'
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  name: periodic-openshift-release-fast-forward
+  spec:
+    containers:
+    - args:
+      - --config-dir=./ci-operator/config/
+      - --current-release=4.3
+      - --future-release=4.4
+      - --fast-forward
+      - --confirm
+      - --username=openshift-merge-robot
+      - --token-path=/etc/github/oauth
+      command:
+      - repo-brancher
+      image: repo-brancher:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: token
+        readOnly: true
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-merge-robot
+- agent: kubernetes
+  cron: '@hourly'
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  name: periodic-openshift-release-merge-blockers
+  spec:
+    containers:
+    - args:
+      - --config-dir=./ci-operator/config/
+      - --current-release=4.3
+      - --future-release=4.4
+      - --confirm
+      - --username=openshift-merge-robot
+      - --token-path=/etc/github/oauth
+      command:
+      - blocking-issue-creator
+      image: blocking-issue-creator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: token
+        readOnly: true
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-merge-robot
