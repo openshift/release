@@ -1,27 +1,18 @@
 periodics:
 - decorate: true
-  decoration_config:
-    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: openshift-azure
   interval: 24h
-  name: periodic-ci-azure-conformance
+  name: periodic-ci-azure-content-update
   spec:
     containers:
     - args:
-      - hack/tests/origin-conformance.sh
-      env:
-      - name: OS_GIT_MAJOR
-        value: "3"
-      - name: OS_GIT_MINOR
-        value: "11"
-      - name: TEST_SUITE
-        value: openshift/conformance/parallel/minimal
-      - name: TEST_NODES
-        value: "30"
+      - hack/periodic/content-update.sh
       image: registry.svc.ci.openshift.org/azure/ci-base:latest
       name: ""
-      resources:
-        requests:
-          cpu: 10m
+      resources: {}
     serviceAccountName: ci-operator
 - decorate: true
   extra_refs:
@@ -186,21 +177,6 @@ periodics:
         value: osa_311
       - name: IMAGE_VERSION
         value: latest
-      image: registry.svc.ci.openshift.org/azure/ci-base:latest
-      name: ""
-      resources: {}
-    serviceAccountName: ci-operator
-- decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: openshift-azure
-  interval: 24h
-  name: periodic-ci-azure-content-update
-  spec:
-    containers:
-    - args:
-      - hack/periodic/content-update.sh
       image: registry.svc.ci.openshift.org/azure/ci-base:latest
       name: ""
       resources: {}
