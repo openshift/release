@@ -13,6 +13,7 @@ prow-monitoring-deploy: ci-secret-deploy
 	oc apply -f ./deck-internal_service_monitor.yaml
 	oc apply -f ./jenkins-operator_service_monitor.yaml
 	oc apply -f ./plank_service_monitor.yaml
+	oc apply -f ./exporter_service_monitor.yaml
 	oc apply -f ./tide_service_monitor.yaml
 	oc apply -f ./prometheus_crd.yaml
 	oc apply -f ./mixins/prometheus_out/prometheus_rule_prow.yaml
@@ -73,6 +74,7 @@ prow-monitoring-cleanup:
 	oc delete -f ./deck-internal_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./jenkins-operator_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./plank_service_monitor.yaml --ignore-not-found=true --as=system:admin
+	oc delete -f ./exporter_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./tide_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./prometheus_service_monitor.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./alert_manager_service_monitor.yaml --ignore-not-found=true --as=system:admin
