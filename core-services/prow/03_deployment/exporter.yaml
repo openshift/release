@@ -1,0 +1,65 @@
+kind: List
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    namespace: ci
+    labels:
+      app: prow
+      component: exporter
+    name: exporter
+  spec:
+    ports:
+    - name: metrics
+      port: 9090
+      protocol: TCP
+      targetPort: 9090
+    selector:
+      app: prow
+      component: exporter
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    namespace: ci
+    name: exporter
+    labels:
+      app: prow
+      component: exporter
+  spec:
+    replicas: 1
+    revisionHistoryLimit: 2
+    strategy:
+      type: Recreate
+    selector:
+      matchLabels:
+        app: prow
+        component: exporter
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: exporter
+      spec:
+        serviceAccountName: exporter
+        priorityClassName: prow-critical
+        containers:
+        - name: exporter
+          image: gcr.io/k8s-prow/exporter:v20191004-3059c69b0
+          args:
+          - --config-path=/etc/config/config.yaml
+          ports:
+          - name: metrics
+            containerPort: 9090
+          volumeMounts:
+          - name: config
+            mountPath: /etc/config
+            readOnly: true
+          resources:
+            requests:
+              memory: "4Gi"
+              cpu: "600m"
+        volumes:
+        - name: config
+          configMap:
+            name: config
