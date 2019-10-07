@@ -20,6 +20,25 @@ items:
       targetPort: 9090
     selector:
       app: ci-operator-configresolver
+- apiVersion: monitoring.coreos.com/v1
+  kind: ServiceMonitor
+  metadata:
+    name: ci-operator-configresolver
+    namespace: prow-monitoring
+    labels:
+      app: ci-operator-configresolver
+      prow-app: ci-operator-configresolver
+  spec:
+    endpoints:
+    - interval: 30s
+      port: metrics
+      scheme: http
+    namespaceSelector:
+      matchNames:
+      - ci
+    selector:
+      matchLabels:
+        app: ci-operator-configresolver
 - apiVersion: apps/v1
   kind: Deployment
   metadata:
