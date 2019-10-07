@@ -1,0 +1,102 @@
+kind: List
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    namespace: ci
+    labels:
+      app: ci-operator-configresolver
+    name: ci-operator-configresolver
+  spec:
+    ports:
+    - name: main
+      port: 80
+      protocol: TCP
+      targetPort: 8080
+    - name: metrics
+      port: 9090
+      protocol: TCP
+      targetPort: 9090
+    selector:
+      app: ci-operator-configresolver
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    namespace: ci
+    name: ci-operator-configresolver
+    annotations:
+      image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"ci-operator-configresolver:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"ci-operator-configresolver\")].image"}]'
+  spec:
+    replicas: 1
+    strategy:
+      type: Recreate
+    selector:
+      matchLabels:
+        app: ci-operator-configresolver
+    template:
+      metadata:
+        labels:
+          app: ci-operator-configresolver
+      spec:
+        ports:
+        - name: main
+          containerPort: 8080
+        - name: metrics
+          containerPort: 9090
+        containers:
+        - name: ci-operator-configresolver
+          image: ci-operator-configresolver:latest
+          args:
+          - -config=/etc/configs
+          - -log-level=debug
+          - -cycle=2m
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 3
+            periodSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz/ready
+              port: 8081
+            initialDelaySeconds: 10
+            periodSeconds: 3
+            timeoutSeconds: 600
+          volumeMounts:
+          - name: master
+            mountPath: /etc/configs/master
+            readOnly: true
+          - name: release-41
+            mountPath: /etc/configs/release-4.1
+            readOnly: true
+          - name: release-42
+            mountPath: /etc/configs/release-4.2
+            readOnly: true
+          - name: release-43
+            mountPath: /etc/configs/release-4.3
+            readOnly: true
+          - name: release-44
+            mountPath: /etc/configs/release-4.4
+            readOnly: true
+          resources:
+            requests:
+              memory: "2Gi"
+              cpu: "200m"
+        volumes:
+        - name: master
+          configMap:
+            name: ci-operator-master-configs
+        - name: release-41
+          configMap:
+            name: ci-operator-4.1-configs
+        - name: release-42
+          configMap:
+            name: ci-operator-4.2-configs
+        - name: release-43
+          configMap:
+            name: ci-operator-4.3-configs
+        - name: release-44
+          configMap:
+            name: ci-operator-4.4-configs
