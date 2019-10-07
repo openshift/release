@@ -229,6 +229,18 @@ spec:
       for: 1m
       labels:
         severity: slack
+  - name: plank-infra
+    rules:
+    - alert: plank-job-with-infra-role-failures
+      annotations:
+        message: plank jobs {{ $labels.job_name }} with infra role has failures. Check
+          on <https://grafana-prow-monitoring.svc.ci.openshift.org/d/8ce131e226b7fd2901c2fce45d4e21c1/dptp-dashboard?orgId=1&fullscreen&panelId=3|grafana>
+          and <https://prow.svc.ci.openshift.org/|deck>
+      expr: |
+        sum(rate(prowjob_state_transitions{job="plank",job_name!~"rehearse.*",state="failure"}[5m])) by (job_name) * on (job_name) group_left prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_role="infra"} > 0
+      for: 1m
+      labels:
+        severity: slack
   - name: ghproxy
     rules:
     - alert: ghproxy-status-code-abnormal-4XX
