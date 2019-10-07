@@ -196,6 +196,36 @@ objects:
   metadata:
     labels:
       app: origin-release
+    name: "origin-release-golang-1.13"
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: DockerImage
+        name: "${PUSH_REPOSITORY}:golang-1.13"
+      pushSecret:
+        name: "dockerhub"
+    source:
+      git:
+        ref: "${SOURCE_REF}"
+        uri: "${SOURCE_URL}"
+      contextDir: "projects/origin-release/golang-1.13/"
+      type: Git
+    strategy:
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: origin-release:base
+        imageOptimizationPolicy: SkipLayers
+    triggers:
+    - imageChange: {}
+      type: ImageChange
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    labels:
+      app: origin-release
     name: "origin-release-nodejs-8"
   spec:
     successfulBuildsHistoryLimit: 1
