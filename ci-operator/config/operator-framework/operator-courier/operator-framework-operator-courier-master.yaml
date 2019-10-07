@@ -1,0 +1,28 @@
+base_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: fedora
+    namespace: openshift
+    tag: "29"
+build_root:
+  project_image:
+    dockerfile_path: tests/integration/dockerfiles/integration-base.Dockerfile
+images:
+- dockerfile_path: tests/integration/dockerfiles/integration.Dockerfile
+  from: root
+  to: integration
+resources:
+  '*':
+    limits:
+      memory: 2Gi
+    requests:
+      cpu: 100m
+      memory: 100Mi
+tests:
+- as: integration
+  commands: . /tmp/secret/quay-env.txt && tox -e integration
+  container:
+    from: integration
+  secret:
+    name: operator-manifests-test-credentials
+    mount_path: /tmp/secret
