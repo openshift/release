@@ -292,3 +292,15 @@ spec:
       for: 5m
       labels:
         severity: slack
+  - name: prow-job-failures
+    rules:
+    - alert: periodic-openshift-library-import-failures
+      annotations:
+        message: Prow job periodic-openshift-library-import has failures. Check on
+          <https://prow.svc.ci.openshift.org/?type=periodic&job=periodic-openshift-library-import|deck>
+      expr: |
+        rate(prowjob_state_transitions{job_name="periodic-openshift-library-import",state="failure"}[5m]) > 0
+      for: 1m
+      labels:
+        severity: slack
+        team: developer-experience

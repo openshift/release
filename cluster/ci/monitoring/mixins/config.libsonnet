@@ -21,6 +21,11 @@
         channel: '#build-cop-alerts',
         notify: 'build-cop',
       },
+      'openshift-library': {
+        team: 'developer-experience',
+        channel: '#forum-devex',
+        notify: 'devex',
+      },
     },
   },
 }
