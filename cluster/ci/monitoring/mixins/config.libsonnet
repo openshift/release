@@ -16,5 +16,17 @@
       'release-.*-upgrade.*': 80,
       'release-.*4.1.*4.2.*': 80,
     },
+    alertManagerReceivers: {
+      'build-cop': {
+        team: 'build-cop',
+        channel: '#build-cop-alerts',
+        notify: 'build-cop',
+      },
+      'openshift-library': {
+        team: 'developer-experience',
+        channel: '#forum-devex',
+        notify: 'devex',
+      },
+    },
   },
 }

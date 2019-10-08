@@ -45,7 +45,7 @@ ci-secret-deploy:
 	@echo "deploy ci secret ..."
 	#TODO: reference a value should be doable with jsonnet
 	@echo "replacing the api_url in ./alertmanager.yaml ..."
-	@sed -e "s|{{ api_url }}|$(slack_api_url)|g" ./alertmanager.yaml > /tmp/alertmanager_with_secret.yaml
+	@sed -e "s|{{ api_url }}|$(slack_api_url)|g" ./mixins/prometheus_out/alertmanager.yaml > /tmp/alertmanager_with_secret.yaml
 	oc create -n prow-monitoring secret generic alertmanager-prow --from-file=alertmanager.yaml=/tmp/alertmanager_with_secret.yaml --from-file=./msg.tmpl --dry-run -o yaml | oc apply -f -
 	sha256sum /tmp/alertmanager_with_secret.yaml
 	rm -fv /tmp/alertmanager_with_secret.yaml
