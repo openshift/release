@@ -9,11 +9,18 @@
       'e2e_template_jobs.json': 'af88e642a76f37342fb52d475d52d965',
     },
     buildCopSuccessRateTargets: {
-      'branch-.*-images': 100, 
+      'branch-.*-images': 100,
       'release-.*-4.1': 80,
       'release-.*-4.2': 80,
       'release-.*-upgrade.*': 80,
       'release-.*4.1.*4.2.*': 80,
+    },
+    alertManagerReceivers: {
+      'build-cop': {
+        team: 'build-cop',
+        channel: '#build-cop-alerts',
+        notify: 'build-cop',
+      },
     },
   },
 }
