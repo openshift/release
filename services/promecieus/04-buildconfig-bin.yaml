@@ -1,0 +1,51 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  labels:
+    app: promecieus
+  name: promecieus-bin
+  namespace: promecieus
+spec:
+  failedBuildsHistoryLimit: 5
+  nodeSelector: null
+  output:
+    to:
+      kind: ImageStreamTag
+      name: "promecieus:bin"
+  postCommit: {}
+  resources: {}
+  runPolicy: Serial
+  source:
+    dockerfile: |-
+      FROM base
+      COPY gobinary /usr/local/bin/promecieus
+      COPY html/ /srv/
+      WORKDIR /srv/
+      EXPOSE 8080
+      ENTRYPOINT ["/usr/local/bin/promecieus"]
+    images:
+    - as: null
+      from:
+        kind: ImageStreamTag
+        name: "promecieus:src"
+      paths:
+      - destinationDir: .
+        sourcePath: /opt/app-root/gobinary
+      - sourcePath: /tmp/src/html
+        destinationDir: ./html
+    type: Dockerfile
+  strategy:
+    dockerStrategy:
+      from:
+        kind: ImageStreamTag
+        name: "promecieus:cli"
+    type: Docker
+  successfulBuildsHistoryLimit: 5
+  triggers:
+  - type: ImageChange
+    imageChange:
+      from:
+        kind: ImageStreamTag
+        name: "promecieus:src"
+  - type: ConfigChange
+  - type: ImageChange

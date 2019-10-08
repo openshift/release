@@ -1,0 +1,35 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  labels:
+    app: promecieus
+  name: promecieus-src
+  namespace: promecieus
+spec:
+  failedBuildsHistoryLimit: 5
+  nodeSelector: null
+  output:
+    to:
+      kind: ImageStreamTag
+      name: promecieus:src
+  postCommit: {}
+  resources: {}
+  runPolicy: Serial
+  source:
+    git:
+      ref: master
+      uri: https://github.com/vrutkovs/promecieus
+    type: Git
+  strategy:
+    sourceStrategy:
+      from:
+        kind: ImageStreamTag
+        name: promecieus:golang1.11
+    type: Source
+  successfulBuildsHistoryLimit: 5
+  triggers:
+  - type: ImageChange
+  - type: ConfigChange
+  - type: "GitHub"
+    github:
+      secret: "secret101"
