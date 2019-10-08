@@ -4,35 +4,6 @@ presubmits:
     always_run: true
     branches:
     - master
-    context: ci/prow/generate
-    decorate: true
-    name: pull-ci-openshift-telemeter-generate
-    rerun_command: /test generate
-    spec:
-      containers:
-      - args:
-        - -c
-        - make generate && git diff --exit-code
-        command:
-        - sh
-        env:
-        - name: GO111MODULE
-          value: "on"
-        - name: GOPATH
-          value: /go:/home/prow/go
-        - name: USER
-          value: deadbeef
-        image: quay.io/coreos/jsonnet-ci
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 500m
-    trigger: (?m)^/test generate
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
     context: ci/prow/benchmark
     decorate: true
     decoration_config:
@@ -211,6 +182,35 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-aws-upgrade,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/generate
+    decorate: true
+    name: pull-ci-openshift-telemeter-master-generate
+    rerun_command: /test generate
+    spec:
+      containers:
+      - args:
+        - -c
+        - make generate && git diff --exit-code
+        command:
+        - sh
+        env:
+        - name: GO111MODULE
+          value: "on"
+        - name: GOPATH
+          value: /go:/home/prow/go
+        - name: USER
+          value: deadbeef
+        image: quay.io/coreos/jsonnet-ci
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+    trigger: (?m)^/test generate
   - agent: kubernetes
     always_run: true
     branches:
