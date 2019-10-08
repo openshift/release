@@ -1,0 +1,69 @@
+periodics:
+- agent: kubernetes
+  decorate: true
+  extra_refs:
+  - base_ref: release-v0.8.1
+    org: openshift
+    repo: knative-serving
+  interval: 12h
+  name: periodic-ci-openshift-knative-serving-release-v0.8.1-e2e-vsphere-ocp-42
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --give-pr-author-access-to-namespace=true
+      - --secret-dir=/usr/local/e2e-vsphere-upi-cluster-profile
+      - --target=e2e-vsphere-upi
+      - --template=/usr/local/e2e-vsphere-upi
+      command:
+      - ci-operator
+      env:
+      - name: CLUSTER_TYPE
+        value: vsphere
+      - name: CONFIG_SPEC
+        value: |
+          tag_specification:
+            name: "4.2"
+            namespace: ocp
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)
+            commands: "make test-e2e"
+            openshift_installer_upi:
+              cluster_profile: "$(CLUSTER_TYPE)"
+      - name: JOB_NAME_SAFE
+        value: e2e-vsphere-upi
+      - name: TEST_COMMAND
+        value: "make test-e2e"
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        '*':
+          limits:
+            memory: 4Gi
+          requests:
+            cpu: 100m
+            memory: 200Mi
+      volumeMounts:
+      - mountPath: /usr/local/e2e-vsphere-upi-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/e2e-vsphere-upi
+        name: job-definition
+        subPath: cluster-launch-installer-upi-e2e.yaml
+    serviceAccountName: ci-operator
+    volumes:
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-vsphere
+    - configMap:
+        name: prow-job-cluster-launch-installer-upi-e2e
+      name: job-definition
