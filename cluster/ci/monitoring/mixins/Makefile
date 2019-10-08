@@ -3,7 +3,7 @@ SHELL=/usr/bin/env bash -o pipefail
 
 dashboards = build_cop boskos canary deck e2e_template_jobs dptp ghproxy hook jenkins_operator plank prow sinker tide
 
-all: $(dashboards) prometheus_rule_prow.yaml
+all: $(dashboards) prometheus_rule_prow.yaml alertmanager.yaml
 
 $(dashboards):
 	@echo "Generating $@.json ..."
@@ -12,6 +12,10 @@ $(dashboards):
 prometheus_rule_prow.yaml:
 	@echo "Generating prometheus_rule_prow.yaml ..."
 	jsonnet  ./prometheus/prometheus_rule_prow.jsonnet | gojsontoyaml > ./prometheus_out/$@
+
+alertmanager.yaml:
+	@echo "Generating alertmanager.yaml ..."
+	jsonnet  ./prometheus/alertmanager.jsonnet | gojsontoyaml > ./prometheus_out/$@
 
 clean:
 	rm -rfv ./vendor
