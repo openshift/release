@@ -7,9 +7,10 @@
       'canary.json': '247fa71a76bb8c5c12c0389b5d532941',
       'dptp.json': '8ce131e226b7fd2901c2fce45d4e21c1',
       'e2e_template_jobs.json': 'af88e642a76f37342fb52d475d52d965',
+      'configresolver.json': '703f0ccf02cc4339a374b52eb10f653b',
     },
     buildCopSuccessRateTargets: {
-      'branch-.*-images': 100, 
+      'branch-.*-images': 100,
       'release-.*-4.1': 80,
       'release-.*-4.2': 80,
       'release-.*-upgrade.*': 80,
