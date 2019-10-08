@@ -39,4 +39,21 @@ dashboard.new(
     x: 0,
     y: 0,
   })
+.addPanel(
+    (graphPanel.new(
+        'Plank Infra-Jobs Failures',
+        description='sum(rate(prowjob_state_transitions{job="plank",job_name!~"rehearse.*",state="failure"}[5m])) by (job_name) * on (job_name) group_left prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_role="infra"}',
+        datasource='prometheus',
+        legend_alignAsTable=true,
+        legend_rightSide=true,
+    ) + legendConfig)
+    .addTarget(prometheus.target(
+        'sum(rate(prowjob_state_transitions{job="plank",job_name!~"rehearse.*",state="failure"}[5m])) by (job_name) * on (job_name) group_left prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_role="infra"}',
+        legendFormat='{{job_name}}',
+    )), gridPos={
+    h: 9,
+    w: 24,
+    x: 0,
+    y: 0,
+  })
 + dashboardConfig
