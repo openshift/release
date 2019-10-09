@@ -35,7 +35,7 @@
               severity: 'slack',
             },
             annotations: {
-              message: 'plank jobs {{ $labels.job_name }} with infra role has failures. Check on <https://grafana-prow-monitoring.svc.ci.openshift.org/d/%s/dptp-dashboard?orgId=1&fullscreen&panelId=3|grafana> and <https://prow.svc.ci.openshift.org/|deck>' % $._config.grafanaDashboardIDs['dptp.json'],
+              message: 'plank jobs {{ $labels.job_name }} with infra role has failures. Check on <https://grafana-prow-monitoring.svc.ci.openshift.org/d/%s/dptp-dashboard?orgId=1&fullscreen&panelId=3|grafana> and <https://prow.svc.ci.openshift.org/?job={{ $labels.job_name }}|deck>' % $._config.grafanaDashboardIDs['dptp.json'],
             },
           }
         ],
