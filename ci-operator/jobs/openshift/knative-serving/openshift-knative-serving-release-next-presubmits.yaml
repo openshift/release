@@ -119,3 +119,126 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-next
+    context: ci/prow/vsphere-e2e-vsphere-ocp-42
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: vsphere
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-serving-release-next-vsphere-e2e-vsphere-ocp-42
+    path_alias: knative.dev/serving
+    rerun_command: /test vsphere-e2e-vsphere-ocp-42
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --branch=release-next
+        - --give-pr-author-access-to-namespace=true
+        - --org=openshift
+        - --repo=knative-serving
+        - --resolver-address=http://ci-operator-configresolver
+        - --secret-dir=/usr/local/e2e-vsphere-ocp-42-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=e2e-vsphere-ocp-42
+        - --template=/usr/local/e2e-vsphere-ocp-42
+        - --variant=vsphere
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: vsphere
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-knative-serving-release-next__vsphere.yaml
+              name: ci-operator-misc-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-vsphere-ocp-42
+        - name: TEST_COMMAND
+          value: make test-e2e
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-vsphere-ocp-42-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-vsphere-ocp-42
+          name: job-definition
+          subPath: cluster-launch-installer-upi-src.yaml
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-vsphere
+      - configMap:
+          name: prow-job-cluster-launch-installer-upi-src
+        name: job-definition
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )vsphere-e2e-vsphere-ocp-42,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-next
+    context: ci/prow/vsphere-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: vsphere
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-serving-release-next-vsphere-images
+    path_alias: knative.dev/serving
+    rerun_command: /test vsphere-images
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --branch=release-next
+        - --give-pr-author-access-to-namespace=true
+        - --org=openshift
+        - --repo=knative-serving
+        - --resolver-address=http://ci-operator-configresolver
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=[images]
+        - --variant=vsphere
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-knative-serving-release-next__vsphere.yaml
+              name: ci-operator-misc-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )vsphere-images,?($|\s.*)
