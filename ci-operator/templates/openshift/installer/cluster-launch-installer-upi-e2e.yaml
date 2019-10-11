@@ -373,11 +373,17 @@ objects:
         GATHER_BOOTSTRAP_ARGS=
 
         function gather_bootstrap_and_fail() {
+          # We want all commands to continue in this function even if they fail
+          set +e
+
           if test -n "${GATHER_BOOTSTRAP_ARGS}"; then
             openshift-install --dir=/tmp/artifacts/installer gather bootstrap --key "${SSH_PRIVATE_KEY_PATH}" ${GATHER_BOOTSTRAP_ARGS}
+            GATHER_BOOTSTRAP_EXITCODE=$?
           fi
 
           if [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
+            # Create a associative array for ip addresses
+            declare -A VSPHERE_INSTANCE_GUEST_IPS
             # list all the virtual machines in the folder/rp
             clustervms=$(govc ls "/${GOVC_DATACENTER}/vm/${CLUSTER_NAME}")
             for ipath in $clustervms; do
@@ -385,9 +391,32 @@ objects:
               IFS=/ read -a ipath_array <<< "$ipath";
               # create png of the current console to determine if a virtual machine has a problem
               govc vm.console -vm.ipath=$ipath -capture /tmp/artifacts/installer/${ipath_array[-1]}.png
+              VSPHERE_INSTANCE_GUEST_IPS[${ipath_array[-1]}]=$(govc vm.info -json ${ipath} | jq -r '.VirtualMachines[].Guest | select(.Net != null) | .Net[].IpConfig | select(.IpAddress != null) | .IpAddress[] | select(.PrefixLength != 64) | select(.IpAddress | startswith("139")) | .IpAddress')
             done
-          fi
 
+            # If gather boostrap fail let's try with the IP addresses from the virtual machine guest tools
+            if [[ ${GATHER_BOOTSTRAP_EXITCODE} -ne 0 ]]; then
+              MASTER_IP_AVAIL=false
+              GATHER_BOOTSTRAP_ARGS="--bootstrap ${VSPHERE_INSTANCE_GUEST_IPS[bootstrap-0]}"
+              unset VSPHERE_INSTANCE_GUEST_IPS[bootstrap-0]
+              unset VSPHERE_INSTANCE_GUEST_IPS[compute-0]
+              unset VSPHERE_INSTANCE_GUEST_IPS[compute-1]
+              unset VSPHERE_INSTANCE_GUEST_IPS[compute-2]
+
+              for key in "${!VSPHERE_INSTANCE_GUEST_IPS[@]}"; do
+                if [[ "${VSPHERE_INSTANCE_GUEST_IPS[$key]}" != "" ]]; then
+                  MASTER_IP_AVAIL=true
+                  GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --master ${VSPHERE_INSTANCE_GUEST_IPS[$key]}"
+                fi
+              done
+
+              if [[ "$MASTER_IP_AVAIL" = true ]]; then
+                openshift-install --dir=/tmp/artifacts/installer gather bootstrap --key "${SSH_PRIVATE_KEY_PATH}" ${GATHER_BOOTSTRAP_ARGS}
+              fi
+            fi
+
+          fi
+          set -e
           return 1
         }
 
@@ -506,7 +535,7 @@ objects:
         }
         EOF
             cat > /tmp/artifacts/installer/install-config.yaml << EOF
-        apiVersion: v1beta4
+        apiVersion: v1
         baseDomain: ${base_domain}
         metadata:
           name: ${CLUSTER_NAME}
@@ -1013,7 +1042,8 @@ objects:
           terraform init -input=false -no-color &
           wait "$!"
 
-          terraform apply -auto-approve -no-color &
+          # TODO: Remove parallelism; slow down vSphere install
+          terraform apply -auto-approve -no-color -parallelism=1 &
           wait "$!"
           # find bootstrap ip
 
