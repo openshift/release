@@ -19,6 +19,7 @@ are currently targeted by existing mirroring jobs:
  - [openshift](./openshift/): `quay.io/openshift`
  - [tekton](./tekton/): `quay.io/openshift-pipeline`
  - [toolchain](./toolchain/): `quay.io/openshiftio`
+ - [ocs-operator](./ocs-operator): `quay.io/ocs-dev`
 
 ## Configuring mirroring for new sets of images
 
