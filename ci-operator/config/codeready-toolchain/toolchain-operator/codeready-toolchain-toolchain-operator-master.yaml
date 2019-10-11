@@ -1,0 +1,54 @@
+
+base_images:
+  os:
+    name: centos
+    namespace: openshift
+    tag: '7'
+
+resources:
+  '*':
+    limits:
+      memory: 3Gi
+    requests:
+      memory: 250Mi
+      cpu: 100m
+promotion:
+  namespace: codeready-toolchain
+  name: toolchain-operator-v0.1
+images:
+- from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/codeready-toolchain/toolchain-operator/build/_output/bin/toolchain-operator
+  dockerfile_path: openshift-ci/Dockerfile.deploy
+  to: toolchain-operator
+    
+build_root:
+  project_image:
+    dockerfile_path: openshift-ci/Dockerfile.tools
+
+binary_build_commands: make build
+
+tag_specification:
+  name: "4.2"
+  namespace: ocp
+
+tests:
+- as: build
+  commands: make build
+  container:
+    from: src
+- as: lint
+  commands: make lint-yaml
+  container:
+    from: src
+- as: test
+  commands: make test-with-coverage upload-codecov-report
+  container:
+    from: src
+- as: e2e
+  commands: make test-e2e
+  openshift_installer_src:
+    cluster_profile: aws
