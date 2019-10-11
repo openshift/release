@@ -1,4 +1,8 @@
 base_images:
+  must-gather:
+    name: "4.4"
+    namespace: ocp
+    tag: must-gather
   operator-registry:
     name: "4.4"
     namespace: ocp
@@ -7,17 +11,10 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "7"
-  must-gather:
-    name: "4.4"
-    namespace: ocp
-    tag: must-gather
-
 binary_build_commands: make build
-
 build_root:
   project_image:
     dockerfile_path: openshift-ci/Dockerfile.tools
-
 images:
 - dockerfile_path: openshift-ci/Dockerfile.deploy
   from: os
@@ -27,15 +24,12 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/ocs-operator/build/_output/bin/ocs-operator
   to: ocs-operator
-
 - dockerfile_path: openshift-ci/Dockerfile.registry.intermediate
   from: operator-registry
   to: operator-registry-base
-
 - dockerfile_path: openshift-ci/Dockerfile.registry.build
   from: operator-registry-base
   to: ocs-registry
-
 - dockerfile_path: build/Dockerfile
   from: os
   inputs:
@@ -43,9 +37,8 @@ images:
       paths:
       - destination_dir: _output/bin
         source_path: /go/src/github.com/openshift/ocs-operator/build/_output/bin/ocs-operator
-  to: ocs-operator-nightly
   optional: true
-
+  to: ocs-operator-nightly
 - dockerfile_path: deploy/Dockerfile
   from: operator-registry
   inputs:
@@ -55,9 +48,8 @@ images:
         source_path: /go/src/github.com/openshift/ocs-operator/deploy/Dockerfile
       - destination_dir: .
         source_path: /go/src/github.com/openshift/ocs-operator/deploy/olm-catalog
-  to: ocs-registry-nightly
   optional: true
-
+  to: ocs-registry-nightly
 - dockerfile_path: must-gather/Dockerfile
   from: must-gather
   inputs:
@@ -71,19 +63,17 @@ images:
         source_path: /go/src/github.com/openshift/ocs-operator/must-gather/collection-scripts
       - destination_dir: .
         source_path: /go/src/github.com/openshift/ocs-operator/must-gather/templates
-  to: ocs-must-gather-nightly
   optional: true
-
+  to: ocs-must-gather-nightly
 promotion:
   additional_images:
     ocs-operator-tests: src
   excluded_images:
   - ocs-operator
-  - ocs-registry-base
+  - operator-registry-base
   - ocs-registry
   name: "4.4"
   namespace: ocp
-
 resources:
   '*':
     limits:
@@ -91,24 +81,20 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-
 tag_specification:
   name: "4.4"
   namespace: ocp
-
 tests:
 - as: ocs-operator-ci
   commands: |
     make ocs-operator-ci
   container:
     from: src
-
 - as: ocs-operator-e2e-aws
   commands: |
     make cluster-deploy && make functest
   openshift_installer_src:
     cluster_profile: aws
-
 - as: red-hat-storage-ocs-ci-e2e-aws
   commands: |
     export REDHAT_OCS_CI_FORCE_TOOL_POD_INSTALL="true" && make cluster-deploy && make red-hat-storage-ocs-ci
