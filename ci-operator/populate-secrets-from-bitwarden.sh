@@ -181,6 +181,11 @@ update_secret generic github-webhook-credentials "$( format_field_value hmac "HM
 # for DeploymentConfigs from GitHub
 update_secret generic github-deploymentconfig-trigger "$( format_field_value github-deploymentconfig-webhook-token "Token" "WebHookSecretKey" )"
 
+# Unsplash API key is stored as a text field named "API Key"
+# It's used for the "goose" prow plugin
+update_secret generic "unsplash-api-key"         \
+	"$( format_field_value "unsplash.com" "API Key" "api-key" )"
+
 # Credentials for GCE service accounts are stored
 # as an attachment on each distinct credential
 for account in "aos-pubsub-subscriber" "ci-vm-operator" "gcs-publisher" "gcs-tide-publisher"; do
