@@ -32,10 +32,48 @@ Update password of `kubeadmin` in bitwarden (searching for item called `build_fa
 
 [openshift.doc](https://docs.openshift.com/container-platform/4.1/authentication/identity_providers/configuring-github-identity-provider.html#configuring-github-identity-provider)
 
-TODO
+```
+$ make set-up-github-oauth
+```
+
+## Set up ci-admins
+
+```
+$ make set-up-ci-admins
+```
 
 ## ClusterAutoscaler
 
 [openshift.doc](https://docs.openshift.com/container-platform/4.1/machine_management/applying-autoscaling.html)
 
-TODO
+We use aws-region `us-east-1` for our clusters: They are 6 zones in it:
+
+```
+$ aws ec2 describe-availability-zones --region us-east-1 | jq -r .AvailabilityZones[].ZoneName
+us-east-1a
+...
+us-east-1f
+
+```
+
+We set autoscaler for 3 zones where the masters are: `us-east-1a`, `us-east-1b`, and `us-east-1c`.
+
+To generate `MachineAutoscaler`s:
+
+```
+$ make generate-machine-autoscaler
+```
+
+To set up autoscaler:
+
+```
+$ make set-up-autoscaler
+```
+
+Then we should see the pod below running:
+
+```
+$ oc get pod -n openshift-machine-api -l cluster-autoscaler=default
+NAME                                          READY     STATUS    RESTARTS   AGE
+cluster-autoscaler-default-576944b996-h82zp   1/1       Running   0          7m54s
+```
