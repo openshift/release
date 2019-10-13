@@ -54,13 +54,21 @@ deck:
     gcs_browser_prefix: https://gcsweb-ci.svc.ci.openshift.org/gcs/
     announcement: "The old job viewer, Gubernator, has been deprecated in favour of this page, Spyglass.{{if .ArtifactPath}} For now, the old page is <a href='https://openshift-gce-devel.appspot.com/build/{{.ArtifactPath}}'>still available</a>.{{end}} Please send feedback to #forum-testplatform."
     size_limit: 500000000 # 500MB
-    viewers:
-      "started.json|finished.json":
-      - metadata
-      "build-log.txt":
-      - buildlog
-      ".*\\.xml":
-      - junit
+    lenses:
+    - lens:
+        name: metadata
+      required_files:
+      - started.json|finished.json
+    - lens:
+        name: buildlog
+      required_files:
+        - build-log.txt
+    - lens:
+        name: junit
+      required_files:
+        - .*/junit.*\.xml
+      optional_files:
+        - .*/monitor.*\.xml
   external_agent_logs:
   - agent: jenkins
     selector: master=ci.openshift.redhat.com
