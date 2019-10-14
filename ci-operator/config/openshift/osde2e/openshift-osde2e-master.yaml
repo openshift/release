@@ -15,6 +15,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+
+# PR check
 - as: verify
   artifact_dir: /tmp/artifacts
   commands: |
@@ -25,7 +27,10 @@ tests:
     ci/prow_pr_check.sh | tee -a /tmp/artifacts/test_output.log
   container:
     from: bin
-- as: e2e-prod-4.1
+
+# Tests
+# --- Integration
+- as: e2e-int-4.1
   artifact_dir: /tmp/artifacts
   cron: '* */4 * * *'
   secret:
@@ -38,33 +43,36 @@ tests:
 
     export HOME=$(mktemp -d)
 
-    export OSD_ENV=prod
-    export TARGET_STREAM=stable-4.1
-    export TESTGRID_PREFIX=logs/osd-prod-4.1
+    export REPORT_DIR=/tmp/artifacts
+
+    export OSD_ENV=int
+    export TARGET_STREAM=4.1.0-0.nightly
+    export TESTGRID_PREFIX=logs/osd-int-4.1
 
     ci/prow_run_tests.sh /usr/local/osde2e-secrets | tee -a /tmp/artifacts/test_output.log
-#- as: e2e-prod-4.2-4.2
-#  artifact_dir: /tmp/artifacts
-#  cron: '* */4 * * *'
-#  secret:
-#    name: osde2e-secrets
-#    mount_path: /usr/local/osde2e-secrets
-#  container:
-#    from: bin
-#  commands: |
-#    set -o pipefail
-#
-#    export HOME=$(mktemp -d)
-#
-#    export REPORT_DIR=/tmp/artifacts
-#
-#    export OSD_ENV=prod
-#    export TARGET_STREAM=prerelease-4.2
-#    export UPGRADE_RELEASE_STREAM=prerelease-4.2
-#    export TESTGRID_PREFIX=logs/osd-upgrade-prod-4.2-4.2
-#
-#    ci/prow_run_tests.sh /usr/local/osde2e-secrets | tee -a /tmp/artifacts/test_output.log
-- as: e2e-stage-4.2-4.2
+- as: e2e-int-4.2
+  artifact_dir: /tmp/artifacts
+  cron: '* */4 * * *'
+  secret:
+    name: osde2e-secrets
+    mount_path: /usr/local/osde2e-secrets
+  container:
+    from: bin
+  commands: |
+    set -o pipefail
+
+    export HOME=$(mktemp -d)
+
+    export REPORT_DIR=/tmp/artifacts
+
+    export OSD_ENV=int
+    export TARGET_STREAM=4.2.0-0.nightly
+    export TESTGRID_PREFIX=logs/osd-int-4.2
+
+    ci/prow_run_tests.sh /usr/local/osde2e-secrets | tee -a /tmp/artifacts/test_output.log
+
+# --- Stage
+- as: e2e-stage-4.1
   artifact_dir: /tmp/artifacts
   cron: '* */4 * * *'
   secret:
@@ -80,9 +88,121 @@ tests:
     export REPORT_DIR=/tmp/artifacts
 
     export OSD_ENV=stage
-    export TARGET_STREAM=prerelease-4.2
-    export UPGRADE_RELEASE_STREAM=prerelease-4.2
-    export TESTGRID_PREFIX=logs/osd-upgrade-stage-4.2-4.2
+    export MAJOR_TARGET=4
+    export MINOR_TARGET=1
+    export TESTGRID_PREFIX=logs/osd-stage-4.1
+
+    ci/prow_run_tests.sh /usr/local/osde2e-secrets | tee -a /tmp/artifacts/test_output.log
+- as: e2e-stage-4.2
+  artifact_dir: /tmp/artifacts
+  cron: '* */4 * * *'
+  secret:
+    name: osde2e-secrets
+    mount_path: /usr/local/osde2e-secrets
+  container:
+    from: bin
+  commands: |
+    set -o pipefail
+
+    export HOME=$(mktemp -d)
+
+    export REPORT_DIR=/tmp/artifacts
+
+    export OSD_ENV=stage
+    export MAJOR_TARGET=4
+    export MINOR_TARGET=2
+    export TESTGRID_PREFIX=logs/osd-stage-4.2
+
+    ci/prow_run_tests.sh /usr/local/osde2e-secrets | tee -a /tmp/artifacts/test_output.log
+
+# --- Production
+- as: e2e-prod-4.1
+  artifact_dir: /tmp/artifacts
+  cron: '* */4 * * *'
+  secret:
+    name: osde2e-secrets
+    mount_path: /usr/local/osde2e-secrets
+  container:
+    from: bin
+  commands: |
+    set -o pipefail
+
+    export HOME=$(mktemp -d)
+
+    export REPORT_DIR=/tmp/artifacts
+
+    export OSD_ENV=prod
+    export MAJOR_TARGET=4
+    export MINOR_TARGET=1
+    export TESTGRID_PREFIX=logs/osd-prod-4.1
+
+    ci/prow_run_tests.sh /usr/local/osde2e-secrets | tee -a /tmp/artifacts/test_output.log
+#- as: e2e-prod-4.2
+#  artifact_dir: /tmp/artifacts
+#  cron: '* */4 * * *'
+#  secret:
+#    name: osde2e-secrets
+#    mount_path: /usr/local/osde2e-secrets
+#  container:
+#    from: bin
+#  commands: |
+#    set -o pipefail
+#
+#    export HOME=$(mktemp -d)
+#
+#    export REPORT_DIR=/tmp/artifacts
+#
+#    export OSD_ENV=prod
+#    export MAJOR_TARGET=4
+#    export MINOR_TARGET=2
+#    export TESTGRID_PREFIX=logs/osd-prod-4.
+#
+#    ci/prow_run_tests.sh /usr/local/osde2e-secrets | tee -a /tmp/artifacts/test_output.log
+
+# Upgrades
+# --- Integration
+- as: e2e-int-4.1-4.1
+  artifact_dir: /tmp/artifacts
+  cron: '* */4 * * *'
+  secret:
+    name: osde2e-secrets
+    mount_path: /usr/local/osde2e-secrets
+  container:
+    from: bin
+  commands: |
+    set -o pipefail
+
+    export HOME=$(mktemp -d)
+
+    export REPORT_DIR=/tmp/artifacts
+
+    export OSD_ENV=int
+    export MAJOR_TARGET=4
+    export MINOR_TARGET=1
+    export UPGRADE_RELEASE_STREAM=4.1.0-0.nightly
+    export TESTGRID_PREFIX=logs/osd-upgrade-int-4.1-4.1
+
+    ci/prow_run_tests.sh /usr/local/osde2e-secrets | tee -a /tmp/artifacts/test_output.log
+- as: e2e-int-4.1-4.2
+  artifact_dir: /tmp/artifacts
+  cron: '* */4 * * *'
+  secret:
+    name: osde2e-secrets
+    mount_path: /usr/local/osde2e-secrets
+  container:
+    from: bin
+  commands: |
+    set -o pipefail
+
+    export HOME=$(mktemp -d)
+
+    export REPORT_DIR=/tmp/artifacts
+
+    export OSD_ENV=int
+    export MAJOR_TARGET=4
+    export MINOR_TARGET=1
+    export UPGRADE_RELEASE_STREAM=4.2.0-0.nightly
+    export TESTGRID_PREFIX=logs/osd-upgrade-int-4.1-4.2
 
     ci/prow_run_tests.sh /usr/local/osde2e-secrets | tee -a /tmp/artifacts/test_output.log
 - as: e2e-int-4.2-4.2
@@ -101,8 +221,145 @@ tests:
     export REPORT_DIR=/tmp/artifacts
 
     export OSD_ENV=int
-    export TARGET_STREAM=prerelease-4.2
+    export MAJOR_TARGET=4
+    export MINOR_TARGET=2
     export UPGRADE_RELEASE_STREAM=4.2.0-0.nightly
     export TESTGRID_PREFIX=logs/osd-upgrade-int-4.2-4.2
 
     ci/prow_run_tests.sh /usr/local/osde2e-secrets | tee -a /tmp/artifacts/test_output.log
+
+# --- Stage
+- as: e2e-stage-4.1-4.1
+  artifact_dir: /tmp/artifacts
+  cron: '* */4 * * *'
+  secret:
+    name: osde2e-secrets
+    mount_path: /usr/local/osde2e-secrets
+  container:
+    from: bin
+  commands: |
+    set -o pipefail
+
+    export HOME=$(mktemp -d)
+
+    export REPORT_DIR=/tmp/artifacts
+
+    export OSD_ENV=stage
+    export MAJOR_TARGET=4
+    export MINOR_TARGET=1
+    export UPGRADE_RELEASE_STREAM=stable-4.1
+    export TESTGRID_PREFIX=logs/osd-upgrade-stage-4.1-4.1
+
+    ci/prow_run_tests.sh /usr/local/osde2e-secrets | tee -a /tmp/artifacts/test_output.log
+- as: e2e-stage-4.1-4.2
+  artifact_dir: /tmp/artifacts
+  cron: '* */4 * * *'
+  secret:
+    name: osde2e-secrets
+    mount_path: /usr/local/osde2e-secrets
+  container:
+    from: bin
+  commands: |
+    set -o pipefail
+
+    export HOME=$(mktemp -d)
+
+    export REPORT_DIR=/tmp/artifacts
+
+    export OSD_ENV=stage
+    export MAJOR_TARGET=4
+    export MINOR_TARGET=1
+    export UPGRADE_RELEASE_STREAM=fast-4.2
+    export TESTGRID_PREFIX=logs/osd-upgrade-stage-4.1-4.2
+
+    ci/prow_run_tests.sh /usr/local/osde2e-secrets | tee -a /tmp/artifacts/test_output.log
+- as: e2e-stage-4.2-4.2
+  artifact_dir: /tmp/artifacts
+  cron: '* */4 * * *'
+  secret:
+    name: osde2e-secrets
+    mount_path: /usr/local/osde2e-secrets
+  container:
+    from: bin
+  commands: |
+    set -o pipefail
+
+    export HOME=$(mktemp -d)
+
+    export REPORT_DIR=/tmp/artifacts
+
+    export OSD_ENV=stage
+    export MAJOR_TARGET=4
+    export MINOR_TARGET=2
+    export UPGRADE_RELEASE_STREAM=fast-4.2
+    export TESTGRID_PREFIX=logs/osd-upgrade-stage-4.2-4.2
+
+    ci/prow_run_tests.sh /usr/local/osde2e-secrets | tee -a /tmp/artifacts/test_output.log
+
+# --- Production
+- as: e2e-prod-4.1-4.1
+  artifact_dir: /tmp/artifacts
+  cron: '* */4 * * *'
+  secret:
+    name: osde2e-secrets
+    mount_path: /usr/local/osde2e-secrets
+  container:
+    from: bin
+  commands: |
+    set -o pipefail
+
+    export HOME=$(mktemp -d)
+
+    export REPORT_DIR=/tmp/artifacts
+
+    export OSD_ENV=prod
+    export MAJOR_TARGET=4
+    export MINOR_TARGET=1
+    export UPGRADE_RELEASE_STREAM=stable-4.1
+    export TESTGRID_PREFIX=logs/osd-upgrade-prod-4.1-4.1
+
+    ci/prow_run_tests.sh /usr/local/osde2e-secrets | tee -a /tmp/artifacts/test_output.log
+- as: e2e-prod-4.1-4.2
+  artifact_dir: /tmp/artifacts
+  cron: '* */4 * * *'
+  secret:
+    name: osde2e-secrets
+    mount_path: /usr/local/osde2e-secrets
+  container:
+    from: bin
+  commands: |
+    set -o pipefail
+
+    export HOME=$(mktemp -d)
+
+    export REPORT_DIR=/tmp/artifacts
+
+    export OSD_ENV=prod
+    export MAJOR_TARGET=4
+    export MINOR_TARGET=1
+    export UPGRADE_RELEASE_STREAM=fast-4.2
+    export TESTGRID_PREFIX=logs/osd-upgrade-prod-4.1-4.2
+
+    ci/prow_run_tests.sh /usr/local/osde2e-secrets | tee -a /tmp/artifacts/test_output.log
+#- as: e2e-prod-4.2-4.2
+#  artifact_dir: /tmp/artifacts
+#  cron: '* */4 * * *'
+#  secret:
+#    name: osde2e-secrets
+#    mount_path: /usr/local/osde2e-secrets
+#  container:
+#    from: bin
+#  commands: |
+#    set -o pipefail
+#
+#    export HOME=$(mktemp -d)
+#
+#    export REPORT_DIR=/tmp/artifacts
+#
+#    export OSD_ENV=prod
+#    export MAJOR_TARGET=4
+#    export MINOR_TARGET=2
+#    export UPGRADE_RELEASE_STREAM=fast-4.2
+#    export TESTGRID_PREFIX=logs/osd-upgrade-prod-4.2-4.2
+#
+#    ci/prow_run_tests.sh /usr/local/osde2e-secrets | tee -a /tmp/artifacts/test_output.log
