@@ -230,14 +230,16 @@ objects:
       - name: artifacts
         mountPath: /tmp/artifacts
       env:
-      - name: AWS_SHARED_CREDENTIALS_FILE
-        value: /tmp/cluster/.awscred
       - name: AWS_REGION
         value: us-east-1
-      - name: ARTIFACT_DIR
-        value: /tmp/artifacts
+      - name: AWS_SHARED_CREDENTIALS_FILE
+        value: /tmp/cluster/.awscred
+      - name: AZURE_AUTH_LOCATION
+        value: /tmp/cluster/osServicePrincipal.json
       - name: GCP_SHARED_CREDENTIALS_FILE
         value: /tmp/cluster/gce.json
+      - name: ARTIFACT_DIR
+        value: /tmp/artifacts
       - name: HOME
         value: /tmp/home
       - name: KUBECONFIG
@@ -278,6 +280,18 @@ objects:
           oc create -f /tmp/cluster/insights-live.yaml || true
         fi
 
+        function setup-google-cloud-sdk() {
+          pushd /tmp
+          curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
+          tar -xzf google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
+          export PATH=$PATH:/tmp/google-cloud-sdk/bin
+          mkdir gcloudconfig
+          export CLOUDSDK_CONFIG=/tmp/gcloudconfig
+          gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}"
+          gcloud config set project openshift-gce-devel-ci
+          popd
+        }
+
         # set up cloud-provider-specific env vars
         export KUBE_SSH_BASTION="$( oc --insecure-skip-tls-verify get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
         export KUBE_SSH_KEY_PATH=/tmp/cluster/ssh-privatekey
@@ -294,6 +308,15 @@ objects:
           # TODO: make openshift-tests auto-discover this from cluster config
           export TEST_PROVIDER='{"type":"aws","region":"us-east-1","zone":"us-east-1a","multizone":true,"multimaster":true}'
           export KUBE_SSH_USER=core
+        elif [[ "${CLUSTER_TYPE}" == "azure4" ]]; then
+          export TEST_PROVIDER='azure'
+        elif [[ "${CLUSTER_TYPE}" == "openstack" ]]; then
+          mkdir -p ~/.ssh
+          cp /tmp/cluster/ssh-privatekey ~/.ssh/kube_openstack_rsa || true
+        fi
+
+        if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
+          setup-google-cloud-sdk
         fi
 
         mkdir -p /tmp/output
