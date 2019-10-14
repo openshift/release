@@ -227,7 +227,7 @@ objects:
         #!/bin/bash
         set -euo pipefail
 
-        export PATH=/usr/libexec/origin:$PATH
+        export PATH=/tmp/shared:$PATH
 
         trap 'touch /tmp/shared/exit' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
@@ -276,9 +276,6 @@ objects:
         }
 
         mkdir -p "${HOME}"
-
-        # Share oc with other containers
-        cp "$(command -v oc)" /tmp/shared
 
         # wait for the API to come up
         while true; do
@@ -348,6 +345,9 @@ objects:
           enable_fips
         fi
 
+        # save the working dir because that's where our test script
+        # will be run from
+        cwd=$(pwd)
         mkdir -p /tmp/output
         cd /tmp/output
 
@@ -406,6 +406,7 @@ objects:
           setup-google-cloud-sdk
         fi
 
+        cd $cwd
         ${TEST_COMMAND}
 
     # Runs an install
@@ -488,7 +489,7 @@ objects:
           echo "Installing from initial release ${RELEASE_IMAGE_INITIAL}"
           OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_INITIAL}"
         elif [[ "${ENABLE_MIRROR}" == "true" ]]; then
-          export PATH=$PATH:/tmp  # gain access to oc
+          export PATH=$PATH:/tmp/shared  # gain access to oc
           while [ ! command -V oc ]; do sleep 1; done # poll to make sure that the test container has dropped oc into the shared volume
 
           # mirror the release image and override the release image to point to the mirrored one
