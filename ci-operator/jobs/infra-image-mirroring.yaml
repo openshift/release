@@ -288,6 +288,55 @@ periodics:
           configMap:
             name: image-mirror-mappings
 
+  - agent: kubernetes
+    labels:
+      ci.openshift.io/role: image-mirroring
+      ci.openshift.io/area: openshift-container-storage
+    cron: "@daily"
+    decorate: true
+    name: periodic-image-mirroring-ocs-operator
+    skip_cloning: true
+    spec:
+      containers:
+        - args:
+            - -c
+            - |
+              set -o errexit
+              failures=0
+              for mapping in /etc/imagemirror/mapping_ocs-operator*; do
+                echo "Running: oc image mirror -f=$mapping --skip-multiple-scopes"
+                if ! oc image mirror -f="$mapping" --skip-multiple-scopes; then
+                  echo "ERROR: Failed to mirror images from $mapping"
+                  failures=$((failures+1))
+                fi
+              done
+              exit $failures
+          command:
+            - /bin/bash
+          env:
+            - name: HOME
+              value: /home/mirror
+          image: "quay.io/openshift/origin-cli:4.1"
+          imagePullPolicy: Always
+          name: ""
+          resources:
+            requests:
+              cpu: 500m
+          volumeMounts:
+            - mountPath: /home/mirror/.docker/config.json
+              name: push
+              readOnly: true
+              subPath: config.json
+            - mountPath: /etc/imagemirror
+              name: config
+      volumes:
+        - name: push
+          secret:
+            secretName: ocs-operator-quay-secret
+        - name: config
+          configMap:
+            name: image-mirror-mappings
+
 # JOB TEMPLATE
 #  - agent: kubernetes
 #    labels:
