@@ -43,6 +43,17 @@ spec:
       labels:
         severity: slack
         team: build-cop
+    - alert: release-.*-4.3-low
+      annotations:
+        message: '@build-cop `release-.*-4.3` jobs are passing at a rate of {{ $value
+          | humanize }}%, which is below the target (100%). Check the <https://grafana-prow-monitoring.svc.ci.openshift.org/d/6829209d59479d48073d09725ce807fa/build-cop-dashboard?orgId=1&fullscreen&panelId=2|dashboard>
+          and <https://prow.svc.ci.openshift.org/?job=release-*-4.3|deck-portal>.'
+      expr: |
+        sum(rate(prowjob_state_transitions{job="plank",job_name=~"release-.*-4.3",job_name!~"rehearse.*",state="success"}[30m]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~"release-.*-4.3",job_name!~"rehearse.*",state=~"success|failure"}[30m])) * 100 < 80
+      for: 10m
+      labels:
+        severity: slack
+        team: build-cop
     - alert: release-.*-upgrade.*-low
       annotations:
         message: '@build-cop `release-.*-upgrade.*` jobs are passing at a rate of
@@ -61,6 +72,17 @@ spec:
           and <https://prow.svc.ci.openshift.org/?job=release-*4.1*4.2*|deck-portal>.'
       expr: |
         sum(rate(prowjob_state_transitions{job="plank",job_name=~"release-.*4.1.*4.2.*",job_name!~"rehearse.*",state="success"}[30m]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~"release-.*4.1.*4.2.*",job_name!~"rehearse.*",state=~"success|failure"}[30m])) * 100 < 80
+      for: 10m
+      labels:
+        severity: slack
+        team: build-cop
+    - alert: release-.*4.2.*4.3.*-low
+      annotations:
+        message: '@build-cop `release-.*4.2.*4.3.*` jobs are passing at a rate of
+          {{ $value | humanize }}%, which is below the target (100%). Check the <https://grafana-prow-monitoring.svc.ci.openshift.org/d/6829209d59479d48073d09725ce807fa/build-cop-dashboard?orgId=1&fullscreen&panelId=2|dashboard>
+          and <https://prow.svc.ci.openshift.org/?job=release-*4.2*4.3*|deck-portal>.'
+      expr: |
+        sum(rate(prowjob_state_transitions{job="plank",job_name=~"release-.*4.2.*4.3.*",job_name!~"rehearse.*",state="success"}[30m]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~"release-.*4.2.*4.3.*",job_name!~"rehearse.*",state=~"success|failure"}[30m])) * 100 < 80
       for: 10m
       labels:
         severity: slack

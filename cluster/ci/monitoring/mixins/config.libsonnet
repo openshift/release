@@ -13,8 +13,10 @@
       'branch-.*-images': 100,
       'release-.*-4.1': 80,
       'release-.*-4.2': 80,
+      'release-.*-4.3': 80,
       'release-.*-upgrade.*': 80,
       'release-.*4.1.*4.2.*': 80,
+      'release-.*4.2.*4.3.*': 80,
     },
     alertManagerReceivers: {
       'build-cop': {

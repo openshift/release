@@ -130,8 +130,10 @@ dashboard.new(
     .addTarget(myPrometheusTarget('branch-.*-images'))
     .addTarget(myPrometheusTarget('release-.*-4.1'))
     .addTarget(myPrometheusTarget('release-.*-4.2'))
+    .addTarget(myPrometheusTarget('release-.*-4.3'))
     .addTarget(myPrometheusTarget('release-.*-upgrade.*'))
-    .addTarget(myPrometheusTarget('release-.*4.1.*4.2.*')), defaultGridPos)
+    .addTarget(myPrometheusTarget('release-.*4.1.*4.2.*'))
+    .addTarget(myPrometheusTarget('release-.*4.2.*4.3.*')), defaultGridPos)
 .addPanel(
     myPanel(
         'Presubmit and Postsubmit Job Success Rates for github.com/${org}/${repo}@${base_ref}',
