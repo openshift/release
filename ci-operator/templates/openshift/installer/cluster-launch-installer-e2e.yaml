@@ -27,6 +27,7 @@ parameters:
 - name: BUILD_ID
   required: false
 - name: ENABLE_MIRROR
+- name: CLUSTER_VARIANT
 
 objects:
 
@@ -406,8 +407,6 @@ objects:
       - name: artifacts
         mountPath: /tmp/artifacts
       env:
-      - name: TYPE
-        value: ${CLUSTER_TYPE}
       - name: AWS_SHARED_CREDENTIALS_FILE
         value: /etc/openshift-installer/.awscred
       - name: AWS_REGION
@@ -422,6 +421,8 @@ objects:
         value: /etc/openshift-installer/gce.json
       - name: CLUSTER_NAME
         value: ${NAMESPACE}-${JOB_NAME_HASH}
+      - name: CLUSTER_VARIANT
+        value: ${CLUSTER_VARIANT}
       - name: BASE_DOMAIN
         value: ${BASE_DOMAIN}
       - name: SSH_PRIV_KEY_PATH
@@ -501,6 +502,32 @@ objects:
         cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
 
         if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
+          if [[ "${CLUSTER_VARIANT}" == "compact" ]]; then
+            cat > /tmp/artifacts/installer/install-config.yaml << EOF
+        apiVersion: v1
+        baseDomain: ${BASE_DOMAIN:-origin-ci-int-aws.dev.rhcloud.com}
+        metadata:
+          name: ${CLUSTER_NAME}
+        controlPlane:
+          name: master
+          replicas: 3
+          platform:
+            aws:
+              zones:
+              - us-east-1a
+              - us-east-1b
+        compute:
+        platform:
+          aws:
+            region:       ${AWS_REGION}
+            userTags:
+              expirationDate: ${EXPIRATION_DATE}
+        pullSecret: >
+          ${PULL_SECRET}
+        sshKey: |
+          ${SSH_PUB_KEY}
+        EOF
+          else
             cat > /tmp/artifacts/installer/install-config.yaml << EOF
         apiVersion: v1
         baseDomain: ${BASE_DOMAIN:-origin-ci-int-aws.dev.rhcloud.com}
@@ -533,6 +560,8 @@ objects:
         sshKey: |
           ${SSH_PUB_KEY}
         EOF
+          fi
+
         elif [[ "${CLUSTER_TYPE}" == "azure4" ]]; then
             case $((RANDOM % 4)) in
             0) AZURE_REGION=centralus;;
@@ -713,8 +742,6 @@ objects:
       env:
       - name: INSTANCE_PREFIX
         value: ${NAMESPACE}-${JOB_NAME_HASH}
-      - name: TYPE
-        value: ${CLUSTER_TYPE}
       - name: AWS_SHARED_CREDENTIALS_FILE
         value: /etc/openshift-installer/.awscred
       - name: AZURE_AUTH_LOCATION
