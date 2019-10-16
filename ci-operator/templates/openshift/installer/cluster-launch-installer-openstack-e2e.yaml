@@ -341,6 +341,16 @@ objects:
           ${SSH_PUB_KEY}
         EOF
 
+        # Create a ramdisk for the etcd storage. This helps with disk latency
+        # unpredictability in the OpenStack cloud used by the CI:
+        TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create ignition-configs --log-level=debug
+        python -c \
+            'import json, sys; j = json.load(sys.stdin); j[u"systemd"][u"units"] = [{u"contents": "[Unit]\nDescription=Mount etcd as a ramdisk\nBefore=local-fs.target\n[Mount]\n What=none\nWhere=/var/lib/etcd\nType=tmpfs\nOptions=size=2G\n[Install]\nWantedBy=local-fs.target", u"enabled": True, u"name":u"var-lib-etcd.mount"}]; json.dump(j, sys.stdout)' \
+            </tmp/artifacts/installer/master.ign \
+            >/tmp/artifacts/installer/master.ign.out
+        mv /tmp/artifacts/installer/master.ign.out /tmp/artifacts/installer/master.ign
+
+
         # What we're doing here is we generate manifests first and force that OpenShift SDN is configured. Kuryr is only
         # allowed when KURYR_ENABLED variable is set to "true".
         TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create manifests --log-level=debug
