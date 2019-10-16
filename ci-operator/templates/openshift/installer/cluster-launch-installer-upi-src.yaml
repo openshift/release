@@ -11,6 +11,8 @@ parameters:
 - name: IMAGE_FORMAT
 - name: LOCAL_IMAGE_SRC
   required: true
+- name: IMAGE_CLI
+  required: true
 - name: IMAGE_UPI_INSTALLER
   required: true
 - name: CLUSTER_TYPE
@@ -106,6 +108,16 @@ objects:
     - name: cluster-profile
       secret:
         secretName: ${JOB_NAME_SAFE}-cluster-profile
+    initContainers:
+    - name: cli
+      image: ${IMAGE_CLI}
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      command:
+      - cp
+      - /usr/bin/oc
+      - /tmp/shared/oc
 
     containers:
 
