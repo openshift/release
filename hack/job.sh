@@ -1,5 +1,5 @@
 #!/bin/bash
-# Create a new run of the Prow bump creation job
+# Create a new run of the Prow job
 set -euo pipefail
 BASE="$( dirname "${BASH_SOURCE[0]}" )"
 source "$BASE/images.sh"
@@ -11,5 +11,5 @@ docker run \
     "$MKPJ_IMG" \
     --config-path core-services/prow/02_config/_config.yaml \
     --job-config-path ci-operator/jobs/ \
-    --job periodic-prow-image-autobump |
+    --job "${1}" |
     oc apply -f -

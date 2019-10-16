@@ -331,5 +331,9 @@ logging:
 .PHONY: logging
 
 bump-pr:
-	hack/bump-pr.sh
+	$(MAKE) job JOB=periodic-prow-image-autobump
 .PHONY: bump-pr
+
+job:
+	hack/job.sh "$(JOB)"
+.PHONY: job
