@@ -4,6 +4,45 @@ periodics:
     ci.openshift.io/role: infra
   cron: ""
   decorate: true
+  cron: "@yearly"
+  name: periodic-bugzilla-refresh
+  skip_cloning: true
+  spec:
+    containers:
+    - args:
+      - |-
+        --query=is:pr
+        state:open
+        label:bugzilla/invalid-bug
+        -label:bugzilla/valid-bug
+      - --token=/etc/oauth/oauth
+      - --updated=0
+      - |-
+        --comment=/bugzilla refresh
+
+        The requirements for Bugzilla bugs have changed, recalculating validity.
+      - --ceiling=0
+      - --confirm
+      command:
+      - /app/robots/commenter/app.binary
+      image: gcr.io/k8s-prow/commenter:v20191013-e7e60101b
+      imagePullPolicy: Always
+      name: ""
+      resources:
+          requests:
+            cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/oauth
+        name: token
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-bot
+- agent: kubernetes
+  labels:
+    ci.openshift.io/role: infra
+  cron: ""
+  decorate: true
   interval: 12m
   name: periodic-retester
   skip_cloning: true
