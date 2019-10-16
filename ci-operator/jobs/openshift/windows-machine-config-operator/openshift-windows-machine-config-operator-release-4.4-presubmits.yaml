@@ -52,6 +52,76 @@ presubmits:
     always_run: true
     branches:
     - release-4.4
+    context: ci/prow/e2e-wmcb
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-windows-machine-config-operator-release-4.4-e2e-wmcb
+    rerun_command: /test e2e-wmcb
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --branch=release-4.4
+        - --give-pr-author-access-to-namespace=true
+        - --org=openshift
+        - --repo=windows-machine-config-operator
+        - --resolver-address=http://ci-operator-configresolver
+        - --secret-dir=/usr/local/e2e-wmcb-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=e2e-wmcb
+        - --template=/usr/local/e2e-wmcb
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_NETWORK_TYPE
+          value: OVNKubernetes
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-windows-machine-config-operator-release-4.4.yaml
+              name: ci-operator-4.4-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-wmcb
+        - name: TEST_COMMAND
+          value: make run-wmcb-ci-e2e-test
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-wmcb-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-wmcb
+          name: job-definition
+          subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-src
+        name: job-definition
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )e2e-wmcb,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-4.4
     context: ci/prow/test-e2e-tools
     decorate: true
     decoration_config:
