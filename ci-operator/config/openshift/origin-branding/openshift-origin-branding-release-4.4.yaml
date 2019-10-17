@@ -2,31 +2,28 @@ base_images:
   base:
     name: "4.4"
     namespace: ocp
-    tag: cli
-binary_build_commands: make build --warn-undefined-variables
+    tag: base
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.12
+    tag: golang-1.10
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  to: must-gather
+- from: base
+  to: branding
 promotion:
   name: "4.4"
   namespace: ocp
 resources:
   '*':
     limits:
-      memory: 3Gi
+      memory: 8Gi
     requests:
-      cpu: "3"
-      memory: 1Gi
+      cpu: 100m
+      memory: 4Gi
 tag_specification:
   name: "4.4"
   namespace: ocp
-test_binary_build_commands: make build GOFLAGS='-race' --warn-undefined-variables
 tests:
 - as: e2e-aws
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
