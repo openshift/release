@@ -1,0 +1,40 @@
+base_images:
+  original_jenkins:
+    name: "4.3"
+    namespace: ocp
+    tag: jenkins
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+images:
+- dockerfile_path: Dockerfile
+  from: original_jenkins
+  inputs:
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/jenkins-client-plugin/.
+  to: jenkins
+promotion:
+  disabled: true
+  excluded_images:
+  - jenkins
+  name: "4.3"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.3"
+  namespace: ocp
+tests:
+- as: e2e-aws-jenkins
+  commands: TEST_SUITE=openshift/jenkins-e2e run-tests
+  openshift_installer:
+    cluster_profile: aws
