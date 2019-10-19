@@ -291,7 +291,8 @@ objects:
 
         PXE_INITRD_URL="$(jq -r '.baseURI + .images["initramfs"].path' /var/lib/openshift-install/rhcos.json)"
         PXE_KERNEL_URL="$(jq -r '.baseURI + .images["kernel"].path' /var/lib/openshift-install/rhcos.json)"
-        PXE_OS_IMAGE_URL="$(jq -r '.baseURI + .images["metal-bios"].path' /var/lib/openshift-install/rhcos.json)"
+        # 4.3 unified 'metal-bios' and 'metal-uefi' into just 'metal'
+        PXE_OS_IMAGE_URL="$(jq -r '.baseURI + (.images["metal-bios"].path // .images["metal"].path)' /var/lib/openshift-install/rhcos.json)"
         cat > /tmp/artifacts/terraform/terraform.tfvars <<-EOF
         cluster_id = "${CLUSTER_NAME}"
         bootstrap_ign_file = "/tmp/artifacts/installer/bootstrap.ign"
