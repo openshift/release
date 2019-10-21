@@ -4,24 +4,24 @@ presubmits:
     always_run: true
     branches:
     - master
-    context: ci/prow/e2e-aws-ovn-kubernetes
+    context: ci/prow/e2e-aws-ovn
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-e2e-aws-ovn-kubernetes
-    rerun_command: /test e2e-aws-ovn-kubernetes
+    name: pull-ci-openshift-ovn-kubernetes-master-e2e-aws-ovn
+    rerun_command: /test e2e-aws-ovn
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
         - --lease-server=http://boskos
-        - --secret-dir=/usr/local/e2e-aws-ovn-kubernetes-cluster-profile
+        - --secret-dir=/usr/local/e2e-aws-ovn-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=e2e-aws-ovn-kubernetes
-        - --template=/usr/local/e2e-aws-ovn-kubernetes
+        - --target=e2e-aws-ovn
+        - --template=/usr/local/e2e-aws-ovn
         command:
         - ci-operator
         env:
@@ -35,7 +35,7 @@ presubmits:
               key: openshift-ovn-kubernetes-master.yaml
               name: ci-operator-master-configs
         - name: JOB_NAME_SAFE
-          value: e2e-aws-ovn-kubernetes
+          value: e2e-aws-ovn
         - name: TEST_COMMAND
           value: TEST_SUITE=openshift/conformance/parallel run-tests
         image: ci-operator:latest
@@ -45,9 +45,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/e2e-aws-ovn-kubernetes-cluster-profile
+        - mountPath: /usr/local/e2e-aws-ovn-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-aws-ovn-kubernetes
+        - mountPath: /usr/local/e2e-aws-ovn
           name: job-definition
           subPath: cluster-launch-installer-e2e.yaml
         - mountPath: /etc/sentry-dsn
@@ -66,7 +66,7 @@ presubmits:
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )e2e-aws-ovn-kubernetes,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-ovn,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
