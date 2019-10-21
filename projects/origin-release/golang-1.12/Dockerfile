@@ -4,27 +4,32 @@
 #
 # The standard name for this image is openshift/origin-release
 #
-FROM ocp/builder-base:golang-1.12
+FROM        centos:7
 
-ENV VERSION=1.12.6 \
+ENV VERSION=1.12.9 \
     GOCACHE=/go/.cache \
     GOARM=5 \
     GOPATH=/go \
+    GOROOT=/usr/local/go \
     LOGNAME=deadbeef
-ENV PATH=$PATH:$GOPATH/bin
+ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
 
 COPY cbs-paas7-openshift-multiarch-el7-build.repo /etc/yum.repos.d/
-COPY CentOS-Base.repo /etc/yum.repos.d/
-COPY RPM-GPG-KEY-CentOS-7 /etc/pki/rpm-gpg/
 RUN yum install -y epel-release && \
+    rpm -V epel-release && \
     INSTALL_PKGS="bc bind-utils bsdtar bzr ceph-common createrepo device-mapper device-mapper-persistent-data e2fsprogs ethtool file findutils gcc git glibc-static glib2-devel gpgme gpgme-devel hostname iptables jq krb5-devel libassuan libassuan-devel libseccomp-devel libvirt-devel lsof make mercurial nmap-ncat openssl protobuf-compiler rsync socat systemd-devel sysvinit-tools tar tito tree util-linux wget which xfsprogs zip goversioninfo" && \
-    yum install -y --setopt=skip_missing_names_on_install=False $INSTALL_PKGS && \
+    yum install -y $INSTALL_PKGS && \
+    rpm -V $INSTALL_PKGS && \
     yum clean all && \
     touch /os-build-image && \
     git config --system user.name origin-release-container && \
     git config --system user.email origin-release@redhat.com
 
-RUN go get golang.org/x/tools/cmd/cover \
+ADD *.rpm /tmp/origin-rpm/
+RUN yum install -y /tmp/origin-rpm/*.rpm && \
+    yum clean all && \
+    curl https://storage.googleapis.com/golang/go$VERSION.linux-$(uname -m | sed 's/x86_64/amd64/g').tar.gz | tar -C /usr/local -xzf - && \
+    go get golang.org/x/tools/cmd/cover \
         github.com/Masterminds/glide \
         golang.org/x/tools/cmd/goimports \
         github.com/tools/godep \
@@ -40,7 +45,8 @@ RUN go get golang.org/x/tools/cmd/cover \
     chmod +x /usr/bin/dep
     # TODO: symlink for backwards compatibility with hack/build-images.sh only, remove
 
-RUN chmod g+xw -R $GOPATH
+RUN chmod g+xw -R $GOPATH && \
+    chmod g+xw -R $(go env GOROOT)
 
 WORKDIR /go/src/github.com/openshift/origin
 LABEL io.k8s.display-name="OpenShift Origin Release Environment (golang-$VERSION)" \
