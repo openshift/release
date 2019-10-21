@@ -4,10 +4,8 @@ base_images:
     namespace: ocp
     tag: "7"
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.10
+  project_image:
+    dockerfile_path: Dockerfile.build
 images:
 - dockerfile_path: Dockerfile.okd
   from: base
@@ -18,10 +16,19 @@ promotion:
 resources:
   '*':
     limits:
-      memory: 4Gi
+      memory: 2Gi
     requests:
-      cpu: 100m
-      memory: 200Mi
+      cpu: "1"
+      memory: 1Gi
 tag_specification:
   name: "4.3"
   namespace: ocp
+tests:
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: |
+    set -x
+    export ARTIFACT_DIR=/tmp/artifacts
+    ./test.sh
+  container:
+    from: src
