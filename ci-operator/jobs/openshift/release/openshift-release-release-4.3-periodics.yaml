@@ -127,6 +127,214 @@ periodics:
         secretName: ci-pull-credentials
 - agent: kubernetes
   decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: release-4.3
+    org: openshift
+    repo: origin
+    workdir: true
+  interval: 30m
+  labels:
+    job-release: "4.3"
+  name: release-promote-openshift-fcos-machine-os-content-e2e-aws-4.3
+  spec:
+    containers:
+    - command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -euo pipefail
+
+        # fetch binaries and configure working env, prow doesn't allow init containers or a second container
+        dir=$(ARTIFACTS)/ostree
+        mkdir -p "${dir}"
+        export PATH=$PATH:/tmp/bin
+        export HOME=/tmp
+        mkdir $HOME/.docker/
+        cp /usr/local/pull-secret/.dockerconfigjson $HOME/.docker/config.json
+        mkdir $HOME/bin
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/ocp-dev-preview/4.2.0-0.nightly-2019-09-11-114314/openshift-client-linux-4.2.0-0.nightly-2019-09-11-114314.tar.gz 2>/dev/null | tar xzf - -C /tmp/bin/ oc
+        curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 2>/dev/null >/tmp/bin/jq
+        chmod ug+x $HOME/bin/oc $HOME/bin/jq
+
+        # populate the base_sha in job spec so we don't build something different
+        origin_commit_id="$( git ls-remote https://github.com/openshift/origin.git refs/heads/release-${BRANCH} | cut -f 1 -d $'\t' )"
+        export JOB_SPEC="$( echo "${JOB_SPEC}" | jq -r ".extra_refs[0].base_sha = \"${origin_commit_id}\"" )"
+
+        # fetch fcos release info and check whether we've already built this image
+        stream=testing-devel
+        build_url="https://builds.coreos.fedoraproject.org/prod/streams/${stream}/builds"
+        curl "${build_url}/builds.json" 2>/dev/null >${dir}/builds.json
+        build_id="$( <"${dir}/builds.json" jq -r '.builds[0].id' )"
+        base_url="${build_url}/${build_id}/x86_64"
+        curl "${base_url}/meta.json" 2>/dev/null >${dir}/meta.json
+        tar_url="${base_url}/$( <${dir}/meta.json jq -r .images.ostree.path )"
+        commit_id="$( <${dir}/meta.json jq -r '."ostree-commit"' )"
+
+        # compare the latest image we have built against the potential candidate
+        latest="$( oc get istag -n fcos ${TAG}:${BRANCH} --template '{{ index .image.dockerImageMetadata.Config.Labels "version" }} {{ index .image.dockerImageMetadata.Config.Labels "origin-commit" }}' )"
+        candidate="${build_id} ${origin_commit_id}"
+        echo "Comparing existing '$latest' against latest '$candidate'"
+        if [[ "${latest}" == "${candidate}" ]]; then
+          echo "No build necessary, content is up to date"
+          exit 0
+        fi
+
+        curl -L https://github.com/mikefarah/yq/releases/download/2.4.0/yq_linux_amd64 2>/dev/null >/tmp/bin/yq
+        chmod ug+x $HOME/bin/yq
+
+        # create namespace and set up basic environment
+        namespace="ci-op-$( echo "${JOB_NAME}-${BUILD_ID}" | md5sum -t | cut -c 1-8 )"
+        echo
+        echo "--- Building machine-os-content for ${build_id} in namespace ${namespace}"
+        oc registry login >/dev/null
+        oc new-project ${namespace} >/dev/null
+        oc policy add-role-to-group system:image-puller -n ${namespace} system:unauthenticated system:authenticated >/dev/null
+
+        function build {
+          oc -n ${namespace} create -f $1 >/dev/null
+          oc -n ${namespace} logs -f build/$2
+          while true; do
+            phase=$( oc -n ${namespace} get build/$2 -o 'jsonpath={.status.phase}' )
+            if [[ "${phase}" == "Failed" || "${phase}" == "Cancelled" || "${phase}" == "Error" ]]; then
+              oc -n ${namespace} describe build/$2
+              exit 1
+            fi
+            if [[ "${phase}" == "Complete" ]]; then
+              break
+            fi
+            sleep 5
+          done
+        }
+
+        # build an FCoS machine-os-content from the ostree tar
+        cat <<EOF > ${dir}/build.yaml
+        kind: Build
+        apiVersion: build.openshift.io/v1
+        metadata:
+          name: machine-os-content-base
+        spec:
+          output:
+            to:
+              kind: ImageStreamTag
+              name: machine-os-content:latest
+          source:
+            dockerfile: |
+              FROM centos:7 AS build
+              RUN set -xe && \\
+                  mkdir -p /srv/repo && \\
+                  curl -L "${tar_url}" | tar xf - -C /srv/repo/
+
+              FROM scratch
+              COPY --from=build /srv/ /srv/
+              LABEL com.coreos.ostree-commit=${commit_id} \\
+                    version=${build_id}
+              ENTRYPOINT /noentry
+
+          strategy:
+            dockerStrategy:
+            type: Docker
+        EOF
+        oc -n ${namespace} create is machine-os-content >/dev/null
+        build ${dir}/build.yaml machine-os-content-base
+
+        # update the base images from the job to point to our newly built image
+        echo "${CONFIG_SPEC}" | yq r - -j > /tmp/job.json
+        </tmp/job.json jq -r ".base_images.\"machine-os-content-base\" = {namespace: \"${namespace}\", name: \"machine-os-content\", tag: \"latest\"}" | yq r - > ${dir}/job.yaml
+        export CONFIG_SPEC="$( cat ${dir}/job.yaml )"
+
+        # verify we layer hyperkube on top of FCoS and that tests pass
+        ci-operator --artifact-dir=$(ARTIFACTS) --secret-dir=/usr/local/pull-secret \
+          --secret-dir=/usr/local/e2e-aws-cluster-profile --template=/usr/local/e2e-aws \
+          --namespace=${namespace} \
+          --target=machine-os-content
+
+        # debug output
+        oc describe -n ${namespace} istag/pipeline:machine-os-content
+
+        # add metadata to the build
+        echo
+        echo "--- Add metadata to new image ---"
+        cat <<EOF > ${dir}/build-metadata.yaml
+        kind: Build
+        apiVersion: build.openshift.io/v1
+        metadata:
+          name: machine-os-content-metadata
+        spec:
+          output:
+            to:
+              kind: ImageStreamTag
+              name: machine-os-content:latest
+          source:
+            dockerfile: |
+              FROM machine-os-content
+              LABEL com.coreos.ostree-commit=${commit_id} \\
+                    version=${build_id} \\
+                    origin-commit=${origin_commit_id}
+          strategy:
+            dockerStrategy:
+              from:
+                kind: ImageStreamTag
+                name: pipeline:machine-os-content
+            type: Docker
+        EOF
+        build ${dir}/build-metadata.yaml machine-os-content-metadata
+        oc describe -n ${namespace} istag/machine-os-content:latest
+
+        oc tag ${namespace}/machine-os-content:latest fcos/machine-os-content:4.3
+        # also tag the image into the art-latest stream
+        # oc tag "${to_quay}" "origin/${BRANCH}:${TAG}"
+      env:
+      - name: TAG_NS
+        value: origin
+      - name: TAG
+        value: machine-os-content
+      - name: BRANCH
+        value: "4.3"
+      - name: TAG_SOURCE
+        value: $(BRANCH):$(TAG)
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: CONFIG_SPEC
+        valueFrom:
+          configMapKeyRef:
+            key: openshift-origin-release-4.3.yaml
+            name: ci-operator-4.3-configs
+      - name: JOB_NAME_SAFE
+        value: e2e-aws
+      - name: TEST_COMMAND
+        value: TEST_SUITE=openshift/conformance/parallel run-tests
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/e2e-aws-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/e2e-aws
+        name: job-definition
+        subPath: cluster-launch-installer-e2e.yaml
+      - mountPath: /usr/local/pull-secret
+        name: pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - configMap:
+        name: prow-job-cluster-launch-installer-e2e
+      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
+  decorate: true
   interval: 12h
   labels:
     ci.openshift.io/release-type: informing

@@ -6,6 +6,42 @@ items:
   metadata:
     name: origin
 
+- kind: Namespace
+  apiVersion: v1
+  metadata:
+    name: fcos
+
+# pull access to authenticated users
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: image-puller
+    namespace: fcos
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:unauthenticated
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:authenticated
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: system:image-puller
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: user-viewer
+    namespace: fcos
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:authenticated
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: view
+
 # pull access to all users
 - kind: RoleBinding
   apiVersion: rbac.authorization.k8s.io/v1beta1
