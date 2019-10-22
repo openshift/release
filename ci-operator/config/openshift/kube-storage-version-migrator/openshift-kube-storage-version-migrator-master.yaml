@@ -3,6 +3,7 @@ base_images:
     name: "4.3"
     namespace: ocp
     tag: base
+binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
     cluster: https://api.ci.openshift.org
@@ -11,9 +12,9 @@ build_root:
     tag: golang-1.12
 canonical_go_repository: github.com/kubernetes-sigs/kube-storage-version-migrator
 images:
-  - dockerfile_path: images/ci/Dockerfile
-    from: base
-    to: migrator
+- dockerfile_path: images/ci/Dockerfile
+  from: base
+  to: migrator
 promotion:
   name: "4.3"
   namespace: ocp
@@ -28,21 +29,20 @@ tag_specification:
   name: "4.3"
   namespace: ocp
 test_binary_build_commands: make build GOFLAGS='-race' --warn-undefined-variables
-binary_build_commands: make build --warn-undefined-variables
 tests:
-  - as: verify
-    commands: |
-      make verify -k --warn-undefined-variables
-    container:
-      from: bin
-  - as: unit
-    commands: |
-      mkdir -p /tmp/artifacts
-      make test-unit JUNITFILE=/tmp/artifacts/unit_report.xml --warn-undefined-variables
-    artifact_dir: /tmp/artifacts
-    container:
-      from: test-bin
-  - as: e2e-aws
-    commands: TEST_SUITE=openshift/conformance/parallel run-tests
-    openshift_installer:
-      cluster_profile: aws
+- as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: bin
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: |
+    mkdir -p /tmp/artifacts
+    make test-unit JUNITFILE=/tmp/artifacts/unit_report.xml --warn-undefined-variables
+  container:
+    from: test-bin
+- as: e2e-aws
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer:
+    cluster_profile: aws
