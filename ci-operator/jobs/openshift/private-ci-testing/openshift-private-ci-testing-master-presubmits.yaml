@@ -1,0 +1,63 @@
+presubmits:
+  openshift/private-ci-testing:
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/showtime
+    decorate: true
+    decoration_config:
+      gcs_configuration:
+        bucket: origin-ci-test-private
+        mediaTypes:
+          log: text/plain
+        path_strategy: single
+      gcs_credentials_secret: gce-sa-credentials-gcs-publisher
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-private-ci-testing-master-showtime
+    rerun_command: /test showtime
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --branch=master
+        - --give-pr-author-access-to-namespace=true
+        - --org=openshift
+        - --repo=private-ci-testing
+        - --resolver-address=http://ci-operator-configresolver
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --ssh-key-path=/usr/local/github-ssh-credentials-openshift-bot/id_rsa
+        - --target=showtime
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-private-ci-testing-master.yaml
+              name: ci-operator-master-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/github-ssh-credentials-openshift-bot
+          name: github-ssh-credentials-openshift-bot
+          readOnly: true
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: github-ssh-credentials-openshift-bot
+        secret:
+          secretName: github-ssh-credentials-openshift-bot
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )showtime,?($|\s.*)
