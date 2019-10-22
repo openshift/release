@@ -486,6 +486,77 @@ presubmits:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-aws-scaleup-rhel7,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - master
+    context: ci/prow/e2e-aws-shared-vpc
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-master-e2e-aws-shared-vpc
+    optional: true
+    rerun_command: /test e2e-aws-shared-vpc
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --branch=master
+        - --give-pr-author-access-to-namespace=true
+        - --org=openshift
+        - --repo=installer
+        - --resolver-address=http://ci-operator-configresolver
+        - --secret-dir=/usr/local/e2e-aws-shared-vpc-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=e2e-aws-shared-vpc
+        - --template=/usr/local/e2e-aws-shared-vpc
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: CLUSTER_VARIANT
+          value: shared-vpc
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-installer-master.yaml
+              name: ci-operator-master-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-aws-shared-vpc
+        - name: TEST_COMMAND
+          value: TEST_SUITE=openshift/conformance/parallel run-tests
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-aws-shared-vpc-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-aws-shared-vpc
+          name: job-definition
+          subPath: cluster-launch-installer-e2e.yaml
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-e2e
+        name: job-definition
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )e2e-aws-shared-vpc,?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - master
@@ -685,6 +756,77 @@ presubmits:
     always_run: false
     branches:
     - master
+    context: ci/prow/e2e-azure-shared-vpc
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-master-e2e-azure-shared-vpc
+    optional: true
+    rerun_command: /test e2e-azure-shared-vpc
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --branch=master
+        - --give-pr-author-access-to-namespace=true
+        - --org=openshift
+        - --repo=installer
+        - --resolver-address=http://ci-operator-configresolver
+        - --secret-dir=/usr/local/e2e-azure-shared-vpc-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=e2e-azure-shared-vpc
+        - --template=/usr/local/e2e-azure-shared-vpc
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: azure4
+        - name: CLUSTER_VARIANT
+          value: shared-vpc
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-installer-master.yaml
+              name: ci-operator-master-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-azure-shared-vpc
+        - name: TEST_COMMAND
+          value: TEST_SUITE=openshift/conformance/parallel run-tests
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-azure-shared-vpc-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-azure-shared-vpc
+          name: job-definition
+          subPath: cluster-launch-installer-e2e.yaml
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-azure4
+      - configMap:
+          name: prow-job-cluster-launch-installer-e2e
+        name: job-definition
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )e2e-azure-shared-vpc,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - master
     context: ci/prow/e2e-gcp
     decorate: true
     decoration_config:
@@ -753,6 +895,79 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-gcp,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - master
+    context: ci/prow/e2e-gcp-shared-vpc
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-master-e2e-gcp-shared-vpc
+    optional: true
+    rerun_command: /test e2e-gcp-shared-vpc
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --branch=master
+        - --give-pr-author-access-to-namespace=true
+        - --org=openshift
+        - --repo=installer
+        - --resolver-address=http://ci-operator-configresolver
+        - --secret-dir=/usr/local/e2e-gcp-shared-vpc-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=e2e-gcp-shared-vpc
+        - --template=/usr/local/e2e-gcp-shared-vpc
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: gcp
+        - name: CLUSTER_VARIANT
+          value: shared-vpc
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-installer-master.yaml
+              name: ci-operator-master-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-gcp-shared-vpc
+        - name: TEST_COMMAND
+          value: TEST_SUITE=openshift/conformance/parallel run-tests
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-gcp-shared-vpc-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-gcp-shared-vpc
+          name: job-definition
+          subPath: cluster-launch-installer-e2e.yaml
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - configMap:
+          name: prow-job-cluster-launch-installer-e2e
+        name: job-definition
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )e2e-gcp-shared-vpc,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
