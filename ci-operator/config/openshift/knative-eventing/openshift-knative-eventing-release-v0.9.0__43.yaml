@@ -1,0 +1,205 @@
+tag_specification:
+  name: '4.3'
+  namespace: ocp
+promotion:
+  cluster: https://api.ci.openshift.org
+  namespace: openshift
+  name: knative-v0.9.0
+base_images:
+  base:
+    name: '4.3'
+    namespace: ocp
+    tag: base
+build_root:
+  project_image:
+    dockerfile_path: openshift/ci-operator/build-image/Dockerfile
+canonical_go_repository: knative.dev/eventing
+binary_build_commands: make install
+test_binary_build_commands: make test-install
+tests:
+- as: e2e-aws-ocp-43
+  commands: "make test-e2e"
+  openshift_installer_src:
+    cluster_profile: aws
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 4
+      memory: 6Gi
+  'bin':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 4
+      memory: 6Gi
+images:
+- dockerfile_path: openshift/ci-operator/knative-images/apiserver_receive_adapter/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/apiserver_receive_adapter
+  to: knative-eventing-apiserver-receive-adapter
+- dockerfile_path: openshift/ci-operator/knative-images/controller/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/controller
+  to: knative-eventing-controller
+- dockerfile_path: openshift/ci-operator/knative-images/cronjob_receive_adapter/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/cronjob_receive_adapter
+  to: knative-eventing-cronjob-receive-adapter
+- dockerfile_path: openshift/ci-operator/knative-images/filter/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/filter
+  to: knative-eventing-filter
+- dockerfile_path: openshift/ci-operator/knative-images/imc-controller/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/imc-controller
+  to: knative-eventing-imc-controller
+- dockerfile_path: openshift/ci-operator/knative-images/imc-dispatcher/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/imc-dispatcher
+  to: knative-eventing-imc-dispatcher
+- dockerfile_path: openshift/ci-operator/knative-images/ingress/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/ingress
+  to: knative-eventing-ingress
+- dockerfile_path: openshift/ci-operator/knative-images/pong/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/pong
+  to: knative-eventing-pong
+- dockerfile_path: openshift/ci-operator/knative-images/sendevent/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/sendevent
+  to: knative-eventing-sendevent
+- dockerfile_path: openshift/ci-operator/knative-images/sources_controller/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/sources_controller
+  to: knative-eventing-sources-controller
+- dockerfile_path: openshift/ci-operator/knative-images/webhook/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/webhook
+  to: knative-eventing-webhook
+- dockerfile_path: openshift/ci-operator/knative-test-images/eventdetails/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/eventdetails
+  to: knative-eventing-test-eventdetails
+- dockerfile_path: openshift/ci-operator/knative-test-images/filterevents/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/filterevents
+  to: knative-eventing-test-filterevents
+- dockerfile_path: openshift/ci-operator/knative-test-images/heartbeats/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/heartbeats
+  to: knative-eventing-test-heartbeats
+- dockerfile_path: openshift/ci-operator/knative-test-images/helloworld/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/helloworld
+  to: knative-eventing-test-helloworld
+- dockerfile_path: openshift/ci-operator/knative-test-images/latency/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/latency
+  to: knative-eventing-test-latency
+- dockerfile_path: openshift/ci-operator/knative-test-images/latencymako/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/latencymako
+  to: knative-eventing-test-latencymako
+- dockerfile_path: openshift/ci-operator/knative-test-images/logevents/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/logevents
+  to: knative-eventing-test-logevents
+- dockerfile_path: openshift/ci-operator/knative-test-images/sendevents/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/sendevents
+  to: knative-eventing-test-sendevents
+- dockerfile_path: openshift/ci-operator/knative-test-images/sequencestepper/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/sequencestepper
+  to: knative-eventing-test-sequencestepper
+- dockerfile_path: openshift/ci-operator/knative-test-images/transformevents/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/transformevents
+  to: knative-eventing-test-transformevents
