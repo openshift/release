@@ -502,11 +502,22 @@ objects:
         cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
 
         workers=3
-        if [[ "${CLUSTER_VARIANT}" == "compact" ]]; then
+        if [[ "${CLUSTER_VARIANT}" =~ "compact" ]]; then
           workers=0
         fi
-        if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
-          cat > /tmp/artifacts/installer/install-config.yaml << EOF
+        if [[ "${CLUSTER_TYPE}" = "aws" ]]; then
+            subnets="[]"
+            if [[ "${CLUSTER_VARIANT}" =~ "shared-vpc" ]]; then
+              case $((RANDOM % 4)) in
+              0) subnets="['subnet-030a88e6e97101ab2','subnet-0e07763243186cac5','subnet-02c5fea7482f804fb','subnet-0291499fd1718ee01','subnet-01c4667ad446c8337','subnet-025e9043c44114baa']";;
+              1) subnets="['subnet-0170ee5ccdd7e7823','subnet-0d50cac95bebb5a6e','subnet-0094864467fc2e737','subnet-0daa3919d85296eb6','subnet-0ab1e11d3ed63cc97','subnet-07681ad7ce2b6c281']";;
+              2) subnets="['subnet-00de9462cf29cd3d3','subnet-06595d2851257b4df','subnet-04bbfdd9ca1b67e74','subnet-096992ef7d807f6b4','subnet-0b3d7ba41fc6278b2','subnet-0b99293450e2edb13']";;
+              3) subnets="['subnet-047f6294332aa3c1c','subnet-0c3bce80bbc2c8f1c','subnet-038c38c7d96364d7f','subnet-027a025e9d9db95ce','subnet-04d9008469025b101','subnet-02f75024b00b20a75']";;
+              *) echo >&2 "invalid subnets index"; exit 1;;
+              esac
+              echo "Subnets : ${subnets}"
+            fi
+            cat > /tmp/artifacts/installer/install-config.yaml << EOF
         apiVersion: v1
         baseDomain: ${BASE_DOMAIN:-origin-ci-int-aws.dev.rhcloud.com}
         metadata:
@@ -533,6 +544,7 @@ objects:
             region:       ${AWS_REGION}
             userTags:
               expirationDate: ${EXPIRATION_DATE}
+            subnets: ${subnets}
         pullSecret: >
           ${PULL_SECRET}
         sshKey: |
@@ -549,6 +561,16 @@ objects:
             esac
             echo "Azure region: ${AZURE_REGION}"
 
+            vnetrg=""
+            vnetname=""
+            ctrlsubnet=""
+            computesubnet=""
+            if [[ "${CLUSTER_VARIANT}" =~ "shared-vpc" ]]; then
+              vnetrg="os4-common"
+              vnetname="do-not-delete-shared-vnet-${AZURE_REGION}"
+              ctrlsubnet="subnet-1"
+              computesubnet="subnet-2"
+            fi
             cat > /tmp/artifacts/installer/install-config.yaml << EOF
         apiVersion: v1
         baseDomain: ${BASE_DOMAIN:-ci.azure.devcluster.openshift.com}
@@ -564,12 +586,24 @@ objects:
           azure:
             baseDomainResourceGroupName: os4-common
             region: ${AZURE_REGION}
+            networkResourceGroupName: ${vnetrg}
+            virtualNetwork: ${vnetname}
+            controlPlaneSubnet: ${ctrlsubnet}
+            computeSubnet: ${computesubnet}
         pullSecret: >
           ${PULL_SECRET}
         sshKey: |
           ${SSH_PUB_KEY}
         EOF
         elif [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
+            network=""
+            ctrlsubnet=""
+            computesubnet=""
+            if [[ "${CLUSTER_VARIANT}" =~ "shared-vpc" ]]; then
+              network="do-not-delete-shared-network"
+              ctrlsubnet="do-not-delete-shared-master-subnet"
+              computesubnet="do-not-delete-shared-worker-subnet"
+            fi
             cat > /tmp/artifacts/installer/install-config.yaml << EOF
         apiVersion: v1
         baseDomain: ${BASE_DOMAIN:-origin-ci-int-gce.dev.openshift.com}
@@ -585,6 +619,9 @@ objects:
           gcp:
             projectID: ${GCP_PROJECT}
             region: ${GCP_REGION}
+            network: ${network}
+            controlPlaneSubnet: ${ctrlsubnet}
+            computeSubnet: ${computesubnet}
         pullSecret: >
           ${PULL_SECRET}
         sshKey: |
