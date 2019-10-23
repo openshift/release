@@ -3,11 +3,12 @@ base_images:
     name: "4.3"
     namespace: ocp
     tag: base
+binary_build_commands: make build
 build_root:
-  image_stream_tag:
+  image_stream_tag: 
     name: release
     namespace: openshift
-    tag: golang-1.10
+    tag: golang-1.12
 images:
 - dockerfile_path: Dockerfile
   from: base
@@ -25,3 +26,12 @@ resources:
 tag_specification:
   name: "4.3"
   namespace: ocp
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
+- as: verify
+  commands: make verify
+  container:
+    from: src
