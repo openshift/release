@@ -22,6 +22,50 @@ presubmits:
     always_run: true
     branches:
     - master
+    context: ci/build-farm/build01-dry
+    decorate: true
+    name: pull-ci-openshift-release-master-build01-dry
+    rerun_command: /test build01-dry
+    spec:
+      containers:
+      - args:
+        - --config-dir
+        - clusters/build-clusters/01_cluster
+        - --kubeconfig
+        - /etc/build-farm-credentials/kubeconfig
+        - --context
+        - ci/api-build01-ci-devcluster-openshift-com:6443/system:serviceaccount:ci:config-updater
+        command:
+        - applyconfig
+        env:
+        - name: github_client_secret
+          valueFrom:
+            secretKeyRef:
+              key: build01_github_client_secret
+              name: build-farm-credentials
+        image: registry.svc.ci.openshift.org/ci/applyconfig:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.kubeconfig
+            path: kubeconfig
+          secretName: build-farm-credentials
+    trigger: (?m)^/test( | .* )build01-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
     context: ci/prow/ci-operator-config
     decorate: true
     name: pull-ci-openshift-release-master-ci-operator-config
