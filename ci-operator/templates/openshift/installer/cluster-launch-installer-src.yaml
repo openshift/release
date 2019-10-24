@@ -246,7 +246,6 @@ objects:
 
         ${TEST_COMMAND}
 
-    # Runs an install
     - name: setup
       image: ${IMAGE_INSTALLER}
       terminationMessagePolicy: FallbackToLogsOnError
@@ -258,8 +257,6 @@ objects:
       - name: artifacts
         mountPath: /tmp/artifacts
       env:
-      - name: TYPE
-        value: ${CLUSTER_TYPE}
       - name: AWS_SHARED_CREDENTIALS_FILE
         value: /etc/openshift-installer/.awscred
       - name: AWS_REGION
@@ -274,6 +271,8 @@ objects:
         value: /etc/openshift-installer/gce.json
       - name: CLUSTER_NAME
         value: ${NAMESPACE}-${JOB_NAME_HASH}
+      - name: CLUSTER_VARIANT
+        value: ${CLUSTER_VARIANT}
       - name: BASE_DOMAIN
         value: ${BASE_DOMAIN}
       - name: SSH_PRIV_KEY_PATH
@@ -286,27 +285,23 @@ objects:
         value: ${RELEASE_IMAGE_LATEST}
       - name: OPENSHIFT_INSTALL_INVOKER
         value: openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID}
-      - name: OPENSTACK_IMAGE
-        value: rhcos
-      - name: OPENSTACK_REGION
-        value: moc-kzn
-      - name: OPENSTACK_FLAVOR
-        value: m1.medium
-      - name: OPENSTACK_EXTERNAL_NETWORK
-        value: external
-      - name: OS_CLOUD
-        value: openstack-cloud
-      - name: OS_CLIENT_CONFIG_FILE
-        value: /etc/openshift-installer/clouds.yaml
+      - name: ENABLE_MIRROR
+        value: ${ENABLE_MIRROR}
       - name: USER
         value: test
       - name: HOME
         value: /tmp
+      - name: MIRROR_BASE
+        value: registry.svc.ci.openshift.org/${NAMESPACE}/release
+      - name: INSTALL_INITIAL_RELEASE
+      - name: RELEASE_IMAGE_INITIAL
       command:
       - /bin/bash
       - -c
       - |
         #!/bin/sh
+        set -e
+
         trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/setup-success; else touch /tmp/exit; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -326,6 +321,28 @@ objects:
         cp "$(command -v openshift-install)" /tmp
         mkdir /tmp/artifacts/installer
 
+        if [[ -n "${INSTALL_INITIAL_RELEASE}" && -n "${RELEASE_IMAGE_INITIAL}" ]]; then
+          echo "Installing from initial release ${RELEASE_IMAGE_INITIAL}"
+          OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_INITIAL}"
+        elif [[ "${ENABLE_MIRROR}" == "true" ]]; then
+          export PATH=$PATH:/tmp  # gain access to oc
+          while [ ! command -V oc ]; do sleep 1; done # poll to make sure that the test container has dropped oc into the shared volume
+
+          # mirror the release image and override the release image to point to the mirrored one
+          mkdir /tmp/.docker && cp /etc/openshift-installer/pull-secret /tmp/.docker/config.json
+          oc registry login
+          oc adm release new --from-release ${RELEASE_IMAGE_LATEST} --to-image ${MIRROR_BASE}-scratch:release --mirror ${MIRROR_BASE}-scratch || echo 'ignore: the release could not be reproduced from its inputs'
+          oc adm release mirror --from ${MIRROR_BASE}-scratch:release --to ${MIRROR_BASE} --to-release-image ${MIRROR_BASE}:mirrored
+          RELEASE_PAYLOAD_IMAGE_SHA=$(oc get istag ${MIRROR_BASE##*/}:mirrored -o=jsonpath="{.image.metadata.name}")
+          oc delete imagestream "$(basename "${MIRROR_BASE}-scratch")"
+          RELEASE_IMAGE_MIRROR="${MIRROR_BASE}@${RELEASE_PAYLOAD_IMAGE_SHA}"
+
+          echo "Installing from mirror override release ${RELEASE_IMAGE_MIRROR}"
+          OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_MIRROR}"
+        else
+          echo "Installing from release ${RELEASE_IMAGE_LATEST}"
+        fi
+
         export EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
         export SSH_PUB_KEY=$(cat "${SSH_PUB_KEY_PATH}")
         export PULL_SECRET=$(cat "${PULL_SECRET_PATH}")
@@ -334,8 +351,12 @@ objects:
         mkdir -p ~/.ssh
         cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
 
+        workers=3
+        if [[ "${CLUSTER_VARIANT}" == "compact" ]]; then
+          workers=0
+        fi
         if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
-            cat > /tmp/artifacts/installer/install-config.yaml << EOF
+          cat > /tmp/artifacts/installer/install-config.yaml << EOF
         apiVersion: v1
         baseDomain: ${BASE_DOMAIN:-origin-ci-int-aws.dev.rhcloud.com}
         metadata:
@@ -350,7 +371,7 @@ objects:
               - us-east-1b
         compute:
         - name: worker
-          replicas: 3
+          replicas: ${workers}
           platform:
             aws:
               type: m4.xlarge
@@ -367,6 +388,7 @@ objects:
         sshKey: |
           ${SSH_PUB_KEY}
         EOF
+
         elif [[ "${CLUSTER_TYPE}" == "azure4" ]]; then
             case $((RANDOM % 4)) in
             0) AZURE_REGION=centralus;;
@@ -387,28 +409,11 @@ objects:
           replicas: 3
         compute:
         - name: worker
-          replicas: 3
+          replicas: ${workers}
         platform:
           azure:
             baseDomainResourceGroupName: os4-common
             region: ${AZURE_REGION}
-        pullSecret: >
-          ${PULL_SECRET}
-        sshKey: |
-          ${SSH_PUB_KEY}
-        EOF
-        elif [[ "${CLUSTER_TYPE}" == "openstack" ]]; then
-            cat > /tmp/artifacts/installer/install-config.yaml << EOF
-        apiVersion: v1
-        baseDomain: ${BASE_DOMAIN:-origin-ci-int-aws.dev.rhcloud.com}
-        metadata:
-          name: ${CLUSTER_NAME}
-        platform:
-          openstack:
-            baseImage:        ${OPENSTACK_IMAGE}
-            cloud:            ${OS_CLOUD}
-            externalNetwork:  ${OPENSTACK_EXTERNAL_NETWORK}
-            region:           ${OPENSTACK_REGION}
         pullSecret: >
           ${PULL_SECRET}
         sshKey: |
@@ -425,7 +430,7 @@ objects:
           replicas: 3
         compute:
         - name: worker
-          replicas: 3
+          replicas: ${workers}
         platform:
           gcp:
             projectID: ${GCP_PROJECT}
@@ -439,12 +444,112 @@ objects:
             echo "Unsupported cluster type '${CLUSTER_TYPE}'"
             exit 1
         fi
-        
+
+        # as a current stop gap -- this is pointing to a proxy hosted in
+        # the namespace "ci-test-ewolinet" on the ci cluster
+        if [[ "${ENABLE_PROXY}" == "true" ]]; then
+
+        # FIXME: due to https://bugzilla.redhat.com/show_bug.cgi?id=1750650 we need to
+        # use a http endpoint for the httpsProxy value
+        # TODO: revert back to using https://ewolinet:5f6ccbbbafc66013d012839921ada773@35.231.5.161:3128/
+
+          cat >> /tmp/artifacts/installer/install-config.yaml << EOF
+        proxy:
+          httpsProxy: http://ewolinet:5f6ccbbbafc66013d012839921ada773@35.196.128.173:3128/
+          httpProxy: http://ewolinet:5f6ccbbbafc66013d012839921ada773@35.196.128.173:3128/
+        additionalTrustBundle: |
+          -----BEGIN CERTIFICATE-----
+          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
+          GtklzYOidGtxo1MT
+          -----END CERTIFICATE-----
+          -----BEGIN CERTIFICATE-----
+          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
+          Q/6M
+          -----END CERTIFICATE-----
+        EOF
+        fi
+
         if [[ -n "${CLUSTER_NETWORK_TYPE}" ]]; then
           cat >> /tmp/artifacts/installer/install-config.yaml << EOF
         networking:
           networkType: ${CLUSTER_NETWORK_TYPE}
         EOF
+        fi
+
+        if [[ "${ENABLE_MIRROR}" == "true" ]]; then
+          cat >> /tmp/artifacts/installer/install-config.yaml << EOF
+        imageContentSources:
+        - source: "${MIRROR_BASE}-scratch"
+          mirrors:
+          - "${MIRROR_BASE}"
+        EOF
+        fi
+
+        # TODO: Replace with a more concise manifest injection approach
+        if [[ -n "${CLUSTER_NETWORK_MANIFEST}" ]]; then
+            openshift-install --dir=/tmp/artifacts/installer/ create manifests
+            echo "${CLUSTER_NETWORK_MANIFEST}" > /tmp/artifacts/installer/manifests/cluster-network-03-config.yml
         fi
 
         TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create cluster &
