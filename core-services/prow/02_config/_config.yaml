@@ -4,22 +4,23 @@ plank:
     '*': 'https://prow.svc.ci.openshift.org/view/gcs/'
   job_url_template: 'https://prow.svc.ci.openshift.org/view/gcs/origin-ci-test/{{if eq .Spec.Type "presubmit"}}pr-logs/pull{{else if eq .Spec.Type "batch"}}pr-logs/pull{{else}}logs{{end}}{{if ne .Spec.Refs.Repo "origin"}}/{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}{{end}}{{if eq .Spec.Type "presubmit"}}/{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}{{else if eq .Spec.Type "batch"}}/batch{{end}}/{{.Spec.Job}}/{{.Status.BuildID}}/'
   report_template: '[Full PR test history](https://prow.svc.ci.openshift.org/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://prow.svc.ci.openshift.org/pr?query=is:pr+state:open+author:{{with index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}). Please help us cut down on flakes by [linking to](https://github.com/kubernetes/community/blob/master/contributors/devel/flaky-tests.md#filing-issues-for-flaky-tests) an [open issue](https://github.com/{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}/issues?q=is:issue+is:open) when you hit one in your PR.'
-  default_decoration_config:
-    timeout: 4h
-    grace_period: 15s
-    utility_images:
-      clonerefs: gcr.io/k8s-prow/clonerefs:v20191023-06d839b4f
-      initupload: gcr.io/k8s-prow/initupload:v20191023-06d839b4f
-      entrypoint: gcr.io/k8s-prow/entrypoint:v20191023-06d839b4f
-      sidecar: gcr.io/k8s-prow/sidecar:v20191023-06d839b4f
-    gcs_configuration:
-      bucket: origin-ci-test
-      path_strategy: single
-      default_org: openshift
-      default_repo: origin
-      mediaTypes:
-        log: text/plain
-    gcs_credentials_secret: gce-sa-credentials-gcs-publisher
+  default_decoration_configs:
+    "*":
+      timeout: 4h
+      grace_period: 15s
+      utility_images:
+        clonerefs: gcr.io/k8s-prow/clonerefs:v20191023-06d839b4f
+        initupload: gcr.io/k8s-prow/initupload:v20191023-06d839b4f
+        entrypoint: gcr.io/k8s-prow/entrypoint:v20191023-06d839b4f
+        sidecar: gcr.io/k8s-prow/sidecar:v20191023-06d839b4f
+      gcs_configuration:
+        bucket: origin-ci-test
+        path_strategy: single
+        default_org: openshift
+        default_repo: origin
+        mediaTypes:
+          log: text/plain
+      gcs_credentials_secret: gce-sa-credentials-gcs-publisher
 
 jenkins_operators:
 - label_selector: master=ci.openshift.redhat.com
