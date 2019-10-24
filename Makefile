@@ -138,6 +138,10 @@ prow-ocp-rpm-secrets:
 		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
 		--from-file=ci-operator/infra/openshift/release-controller/repos/ocp-4.2-default.repo \
 		-o yaml --dry-run | oc apply -n ocp -f -
+	oc create secret generic base-4-2-repos-s390x \
+		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
+		--from-file=ci-operator/infra/openshift/release-controller/repos/ocp-4.2-s390x.repo \
+		-o yaml --dry-run | oc apply -n ocp -f -
 	oc create secret generic base-openstack-4-2-repos \
 		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
 		--from-file=ci-operator/infra/openshift/release-controller/repos/ocp-4.2-openstack.repo \
@@ -145,6 +149,14 @@ prow-ocp-rpm-secrets:
 	oc create secret generic base-4-3-repos \
 		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
 		--from-file=ci-operator/infra/openshift/release-controller/repos/ocp-4.3-default.repo \
+		-o yaml --dry-run | oc apply -n ocp -f -
+	oc create secret generic base-4-3-repos-s390x \
+		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
+		--from-file=ci-operator/infra/openshift/release-controller/repos/ocp-4.3-s390x.repo \
+		-o yaml --dry-run | oc apply -n ocp -f -
+	oc create secret generic base-4-3-repos-ppc64le \
+		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
+		--from-file=ci-operator/infra/openshift/release-controller/repos/ocp-4.3-ppc64le.repo \
 		-o yaml --dry-run | oc apply -n ocp -f -
 	oc create secret generic base-4-3-rhel8-repos \
 		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
