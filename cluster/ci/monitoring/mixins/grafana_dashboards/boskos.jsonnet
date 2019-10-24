@@ -17,7 +17,7 @@ local dashboardConfig = {
 
 local statePanel(iaas, displayName, maximum) = (graphPanel.new(
     std.format('%s Quota Leases by State', displayName),
-    description=std.format('sum(boskos_resources{type="%s-quota-slice"}) by (state)', iaas),
+    description=std.format('sum(boskos_resources{type="%s-quota-slice",state!="other"}) by (state)', iaas),
     datasource='prometheus',
     legend_alignAsTable=true,
     legend_rightSide=true,
