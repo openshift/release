@@ -31,7 +31,7 @@ local statePanel(iaas, displayName, maximum) = (graphPanel.new(
     stack=true,
   ) + legendConfig)
   .addTarget(prometheus.target(
-    std.format('sum(boskos_resources{type="%s-quota-slice"}) by (state)', iaas),
+    std.format('sum(boskos_resources{type="%s-quota-slice",state!="other"}) by (state)', iaas),
     legendFormat='{{state}}',
   ));
 
