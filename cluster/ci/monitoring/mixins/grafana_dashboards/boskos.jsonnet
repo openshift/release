@@ -15,7 +15,7 @@ local dashboardConfig = {
         uid: config._config.grafanaDashboardIDs['boskos.json'],
     };
 
-local statePanel(iaas, displayName, maximum) = (graphPanel.new(
+local statePanel(iaas, displayName) = (graphPanel.new(
     std.format('%s Quota Leases by State', displayName),
     description=std.format('sum(boskos_resources{type="%s-quota-slice",state!="other"}) by (state)', iaas),
     datasource='prometheus',
@@ -27,7 +27,6 @@ local statePanel(iaas, displayName, maximum) = (graphPanel.new(
     legend_current=true,
     legend_sortDesc=true,
     min='0',
-    max=maximum,
     stack=true,
   ) + legendConfig)
   .addTarget(prometheus.target(
@@ -74,9 +73,9 @@ dashboard.new(
     x: 0,
     y: 0,
   })
-.addPanel(statePanel(iaas="aws", displayName="AWS", maximum="120"), gridPos={h: 9, w: 24, x: 0, y: 0})
-.addPanel(statePanel(iaas="gcp", displayName="GCP", maximum="1000"), gridPos={h: 9, w: 24, x: 0, y: 0})
-.addPanel(statePanel(iaas="azure4", displayName="Azure", maximum="10"), gridPos={h: 9, w: 24, x: 0, y: 0})
-.addPanel(statePanel(iaas="vsphere", displayName="vSphere", maximum="1000"), gridPos={h: 9, w: 24, x: 0, y: 0})
-.addPanel(statePanel(iaas="openstack", displayName="OpenStack", maximum="1000"), gridPos={h: 9, w: 24, x: 0, y: 0})
+.addPanel(statePanel(iaas="aws", displayName="AWS"), gridPos={h: 9, w: 24, x: 0, y: 0})
+.addPanel(statePanel(iaas="gcp", displayName="GCP"), gridPos={h: 9, w: 24, x: 0, y: 0})
+.addPanel(statePanel(iaas="azure4", displayName="Azure"), gridPos={h: 9, w: 24, x: 0, y: 0})
+.addPanel(statePanel(iaas="vsphere", displayName="vSphere"), gridPos={h: 9, w: 24, x: 0, y: 0})
+.addPanel(statePanel(iaas="openstack", displayName="OpenStack"), gridPos={h: 9, w: 24, x: 0, y: 0})
 + dashboardConfig
