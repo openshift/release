@@ -501,11 +501,11 @@ objects:
         mkdir -p ~/.ssh
         cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
 
+        workers=3
+        if [[ "${CLUSTER_VARIANT}" == "compact" ]]; then
+          workers=0
+        fi
         if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
-          workers=3
-          if [[ "${CLUSTER_VARIANT}" == "compact" ]]; then
-            workers=0
-          fi
           cat > /tmp/artifacts/installer/install-config.yaml << EOF
         apiVersion: v1
         baseDomain: ${BASE_DOMAIN:-origin-ci-int-aws.dev.rhcloud.com}
@@ -559,7 +559,7 @@ objects:
           replicas: 3
         compute:
         - name: worker
-          replicas: 3
+          replicas: ${workers}
         platform:
           azure:
             baseDomainResourceGroupName: os4-common
@@ -580,7 +580,7 @@ objects:
           replicas: 3
         compute:
         - name: worker
-          replicas: 3
+          replicas: ${workers}
         platform:
           gcp:
             projectID: ${GCP_PROJECT}
