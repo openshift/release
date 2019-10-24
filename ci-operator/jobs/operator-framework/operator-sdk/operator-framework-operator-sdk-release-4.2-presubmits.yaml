@@ -4,15 +4,15 @@ presubmits:
     always_run: true
     branches:
     - release-4.2
-    context: ci/prow/e2e-aws-ansible
+    context: ci/prow/e2e-aws-go-subcommand
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-operator-framework-operator-sdk-release-4.2-e2e-aws-ansible
-    rerun_command: /test e2e-aws-ansible
+    name: pull-ci-operator-framework-operator-sdk-release-4.2-e2e-aws-go-subcommand
+    rerun_command: /test e2e-aws-go-subcommand
     spec:
       containers:
       - args:
@@ -22,10 +22,10 @@ presubmits:
         - --org=operator-framework
         - --repo=operator-sdk
         - --resolver-address=http://ci-operator-configresolver
-        - --secret-dir=/usr/local/e2e-aws-ansible-cluster-profile
+        - --secret-dir=/usr/local/e2e-aws-go-subcommand-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=e2e-aws-ansible
-        - --template=/usr/local/e2e-aws-ansible
+        - --target=e2e-aws-go-subcommand
+        - --template=/usr/local/e2e-aws-go-subcommand
         command:
         - ci-operator
         env:
@@ -37,9 +37,11 @@ presubmits:
               key: operator-framework-operator-sdk-release-4.2.yaml
               name: ci-operator-4.2-configs
         - name: JOB_NAME_SAFE
-          value: e2e-aws-ansible
+          value: e2e-aws-go-subcommand
         - name: TEST_COMMAND
-          value: make -f ci/prow.Makefile test/e2e/ansible
+          value: |
+            make -f ci/prow.Makefile test/e2e/go
+            make -f ci/prow.Makefile test/e2e/subcommand
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -47,9 +49,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/e2e-aws-ansible-cluster-profile
+        - mountPath: /usr/local/e2e-aws-go-subcommand-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-aws-ansible
+        - mountPath: /usr/local/e2e-aws-go-subcommand
           name: job-definition
           subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/sentry-dsn
@@ -68,20 +70,20 @@ presubmits:
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )e2e-aws-ansible,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-go-subcommand,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - release-4.2
-    context: ci/prow/e2e-aws-go
+    context: ci/prow/e2e-aws-helm-ansible
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-operator-framework-operator-sdk-release-4.2-e2e-aws-go
-    rerun_command: /test e2e-aws-go
+    name: pull-ci-operator-framework-operator-sdk-release-4.2-e2e-aws-helm-ansible
+    rerun_command: /test e2e-aws-helm-ansible
     spec:
       containers:
       - args:
@@ -91,10 +93,10 @@ presubmits:
         - --org=operator-framework
         - --repo=operator-sdk
         - --resolver-address=http://ci-operator-configresolver
-        - --secret-dir=/usr/local/e2e-aws-go-cluster-profile
+        - --secret-dir=/usr/local/e2e-aws-helm-ansible-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=e2e-aws-go
-        - --template=/usr/local/e2e-aws-go
+        - --target=e2e-aws-helm-ansible
+        - --template=/usr/local/e2e-aws-helm-ansible
         command:
         - ci-operator
         env:
@@ -106,9 +108,11 @@ presubmits:
               key: operator-framework-operator-sdk-release-4.2.yaml
               name: ci-operator-4.2-configs
         - name: JOB_NAME_SAFE
-          value: e2e-aws-go
+          value: e2e-aws-helm-ansible
         - name: TEST_COMMAND
-          value: make -f ci/prow.Makefile test/e2e/go
+          value: |
+            make -f ci/prow.Makefile test/e2e/helm
+            make -f ci/prow.Makefile test/e2e/ansible
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -116,9 +120,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/e2e-aws-go-cluster-profile
+        - mountPath: /usr/local/e2e-aws-helm-ansible-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-aws-go
+        - mountPath: /usr/local/e2e-aws-helm-ansible
           name: job-definition
           subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/sentry-dsn
@@ -137,145 +141,7 @@ presubmits:
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )e2e-aws-go,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.2
-    context: ci/prow/e2e-aws-helm
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-operator-framework-operator-sdk-release-4.2-e2e-aws-helm
-    rerun_command: /test e2e-aws-helm
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --branch=release-4.2
-        - --give-pr-author-access-to-namespace=true
-        - --org=operator-framework
-        - --repo=operator-sdk
-        - --resolver-address=http://ci-operator-configresolver
-        - --secret-dir=/usr/local/e2e-aws-helm-cluster-profile
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=e2e-aws-helm
-        - --template=/usr/local/e2e-aws-helm
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: operator-framework-operator-sdk-release-4.2.yaml
-              name: ci-operator-4.2-configs
-        - name: JOB_NAME_SAFE
-          value: e2e-aws-helm
-        - name: TEST_COMMAND
-          value: make -f ci/prow.Makefile test/e2e/helm
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/e2e-aws-helm-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-aws-helm
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )e2e-aws-helm,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.2
-    context: ci/prow/e2e-aws-subcommand
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-operator-framework-operator-sdk-release-4.2-e2e-aws-subcommand
-    rerun_command: /test e2e-aws-subcommand
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --branch=release-4.2
-        - --give-pr-author-access-to-namespace=true
-        - --org=operator-framework
-        - --repo=operator-sdk
-        - --resolver-address=http://ci-operator-configresolver
-        - --secret-dir=/usr/local/e2e-aws-subcommand-cluster-profile
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=e2e-aws-subcommand
-        - --template=/usr/local/e2e-aws-subcommand
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: operator-framework-operator-sdk-release-4.2.yaml
-              name: ci-operator-4.2-configs
-        - name: JOB_NAME_SAFE
-          value: e2e-aws-subcommand
-        - name: TEST_COMMAND
-          value: make -f ci/prow.Makefile test/subcommand
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/e2e-aws-subcommand-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-aws-subcommand
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )e2e-aws-subcommand,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-helm-ansible,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
