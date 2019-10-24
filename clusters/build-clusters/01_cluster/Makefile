@@ -54,5 +54,5 @@ generate-machine-autoscaler:
 .PHONY: set-up-autoscaler
 set-up-autoscaler:
 	@echo "setting up autoscaler ..."
-	oc apply -f ./assets/default_clusterautoscaler.yaml
+	oc apply -f ./assets/admin_default_clusterautoscaler.yaml
 	find ./assets -name "*_machineautoscaler.yaml" -exec oc apply -f {} \;
