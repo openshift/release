@@ -278,6 +278,11 @@ update_secret generic "sentry-dsn" "$( format_field_value "sentry" "ci-operator"
 # codecov.io tokens we store for teams
 update_secret generic "redhat-developer-service-binding-operator-codecov-token" "$( format_field_value "codecov-tokens" redhat-developer-service-binding-operator token )"
 
+# collects all the secrets for build farm
+update_secret generic "build-farm-credentials" \
+	"$( format_field_value build_farm_01_cluster "github_client_secret" "build01_github_client_secret" )" \
+	"$( format_attachment "build_farm" sa.kubeconfig )"
+
 # Configuration for the .git-credentials used by the release controller to clone
 # private repositories to generate changelogs
 oc -n "ci-release" create secret generic "git-credentials" "--from-literal=.git-credentials=https://openshift-bot:$( field_value "openshift-bot" "GitHub OAuth Token" "oauth" )@github.com" --dry-run -o yaml | oc apply -f -
