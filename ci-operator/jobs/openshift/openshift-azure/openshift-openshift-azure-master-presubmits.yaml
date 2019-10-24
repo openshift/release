@@ -91,7 +91,7 @@ presubmits:
       serviceAccountName: ci-operator
     trigger: (?m)^/test( | .* )e2e-changeloglevel,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     context: e2e-create-20190430
@@ -113,7 +113,7 @@ presubmits:
       serviceAccountName: ci-operator
     trigger: (?m)^/test( | .* )e2e-create-20190430,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - master
     context: e2e-create-20190930
@@ -135,13 +135,37 @@ presubmits:
       serviceAccountName: ci-operator
     trigger: (?m)^/test( | .* )e2e-create-20190930,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
-    context: e2e-create-20191027
+    context: e2e-create-20191027-private
     decorate: true
-    name: pull-ci-azure-master-e2e-create-20191027
-    rerun_command: /test e2e-create-20191027
+    name: pull-ci-azure-master-e2e-create-20191027-private
+    rerun_command: /test e2e-create-20191027-private
+    spec:
+      containers:
+      - args:
+        - hack/tests/e2e-create.sh
+        env:
+        - name: API_VERSION
+          value: 2019-10-27-preview
+        - name: FOCUS
+          value: \[EveryPR\]
+        - name: PRIVATE_API_SERVER
+          value: "true"
+        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        name: ""
+        resources: {}
+      serviceAccountName: ci-operator
+    trigger: (?m)^/test( | .* )e2e-create-20191027-private,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: e2e-create-20191027-public
+    decorate: true
+    name: pull-ci-azure-master-e2e-create-20191027-public
+    rerun_command: /test e2e-create-20191027-public
     spec:
       containers:
       - args:
@@ -155,7 +179,7 @@ presubmits:
         name: ""
         resources: {}
       serviceAccountName: ci-operator
-    trigger: (?m)^/test( | .* )e2e-create-20191027,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-create-20191027-public,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
