@@ -52,147 +52,6 @@ presubmits:
     always_run: true
     branches:
     - release-4.2
-    context: ci/prow/e2e-aws-console-olm
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-console-release-4.2-e2e-aws-console-olm
-    optional: true
-    rerun_command: /test e2e-aws-console-olm
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --branch=release-4.2
-        - --give-pr-author-access-to-namespace=true
-        - --org=openshift
-        - --repo=console
-        - --resolver-address=http://ci-operator-configresolver
-        - --secret-dir=/usr/local/e2e-aws-console-olm-cluster-profile
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=e2e-aws-console-olm
-        - --template=/usr/local/e2e-aws-console-olm
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-console-release-4.2.yaml
-              name: ci-operator-4.2-configs
-        - name: JOB_NAME_SAFE
-          value: e2e-aws-console-olm
-        - name: TEST_COMMAND
-          value: ./test-prow-e2e.sh olmFull
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/e2e-aws-console-olm-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-aws-console-olm
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )e2e-aws-console-olm,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.2
-    context: ci/prow/e2e-gcp
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-console-release-4.2-e2e-gcp
-    rerun_command: /test e2e-gcp
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --branch=release-4.2
-        - --give-pr-author-access-to-namespace=true
-        - --org=openshift
-        - --repo=console
-        - --resolver-address=http://ci-operator-configresolver
-        - --secret-dir=/usr/local/e2e-gcp-cluster-profile
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=e2e-gcp
-        - --template=/usr/local/e2e-gcp
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: gcp
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-console-release-4.2.yaml
-              name: ci-operator-4.2-configs
-        - name: JOB_NAME_SAFE
-          value: e2e-gcp
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance/parallel run-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/e2e-gcp-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-gcp
-          name: job-definition
-          subPath: cluster-launch-installer-e2e.yaml
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
-      - configMap:
-          name: prow-job-cluster-launch-installer-e2e
-        name: job-definition
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )e2e-gcp,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.2
     context: ci/prow/e2e-gcp-console
     decorate: true
     decoration_config:
@@ -260,6 +119,77 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-gcp-console,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-4.2
+    context: ci/prow/e2e-gcp-console-olm
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-console-release-4.2-e2e-gcp-console-olm
+    rerun_command: /test e2e-gcp-console-olm
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --branch=release-4.2
+        - --give-pr-author-access-to-namespace=true
+        - --org=openshift
+        - --repo=console
+        - --resolver-address=http://ci-operator-configresolver
+        - --secret-dir=/usr/local/e2e-gcp-console-olm-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=e2e-gcp-console-olm
+        - --template=/usr/local/e2e-gcp-console-olm
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: gcp
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-console-release-4.2.yaml
+              name: ci-operator-4.2-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-gcp-console-olm
+        - name: TEST_COMMAND
+          value: ./test-prow-e2e.sh olmFull
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-gcp-console-olm-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-gcp-console-olm
+          name: job-definition
+          subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - configMap:
+          name: prow-job-cluster-launch-installer-src
+        name: job-definition
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )e2e-gcp-console-olm,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
