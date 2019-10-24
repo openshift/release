@@ -1,19 +1,18 @@
 presubmits:
   openshift/cluster-network-operator:
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - release-4.3
-    context: ci/prow/e2e-aws
+    context: ci/prow/e2e-gcp
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-network-operator-release-4.3-e2e-aws
-    rerun_command: /test e2e-aws
-    run_if_changed: ([^d]|[^m]d|[^.]md)$
+    name: pull-ci-openshift-cluster-network-operator-release-4.3-e2e-gcp
+    rerun_command: /test e2e-gcp
     spec:
       containers:
       - args:
@@ -23,22 +22,22 @@ presubmits:
         - --org=openshift
         - --repo=cluster-network-operator
         - --resolver-address=http://ci-operator-configresolver
-        - --secret-dir=/usr/local/e2e-aws-cluster-profile
+        - --secret-dir=/usr/local/e2e-gcp-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=e2e-aws
-        - --template=/usr/local/e2e-aws
+        - --target=e2e-gcp
+        - --template=/usr/local/e2e-gcp
         command:
         - ci-operator
         env:
         - name: CLUSTER_TYPE
-          value: aws
+          value: gcp
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
               key: openshift-cluster-network-operator-release-4.3.yaml
               name: ci-operator-4.3-configs
         - name: JOB_NAME_SAFE
-          value: e2e-aws
+          value: e2e-gcp
         - name: TEST_COMMAND
           value: TEST_SUITE=openshift/conformance/parallel run-tests
         image: ci-operator:latest
@@ -48,9 +47,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/e2e-aws-cluster-profile
+        - mountPath: /usr/local/e2e-gcp-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-aws
+        - mountPath: /usr/local/e2e-gcp
           name: job-definition
           subPath: cluster-launch-installer-e2e.yaml
         - mountPath: /etc/sentry-dsn
@@ -62,28 +61,29 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-aws
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
       - configMap:
           name: prow-job-cluster-launch-installer-e2e
         name: job-definition
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )e2e-aws,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-gcp,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - release-4.3
-    context: ci/prow/e2e-aws-upgrade
+    context: ci/prow/e2e-gcp-upgrade
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-network-operator-release-4.3-e2e-aws-upgrade
-    rerun_command: /test e2e-aws-upgrade
-    run_if_changed: ([^d]|[^m]d|[^.]md)$
+    name: pull-ci-openshift-cluster-network-operator-release-4.3-e2e-gcp-upgrade
+    rerun_command: /test e2e-gcp-upgrade
     spec:
       containers:
       - args:
@@ -93,9 +93,9 @@ presubmits:
         - --org=openshift
         - --repo=cluster-network-operator
         - --resolver-address=http://ci-operator-configresolver
-        - --secret-dir=/usr/local/e2e-aws-upgrade-cluster-profile
+        - --secret-dir=/usr/local/e2e-gcp-upgrade-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=e2e-aws-upgrade
+        - --target=e2e-gcp-upgrade
         command:
         - ci-operator
         env:
@@ -111,7 +111,7 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
+        - mountPath: /usr/local/e2e-gcp-upgrade-cluster-profile
           name: cluster-profile
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
@@ -122,11 +122,13 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-aws
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )e2e-aws-upgrade,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-gcp-upgrade,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
