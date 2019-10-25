@@ -4,14 +4,12 @@
 #
 # The standard name for this image is openshift/origin-release
 #
-FROM ocp/builder-base:golang-1.13
+FROM ocp/builder-base:rhel-7-golang-1.11
 
-ENV VERSION=1.13.1 \
+ENV VERSION=1.11.6 \
     GOCACHE=/go/.cache \
     GOARM=5 \
-    GOPATH=/go \
-    GOROOT=/usr/local/go \
-    LOGNAME=deadbeef
+    GOPATH=/go
 ENV PATH=$PATH:$GOPATH/bin
 
 COPY cbs-paas7-openshift-multiarch-el7-build.repo /etc/yum.repos.d/
@@ -36,9 +34,7 @@ RUN go get golang.org/x/tools/cmd/cover \
     rm -rf $GOPATH/* $GOPATH/.cache && \
     mkdir $GOPATH/bin && \
     ln -s /usr/bin/imagebuilder $GOPATH/bin/imagebuilder && \
-    ln -s /usr/bin/goimports $GOPATH/bin/goimports && \
-    curl -L https://github.com/golang/dep/releases/download/v0.5.4/dep-linux-amd64 > /usr/bin/dep && \
-    chmod +x /usr/bin/dep
+    ln -s /usr/bin/goimports $GOPATH/bin/goimports
     # TODO: symlink for backwards compatibility with hack/build-images.sh only, remove
 
 RUN chmod g+xw -R $GOPATH
