@@ -4,12 +4,13 @@
 #
 # The standard name for this image is openshift/origin-release
 #
-FROM ocp/builder-base:golang-1.12
+FROM ocp/builder-base:rhel-7-golang-1.13
 
-ENV VERSION=1.12.6 \
+ENV VERSION=1.13.1 \
     GOCACHE=/go/.cache \
     GOARM=5 \
     GOPATH=/go \
+    GOROOT=/usr/local/go \
     LOGNAME=deadbeef
 ENV PATH=$PATH:$GOPATH/bin
 
@@ -36,7 +37,7 @@ RUN go get golang.org/x/tools/cmd/cover \
     mkdir $GOPATH/bin && \
     ln -s /usr/bin/imagebuilder $GOPATH/bin/imagebuilder && \
     ln -s /usr/bin/goimports $GOPATH/bin/goimports && \
-    curl -L https://github.com/golang/dep/releases/download/v0.5.3/dep-linux-amd64 > /usr/bin/dep && \
+    curl -L https://github.com/golang/dep/releases/download/v0.5.4/dep-linux-amd64 > /usr/bin/dep && \
     chmod +x /usr/bin/dep
     # TODO: symlink for backwards compatibility with hack/build-images.sh only, remove
 
