@@ -1,27 +1,27 @@
 base_images:
   base:
-    name: "4.4"
+    name: "ubi"
     namespace: ocp
-    tag: base
+    tag: "8"
 base_rpm_images:
   rpm:
-    name: "4.4"
+    name: "ubi"
     namespace: ocp
-    tag: base
+    tag: "8"
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.10
 images:
-- dockerfile_path: openshift-kuryr-tester.Dockerfile
+- dockerfile_path: openshift-kuryr-tester-rhel8.Dockerfile
   from: src
   optional: true
   to: kuryr-tester
-- dockerfile_path: openshift-kuryr-cni-ci.Dockerfile
+- dockerfile_path: openshift-kuryr-cni-ci-rhel8.Dockerfile
   from: rpm-os
   to: kuryr-cni
-- dockerfile_path: openshift-kuryr-controller-ci.Dockerfile
+- dockerfile_path: openshift-kuryr-controller-ci-rhel8.Dockerfile
   from: rpm-os
   to: kuryr-controller
 promotion:
@@ -30,7 +30,8 @@ promotion:
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
-      curl http://base-openstack-4-2.ocp.svc > /etc/yum.repos.d/base-openstack-4-2.repo
+      curl http://base-4-3-rhel8.ocp.svc > /etc/yum.repos.d/base-4-3-rhel8.repo
+      curl http://base-openstack-4-3.ocp.svc > /etc/yum.repos.d/base-openstack-4-3.repo
     from: rpm
     to: rpm-os
 resources:
@@ -40,18 +41,17 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-rpm_build_commands: tools/build-rpm.sh
+rpm_build_commands: tools/build-rpm-rhel8.sh
 rpm_build_location: _output/RPMS/noarch
 tag_specification:
   name: "4.4"
   namespace: ocp
 tests:
 - as: unit
-  commands: tox -e py27
+  commands: tox -e py3
   container:
     from: kuryr-tester
 - as: verify
-  commands: sed -i -e "s/basepython = python3/basepython = python2.7/g" tox.ini &&
-    tox -e pep8
+  commands: tox -e pep8
   container:
     from: kuryr-tester
