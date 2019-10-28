@@ -93,6 +93,7 @@ objects:
           - --job-config-path=/etc/job-config
           - --spyglass=true
           - --rerun-creates-job=true
+          - --kubeconfig=/etc/build-farm-credentials/kubeconfig
           ports:
             - name: main
               containerPort: 8080
@@ -151,6 +152,9 @@ objects:
           - name: job-config-44
             mountPath: /etc/job-config/4.4
             readOnly: true
+          - mountPath: /etc/build-farm-credentials
+            name: build-farm-credentials
+            readOnly: true
           resources:
             requests:
               memory: "5Gi"
@@ -195,6 +199,12 @@ objects:
         - name: job-config-44
           configMap:
             name: job-config-4.4
+        - name: build-farm-credentials
+          secret:
+            items:
+            - key: sa.deck.build01.config
+              path: kubeconfig
+            secretName: build-farm-credentials
 - apiVersion: v1
   kind: Route
   metadata:
