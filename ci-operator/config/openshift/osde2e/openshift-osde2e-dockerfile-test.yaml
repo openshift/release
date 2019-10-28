@@ -1,0 +1,64 @@
+base_images:
+  osde2e-run:
+    name: master
+    namespace: app-sre
+    tag: osde2e
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.11
+binary_build_commands: |
+  go get -u github.com/Masterminds/glide && glide install --strip-vendor
+  mkdir -p /tmp/artifacts
+images:
+- dockerfile_path: Dockerfile.ci
+  to: osde2e-binary
+promotion:
+  name: master
+  namespace: app-sre
+  tag: osde2e
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+
+# PR check
+- as: verify
+  artifact_dir: /tmp/artifacts
+  commands: |
+    set -o pipefail
+
+    export HOME=$(mktemp -d)
+
+    export REPORT_DIR=/tmp/artifacts
+
+    ci/prow_pr_check.sh
+  container:
+    from: bin
+
+- as: e2e-int-4.1
+  artifact_dir: /tmp/artifacts
+  cron: '* */4 * * *'
+  secret:
+    name: osde2e-secrets
+    mount_path: /usr/local/osde2e-secrets
+  container:
+    from: osde2e-run
+  commands: |
+    set -o pipefail
+
+    export HOME=$(mktemp -d)
+
+    export REPORT_DIR=/tmp/artifacts
+
+    export OSD_ENV=int
+    export MAJOR_TARGET=4
+    export MINOR_TARGET=1
+    export TESTGRID_PREFIX=logs/osd-int-4.1
+
+    ci/prow_run_tests.sh /usr/local/osde2e-secrets

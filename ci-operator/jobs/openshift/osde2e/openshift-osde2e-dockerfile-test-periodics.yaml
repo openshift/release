@@ -1,0 +1,55 @@
+periodics:
+- agent: kubernetes
+  cron: '* */4 * * *'
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: dockerfile-test
+    org: openshift
+    repo: osde2e
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-osde2e-dockerfile-test-e2e-int-4.1
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --branch=dockerfile-test
+      - --give-pr-author-access-to-namespace=true
+      - --org=openshift
+      - --repo=osde2e
+      - --resolver-address=http://ci-operator-configresolver
+      - --secret-dir=/usr/local/osde2e-secrets
+      - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+      - --target=e2e-int-4.1
+      command:
+      - ci-operator
+      env:
+      - name: CONFIG_SPEC
+        valueFrom:
+          configMapKeyRef:
+            key: openshift-osde2e-dockerfile-test.yaml
+            name: ci-operator-misc-configs
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/osde2e-secrets
+        name: osde2e-secrets
+        readOnly: true
+      - mountPath: /etc/sentry-dsn
+        name: sentry-dsn
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: osde2e-secrets
+      secret:
+        secretName: osde2e-secrets
+    - name: sentry-dsn
+      secret:
+        secretName: sentry-dsn

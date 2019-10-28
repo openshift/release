@@ -1,12 +1,23 @@
 build_root:
   image_stream_tag:
-    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.11
+base_images:
+  base:
+    name: centos
+    namespace: openshift
+    tag: '7'
 binary_build_commands: |
   go get -u github.com/Masterminds/glide && glide install --strip-vendor
   mkdir -p /tmp/artifacts
+images:
+- dockerfile_path: Dockerfile
+  from: src
+  to: osde2e-binary
+promotion:
+  name: master
+  namespace: osde2e
 resources:
   '*':
     limits:
@@ -28,7 +39,7 @@ tests:
 
     ci/prow_pr_check.sh
   container:
-    from: bin
+    from: src
 
 # Tests
 # --- Integration
@@ -39,7 +50,7 @@ tests:
     name: osde2e-secrets
     mount_path: /usr/local/osde2e-secrets
   container:
-    from: bin
+    from: osde2e-binary
   commands: |
     set -o pipefail
 
