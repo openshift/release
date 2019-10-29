@@ -188,7 +188,7 @@ update_secret generic "unsplash-api-key"         \
 
 # Credentials for GCE service accounts are stored
 # as an attachment on each distinct credential
-for account in "aos-pubsub-subscriber" "ci-vm-operator" "gcs-publisher" "gcs-tide-publisher"; do
+for account in "aos-pubsub-subscriber" "ci-vm-operator" "gcs-publisher" "gcs-tide-publisher" "gcs-private"; do
 	update_secret generic "gce-sa-credentials-${account}" "$( format_attachment "${account}" credentials.json service-account.json )"
 done
 
