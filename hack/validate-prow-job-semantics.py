@@ -110,6 +110,10 @@ def validate_names(path, data):
                 if job["spec"]["containers"][0]["command"][0] != "ci-operator":
                     continue
 
+                if ("labels" in job) and ("ci-operator.openshift.io/semantics-ignored" in job["labels"]) and job["labels"]["ci-operator.openshift.io/semantics-ignored"] == "true":
+                    print("[INFO] {}: ci-operator job {} is ignored because of a label says so".format(path, job["name"]))
+                    continue
+
                 targets = []
                 for arg in job["spec"]["containers"][0].get("args", []) + job["spec"]["containers"][0]["command"]:
                     if arg.startswith("--target="):
