@@ -30,6 +30,7 @@ items:
           - --config-path=/etc/config/config.yaml
           - --job-config-path=/etc/job-config
           - --dry-run=false
+          - --kubeconfig=/etc/build-farm-credentials/kubeconfig
           ports:
           - name: metrics
             containerPort: 9090
@@ -60,6 +61,9 @@ items:
             readOnly: true
           - name: job-config-44
             mountPath: /etc/job-config/4.4
+            readOnly: true
+          - mountPath: /etc/build-farm-credentials
+            name: build-farm-credentials
             readOnly: true
           resources:
             requests:
@@ -93,6 +97,12 @@ items:
         - name: job-config-44
           configMap:
             name: job-config-4.4
+        - name: build-farm-credentials
+          secret:
+            items:
+            - key: sa.sinker.build01.kubeconfig
+              path: kubeconfig
+            secretName: build-farm-credentials
 - apiVersion: v1
   kind: Service
   metadata:
