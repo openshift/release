@@ -247,7 +247,9 @@ objects:
         EOF
           done
           oc patch clusterversion version --type json -p "$(cat version-patch.yaml)"
-
+          echo "FIXME: getting image pullspecs"
+          oc adm release info -a "${PULL_SECRET_PATH}" --pullspecs
+          echo "FIXME: got the image pullspecs"
           for NAME in ${NAMES}
           do
             DIGEST="$(oc adm release info -a "${PULL_SECRET_PATH}" --image-for="${NAME}" | sed 's/.*@//')"
@@ -260,6 +262,7 @@ objects:
         EOF
             oc -n openshift patch imagestream "${NAME}" --type json -p "$(cat image-stream-new-source.yaml)"
           done
+          echo "FIXME: patches image streams for ${NAMES}"
         }
 
         mkdir -p "${HOME}"
