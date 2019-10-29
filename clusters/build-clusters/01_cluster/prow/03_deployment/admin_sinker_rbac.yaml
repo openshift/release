@@ -1,0 +1,58 @@
+kind: List
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    name: sinker
+    namespace: ci
+- kind: Role
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: sinker
+    namespace: ci
+  rules:
+    - apiGroups:
+        - ""
+      resources:
+        - pods
+      verbs:
+        - delete
+        - list
+    - apiGroups:
+        - prow.k8s.io
+      resources:
+        - prowjobs
+      verbs:
+        - delete
+        - list
+        - watch
+        - get        
+    - apiGroups:
+        - ""
+      resources:
+        - configmaps
+      resourceNames:
+        - prow-sinker-leaderlock
+      verbs:
+        - get
+        - update
+    - apiGroups:
+        - ""
+      resources:
+        - configmaps
+        - events
+      verbs:
+        - create        
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: sinker
+    namespace: ci
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: Role
+    name: sinker
+  subjects:
+  - kind: ServiceAccount
+    name: sinker
