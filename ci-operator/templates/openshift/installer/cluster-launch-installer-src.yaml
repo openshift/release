@@ -26,6 +26,7 @@ parameters:
 - name: RELEASE_IMAGE_LATEST
   required: true
 - name: BASE_DOMAIN
+- name: ENABLE_FIPS
 - name: CLUSTER_NETWORK_TYPE
 - name: BUILD_ID
   required: false
@@ -216,6 +217,32 @@ objects:
           gcloud config set project openshift-gce-devel-ci
           popd
         }
+
+        # create fips enable helper
+        function enable_fips() {
+            for name in $(oc get machineconfigpool --template='{{range .items}}{{.metadata.name}}{{"\n"}}{{end}}')
+            do
+              cat > /tmp/fips-mc.yaml <<'EOF'
+        apiVersion: machineconfiguration.openshift.io/v1
+        kind: MachineConfig
+        metadata:
+          labels:
+            machineconfiguration.openshift.io/role: "{{name}}"
+          name: 99-fips-"{{name}}"
+        spec:
+          fips: true
+        EOF
+              sed -i "s/\"{{name}}\"/${name}/g" /tmp/fips-mc.yaml
+              oc create -f /tmp/fips-mc.yaml
+            done
+
+            for i in $(seq 0 10); do oc wait machineconfigpool --all --for=condition=Updating --timeout=5m && break; done
+            for i in $(seq 0 10); do oc wait machineconfigpool --all --for=condition=Updated --timeout=5m && break; sleep 30; done
+        }
+
+        if [[ "${ENABLE_FIPS}" == true ]]; then
+          enable_fips
+        fi
 
         # set up cloud-provider-specific env vars
         export KUBE_SSH_BASTION="$( oc --insecure-skip-tls-verify get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"

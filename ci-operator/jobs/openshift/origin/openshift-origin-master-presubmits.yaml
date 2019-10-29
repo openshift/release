@@ -32,6 +32,77 @@ presubmits:
       serviceAccountName: ci-operator
     trigger: (?m)^/test( | .* )artifacts,?($|\s.*)
   - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/aws-fips-unit
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-origin-master-aws-fips-unit
+    rerun_command: /test aws-fips-unit
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --branch=master
+        - --give-pr-author-access-to-namespace=true
+        - --org=openshift
+        - --repo=origin
+        - --resolver-address=http://ci-operator-configresolver
+        - --secret-dir=/usr/local/aws-fips-unit-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=aws-fips-unit
+        - --template=/usr/local/aws-fips-unit
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-origin-master.yaml
+              name: ci-operator-master-configs
+        - name: ENABLE_FIPS
+          value: "true"
+        - name: JOB_NAME_SAFE
+          value: aws-fips-unit
+        - name: TEST_COMMAND
+          value: GODEBUG=tls13=1 make test-unit
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/aws-fips-unit-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/aws-fips-unit
+          name: job-definition
+          subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-src
+        name: job-definition
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )aws-fips-unit,?($|\s.*)
+  - agent: kubernetes
     always_run: false
     branches:
     - master
