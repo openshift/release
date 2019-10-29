@@ -127,6 +127,7 @@ prow-cluster-jobs:
 	oc create configmap prow-job-master-sidecar-4.2 --from-file=ci-operator/templates/master-sidecar-4.2.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap prow-job-master-sidecar-4.3 --from-file=ci-operator/templates/master-sidecar-4.3.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap prow-job-master-sidecar-3 --from-file=ci-operator/templates/master-sidecar-3.yaml -o yaml --dry-run | oc apply -f -
+	oc create configmap prow-job-rhel8-fips-unit-tests --from-file=ci-operator/templates/rhel8-fips-unit-tests.yaml -o yaml --dry-run | oc apply -f -
 .PHONY: prow-cluster-jobs
 
 prow-ocp-rpm-secrets:

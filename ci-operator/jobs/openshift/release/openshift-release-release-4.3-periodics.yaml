@@ -309,6 +309,78 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
+  cron: '@yearly'
+  decorate: true
+  labels:
+    ci.openshift.io/release-type: informing
+    job-release: "4.3"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: release-openshift-origin-gcp-fips-unit-4.3
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --give-pr-author-access-to-namespace=true
+      - --secret-dir=/usr/local/pull-secret
+      - --secret-dir=/usr/local/e2e-gcp-fips-cluster-profile
+      - --target=origin-gcp-fips-unit
+      - --template=/usr/local/origin-gcp-fips-unit
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      command:
+      - ci-operator
+      env:
+      - name: BRANCH
+        value: "4.3"
+      - name: CLUSTER_TYPE
+        value: gcp
+      - name: CONFIG_SPEC
+        value: |
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: origin-$(CLUSTER_TYPE)-fips-unit
+            commands: ""
+            openshift_rhel_fips_unit:
+              cluster_profile: "$(CLUSTER_TYPE)"
+      - name: JOB_NAME_SAFE
+        value: origin-gcp-fips-unit
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/e2e-gcp-fips-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/origin-gcp-fips-unit
+        name: job-definition
+        subPath: rhel8-fips-unit-tests.yaml
+    serviceAccountName: ci-operator
+    volumes:
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-gcp
+        - configMap:
+            name: cluster-profile-gcp
+    - configMap:
+        name: prow-job-rhel8-fips-unit-tests.yaml
+      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
   decorate: true
   interval: 12h
   labels:

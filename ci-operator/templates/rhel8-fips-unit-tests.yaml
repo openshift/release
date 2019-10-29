@@ -1,0 +1,215 @@
+kind: Template
+apiVersion: template.openshift.io/v1
+
+parameters:
+- name: JOB_NAME_SAFE
+  required: true
+- name: JOB_NAME_HASH
+  required: true
+- name: NAMESPACE
+  required: true
+- name: LOCAL_IMAGE_LAUNCH_RHEL_FIPS
+  required: true
+- name: CLUSTER_TYPE
+  value: "gcp"
+
+objects:
+
+# We want the cluster to be able to access these images
+- kind: RoleBinding
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: ${JOB_NAME_SAFE}-image-puller
+    namespace: ${NAMESPACE}
+  roleRef:
+    name: system:image-puller
+  subjects:
+  - kind: SystemGroup
+    name: system:unauthenticated
+  - kind: SystemGroup
+    name: system:authenticated
+
+# Give admin access to a known bot
+- kind: RoleBinding
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: ${JOB_NAME_SAFE}-namespace-admins
+    namespace: ${NAMESPACE}
+  roleRef:
+    name: admin
+  subjects:
+  - kind: ServiceAccount
+    namespace: ci
+    name: ci-chat-bot
+
+# The e2e pod spins up a cluster, runs e2e tests, and then cleans up the cluster.
+- kind: Pod
+  apiVersion: v1
+  metadata:
+    name: ${JOB_NAME_SAFE}
+    namespace: ${NAMESPACE}
+    annotations:
+      # we want to gather the teardown logs no matter what
+      ci-operator.openshift.io/wait-for-container-artifacts: teardown
+      ci-operator.openshift.io/save-container-logs: "true"
+      ci-operator.openshift.io/container-sub-tests: "setup,test,teardown"
+  spec:
+    restartPolicy: Never
+    activeDeadlineSeconds: 14400
+    terminationGracePeriodSeconds: 900
+    volumes:
+    - name: artifacts
+      emptyDir: {}
+    - name: shared-tmp
+      emptyDir: {}
+    - name: cluster-profile
+      secret:
+        secretName: ${JOB_NAME_SAFE}-cluster-profile
+    containers:
+
+    # Launches a gcp rhel8, fips enabled instance, clones origin
+    - name: test
+      image: ${LOCAL_IMAGE_LAUNCH_RHEL_FIPS}
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /home/packer
+      - name: cluster-profile
+        mountPath: /tmp/cluster
+      - name: artifacts
+        mountPath: /tmp/artifacts
+      env:
+      - name: HOME
+        value: /home/packer
+      - name: NSS_WRAPPER_PASSWD
+        value: /home/packer/passwd
+      - name: NSS_WRAPPER_GROUP
+        value: /home/packer/group
+      - name: NSS_USERNAME
+        value: packer
+      - name: NSS_GROUPNAME
+        value: packer
+      - name: GOOGLE_PROJECT_ID
+        value: openshift-gce-devel-ci
+      - name: GOOGLE_COMPUTE_ZONE
+        value: us-east1-c
+      - name: INSTANCE_PREFIX
+        value: ${NAMESPACE}-${JOB_NAME_HASH}
+      command:
+      - /bin/sh
+      - -c
+      - |
+        #!/bin/sh
+        set -euo pipefail
+        trap 'rc=$?; if test "${rc}" -eq 0; then touch "${HOME}"/setup-success; else touch "${HOME}"/exit; fi; exit "${rc}"' EXIT
+        trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+        cat  > "${HOME}"/run-tests.sh << 'EOF'
+        #!/bin/bash
+        set -euo pipefail
+        export PATH=/home/packer:$PATH
+        mkdir -p go/src/github.com/openshift
+        cd go/src/github.com/openshift
+        git clone https://github.com/openshift/origin
+        cd origin
+        mkdir -p /tmp/artifacts/junit
+
+        function run-tests() {
+          TIMEOUT=240s make test-unit 2>&1 | tee /tmp/artifacts/fips-rhel8-unit.log
+          return 0
+        }
+
+        run-tests
+        EOF
+        chmod +x "${HOME}"/run-tests.sh
+        mock-nss.sh
+        mkdir "${HOME}"/.ssh
+        gcloud auth activate-service-account \
+          --quiet --key-file /tmp/cluster/gce.json
+        gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
+        gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
+        set -x
+
+        # image-family rhel8-fips must exist in ${GOOGLE_COMPUTE_ZONE} for this template
+        # to create the image-family see here: https://github.com/sallyom/fips-rhel-packer#images
+        gcloud compute instances create "${INSTANCE_PREFIX}" \
+          --image-family rhel8-fips \
+          --zone "${GOOGLE_COMPUTE_ZONE}" \
+          --machine-type n1-standard-8 \
+          --min-cpu-platform "Intel Haswell" \
+          --boot-disk-type pd-ssd \
+          --boot-disk-size 256GB
+        LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+          --quiet \
+          --project "${GOOGLE_PROJECT_ID}" \
+          --zone "${GOOGLE_COMPUTE_ZONE}" \
+          --recurse "${HOME}"/run-tests.sh packer@"${INSTANCE_PREFIX}":~/run-tests.sh
+        set +x
+        echo 'Will now clone origin/master in rhel8-fips-enabled gce instance and run unit-tests'
+        LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+          --zone "${GOOGLE_COMPUTE_ZONE}" \
+          packer@"${INSTANCE_PREFIX}" \
+          --command '/home/packer/run-tests.sh'
+
+   # Performs cleanup of all created resources and upload the artifacts
+    - name: teardown
+      image: ${LOCAL_IMAGE_LAUNCH_RHEL_FIPS}
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /home/packer
+      - name: cluster-profile
+        mountPath: /tmp/cluster
+      - name: artifacts
+        mountPath: /tmp/artifacts
+      env:
+      - name: HOME
+        value: /home/packer
+      - name: NSS_WRAPPER_PASSWD
+        value: /home/packer/passwd
+      - name: NSS_WRAPPER_GROUP
+        value: /home/packer/group
+      - name: NSS_USERNAME
+        value: packer
+      - name: NSS_GROUPNAME
+        value: packer
+      - name: GOOGLE_PROJECT_ID
+        value: openshift-gce-devel-ci
+      - name: GOOGLE_COMPUTE_ZONE
+        value: us-east1-c
+      - name: INSTANCE_PREFIX
+        value: ${NAMESPACE}-${JOB_NAME_HASH}
+      command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -euo pipefail
+        function teardown() {
+          # This is for running the gcloud commands
+          mock-nss.sh
+          gcloud auth activate-service-account \
+            --quiet --key-file /tmp/cluster/gce.json
+          gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
+          gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
+
+          set -x
+          set +e
+          echo "scp junit logs back to test pod"
+          LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+            --quiet \
+            --project "${GOOGLE_PROJECT_ID}" \
+            --zone "${GOOGLE_COMPUTE_ZONE}" \
+            --recurse packer@"${INSTANCE_PREFIX}":/tmp/artifacts/junit /tmp/artifacts
+
+          touch /home/packer/exit
+          echo "Deprovisioning instance ..."
+          gcloud compute instances delete "${INSTANCE_PREFIX}" --quiet
+        }
+
+        trap 'teardown' EXIT
+        trap 'kill $(jobs -p); exit 0' TERM
+
+        for i in `seq 1 180`; do
+          if [[ -f /home/packer/exit ]]; then
+            exit 0
+          fi
+          sleep 60 & wait
+        done
