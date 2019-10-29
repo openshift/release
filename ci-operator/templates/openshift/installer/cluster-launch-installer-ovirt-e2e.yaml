@@ -11,7 +11,7 @@ parameters:
 - name: IMAGE_TESTS
   required: true
 - name: IMAGE_INSTALLER
-  required: true
+  required: false
 - name: CLUSTER_TYPE
   value: ovirt
 - name: TEST_COMMAND
@@ -188,7 +188,7 @@ objects:
 
     # Runs an install
     - name: setup
-      image: ${IMAGE_INSTALLER}
+      image: quay.io/rgolangh/openshift-installer
       terminationMessagePolicy: FallbackToLogsOnError
       volumeMounts:
       - name: shared-tmp
@@ -250,7 +250,9 @@ objects:
             ovirt_password: ${OVIRT_ENGINE_PASSWORD}
             ovirt_cafile: ${OVIRT_ENGINE_CA_FILE}
             ovirt_cluster_id: ${OVIRT_ENGINE_CLUSTER_ID}
+            cluster_id: ${OVIRT_ENGINE_CLUSTER_ID}
             ovirt_template_id: ${OVIRT_ENGINE_TEMPLATE_ID}
+            template_id: ${OVIRT_ENGINE_TEMPLATE_ID}
             api_vip: ${OVIRT_APIVIP}
             dns_vip: ${OVIRT_DNSVIP}
             ingress_vip: ${OVIRT_INGRESSVIP}
@@ -260,6 +262,19 @@ objects:
           ${SSH_PUB_KEY}
         EOF
 
+        ### debug
+        echo "debug"
+        curl -k https://gzaidman-ocp-rhv-vm-engine.c.openshift-gce-devel.internal/ovirt-engine/services/health
+        echo "${CLUSTER_NAME}"
+        echo "${BASE_DOMAIN}"
+        echo "${OVIRT_ENGINE_URL}"
+        echo "${OVIRT_ENGINE_USERNAME}"
+        echo "${OVIRT_ENGINE_CLUSTER_ID}"
+        echo "${OVIRT_ENGINE_TEMPLATE_ID}"
+        echo "${OVIRT_APIVIP}"
+        echo "${OVIRT_DNSVIP}"
+        echo "${OVIRT_INGRESSVIP}"
+
         # What we're doing here is we generate manifests first and force that OpenShift SDN is configured.
         TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create manifests --log-level=debug
         TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create cluster --log-level=debug &
@@ -267,7 +282,7 @@ objects:
 
     # Performs cleanup of all created resources
     - name: teardown
-      image: ${IMAGE_INSTALLER}
+      image: quay.io/rgolangh/openshift-installer
       terminationMessagePolicy: FallbackToLogsOnError
       volumeMounts:
       - name: shared-tmp
