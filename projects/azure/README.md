@@ -294,7 +294,7 @@ We use various OpenShift secrets in our CI. You can manage these secrets in the
 | `cluster-secrets-azure`                 | contains all the necessary credentials for e2e and image build jobs                  |
 | `cluster-secrets-azure-env`             | environment based secret. It can be injected to pod using pod spec (see azure-purge) |
 | `codecov-token`                         | used for pushing reports to Codecov                                                  |
-| `openshift-on-azure-openshiftci-secret` | quay robot secret used for mirroring images between the CI registry and quay         |
+| `openshift-on-azure-scratch-secret`     | quay robot secret used for mirroring images between the CI registry and quay         |
 
 
 ### cluster-secrets-azure
