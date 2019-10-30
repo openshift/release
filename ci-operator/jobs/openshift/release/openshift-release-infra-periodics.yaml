@@ -539,3 +539,83 @@ periodics:
     - name: pull-secret
       secret:
         secretName: ci-pull-credentials
+- agent: kubernetes
+  cron: '@yearly'
+  decorate: true
+  labels:
+    job-env: gcp
+    job-test: e2e
+    job-type: upgrade
+  name: release-openshift-origin-installer-e2e-gcp-upgrade
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --give-pr-author-access-to-namespace=true
+      - --secret-dir=/usr/local/pull-secret
+      - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
+      - --target=e2e-$(CLUSTER_TYPE)-upgrade
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: BRANCH
+        value: "4.1"
+      - name: CLUSTER_TYPE
+        value: gcp
+      - name: CONFIG_SPEC
+        value: |
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-serial
+            commands: TEST_SUITE=openshift/conformance/serial run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-upgrade
+            commands: TEST_SUITE=all run-upgrade-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: launch-$(CLUSTER_TYPE)
+            commands: sleep 9000 & wait
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/e2e-gcp-upgrade-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/pull-secret
+        name: pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-gcp
+        - configMap:
+            name: cluster-profile-gcp
+    - name: pull-secret
+      secret:
+        secretName: ci-pull-credentials
