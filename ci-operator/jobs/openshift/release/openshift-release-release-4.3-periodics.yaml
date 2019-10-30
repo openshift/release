@@ -2578,6 +2578,99 @@ periodics:
   interval: 24h
   labels:
     ci.openshift.io/release-type: informing
+    job-env: gcp
+    job-release: "4.3"
+    job-test: e2e-serial
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: release-openshift-origin-installer-e2e-gcp-serial-4.3
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --give-pr-author-access-to-namespace=true
+      - --secret-dir=/usr/local/pull-secret
+      - --secret-dir=/usr/local/e2e-gcp-serial-cluster-profile
+      - --target=e2e-gcp-serial
+      - --template=/usr/local/e2e-gcp-serial
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_LATEST
+        value: registry.svc.ci.openshift.org/ocp/release:4.3-ci
+      - name: BRANCH
+        value: "4.3"
+      - name: CLUSTER_TYPE
+        value: gcp
+      - name: CONFIG_SPEC
+        value: |
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-serial
+            commands: TEST_SUITE=openshift/conformance/serial run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-upgrade
+            commands: TEST_SUITE=all run-upgrade-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: launch-$(CLUSTER_TYPE)
+            commands: sleep 9000 & wait
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+      - name: JOB_NAME_SAFE
+        value: e2e-gcp-serial
+      - name: TEST_COMMAND
+        value: TEST_SUITE=openshift/conformance/serial run-tests
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/e2e-gcp-serial-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/e2e-gcp-serial
+        name: job-definition
+        subPath: cluster-launch-installer-e2e.yaml
+      - mountPath: /usr/local/pull-secret
+        name: pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-gcp
+        - configMap:
+            name: cluster-profile-gcp
+    - configMap:
+        name: prow-job-cluster-launch-installer-e2e
+      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
+  decorate: true
+  interval: 24h
+  labels:
+    ci.openshift.io/release-type: informing
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-console-aws-4.3
@@ -3513,6 +3606,8 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-gcp
+        - configMap:
+            name: cluster-profile-gcp
     - name: pull-secret
       secret:
         secretName: ci-pull-credentials
