@@ -3452,12 +3452,13 @@ periodics:
     ci.openshift.io/release-type: informing
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: release-openshift-openshift-ansible-e2e-aws-scaleup-rhel7-4.3
+  name: release-openshift-ocp-installer-e2e-aws-rhel7-workers-4.3
   spec:
     containers:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-aws-scaleup-rhel7-cluster-profile
       - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
       - --target=e2e-aws-scaleup-rhel7
@@ -3465,6 +3466,8 @@ periodics:
       command:
       - ci-operator
       env:
+      - name: BRANCH
+        value: "4.3"
       - name: CLUSTER_TYPE
         value: aws
       - name: CONFIG_SPEC
@@ -3495,6 +3498,8 @@ periodics:
       - mountPath: /etc/sentry-dsn
         name: sentry-dsn
         readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: pull-secret
     serviceAccountName: ci-operator
     volumes:
     - name: cluster-profile
@@ -3510,6 +3515,9 @@ periodics:
     - name: sentry-dsn
       secret:
         secretName: sentry-dsn
+    - name: pull-secret
+      secret:
+        secretName: ci-pull-credentials
 - agent: kubernetes
   decorate: true
   decoration_config:
