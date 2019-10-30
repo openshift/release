@@ -161,6 +161,7 @@ periodics:
 
         # populate the base_sha in job spec so we don't build something different
         origin_artifacts_id="$( oc get istag -n ${TAG_NS} ${BRANCH}:artifacts --template '{{ .image.metadata.name }}' )"
+        origin_machine_config_operator_rpms_id="$( oc get istag -n ${TAG_NS} ${BRANCH}:machine-config-operator-rpms --template '{{ .image.metadata.name }}' )"
         # export JOB_SPEC="$( echo "${JOB_SPEC}" | jq -r ".extra_refs[0].base_sha = \"${origin_commit_id}\"" )"
 
         # fetch fcos release info and check whether we've already built this image
@@ -175,12 +176,12 @@ periodics:
         ostree_ref="fedora/x86_64/coreos/${stream}"
 
         # compare the latest image we have built against the potential candidate
-        latest="$( oc get istag -n fcos ${TAG}:${BRANCH} --template '{{ index .image.dockerImageMetadata.Config.Labels "version" }} {{ index .image.dockerImageMetadata.Config.Labels "artifacts-id" }}' )"
-        candidate="${build_id} ${origin_artifacts_id}"
+        latest="$( oc get istag -n fcos ${TAG}:${BRANCH} --template '{{ index .image.dockerImageMetadata.Config.Labels "version" }} {{ index .image.dockerImageMetadata.Config.Labels "id-artifacts" }} {{ index .image.dockerImageMetadata.Config.Labels "id-machine-config-operator-rpms" }}' )"
+        candidate="${build_id} ${origin_artifacts_id} ${origin_machine_config_operator_rpms_id}"
         echo "Comparing existing '$latest' against latest '$candidate'"
         if [[ "${latest}" == "${candidate}" ]]; then
           echo "No build necessary, content is up to date"
-          exit 0
+          #exit 0
         fi
 
         curl -L https://github.com/mikefarah/yq/releases/download/2.4.0/yq_linux_amd64 2>/dev/null >/tmp/bin/yq
@@ -224,27 +225,29 @@ periodics:
           source:
             dockerfile: |
               FROM registry.svc.ci.openshift.org/${TAG_NS}/${BRANCH}@${origin_artifacts_id} AS artifacts
+              FROM registry.svc.ci.openshift.org/${TAG_NS}/${BRANCH}@${origin_machine_config_operator_rpms_id} AS machine_config_operator_rpms
 
               FROM quay.io/coreos-assembler/coreos-assembler:latest AS build
               USER 0
               COPY --from=artifacts /srv/repo/*.rpm /tmp/rpms/
+              COPY --from=machine_config_operator_rpms /srv/repo/*.rpm /tmp/rpms/
               RUN set -xeuo pipefail && \\
                   mkdir -p /srv/repo /tmp/working && \\
                   curl -L "${tar_url}" | tar xf - -C /srv/repo/ && \\
-                  rpm-ostree db list --repo /srv/repo "${ostree_ref}" > /tmp/packages && \\
                   rm -rf /etc/yum.repos.d/* && \\
+                  rpm-ostree db list --repo /srv/repo "${ostree_ref}" > /tmp/packages && \\
                   curl http://base-${BRANCH//\./-}-rhel8.ocp.svc > /etc/yum.repos.d/rhel8.repo && \\
                   if ! grep -q cri-o /tmp/packages; then yumdownloader -y --disablerepo=* --enablerepo=rhel-8* --destdir=/tmp/rpms cri-o cri-tools; fi && \\
-                  if ! grep -q machine-config-daemon /tmp/packages; then yumdownloader -y --disablerepo=* --enablerepo=rhel-8* --destdir=/tmp/rpms machine-config-daemon; fi && \\
                   cd /tmp/working && \\
-                  for i in \$(find /tmp/rpms/ -name *.rpm); do echo "Extracting \$i ..."; rpm2cpio \$i | cpio -div; done && mv etc usr/ && \\
+                  for i in \$(find /tmp/rpms/ -name *.rpm); do echo "Extracting \$i ..."; rpm2cpio \$i | cpio -div; done && \\
+                  mv etc usr/ && \\
                   coreos-assembler dev-overlay --repo /srv/repo --rev "${ostree_ref}" --add-tree /tmp/working --output-ref "${ostree_ref}"
 
               FROM scratch
               COPY --from=build /srv/ /srv/
-              LABEL com.coreos.ostree-commit=${commit_id} \\
-                    version=${build_id} \\
-                    artifacts-id=${origin_artifacts_id}
+              LABEL version=${build_id} \\
+                    id-artifacts=${origin_artifacts_id} \\
+                    id-machine-config-operator-rpms=${origin_machine_config_operator_rpms_id}
               ENTRYPOINT ["/noentry"]
 
           strategy:
