@@ -13,8 +13,16 @@ images:
   from: base
   to: machine-config-operator
 promotion:
+  additional_images:
+    machine-config-operator-rpms: rpms
+  excluded_images:
+  - machine-config-operator-base-with-rpms
   name: "4.3"
   namespace: origin
+raw_steps:
+- rpm_image_injection_step:
+    from: base
+    to: machine-config-operator-base-with-rpms
 resources:
   '*':
     limits:
@@ -22,10 +30,25 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+rpm_build_commands: |-
+  TMPDIR=$( mktemp -d )
+  RPMBUILD_DIR=_rpmbuild/
+  COMMIT=$( git rev-parse HEAD )
+  SHORTCOMMIT=$( git rev-parse --short=7 HEAD )
+  mkdir -p ${RPMBUILD_DIR}/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+  tar -czf "${TMPDIR}/machine-config-operator-${COMMIT}.tar.gz" --exclude='.git' --transform="s|^.|machine-config-operator-${COMMIT}|" --exclude="machine-config-operator-${COMMIT}.tar.gz" ./
+  cp ./machine-config-daemon.spec "${RPMBUILD_DIR}/SPECS/"
+  cp "${TMPDIR}/machine-config-operator-${COMMIT}.tar.gz" "${RPMBUILD_DIR}/SOURCES/machine-config-operator-${SHORTCOMMIT}.tar.gz"
+  rpmbuild -ba --nodeps --define "_topdir $( pwd )/${RPMBUILD_DIR}" --define "commit ${COMMIT}" ${RPMBUILD_DIR}/SPECS/machine-config-daemon.spec
+rpm_build_location: _rpmbuild/RPMS/
 tag_specification:
   name: "4.3"
   namespace: origin
 tests:
+- as: build-rpms-from-tar
+  commands: '# noop, just to force the building the `rpms` target'
+  container:
+    from: machine-config-operator-base-with-rpms
 - as: unit
   commands: make test-unit
   container:
