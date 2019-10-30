@@ -137,7 +137,7 @@ periodics:
   interval: 30m
   labels:
     job-release: "4.3"
-  name: release-promote-openshift-fcos-machine-os-content-e2e-aws-4.3
+  name: release-promote-openshift-okd-machine-os-content-e2e-aws-4.3
   spec:
     containers:
     - command:
@@ -160,8 +160,8 @@ periodics:
         chmod ug+x $HOME/bin/oc $HOME/bin/jq
 
         # populate the base_sha in job spec so we don't build something different
-        origin_commit_id="$( git ls-remote https://github.com/openshift/origin.git refs/heads/release-${BRANCH} | cut -f 1 -d $'\t' )"
-        export JOB_SPEC="$( echo "${JOB_SPEC}" | jq -r ".extra_refs[0].base_sha = \"${origin_commit_id}\"" )"
+        origin_artifacts_id="$( oc get istag -n ${TAG_NS} ${BRANCH}:artifacts --template '{{ .image.metadata.name }}' )"
+        # export JOB_SPEC="$( echo "${JOB_SPEC}" | jq -r ".extra_refs[0].base_sha = \"${origin_commit_id}\"" )"
 
         # fetch fcos release info and check whether we've already built this image
         stream=testing-devel
@@ -172,10 +172,11 @@ periodics:
         curl "${base_url}/meta.json" 2>/dev/null >${dir}/meta.json
         tar_url="${base_url}/$( <${dir}/meta.json jq -r .images.ostree.path )"
         commit_id="$( <${dir}/meta.json jq -r '."ostree-commit"' )"
+        ostree_ref="fedora/x86_64/coreos/${stream}"
 
         # compare the latest image we have built against the potential candidate
-        latest="$( oc get istag -n fcos ${TAG}:${BRANCH} --template '{{ index .image.dockerImageMetadata.Config.Labels "version" }} {{ index .image.dockerImageMetadata.Config.Labels "origin-commit" }}' )"
-        candidate="${build_id} ${origin_commit_id}"
+        latest="$( oc get istag -n fcos ${TAG}:${BRANCH} --template '{{ index .image.dockerImageMetadata.Config.Labels "version" }} {{ index .image.dockerImageMetadata.Config.Labels "artifacts-id" }}' )"
+        candidate="${build_id} ${origin_artifacts_id}"
         echo "Comparing existing '$latest' against latest '$candidate'"
         if [[ "${latest}" == "${candidate}" ]]; then
           echo "No build necessary, content is up to date"
@@ -209,12 +210,12 @@ periodics:
           done
         }
 
-        # build an FCoS machine-os-content from the ostree tar
+        # build an FCoS machine-os-content from the ostree tar, the artifacts rpms, and the latest MCD and cri-o
         cat <<EOF > ${dir}/build.yaml
         kind: Build
         apiVersion: build.openshift.io/v1
         metadata:
-          name: machine-os-content-base
+          name: machine-os-content
         spec:
           output:
             to:
@@ -222,70 +223,41 @@ periodics:
               name: machine-os-content:latest
           source:
             dockerfile: |
-              FROM centos:7 AS build
-              RUN set -xe && \\
-                  mkdir -p /srv/repo && \\
-                  curl -L "${tar_url}" | tar xf - -C /srv/repo/
+              FROM registry.svc.ci.openshift.org/${TAG_NS}/${BRANCH}@${origin_artifacts_id} AS artifacts
+
+              FROM quay.io/coreos-assembler/coreos-assembler:latest AS build
+              USER 0
+              COPY --from=artifacts /srv/repo/*.rpm /tmp/rpms/
+              RUN set -xeuo pipefail && \\
+                  mkdir -p /srv/repo /tmp/working && \\
+                  curl -L "${tar_url}" | tar xf - -C /srv/repo/ && \\
+                  rpm-ostree db list --repo /srv/repo "${ostree_ref}" > /tmp/packages && \\
+                  rm -rf /etc/yum.repos.d/* && \\
+                  curl http://base-${BRANCH//\./-}-rhel8.ocp.svc > /etc/yum.repos.d/rhel8.repo && \\
+                  if ! grep -q cri-o /tmp/packages; then yumdownloader -y --disablerepo=* --enablerepo=rhel-8* --destdir=/tmp/rpms cri-o cri-tools; fi && \\
+                  if ! grep -q machine-config-daemon /tmp/packages; then yumdownloader -y --disablerepo=* --enablerepo=rhel-8* --destdir=/tmp/rpms machine-config-daemon; fi && \\
+                  cd /tmp/working && \\
+                  for i in \$(find /tmp/rpms/ -name *.rpm); do echo "Extracting \$i ..."; rpm2cpio \$i | cpio -div; done && \\
+                  coreos-assembler dev-overlay --repo /srv/repo --rev "${ostree_ref}" --add-tree /tmp/working --output-ref "${ostree_ref}"
 
               FROM scratch
               COPY --from=build /srv/ /srv/
               LABEL com.coreos.ostree-commit=${commit_id} \\
-                    version=${build_id}
-              ENTRYPOINT /noentry
+                    version=${build_id} \\
+                    artifacts-id=${origin_artifacts_id}
+              ENTRYPOINT ["/noentry"]
 
           strategy:
             dockerStrategy:
             type: Docker
         EOF
         oc -n ${namespace} create is machine-os-content >/dev/null
-        build ${dir}/build.yaml machine-os-content-base
-
-        # update the base images from the job to point to our newly built image
-        echo "${CONFIG_SPEC}" | yq r - -j > /tmp/job.json
-        </tmp/job.json jq -r ".base_images.\"machine-os-content-base\" = {namespace: \"${namespace}\", name: \"machine-os-content\", tag: \"latest\"}" | yq r - > ${dir}/job.yaml
-        export CONFIG_SPEC="$( cat ${dir}/job.yaml )"
-
-        # verify we layer hyperkube on top of FCoS and that tests pass
-        ci-operator --artifact-dir=$(ARTIFACTS) --secret-dir=/usr/local/pull-secret \
-          --secret-dir=/usr/local/e2e-aws-cluster-profile --template=/usr/local/e2e-aws \
-          --namespace=${namespace} \
-          --target=machine-os-content
+        build ${dir}/build.yaml machine-os-content
 
         # debug output
-        oc describe -n ${namespace} istag/pipeline:machine-os-content
-
-        # add metadata to the build
-        echo
-        echo "--- Add metadata to new image ---"
-        cat <<EOF > ${dir}/build-metadata.yaml
-        kind: Build
-        apiVersion: build.openshift.io/v1
-        metadata:
-          name: machine-os-content-metadata
-        spec:
-          output:
-            to:
-              kind: ImageStreamTag
-              name: machine-os-content:latest
-          source:
-            dockerfile: |
-              FROM machine-os-content
-              LABEL com.coreos.ostree-commit=${commit_id} \\
-                    version=${build_id} \\
-                    origin-commit=${origin_commit_id}
-          strategy:
-            dockerStrategy:
-              from:
-                kind: ImageStreamTag
-                name: pipeline:machine-os-content
-            type: Docker
-        EOF
-        build ${dir}/build-metadata.yaml machine-os-content-metadata
         oc describe -n ${namespace} istag/machine-os-content:latest
-
-        oc tag ${namespace}/machine-os-content:latest fcos/machine-os-content:4.3
-        # also tag the image into the art-latest stream
-        # oc tag "${to_quay}" "origin/${BRANCH}:${TAG}"
+        oc tag ${namespace}/machine-os-content:latest fcos/machine-os-content:${BRANCH}
+        oc tag fcos/machine-os-content:${BRANCH} ${TAG_NS}/${BRANCH}:machine-os-content
       env:
       - name: TAG_NS
         value: origin
