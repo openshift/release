@@ -596,6 +596,15 @@ objects:
           ${SSH_PUB_KEY}
         EOF
         elif [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
+            # HACK: try to "poke" the token endpoint before the test starts
+            for i in `seq 1 30`; do
+              [[ "$( curl -s -o /dev/null -w "%{http_code}"  https://accounts.google.com/ )" == "302" ]] && break
+              if [[ "${i}" == "30" ]]; then
+                echo "error: Unable to resolve https://accounts.google.com within 10s" 1>&2
+                exit 1
+              fi
+              sleep 1
+            done
             network=""
             ctrlsubnet=""
             computesubnet=""
