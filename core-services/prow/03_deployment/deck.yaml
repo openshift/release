@@ -297,10 +297,14 @@ objects:
           - --hook-url=http://hook:8888/plugin-help
           - --hidden-only=true
           - --cookie-secret=/etc/proxy/secrets/session_secret
+          - --gcs-credentials-file=/etc/gce-sa-credentials-gcs-private/service-account.json
           ports:
             - name: http
               containerPort: 8080
           volumeMounts:
+          - name: gce-sa-credentials-gcs-private
+            mountPath: /etc/gce-sa-credentials-gcs-private
+            readOnly: true
           - mountPath: /etc/proxy/secrets
             name: session-secret
           - name: config
@@ -326,6 +330,9 @@ objects:
         - name: oauth
           secret:
             secretName: github-credentials-openshift-ci-robot
+        - name: gce-sa-credentials-gcs-private
+          secret:
+            secretName: gce-sa-credentials-gcs-private
         - name: session-secret
           secret:
             secretName: deck-internal-session-secret
