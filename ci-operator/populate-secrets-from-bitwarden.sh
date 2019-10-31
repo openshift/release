@@ -291,3 +291,6 @@ update_secret generic "build-farm-credentials" \
 # private repositories to generate changelogs
 oc -n "ci-release" create secret generic "git-credentials" "--from-literal=.git-credentials=https://openshift-bot:$( field_value "openshift-bot" "GitHub OAuth Token" "oauth" )@github.com" --dry-run -o yaml | oc apply -f -
 oc -n "ci-release" label secret "git-credentials" "ci.openshift.io/managed=true" --overwrite
+
+# The private key here is used to mirror content from the ops mirror
+update_secret generic "mirror.openshift.com" "$( format_attachment "mirror.openshift.com" cert-key.pem ops-mirror.pem )"
