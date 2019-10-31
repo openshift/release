@@ -76,6 +76,7 @@ items:
           - --github-graphql-endpoint=http://ghproxy/graphql
           - --bugzilla-endpoint=https://bugzilla.redhat.com
           - --bugzilla-api-key-path=/etc/bugzilla/api
+          - --kubeconfig=/etc/build-farm-credentials/kubeconfig
           ports:
             - name: main
               containerPort: 8888
@@ -126,6 +127,9 @@ items:
           - name: job-config-44
             mountPath: /etc/job-config/4.4
             readOnly: true
+          - mountPath: /etc/build-farm-credentials
+            name: build-farm-credentials
+            readOnly: true
           resources:
             requests:
               memory: "3Gi"
@@ -173,5 +177,11 @@ items:
         - name: job-config-44
           configMap:
             name: job-config-4.4
+        - name: build-farm-credentials
+          secret:
+            items:
+            - key: sa.hook.build01.config
+              path: kubeconfig
+            secretName: build-farm-credentials
         - name: tmp
           emptyDir: {}
