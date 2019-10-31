@@ -21,7 +21,7 @@ using the files there. Add manifests and other configuration as needed.
 enforced by `make check-services` locally and by the `ci/prow/services-valid`
 check on pull requests.
 2. Config is applied to the cluster using the [`applyconfig`](https://github.com/openshift/ci-tools/tree/master/cmd/applyconfig)
-tool. The tool applies all YAML files under your service subdirectory. All
+tool. The tool applies all YAML files under your service subdirectory. Subdirectories are searched recursively and directories with names starting with _ are skipped. All
    YAML filenames should follow the following convention:
     - All admin resources should be in `admin_*.yaml` files
     - Names of YAML files that should not be applied to the cluster should start
