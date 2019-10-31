@@ -40,7 +40,7 @@ presubmits:
         - name: JOB_NAME_SAFE
           value: e2e
         - name: TEST_COMMAND
-          value: make test-e2e
+          value: make -C openshift test-e2e-downstream-stable
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -70,3 +70,75 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-next
+    context: ci/prow/variant-e2e-pipeline-nightly
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: variant
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-tektoncd-cli-release-next-variant-e2e-pipeline-nightly
+    path_alias: github.com/tektoncd/cli
+    rerun_command: /test variant-e2e-pipeline-nightly
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --branch=release-next
+        - --give-pr-author-access-to-namespace=true
+        - --org=openshift
+        - --repo=tektoncd-cli
+        - --resolver-address=http://ci-operator-configresolver
+        - --secret-dir=/usr/local/e2e-pipeline-nightly-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=e2e-pipeline-nightly
+        - --template=/usr/local/e2e-pipeline-nightly
+        - --variant=variant
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-tektoncd-cli-release-next__variant.yaml
+              name: ci-operator-misc-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-pipeline-nightly
+        - name: TEST_COMMAND
+          value: make -C openshift test-e2e-downstream-nightly
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-pipeline-nightly-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-pipeline-nightly
+          name: job-definition
+          subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-src
+        name: job-definition
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )variant-e2e-pipeline-nightly,?($|\s.*)
