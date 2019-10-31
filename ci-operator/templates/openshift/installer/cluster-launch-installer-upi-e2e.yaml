@@ -1085,6 +1085,7 @@ objects:
         export SSH_PUB_KEY=$(cat "${SSH_PUB_KEY_PATH}")
         export PULL_SECRET=$(cat "${PULL_SECRET_PATH}")
 
+
         if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
           base_domain="${BASE_DOMAIN:-origin-ci-int-aws.dev.rhcloud.com}"
           MACHINE_CIDR=10.0.0.0/16
@@ -1202,12 +1203,14 @@ objects:
           rm -f /tmp/artifacts/installer/openshift/99_openshift-cluster-api_worker-machineset-*.yaml
           sed -i "s;mastersSchedulable: true;mastersSchedulable: false;g" /tmp/artifacts/installer/manifests/cluster-scheduler-02-config.yml
         elif [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
-            base_domain="${BASE_DOMAIN:-origin-ci-int-aws.dev.rhcloud.com}"
-            # Get user and password from TFVARS_PATH
-            export VSPHERE_USER=$(grep -oP 'vsphere_user="\K[^"]+' ${TFVARS_PATH})
-            export VSPHERE_PASSWORD=$(grep -oP 'vsphere_password="\K[^"]+' ${TFVARS_PATH})
+            base_domain="openshiftcorp.com"
+
+            export VSPHERE_USER=$(awk -F'[ =]' '/^vsphere_user/{print $NF}' ${TFVARS_PATH} | cut -d'"' -f 2)
+            export VSPHERE_PASSWORD=$(awk -F'[ =]' '/^vsphere_password/{print $NF}' ${TFVARS_PATH} | cut -d'"' -f 2)
             export OVA_URL="$(jq -r '.baseURI + .images["vmware"].path' /var/lib/openshift-install/rhcos.json)"
             export VM_TEMPLATE="${OVA_URL##*/}"
+            export VM_TEMPLATE_NAME="${VM_TEMPLATE%.*}"
+
             mkdir /tmp/rhcos
 
             cat > /tmp/rhcos/rhcos.json << EOF
@@ -1226,30 +1229,33 @@ objects:
         metadata:
           name: ${CLUSTER_NAME}
         networking:
-          machineCIDR: 139.178.87.128/25
+          machineCIDR: 172.29.0.0/23
         platform:
           vsphere:
-            vCenter: vcsa-ci.vmware.devcluster.openshift.com
+            vCenter: vcenter.sddc-100-22-2-228.vmwarevmc.com
             username: "${VSPHERE_USER}"
             password: "${VSPHERE_PASSWORD}"
-            datacenter: dc1
-            defaultDatastore: nvme-ds1
+            datacenter: SDDC-Datacenter
+            defaultDatastore: WorkloadDatastore
         pullSecret: >
           ${PULL_SECRET}
         sshKey: |
           ${SSH_PUB_KEY}
         EOF
-            export GOVC_URL=vcsa-ci.vmware.devcluster.openshift.com
+
+            export GOVC_URL=vcenter.sddc-100-22-2-228.vmwarevmc.com
             export GOVC_USERNAME="${VSPHERE_USER}"
             export GOVC_PASSWORD="${VSPHERE_PASSWORD}"
             export GOVC_INSECURE=1
-            export GOVC_DATACENTER=dc1
-            export GOVC_DATASTORE=nvme-ds1
-            if [[ "$(govc vm.info ${VM_TEMPLATE} | wc -c)" -eq 0 ]]
+            export GOVC_DATACENTER=SDDC-Datacenter
+            export GOVC_DATASTORE=WorkloadDatastore
+
+            if [[ "$(govc library.ls /openshift/${VM_TEMPLATE_NAME} | wc -c)" -eq 0 ]]
             then
                 echo "Creating a template for the VMs from ${OVA_URL}..."
-                curl -L -o /tmp/rhcos/rhcos.ova "${OVA_URL}"
-                govc import.ova -options=/tmp/rhcos/rhcos.json /tmp/rhcos/rhcos.ova
+                curl -L -o /tmp/rhcos/${VM_TEMPLATE} "${OVA_URL}"
+                govc library.import openshift /tmp/rhcos/${VM_TEMPLATE}
+                govc library.deploy -options=/tmp/rhcos/rhcos.json "openshift/${VM_TEMPLATE_NAME}"
             fi
         else
             echo "Unsupported cluster type '${CLUSTER_TYPE}'"
@@ -1259,9 +1265,6 @@ objects:
         echo "Creating ignition configs"
         openshift-install --dir=/tmp/artifacts/installer create ignition-configs &
         wait "$!"
-
-        cp /tmp/artifacts/installer/bootstrap.ign /srv
-        BOOTSTRAP_URI="https://${JOB_NAME_SAFE}-bootstrap-exporter-${NAMESPACE}.svc.ci.openshift.org/bootstrap.ign"
 
         # begin bootstrapping
         if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
@@ -1776,22 +1779,40 @@ objects:
           # Copy sample UPI files
           cp -r /var/lib/openshift-install/upi/${CLUSTER_TYPE}/* /tmp/tf
 
-          # Create terraform.tfvars
-          export MASTER_IGN=$(cat /tmp/artifacts/installer/master.ign)
-          export WORKER_IGN=$(cat /tmp/artifacts/installer/worker.ign)
+          cat > /tmp/tf/vmc/terraform.tfvars <<-EOF
 
-          cat > /tmp/tf/terraform.tfvars <<-EOF
-          machine_cidr = "139.178.87.128/25"
+          # VMware Cloud on AWS
+          # AWS Variables
+          vpc_id = "vpc-0b5912f3db15f56f3"
+          aws_region = "us-west-2"
+          aws_availability_zone = "us-west-2a"
+          aws_master_availability_zones = ["us-west-2a"]
+          aws_worker_availability_zones = ["us-west-2a"]
+          aws_public_subnet_id = ["subnet-011c2a9515cdc7ef7"]
+          aws_private_subnet_id = ["subnet-05a236c1d9af24452"]
+
+          master_count = 3
+          worker_count = 2
+
+          # path to ignition files
+          bootstrap_ignition_path = "/tmp/artifacts/installer/bootstrap.ign"
+          master_ignition_path = "/tmp/artifacts/installer/master.ign"
+          worker_ignition_path = "/tmp/artifacts/installer/worker.ign"
+
+          machine_cidr = "172.29.0.0/23"
 
           vm_template = "${VM_TEMPLATE}"
+          vm_network = "ci-network"
 
-          vsphere_cluster = "devel"
+          vm_dns_addresses = ["10.2.192.12"]
 
-          vsphere_datacenter = "dc1"
+          vsphere_cluster = "Cluster-1"
 
-          vsphere_datastore = "nvme-ds1"
+          vsphere_datacenter = "SDDC-Datacenter"
 
-          vsphere_server = "vcsa-ci.vmware.devcluster.openshift.com"
+          vsphere_datastore = "WorkloadDatastore"
+
+          vsphere_server = "vcenter.sddc-100-22-2-228.vmwarevmc.com"
 
           ipam = "139.178.89.254"
 
@@ -1801,40 +1822,39 @@ objects:
 
           cluster_domain = "${CLUSTER_NAME}.${base_domain}"
 
-          bootstrap_ignition_url = "${BOOTSTRAP_URI}"
-
-          // Ignition config for the control plane machines. You should copy the contents of the master.ign generated by the installer.
-          control_plane_ignition = <<END_OF_MASTER_IGNITION
-          ${MASTER_IGN}
-          END_OF_MASTER_IGNITION
-
-          // Ignition config for the compute machines. You should copy the contents of the worker.ign generated by the installer.
-          compute_ignition = <<END_OF_WORKER_IGNITION
-          ${WORKER_IGN}
-          END_OF_WORKER_IGNITION
         EOF
+          # FIXME: get epel-release or otherwise add awscli to our UPI image
+          export PATH="${HOME}/.local/bin:${PATH}"
+          easy_install --user pip  # our Python 2.7.5 is even too old for ensurepip
+          pip install --user awscli
+
+          export AWS_PROFILE="default"
+          export AWS_DEFAULT_REGION=us-west-2
 
           # Copy secret tfvars
-          cp ${TFVARS_PATH} /tmp/tf
+          cp ${TFVARS_PATH} /tmp/tf/vmc
+          cd /tmp/tf/vmc
 
-          cd /tmp/tf
           echo "Creating infra"
           terraform init -input=false -no-color &
           wait "$!"
 
           terraform apply -auto-approve -no-color &
           wait "$!"
-          # find bootstrap ip
 
-          BOOTSTRAP_IP=$(terraform state show 'module.bootstrap.external.ip_address' | grep ip_address | awk '{print $3}')
+          unset GATHER_BOOTSTRAP_ARGS
+          # FIXME: The RHCOS virtual machines have no public address or NAT.
+          # Will need a way around this for gather bootstrap to function.
 
-          GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --bootstrap ${BOOTSTRAP_IP}"
+          #BOOTSTRAP_IP=$(terraform state show 'module.bootstrap.external.ip_address' | grep ip_address | awk '{print $3}')
 
-          CONTROL_PLANE_0_IP=$(terraform state show 'module.control_plane.external.ip_address[0]' | grep ip_address | awk '{print $3}')
-          CONTROL_PLANE_1_IP=$(terraform state show 'module.control_plane.external.ip_address[1]' | grep ip_address | awk '{print $3}')
-          CONTROL_PLANE_2_IP=$(terraform state show 'module.control_plane.external.ip_address[2]' | grep ip_address | awk '{print $3}')
+          #GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --bootstrap ${BOOTSTRAP_IP}"
 
-          GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --master ${CONTROL_PLANE_0_IP} --master ${CONTROL_PLANE_1_IP} --master ${CONTROL_PLANE_2_IP}"
+          #CONTROL_PLANE_0_IP=$(terraform state show 'module.control_plane.external.ip_address[0]' | grep ip_address | awk '{print $3}')
+          #CONTROL_PLANE_1_IP=$(terraform state show 'module.control_plane.external.ip_address[1]' | grep ip_address | awk '{print $3}')
+          #CONTROL_PLANE_2_IP=$(terraform state show 'module.control_plane.external.ip_address[2]' | grep ip_address | awk '{print $3}')
+
+          #GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --master ${CONTROL_PLANE_0_IP} --master ${CONTROL_PLANE_1_IP} --master ${CONTROL_PLANE_2_IP}"
         fi
 
         echo "Waiting for bootstrap to complete"
@@ -1855,7 +1875,12 @@ objects:
           gsutil rb gs://${INFRA_ID}-bootstrap-ignition
           gcloud deployment-manager deployments delete -q ${CLUSTER_NAME}-bootstrap
         elif [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
-          terraform apply -auto-approve -var 'bootstrap_complete=true' -no-color &
+          # Remove bootstrap ip address from LB target group
+          terraform destroy -auto-approve -target=module.aws.module.bootstrap.aws_lb_target_group_attachment.bootstrap
+          # Delete bootstrap virtual machine from vSphere
+          terraform destroy -auto-approve -target=module.rhcos.module.bootstrap.vsphere_virtual_machine.vm
+          # Remove IP allocation from phpIPAM
+          terraform destroy -auto-approve -target=module.ipam_bootstrap.null_resource.ip_address &
           wait "$!"
         fi
 
@@ -1955,13 +1980,17 @@ objects:
           if [ -f /tmp/artifacts/installer/.openshift_install_state.json ]
           then
               # Remove VSPHERE_USER and VSPHERE_PASSWORD from install state json
-              export VSPHERE_USER=$(grep -oP 'vsphere_user="\K[^"]+' ${TFVARS_PATH})
-              export VSPHERE_PASSWORD=$(grep -oP 'vsphere_password="\K[^"]+' ${TFVARS_PATH})
+              export VSPHERE_USER=$(awk -F'[ =]' '/^vsphere_user/{print $NF}' ${TFVARS_PATH} | cut -d'"' -f 2)
+              export VSPHERE_PASSWORD=$(awk -F'[ =]' '/^vsphere_password/{print $NF}' ${TFVARS_PATH} | cut -d'"' -f 2)
+
               sed -i "s;${VSPHERE_USER};REDACTED;g" /tmp/artifacts/installer/.openshift_install_state.json
               sed -i "s;${VSPHERE_PASSWORD};REDACTED;g" /tmp/artifacts/installer/.openshift_install_state.json
 
               # bootstrap.ign also contains passwords
               rm -rf /tmp/artifacts/installer/bootstrap.ign
+              # vSphere terraform needs an empty bootstrap
+              touch /tmp/artifacts/installer/bootstrap.ign
+
               jq -r '."*bootstrap.Bootstrap" |= {"Config": "REDACTED"}' /tmp/artifacts/installer/.openshift_install_state.json > /tmp/artifacts/installer/openshift_install_state_updated.json
               mv /tmp/artifacts/installer/openshift_install_state_updated.json /tmp/artifacts/installer/.openshift_install_state.json
           fi
@@ -2102,6 +2131,19 @@ objects:
             export CLOUDSDK_CONFIG=${HOME}/shared/gcloudconfig
             openshift-install --dir ${HOME}/artifacts/installer destroy cluster
             gcloud deployment-manager deployments delete -q ${CLUSTER_NAME}-{worker,control-plane,bootstrap,security,infra,vpc}
+          elif [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
+            export HOME=/tmp/shared
+            export PATH="${HOME}/.local/bin:${PATH}"
+            easy_install --user pip  # our Python 2.7.5 is even too old for ensurepip
+            pip install --user awscli
+            export AWS_PROFILE="default"
+            export AWS_DEFAULT_REGION=us-west-2
+
+            cd /tmp/shared/tf/vmc
+
+            rm -rf .terraform
+            terraform init -input=false -no-color
+            terraform destroy -auto-approve -no-color
           else
             cd /tmp/shared/tf
             rm -rf .terraform
