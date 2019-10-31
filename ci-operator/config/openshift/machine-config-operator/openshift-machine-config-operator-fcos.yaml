@@ -3,6 +3,14 @@ base_images:
     name: "4.3"
     namespace: origin
     tag: base
+  base-machine:
+    name: fedora
+    namespace: openshift
+    tag: "29"
+  machine-os-content-base:
+    name: "4.3"
+    namespace: ocp
+    tag: machine-os-content
 build_root:
   image_stream_tag:
     name: release
@@ -12,17 +20,33 @@ images:
 - dockerfile_path: Dockerfile
   from: base
   to: machine-config-operator
+- context: ci/prow/images/
+  from: base
+  inputs:
+    base-machine-with-rpms:
+      as:
+      - fedora:29
+      paths: null
+    machine-os-content-base:
+      as:
+      - registry.svc.ci.openshift.org/openshift/origin-v4.0:machine-os-content
+      paths: null
+  to: machine-os-content
 promotion:
   additional_images:
     machine-config-operator-rpms: rpms
   excluded_images:
   - machine-config-operator-base-with-rpms
+  - machine-os-content
   name: "4.3"
   namespace: origin
 raw_steps:
 - rpm_image_injection_step:
     from: base
     to: machine-config-operator-base-with-rpms
+- rpm_image_injection_step:
+    from: base-machine
+    to: base-machine-with-rpms
 resources:
   '*':
     limits:
@@ -57,7 +81,8 @@ tests:
   container:
     from: src
 - as: e2e-aws
-  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  commands: |
+    TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: aws
 - as: verify
