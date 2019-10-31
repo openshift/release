@@ -282,6 +282,7 @@ update_secret generic "redhat-developer-service-binding-operator-codecov-token" 
 update_secret generic "build-farm-credentials" \
 	"$( format_field_value build_farm_01_cluster "github_client_secret" "build01_github_client_secret" )" \
 	"$( format_attachment "build_farm" sa.deck.build01.config )" \
+	"$( format_attachment "build_farm" sa.hook.build01.config )" \
 	"$( format_attachment "build_farm" sa.plank.build01.config )" \
 	"$( format_attachment "build_farm" sa.sinker.build01.config )" \
 	"$( format_attachment "build_farm" sa.kubeconfig )"
