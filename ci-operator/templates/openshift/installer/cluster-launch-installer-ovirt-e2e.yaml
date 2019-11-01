@@ -19,7 +19,7 @@ parameters:
 - name: RELEASE_IMAGE_LATEST
   required: true
 - name: BASE_DOMAIN
-  value: ocp.devcluster.openshift.com
+  value: gcp.devcluster.openshift.com
   required: true
 
 objects:
@@ -74,6 +74,8 @@ objects:
     - name: cluster-profile
       secret:
         secretName: ${JOB_NAME_SAFE}-cluster-profile
+
+    containers:
 
     # Once the cluster is up, executes shared tests
     - name: test
@@ -173,12 +175,13 @@ objects:
           echo "WARNING: No tests were run against the installed cluster"
           exit 0
         }
-
+  
+        echo "${TEST_COMMAND}"
         ${TEST_COMMAND}
 
     # Runs an install
     - name: setup
-      image: quay.io/rgolangh/openshift-installer
+      image: quay.io/rgolangh/openshift-installer:terraform-workers
       terminationMessagePolicy: FallbackToLogsOnError
       volumeMounts:
       - name: shared-tmp
@@ -216,14 +219,6 @@ objects:
         cp "$(command -v openshift-install)" /tmp
         mkdir /tmp/artifacts/installer
 
-        function update_image_registry() {
-          while true; do
-            sleep 10;
-            oc get configs.imageregistry.operator.openshift.io/cluster > /dev/null && break
-          done
-          oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"storage":{"emptyDir":{}}}}'
-        }
-
         if [[ -n "${INSTALL_INITIAL_RELEASE}" && -n "${RELEASE_IMAGE_INITIAL}" ]]; then
           echo "Installing from initial release ${RELEASE_IMAGE_INITIAL}"
           OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_INITIAL}"
@@ -237,7 +232,15 @@ objects:
         source /etc/openshift-installer/ovirt.conf
 
         # We want the setup to download the latest CA from the engine
-        # Therefor living it empty in the setup stage
+        # Therefor living it empty
+        export OVIRT_CONFIG=/tmp/artifacts/installer/ovirt-config.yaml
+        cat > /tmp/artifacts/installer/ovirt-config.yaml <<EOF
+        ovirt_url: ${OVIRT_ENGINE_URL}
+        ovirt_username: ${OVIRT_ENGINE_USERNAME}
+        ovirt_password: ${OVIRT_ENGINE_PASSWORD}
+        ovirt_cafile: ""
+        EOF
+
         cat > /tmp/artifacts/installer/install-config.yaml << EOF
         apiVersion: v1
         baseDomain: ${BASE_DOMAIN}
@@ -264,7 +267,7 @@ objects:
 
         ### debug
         echo "debug"
-        curl -k https://gzaidman-ocp-rhv-vm-engine.c.openshift-gce-devel.internal/ovirt-engine/services/health
+        curl -k ${OVIRT_ENGINE_URL::-4}/services/health
         echo "${CLUSTER_NAME}"
         echo "${BASE_DOMAIN}"
         echo "${OVIRT_ENGINE_URL}"
@@ -275,9 +278,6 @@ objects:
         echo "${OVIRT_DNSVIP}"
         echo "${OVIRT_INGRESSVIP}"
 
-        # Remove once https://github.com/openshift/enhancements/pull/45/files is complete 
-        update_image_registry &
-
         # What we're doing here is we generate manifests first and force that OpenShift SDN is configured.
         TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create manifests --log-level=debug
         TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create cluster --log-level=debug &
@@ -285,7 +285,7 @@ objects:
 
     # Performs cleanup of all created resources
     - name: teardown
-      image: quay.io/rgolangh/openshift-installer
+      image: quay.io/rgolangh/openshift-installer:terraform-workers
       terminationMessagePolicy: FallbackToLogsOnError
       volumeMounts:
       - name: shared-tmp
@@ -426,6 +426,15 @@ objects:
 
           echo "Waiting for logs ..."
           wait
+
+          # We set OVIRT_CONFIG and insert he path to the engine ca to the config file
+          export OVIRT_CONFIG=/tmp/artifacts/installer/ovirt-config.yaml
+          curl -k -o "/tmp/artifacts/installer/ovirt-engine.ca" ${OVIRT_ENGINE_URL::-4}/services/pki-resource?resource=ca-certificate
+          sed 's|ovirt_cafile: ""|ovirt_cafile: /tmp/artifacts/installer/ovirt-engine.ca|' -i /tmp/artifacts/installer/ovirt-config.yaml
+          echo "/tmp/artifacts/installer/"
+          ls /tmp/artifacts/installer/
+          echo "/tmp/artifacts/installer/ovirt-engine.ca"
+          cat /tmp/artifacts/installer/ovirt-engine.ca
 
           echo "Destroy cluster ..."
           openshift-install --dir /tmp/artifacts/installer destroy cluster
