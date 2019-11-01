@@ -598,9 +598,13 @@ objects:
         elif [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
             # HACK: try to "poke" the token endpoint before the test starts
             for i in `seq 1 30`; do
-              [[ "$( curl -s -o /dev/null -w "%{http_code}"  https://accounts.google.com/ )" == "302" ]] && break
+              code="$( curl -s -o /dev/null -w "%{http_code}" https://oauth2.googleapis.com/token -X POST )"
+              if [[ "${code}" == "400" ]]; then
+                break
+              fi
+              echo "error: Unable to resolve https://oauth2.googleapis.com/token: $code" 1>&2
               if [[ "${i}" == "30" ]]; then
-                echo "error: Unable to resolve https://accounts.google.com within 10s" 1>&2
+                echo "error: Unable to resolve https://oauth2.googleapis.com/token within timeout, exiting" 1>&2
                 exit 1
               fi
               sleep 1
