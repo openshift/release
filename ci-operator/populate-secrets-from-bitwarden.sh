@@ -281,6 +281,7 @@ update_secret generic "redhat-developer-service-binding-operator-codecov-token" 
 # collects all the secrets for build farm
 update_secret generic "build-farm-credentials" \
 	"$( format_field_value build_farm_01_cluster "github_client_secret" "build01_github_client_secret" )" \
+	"$( format_attachment "build_farm" build01_ci_reg_auth_value.txt )" \
 	"$( format_attachment "build_farm" sa.deck.build01.config )" \
 	"$( format_attachment "build_farm" sa.hook.build01.config )" \
 	"$( format_attachment "build_farm" sa.plank.build01.config )" \
