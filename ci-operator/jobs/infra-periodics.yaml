@@ -748,6 +748,8 @@ periodics:
     org: openshift
     repo: release
   interval: 1h
+  labels:
+    ci.openshift.io/role: infra
   name: openshift-release-master-config-bootstrapper
   spec:
     containers:
@@ -756,6 +758,7 @@ periodics:
       - --source-path=.
       - --config-path=core-services/prow/02_config/_config.yaml
       - --plugin-config=core-services/prow/02_config/_plugins.yaml
+      - --kubeconfig=/etc/build-farm-credentials/kubeconfig
       command:
       - /app/prow/cmd/config-bootstrapper/app.binary
       image: gcr.io/k8s-prow/config-bootstrapper:v20191030-49516b6be
@@ -764,7 +767,18 @@ periodics:
       resources:
         requests:
           cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/build-farm-credentials
+        name: build-farm-credentials
+        readOnly: true
     serviceAccountName: config-updater
+    volumes:
+    - name: build-farm-credentials
+      secret:
+        items:
+        - key: sa.hook.build01.config
+          path: kubeconfig
+        secretName: build-farm-credentials
 - agent: kubernetes
   labels:
     ci.openshift.io/role: infra
