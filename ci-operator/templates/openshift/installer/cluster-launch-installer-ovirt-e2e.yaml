@@ -11,7 +11,7 @@ parameters:
 - name: IMAGE_TESTS
   required: true
 - name: IMAGE_INSTALLER
-  required: false
+  required: true
 - name: CLUSTER_TYPE
   value: ovirt
 - name: TEST_COMMAND
@@ -19,7 +19,7 @@ parameters:
 - name: RELEASE_IMAGE_LATEST
   required: true
 - name: BASE_DOMAIN
-  value: metalkube.org
+  value: ocp.devcluster.openshift.com
   required: true
 
 objects:
@@ -74,16 +74,6 @@ objects:
     - name: cluster-profile
       secret:
         secretName: ${JOB_NAME_SAFE}-cluster-profile
-    hostAliases:
-      - ip: "35.226.85.87"
-        hostnames:
-          - gzaidman-ocp-rhv-vm-engine
-          - gzaidman-ocp-rhv-vm-engine.c.openshift-gce-devel.internal
-      - ip: "35.192.11.5"
-        # ${CLUSTER_NAME} is not available yet, therefor using ${NAMESPACE}-${JOB_NAME_HASH}
-        hostnames:
-          - api.${NAMESPACE}-${JOB_NAME_HASH}.${BASE_DOMAIN}
-    containers:
 
     # Once the cluster is up, executes shared tests
     - name: test
@@ -201,7 +191,7 @@ objects:
       - name: TYPE
         value: ${CLUSTER_TYPE}
       - name: CLUSTER_NAME
-        value: ${NAMESPACE}-${JOB_NAME_HASH}
+        value: ocp-on-rhv
       - name: BASE_DOMAIN
         value: ${BASE_DOMAIN}
       - name: SSH_PUB_KEY_PATH
@@ -226,6 +216,14 @@ objects:
         cp "$(command -v openshift-install)" /tmp
         mkdir /tmp/artifacts/installer
 
+        function update_image_registry() {
+          while true; do
+            sleep 10;
+            oc get configs.imageregistry.operator.openshift.io/cluster > /dev/null && break
+          done
+          oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"storage":{"emptyDir":{}}}}'
+        }
+
         if [[ -n "${INSTALL_INITIAL_RELEASE}" && -n "${RELEASE_IMAGE_INITIAL}" ]]; then
           echo "Installing from initial release ${RELEASE_IMAGE_INITIAL}"
           OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_INITIAL}"
@@ -238,6 +236,8 @@ objects:
         export PULL_SECRET=$(cat "${PULL_SECRET_PATH}")
         source /etc/openshift-installer/ovirt.conf
 
+        # We want the setup to download the latest CA from the engine
+        # Therefor living it empty in the setup stage
         cat > /tmp/artifacts/installer/install-config.yaml << EOF
         apiVersion: v1
         baseDomain: ${BASE_DOMAIN}
@@ -248,7 +248,7 @@ objects:
             ovirt_url: ${OVIRT_ENGINE_URL}
             ovirt_username: ${OVIRT_ENGINE_USERNAME}
             ovirt_password: ${OVIRT_ENGINE_PASSWORD}
-            ovirt_cafile: ${OVIRT_ENGINE_CA_FILE}
+            ovirt_cafile: ""
             ovirt_cluster_id: ${OVIRT_ENGINE_CLUSTER_ID}
             cluster_id: ${OVIRT_ENGINE_CLUSTER_ID}
             ovirt_template_id: ${OVIRT_ENGINE_TEMPLATE_ID}
@@ -275,6 +275,9 @@ objects:
         echo "${OVIRT_DNSVIP}"
         echo "${OVIRT_INGRESSVIP}"
 
+        # Remove once https://github.com/openshift/enhancements/pull/45/files is complete 
+        update_image_registry &
+
         # What we're doing here is we generate manifests first and force that OpenShift SDN is configured.
         TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create manifests --log-level=debug
         TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create cluster --log-level=debug &
@@ -295,7 +298,7 @@ objects:
       - name: TYPE
         value: ${CLUSTER_TYPE}
       - name: CLUSTER_NAME
-        value: ${NAMESPACE}-${JOB_NAME_HASH}
+        value: ocp-on-rhv
       - name: KUBECONFIG
         value: /tmp/artifacts/installer/auth/kubeconfig
       command:
