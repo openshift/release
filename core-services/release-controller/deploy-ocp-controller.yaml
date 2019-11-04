@@ -1,0 +1,150 @@
+kind: List
+apiVersion: v1
+items:
+# expose the files cache to the outside world
+- kind: Service
+  apiVersion: v1
+  metadata:
+    name: files-cache
+    namespace: ci-release
+  spec:
+    selector:
+      app: files-cache
+    ports:
+    - port: 80
+      targetPort: 8080
+- kind: Route
+  apiVersion: v1
+  metadata:
+    name: files-cache
+    namespace: ci-release
+  spec:
+    host: openshift-release-artifacts.svc.ci.openshift.org
+    tls:
+      termination: Edge
+      insecureEdgeTerminationPolicy: Redirect
+    to:
+      kind: Service
+      name: files-cache
+
+# deploy the controller
+- kind: Service
+  apiVersion: v1
+  metadata:
+    name: release-controller-ocp
+    namespace: ci
+  spec:
+    selector:
+      app: release-controller-ocp
+    ports:
+    - port: 80
+      targetPort: 8080
+- kind: Route
+  apiVersion: v1
+  metadata:
+    name: release-controller-ocp
+    namespace: ci
+  spec:
+    host: openshift-release.svc.ci.openshift.org
+    tls:
+      termination: Edge
+      insecureEdgeTerminationPolicy: Redirect
+    to:
+      kind: Service
+      name: release-controller-ocp
+- kind: Deployment
+  apiVersion: apps/v1
+  metadata:
+    name: release-controller-ocp
+    namespace: ci
+    annotations:
+      image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"release-controller:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"controller\")].image"}]'
+  spec:
+    selector:
+      matchLabels:
+        app: release-controller-ocp
+    template:
+      metadata:
+        labels:
+          app: release-controller-ocp
+      spec:
+        serviceAccountName: release-controller-ocp
+        volumes:
+        - configMap:
+            defaultMode: 420
+            name: config
+          name: config
+        - configMap:
+            defaultMode: 420
+            name: job-config-misc
+          name: job-config-misc
+        - configMap:
+            defaultMode: 420
+            name: job-config-master
+          name: job-config-master
+        - configMap:
+            defaultMode: 420
+            name: job-config-3.x
+          name: job-config-3x
+        - configMap:
+            defaultMode: 420
+            name: job-config-4.0
+          name: job-config-40
+        - configMap:
+            defaultMode: 420
+            name: job-config-4.1
+          name: job-config-41
+        - configMap:
+            defaultMode: 420
+            name: job-config-4.2
+          name: job-config-42
+        - configMap:
+            defaultMode: 420
+            name: job-config-4.3
+          name: job-config-43
+        - configMap:
+            defaultMode: 420
+            name: job-config-4.4
+          name: job-config-44
+        containers:
+        - name: controller
+          image: release-controller:latest
+          volumeMounts:
+          - mountPath: /etc/config
+            name: config
+            readOnly: true
+          - mountPath: /etc/job-config/misc
+            name: job-config-misc
+            readOnly: true
+          - mountPath: /etc/job-config/master
+            name: job-config-master
+            readOnly: true
+          - mountPath: /etc/job-config/3.x
+            name: job-config-3x
+            readOnly: true
+          - mountPath: /etc/job-config/4.0
+            name: job-config-40
+            readOnly: true
+          - mountPath: /etc/job-config/4.1
+            name: job-config-41
+            readOnly: true
+          - mountPath: /etc/job-config/4.2
+            name: job-config-42
+            readOnly: true
+          - mountPath: /etc/job-config/4.3
+            name: job-config-43
+            readOnly: true
+          - name: job-config-44
+            mountPath: /etc/job-config/4.4
+            readOnly: true
+          command:
+          - /usr/bin/release-controller
+          - --to=release
+          - --release-namespace=ocp
+          - --release-namespace=origin
+          - --prow-config=/etc/config/config.yaml
+          - --job-config=/etc/job-config
+          - --artifacts=openshift-release-artifacts.svc.ci.openshift.org
+          - --prow-namespace=ci
+          - --job-namespace=ci-release
+          - -v=4

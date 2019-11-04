@@ -1,0 +1,263 @@
+kind: List
+apiVersion: v1
+items:
+- kind: Namespace
+  apiVersion: v1
+  metadata:
+    name: ocp
+# pull access to authenticated users
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: image-puller
+    namespace: ocp
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:authenticated
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: system:image-puller
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: user-viewer
+    namespace: ocp
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:authenticated
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: view
+
+# grant release-controller image modification in the
+# release namespace
+- kind: Role
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: release-controller-modify
+    namespace: ocp
+  rules:
+  - apiGroups:
+    - ""
+    resources:
+    - secrets
+    resourceNames:
+    - release-upgrade-graph
+    verbs:
+    - get
+    - update
+    - patch
+  - apiGroups:
+    - image.openshift.io
+    resources:
+    - imagestreams
+    - imagestreamtags
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - delete
+    - update
+    - patch
+  - apiGroups:
+    - ""
+    resources:
+    - events
+    verbs:
+    - create
+    - patch
+    - update
+- kind: Role
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: release-controller-modify-ocp
+    namespace: openshift
+  rules:
+  - apiGroups:
+    - image.openshift.io
+    resources:
+    - imagestreams
+    resourceNames:
+    - origin-v4.0
+    verbs:
+    - get
+    - list
+    - watch
+    - update
+    - patch
+- kind: Role
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: release-controller-modify-ocp
+    namespace: origin
+  rules:
+  - apiGroups:
+    - image.openshift.io
+    resources:
+    - imagestreams
+    resourceNames:
+    - release
+    - "4.1"
+    - "4.2"
+    - "4.3"
+    verbs:
+    - get
+    - list
+    - watch
+    - update
+    - patch
+- kind: Role
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: release-controller-import-ocp
+    namespace: ocp
+  rules:
+  - apiGroups:
+    - image.openshift.io
+    resources:
+    - imagestreamimports
+    verbs:
+    - create
+- kind: Role
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: release-controller-prowjob
+    namespace: ci
+  rules:
+  - apiGroups:
+    - prow.k8s.io
+    resources:
+    - prowjobs
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - delete
+    - update
+    - patch
+
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: release-controller-binding
+    namespace: ocp
+  roleRef:
+    kind: Role
+    name: release-controller-modify
+  subjects:
+  - kind: ServiceAccount
+    namespace: ci
+    name: release-controller-ocp
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: release-controller-binding-ocp
+    namespace: openshift
+  roleRef:
+    kind: Role
+    name: release-controller-modify-ocp
+  subjects:
+  - kind: ServiceAccount
+    namespace: ci
+    name: release-controller-ocp
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: release-controller-binding-ocp
+    namespace: origin
+  roleRef:
+    kind: Role
+    name: release-controller-modify-ocp
+  subjects:
+  - kind: ServiceAccount
+    namespace: ci
+    name: release-controller-ocp
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: release-controller-binding-view
+    namespace: ocp
+  roleRef:
+    kind: ClusterRole
+    name: view
+  subjects:
+  - kind: ServiceAccount
+    namespace: ci
+    name: release-controller-ocp
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: release-controller-binding-prowjob-ocp
+    namespace: ci
+  roleRef:
+    kind: Role
+    name: release-controller-prowjob
+  subjects:
+  - kind: ServiceAccount
+    namespace: ci
+    name: release-controller-ocp
+
+# grant release-controller-ocp edit on its work namespace
+- kind: Namespace
+  apiVersion: v1
+  metadata:
+    name: ci-release
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: release-controller-binding-ocp
+    namespace: ci-release
+  roleRef:
+    kind: ClusterRole
+    name: edit
+  subjects:
+  - kind: ServiceAccount
+    namespace: ci
+    name: release-controller-ocp
+# give jobs in the work namespace authority to push to the
+# release namespace
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: release-controller-binding-promote
+    namespace: ocp
+  roleRef:
+    kind: ClusterRole
+    name: system:image-builder
+  subjects:
+  - kind: ServiceAccount
+    namespace: ci-release
+    name: builder
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: release-controller-binding-import
+    namespace: ocp
+  roleRef:
+    kind: Role
+    namespace: ocp
+    name: release-controller-import-ocp
+  subjects:
+  - kind: ServiceAccount
+    namespace: ci-release
+    name: builder
+
+# create the secret that holds the upgrade graph state
+- kind: Secret
+  apiVersion: v1
+  metadata:
+    name: release-upgrade-graph
+    namespace: ocp
+
+# deploy the controller
+- kind: ServiceAccount
+  apiVersion: v1
+  metadata:
+    name: release-controller-ocp
+    namespace: ci

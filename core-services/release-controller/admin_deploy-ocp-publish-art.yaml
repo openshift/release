@@ -1,0 +1,63 @@
+# This service accounts allows the ART team to publish images
+# to this namespace.
+
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: art-publish
+  namespace: ocp
+---
+kind: Role
+apiVersion: authorization.openshift.io/v1
+metadata:
+  name: art-publish-modify-release
+  namespace: ocp
+rules:
+- apiGroups:
+  - image.openshift.io
+  resources:
+  - imagestreams
+  resourceNames:
+  - release
+  - '4.0-art-latest'
+  - '4.1-art-latest'
+  - '4.2-art-latest'
+  - '4.2-art-latest-s390x'
+  - '4.3-art-latest'
+  - '4.3-art-latest-ppc64le'
+  - '4.3-art-latest-s390x'
+  - '4.4-art-latest'
+  - '4.4-art-latest-ppc64le'
+  - '4.4-art-latest-s390x'
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+  - patch
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: art-publish-modify-release
+  namespace: ocp
+roleRef:
+  kind: Role
+  name: art-publish-modify-release
+subjects:
+- kind: ServiceAccount
+  namespace: ocp
+  name: art-publish
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: art-publish
+  namespace: ocp
+roleRef:
+  kind: ClusterRole
+  name: system:image-builder
+subjects:
+- kind: ServiceAccount
+  namespace: ocp
+  name: art-publish
