@@ -1,0 +1,37 @@
+base_images:
+  base:
+    name: ubi
+    namespace: ocp
+    tag: "7"
+build_root:
+  project_image:
+    dockerfile_path: Dockerfile.build
+images:
+- dockerfile_path: Dockerfile.okd
+  from: base
+  to: metering-presto
+resources:
+  '*':
+    limits:
+      memory: 2Gi
+    requests:
+      cpu: "1"
+      memory: 1Gi
+  unit:
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
+tag_specification:
+  name: "4.3"
+  namespace: ocp
+tests:
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: |
+    set -x
+    export ARTIFACT_DIR=/tmp/artifacts
+    ./test.sh
+  container:
+    from: src
