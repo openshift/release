@@ -192,9 +192,12 @@ prow-release-controller-definitions:
 	oc annotate -n ocp is/4.1-art-latest "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.1.json)" --overwrite
 	oc annotate -n ocp is/4.1 "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.1-ci.json)" --overwrite
 	oc annotate -n ocp is/4.2-art-latest "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.2.json)" --overwrite
+	oc annotate -n ocp is/4.2-art-latest-s390x "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.2-s390x.json)" --overwrite
 	oc annotate -n ocp is/4.2 "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.2-ci.json)" --overwrite
 	oc annotate -n origin is/4.3 "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-origin-4.3.json)" --overwrite
 	oc annotate -n ocp is/4.3-art-latest "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.3.json)" --overwrite
+	oc annotate -n ocp is/4.3-art-latest-s390x "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.3-s390x.json)" --overwrite
+	oc annotate -n ocp is/4.3-art-latest-ppc64le "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.3-ppc64le.json)" --overwrite
 	oc annotate -n ocp is/4.3 "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.3-ci.json)" --overwrite
 	oc annotate -n ocp is/release "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.y-stable.json)" --overwrite
 .PHONY: prow-release-controller-definitions
