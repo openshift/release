@@ -99,7 +99,7 @@ dashboard.new(
    ) + legendConfig)
   .addTarget(
     prometheus.target(
-      'sum(container_memory_working_set_bytes{namespace="ci",container_name!="POD"} * on (pod_name) group_left(label_component) label_replace(kube_pod_labels{pod!="",label_app="prow"}, "pod_name", "$1", "pod", "(.*)")) by (label_component)',
+      'sum(container_memory_working_set_bytes{namespace="ci",container_name!="POD",container_name!=""} * on (pod_name) group_left(label_component) label_replace(kube_pod_labels{pod!="",label_app="prow"}, "pod_name", "$1", "pod", "(.*)")) by (label_component)',
       legendFormat='{{label_component}}'
     )
   ), gridPos={
@@ -129,7 +129,7 @@ dashboard.new(
    ) + legendConfig)
   .addTarget(
     prometheus.target(
-      '(sum by(pod)(container_memory_working_set_bytes{namespace="ci",container_name!="POD"} * on (pod_name) group_left(pod) label_replace(kube_pod_labels{pod!="",label_app="prow"}, "pod_name", "$1", "pod", "(.*)"))/ sum(kube_pod_container_resource_requests_memory_bytes) by (pod)) > 1.5',
+      '(sum by(pod)(container_memory_working_set_bytes{namespace="ci",container_name!="POD",container_name!=""} * on (pod_name) group_left(pod) label_replace(kube_pod_labels{pod!="",label_app="prow"}, "pod_name", "$1", "pod", "(.*)"))/ sum(kube_pod_container_resource_requests_memory_bytes) by (pod)) > 1.5',
       legendFormat='{{pod}}',
     )
   ), gridPos={
