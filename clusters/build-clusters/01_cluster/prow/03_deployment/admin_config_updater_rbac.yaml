@@ -206,3 +206,32 @@ items:
   - kind: ServiceAccount
     name: config-updater
     namespace: ci
+- kind: Role
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: config-updater
+    namespace: openshift-monitoring
+  rules:
+    - apiGroups:
+        - ""
+      resources:
+        - secrets
+        - configmaps
+      verbs:
+        - get
+        - create
+        - update
+        - patch
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: config-updater
+    namespace: openshift-monitoring
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: Role
+    name: config-updater
+  subjects:
+  - kind: ServiceAccount
+    name: config-updater
+    namespace: ci
