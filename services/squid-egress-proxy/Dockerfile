@@ -2,7 +2,7 @@ FROM openshift/origin-base
 
 ADD squid.repo /etc/yum.repos.d/squid.repo
 
-RUN INSTALL_PKGS="squid" && \
+RUN INSTALL_PKGS="squid squid-helpers" && \
     yum install -y $INSTALL_PKGS && \
     rpm -V $INSTALL_PKGS && \
     yum clean all && \
