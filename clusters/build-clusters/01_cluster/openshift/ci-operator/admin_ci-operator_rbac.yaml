@@ -9,3 +9,67 @@ items:
     namespace: ci
   imagePullSecrets:
   - name: regcred
+
+- kind: ClusterRoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: self-provisioner-ci-operator
+  roleRef:
+    kind: ClusterRole
+    name: self-provisioner
+  subjects:
+  - kind: ServiceAccount
+    name: ci-operator
+    namespace: ci
+
+- kind: ClusterRole
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: namespace-annotator
+  rules:
+  - apiGroups:
+    - ""
+    resources:
+    - namespaces
+    verbs:
+    - get
+    - update
+
+- kind: ClusterRoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: namespace-annotator-ci-operator
+  roleRef:
+    kind: ClusterRole
+    name: namespace-annotator
+  subjects:
+  - kind: ServiceAccount
+    name: ci-operator
+    namespace: ci
+
+- kind: ClusterRole
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: manage-events
+  rules:
+  - apiGroups:
+    - ""
+    resources:
+    - events
+    verbs:
+    - create
+    - get
+    - list
+    - watch
+
+- kind: ClusterRoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: manage-events-ci-operator
+  roleRef:
+    kind: ClusterRole
+    name: manage-events
+  subjects:
+  - kind: ServiceAccount
+    name: ci-operator
+    namespace: ci
