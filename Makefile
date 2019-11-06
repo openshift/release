@@ -129,49 +129,6 @@ prow-cluster-jobs:
 	oc create configmap prow-job-master-sidecar-3 --from-file=ci-operator/templates/master-sidecar-3.yaml -o yaml --dry-run | oc apply -f -
 .PHONY: prow-cluster-jobs
 
-prow-ocp-rpm-secrets:
-	oc create secret generic base-4-1-repos \
-		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
-		--from-file=ci-operator/infra/openshift/release-controller/repos/ocp-4.1-default.repo \
-		-o yaml --dry-run | oc apply -n ocp -f -
-	oc create secret generic base-4-2-repos \
-		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
-		--from-file=ci-operator/infra/openshift/release-controller/repos/ocp-4.2-default.repo \
-		-o yaml --dry-run | oc apply -n ocp -f -
-	oc create secret generic base-4-2-repos-s390x \
-		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
-		--from-file=ci-operator/infra/openshift/release-controller/repos/ocp-4.2-s390x.repo \
-		-o yaml --dry-run | oc apply -n ocp -f -
-	oc create secret generic base-openstack-4-2-repos \
-		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
-		--from-file=ci-operator/infra/openshift/release-controller/repos/ocp-4.2-openstack.repo \
-		-o yaml --dry-run | oc apply -n ocp -f -
-	oc create secret generic base-4-3-repos \
-		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
-		--from-file=ci-operator/infra/openshift/release-controller/repos/ocp-4.3-default.repo \
-		-o yaml --dry-run | oc apply -n ocp -f -
-	oc create secret generic base-4-3-repos-s390x \
-		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
-		--from-file=ci-operator/infra/openshift/release-controller/repos/ocp-4.3-s390x.repo \
-		-o yaml --dry-run | oc apply -n ocp -f -
-	oc create secret generic base-4-3-repos-ppc64le \
-		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
-		--from-file=ci-operator/infra/openshift/release-controller/repos/ocp-4.3-ppc64le.repo \
-		-o yaml --dry-run | oc apply -n ocp -f -
-	oc create secret generic base-4-3-rhel8-repos \
-		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
-		--from-file=ci-operator/infra/openshift/release-controller/repos/ocp-4.3-rhel8.repo \
-		-o yaml --dry-run | oc apply -n ocp -f -
-	oc create secret generic base-openstack-4-3-repos \
-		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
-		--from-file=ci-operator/infra/openshift/release-controller/repos/ocp-4.3-openstack.repo \
-		-o yaml --dry-run | oc apply -n ocp -f -
-	oc create secret generic base-openstack-beta-4-3-repos \
-		--from-file=cluster/test-deploy/gcp/ops-mirror.pem \
-		--from-file=ci-operator/infra/openshift/release-controller/repos/ocp-4.3-openstack-beta.repo \
-		-o yaml --dry-run | oc apply -n ocp -f -
-.PHONY: prow-ocp-rpms-secrets
-
 prow-jobs: prow-cluster-jobs prow-artifacts
 	$(MAKE) apply WHAT=projects/prometheus/test/build.yaml
 	$(MAKE) apply WHAT=ci-operator/templates/os.yaml
