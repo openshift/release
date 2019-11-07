@@ -1,89 +1,219 @@
-plank:
-  allow_cancellations: true
-  job_url_prefix_config:
-    '*': 'https://prow.svc.ci.openshift.org/view/gcs/'
-  job_url_template: 'https://prow.svc.ci.openshift.org/view/gcs/origin-ci-test/{{if eq .Spec.Type "presubmit"}}pr-logs/pull{{else if eq .Spec.Type "batch"}}pr-logs/pull{{else}}logs{{end}}{{if ne .Spec.Refs.Repo "origin"}}/{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}{{end}}{{if eq .Spec.Type "presubmit"}}/{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}{{else if eq .Spec.Type "batch"}}/batch{{end}}/{{.Spec.Job}}/{{.Status.BuildID}}/'
-  report_template: '[Full PR test history](https://prow.svc.ci.openshift.org/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://prow.svc.ci.openshift.org/pr?query=is:pr+state:open+author:{{with index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}). Please help us cut down on flakes by [linking to](https://github.com/kubernetes/community/blob/master/contributors/devel/flaky-tests.md#filing-issues-for-flaky-tests) an [open issue](https://github.com/{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}/issues?q=is:issue+is:open) when you hit one in your PR.'
-  default_decoration_configs:
-    "*":
-      timeout: 4h
-      grace_period: 15s
-      utility_images:
-        clonerefs: gcr.io/k8s-prow/clonerefs:v20191107-34a664162
-        initupload: gcr.io/k8s-prow/initupload:v20191107-34a664162
-        entrypoint: gcr.io/k8s-prow/entrypoint:v20191107-34a664162
-        sidecar: gcr.io/k8s-prow/sidecar:v20191107-34a664162
-      gcs_configuration:
-        bucket: origin-ci-test
-        path_strategy: single
-        default_org: openshift
-        default_repo: origin
-        mediaTypes:
-          log: text/plain
-      gcs_credentials_secret: gce-sa-credentials-gcs-publisher
-    "openshift/private-ci-testing":
-      gcs_configuration:
-        bucket: origin-ci-private
-        mediaTypes:
-          log: text/plain
-      gcs_credentials_secret: gce-sa-credentials-gcs-private
-
-jenkins_operators:
-- label_selector: master=ci.openshift.redhat.com
-  max_concurrency: 150
-  max_goroutines: 20
-  allow_cancellations: true
-  job_url_template: 'https://prow.svc.ci.openshift.org/view/gcs/origin-{{if eq .Spec.Type "presubmit"}}{{if eq .Spec.Refs.Org "kubernetes"}}federated-results{{else if eq .Spec.Refs.Org "kubernetes-incubator"}}federated-results{{else if eq .Spec.Refs.Org "cri-o"}}federated-results{{else}}ci-test{{end}}{{else}}ci-test{{end}}/{{if eq .Spec.Type "presubmit"}}pr-logs/pull{{else if eq .Spec.Type "batch"}}pr-logs/pull{{else}}logs{{end}}{{if ne .Spec.Refs.Repo "origin"}}/{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}{{end}}{{if eq .Spec.Type "presubmit"}}/{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}{{else if eq .Spec.Type "batch"}}/batch{{end}}/{{.Spec.Job}}/{{.Status.JenkinsBuildID}}/'
-  report_template: '[Full PR test history](https://prow.svc.ci.openshift.org/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://prow.svc.ci.openshift.org/pr?query=is:pr+state:open+author:{{with index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}). Please help us cut down on flakes by [linking to](https://github.com/kubernetes/community/blob/master/contributors/devel/flaky-tests.md#filing-issues-for-flaky-tests) an [open issue](https://github.com/{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}/issues?q=is:issue+is:open) when you hit one in your PR.'
-- label_selector: master=ci.dev.openshift.redhat.com
-  max_concurrency: 25
-  max_goroutines: 20
-  allow_cancellations: true
-  job_url_template: 'https://ci.dev.openshift.redhat.com/jenkins/job/{{.Spec.Job}}/{{.Status.JenkinsBuildID}}'
-- label_selector: master=jenkins.katacontainers.io
-  max_concurrency: 10
-  max_goroutines: 20
-  allow_cancellations: true
-  job_url_template: 'http://jenkins.katacontainers.io/job/{{.Spec.Job}}/{{.Status.JenkinsBuildID}}'
-- label_selector: master=jenkins-tectonic.prod.coreos.systems
-  max_concurrency: 1
-  max_goroutines: 1
-  allow_cancellations: true
-  job_url_template: 'https://jenkins-tectonic.prod.coreos.systems/job/{{.Spec.Job}}/{{.Status.JenkinsBuildID}}'
-
-sinker:
-  resync_period: 5m
-  max_prowjob_age: 24h
-  max_pod_age: 6h
-
+branch-protection:
+  allow_disabled_job_policies: true
+  allow_disabled_policies: true
+  orgs:
+    codeready-toolchain:
+      repos:
+        api:
+          protect: false
+        host-operator:
+          protect: false
+        member-operator:
+          protect: false
+        registration-service:
+          protect: false
+        toolchain-common:
+          protect: false
+        toolchain-e2e:
+          protect: false
+        toolchain-operator:
+          protect: false
+    containers:
+      repos:
+        libpod:
+          protect: false
+    cri-o:
+      required_status_checks:
+        contexts:
+        - dco
+    fabric8-services:
+      repos:
+        toolchain-operator:
+          protect: false
+    kiegroup:
+      repos:
+        kie-cloud-operator:
+          protect: false
+    kubevirt:
+      repos:
+        hyperconverged-cluster-operator:
+          protect: false
+    monstorak:
+      repos:
+        monstorak-operator:
+          protect: false
+    openshift:
+      repos:
+        aws-account-operator:
+          required_status_checks:
+            contexts:
+            - ci.ext.devshift.net PR build
+        azure-misc:
+          restrictions:
+            teams:
+            - team-azure-committers
+            users: null
+        azure-sop:
+          restrictions:
+            teams:
+            - team-azure-committers
+            users: null
+        certman-operator:
+          required_status_checks:
+            contexts:
+            - ci.ext.devshift.net PR build
+        cluster-capacity:
+          required_status_checks:
+            contexts:
+            - continuous-integration/travis-ci/pr
+        configure-alertmanager-operator:
+          required_status_checks:
+            contexts:
+            - ci.ext.devshift.net PR build
+        deadmanssnitch-operator:
+          required_status_checks:
+            contexts:
+            - ci.ext.devshift.net PR build
+        dedicated-admin-operator:
+          required_status_checks:
+            contexts:
+            - ci.ext.devshift.net PR build
+        jenkins-client-plugin:
+          restrictions:
+            teams:
+            - team-jenkins
+            users: null
+        jenkins-openshift-login-plugin:
+          restrictions:
+            teams:
+            - team-jenkins
+            users: null
+        jenkins-plugin:
+          restrictions:
+            teams:
+            - team-jenkins
+            users: null
+        jenkins-sync-plugin:
+          restrictions:
+            teams:
+            - team-jenkins
+            users: null
+        knative-client:
+          branches:
+            release-next:
+              protect: false
+            release-next-ci:
+              protect: false
+            release-v0.9.0:
+              protect: false
+        knative-eventing:
+          branches:
+            release-next:
+              protect: false
+            release-next-ci:
+              protect: false
+        knative-eventing-contrib:
+          branches:
+            release-next:
+              protect: false
+            release-next-ci:
+              protect: false
+        knative-serving:
+          branches:
+            release-next:
+              protect: false
+            release-next-ci:
+              protect: false
+        managed-cluster-config:
+          required_status_checks:
+            contexts:
+            - ci.ext.devshift.net PR build
+        managed-prometheus-exporter-dns:
+          required_status_checks:
+            contexts:
+            - ci.ext.devshift.net PR build
+        managed-prometheus-exporter-ebs-iops-reporter:
+          required_status_checks:
+            contexts:
+            - ci.ext.devshift.net PR build
+        managed-prometheus-exporter-machine-api:
+          required_status_checks:
+            contexts:
+            - ci.ext.devshift.net PR build
+        managed-prometheus-exporter-stuck-ebs-vols:
+          required_status_checks:
+            contexts:
+            - ci.ext.devshift.net PR build
+        openshift-azure:
+          restrictions:
+            teams:
+            - team-azure-committers
+            users: null
+        openshift-restclient-java:
+          required_status_checks:
+            contexts:
+            - continuous-integration/travis-ci/pr
+        ose:
+          restrictions:
+            teams:
+            - team-release-admins
+            users: null
+        pagerduty-operator:
+          required_status_checks:
+            contexts:
+            - ci.ext.devshift.net PR build
+        tektoncd-catalog:
+          branches:
+            release-next:
+              protect: false
+            release-next-ci:
+              protect: false
+        tektoncd-cli:
+          branches:
+            release-next:
+              protect: false
+            release-next-ci:
+              protect: false
+        tektoncd-pipeline:
+          branches:
+            release-next:
+              protect: false
+            release-next-ci:
+              protect: false
+    openshift-s2i:
+      repos:
+        s2i-wildfly:
+          required_status_checks:
+            contexts:
+            - continuous-integration/travis-ci/pr
+    operator-framework:
+      repos:
+        community-operators:
+          protect: false
+        operator-sdk:
+          protect: false
+    redhat-developer:
+      repos:
+        devconsole-api:
+          protect: false
+        devconsole-git:
+          protect: false
+        devconsole-operator:
+          protect: false
+    tnozicka:
+      repos:
+        openshift-acme:
+          protect: false
+  protect-tested-repos: true
 deck:
-  spyglass:
-    gcs_browser_prefix: https://gcsweb-ci.svc.ci.openshift.org/gcs/
-    announcement: "The old job viewer, Gubernator, has been deprecated in favour of this page, Spyglass.{{if .ArtifactPath}} For now, the old page is <a href='https://openshift-gce-devel.appspot.com/build/{{.ArtifactPath}}'>still available</a>.{{end}} Please send feedback to #forum-testplatform."
-    size_limit: 500000000 # 500MB
-    lenses:
-    - lens:
-        name: metadata
-      required_files:
-      - started.json|finished.json
-    - lens:
-        name: buildlog
-      required_files:
-        - build-log.txt
-    - lens:
-        name: junit
-      required_files:
-        - .*/junit.*\.xml
-      optional_files:
-        - .*/monitor.*\.xml
+  branding:
+    favicon: /static/extensions/favicon.ico
+    header_color: black
+    logo: /static/extensions/logo.png
   external_agent_logs:
   - agent: jenkins
     selector: master=ci.openshift.redhat.com
-    url_template: 'http://jenkins-operator/job/{{.Spec.Job}}/{{.Status.JenkinsBuildID}}/consoleText'
-  branding:
-    logo: "/static/extensions/logo.png"
-    favicon: "/static/extensions/favicon.ico"
-    header_color: "black"
+    url_template: http://jenkins-operator/job/{{.Spec.Job}}/{{.Status.JenkinsBuildID}}/consoleText
   hidden_repos:
   - openshift/ose
   - openshift/online-registration
@@ -97,41 +227,195 @@ deck:
     - hongkailiu
     - vikaslaad
     - dobbymoodge
-
+  spyglass:
+    announcement: 'The old job viewer, Gubernator, has been deprecated in favour of
+      this page, Spyglass.{{if .ArtifactPath}} For now, the old page is <a href=''https://openshift-gce-devel.appspot.com/build/{{.ArtifactPath}}''>still
+      available</a>.{{end}} Please send feedback to #forum-testplatform.'
+    gcs_browser_prefix: https://gcsweb-ci.svc.ci.openshift.org/gcs/
+    lenses:
+    - lens:
+        name: metadata
+      required_files:
+      - started.json|finished.json
+    - lens:
+        name: buildlog
+      required_files:
+      - build-log.txt
+    - lens:
+        name: junit
+      optional_files:
+      - .*/monitor.*\.xml
+      required_files:
+      - .*/junit.*\.xml
+    size_limit: 500000000
+  tide_update_period: 10s
+default_job_timeout: 24h0m0s
+gerrit:
+  ratelimit: 5
+  tick_interval: 1m0s
+github:
+  link_url: https://github.com
+github_reporter:
+  job_types_to_report:
+  - presubmit
+  - postsubmit
+in_repo_config: {}
+jenkins_operators:
+- allow_cancellations: true
+  job_url_template: https://prow.svc.ci.openshift.org/view/gcs/origin-{{if eq .Spec.Type
+    "presubmit"}}{{if eq .Spec.Refs.Org "kubernetes"}}federated-results{{else if eq
+    .Spec.Refs.Org "kubernetes-incubator"}}federated-results{{else if eq .Spec.Refs.Org
+    "cri-o"}}federated-results{{else}}ci-test{{end}}{{else}}ci-test{{end}}/{{if eq
+    .Spec.Type "presubmit"}}pr-logs/pull{{else if eq .Spec.Type "batch"}}pr-logs/pull{{else}}logs{{end}}{{if
+    ne .Spec.Refs.Repo "origin"}}/{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}{{end}}{{if
+    eq .Spec.Type "presubmit"}}/{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}{{else
+    if eq .Spec.Type "batch"}}/batch{{end}}/{{.Spec.Job}}/{{.Status.JenkinsBuildID}}/
+  label_selector: master=ci.openshift.redhat.com
+  max_concurrency: 150
+  max_goroutines: 20
+  report_template: '[Full PR test history](https://prow.svc.ci.openshift.org/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
+    index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://prow.svc.ci.openshift.org/pr?query=is:pr+state:open+author:{{with
+    index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}). Please help us cut down on flakes
+    by [linking to](https://github.com/kubernetes/community/blob/master/contributors/devel/flaky-tests.md#filing-issues-for-flaky-tests)
+    an [open issue](https://github.com/{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}/issues?q=is:issue+is:open)
+    when you hit one in your PR.'
+- allow_cancellations: true
+  job_url_template: https://ci.dev.openshift.redhat.com/jenkins/job/{{.Spec.Job}}/{{.Status.JenkinsBuildID}}
+  label_selector: master=ci.dev.openshift.redhat.com
+  max_concurrency: 25
+  max_goroutines: 20
+- allow_cancellations: true
+  job_url_template: http://jenkins.katacontainers.io/job/{{.Spec.Job}}/{{.Status.JenkinsBuildID}}
+  label_selector: master=jenkins.katacontainers.io
+  max_concurrency: 10
+  max_goroutines: 20
+- allow_cancellations: true
+  job_url_template: https://jenkins-tectonic.prod.coreos.systems/job/{{.Spec.Job}}/{{.Status.JenkinsBuildID}}
+  label_selector: master=jenkins-tectonic.prod.coreos.systems
+  max_concurrency: 1
+  max_goroutines: 1
+log_level: debug
 owners_dir_blacklist:
   default:
   - vendor/.*
-
+plank:
+  allow_cancellations: true
+  default_decoration_configs:
+    '*':
+      gcs_configuration:
+        bucket: origin-ci-test
+        default_org: openshift
+        default_repo: origin
+        mediaTypes:
+          log: text/plain
+        path_strategy: single
+      gcs_credentials_secret: gce-sa-credentials-gcs-publisher
+      grace_period: 15s
+      timeout: 4h0m0s
+      utility_images:
+        clonerefs: gcr.io/k8s-prow/clonerefs:v20191107-34a664162
+        entrypoint: gcr.io/k8s-prow/entrypoint:v20191107-34a664162
+        initupload: gcr.io/k8s-prow/initupload:v20191107-34a664162
+        sidecar: gcr.io/k8s-prow/sidecar:v20191107-34a664162
+    openshift/private-ci-testing:
+      gcs_configuration:
+        bucket: origin-ci-private
+        mediaTypes:
+          log: text/plain
+      gcs_credentials_secret: gce-sa-credentials-gcs-private
+  job_url_prefix_config:
+    '*': https://prow.svc.ci.openshift.org/view/gcs/
+  job_url_template: https://prow.svc.ci.openshift.org/view/gcs/origin-ci-test/{{if
+    eq .Spec.Type "presubmit"}}pr-logs/pull{{else if eq .Spec.Type "batch"}}pr-logs/pull{{else}}logs{{end}}{{if
+    ne .Spec.Refs.Repo "origin"}}/{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}{{end}}{{if
+    eq .Spec.Type "presubmit"}}/{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}{{else
+    if eq .Spec.Type "batch"}}/batch{{end}}/{{.Spec.Job}}/{{.Status.BuildID}}/
+  max_goroutines: 20
+  pod_pending_timeout: 24h0m0s
+  pod_running_timeout: 48h0m0s
+  report_template: '[Full PR test history](https://prow.svc.ci.openshift.org/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
+    index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://prow.svc.ci.openshift.org/pr?query=is:pr+state:open+author:{{with
+    index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}). Please help us cut down on flakes
+    by [linking to](https://github.com/kubernetes/community/blob/master/contributors/devel/flaky-tests.md#filing-issues-for-flaky-tests)
+    an [open issue](https://github.com/{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}/issues?q=is:issue+is:open)
+    when you hit one in your PR.'
+pod_namespace: ci
+prowjob_namespace: ci
+push_gateway:
+  interval: 1m0s
+  serve_metrics: false
+sinker:
+  max_pod_age: 6h0m0s
+  max_prowjob_age: 24h0m0s
+  resync_period: 5m0s
+status_error_link: https://github.com/kubernetes/test-infra/issues
 tide:
   blocker_label: tide/merge-blocker
-  squash_label: tide/merge-method-squash
-  rebase_label: tide/merge-method-rebase
+  context_options:
+    from-branch-protection: true
+    orgs:
+      containers:
+        repos:
+          libpod:
+            skip-unknown-contexts: true
+      cri-o:
+        repos:
+          cri-o:
+            skip-unknown-contexts: true
+      openshift:
+        repos:
+          release:
+            skip-unknown-contexts: true
+      redhat-developer:
+        repos:
+          service-binding-operator:
+            skip-unknown-contexts: true
+  max_goroutines: 20
   merge_label: tide/merge-method-merge
   merge_method:
-    openshift/jenkins-plugin: rebase
-    openshift/jenkins-sync-plugin: rebase
-    openshift/jenkins-client-plugin: rebase
-    openshift/jenkins-openshift-login-plugin: rebase
-    openshift/ansible-service-broker: squash
-    openshift/template-service-broker-operator: squash
-    openshift/cluster-api: rebase
-    openshift/cluster-api-provider-azure: rebase
-    openshift/custom-resource-status: squash
-    openshift/odo: squash
-    openshift/odo-init-image: squash
-    codeready-toolchain/host-operator: squash
     codeready-toolchain/api: squash
+    codeready-toolchain/host-operator: squash
     codeready-toolchain/member-operator: squash
+    codeready-toolchain/registration-service: squash
     codeready-toolchain/toolchain-common: squash
     codeready-toolchain/toolchain-e2e: squash
     codeready-toolchain/toolchain-operator: squash
-    codeready-toolchain/registration-service: squash
-    redhat-developer/service-binding-operator: squash
-    redhat-developer/openshift-jenkins-operator: rebase
     coreos/rpm-ostree: rebase
+    openshift/ansible-service-broker: squash
+    openshift/cluster-api: rebase
+    openshift/cluster-api-provider-azure: rebase
+    openshift/custom-resource-status: squash
+    openshift/jenkins-client-plugin: rebase
+    openshift/jenkins-openshift-login-plugin: rebase
+    openshift/jenkins-plugin: rebase
+    openshift/jenkins-sync-plugin: rebase
+    openshift/odo: squash
+    openshift/odo-init-image: squash
+    openshift/template-service-broker-operator: squash
+    redhat-developer/openshift-jenkins-operator: rebase
+    redhat-developer/service-binding-operator: squash
   pr_status_base_url: https://prow.svc.ci.openshift.org/pr
   queries:
-  - repos:
+  - includedBranches:
+    - release-4.0
+    - release-4.1
+    - release-4.2
+    - release-4.3
+    - release-4.4
+    - openshift-4.1
+    labels:
+    - lgtm
+    - approved
+    - bugzilla/valid-bug
+    - cherry-pick-approved
+    missingLabels:
+    - needs-rebase
+    - do-not-merge/blocked-paths
+    - do-not-merge/hold
+    - do-not-merge/work-in-progress
+    - do-not-merge/invalid-owners-file
+    - bugzilla/invalid-bug
+    repos:
     - openshift/ansible-service-broker
     - openshift/api
     - openshift/apiserver-library-go
@@ -274,7 +558,7 @@ tide:
     - operator-framework/operator-metering
     - operator-framework/operator-registry
     - operator-framework/presto
-    includedBranches:
+  - includedBranches:
     - release-4.0
     - release-4.1
     - release-4.2
@@ -283,7 +567,6 @@ tide:
     - openshift-4.1
     labels:
     - lgtm
-    - approved
     - bugzilla/valid-bug
     - cherry-pick-approved
     missingLabels:
@@ -293,7 +576,7 @@ tide:
     - do-not-merge/work-in-progress
     - do-not-merge/invalid-owners-file
     - bugzilla/invalid-bug
-  - repos:
+    repos:
     - openshift/cluster-capacity
     - openshift/containernetworking-plugins
     - openshift/coredns
@@ -308,7 +591,7 @@ tide:
     - openshift/sriov-network-operator
     - openshift/linuxptp-daemon
     - openshift/ptp-operator
-    includedBranches:
+  - excludedBranches:
     - release-4.0
     - release-4.1
     - release-4.2
@@ -317,8 +600,7 @@ tide:
     - openshift-4.1
     labels:
     - lgtm
-    - bugzilla/valid-bug
-    - cherry-pick-approved
+    - approved
     missingLabels:
     - needs-rebase
     - do-not-merge/blocked-paths
@@ -326,7 +608,7 @@ tide:
     - do-not-merge/work-in-progress
     - do-not-merge/invalid-owners-file
     - bugzilla/invalid-bug
-  - repos:
+    repos:
     - openshift/ansible-service-broker
     - openshift/api
     - openshift/apiserver-library-go
@@ -525,7 +807,22 @@ tide:
     - operator-framework/operator-metering
     - operator-framework/operator-registry
     - operator-framework/presto
-    excludedBranches:
+  - labels:
+    - lgtm
+    - approved
+    missingLabels:
+    - needs-rebase
+    - do-not-merge/blocked-paths
+    - do-not-merge/hold
+    - do-not-merge/work-in-progress
+    - do-not-merge/invalid-owners-file
+    - bugzilla/invalid-bug
+    repos:
+    - openshift/online-registration
+    - openshift/enterprise-images
+    - openshift/ose
+    - openshift/source-to-image
+  - excludedBranches:
     - release-4.0
     - release-4.1
     - release-4.2
@@ -534,7 +831,6 @@ tide:
     - openshift-4.1
     labels:
     - lgtm
-    - approved
     missingLabels:
     - needs-rebase
     - do-not-merge/blocked-paths
@@ -542,22 +838,7 @@ tide:
     - do-not-merge/work-in-progress
     - do-not-merge/invalid-owners-file
     - bugzilla/invalid-bug
-  - repos:
-    - openshift/online-registration
-    - openshift/enterprise-images
-    - openshift/ose
-    - openshift/source-to-image
-    labels:
-    - lgtm
-    - approved
-    missingLabels:
-    - needs-rebase
-    - do-not-merge/blocked-paths
-    - do-not-merge/hold
-    - do-not-merge/work-in-progress
-    - do-not-merge/invalid-owners-file
-    - bugzilla/invalid-bug
-  - repos:
+    repos:
     - openshift/azure-sop
     - openshift/origin-metrics
     - openshift/origin-web-console
@@ -577,25 +858,7 @@ tide:
     - openshift/sriov-network-operator
     - openshift/linuxptp-daemon
     - openshift/ptp-operator
-    excludedBranches:
-    - release-4.0
-    - release-4.1
-    - release-4.2
-    - release-4.3
-    - release-4.4
-    - openshift-4.1
-    labels:
-    - lgtm
-    missingLabels:
-    - needs-rebase
-    - do-not-merge/blocked-paths
-    - do-not-merge/hold
-    - do-not-merge/work-in-progress
-    - do-not-merge/invalid-owners-file
-    - bugzilla/invalid-bug
-  - repos:
-    - openshift/openshift-azure
-    labels:
+  - labels:
     - lgtm
     - approved
     missingLabels:
@@ -607,9 +870,9 @@ tide:
     - do-not-merge/needs-signoff
     - do-not-merge/release-note-label-needed
     - bugzilla/invalid-bug
-  - repos:
-    - tnozicka/openshift-acme
-    labels:
+    repos:
+    - openshift/openshift-azure
+  - labels:
     - lgtm
     - approved
     missingLabels:
@@ -619,14 +882,9 @@ tide:
     - do-not-merge/work-in-progress
     - do-not-merge/invalid-owners-file
     - do-not-merge/release-note-label-needed
-  - repos:
-    - fabric8-services/toolchain-operator
-    - containers/libpod
-    - containers/buildah
-    - coreos/rpm-ostree
-    - ostreedev/ostree
-    - kiegroup/kie-cloud-operator
-    labels:
+    repos:
+    - tnozicka/openshift-acme
+  - labels:
     - lgtm
     - approved
     missingLabels:
@@ -635,7 +893,23 @@ tide:
     - do-not-merge/hold
     - do-not-merge/work-in-progress
     - do-not-merge/invalid-owners-file
-  - repos:
+    repos:
+    - fabric8-services/toolchain-operator
+    - containers/libpod
+    - containers/buildah
+    - coreos/rpm-ostree
+    - ostreedev/ostree
+    - kiegroup/kie-cloud-operator
+  - labels:
+    - lgtm
+    - approved
+    missingLabels:
+    - needs-rebase
+    - do-not-merge/blocked-paths
+    - do-not-merge/hold
+    - do-not-merge/work-in-progress
+    - do-not-merge/invalid-owners-file
+    repos:
     - codeready-toolchain/host-operator
     - codeready-toolchain/api
     - codeready-toolchain/member-operator
@@ -643,7 +917,7 @@ tide:
     - codeready-toolchain/toolchain-e2e
     - codeready-toolchain/toolchain-operator
     - codeready-toolchain/registration-service
-    labels:
+  - labels:
     - lgtm
     - approved
     missingLabels:
@@ -652,9 +926,9 @@ tide:
     - do-not-merge/hold
     - do-not-merge/work-in-progress
     - do-not-merge/invalid-owners-file
-  - repos:
+    repos:
     - redhat-developer/service-binding-operator
-    labels:
+  - labels:
     - lgtm
     - approved
     missingLabels:
@@ -663,20 +937,9 @@ tide:
     - do-not-merge/hold
     - do-not-merge/work-in-progress
     - do-not-merge/invalid-owners-file
-  - repos:
+    repos:
     - redhat-developer/openshift-jenkins-operator
-    labels:
-    - lgtm
-    - approved
-    missingLabels:
-    - needs-rebase
-    - do-not-merge/blocked-paths
-    - do-not-merge/hold
-    - do-not-merge/work-in-progress
-    - do-not-merge/invalid-owners-file
-  - repos:
-    - openshift/community
-    labels:
+  - labels:
     - lgtm
     - approved
     missingLabels:
@@ -686,251 +949,34 @@ tide:
     - do-not-merge/work-in-progress
     - do-not-merge/invalid-owners-file
     - bugzilla/invalid-bug
-  - repos:
+    repos:
+    - openshift/community
+  - labels:
+    - lgtm
+    - approved
+    missingLabels:
+    - needs-rebase
+    - do-not-merge/blocked-paths
+    - do-not-merge/hold
+    - do-not-merge/work-in-progress
+    - do-not-merge/invalid-owners-file
+    repos:
     - integr8ly/integreatly-operator
     - integr8ly/installation
-    labels:
+  - labels:
     - lgtm
     - approved
+    - 'dco-signoff: yes'
     missingLabels:
     - needs-rebase
     - do-not-merge/blocked-paths
     - do-not-merge/hold
     - do-not-merge/work-in-progress
     - do-not-merge/invalid-owners-file
-  - orgs:
-    - cri-o
-    labels:
-    - lgtm
-    - approved
-    - "dco-signoff: yes"
-    missingLabels:
-    - needs-rebase
-    - do-not-merge/blocked-paths
-    - do-not-merge/hold
-    - do-not-merge/work-in-progress
-    - do-not-merge/invalid-owners-file
-    - "dco-signoff: no"
-  context_options:
-    from-branch-protection: true
+    - 'dco-signoff: no'
     orgs:
-      cri-o:
-        repos:
-          cri-o:
-            skip-unknown-contexts: true # to make codecov jobs not blocking
-      openshift:
-        repos:
-          release:
-            skip-unknown-contexts: true # to make rehearsal jobs not blocking
-      redhat-developer:
-        repos:
-          service-binding-operator:
-            skip-unknown-contexts: true # to make codecov jobs not blocking
-      containers:
-        repos:
-          libpod:
-            skip-unknown-contexts: true # to make Tripleo based Zuul jobs not blocking
-
-prowjob_namespace: ci
-pod_namespace: ci
-log_level: debug
-
-branch-protection:
-  protect-tested-repos: true
-  allow_disabled_policies: true
-  allow_disabled_job_policies: true
-  orgs:
-    cri-o:
-      required_status_checks:
-        contexts:
-        - dco
-    openshift:
-      repos:
-        ose:
-          restrictions:
-            teams:
-            - team-release-admins
-        jenkins-openshift-login-plugin:
-          restrictions:
-            teams:
-            - team-jenkins
-        jenkins-client-plugin:
-          restrictions:
-            teams:
-            - team-jenkins
-        jenkins-plugin:
-          restrictions:
-            teams:
-            - team-jenkins
-        jenkins-sync-plugin:
-          restrictions:
-            teams:
-            - team-jenkins
-        azure-sop:
-          restrictions:
-            teams:
-            - team-azure-committers
-        azure-misc:
-          restrictions:
-            teams:
-            - team-azure-committers
-        openshift-azure:
-          restrictions:
-            teams:
-            - team-azure-committers
-        cluster-capacity:
-          required_status_checks:
-            contexts:
-            - continuous-integration/travis-ci/pr
-        openshift-restclient-java:
-          required_status_checks:
-            contexts:
-            - continuous-integration/travis-ci/pr
-        aws-account-operator:
-          required_status_checks:
-            contexts:
-            - "ci.ext.devshift.net PR build"
-        certman-operator:
-          required_status_checks:
-            contexts:
-            - "ci.ext.devshift.net PR build"
-        configure-alertmanager-operator:
-          required_status_checks:
-            contexts:
-            - "ci.ext.devshift.net PR build"
-        deadmanssnitch-operator:
-          required_status_checks:
-            contexts:
-            - "ci.ext.devshift.net PR build"
-        dedicated-admin-operator:
-          required_status_checks:
-            contexts:
-            - "ci.ext.devshift.net PR build"
-        managed-cluster-config:
-          required_status_checks:
-            contexts:
-            - "ci.ext.devshift.net PR build"
-        managed-prometheus-exporter-dns:
-          required_status_checks:
-            contexts:
-            - "ci.ext.devshift.net PR build"
-        managed-prometheus-exporter-ebs-iops-reporter:
-          required_status_checks:
-            contexts:
-            - "ci.ext.devshift.net PR build"
-        managed-prometheus-exporter-stuck-ebs-vols:
-          required_status_checks:
-            contexts:
-            - "ci.ext.devshift.net PR build"
-        managed-prometheus-exporter-machine-api:
-          required_status_checks:
-            contexts:
-            - "ci.ext.devshift.net PR build"
-        pagerduty-operator:
-          required_status_checks:
-            contexts:
-            - "ci.ext.devshift.net PR build"
-        knative-client:
-          branches:
-            release-next:
-               protect: false
-            release-next-ci:
-               protect: false
-            release-v0.9.0:
-               protect: false
-        knative-eventing-contrib:
-          branches:
-            release-next:
-               protect: false
-            release-next-ci:
-               protect: false
-        knative-eventing:
-          branches:
-            release-next:
-               protect: false
-            release-next-ci:
-               protect: false
-        knative-serving:
-          branches:
-            release-next:
-               protect: false
-            release-next-ci:
-               protect: false
-        tektoncd-pipeline:
-          branches:
-            release-next:
-               protect: false
-            release-next-ci:
-               protect: false
-        tektoncd-cli:
-          branches:
-            release-next:
-               protect: false
-            release-next-ci:
-               protect: false
-        tektoncd-catalog:
-          branches:
-            release-next:
-               protect: false
-            release-next-ci:
-               protect: false
-    openshift-s2i:
-      repos:
-        s2i-wildfly:
-          required_status_checks:
-            contexts:
-            - continuous-integration/travis-ci/pr
-    fabric8-services:
-      repos:
-        toolchain-operator:
-          protect: false
-    containers:
-      repos:
-        libpod:
-          protect: false
-    kiegroup:
-      repos:
-        kie-cloud-operator:
-          protect: false
-    monstorak:
-      repos:
-        monstorak-operator:
-          protect: false
-    tnozicka:
-      repos:
-        openshift-acme:
-          protect: false
-    operator-framework:
-      repos:
-        operator-sdk:
-          protect: false
-        community-operators:
-          protect: false
-    codeready-toolchain:
-      repos:
-        member-operator:
-          protect: false
-        host-operator:
-          protect: false
-        api:
-          protect: false
-        toolchain-common:
-          protect: false
-        toolchain-e2e:
-          protect: false
-        toolchain-operator:
-          protect: false
-        registration-service:
-          protect: false
-    kubevirt:
-      repos:
-        hyperconverged-cluster-operator:
-          protect: false
-    redhat-developer:
-      repos:
-        devconsole-git:
-          protect: false
-        devconsole-operator:
-          protect: false
-        devconsole-api:
-          protect: false
+    - cri-o
+  rebase_label: tide/merge-method-rebase
+  squash_label: tide/merge-method-squash
+  status_update_period: 1m0s
+  sync_period: 1m0s
