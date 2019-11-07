@@ -12,7 +12,7 @@ trap 'rm -rf "${workdir}"' EXIT
 
 prow_config_dir="$( dirname "${BASH_SOURCE[0]}" )/../core-services/prow/02_config/"
 
-cp -r "${prow_config_dir}" "${workdir}"
+cp -r "${prow_config_dir}"* "${workdir}"
 
 determinize-prow-config --prow-config-dir "${workdir}"
 
