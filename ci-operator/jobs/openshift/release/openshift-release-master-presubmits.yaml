@@ -327,6 +327,27 @@ presubmits:
     always_run: true
     branches:
     - master
+    context: ci/prow/prow-config
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-prow-config
+    rerun_command: /test prow-config
+    spec:
+      containers:
+      - command:
+        - hack/validate-prow-config-formatting.sh
+        image: determinize-prow-config:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: ((?m)^/test prow-config,?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
     context: ci/prow/prow-config-filenames
     decorate: true
     name: pull-ci-openshift-release-master-prow-config-filenames
