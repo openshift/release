@@ -1,0 +1,47 @@
+kind: List
+apiVersion: v1
+items:
+- kind: Group
+  apiVersion: v1
+  metadata:
+    name: openshift-priv-admins
+  users:
+  - smarterclayton
+
+- kind: ClusterRole
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: openshift-priv-getters
+  rules:
+  - apiGroups:
+      - private.openshift.io
+    resources:
+      - openshiftprivs
+    verbs:
+      - get
+
+- kind: ClusterRoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: openshift-priv-admin-getters
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: openshift-priv-admins
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: openshift-priv-getters
+
+- kind: ClusterRoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: openshift-priv-ci-admins
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: ci-admins
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: openshift-priv-getters    
