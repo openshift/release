@@ -67,6 +67,10 @@ dashboard.new(
     .addTarget(prometheus.target(
         'sum(kube_pod_container_status_running{pod=~".*-azure(-.*)?",container="teardown"})',
         legendFormat='azure',
+    ))
+    .addTarget(prometheus.target(
+        'sum(kube_pod_container_status_running{pod=~".*-openstack(-.*)?",container="teardown"})',
+        legendFormat='openstack',
     )), gridPos={
     h: 9,
     w: 24,
