@@ -225,7 +225,9 @@ objects:
           cp /tmp/cluster/ssh-privatekey ~/.ssh/kube_aws_rsa || true
           export PROVIDER_ARGS="-provider=aws -gce-zone=us-east-1"
           # TODO: make openshift-tests auto-discover this from cluster config
-          export TEST_PROVIDER='{"type":"aws","region":"us-east-1","zone":"us-east-1a","multizone":true,"multimaster":true}'
+          REGION="$(oc get -o jsonpath='{.status.platformStatus.aws.region}' infrastructure cluster)"
+          ZONE="$(oc get -o jsonpath='{.items[0].metadata.labels.failure-domain\.beta\.kubernetes\.io/zone}' nodes)"
+          export TEST_PROVIDER="{\"type\":\"aws\",\"region\":\"${REGION}\",\"zone\":\"${ZONE}\",\"multizone\":true,\"multimaster\":true}"
           export KUBE_SSH_USER=core
         fi
 
