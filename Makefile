@@ -50,7 +50,7 @@ jobs:
 
 prow-config:
 	docker pull registry.svc.ci.openshift.org/ci/determinize-prow-config:latest
-	docker run -it -v "${CURDIR}/core-services/prow/02_config:/config" registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest --prow-config-dir /config
+	docker run -it -v "${CURDIR}/core-services/prow/02_config:/config" registry.svc.ci.openshift.org/ci/determinize-prow-config:latest --prow-config-dir /config
 
 branch-cut:
 	docker pull registry.svc.ci.openshift.org/ci/config-brancher:latest
