@@ -12,13 +12,14 @@ ENV VERSION=1.13.1 \
     GOPATH=/go \
     GOROOT=/usr/local/go \
     LOGNAME=deadbeef
-ENV PATH=$PATH:$GOPATH/bin
+ENV PATH=/opt/rh/rh-git218/root/bin/:$PATH:$GOPATH/bin
 
 COPY cbs-paas7-openshift-multiarch-el7-build.repo /etc/yum.repos.d/
 COPY CentOS-Base.repo /etc/yum.repos.d/
+COPY rhel-server-rhscl.repo /etc/yum.repos.d/
 COPY RPM-GPG-KEY-CentOS-7 /etc/pki/rpm-gpg/
 RUN yum install -y epel-release && \
-    INSTALL_PKGS="bc bind-utils bsdtar bzr ceph-common createrepo device-mapper device-mapper-persistent-data e2fsprogs ethtool file findutils gcc git glibc-static glib2-devel gpgme gpgme-devel hostname iptables jq krb5-devel libassuan libassuan-devel libseccomp-devel libvirt-devel lsof make mercurial nmap-ncat openssl protobuf-compiler rsync socat systemd-devel sysvinit-tools tar tito tree util-linux wget which xfsprogs zip goversioninfo" && \
+    INSTALL_PKGS="bc bind-utils bsdtar bzr ceph-common createrepo device-mapper device-mapper-persistent-data e2fsprogs ethtool file findutils gcc rh-git218-git-core glibc-static glib2-devel gpgme gpgme-devel hostname iptables jq krb5-devel libassuan libassuan-devel libseccomp-devel libvirt-devel lsof make mercurial nmap-ncat openssl protobuf-compiler rsync socat systemd-devel sysvinit-tools tar tito tree util-linux wget which xfsprogs zip goversioninfo" && \
     yum install -y --setopt=skip_missing_names_on_install=False $INSTALL_PKGS && \
     yum clean all && \
     touch /os-build-image && \
