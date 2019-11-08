@@ -155,31 +155,6 @@ objects:
         mkdir -p ~/.ssh
         cp /tmp/cluster/ssh-privatekey ~/.ssh/kube_metal_rsa || true
 
-        # create fips enable helper
-        function enable_fips() {
-            for name in $(oc get machineconfigpool --template='{{range .items}}{{.metadata.name}}{{"\n"}}{{end}}')
-            do
-              cat > /tmp/fips-mc.yaml <<'EOF'
-        apiVersion: machineconfiguration.openshift.io/v1
-        kind: MachineConfig
-        metadata:
-          labels:
-            machineconfiguration.openshift.io/role: "{{name}}"
-          name: 99-fips-"{{name}}"
-        spec:
-          fips: true
-        EOF
-              sed -i "s/\"{{name}}\"/${name}/g" /tmp/fips-mc.yaml
-              oc create -f /tmp/fips-mc.yaml
-            done
-            for i in $(seq 0 10); do oc wait machineconfigpool --all --for=condition=Updating --timeout=5m && break; done
-            for i in $(seq 0 10); do oc wait machineconfigpool --all --for=condition=Updated --timeout=5m && break; sleep 30; done
-        }
-
-        if [[ "${ENABLE_FIPS}" == true ]]; then
-          enable_fips
-        fi
-
         mkdir -p /tmp/output
         cd /tmp/output
 
@@ -241,6 +216,8 @@ objects:
         value: /tmp/artifacts/installer/auth/kubeconfig
       - name: INSTALL_INITIAL_RELEASE
       - name: RELEASE_IMAGE_INITIAL
+      - name: ENABLE_FIPS
+        value: ${ENABLE_FIPS}
       command:
       - /bin/sh
       - -c
@@ -282,6 +259,12 @@ objects:
         sshKey: |
           ${SSH_PUB_KEY}
         EOF
+
+        if [[ "${ENABLE_FIPS}" == true ]]; then
+          cat >> /tmp/artifacts/installer/install-config.yaml << EOF
+        fips: true
+        EOF
+        fi
 
         openshift-install --dir=/tmp/artifacts/installer create ignition-configs
 

@@ -321,32 +321,6 @@ objects:
           export TEST_PROVIDER='azure'
         fi
 
-        # create fips enable helper
-        function enable_fips() {
-            for name in $(oc get machineconfigpool --template='{{range .items}}{{.metadata.name}}{{"\n"}}{{end}}')
-            do
-              cat > /tmp/fips-mc.yaml <<'EOF'
-        apiVersion: machineconfiguration.openshift.io/v1
-        kind: MachineConfig
-        metadata:
-          labels:
-            machineconfiguration.openshift.io/role: "{{name}}"
-          name: 99-fips-"{{name}}"
-        spec:
-          fips: true
-        EOF
-              sed -i "s/\"{{name}}\"/${name}/g" /tmp/fips-mc.yaml
-              oc create -f /tmp/fips-mc.yaml
-            done
-
-            for i in $(seq 0 10); do oc wait machineconfigpool --all --for=condition=Updating --timeout=5m && break; done
-            for i in $(seq 0 10); do oc wait machineconfigpool --all --for=condition=Updated --timeout=5m && break; sleep 30; done
-        }
-
-        if [[ "${ENABLE_FIPS}" == true ]]; then
-          enable_fips
-        fi
-
         # save the working dir because that's where our test script
         # will be run from
         cwd=$(pwd)
@@ -461,6 +435,8 @@ objects:
         value: registry.svc.ci.openshift.org/${NAMESPACE}/release
       - name: INSTALL_INITIAL_RELEASE
       - name: RELEASE_IMAGE_INITIAL
+      - name: ENABLE_FIPS
+        value: ${ENABLE_FIPS}
       command:
       - /bin/bash
       - -c
@@ -711,6 +687,12 @@ objects:
         if [[ -n "${CLUSTER_NETWORK_MANIFEST}" ]]; then
             openshift-install --dir=/tmp/artifacts/installer/ create manifests
             echo "${CLUSTER_NETWORK_MANIFEST}" > /tmp/artifacts/installer/manifests/cluster-network-03-config.yml
+        fi
+
+        if [[ "${ENABLE_FIPS}" == true ]]; then
+          cat >> /tmp/artifacts/installer/install-config.yaml << EOF
+        fips: true
+        EOF
         fi
 
         TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create cluster &
