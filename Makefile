@@ -165,6 +165,10 @@ prow-release-controller-definitions:
 	oc annotate -n ocp is/4.3-art-latest-s390x "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.3-s390x.json)" --overwrite
 	oc annotate -n ocp is/4.3-art-latest-ppc64le "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.3-ppc64le.json)" --overwrite
 	oc annotate -n ocp is/4.3 "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.3-ci.json)" --overwrite
+	oc annotate -n ocp is/4.4-art-latest "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.4.json)" --overwrite
+	oc annotate -n ocp is/4.4-art-latest-s390x "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.4-s390x.json)" --overwrite
+	oc annotate -n ocp is/4.4-art-latest-ppc64le "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.4-ppc64le.json)" --overwrite
+	oc annotate -n ocp is/4.4 "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.4-ci.json)" --overwrite
 	oc annotate -n ocp is/release "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.y-stable.json)" --overwrite
 .PHONY: prow-release-controller-definitions
 

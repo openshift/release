@@ -1,0 +1,49 @@
+{
+  "name":"4.4.0-0.ci",
+  "to": "release",
+  "message": "This release contains CI image builds of all code in release-4.4 (master) branches, and is updated each time someone merges.",
+  "mirrorPrefix": "4.4",
+  "expires":"72h",
+  "maxUnreadyReleases": 4,
+  "minCreationIntervalSeconds": 1800,
+  "pullSecretName": "source",
+  "publish":{
+    "mirror-to-origin":{
+      "disabled": true,
+      "imageStreamRef":{
+        "namespace": "origin",
+        "name": "4.4",
+        "excludeTags": [
+          "machine-config-operator",
+          "machine-config-operator-rpms",
+          "installer",
+          "installer-artifacts",
+          "baremetal-installer",
+          "openstack-installer",
+          "upi-installer",
+          "libvirt-installer"
+        ]
+      }
+    },
+    "tag":{"tagRef":{"name":"4.4-ci"}}
+  },
+  "verify":{
+    "gcp":{
+      "prowJob":{"name":"release-openshift-origin-installer-e2e-gcp-4.4"}
+    },
+    "gcp-serial":{
+      "prowJob":{"name":"release-openshift-origin-installer-e2e-gcp-serial-4.4"}
+    },
+    "upgrade":{
+      "upgrade":true,
+      "optional":true,
+      "prowJob":{"name":"release-openshift-origin-installer-e2e-aws-upgrade"}
+    },
+    "upgrade-minor":{
+      "upgrade":true,
+      "upgradeFrom": "PreviousMinor",
+      "optional":false,
+      "prowJob":{"name":"release-openshift-origin-installer-e2e-aws-upgrade"}
+    }
+  }
+}
