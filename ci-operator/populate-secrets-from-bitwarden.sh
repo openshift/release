@@ -295,3 +295,7 @@ oc -n "ci-release" label secret "git-credentials" "ci.openshift.io/managed=true"
 
 # The private key here is used to mirror content from the ops mirror
 update_secret generic "mirror.openshift.com" "$( format_attachment "mirror.openshift.com" cert-key.pem ops-mirror.pem )"
+
+#https://jira.coreos.com/browse/DPP-2164
+update_secret generic "aws-openshift-llc-account-credentials" \
+	"$( format_attachment "AWS ci-longlivedcluster-bot" .awscred )"
