@@ -73,3 +73,49 @@ items:
   - kind: ServiceAccount
     name: ci-operator
     namespace: ci
+
+- kind: Role
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: image-tagger
+    namespace: ci
+  rules:
+  - apiGroups:
+    - ""
+    - image.openshift.io
+    attributeRestrictions: null
+    resources:
+    - imagestreamtags
+    - imagestreams
+    verbs:
+    - update
+    - patch
+    - get
+    - create
+
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: image-tagger-ci-operator
+    namespace: ci
+  roleRef:
+    kind: Role
+    name: image-tagger
+    namespace: ci
+  subjects:
+  - kind: ServiceAccount
+    name: ci-operator
+    namespace: ci
+
+- apiVersion: authorization.openshift.io/v1
+  kind: RoleBinding
+  metadata:
+    name: image-puller
+    namespace: ci
+  roleRef:
+    name: system:image-puller
+  subjects:
+  - kind: SystemGroup
+    name: system:unauthenticated
+  - kind: SystemGroup
+    name: system:authenticated
