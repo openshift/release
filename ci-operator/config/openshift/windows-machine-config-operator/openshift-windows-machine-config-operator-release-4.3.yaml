@@ -8,10 +8,15 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.12
+images:
+- dockerfile_path: Dockerfile.tools
+  to: ansible-test
 promotion:
   disabled: true
   name: "4.3"
   namespace: ocp
+  excluded_images:
+  - ansible-test
 resources:
   '*':
     limits:
@@ -34,3 +39,9 @@ tests:
   commands: make verify-all
   container:
     from: src
+# Leaving this here, but commented out, to show how the prow jobs were generated
+#- as: e2e-wsu
+#  commands: make run-wsu-ci-e2e-test
+#  openshift_installer_custom_test_image:
+#    cluster_profile: aws
+#    from: pipeline:ansible-test
