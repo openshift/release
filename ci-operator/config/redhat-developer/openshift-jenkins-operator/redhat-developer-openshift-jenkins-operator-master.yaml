@@ -1,18 +1,19 @@
 base_images:
   base:
-    cluster: https://api.ci.openshift.org
     name: "4.2"
     namespace: ocp
     tag: base
 build_root:
   image_stream_tag:
-    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.12
 images:
 - from: base
   to: openshift-jenkins-operator
+#promotion:
+#  name: "4.2"
+#  namespace: ocp
 resources:
   '*':
     limits:
@@ -21,7 +22,6 @@ resources:
       cpu: 200m
       memory: 200Mi
 tag_specification:
-  cluster: https://api.ci.openshift.org
   name: "4.2"
   namespace: ocp
 tests:
@@ -29,3 +29,12 @@ tests:
   commands: make test-unit
   container:
     from: src
+#- as: e2e-operator
+#  commands: make test-e2e
+#  openshift_installer_src:
+#    cluster_profile: aws
+#- as: e2e-aws
+#  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+#  openshift_installer:
+#    cluster_profile: aws
+

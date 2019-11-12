@@ -1,23 +1,23 @@
 base_images:
-  must-gather:
-    cluster: https://api.ci.openshift.org
-    name: "4.3"
-    namespace: ocp
-    tag: must-gather
   operator-registry:
-    cluster: https://api.ci.openshift.org
     name: "4.2"
     namespace: ocp
     tag: operator-registry
   os:
-    cluster: https://api.ci.openshift.org
     name: ubi
     namespace: ocp
     tag: "7"
+  must-gather:
+    name: "4.3"
+    namespace: ocp
+    tag: must-gather
+
 binary_build_commands: make build
+
 build_root:
   project_image:
     dockerfile_path: openshift-ci/Dockerfile.tools
+
 images:
 - dockerfile_path: openshift-ci/Dockerfile.deploy
   from: os
@@ -27,12 +27,15 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/ocs-operator/build/_output/bin/ocs-operator
   to: ocs-operator
+
 - dockerfile_path: openshift-ci/Dockerfile.registry.intermediate
   from: operator-registry
   to: operator-registry-base
+
 - dockerfile_path: openshift-ci/Dockerfile.registry.build
   from: operator-registry-base
   to: ocs-registry
+
 - dockerfile_path: build/Dockerfile
   from: os
   inputs:
@@ -41,6 +44,7 @@ images:
       - destination_dir: _output/bin
         source_path: /go/src/github.com/openshift/ocs-operator/build/_output/bin/ocs-operator
   to: ocs-operator-quay
+
 - dockerfile_path: deploy/Dockerfile
   from: operator-registry
   inputs:
@@ -51,6 +55,7 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/ocs-operator/deploy/olm-catalog
   to: ocs-registry-quay
+
 - dockerfile_path: must-gather/Dockerfile
   from: must-gather
   inputs:
@@ -65,6 +70,7 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/ocs-operator/must-gather/templates
   to: ocs-must-gather-quay
+
 promotion:
   additional_images:
     ocs-operator-tests: src
@@ -72,8 +78,9 @@ promotion:
   - ocs-operator
   - operator-registry-base
   - ocs-registry
-  name: ocs-4.2
+  name: "ocs-4.2"
   namespace: ocp
+
 resources:
   '*':
     limits:
@@ -81,21 +88,24 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+
 tag_specification:
-  cluster: https://api.ci.openshift.org
   name: "4.2"
   namespace: ocp
+
 tests:
 - as: ocs-operator-ci
   commands: |
     make ocs-operator-ci
   container:
     from: src
+
 - as: ocs-operator-e2e-aws
   commands: |
     make functest
   openshift_installer_src:
     cluster_profile: aws
+
 - as: red-hat-storage-ocs-ci-e2e-aws
   commands: |
     export REDHAT_OCS_CI_FORCE_TOOL_POD_INSTALL="true" && make cluster-deploy && make red-hat-storage-ocs-ci

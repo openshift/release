@@ -1,14 +1,17 @@
+tag_specification:
+  name: origin-v3.11
+  namespace: openshift
 base_images:
   base:
-    cluster: https://api.ci.openshift.org
     name: origin-v3.11
     namespace: openshift
     tag: base
-binary_build_commands: make install
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
 canonical_go_repository: github.com/knative/serving
+binary_build_commands: make install
+test_binary_build_commands: make test-install
 images:
 - dockerfile_path: openshift/ci-operator/knative-images/activator/Dockerfile
   from: base
@@ -115,8 +118,13 @@ images:
         source_path: /go/bin/singlethreaded
   to: knative-serving-test-singlethreaded
 promotion:
-  name: knative-v0.2
   namespace: openshift
+  name: knative-v0.2
+tests:
+- as: e2e
+  commands: "make test-e2e"
+  openshift_ansible_src:
+    cluster_profile: gcp
 resources:
   '*':
     limits:
@@ -124,13 +132,3 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  cluster: https://api.ci.openshift.org
-  name: origin-v3.11
-  namespace: openshift
-test_binary_build_commands: make test-install
-tests:
-- as: e2e
-  commands: make test-e2e
-  openshift_ansible_src:
-    cluster_profile: gcp

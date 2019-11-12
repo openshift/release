@@ -1,26 +1,27 @@
 base_images:
   base:
-    cluster: https://api.ci.openshift.org
-    name: "4.0"
+    name: '4.0'
     namespace: ocp
     tag: base
   base-machine:
-    cluster: https://api.ci.openshift.org
     name: fedora
     namespace: openshift
-    tag: "29"
+    tag: '29'
   machine-os-content-base:
-    cluster: https://api.ci.openshift.org
-    name: "4.0"
+    name: '4.0'
     namespace: ocp
     tag: machine-os-content
-binary_build_commands: make build GOFLAGS='-v'
+
 build_root:
   image_stream_tag:
-    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.10
+
+
+binary_build_commands: make build GOFLAGS='-v'
+test_binary_build_commands: make build GOFLAGS='-v -race'
+
 images:
 - dockerfile_path: images/openshift-acme-controller/Dockerfile
   from: base
@@ -28,38 +29,41 @@ images:
     bin:
       as:
       - bin
-      paths: null
   to: openshift-acme
+
 promotion:
-  name: ""
   namespace: ci
   tag: latest
-resources:
-  '*':
-    limits:
-      memory: 3Gi
-    requests:
-      cpu: "3"
-      memory: 1Gi
+
 tag_specification:
-  cluster: https://api.ci.openshift.org
-  name: "4.0"
+  name: '4.0'
   namespace: ocp
-test_binary_build_commands: make build GOFLAGS='-v -race'
+
 tests:
 - as: verify
   commands: make verify -k
   container:
     from: bin
+
 - as: unit
   commands: make test
   container:
     from: test-bin
+
 - as: e2e-cluster-wide
   commands: hack/ci-run-e2e-cluster-wide.sh
   openshift_installer_src:
     cluster_profile: aws
+
 - as: e2e-single-namespace
   commands: hack/ci-run-e2e-single-namespace.sh
   openshift_installer_src:
     cluster_profile: aws
+
+resources:
+  '*':
+    limits:
+      memory: 3Gi
+    requests:
+      cpu: '3'
+      memory: 1Gi
