@@ -1,50 +1,55 @@
+
 base_images:
+  os:
+    name: centos
+    namespace: openshift
+    tag: '7'
   operator-registry:
-    cluster: https://api.ci.openshift.org
     name: "4.2"
     namespace: ocp
     tag: operator-registry
-  os:
-    cluster: https://api.ci.openshift.org
-    name: centos
-    namespace: openshift
-    tag: "7"
-binary_build_commands: make build
-build_root:
-  project_image:
-    dockerfile_path: openshift-ci/Dockerfile.tools
-images:
-- dockerfile_path: openshift-ci/Dockerfile.deploy
-  from: os
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/tektoncd-pipeline-operator/out/operator
-  to: tektoncd-pipeline-operator
-- dockerfile_path: openshift-ci/Dockerfile.registry.intermediate
-  from: operator-registry
-  to: operator-registry-base
-- dockerfile_path: openshift-ci/Dockerfile.registry.build
-  from: operator-registry-base
-  to: tektoncd-pipeline-operator-registry
-- dockerfile_path: openshift-ci/Dockerfile.upgrade.build
-  from: src
-  to: upgrade-manifest-build
-promotion:
-  name: tektoncd-pipeline
-  namespace: openshift
+
 resources:
   '*':
     limits:
       memory: 6Gi
     requests:
-      cpu: 100m
       memory: 250Mi
+      cpu: 100m
+
+images:
+- from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/tektoncd-pipeline-operator/out/operator
+  dockerfile_path: openshift-ci/Dockerfile.deploy
+  to: tektoncd-pipeline-operator
+- from: operator-registry
+  dockerfile_path: openshift-ci/Dockerfile.registry.intermediate
+  to: operator-registry-base
+- from: operator-registry-base
+  dockerfile_path: openshift-ci/Dockerfile.registry.build
+  to: tektoncd-pipeline-operator-registry
+- from: src
+  dockerfile_path: openshift-ci/Dockerfile.upgrade.build
+  to: upgrade-manifest-build
+
+promotion:
+  namespace: openshift
+  name: tektoncd-pipeline
+
+build_root:
+  project_image:
+    dockerfile_path: openshift-ci/Dockerfile.tools
+
+binary_build_commands: make build
+
 tag_specification:
-  cluster: https://api.ci.openshift.org
   name: "4.2"
   namespace: ocp
+
 tests:
 - as: lint
   commands: VERBOSE=2 make lint
@@ -54,8 +59,8 @@ tests:
   commands: make test-e2e
   openshift_installer_src:
     cluster_profile: aws
-- artifact_dir: /tmp/artifacts
-  as: csv
+- as: csv
   commands: VERBOSE=2 make test-csv
   container:
     from: src
+  artifact_dir: /tmp/artifacts

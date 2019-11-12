@@ -1,58 +1,63 @@
+
 base_images:
+  os:
+    name: centos
+    namespace: openshift
+    tag: '7'
   operator-registry:
-    cluster: https://api.ci.openshift.org
     name: "4.0"
     namespace: ocp
     tag: operator-registry
-  os:
-    cluster: https://api.ci.openshift.org
-    name: centos
-    namespace: openshift
-    tag: "7"
-binary_build_commands: make build
-build_root:
-  project_image:
-    dockerfile_path: openshift-ci/Dockerfile.tools
-images:
-- dockerfile_path: openshift-ci/Dockerfile.deploy
-  from: os
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/redhat-developer/devconsole-operator/out/operator
-  to: devconsole-operator
-- dockerfile_path: openshift-ci/Dockerfile.registry.intermediate
-  from: operator-registry
-  to: operator-registry-base
-- dockerfile_path: openshift-ci/Dockerfile.registry.build
-  from: operator-registry-base
-  to: devconsole-operator-registry
-- dockerfile_path: openshift-ci/Dockerfile.upgrade.build
-  from: src
-  to: upgrade-manifest-build
-- dockerfile_path: openshift-ci/Dockerfile.registry.build.next
-  from: operator-registry-base
-  inputs:
-    upgrade-manifest-build:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/redhat-developer/devconsole-operator/out/manifests.tar.gz
-  to: devconsole-operator-registry-next
-promotion:
-  name: devconsole-0.1.0
-  namespace: openshift
+
 resources:
   '*':
     limits:
       memory: 6Gi
     requests:
-      cpu: 100m
       memory: 250Mi
+      cpu: 100m
+
+images:
+- from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/redhat-developer/devconsole-operator/out/operator 
+  dockerfile_path: openshift-ci/Dockerfile.deploy
+  to: devconsole-operator
+- from: operator-registry
+  dockerfile_path: openshift-ci/Dockerfile.registry.intermediate
+  to: operator-registry-base
+- from: operator-registry-base
+  dockerfile_path: openshift-ci/Dockerfile.registry.build
+  to: devconsole-operator-registry
+- from: src
+  dockerfile_path: openshift-ci/Dockerfile.upgrade.build
+  to: upgrade-manifest-build
+- from: operator-registry-base
+  inputs:
+    upgrade-manifest-build:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/redhat-developer/devconsole-operator/out/manifests.tar.gz
+  dockerfile_path: openshift-ci/Dockerfile.registry.build.next
+  to: devconsole-operator-registry-next
+
+promotion:
+  namespace: openshift
+  name: devconsole-0.1.0
+
+build_root:
+  project_image:
+    dockerfile_path: openshift-ci/Dockerfile.tools
+
+binary_build_commands: make build
+
 tag_specification:
-  cluster: https://api.ci.openshift.org
   name: "4.0"
   namespace: ocp
+
 tests:
 - as: lint
   commands: VERBOSE=2 make lint

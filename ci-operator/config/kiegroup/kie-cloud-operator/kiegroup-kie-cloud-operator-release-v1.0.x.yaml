@@ -1,16 +1,9 @@
 base_images:
   os:
-    cluster: https://api.ci.openshift.org
     name: centos
     namespace: openshift
-    tag: "7"
+    tag: '7'
 binary_build_commands: CI=true make build
-build_root:
-  image_stream_tag:
-    cluster: https://api.ci.openshift.org
-    name: release
-    namespace: openshift
-    tag: golang-1.10
 images:
 - dockerfile_path: build/Dockerfile
   from: os
@@ -20,9 +13,6 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/kiegroup/kie-cloud-operator/build
   to: kie-cloud-operator
-promotion:
-  name: kie-cloud
-  namespace: kiegroup
 resources:
   '*':
     limits:
@@ -30,6 +20,14 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+promotion:
+  name: kie-cloud
+  namespace: kiegroup
 tests:
 - as: unit
   commands: CI=true make test
