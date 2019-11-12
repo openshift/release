@@ -3,8 +3,14 @@ base_images:
     cluster: https://api.ci.openshift.org
     name: alpine
     namespace: ci
-    tag: '3.10'
+    tag: "3.10"
 binary_build_commands: make CGO_ENABLED=0 install
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.13
 images:
 - context_dir: image/
   from: os
@@ -15,7 +21,7 @@ images:
         source_path: /go/bin/ci-ns-ttl-controller
   to: ci-ns-ttl-controller
 promotion:
-  cluster: https://api.ci.openshift.org
+  name: ""
   namespace: ci
   tag: latest
 resources:
@@ -25,12 +31,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-build_root:
-  image_stream_tag:
-    cluster: https://api.ci.openshift.org
-    name: release
-    namespace: openshift
-    tag: golang-1.13
 tests:
 - artifact_dir: /tmp/artifacts
   as: unit

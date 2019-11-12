@@ -1,21 +1,31 @@
 base_images:
-  os:
-    name: centos
-    namespace: openshift
-    tag: '7'
+  cli:
+    cluster: https://api.ci.openshift.org
+    name: "4.2"
+    namespace: ocp
+    tag: cli
   git:
+    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.13
   hive:
+    cluster: https://api.ci.openshift.org
     name: hive-v4.0
     namespace: openshift
-    tag: 'hive'
-  cli:
-    name: "4.2"
-    namespace: ocp
-    tag: cli
+    tag: hive
+  os:
+    cluster: https://api.ci.openshift.org
+    name: centos
+    namespace: openshift
+    tag: "7"
 binary_build_commands: make install
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.13
 images:
 - context_dir: images/blocking-issue-creator/
   from: os
@@ -124,8 +134,8 @@ images:
   inputs:
     bin:
       paths:
-        - destination_dir: .
-          source_path: /go/bin/applyconfig
+      - destination_dir: .
+        source_path: /go/bin/applyconfig
     cli:
       paths:
       - destination_dir: usr/bin
@@ -188,6 +198,7 @@ images:
         source_path: /go/bin/determinize-prow-config
   to: determinize-prow-config
 promotion:
+  name: ""
   namespace: ci
   tag: latest
 resources:
@@ -197,11 +208,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.13
 tests:
 - artifact_dir: /tmp/artifacts
   as: unit
