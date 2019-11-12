@@ -1,24 +1,10 @@
+binary_build_commands: env SKIP_INSTALLDEPS=1 ./ci/build.sh
 build_root:
   image_stream_tag:
-    namespace: coreos
+    cluster: https://api.ci.openshift.org
     name: cosa-buildroot
+    namespace: coreos
     tag: latest
-
-# With this we build a container image derived from cosa-buildroot
-# that contains new binaries.  From there...since this
-# cluster doesn't support recursive containerization or virt,
-# we can't do much interesting to test it today.  But hopefully
-# that will soon change.
-# https://github.com/openshift/release/issues/4892
-# FIXME: change this to build-check.sh as soon as we debug the libarchive test suite failure
-binary_build_commands: env SKIP_INSTALLDEPS=1 ./ci/build.sh
-
-tests:
-- as: sanity
-  commands: ostree --version
-  container:
-    from: bin
-
 resources:
   '*':
     limits:
@@ -26,3 +12,8 @@ resources:
     requests:
       cpu: 1000m
       memory: 2Gi
+tests:
+- as: sanity
+  commands: ostree --version
+  container:
+    from: bin

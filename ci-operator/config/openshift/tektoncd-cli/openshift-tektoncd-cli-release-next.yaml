@@ -1,34 +1,30 @@
-tag_specification:
-  name: '4.2'
-  namespace: ocp
-promotion:
-  namespace: openshift
-  name: release-next
 base_images:
   base:
-    name: '4.2'
+    cluster: https://api.ci.openshift.org
+    name: "4.2"
     namespace: ocp
     tag: base
+binary_build_commands: make
 build_root:
   project_image:
     dockerfile_path: openshift/Dockerfile
 canonical_go_repository: github.com/tektoncd/cli
-binary_build_commands: make
-
 promotion:
-  namespace: openshift
   name: tektoncd-next
-
-tests:
-- as: e2e
-  commands: "make -C openshift test-e2e-downstream-stable"
-  openshift_installer_src:
-    cluster_profile: aws
-
+  namespace: openshift
 resources:
   '*':
     limits:
       memory: 6Gi
     requests:
-      memory: 250Mi
       cpu: 100m
+      memory: 250Mi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: "4.2"
+  namespace: ocp
+tests:
+- as: e2e
+  commands: make -C openshift test-e2e-downstream-stable
+  openshift_installer_src:
+    cluster_profile: aws

@@ -1,19 +1,14 @@
-tag_specification:
-  name: '4.3'
-  namespace: ocp
-promotion:
-  namespace: openshift
-  name: release-next-variant
 base_images:
   base:
-    name: '4.3'
+    cluster: https://api.ci.openshift.org
+    name: "4.3"
     namespace: ocp
     tag: base
+binary_build_commands: make install
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
 canonical_go_repository: github.com/tektoncd/pipeline
-binary_build_commands: make install
 images:
 - dockerfile_path: openshift/ci-operator/knative-images/controller/Dockerfile
   from: base
@@ -79,11 +74,9 @@ images:
       - destination_dir: .
         source_path: /go/bin/.
   to: tektoncd-pipeline-webhook
-tests:
-- as: e2e-aws-ocp-43
-  commands: "make test-e2e"
-  openshift_installer_src:
-    cluster_profile: aws
+promotion:
+  name: release-next-variant
+  namespace: openshift
 resources:
   '*':
     limits:
@@ -91,3 +84,12 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: "4.3"
+  namespace: ocp
+tests:
+- as: e2e-aws-ocp-43
+  commands: make test-e2e
+  openshift_installer_src:
+    cluster_profile: aws
