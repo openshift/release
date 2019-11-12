@@ -1,16 +1,9 @@
 base_images:
   os:
-    cluster: https://api.ci.openshift.org
     name: centos
     namespace: openshift
-    tag: "7"
+    tag: '7'
 binary_build_commands: make build
-build_root:
-  image_stream_tag:
-    cluster: https://api.ci.openshift.org
-    name: release
-    namespace: openshift
-    tag: golang-1.10
 images:
 - context_dir: images/base/
   from: os
@@ -67,11 +60,11 @@ images:
   from: control-plane
   to: node
 promotion:
+  name: origin-v3.11
+  namespace: openshift
   additional_images:
     artifacts: artifacts
     base: base
-  name: origin-v3.11
-  namespace: openshift
 raw_steps:
 - pipeline_image_cache_step:
     commands: mkdir -p _output/local/releases; touch _output/local/releases/CHECKSUM;
@@ -92,9 +85,7 @@ raw_steps:
       rpms:
         as:
         - rpms
-        paths: null
-      src:
-        paths: null
+      src: {}
     optional: true
     to: artifacts
 - output_image_tag_step:
@@ -102,7 +93,6 @@ raw_steps:
     optional: true
     to:
       name: stable
-      namespace: ""
       tag: artifacts
 - rpm_image_injection_step:
     from: base
@@ -118,43 +108,49 @@ resources:
     limits:
       memory: 11Gi
     requests:
-      cpu: "3"
+      cpu: '3'
       memory: 7Gi
   bin-cross:
     limits:
       memory: 11Gi
     requests:
-      cpu: "3"
+      cpu: '3'
       memory: 8Gi
   integration:
     limits:
       memory: 13Gi
     requests:
-      cpu: "3"
+      cpu: '3'
       memory: 10Gi
   rpms:
     limits:
       memory: 12Gi
     requests:
-      cpu: "2"
+      cpu: '2'
       memory: 6Gi
   unit:
     limits:
       memory: 20Gi
     requests:
-      cpu: "8"
+      cpu: '8'
       memory: 16Gi
   verify:
     limits:
       memory: 11Gi
     requests:
-      cpu: "2"
+      cpu: '2'
       memory: 6Gi
 rpm_build_commands: make build-rpms
 tag_specification:
-  cluster: https://api.ci.openshift.org
   name: origin-v3.11
   namespace: openshift
+  tag: ''
+  tag_overrides: {}
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.10
 tests:
 - artifact_dir: /tmp/artifacts
   as: unit
@@ -164,8 +160,8 @@ tests:
     from: src
 - artifact_dir: /tmp/artifacts
   as: integration
-  commands: TMPDIR=/tmp/volume ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1 KUBERNETES_SERVICE_HOST=
-    make test-integration
+  commands: TMPDIR=/tmp/volume ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1 KUBERNETES_SERVICE_HOST= make
+    test-integration
   container:
     from: bin
     memory_backed_volume:

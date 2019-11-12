@@ -1,44 +1,48 @@
+
 base_images:
+  os:
+    name: ubi
+    namespace: ocp
+    tag: '7'
   operator-registry:
-    cluster: https://api.ci.openshift.org
     name: "4.0"
     namespace: ocp
     tag: operator-registry
-  os:
-    cluster: https://api.ci.openshift.org
-    name: ubi
-    namespace: ocp
-    tag: "7"
-binary_build_commands: make build
-build_root:
-  project_image:
-    dockerfile_path: openshift-ci/Dockerfile.tools
-images:
-- dockerfile_path: openshift-ci/Dockerfile.deploy
-  from: os
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/redhat-developer/service-binding-operator/out/operator
-  to: service-binding-operator
-- dockerfile_path: openshift-ci/Dockerfile.registry.intermediate
-  from: operator-registry
-  to: operator-registry-base
-- dockerfile_path: openshift-ci/Dockerfile.registry.build
-  from: operator-registry-base
-  to: service-binding-operator-registry
+
 resources:
   '*':
     limits:
       memory: 6Gi
     requests:
-      cpu: 100m
       memory: 250Mi
+      cpu: 100m
+
+images:
+- from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/redhat-developer/service-binding-operator/out/operator 
+  dockerfile_path: openshift-ci/Dockerfile.deploy
+  to: service-binding-operator
+- from: operator-registry
+  dockerfile_path: openshift-ci/Dockerfile.registry.intermediate
+  to: operator-registry-base
+- from: operator-registry-base
+  dockerfile_path: openshift-ci/Dockerfile.registry.build
+  to: service-binding-operator-registry
+
+binary_build_commands: make build
+
+build_root:
+  project_image:
+    dockerfile_path: openshift-ci/Dockerfile.tools
+
 tag_specification:
-  cluster: https://api.ci.openshift.org
-  name: "4.2"
+  name: '4.2'
   namespace: ocp
+
 tests:
 - as: lint
   commands: VERBOSE=2 make lint
@@ -46,12 +50,16 @@ tests:
     from: src
 - as: unit
   commands: VERBOSE=2 make test-unit-with-coverage upload-codecov-report
+  secret:
+    name: redhat-developer-service-binding-operator-codecov-token
+    mount_path: /usr/local/redhat-developer-service-binding-operator-codecov-token
   container:
     from: src
-  secret:
-    mount_path: /usr/local/redhat-developer-service-binding-operator-codecov-token
-    name: redhat-developer-service-binding-operator-codecov-token
 - as: e2e
   commands: VERBOSE=2 LOGS_DIR=/tmp/artifacts make -k test-e2e parse-test-e2e-operator-log
   openshift_installer_src:
     cluster_profile: aws
+#- as: e2e-olm-ci
+#  commands: make test-e2e-olm-ci
+#  openshift_installer_src:
+#    cluster_profile: aws
