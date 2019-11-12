@@ -238,9 +238,10 @@ periodics:
                   rpm-ostree db list --repo /srv/repo "${ostree_ref}" > /tmp/packages && \\
                   curl http://base-${BRANCH//\./-}-rhel8.ocp.svc > /etc/yum.repos.d/rhel8.repo && \\
                   if ! grep -q cri-o /tmp/packages; then yumdownloader -y --disablerepo=* --enablerepo=rhel-8* --destdir=/tmp/rpms cri-o cri-tools; fi && \\
+                  if ! grep -q glusterfs-fuse /tmp/packages; then yumdownloader -y --disablerepo=* --enablerepo=rhel-8* --destdir=/tmp/rpms glusterfs-fuse; fi && \\
                   cd /tmp/working && \\
                   for i in \$(find /tmp/rpms/ -name *.rpm); do echo "Extracting \$i ..."; rpm2cpio \$i | cpio -div; done && \\
-                  mv etc usr/ && \\
+                  mv etc usr/ && mv sbin/* usr/sbin/ && rm -rf sbin/ && \\
                   coreos-assembler dev-overlay --repo /srv/repo --rev "${ostree_ref}" --add-tree /tmp/working --output-ref "${ostree_ref}"
 
               FROM scratch
