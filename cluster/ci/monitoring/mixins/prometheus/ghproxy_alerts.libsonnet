@@ -6,18 +6,15 @@
         rules: [
           {
             alert: 'ghproxy-status-code-abnormal-%sXX' % code_prefix,
-            // excluding 404 because otherwise
-            // "this is going to spam us just about 24/7 with the OWNERS thing"
-            // TODO: Undo 404 after https://jira.coreos.com/browse/DPTP-447 is done
+            // excluding 404 because it does not indicate any error in the system
             expr: |||
               sum(rate(github_request_duration_count{status=~"%s..", status!="404"}[5m])) / sum(rate(github_request_duration_count{status!="404"}[5m])) * 100 > 5
             ||| % code_prefix,
-            'for': '1m',
             labels: {
               severity: 'slack',
             },
             annotations: {
-              message: 'ghproxy has {{ $value | humanize }}%% of status code %sXX for over 1 minute.' % code_prefix,
+              message: 'ghproxy has {{ $value | humanize }}%% of status code %sXX in the last 5 minutes.' % code_prefix,
             },
           }
           for code_prefix in ['4', '5']
