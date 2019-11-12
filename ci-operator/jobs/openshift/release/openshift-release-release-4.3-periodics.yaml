@@ -627,6 +627,7 @@ periodics:
     workdir: true
   interval: 15m
   labels:
+    ci.openshift.io/release-type: informing
     job-release: "4.3"
   name: promote-release-openshift-okd-machine-os-content-e2e-aws-4.3
   spec:
@@ -757,8 +758,27 @@ periodics:
 
         # debug output
         oc describe -n ${namespace} istag/machine-os-content:latest
+
+        # Craft a release image
+        MOC_SHA256=$( oc get istag -n "${namespace}" istag/machine-os-content:latest -o template='{{ .image.metadata.name }}' )
+        export RELEASE_IMAGE_LATEST=registry.svc.ci.openshift.org/${namespace}/release:latest
+        oc registry login
+        oc adm release new -n origin \
+          --from-image-stream=$(BRANCH) \
+          --to-image=${RELEASE_IMAGE_LATEST} \
+          machine-os-content=registry.svc.ci.openshift.org/${namespace}/machine-os-content@${MOC_SHA256}
+
+        # execute the test
+        ci-operator \
+          --artifact-dir=$(ARTIFACTS) \
+          --namespace=${namespace} \
+          --secret-dir=/usr/local/pull-secret \
+          --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-cluster-profile \
+          --target=e2e-$(CLUSTER_TYPE)
+
+        # promote to fcos namespace
         oc tag ${namespace}/machine-os-content:latest fcos/machine-os-content:${BRANCH}
-        oc tag fcos/machine-os-content:${BRANCH} ${TAG_NS}/${BRANCH}:machine-os-content
+        oc tag fcos/machine-os-content:${BRANCH} ${namespace}/machine-os-content@${MOC_SHA256}
       env:
       - name: TAG_NS
         value: origin
