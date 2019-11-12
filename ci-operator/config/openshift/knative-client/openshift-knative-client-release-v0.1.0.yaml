@@ -1,17 +1,24 @@
+tag_specification:
+  name: '4.1'
+  namespace: ocp
+promotion:
+  namespace: openshift
+  name: release-v0.1.0
 base_images:
   base:
-    cluster: https://api.ci.openshift.org
-    name: "4.1"
+    name: '4.1'
     namespace: ocp
     tag: base
-binary_build_commands: make build
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
 canonical_go_repository: github.com/knative/client
-promotion:
-  name: release-v0.1.0
-  namespace: openshift
+binary_build_commands: make build
+tests:
+- as: e2e-aws
+  commands: "make test-e2e"
+  openshift_installer_src:
+    cluster_profile: aws
 resources:
   '*':
     limits:
@@ -19,12 +26,3 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  cluster: https://api.ci.openshift.org
-  name: "4.1"
-  namespace: ocp
-tests:
-- as: e2e-aws
-  commands: make test-e2e
-  openshift_installer_src:
-    cluster_profile: aws

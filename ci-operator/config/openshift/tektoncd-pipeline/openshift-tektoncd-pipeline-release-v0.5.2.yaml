@@ -1,14 +1,19 @@
+tag_specification:
+  name: '4.0'
+  namespace: ocp
+promotion:
+  namespace: openshift
+  name: tektoncd-v0.5.2
 base_images:
   base:
-    cluster: https://api.ci.openshift.org
-    name: "4.0"
+    name: '4.0'
     namespace: ocp
     tag: base
-binary_build_commands: make install
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
 canonical_go_repository: github.com/tektoncd/pipeline
+binary_build_commands: make install
 images:
 - dockerfile_path: openshift/ci-operator/knative-images/bash/Dockerfile
   from: base
@@ -99,8 +104,13 @@ images:
         source_path: /go/bin/.
   to: tektoncd-pipeline-pullrequest-init
 promotion:
-  name: tektoncd-v0.5.2
   namespace: openshift
+  name: tektoncd-v0.5.2
+tests:
+- as: e2e
+  commands: "make test-e2e"
+  openshift_installer_src:
+    cluster_profile: aws
 resources:
   '*':
     limits:
@@ -108,12 +118,3 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  cluster: https://api.ci.openshift.org
-  name: "4.0"
-  namespace: ocp
-tests:
-- as: e2e
-  commands: make test-e2e
-  openshift_installer_src:
-    cluster_profile: aws

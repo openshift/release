@@ -1,22 +1,18 @@
 base_images:
   base:
-    cluster: https://api.ci.openshift.org
     name: "4.3"
     namespace: origin
     tag: base
   base-machine:
-    cluster: https://api.ci.openshift.org
     name: fedora
     namespace: openshift
     tag: "29"
   machine-os-content-base:
-    cluster: https://api.ci.openshift.org
     name: "4.3"
     namespace: origin
     tag: machine-os-content
 build_root:
   image_stream_tag:
-    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.12
@@ -24,7 +20,8 @@ images:
 - dockerfile_path: Dockerfile
   from: base
   to: machine-config-operator
-- from: base
+- context: ci/prow/images/
+  from: base
   inputs:
     base-machine-with-rpms:
       as:
@@ -72,7 +69,6 @@ rpm_build_commands: |-
   rm -rf /go/.cache ${RPMBUILD_DIR}
 rpm_build_location: _rpmbuild/RPMS/
 tag_specification:
-  cluster: https://api.ci.openshift.org
   name: "4.3"
   namespace: origin
 tests:

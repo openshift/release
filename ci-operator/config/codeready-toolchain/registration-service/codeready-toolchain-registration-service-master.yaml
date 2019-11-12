@@ -1,36 +1,40 @@
+
 base_images:
   os:
-    cluster: https://api.ci.openshift.org
     name: centos
     namespace: openshift
-    tag: "7"
-binary_build_commands: make build
-build_root:
-  project_image:
-    dockerfile_path: openshift-ci/Dockerfile.tools
-images:
-- dockerfile_path: openshift-ci/Dockerfile.deploy
-  from: os
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/codeready-toolchain/registration-service/build/_output/bin/registration-service
-  to: registration-service
-promotion:
-  name: registration-service-v0.1
-  namespace: codeready-toolchain
+    tag: '7'
+
 resources:
   '*':
     limits:
       memory: 3Gi
     requests:
-      cpu: 100m
       memory: 250Mi
+      cpu: 100m
+promotion:
+  namespace: codeready-toolchain
+  name: registration-service-v0.1
+images:
+- from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/codeready-toolchain/registration-service/build/_output/bin/registration-service
+  dockerfile_path: openshift-ci/Dockerfile.deploy
+  to: registration-service
+    
+build_root:
+  project_image:
+    dockerfile_path: openshift-ci/Dockerfile.tools
+
+binary_build_commands: make build
+
 tag_specification:
-  cluster: https://api.ci.openshift.org
   name: "4.2"
   namespace: ocp
+
 tests:
 - as: build
   commands: make build
