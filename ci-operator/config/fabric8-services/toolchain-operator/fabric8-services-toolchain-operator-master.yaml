@@ -1,41 +1,36 @@
-
 base_images:
   os:
+    cluster: https://api.ci.openshift.org
     name: centos
     namespace: openshift
-    tag: '7'
-
-resources:
-  '*':
-    limits:
-      memory: 3Gi
-    requests:
-      memory: 250Mi
-      cpu: 100m
-promotion:
-  namespace: fabric8-services
-  name: toolchain-v0.0.1
+    tag: "7"
+binary_build_commands: make build
+build_root:
+  project_image:
+    dockerfile_path: openshift-ci/Dockerfile.tools
 images:
-- from: os
+- dockerfile_path: openshift-ci/Dockerfile.deploy
+  from: os
   inputs:
     bin:
       paths:
       - destination_dir: .
         source_path: /go/src/github.com/fabric8-services/toolchain-operator/out/operator
-  dockerfile_path: openshift-ci/Dockerfile.deploy
   to: toolchain-operator
-
-    
-build_root:
-  project_image:
-    dockerfile_path: openshift-ci/Dockerfile.tools
-
-binary_build_commands: make build
-
+promotion:
+  name: toolchain-v0.0.1
+  namespace: fabric8-services
+resources:
+  '*':
+    limits:
+      memory: 3Gi
+    requests:
+      cpu: 100m
+      memory: 250Mi
 tag_specification:
+  cluster: https://api.ci.openshift.org
   name: "4.1"
   namespace: ocp
-
 tests:
 - as: build
   commands: make build

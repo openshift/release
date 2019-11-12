@@ -1,12 +1,12 @@
+binary_build_commands: |
+  go get -u github.com/Masterminds/glide && glide install --strip-vendor
+  mkdir -p /tmp/artifacts
 build_root:
   image_stream_tag:
     cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.11
-binary_build_commands: |
-  go get -u github.com/Masterminds/glide && glide install --strip-vendor
-  mkdir -p /tmp/artifacts
 resources:
   '*':
     limits:
@@ -15,10 +15,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-
-# PR check
-- as: verify
-  artifact_dir: /tmp/artifacts
+- artifact_dir: /tmp/artifacts
+  as: verify
   commands: |
     set -o pipefail
 
@@ -29,17 +27,8 @@ tests:
     ci/prow_pr_check.sh
   container:
     from: bin
-
-# Tests
-# --- Integration
-- as: e2e-int-4.1
-  artifact_dir: /tmp/artifacts
-  cron: '* */4 * * *'
-  secret:
-    name: osde2e-secrets
-    mount_path: /usr/local/osde2e-secrets
-  container:
-    from: bin
+- artifact_dir: /tmp/artifacts
+  as: e2e-int-4.1
   commands: |
     set -o pipefail
 
@@ -52,14 +41,14 @@ tests:
     export MINOR_TARGET=1
 
     ci/prow_run_tests.sh /usr/local/osde2e-secrets
-- as: e2e-int-4.2
-  artifact_dir: /tmp/artifacts
-  cron: '* */4 * * *'
-  secret:
-    name: osde2e-secrets
-    mount_path: /usr/local/osde2e-secrets
   container:
     from: bin
+  cron: '* */4 * * *'
+  secret:
+    mount_path: /usr/local/osde2e-secrets
+    name: osde2e-secrets
+- artifact_dir: /tmp/artifacts
+  as: e2e-int-4.2
   commands: |
     set -o pipefail
 
@@ -72,16 +61,14 @@ tests:
     export MINOR_TARGET=2
 
     ci/prow_run_tests.sh /usr/local/osde2e-secrets
-
-# --- Stage
-- as: e2e-stage-4.1
-  artifact_dir: /tmp/artifacts
-  cron: '* */4 * * *'
-  secret:
-    name: osde2e-secrets
-    mount_path: /usr/local/osde2e-secrets
   container:
     from: bin
+  cron: '* */4 * * *'
+  secret:
+    mount_path: /usr/local/osde2e-secrets
+    name: osde2e-secrets
+- artifact_dir: /tmp/artifacts
+  as: e2e-stage-4.1
   commands: |
     set -o pipefail
 
@@ -94,14 +81,14 @@ tests:
     export MINOR_TARGET=1
 
     ci/prow_run_tests.sh /usr/local/osde2e-secrets
-- as: e2e-stage-4.2
-  artifact_dir: /tmp/artifacts
-  cron: '* */4 * * *'
-  secret:
-    name: osde2e-secrets
-    mount_path: /usr/local/osde2e-secrets
   container:
     from: bin
+  cron: '* */4 * * *'
+  secret:
+    mount_path: /usr/local/osde2e-secrets
+    name: osde2e-secrets
+- artifact_dir: /tmp/artifacts
+  as: e2e-stage-4.2
   commands: |
     set -o pipefail
 
@@ -114,16 +101,14 @@ tests:
     export MINOR_TARGET=2
 
     ci/prow_run_tests.sh /usr/local/osde2e-secrets
-
-# --- Production
-- as: e2e-prod-4.1
-  artifact_dir: /tmp/artifacts
-  cron: '* */4 * * *'
-  secret:
-    name: osde2e-secrets
-    mount_path: /usr/local/osde2e-secrets
   container:
     from: bin
+  cron: '* */4 * * *'
+  secret:
+    mount_path: /usr/local/osde2e-secrets
+    name: osde2e-secrets
+- artifact_dir: /tmp/artifacts
+  as: e2e-prod-4.1
   commands: |
     set -o pipefail
 
@@ -136,14 +121,14 @@ tests:
     export MINOR_TARGET=1
 
     ci/prow_run_tests.sh /usr/local/osde2e-secrets
-- as: e2e-prod-4.2
-  artifact_dir: /tmp/artifacts
-  cron: '* */4 * * *'
-  secret:
-    name: osde2e-secrets
-    mount_path: /usr/local/osde2e-secrets
   container:
     from: bin
+  cron: '* */4 * * *'
+  secret:
+    mount_path: /usr/local/osde2e-secrets
+    name: osde2e-secrets
+- artifact_dir: /tmp/artifacts
+  as: e2e-prod-4.2
   commands: |
     set -o pipefail
 
@@ -156,17 +141,14 @@ tests:
     export MINOR_TARGET=2
 
     ci/prow_run_tests.sh /usr/local/osde2e-secrets
-
-# Upgrades
-# --- Integration
-- as: e2e-int-4.1-4.1
-  artifact_dir: /tmp/artifacts
-  cron: '* */4 * * *'
-  secret:
-    name: osde2e-secrets
-    mount_path: /usr/local/osde2e-secrets
   container:
     from: bin
+  cron: '* */4 * * *'
+  secret:
+    mount_path: /usr/local/osde2e-secrets
+    name: osde2e-secrets
+- artifact_dir: /tmp/artifacts
+  as: e2e-int-4.1-4.1
   commands: |
     set -o pipefail
 
@@ -180,14 +162,14 @@ tests:
     export UPGRADE_RELEASE_STREAM=4.1.0-0.nightly
 
     ci/prow_run_tests.sh /usr/local/osde2e-secrets
-- as: e2e-int-4.1-4.2
-  artifact_dir: /tmp/artifacts
-  cron: '* */4 * * *'
-  secret:
-    name: osde2e-secrets
-    mount_path: /usr/local/osde2e-secrets
   container:
     from: bin
+  cron: '* */4 * * *'
+  secret:
+    mount_path: /usr/local/osde2e-secrets
+    name: osde2e-secrets
+- artifact_dir: /tmp/artifacts
+  as: e2e-int-4.1-4.2
   commands: |
     set -o pipefail
 
@@ -201,14 +183,14 @@ tests:
     export UPGRADE_RELEASE_STREAM=4.2.0-0.nightly
 
     ci/prow_run_tests.sh /usr/local/osde2e-secrets
-- as: e2e-int-4.2-4.2
-  artifact_dir: /tmp/artifacts
-  cron: '* */4 * * *'
-  secret:
-    name: osde2e-secrets
-    mount_path: /usr/local/osde2e-secrets
   container:
     from: bin
+  cron: '* */4 * * *'
+  secret:
+    mount_path: /usr/local/osde2e-secrets
+    name: osde2e-secrets
+- artifact_dir: /tmp/artifacts
+  as: e2e-int-4.2-4.2
   commands: |
     set -o pipefail
 
@@ -222,16 +204,14 @@ tests:
     export UPGRADE_RELEASE_STREAM=4.2.0-0.nightly
 
     ci/prow_run_tests.sh /usr/local/osde2e-secrets
-
-# --- Stage
-- as: e2e-stage-4.1-4.1
-  artifact_dir: /tmp/artifacts
-  cron: '* */4 * * *'
-  secret:
-    name: osde2e-secrets
-    mount_path: /usr/local/osde2e-secrets
   container:
     from: bin
+  cron: '* */4 * * *'
+  secret:
+    mount_path: /usr/local/osde2e-secrets
+    name: osde2e-secrets
+- artifact_dir: /tmp/artifacts
+  as: e2e-stage-4.1-4.1
   commands: |
     set -o pipefail
 
@@ -245,14 +225,14 @@ tests:
     export UPGRADE_RELEASE_STREAM=stable-4.1
 
     ci/prow_run_tests.sh /usr/local/osde2e-secrets
-- as: e2e-stage-4.1-4.2
-  artifact_dir: /tmp/artifacts
-  cron: '* */4 * * *'
-  secret:
-    name: osde2e-secrets
-    mount_path: /usr/local/osde2e-secrets
   container:
     from: bin
+  cron: '* */4 * * *'
+  secret:
+    mount_path: /usr/local/osde2e-secrets
+    name: osde2e-secrets
+- artifact_dir: /tmp/artifacts
+  as: e2e-stage-4.1-4.2
   commands: |
     set -o pipefail
 
@@ -266,14 +246,14 @@ tests:
     export UPGRADE_RELEASE_STREAM=fast-4.2
 
     ci/prow_run_tests.sh /usr/local/osde2e-secrets
-- as: e2e-stage-4.2-4.2
-  artifact_dir: /tmp/artifacts
-  cron: '* */4 * * *'
-  secret:
-    name: osde2e-secrets
-    mount_path: /usr/local/osde2e-secrets
   container:
     from: bin
+  cron: '* */4 * * *'
+  secret:
+    mount_path: /usr/local/osde2e-secrets
+    name: osde2e-secrets
+- artifact_dir: /tmp/artifacts
+  as: e2e-stage-4.2-4.2
   commands: |
     set -o pipefail
 
@@ -287,16 +267,14 @@ tests:
     export UPGRADE_RELEASE_STREAM=fast-4.2
 
     ci/prow_run_tests.sh /usr/local/osde2e-secrets
-
-# --- Production
-- as: e2e-prod-4.1-4.1
-  artifact_dir: /tmp/artifacts
-  cron: '* */4 * * *'
-  secret:
-    name: osde2e-secrets
-    mount_path: /usr/local/osde2e-secrets
   container:
     from: bin
+  cron: '* */4 * * *'
+  secret:
+    mount_path: /usr/local/osde2e-secrets
+    name: osde2e-secrets
+- artifact_dir: /tmp/artifacts
+  as: e2e-prod-4.1-4.1
   commands: |
     set -o pipefail
 
@@ -310,14 +288,14 @@ tests:
     export UPGRADE_RELEASE_STREAM=stable-4.1
 
     ci/prow_run_tests.sh /usr/local/osde2e-secrets
-- as: e2e-prod-4.1-4.2
-  artifact_dir: /tmp/artifacts
-  cron: '* */4 * * *'
-  secret:
-    name: osde2e-secrets
-    mount_path: /usr/local/osde2e-secrets
   container:
     from: bin
+  cron: '* */4 * * *'
+  secret:
+    mount_path: /usr/local/osde2e-secrets
+    name: osde2e-secrets
+- artifact_dir: /tmp/artifacts
+  as: e2e-prod-4.1-4.2
   commands: |
     set -o pipefail
 
@@ -331,24 +309,9 @@ tests:
     export UPGRADE_RELEASE_STREAM=fast-4.2
 
     ci/prow_run_tests.sh /usr/local/osde2e-secrets
-#- as: e2e-prod-4.2-4.2
-#  artifact_dir: /tmp/artifacts
-#  cron: '* */4 * * *'
-#  secret:
-#    name: osde2e-secrets
-#    mount_path: /usr/local/osde2e-secrets
-#  container:
-#    from: bin
-#  commands: |
-#    set -o pipefail
-#
-#    export HOME=$(mktemp -d)
-#
-#    export REPORT_DIR=/tmp/artifacts
-#
-#    export OSD_ENV=prod
-#    export MAJOR_TARGET=4
-#    export MINOR_TARGET=2
-#    export UPGRADE_RELEASE_STREAM=fast-4.2
-#
-#    ci/prow_run_tests.sh /usr/local/osde2e-secrets
+  container:
+    from: bin
+  cron: '* */4 * * *'
+  secret:
+    mount_path: /usr/local/osde2e-secrets
+    name: osde2e-secrets
