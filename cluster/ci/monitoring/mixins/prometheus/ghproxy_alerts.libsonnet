@@ -10,7 +10,7 @@
             // "this is going to spam us just about 24/7 with the OWNERS thing"
             // TODO: Undo 404 after https://jira.coreos.com/browse/DPTP-447 is done
             expr: |||
-              sum(github_request_duration_count{status=~"%s..", status!="404"})/sum(github_request_duration_count{status!="404"}) * 100 > 5
+              sum(rate(github_request_duration_count{status=~"%s..", status!="404"}[5m])) / sum(rate(github_request_duration_count{status!="404"}[5m])) * 100 > 5
             ||| % code_prefix,
             'for': '1m',
             labels: {
