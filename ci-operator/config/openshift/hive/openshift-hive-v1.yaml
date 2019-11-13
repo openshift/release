@@ -1,0 +1,71 @@
+tag_specification:
+  name: '4.3'
+  namespace: ocp
+promotion:
+  name: hivev1
+  namespace: openshift
+base_images:
+  base:
+    name: '4.3'
+    namespace: ocp
+    tag: base
+binary_build_commands: make build
+images:
+- dockerfile_path: Dockerfile.hivebase
+  from: base
+  to: hivebase
+- dockerfile_path: Dockerfile
+  from: hivebase
+  inputs:
+    hivebase:
+      as:
+      - hive
+      paths: null
+  to: hive
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  unit:
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 1000m
+      memory: 4Gi
+  integration:
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+build_root:
+  project_image:
+    dockerfile_path: build/build-image/Dockerfile
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
+- as: verify
+  commands: make verify
+  container:
+    from: src
+- as: integration
+  commands: make test-integration
+  container:
+    from: src
+- as: e2e
+  commands: CLOUD=aws make test-e2e
+  openshift_installer_src:
+    cluster_profile: aws
+- as: e2e-gcp
+  commands: CLOUD=gcp make test-e2e
+  openshift_installer_src:
+    cluster_profile: gcp
+- as: e2e-azure
+  commands: CLOUD=azure make test-e2e
+  openshift_installer_src:
+    cluster_profile: azure4
