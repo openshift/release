@@ -94,39 +94,33 @@ dashboard.new(
     myPanel('Job Success Rates for osde2e integration regular',
         description='Job success rate for osde2e tests on integration running regularly (without an upgrade).'
         )
-    .addTarget(myPrometheusTarget('periodic.*osde2e.*int-4.1'))
-    .addTarget(myPrometheusTarget('periodic.*osde2e.*int-4.2')), defaultGridPos)
+    .addTarget(myPrometheusTarget('periodic.*osde2e.*int-4.2'))
+    .addTarget(myPrometheusTarget('periodic.*osde2e.*int-4.3')), defaultGridPos)
 .addPanel(
     myPanel('Job Success Rates for osde2e stage regular',
         description='Job success rate for osde2e tests on stage running regularly (without an upgrade).'
         )
-    .addTarget(myPrometheusTarget('periodic.*osde2e.*stage-4.1'))
     .addTarget(myPrometheusTarget('periodic.*osde2e.*stage-4.2')), defaultGridPos)
 .addPanel(
     myPanel('Job Success Rates for osde2e production regular',
         description='Job success rate for osde2e tests on production running regularly (without an upgrade).'
         )
-    .addTarget(myPrometheusTarget('periodic.*osde2e.*prod-4.1'))
     .addTarget(myPrometheusTarget('periodic.*osde2e.*prod-4.2')), defaultGridPos)
 .addPanel(
     myPanel('Job Success Rates for osde2e integration upgrades',
         description='Job success rate for osde2e tests on integration running with upgrades.'
         )
-    .addTarget(myPrometheusTarget('periodic.*osde2e.*int-4.1-4.1'))
-    .addTarget(myPrometheusTarget('periodic.*osde2e.*int-4.1-4.2'))
-    .addTarget(myPrometheusTarget('periodic.*osde2e.*int-4.2-4.2')), defaultGridPos)
+    .addTarget(myPrometheusTarget('periodic.*osde2e.*int-4.2-4.2'))
+    .addTarget(myPrometheusTarget('periodic.*osde2e.*int-4.2-4.3'))
+    .addTarget(myPrometheusTarget('periodic.*osde2e.*int-4.3-4.3')), defaultGridPos)
 .addPanel(
     myPanel('Job Success Rates for osde2e stage upgrades',
         description='Job success rate for osde2e tests on stage running with upgrades.'
         )
-    .addTarget(myPrometheusTarget('periodic.*osde2e.*stage-4.1-4.1'))
-    .addTarget(myPrometheusTarget('periodic.*osde2e.*stage-4.1-4.2'))
     .addTarget(myPrometheusTarget('periodic.*osde2e.*stage-4.2-4.2')), defaultGridPos)
 .addPanel(
     myPanel('Job Success Rates for osde2e production upgrades',
         description='Job success rate for osde2e tests on production running with upgrades.'
         )
-    .addTarget(myPrometheusTarget('periodic.*osde2e.*prod-4.1-4.1'))
-    .addTarget(myPrometheusTarget('periodic.*osde2e.*prod-4.1-4.2'))
     .addTarget(myPrometheusTarget('periodic.*osde2e.*prod-4.2-4.2')), defaultGridPos)
 + dashboardConfig
