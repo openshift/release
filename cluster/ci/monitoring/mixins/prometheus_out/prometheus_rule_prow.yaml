@@ -265,20 +265,20 @@ spec:
         severity: slack
   - name: ghproxy
     rules:
-    - alert: ghproxy-status-code-abnormal-4XX
+    - alert: ghproxy-specific-status-code-abnormal
       annotations:
-        message: ghproxy has {{ $value | humanize }}% of status code 4XX in the last
-          5 minutes.
+        message: '{{ $value | humanizePercentage }} of all requests for {{ $labels.path
+          }} through the GitHub proxy are errorring with code {{ $labels.status }}.'
       expr: |
-        sum(rate(github_request_duration_count{status=~"4..", status!="404"}[5m])) / sum(rate(github_request_duration_count{status!="404"}[5m])) * 100 > 5
+        sum(rate(github_request_duration_count{status=~"[45]..",status!="404",status!="410"}[5m])) by (status,path) / ignoring(status) group_left sum(rate(github_request_duration_count[5m])) by (path) > .1
       labels:
         severity: slack
-    - alert: ghproxy-status-code-abnormal-5XX
+    - alert: ghproxy-global-status-code-abnormal
       annotations:
-        message: ghproxy has {{ $value | humanize }}% of status code 5XX in the last
-          5 minutes.
+        message: '{{ $value | humanizePercentage }} of all API requests through the
+          GitHub proxy are errorring with code {{ $labels.status }}.'
       expr: |
-        sum(rate(github_request_duration_count{status=~"5..", status!="404"}[5m])) / sum(rate(github_request_duration_count{status!="404"}[5m])) * 100 > 5
+        sum(rate(github_request_duration_count{status=~"[45]..",status!="404",status!="410"}[5m])) by (status) / ignoring(status) group_left sum(rate(github_request_duration_count[5m])) > .03
       labels:
         severity: slack
     - alert: ghproxy-running-out-github-tokens-in-a-hour
