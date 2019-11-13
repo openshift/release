@@ -44,17 +44,17 @@ services:
 # these are useful for devs
 jobs:
 	docker pull registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest
-	docker run -it -v "${CURDIR}/ci-operator:/ci-operator" registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest --from-dir /ci-operator/config --to-dir /ci-operator/jobs
+	docker run -v "${CURDIR}/ci-operator:/ci-operator" registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest --from-dir /ci-operator/config --to-dir /ci-operator/jobs
 	docker pull registry.svc.ci.openshift.org/ci/determinize-prow-jobs:latest
-	docker run -it -v "${CURDIR}/ci-operator/jobs:/ci-operator/jobs" registry.svc.ci.openshift.org/ci/determinize-prow-jobs:latest --prow-jobs-dir /ci-operator/jobs
+	docker run -v "${CURDIR}/ci-operator/jobs:/ci-operator/jobs" registry.svc.ci.openshift.org/ci/determinize-prow-jobs:latest --prow-jobs-dir /ci-operator/jobs
 
 prow-config:
 	docker pull registry.svc.ci.openshift.org/ci/determinize-prow-config:latest
-	docker run -it -v "${CURDIR}/core-services/prow/02_config:/config" registry.svc.ci.openshift.org/ci/determinize-prow-config:latest --prow-config-dir /config
+	docker run -v "${CURDIR}/core-services/prow/02_config:/config" registry.svc.ci.openshift.org/ci/determinize-prow-config:latest --prow-config-dir /config
 
 branch-cut:
 	docker pull registry.svc.ci.openshift.org/ci/config-brancher:latest
-	docker run -it -v "${CURDIR}/ci-operator:/ci-operator" registry.svc.ci.openshift.org/ci/config-brancher:latest --config-dir /ci-operator/config --org=$(ORG) --repo=$(REPO) --current-release=4.3 --future-release=4.4 --bump-release=4.4 --confirm
+	docker run -v "${CURDIR}/ci-operator:/ci-operator" registry.svc.ci.openshift.org/ci/config-brancher:latest --config-dir /ci-operator/config --org=$(ORG) --repo=$(REPO) --current-release=4.3 --future-release=4.4 --bump-release=4.4 --confirm
 		$(MAKE) jobs
 
 # LEGACY TARGETS
