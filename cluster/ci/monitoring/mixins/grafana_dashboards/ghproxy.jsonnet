@@ -238,7 +238,7 @@ dashboard.new(
     ) + legendConfig)
     .addTarget(prometheus.target(
         'sum(rate(github_request_duration_count{status="${status}",job="ghproxy"}[${range}])) by (path)',
-         legendFormat='{{status}}',
+         legendFormat='{{path}}',
     )), gridPos={
     h: 9,
     w: 24,
