@@ -159,6 +159,12 @@ periodics:
         curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 2>/dev/null >/tmp/bin/jq
         chmod ug+x $HOME/bin/oc $HOME/bin/jq
 
+        # guard against starting if no okd stream exists yet
+        if ! oc get istag -n fcos ${TAG}:${BRANCH}; then
+          echo "No build possible, no image stream"
+          exit 0
+        fi
+
         # populate the base_sha in job spec so we don't build something different
         origin_artifacts_id="$( oc get istag -n ${TAG_NS} ${BRANCH}:artifacts --template '{{ .image.metadata.name }}' )"
         origin_machine_config_operator_rpms_id="$( oc get istag -n ${TAG_NS} ${BRANCH}:machine-config-operator-rpms --template '{{ .image.metadata.name }}' )"
@@ -197,8 +203,8 @@ periodics:
 
         function build {
           oc -n ${namespace} create -f $1 >/dev/null
-          oc -n ${namespace} logs -f build/$2
           while true; do
+            oc -n ${namespace} logs -f build/$2 || true
             phase=$( oc -n ${namespace} get build/$2 -o 'jsonpath={.status.phase}' )
             if [[ "${phase}" == "Failed" || "${phase}" == "Cancelled" || "${phase}" == "Error" ]]; then
               oc -n ${namespace} describe build/$2
