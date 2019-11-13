@@ -1,3 +1,4 @@
+local config =  import '../config.libsonnet';
 local grafana = import 'grafonnet/grafana.libsonnet';
 local dashboard = grafana.dashboard;
 local graphPanel = grafana.graphPanel;
@@ -12,7 +13,7 @@ local legendConfig = {
     };
 
 local dashboardConfig = {
-        uid: 'd72fe8d0400b2912e319b1e95d0ab1b3',
+        uid: config._config.grafanaDashboardIDs['ghproxy.json'],
     };
 
 local histogramQuantileTarget(phi) = prometheus.target(
