@@ -228,3 +228,65 @@ tests:
 #    export UPGRADE_RELEASE_STREAM=fast-4.2
 #
 #    ci/prow_run_tests.sh /usr/local/osde2e-secrets
+
+# Scale
+- as: e2e-int-scale-4.2
+  artifact_dir: /tmp/artifacts
+  cron: '* 8 * * *'
+  secret:
+    name: osde2e-secrets
+    mount_path: /usr/local/osde2e-secrets
+  container:
+    from: bin
+  commands: |
+    set -o pipefail
+
+    export HOME=$(mktemp -d)
+
+    export REPORT_DIR=/tmp/artifacts
+
+    export OSD_ENV=int
+    export MAJOR_TARGET=4
+    export MINOR_TARGET=2
+
+    ci/prow_run_tests.sh /usr/local/osde2e-secrets scale
+- as: e2e-stage-scale-4.2
+  artifact_dir: /tmp/artifacts
+  cron: '* 8 * * *'
+  secret:
+    name: osde2e-secrets
+    mount_path: /usr/local/osde2e-secrets
+  container:
+    from: bin
+  commands: |
+    set -o pipefail
+
+    export HOME=$(mktemp -d)
+
+    export REPORT_DIR=/tmp/artifacts
+
+    export OSD_ENV=stage
+    export MAJOR_TARGET=4
+    export MINOR_TARGET=2
+
+    ci/prow_run_tests.sh /usr/local/osde2e-secrets scale
+- as: e2e-prod-scale-4.2
+  artifact_dir: /tmp/artifacts
+  cron: '* 8 * * *'
+  secret:
+    name: osde2e-secrets
+    mount_path: /usr/local/osde2e-secrets
+  container:
+    from: bin
+  commands: |
+    set -o pipefail
+
+    export HOME=$(mktemp -d)
+
+    export REPORT_DIR=/tmp/artifacts
+
+    export OSD_ENV=prod
+    export MAJOR_TARGET=4
+    export MINOR_TARGET=2
+
+    ci/prow_run_tests.sh /usr/local/osde2e-secrets scale
