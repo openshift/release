@@ -219,6 +219,26 @@ objects:
         trap 'touch /tmp/shared/exit' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
 
+        function fips_check() {
+          oc --insecure-skip-tls-verify --request-timeout=60s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' > /tmp/nodelist
+          while IFS= read -r i; do
+            oc -n default --insecure-skip-tls-verify --request-timeout=60s debug node/$i -- cat /proc/sys/crypto/fips_enabled > /tmp/enabled
+            if [[ "${ENABLE_FIPS}" == true ]]; then
+              if [[ $(< /tmp/enabled) == "0" ]]; then
+                echo fips not enabled in node "$i" but should be, exiting
+                exit 1
+              fi
+            else
+              if [[ $(< /tmp/enabled) == "1" ]]; then
+                echo fips is enabled in node "$i" but should not be, exiting
+                exit 1
+              fi
+            fi
+          done </tmp/nodelist
+          rm -f /tmp/nodelist
+          rm -f /tmp/enabled
+        }
+
         function patch_image_specs() {
           cat <<EOF >samples-patch.yaml
         - op: add
