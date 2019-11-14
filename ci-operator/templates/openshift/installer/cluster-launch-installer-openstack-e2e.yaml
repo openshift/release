@@ -510,8 +510,16 @@ objects:
           echo "Gathering artifacts ..."
           mkdir -p /tmp/artifacts/pods /tmp/artifacts/nodes /tmp/artifacts/metrics /tmp/artifacts/bootstrap /tmp/artifacts/network
 
-          # Get nova logs
-          openstack console log show ${CLUSTER_NAME}-bootstrap &>/tmp/artifacts/bootstrap/nova.log
+          # Get bootstrap nova logs
+          # NOTE(shadower): The server names are in the form
+          # `$CLUSTER_NAME-fmszv-bootstrap`. I could not find how to
+          # get the middle part (`fmszv`) (it's not in the shell
+          # environment here) so we'll list all the servers and look
+          # the bootstrap name up that way.
+          local BOOTSTRAP_NAME=$(openstack server list --format value --column Name | grep "${CLUSTER_NAME}-.*-bootstrap")
+          if [ -n "$BOOTSTRAP_NAME" ]; then
+              openstack console log show "$BOOTSTRAP_NAME" &>/tmp/artifacts/bootstrap/nova.log
+          fi
 
           oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' > /tmp/nodes
           oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces --template '{{ range .items }}{{ $name := .metadata.name }}{{ $ns := .metadata.namespace }}{{ range .spec.containers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ range .spec.initContainers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ end }}' > /tmp/containers
