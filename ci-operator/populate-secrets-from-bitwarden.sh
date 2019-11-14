@@ -288,6 +288,10 @@ update_secret generic "build-farm-credentials" \
 	"$( format_attachment "build_farm" sa.sinker.build01.config )" \
 	"$( format_attachment "build_farm" sa.kubeconfig )"
 
+# collects all the secrets for ci-operator
+update_secret generic "apici-ci-operator-credentials" \
+	"$( format_attachment "build_farm" sa.ci-operator.apici.config )"
+
 # Configuration for the .git-credentials used by the release controller to clone
 # private repositories to generate changelogs
 oc -n "ci-release" create secret generic "git-credentials" "--from-literal=.git-credentials=https://openshift-bot:$( field_value "openshift-bot" "GitHub OAuth Token" "oauth" )@github.com" --dry-run -o yaml | oc apply -f -
