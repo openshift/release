@@ -293,7 +293,6 @@ We use various OpenShift secrets in our CI. You can manage these secrets in the
 | --------------------------------------- | ------------------------------------------------------------------------------------ |
 | `cluster-secrets-azure`                 | contains all the necessary credentials for e2e and image build jobs                  |
 | `cluster-secrets-azure-env`             | environment based secret. It can be injected to pod using pod spec (see azure-purge) |
-| `codecov-token`                         | used for pushing reports to Codecov                                                  |
 | `openshift-on-azure-scratch-secret`     | quay robot secret used for mirroring images between the CI registry and quay         |
 
 
@@ -363,14 +362,6 @@ To rotate this secret:
 source ./cluster/test-deploy/azure/secret
 oc create secret generic cluster-secrets-azure-env --from-literal=azure_client_id=${AZURE_CLIENT_ID} --from-literal=azure_client_secret=${AZURE_CLIENT_SECRET} --from-literal=azure_tenant_id=${AZURE_TENANT_ID} --from-literal=azure_subscription_id=${AZURE_SUBSCRIPTION_ID} -o yaml --dry-run | oc apply -n azure -f -
 ```
-
-### codecov-token
-
-This secret is used for pushing reports to [Codecov](https://codecov.io/).
-
-TODO: How to rotate this secret from Codecov?
-
-Ensure the secret is placed in the [ci-secret-mirroring-controller config](https://github.com/openshift/release/blob/master/core-services/secret-mirroring/_mapping.yaml). The controller will make sure to keep the secret in sync between the `azure` and the `ci` namespace where all CI tests run.
 
 ## Other cron jobs
 
