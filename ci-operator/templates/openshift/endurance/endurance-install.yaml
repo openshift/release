@@ -1,0 +1,467 @@
+kind: Template
+apiVersion: template.openshift.io/v1
+
+parameters:
+- name: JOB_NAME_SAFE
+  required: true
+- name: JOB_NAME_HASH
+  required: true
+- name: NAMESPACE
+  required: true
+- name: IMAGE_INSTALLER
+  required: true
+- name: IMAGE_TESTS
+  required: true
+- name: CLUSTER_TYPE
+  required: true
+- name: RELEASE_IMAGE_LATEST
+  required: true
+- name: BASE_DOMAIN
+  value: llc.devcluster.openshift.com
+  required: true
+
+objects:
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: edit
+    namespace: ${NAMESPACE}
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: edit
+  subjects:
+  - kind: ServiceAccount
+    name: default
+    namespace: ${NAMESPACE}
+- kind: Pod
+  apiVersion: v1
+  metadata:
+    name: ${JOB_NAME_SAFE}
+    namespace: ${NAMESPACE}
+    annotations:
+      # we want to gather the teardown logs no matter what
+      ci-operator.openshift.io/wait-for-container-artifacts: teardown
+      ci-operator.openshift.io/save-container-logs: "true"
+      ci-operator.openshift.io/container-sub-tests: "checkcluster,teardown,reinstall,test"
+  spec:
+    restartPolicy: Never
+    activeDeadlineSeconds: 14400
+    terminationGracePeriodSeconds: 900
+    volumes:
+    - name: artifacts
+      emptyDir: {}
+    - name: shared-tmp
+      emptyDir: {}
+    - name: ci-credentials
+      secret:
+        secretName: ci-credentials
+    - name: cloud-credentials
+      secret:
+        secretName: ${CLUSTER_TYPE}-openshift-llc-account-credentials
+    - name: cluster-credentials
+      secret:
+        secretName: endurance-cluster-credentials-${CLUSTER_TYPE}
+
+    initContainers:
+    - name: checkcluster
+      image: ${IMAGE_TESTS}
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      - name: artifacts
+        mountPath: /tmp/artifacts
+      - name: cluster-credentials
+        mountPath: /tmp/cluster-credentials
+      env:
+      - name: KUBECONFIG
+        value: /tmp/shared/auth/kubeconfig
+      command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash -x
+        
+        # fetch the oc binary so we can talk to the cluster.  
+        export PATH=$PATH:/tmp/shared/bin
+        mkdir /tmp/shared/bin
+        curl https://storage.googleapis.com/origin-ci-test/_tools/4.1.0/oc >/tmp/shared/bin/oc 2>/dev/null
+        chmod ug+x /tmp/shared/bin/oc
+
+        # setup the persisted metadata.json and kubeconfig files that 
+        # correspond to the endurance cluster so we can interact with it.
+        # (endurance cluster credentials injected by ci-operator)
+        mkdir -p /tmp/shared/auth
+        mkdir -p /tmp/artifacts/installer
+        cp /tmp/cluster-credentials/metadata.json /tmp/artifacts/installer
+        cp /tmp/cluster-credentials/kubeconfig /tmp/shared/auth
+
+        # check if all the operators are reporting available. If anything
+        # goes wrong or any operator is not reporting available, we will 
+        # gather artifacts, tear down the endurance cluster, install a new one, 
+        # and fail this job.
+        echo "Fetching cluster operator status...."
+        oc get clusteroperators &> /tmp/operators.out
+        rc=$?
+        cat /tmp/operators.out
+        if [ ! $rc -eq 0 ]; then
+          echo "Could not retrieve cluster operator objects, tearing down cluster"
+          touch /tmp/shared/teardown
+          exit 0
+        fi
+        awk '{print $3}' < /tmp/operators.out  | grep -v AVAILABLE | grep -v True
+        rc=$?
+        if [ ! $rc -eq 1 ]; then
+          echo "Some operators are not available, tearing down cluster"
+          touch /tmp/shared/teardown
+          exit 0
+        fi          
+        echo "Cluster appears healthy"
+
+    - name: teardown
+      image: ${IMAGE_INSTALLER}
+      terminationMessagePolicy: FallbackToLogsOnError
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      - name: ci-credentials
+        mountPath: /etc/openshift-installer
+      - name: cloud-credentials
+        mountPath: /etc/cloud-credentials
+      - name: artifacts
+        mountPath: /tmp/artifacts
+      env:
+      - name: INSTANCE_PREFIX
+        value: ${NAMESPACE}-${JOB_NAME_HASH}
+      - name: TYPE
+        value: ${CLUSTER_TYPE}
+      - name: KUBECONFIG
+        value: /tmp/shared/auth/kubeconfig
+      command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash -x
+
+        export PATH=$PATH:/tmp/shared/bin
+
+        if [ ! -f /tmp/shared/teardown ];then
+          echo "Long lived cluster appears healthy, taking no action"
+          exit 0
+        fi
+
+        # flag that we're going to need to install a new endurance cluster
+        # after gathering artifacts/teardown.
+        touch /tmp/shared/install
+
+        function queue() {
+          local TARGET="${1}"
+          shift
+          local LIVE="$(jobs | wc -l)"
+          while [[ "${LIVE}" -ge 45 ]]; do
+            sleep 1
+            LIVE="$(jobs | wc -l)"
+          done
+          echo "${@}"
+          if [[ -n "${FILTER}" ]]; then
+            "${@}" | "${FILTER}" >"${TARGET}" &
+          else
+            "${@}" >"${TARGET}" &
+          fi
+        }
+
+        function teardown() {
+          set +e
+
+          echo "Gathering artifacts ..."
+          mkdir -p /tmp/artifacts/pods /tmp/artifacts/nodes /tmp/artifacts/metrics /tmp/artifacts/bootstrap /tmp/artifacts/network
+
+
+          if [ -f /tmp/artifacts/installer/terraform.tfstate ]
+          then
+              # we don't have jq, so the python equivalent of
+              # jq '.modules[].resources."aws_instance.bootstrap".primary.attributes."public_ip" | select(.)'
+              bootstrap_ip=$(python -c \
+                  'import sys, json; d=reduce(lambda x,y: dict(x.items() + y.items()), map(lambda x: x["resources"], json.load(sys.stdin)["modules"])); k="aws_instance.bootstrap"; print d[k]["primary"]["attributes"]["public_ip"] if k in d else ""' \
+                  < /tmp/artifacts/installer/terraform.tfstate
+              )
+
+              if [ -n "${bootstrap_ip}" ]
+              then
+                for service in bootkube openshift kubelet crio
+                do
+                    queue "/tmp/artifacts/bootstrap/${service}.service" curl \
+                        --insecure \
+                        --silent \
+                        --connect-timeout 5 \
+                        --retry 3 \
+                        --cert /tmp/artifacts/installer/tls/journal-gatewayd.crt \
+                        --key /tmp/artifacts/installer/tls/journal-gatewayd.key \
+                        --url "https://${bootstrap_ip}:19531/entries?_SYSTEMD_UNIT=${service}.service"
+                done
+                if ! whoami &> /dev/null; then
+                  if [ -w /etc/passwd ]; then
+                    echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+                  fi
+                fi
+                eval $(ssh-agent)
+                ssh-add /etc/openshift-installer/ssh-privatekey
+                ssh -A -o PreferredAuthentications=publickey -o StrictHostKeyChecking=false -o UserKnownHostsFile=/dev/null core@${bootstrap_ip} /bin/bash -x /usr/local/bin/installer-gather.sh
+                scp -o PreferredAuthentications=publickey -o StrictHostKeyChecking=false -o UserKnownHostsFile=/dev/null core@${bootstrap_ip}:log-bundle.tar.gz /tmp/artifacts/installer/bootstrap-logs.tar.gz
+              fi
+          else
+              echo "No terraform statefile found. Skipping collection of bootstrap logs."
+          fi
+
+          oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' > /tmp/nodes
+          oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces --template '{{ range .items }}{{ $name := .metadata.name }}{{ $ns := .metadata.namespace }}{{ range .spec.containers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ range .spec.initContainers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ end }}' > /tmp/containers
+          oc --insecure-skip-tls-verify --request-timeout=5s get pods -l openshift.io/component=api --all-namespaces --template '{{ range .items }}-n {{ .metadata.namespace }} {{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/pods-api
+
+          queue /tmp/artifacts/config-resources.json oc --insecure-skip-tls-verify --request-timeout=5s get apiserver.config.openshift.io authentication.config.openshift.io build.config.openshift.io console.config.openshift.io dns.config.openshift.io featuregate.config.openshift.io image.config.openshift.io infrastructure.config.openshift.io ingress.config.openshift.io network.config.openshift.io oauth.config.openshift.io project.config.openshift.io scheduler.config.openshift.io -o json
+          queue /tmp/artifacts/apiservices.json oc --insecure-skip-tls-verify --request-timeout=5s get apiservices -o json
+          queue /tmp/artifacts/clusteroperators.json oc --insecure-skip-tls-verify --request-timeout=5s get clusteroperators -o json
+          queue /tmp/artifacts/clusterversion.json oc --insecure-skip-tls-verify --request-timeout=5s get clusterversion -o json
+          queue /tmp/artifacts/configmaps.json oc --insecure-skip-tls-verify --request-timeout=5s get configmaps --all-namespaces -o json
+          queue /tmp/artifacts/credentialsrequests.json oc --insecure-skip-tls-verify --request-timeout=5s get credentialsrequests --all-namespaces -o json
+          queue /tmp/artifacts/csr.json oc --insecure-skip-tls-verify --request-timeout=5s get csr -o json
+          queue /tmp/artifacts/endpoints.json oc --insecure-skip-tls-verify --request-timeout=5s get endpoints --all-namespaces -o json
+          FILTER=gzip queue /tmp/artifacts/deployments.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get deployments --all-namespaces -o json
+          FILTER=gzip queue /tmp/artifacts/daemonsets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get daemonsets --all-namespaces -o json
+          queue /tmp/artifacts/events.json oc --insecure-skip-tls-verify --request-timeout=5s get events --all-namespaces -o json
+          queue /tmp/artifacts/kubeapiserver.json oc --insecure-skip-tls-verify --request-timeout=5s get kubeapiserver -o json
+          queue /tmp/artifacts/kubecontrollermanager.json oc --insecure-skip-tls-verify --request-timeout=5s get kubecontrollermanager -o json
+          queue /tmp/artifacts/machineconfigpools.json oc --insecure-skip-tls-verify --request-timeout=5s get machineconfigpools -o json
+          queue /tmp/artifacts/machineconfigs.json oc --insecure-skip-tls-verify --request-timeout=5s get machineconfigs -o json
+          queue /tmp/artifacts/namespaces.json oc --insecure-skip-tls-verify --request-timeout=5s get namespaces -o json
+          queue /tmp/artifacts/nodes.json oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o json
+          queue /tmp/artifacts/openshiftapiserver.json oc --insecure-skip-tls-verify --request-timeout=5s get openshiftapiserver -o json
+          queue /tmp/artifacts/pods.json oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces -o json
+          queue /tmp/artifacts/persistentvolumes.json oc --insecure-skip-tls-verify --request-timeout=5s get persistentvolumes --all-namespaces -o json
+          queue /tmp/artifacts/persistentvolumeclaims.json oc --insecure-skip-tls-verify --request-timeout=5s get persistentvolumeclaims --all-namespaces -o json
+          FILTER=gzip queue /tmp/artifacts/replicasets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get replicasets --all-namespaces -o json
+          queue /tmp/artifacts/rolebindings.json oc --insecure-skip-tls-verify --request-timeout=5s get rolebindings --all-namespaces -o json
+          queue /tmp/artifacts/roles.json oc --insecure-skip-tls-verify --request-timeout=5s get roles --all-namespaces -o json
+          queue /tmp/artifacts/services.json oc --insecure-skip-tls-verify --request-timeout=5s get services --all-namespaces -o json
+          FILTER=gzip queue /tmp/artifacts/statefulsets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get statefulsets --all-namespaces -o json
+
+          FILTER=gzip queue /tmp/artifacts/openapi.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get --raw /openapi/v2
+
+          # gather nodes first in parallel since they may contain the most relevant debugging info
+          while IFS= read -r i; do
+            mkdir -p /tmp/artifacts/nodes/$i
+            queue /tmp/artifacts/nodes/$i/heap oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/debug/pprof/heap
+          done < /tmp/nodes
+
+          if oc --insecure-skip-tls-verify adm node-logs -h &>/dev/null; then
+            # starting in 4.0 we can query node logs directly
+            FILTER=gzip queue /tmp/artifacts/nodes/masters-journal.gz oc --insecure-skip-tls-verify adm node-logs --role=master --unify=false
+            FILTER=gzip queue /tmp/artifacts/nodes/workers-journal.gz oc --insecure-skip-tls-verify adm node-logs --role=worker --unify=false
+          else
+            while IFS= read -r i; do
+              FILTER=gzip queue /tmp/artifacts/nodes/$i/messages.gz oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/messages
+              oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/journal | sed -e 's|.*href="\(.*\)".*|\1|;t;d' > /tmp/journals
+              while IFS= read -r j; do
+                FILTER=gzip queue /tmp/artifacts/nodes/$i/journal.gz oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/journal/${j}system.journal
+              done < /tmp/journals
+              FILTER=gzip queue /tmp/artifacts/nodes/$i/secure.gz oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/secure
+              FILTER=gzip queue /tmp/artifacts/nodes/$i/audit.gz oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/audit
+            done < /tmp/nodes
+          fi
+
+          # Snapshot iptables-save on each node for debugging possible kube-proxy issues
+          oc --insecure-skip-tls-verify get --request-timeout=20s -n openshift-sdn -l app=sdn pods --template '{{ range .items }}{{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/sdn-pods
+          while IFS= read -r i; do
+            queue /tmp/artifacts/network/iptables-save-$i oc --insecure-skip-tls-verify rsh --timeout=20 -n openshift-sdn -c sdn $i iptables-save -c
+          done < /tmp/sdn-pods
+
+          while IFS= read -r i; do
+            file="$( echo "$i" | cut -d ' ' -f 3 | tr -s ' ' '_' )"
+            queue /tmp/artifacts/metrics/${file}-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig'
+            queue /tmp/artifacts/metrics/${file}-controllers-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig'
+          done < /tmp/pods-api
+
+          while IFS= read -r i; do
+            file="$( echo "$i" | cut -d ' ' -f 2,3,5 | tr -s ' ' '_' )"
+            FILTER=gzip queue /tmp/artifacts/pods/${file}.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s $i
+            FILTER=gzip queue /tmp/artifacts/pods/${file}_previous.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s -p $i
+          done < /tmp/containers
+
+          echo "Gathering kube-apiserver audit.log ..."
+          oc --insecure-skip-tls-verify adm node-logs --role=master --path=kube-apiserver/ > /tmp/kube-audit-logs
+          while IFS=$'\n' read -r line; do
+            IFS=' ' read -ra log <<< "${line}"
+            FILTER=gzip queue /tmp/artifacts/nodes/"${log[0]}"-"${log[1]}".gz oc --insecure-skip-tls-verify adm node-logs "${log[0]}" --path=kube-apiserver/"${log[1]}"
+          done < /tmp/kube-audit-logs
+
+          echo "Gathering openshift-apiserver audit.log ..."
+          oc --insecure-skip-tls-verify adm node-logs --role=master --path=openshift-apiserver/ > /tmp/openshift-audit-logs
+          while IFS=$'\n' read -r line; do
+            IFS=' ' read -ra log <<< "${line}"
+            FILTER=gzip queue /tmp/artifacts/nodes/"${log[0]}"-"${log[1]}".gz oc --insecure-skip-tls-verify adm node-logs "${log[0]}" --path=openshift-apiserver/"${log[1]}"
+          done < /tmp/openshift-audit-logs
+
+          echo "Snapshotting prometheus (may take 15s) ..."
+          queue /tmp/artifacts/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring prometheus-k8s-0 -- tar cvzf - -C /prometheus .
+
+          echo "Running must-gather..."
+          mkdir -p /tmp/artifacts/must-gather
+          queue /tmp/artifacts/must-gather/must-gather.log oc --insecure-skip-tls-verify adm must-gather --dest-dir /tmp/artifacts/must-gather
+
+          echo "Waiting for logs ..."
+          wait
+
+          if [ -f /tmp/artifacts/installer/metadata.json ]; then
+            echo "Deprovisioning cluster ..."
+            export AWS_SHARED_CREDENTIALS_FILE=/etc/cloud-credentials/.awscred
+            openshift-install --dir /tmp/artifacts/installer destroy cluster
+            echo "Done"
+          else
+            echo "no cluster metadata.json found so skipping teardown"
+          fi
+
+        }
+
+        trap 'kill $(jobs -p); exit 0' TERM
+        teardown
+
+    # Runs an install
+    - name: reinstall
+      image: ${IMAGE_INSTALLER}
+      terminationMessagePolicy: FallbackToLogsOnError
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      - name: ci-credentials
+        mountPath: /etc/openshift-installer
+      - name: cloud-credentials
+        mountPath: /etc/cloud-credentials
+      - name: artifacts
+        mountPath: /tmp/artifacts
+      env:
+      - name: TYPE
+        value: ${CLUSTER_TYPE}
+      - name: AWS_SHARED_CREDENTIALS_FILE
+        value: /etc/cloud-credentials/.awscred
+      - name: AWS_REGION
+        value: us-east-1
+      - name: CLUSTER_NAME
+        value: ${NAMESPACE}-${JOB_NAME_HASH}
+      - name: BASE_DOMAIN
+        value: ${BASE_DOMAIN}
+      - name: SSH_PUB_KEY_PATH
+        value: /etc/openshift-installer/ssh-publickey
+      - name: PULL_SECRET_PATH
+        value: /etc/openshift-installer/pull-secret
+      - name: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+        value: ${RELEASE_IMAGE_LATEST}
+      - name: USER
+        value: test
+      - name: HOME
+        value: /tmp
+      - name: NAMESPACE
+        value: ${NAMESPACE}
+      command:
+      - /bin/sh
+      - -c
+      - |
+        #!/bin/sh -x
+
+        export PATH=$PATH:/tmp/shared/bin
+
+        if [ ! -f /tmp/shared/install ];then
+          echo "Existing long lived cluster is healthy, not reinstalling"
+          oc create secret generic endurance-cluster-credentials-${CLUSTER_TYPE}-new -n ${NAMESPACE} --from-file=kubeconfig=/tmp/shared/auth/kubeconfig --from-file=metadata.json=/tmp/artifacts/installer/metadata.json
+          exit 0
+        fi
+
+        rm -rf /tmp/artifacts/installer
+        mkdir -p /tmp/artifacts/installer
+
+        echo "Installing from release ${RELEASE_IMAGE_LATEST}"
+
+        export EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
+        export SSH_PUB_KEY=$(cat "${SSH_PUB_KEY_PATH}")
+        export PULL_SECRET=$(cat "${PULL_SECRET_PATH}")
+
+        if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
+            cat > /tmp/artifacts/installer/install-config.yaml << EOF
+        apiVersion: v1beta4
+        baseDomain: ${BASE_DOMAIN}
+        metadata:
+          name: ${CLUSTER_NAME}
+        controlPlane:
+          name: master
+          replicas: 3
+          platform:
+            aws:
+              zones:
+              - us-east-1a
+              - us-east-1b
+        compute:
+        - name: worker
+          replicas: 3
+          platform:
+            aws:
+              zones:
+              - us-east-1a
+              - us-east-1b
+        networking:
+          clusterNetwork:
+          - cidr: 10.128.0.0/14
+            hostPrefix: 23
+          machineCIDR: 10.0.0.0/16
+          serviceNetwork:
+          - 172.30.0.0/16
+          networkType: OpenShiftSDN
+        platform:
+          aws:
+            region:       ${AWS_REGION}
+            userTags:
+              expirationDate: ${EXPIRATION_DATE}
+        pullSecret: |
+          ${PULL_SECRET}
+        sshKey: |
+          ${SSH_PUB_KEY}
+        EOF
+        else
+            echo "Unsupported cluster type '${CLUSTER_NAME}'"
+            exit 1
+        fi
+
+        TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create cluster &
+        wait "$!"
+
+        echo "##################### start cluster metadata.json ##########################"
+        cat /tmp/artifacts/installer/metadata.json
+        echo "##################### end cluster metadata.json ############################"       
+
+        # the ci-operator pod will copy this secret into the ci namespace to persist
+        # it for future jobs to use when accessing the long lived cluster.
+        oc create secret generic endurance-cluster-credentials-${CLUSTER_TYPE}-new -n ${NAMESPACE} --from-file=kubeconfig=/tmp/artifacts/installer/auth/kubeconfig --from-file=metadata.json=/tmp/artifacts/installer/metadata.json
+
+    containers:
+    - name: test
+      image: ${IMAGE_TESTS}
+      terminationMessagePolicy: FallbackToLogsOnError
+      resources:
+        requests:
+          cpu: 1
+          memory: 300Mi
+        limits:
+          memory: 3Gi
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -euo pipefail
+
+        if [ -f /tmp/shared/teardown ]; then
+          echo "Cluster was found to be in a failed state and torn down, artifacts gathered"
+          exit 1
+        fi
+        echo "Cluster was found to be healthy"
+        exit 0
