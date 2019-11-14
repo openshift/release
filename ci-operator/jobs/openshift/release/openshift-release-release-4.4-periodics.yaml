@@ -2860,6 +2860,113 @@ periodics:
         secretName: ci-pull-credentials
 - agent: kubernetes
   decorate: true
+  interval: 12h
+  labels:
+    ci.openshift.io/release-type: informing
+    job-release: "4.4"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: release-openshift-origin-installer-e2e-aws-upgrade-fips-4.4
+  spec:
+    containers:
+    - command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -euo pipefail
+
+        initial=$(ARTIFACTS)/release-initial.json
+        latest=$(ARTIFACTS)/release-latest.json
+        if ! curl --fail -X GET -G https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.4.0-0.ci/latest --data-urlencode 'rel=1' > ${initial}; then
+          echo "error: Could not find a stable version"
+          exit 1
+        fi
+        if ! curl --fail -X GET -G https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.4.0-0.ci/latest > ${latest}; then
+          echo "error: Could not find newest version"
+          exit 1
+        fi
+
+        from=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${initial}" )
+        to=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${latest}" )
+        export RELEASE_IMAGE_INITIAL=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${initial}" )
+        export RELEASE_IMAGE_LATEST=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${latest}" )
+
+        # prow doesn't allow init containers or a second container
+        export PATH=$PATH:/tmp/bin
+        mkdir /tmp/bin
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/ocp-dev-preview/4.3.0-0.nightly-2019-11-13-233341/openshift-client-linux-4.3.0-0.nightly-2019-11-13-233341.tar.gz | tar xvzf - -C /tmp/bin/
+        chmod ug+x /tmp/bin/oc
+
+        # annotate the information about this job so that we can query for it
+        oc annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
+
+        ci-operator --artifact-dir=$(ARTIFACTS) \
+          --give-pr-author-access-to-namespace=true --template=/usr/local/e2e-$(CLUSTER_TYPE)-fips \
+          --secret-dir=/usr/local/pull-secret --secret-dir=/usr/local/e2e-aws-fips-cluster-profile \
+          --target=e2e-aws-fips --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME) --lease-server=http://boskos
+      env:
+      - name: BRANCH
+        value: "4.4"
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: CLUSTER_VARIANT
+        value: fips
+      - name: JOB_NAME_SAFE
+        value: e2e-aws-fips
+      - name: CONFIG_SPEC
+        value: |
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-aws-fips
+            commands: |
+              fips_check
+              TEST_SUITE=all run-upgrade-tests
+              fips_check
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+      - name: TEST_COMMAND
+        value: |
+          fips_check
+          TEST_SUITE=all run-upgrade-tests
+          fips_check
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/e2e-aws-fips-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/e2e-aws-fips
+        name: job-definition
+        subPath: cluster-launch-installer-e2e.yaml
+      - mountPath: /usr/local/pull-secret
+        name: pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - configMap:
+        name: prow-job-cluster-launch-installer-e2e
+      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
+  decorate: true
   interval: 48h
   labels:
     ci.openshift.io/release-type: informing
