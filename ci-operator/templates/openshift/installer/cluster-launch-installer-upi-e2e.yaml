@@ -401,6 +401,17 @@ objects:
         trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/setup-success; else touch /tmp/exit; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+        # TODO(shadower): Remove this
+        # I just want to see what the default cluster type is when opening this as a pull request
+        echo "CLUSTER_TYPE: '$CLUSTER_TYPE'"
+        export CLUSTER_TYPE=openstack
+        echo "IMAGE_UPI_INSTALLER: '${IMAGE_UPI_INSTALLER}'"
+        echo "CLUSTER_NAME: '$CLUSTER_NAME'"
+        echo "BASE_DOMAIN: '$BASE_DOMAIN'"
+        echo "BUILD_ID: $BUILD_ID"
+        echo "Trying to detect Ansible:"
+        which ansible
+
         GATHER_BOOTSTRAP_ARGS=
 
         function gather_bootstrap_and_fail() {
@@ -1251,6 +1262,35 @@ objects:
                 curl -L -o /tmp/rhcos/rhcos.ova "${OVA_URL}"
                 govc import.ova -options=/tmp/rhcos/rhcos.json /tmp/rhcos/rhcos.ova
             fi
+        elif [[ "${CLUSTER_TYPE}" == "openstack" ]]; then
+          echo "TODO OpenStack: Create manifests"
+          # TODO(shadower): fix this GCP copy/pasta
+          base_domain="${BASE_DOMAIN:-origin-ci-int-gce.dev.openshift.com}"
+          cat > /tmp/artifacts/installer/install-config.yaml << EOF
+        apiVersion: v1
+        baseDomain: ${base_domain}
+        metadata:
+          name: ${CLUSTER_NAME}
+        controlPlane:
+          name: master
+          replicas: 3
+        compute:
+        - name: worker
+          replicas: 0
+        platform:
+          gcp:
+            projectID: ${GCP_PROJECT}
+            region: ${GCP_REGION}
+        pullSecret: >
+          ${PULL_SECRET}
+        sshKey: |
+          ${SSH_PUB_KEY}
+        EOF
+
+          openshift-install --dir=/tmp/artifacts/installer create manifests
+          rm -f /tmp/artifacts/installer/openshift/99_openshift-cluster-api_master-machines-*.yaml
+          rm -f /tmp/artifacts/installer/openshift/99_openshift-cluster-api_worker-machineset-*.yaml
+          sed -i "s;mastersSchedulable: true;mastersSchedulable: false;g" /tmp/artifacts/installer/manifests/cluster-scheduler-02-config.yml
         else
             echo "Unsupported cluster type '${CLUSTER_TYPE}'"
             exit 1
@@ -1835,6 +1875,11 @@ objects:
           CONTROL_PLANE_2_IP=$(terraform state show 'module.control_plane.external.ip_address[2]' | grep ip_address | awk '{print $3}')
 
           GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --master ${CONTROL_PLANE_0_IP} --master ${CONTROL_PLANE_1_IP} --master ${CONTROL_PLANE_2_IP}"
+        elif [[ "${CLUSTER_TYPE}" == "openstack" ]]; then
+          echo "TODO: OpenStack: Create the bootstrap, control plane and worker resources"
+          export UPI_DIR="/var/lib/openshift-install/upi/${CLUSTER_TYPE}"
+          echo "OpenStack UPI directory: '$UPI_DIR'"
+          ansible-playbook -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/01_network.yaml"
         fi
 
         echo "Waiting for bootstrap to complete"
@@ -1857,6 +1902,8 @@ objects:
         elif [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
           terraform apply -auto-approve -var 'bootstrap_complete=true' -no-color &
           wait "$!"
+        elif [[ "${CLUSTER_TYPE}" == "openstack" ]]; then
+          echo "TODO: OpenStack: Delete the bootstrap resources"
         fi
 
         function approve_csrs() {
