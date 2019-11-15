@@ -29,6 +29,8 @@ parameters:
 - name: CLUSTER_NETWORK_TYPE
 - name: CLUSTER_VARIANT
 - name: BUILD_ID
+- name: SERVICE_CA_CRD
+- name: SERVICE_CA_CONFIG
   required: false
 
 objects:
@@ -586,10 +588,18 @@ objects:
         EOF
         fi
 
+        if [[ -n "${CLUSTER_NETWORK_MANIFEST}" || -n "${SERVICE_CA_CRD}" ]]; then
+            openshift-install --dir=/tmp/artifacts/installer/ create manifests
+        fi
+
         # TODO: Replace with a more concise manifest injection approach
         if [[ -n "${CLUSTER_NETWORK_MANIFEST}" ]]; then
-            openshift-install --dir=/tmp/artifacts/installer/ create manifests
             echo "${CLUSTER_NETWORK_MANIFEST}" > /tmp/artifacts/installer/manifests/cluster-network-03-config.yml
+        fi
+
+        if [[ -n "${SERVICE_CA_CRD}" ]]; then
+            echo "${SERVICE_CA_CRD}" > /tmp/artifacts/installer/manifests/service-ca-02-crd.yaml
+            echo "${SERVICE_CA_CONFIG}" > /tmp/artifacts/installer/manifests/service-ca-03-config.yaml
         fi
 
         TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create cluster &
