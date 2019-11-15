@@ -401,16 +401,6 @@ objects:
         trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/setup-success; else touch /tmp/exit; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-        # TODO(shadower): Remove this
-        # I just want to see what the default cluster type is when opening this as a pull request
-        echo "TYPE: '$TYPE'"
-        echo "CLUSTER_TYPE: '$CLUSTER_TYPE'"
-        export CLUSTER_TYPE=openstack
-        echo "IMAGE_UPI_INSTALLER: '${IMAGE_UPI_INSTALLER}'"
-        echo "CLUSTER_NAME: '$CLUSTER_NAME'"
-        echo "BASE_DOMAIN: '$BASE_DOMAIN'"
-        echo "BUILD_ID: $BUILD_ID"
-
         GATHER_BOOTSTRAP_ARGS=
 
         function gather_bootstrap_and_fail() {
@@ -1094,6 +1084,16 @@ objects:
         export EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
         export SSH_PUB_KEY=$(cat "${SSH_PUB_KEY_PATH}")
         export PULL_SECRET=$(cat "${PULL_SECRET_PATH}")
+
+        # TODO(shadower): Remove this
+        # I just want to see what the default cluster type is when opening this as a pull request
+        echo "TYPE: '$TYPE'"
+        echo "CLUSTER_TYPE: '$CLUSTER_TYPE'"
+        export CLUSTER_TYPE=openstack
+        echo "IMAGE_UPI_INSTALLER: '${IMAGE_UPI_INSTALLER}'"
+        echo "CLUSTER_NAME: '$CLUSTER_NAME'"
+        echo "BASE_DOMAIN: '$BASE_DOMAIN'"
+        echo "BUILD_ID: $BUILD_ID"
 
         if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
           base_domain="${BASE_DOMAIN:-origin-ci-int-aws.dev.rhcloud.com}"
