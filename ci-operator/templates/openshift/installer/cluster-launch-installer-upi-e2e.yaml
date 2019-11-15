@@ -403,14 +403,13 @@ objects:
 
         # TODO(shadower): Remove this
         # I just want to see what the default cluster type is when opening this as a pull request
+        echo "TYPE: '$TYPE'"
         echo "CLUSTER_TYPE: '$CLUSTER_TYPE'"
         export CLUSTER_TYPE=openstack
         echo "IMAGE_UPI_INSTALLER: '${IMAGE_UPI_INSTALLER}'"
         echo "CLUSTER_NAME: '$CLUSTER_NAME'"
         echo "BASE_DOMAIN: '$BASE_DOMAIN'"
         echo "BUILD_ID: $BUILD_ID"
-        echo "Trying to detect Ansible:"
-        which ansible
 
         GATHER_BOOTSTRAP_ARGS=
 
@@ -1879,6 +1878,15 @@ objects:
           echo "TODO: OpenStack: Create the bootstrap, control plane and worker resources"
           export UPI_DIR="/var/lib/openshift-install/upi/${CLUSTER_TYPE}"
           echo "OpenStack UPI directory: '$UPI_DIR'"
+
+          # TODO(shadower): move this to the install image?
+          echo "OpenStack: installing ansible"
+          cat ${UPI_DIR}/requirements.txt
+          export PATH="${HOME}/.local/bin:${PATH}"
+          easy_install --user pip  # our Python 2.7.5 is even too old for ensurepip
+          pip install --user -r ${UPI_DIR}/requirements.txt
+          which ansible-playbook
+
           ansible-playbook -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/01_network.yaml"
         fi
 
