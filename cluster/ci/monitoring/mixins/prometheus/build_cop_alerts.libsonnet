@@ -11,7 +11,7 @@
             ||| % [job_name_regex, job_name_regex, $._config.buildCopSuccessRateTargets[job_name_regex]],
             'for': '10m',
             labels: {
-              severity: 'slack',
+              severity: 'critical',
               team: '%s' % $._config.alertManagerReceivers['build-cop'].team,
             },
             annotations: {
@@ -31,7 +31,7 @@
             |||,
             'for': '1m',
             labels: {
-              severity: 'slack',
+              severity: 'critical',
               team: '%s' % $._config.alertManagerReceivers['build-cop'].team,
             },
             annotations: {
