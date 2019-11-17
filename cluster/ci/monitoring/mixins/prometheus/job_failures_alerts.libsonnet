@@ -11,7 +11,7 @@
             ||| % job_name,
             'for': '1m',
             labels: {
-              severity: 'slack',
+              severity: 'critical',
               team: '%s' % $._config.alertManagerReceivers[$._job_failures_config.alerts[job_name].receiver].team,
             },
             annotations: {
