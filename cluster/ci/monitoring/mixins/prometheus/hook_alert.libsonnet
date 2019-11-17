@@ -13,7 +13,7 @@
             |||,
             'for': '5m',
             labels: {
-              severity: 'slack',
+              severity: 'critical',
             },
             annotations: {
               message: 'There have been no webhook calls on working hours for 5 minutes',
