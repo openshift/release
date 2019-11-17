@@ -1,10 +1,16 @@
 global:
   resolve_timeout: 5m
 receivers:
-- name: slack-notifications
+- name: slack-alerts
   slack_configs:
   - api_url: '{{ api_url }}'
     channel: '#ops-testplatform'
+    icon_url: https://avatars3.githubusercontent.com/u/3380462
+    text: '{{ template "custom_slack_text" . }}'
+- name: slack-warnings
+  slack_configs:
+  - api_url: '{{ api_url }}'
+    channel: '#alerts-testplatform'
     icon_url: https://avatars3.githubusercontent.com/u/3380462
     text: '{{ template "custom_slack_text" . }}'
 - name: slack-build-cop
@@ -30,6 +36,14 @@ route:
   receiver: slack-notifications
   repeat_interval: 2h
   routes:
+  - continue: true
+    match:
+      severity: warning
+    receiver: slack-warning
+  - continue: true
+    match:
+      severity: critical
+    receiver: slack-critical
   - continue: true
     match:
       team: build-cop

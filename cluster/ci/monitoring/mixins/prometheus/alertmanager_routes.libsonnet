@@ -1,6 +1,15 @@
 {
   alertmanagerRoutes+:: [
     {
+      receiver: 'slack-%s' % severity,
+      continue: true,
+      match: {
+        severity: '%s' % severity,
+      },
+    }
+    for severity in ['warning', 'critical']
+  ] + [
+    {
       receiver: 'slack-%s' % receiver_name,
       continue: true,
       match: {
