@@ -1,7 +1,7 @@
 {
   alertmanagerRoutes+:: [
     {
-      receiver: 'slack-%s' % severity,
+      receiver: 'slack-%ss' % severity,
       match: {
         severity: '%s' % severity,
       },
