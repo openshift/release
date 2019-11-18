@@ -1,7 +1,7 @@
 {
   alertmanagerReceivers+:: [
     {
-      name: 'slack-alerts',
+      name: 'slack-criticals',
       slack_configs: [
         {
           channel: '#ops-testplatform',
