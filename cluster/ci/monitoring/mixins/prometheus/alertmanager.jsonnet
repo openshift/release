@@ -13,7 +13,7 @@ local routes = (import 'alertmanager.libsonnet').alertmanagerRoutes;
     group_wait: '30s',
     group_interval: '5m',
     repeat_interval: '2h',
-    receiver: 'slack-notifications',
+    receiver: 'slack-warnings',
     routes: routes,
   },
   receivers: receivers,

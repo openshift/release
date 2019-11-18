@@ -2,7 +2,6 @@
   alertmanagerRoutes+:: [
     {
       receiver: 'slack-%s' % severity,
-      continue: true,
       match: {
         severity: '%s' % severity,
       },
@@ -11,7 +10,6 @@
   ] + [
     {
       receiver: 'slack-%s' % receiver_name,
-      continue: true,
       match: {
         team: '%s' % $._config.alertManagerReceivers[receiver_name].team,
       },
