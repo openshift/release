@@ -19,10 +19,8 @@ parameters:
 - name: RELEASE_IMAGE_LATEST
   required: true
 - name: BASE_DOMAIN
-  value: shiftstack.ci
+  value: shiftstack.devcluster.openshift.com
   required: true
-- name: CI_DNS_IP
-  value: 128.31.27.48
 - name: KURYR_ENABLED
   value: "false"
 - name: BUILD_ID
@@ -80,10 +78,6 @@ objects:
     - name: cluster-profile
       secret:
         secretName: ${JOB_NAME_SAFE}-cluster-profile
-    dnsPolicy: "None"
-    dnsConfig:
-      nameservers:
-        - ${CI_DNS_IP}
     initContainers:
     - name: cp-shared
       image: ${IMAGE_TESTS}
@@ -132,10 +126,6 @@ objects:
         function boskosctl() {
           /app/boskos/cmd/cli/app.binary "${@}"
         }
-
-        # NOTE(mandre) The boskos.ci domain is normally resolved internally by
-        # the cluster DNS resolver, however since we're using a custom resolver
-        # $CI_DNS_IP, this one needs to know about the IP address of boskos.ci.
 
         echo "[INFO] Acquiring a lease ..."
         resource="$( boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" acquire --type "${CLUSTER_TYPE}-quota-slice" --state free --target-state leased --timeout 150m )"
@@ -307,6 +297,14 @@ objects:
         value: ${CLUSTER_TYPE}
       - name: CLUSTER_NAME
         value: ${NAMESPACE}-${JOB_NAME_HASH}
+      - name: AWS_SHARED_CREDENTIALS_FILE
+        value: /etc/openshift-installer/.awscred
+      - name: AWS_DEFAULT_REGION
+        value: us-east-1
+      - name: AWS_DEFAULT_OUTPUT
+        value: json
+      - name: AWS_PROFILE
+        value: openshift-ci-infra
       - name: BASE_DOMAIN
         value: ${BASE_DOMAIN}
       - name: SSH_PUB_KEY_PATH
@@ -335,8 +333,6 @@ objects:
         value: test
       - name: HOME
         value: /tmp
-      - name: CI_DNS_IP
-        value: ${CI_DNS_IP}
       # we must boot from performance volumes to reduce disk speed related etcd failures
       - name: OPENSTACK_MASTER_VOLUME_SIZE
         value: "25"
@@ -394,8 +390,23 @@ objects:
         # create a new floating ip tagged with CLUSTER_NAME so it can be deleted later
         LB_FIP=$(openstack floating ip create --description $CLUSTER_NAME $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address')
 
-        # create A record for the api
-        curl -v $CI_DNS_IP:8080/add -d '{"cluster_name": "'$CLUSTER_NAME'", "lb_fip": "'$LB_FIP'"}'
+        echo "Creating DNS record for api.$CLUSTER_NAME.$BASE_DOMAIN. -> $LB_FIP"
+        cat > /tmp/artifacts/installer/api-record.json <<EOF
+        {
+        "Comment": "Create the public OpenShift API record",
+        "Changes": [{
+            "Action": "UPSERT",
+            "ResourceRecordSet": {
+              "Name": "api.$CLUSTER_NAME.$BASE_DOMAIN.",
+              "Type": "A",
+              "TTL": 300,
+              "ResourceRecords": [{"Value": "$LB_FIP"}]
+              }
+        }]}
+        EOF
+
+        export HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "shiftstack.devcluster.openshift.com" | python -c 'import json,sys;print json.load(sys.stdin)["HostedZones"][0]["Id"].split("/")[-1]')
+        aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file:///tmp/artifacts/installer/api-record.json
 
         cat > /tmp/artifacts/installer/install-config.yaml << EOF
         apiVersion: v1beta4
@@ -447,8 +458,21 @@ objects:
           # Assign a FIP to ingress port to allow getting to apps
           # create a new floating ip tagged with CLUSTER_NAME so it can be deleted later
           APPS_FIP=$(openstack floating ip create --description $CLUSTER_NAME $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address' --port $INGRESS_PORT)
-          # create A record for *.apps
-          curl -v $CI_DNS_IP:8080/add -d '{"cluster_name": "'$CLUSTER_NAME'", "apps_fip": "'$APPS_FIP'"}'
+          echo "Creating DNS record for *.apps.$CLUSTER_NAME.$BASE_DOMAIN. -> $APPS_FIP"
+          cat > /tmp/artifacts/installer/ingress-record.json <<EOF
+          {
+          "Comment": "Create the public OpenShift Ingress record",
+          "Changes": [{
+              "Action": "UPSERT",
+              "ResourceRecordSet": {
+                "Name": "*.apps.$CLUSTER_NAME.$BASE_DOMAIN.",
+                "Type": "A",
+                "TTL": 300,
+                "ResourceRecords": [{"Value": "$APPS_FIP"}]
+                }
+          }]}
+        EOF
+          aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file:///tmp/artifacts/installer/ingress-record.json
         fi
 
     # Performs cleanup of all created resources
@@ -467,8 +491,14 @@ objects:
         value: ${CLUSTER_TYPE}
       - name: CLUSTER_NAME
         value: ${NAMESPACE}-${JOB_NAME_HASH}
-      - name: CI_DNS_IP
-        value: ${CI_DNS_IP}
+      - name: AWS_SHARED_CREDENTIALS_FILE
+        value: /etc/openshift-installer/.awscred
+      - name: AWS_DEFAULT_REGION
+        value: us-east-1
+      - name: AWS_DEFAULT_OUTPUT
+        value: json
+      - name: AWS_PROFILE
+        value: openshift-ci-infra
       - name: KUBECONFIG
         value: /tmp/artifacts/installer/auth/kubeconfig
       - name: OS_CLOUD
@@ -600,7 +630,11 @@ objects:
           wait
 
           echo "Removing entries from DNS ..."
-          curl -v $CI_DNS_IP:8080/remove -d '{"cluster_name": "'$CLUSTER_NAME'"}'
+          export HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "shiftstack.devcluster.openshift.com" | python -c 'import json,sys;print json.load(sys.stdin)["HostedZones"][0]["Id"].split("/")[-1]')
+          sed -e's/UPSERT/DELETE/g' /tmp/artifacts/installer/api-record.json > /tmp/artifacts/installer/delete-api-record.json
+          aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file:///tmp/artifacts/installer/delete-api-record.json
+          sed -e's/UPSERT/DELETE/g' /tmp/artifacts/installer/ingress-record.json > /tmp/artifacts/installer/delete-ingress-record.json
+          aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file:///tmp/artifacts/installer/delete-ingress-record.json
 
           echo "Deleting service VM FIP ..."
           openstack floating ip list --long -f csv -c Description -c "Floating IP Address" | grep $CLUSTER_NAME | cut -f1 -d "," | xargs openstack floating ip delete
