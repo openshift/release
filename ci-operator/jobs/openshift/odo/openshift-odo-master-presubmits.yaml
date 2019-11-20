@@ -4,229 +4,15 @@ presubmits:
     always_run: true
     branches:
     - master
-    context: ci/prow/v4.1-benchmark
+    context: ci/prow/unit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: v4.1
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-odo-master-v4.1-benchmark
-    rerun_command: /test v4.1-benchmark
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
-        - --give-pr-author-access-to-namespace=true
-        - --org=openshift
-        - --repo=odo
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-        - --secret-dir=/usr/local/benchmark-cluster-profile
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=benchmark
-        - --template=/usr/local/benchmark
-        - --variant=v4.1
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-odo-master__v4.1.yaml
-              name: ci-operator-master-configs
-        - name: JOB_NAME_SAFE
-          value: benchmark
-        - name: TEST_COMMAND
-          value: scripts/openshiftci-presubmit-benchmark.sh
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/benchmark-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/benchmark
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )v4.1-benchmark,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    context: ci/prow/v4.1-e2e-scenarios
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: v4.1
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-odo-master-v4.1-e2e-scenarios
-    rerun_command: /test v4.1-e2e-scenarios
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
-        - --give-pr-author-access-to-namespace=true
-        - --org=openshift
-        - --repo=odo
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-        - --secret-dir=/usr/local/e2e-scenarios-cluster-profile
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=e2e-scenarios
-        - --template=/usr/local/e2e-scenarios
-        - --variant=v4.1
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-odo-master__v4.1.yaml
-              name: ci-operator-master-configs
-        - name: JOB_NAME_SAFE
-          value: e2e-scenarios
-        - name: TEST_COMMAND
-          value: scripts/openshiftci-presubmit-e2etests.sh
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/e2e-scenarios-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-scenarios
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )v4.1-e2e-scenarios,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    context: ci/prow/v4.1-integration
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: v4.1
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-odo-master-v4.1-integration
-    rerun_command: /test v4.1-integration
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
-        - --give-pr-author-access-to-namespace=true
-        - --org=openshift
-        - --repo=odo
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-        - --secret-dir=/usr/local/integration-cluster-profile
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=integration
-        - --template=/usr/local/integration
-        - --variant=v4.1
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-odo-master__v4.1.yaml
-              name: ci-operator-master-configs
-        - name: JOB_NAME_SAFE
-          value: integration
-        - name: TEST_COMMAND
-          value: scripts/openshiftci-presubmit-integrationtests.sh
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/integration-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/integration
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )v4.1-integration,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    context: ci/prow/v4.1-unit
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: v4.1
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-odo-master-v4.1-unit
-    rerun_command: /test v4.1-unit
+    name: pull-ci-openshift-odo-master-unit
+    rerun_command: /test unit
     spec:
       containers:
       - args:
@@ -238,15 +24,72 @@ presubmits:
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=unit
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-odo-master.yaml
+              name: ci-operator-master-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )unit,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/v4.1-integration-e2e-benchmark
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: v4.1
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-odo-master-v4.1-integration-e2e-benchmark
+    rerun_command: /test v4.1-integration-e2e-benchmark
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --branch=master
+        - --give-pr-author-access-to-namespace=true
+        - --org=openshift
+        - --repo=odo
+        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
+        - --secret-dir=/usr/local/integration-e2e-benchmark-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=integration-e2e-benchmark
+        - --template=/usr/local/integration-e2e-benchmark
         - --variant=v4.1
         command:
         - ci-operator
         env:
+        - name: CLUSTER_TYPE
+          value: aws
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
               key: openshift-odo-master__v4.1.yaml
               name: ci-operator-master-configs
+        - name: JOB_NAME_SAFE
+          value: integration-e2e-benchmark
+        - name: TEST_COMMAND
+          value: scripts/openshiftci-presubmit-all-tests.sh
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -254,20 +97,33 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /usr/local/integration-e2e-benchmark-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/integration-e2e-benchmark
+          name: job-definition
+          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-src
+        name: job-definition
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )v4.1-unit,?($|\s.*)
+    trigger: (?m)^/test( | .* )v4.1-integration-e2e-benchmark,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - master
-    context: ci/prow/v4.2-benchmark
+    context: ci/prow/v4.2-integration-e2e-benchmark
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -275,8 +131,8 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       ci-operator.openshift.io/variant: v4.2
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-odo-master-v4.2-benchmark
-    rerun_command: /test v4.2-benchmark
+    name: pull-ci-openshift-odo-master-v4.2-integration-e2e-benchmark
+    rerun_command: /test v4.2-integration-e2e-benchmark
     spec:
       containers:
       - args:
@@ -286,10 +142,10 @@ presubmits:
         - --org=openshift
         - --repo=odo
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-        - --secret-dir=/usr/local/benchmark-cluster-profile
+        - --secret-dir=/usr/local/integration-e2e-benchmark-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=benchmark
-        - --template=/usr/local/benchmark
+        - --target=integration-e2e-benchmark
+        - --template=/usr/local/integration-e2e-benchmark
         - --variant=v4.2
         command:
         - ci-operator
@@ -302,9 +158,9 @@ presubmits:
               key: openshift-odo-master__v4.2.yaml
               name: ci-operator-master-configs
         - name: JOB_NAME_SAFE
-          value: benchmark
+          value: integration-e2e-benchmark
         - name: TEST_COMMAND
-          value: scripts/openshiftci-presubmit-benchmark.sh
+          value: scripts/openshiftci-presubmit-all-tests.sh
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -312,9 +168,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/benchmark-cluster-profile
+        - mountPath: /usr/local/integration-e2e-benchmark-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/benchmark
+        - mountPath: /usr/local/integration-e2e-benchmark
           name: job-definition
           subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/sentry-dsn
@@ -333,154 +189,12 @@ presubmits:
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )v4.2-benchmark,?($|\s.*)
+    trigger: (?m)^/test( | .* )v4.2-integration-e2e-benchmark,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - master
-    context: ci/prow/v4.2-e2e-scenarios
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: v4.2
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-odo-master-v4.2-e2e-scenarios
-    rerun_command: /test v4.2-e2e-scenarios
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
-        - --give-pr-author-access-to-namespace=true
-        - --org=openshift
-        - --repo=odo
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-        - --secret-dir=/usr/local/e2e-scenarios-cluster-profile
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=e2e-scenarios
-        - --template=/usr/local/e2e-scenarios
-        - --variant=v4.2
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-odo-master__v4.2.yaml
-              name: ci-operator-master-configs
-        - name: JOB_NAME_SAFE
-          value: e2e-scenarios
-        - name: TEST_COMMAND
-          value: scripts/openshiftci-presubmit-e2etests.sh
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/e2e-scenarios-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-scenarios
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )v4.2-e2e-scenarios,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    context: ci/prow/v4.2-integration
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: v4.2
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-odo-master-v4.2-integration
-    rerun_command: /test v4.2-integration
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
-        - --give-pr-author-access-to-namespace=true
-        - --org=openshift
-        - --repo=odo
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-        - --secret-dir=/usr/local/integration-cluster-profile
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=integration
-        - --template=/usr/local/integration
-        - --variant=v4.2
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-odo-master__v4.2.yaml
-              name: ci-operator-master-configs
-        - name: JOB_NAME_SAFE
-          value: integration
-        - name: TEST_COMMAND
-          value: scripts/openshiftci-presubmit-integrationtests.sh
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/integration-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/integration
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )v4.2-integration,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    context: ci/prow/v4.3-benchmark
+    context: ci/prow/v4.3-integration-e2e-benchmark
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -488,8 +202,8 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       ci-operator.openshift.io/variant: v4.3
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-odo-master-v4.3-benchmark
-    rerun_command: /test v4.3-benchmark
+    name: pull-ci-openshift-odo-master-v4.3-integration-e2e-benchmark
+    rerun_command: /test v4.3-integration-e2e-benchmark
     spec:
       containers:
       - args:
@@ -499,10 +213,10 @@ presubmits:
         - --org=openshift
         - --repo=odo
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-        - --secret-dir=/usr/local/benchmark-cluster-profile
+        - --secret-dir=/usr/local/integration-e2e-benchmark-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=benchmark
-        - --template=/usr/local/benchmark
+        - --target=integration-e2e-benchmark
+        - --template=/usr/local/integration-e2e-benchmark
         - --variant=v4.3
         command:
         - ci-operator
@@ -515,9 +229,9 @@ presubmits:
               key: openshift-odo-master__v4.3.yaml
               name: ci-operator-master-configs
         - name: JOB_NAME_SAFE
-          value: benchmark
+          value: integration-e2e-benchmark
         - name: TEST_COMMAND
-          value: scripts/openshiftci-presubmit-benchmark.sh
+          value: scripts/openshiftci-presubmit-all-tests.sh
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -525,9 +239,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/benchmark-cluster-profile
+        - mountPath: /usr/local/integration-e2e-benchmark-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/benchmark
+        - mountPath: /usr/local/integration-e2e-benchmark
           name: job-definition
           subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/sentry-dsn
@@ -546,146 +260,4 @@ presubmits:
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )v4.3-benchmark,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    context: ci/prow/v4.3-e2e-scenarios
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: v4.3
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-odo-master-v4.3-e2e-scenarios
-    rerun_command: /test v4.3-e2e-scenarios
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
-        - --give-pr-author-access-to-namespace=true
-        - --org=openshift
-        - --repo=odo
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-        - --secret-dir=/usr/local/e2e-scenarios-cluster-profile
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=e2e-scenarios
-        - --template=/usr/local/e2e-scenarios
-        - --variant=v4.3
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-odo-master__v4.3.yaml
-              name: ci-operator-master-configs
-        - name: JOB_NAME_SAFE
-          value: e2e-scenarios
-        - name: TEST_COMMAND
-          value: scripts/openshiftci-presubmit-e2etests.sh
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/e2e-scenarios-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-scenarios
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )v4.3-e2e-scenarios,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    context: ci/prow/v4.3-integration
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: v4.3
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-odo-master-v4.3-integration
-    rerun_command: /test v4.3-integration
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
-        - --give-pr-author-access-to-namespace=true
-        - --org=openshift
-        - --repo=odo
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-        - --secret-dir=/usr/local/integration-cluster-profile
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=integration
-        - --template=/usr/local/integration
-        - --variant=v4.3
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-odo-master__v4.3.yaml
-              name: ci-operator-master-configs
-        - name: JOB_NAME_SAFE
-          value: integration
-        - name: TEST_COMMAND
-          value: scripts/openshiftci-presubmit-integrationtests.sh
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/integration-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/integration
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )v4.3-integration,?($|\s.*)
+    trigger: (?m)^/test( | .* )v4.3-integration-e2e-benchmark,?($|\s.*)
