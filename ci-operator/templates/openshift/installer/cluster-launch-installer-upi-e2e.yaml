@@ -97,7 +97,7 @@ objects:
       app: ${JOB_NAME_SAFE}-bootstrap-exporter
   spec:
     restartPolicy: Never
-    activeDeadlineSeconds: 14400
+    activeDeadlineSeconds: 18000
     terminationGracePeriodSeconds: 900
     volumes:
     - name: shared-ignition-files
@@ -2086,14 +2086,14 @@ objects:
 
             export AWS_DEFAULT_REGION="${AWS_REGION}"  # CLI prefers the former
 
-            for STACK_SUFFIX in compute-2 compute-1 compute-0 control-plane bootstrap security infra vpc
+            for STACK_SUFFIX in compute-2 compute-1 compute-0 control-plane bootstrap proxy security infra vpc
             do
               aws cloudformation delete-stack --stack-name "${CLUSTER_NAME}-${STACK_SUFFIX}"
             done
 
             openshift-install --dir /tmp/artifacts/installer destroy cluster
 
-            for STACK_SUFFIX in compute-2 compute-1 compute-0 control-plane bootstrap security infra vpc
+            for STACK_SUFFIX in compute-2 compute-1 compute-0 control-plane bootstrap proxy security infra vpc
             do
               aws cloudformation wait stack-delete-complete --stack-name "${CLUSTER_NAME}-${STACK_SUFFIX}"
             done
@@ -2113,7 +2113,7 @@ objects:
         trap 'teardown' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
 
-        for i in $(seq 1 180); do
+        for i in $(seq 1 220); do
           if [[ -f /tmp/shared/exit ]]; then
             exit 0
           fi

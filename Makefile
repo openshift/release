@@ -129,6 +129,7 @@ prow-cluster-jobs:
 	oc create configmap prow-job-cluster-launch-e2e-openshift-jenkins --from-file=ci-operator/templates/openshift/openshift-ansible/cluster-launch-e2e-openshift-jenkins.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap prow-job-cluster-launch-src --from-file=ci-operator/templates/openshift/openshift-ansible/cluster-launch-src.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap prow-job-cluster-launch-installer-e2e --from-file=ci-operator/templates/openshift/installer/cluster-launch-installer-e2e.yaml -o yaml --dry-run | oc apply -f -
+	oc create configmap prow-job-cluster-launch-installer-longlived --from-file=ci-operator/templates/openshift/installer/cluster-launch-installer-longlived.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap prow-job-cluster-launch-installer-libvirt-e2e --from-file=ci-operator/templates/openshift/installer/cluster-launch-installer-libvirt-e2e.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap prow-job-cluster-launch-installer-src --from-file=ci-operator/templates/openshift/installer/cluster-launch-installer-src.yaml -o yaml --dry-run | oc apply -f -
 	oc create configmap prow-job-cluster-launch-installer-console --from-file=ci-operator/templates/openshift/installer/cluster-launch-installer-console.yaml -o yaml --dry-run | oc apply -f -
@@ -157,19 +158,25 @@ prow-artifacts:
 prow-release-controller-definitions:
 	oc annotate -n ocp is/4.1-art-latest "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.1.json)" --overwrite
 	oc annotate -n ocp is/4.1 "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.1-ci.json)" --overwrite
+
 	oc annotate -n ocp is/4.2-art-latest "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.2.json)" --overwrite
 	oc annotate -n ocp is/4.2-art-latest-s390x "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.2-s390x.json)" --overwrite
 	oc annotate -n ocp is/4.2 "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.2-ci.json)" --overwrite
-	oc annotate -n origin is/4.3 "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-origin-4.3.json)" --overwrite
+
 	oc annotate -n ocp is/4.3-art-latest "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.3.json)" --overwrite
 	oc annotate -n ocp is/4.3-art-latest-s390x "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.3-s390x.json)" --overwrite
 	oc annotate -n ocp is/4.3-art-latest-ppc64le "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.3-ppc64le.json)" --overwrite
 	oc annotate -n ocp is/4.3 "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.3-ci.json)" --overwrite
+
 	oc annotate -n ocp is/4.4-art-latest "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.4.json)" --overwrite
 	oc annotate -n ocp is/4.4-art-latest-s390x "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.4-s390x.json)" --overwrite
 	oc annotate -n ocp is/4.4-art-latest-ppc64le "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.4-ppc64le.json)" --overwrite
 	oc annotate -n ocp is/4.4 "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.4-ci.json)" --overwrite
+
 	oc annotate -n ocp is/release "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.y-stable.json)" --overwrite
+
+	oc annotate -n origin is/4.3 "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-origin-4.3.json)" --overwrite
+	oc annotate -n origin is/release "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-origin-4.y-stable.json)" --overwrite
 .PHONY: prow-release-controller-definitions
 
 prow-release-controller-deploy:
@@ -262,8 +269,6 @@ azure-secrets:
 	--from-file=cluster/test-deploy/azure/metrics-int.cert \
 	--from-file=cluster/test-deploy/azure/metrics-int.key \
 	-o yaml --dry-run | oc apply -n azure -f -
-	oc create secret generic aws-reg-master --from-literal=username=${AWS_REG_USERNAME} --from-literal=password=${AWS_REG_PASSWORD} -o yaml --dry-run | oc apply -n azure -f -
-	oc create secret generic codecov-token --from-literal=upload=${CODECOV_UPLOAD_TOKEN} -o yaml --dry-run | oc apply -n azure -f -
 	oc create secret generic cluster-secrets-azure-env --from-literal=azure_client_id=${AZURE_ROOT_CLIENT_ID} --from-literal=azure_client_secret=${AZURE_ROOT_CLIENT_SECRET} --from-literal=azure_tenant_id=${AZURE_ROOT_TENANT_ID} --from-literal=azure_subscription_id=${AZURE_ROOT_SUBSCRIPTION_ID} -o yaml --dry-run | oc apply -n azure-private -f -
 .PHONY: azure-secrets
 
