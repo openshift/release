@@ -1,0 +1,151 @@
+kind: Template
+apiVersion: template.openshift.io/v1
+
+parameters:
+- name: JOB_NAME_SAFE
+  required: true
+- name: NAMESPACE
+  required: true
+- name: IMAGE_TESTS
+  required: true
+- name: CLUSTER_TYPE
+  required: true
+- name: TEST_COMMAND
+  required: true
+- name: RELEASE_IMAGE_LATEST
+  required: true
+
+objects:
+# We want the cluster to be able to access these images
+- kind: RoleBinding
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: ${JOB_NAME_SAFE}-image-puller
+    namespace: ${NAMESPACE}
+  roleRef:
+    name: system:image-puller
+  subjects:
+  - kind: SystemGroup
+    name: system:unauthenticated
+  - kind: SystemGroup
+    name: system:authenticated
+
+# Give edit access to a known bot
+- kind: RoleBinding
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: ${JOB_NAME_SAFE}-namespace-editors
+    namespace: ${NAMESPACE}
+  roleRef:
+    name: edit
+  subjects:
+  - kind: ServiceAccount
+    namespace: ci
+    name: ci-chat-bot
+
+# The e2e pod spins up a cluster, runs e2e tests, and then cleans up the cluster.
+- kind: Pod
+  apiVersion: v1
+  metadata:
+    name: ${JOB_NAME_SAFE}
+    namespace: ${NAMESPACE}
+    annotations:
+      # we want to gather the teardown logs no matter what
+      ci-operator.openshift.io/wait-for-container-artifacts: teardown
+      ci-operator.openshift.io/save-container-logs: "true"
+      ci-operator.openshift.io/container-sub-tests: "initcreds,test"
+  spec:
+    restartPolicy: Never
+    activeDeadlineSeconds: 18000
+    terminationGracePeriodSeconds: 900
+    volumes:
+    - name: artifacts
+      emptyDir: {}
+    - name: cluster-credentials
+      secret:
+        secretName: endurance-cluster-credentials-${CLUSTER_TYPE}
+    - name: ci-credentials
+      secret:
+        secretName: ci-credentials
+       
+    containers:
+    # Once the cluster is up, executes shared tests
+    - name: test
+      image: ${IMAGE_TESTS}
+      terminationMessagePolicy: FallbackToLogsOnError
+      resources:
+        requests:
+          cpu: 1
+          memory: 300Mi
+        limits:
+          memory: 3Gi
+      volumeMounts:
+      - name: artifacts
+        mountPath: /tmp/artifacts
+      - name: cluster-credentials
+        mountPath: /tmp/cluster-credentials
+      - name: ci-credentials
+        mountPath: /tmp/ci-credentials
+      env:
+      - name: ARTIFACT_DIR
+        value: /tmp/artifacts
+      - name: HOME
+        value: /tmp/home
+      - name: KUBECONFIG
+        value: /tmp/cluster-credentials/kubeconfig
+      command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -euo pipefail
+
+        export PATH=/usr/libexec/origin:$PATH
+
+        trap 'touch /tmp/done' EXIT
+        trap 'kill $(jobs -p); exit 0' TERM
+
+        mkdir -p "${HOME}"
+
+        # set up cloud-provider-specific env vars
+        export KUBE_SSH_BASTION="$( oc --insecure-skip-tls-verify get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
+        export KUBE_SSH_KEY_PATH=/tmp/cluster/ssh-privatekey
+        if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
+          export GOOGLE_APPLICATION_CREDENTIALS="/tmp/cluster/gce.json"
+          export KUBE_SSH_USER=cloud-user
+          mkdir -p ~/.ssh
+          cp /tmp/cluster/ssh-privatekey ~/.ssh/google_compute_engine || true
+          export PROVIDER_ARGS='-provider=gce -gce-zone=us-east1-c -gce-project=openshift-gce-devel-ci'
+          export TEST_PROVIDER='{"type":"gce","zone":"us-east1-c","projectid":"openshift-gce-devel-ci"}'
+        elif [[ "${CLUSTER_TYPE}" == "aws" ]]; then
+          mkdir -p ~/.ssh
+          cp /tmp/cluster/ssh-privatekey ~/.ssh/kube_aws_rsa || true
+          export PROVIDER_ARGS="-provider=aws -gce-zone=us-east-1"
+          # TODO: make openshift-tests auto-discover this from cluster config
+          export TEST_PROVIDER='{"type":"aws","region":"us-east-1","zone":"us-east-1a","multizone":true,"multimaster":true}'
+          export KUBE_SSH_USER=core
+        fi
+
+        mkdir -p /tmp/output
+        cd /tmp/output
+
+        function run-tests() {
+          openshift-tests run "${TEST_SUITE}" \
+            --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
+          exit 0
+        }
+
+        function run-upgrade-tests() {
+          current=$(oc get clusterversion/version -o jsonpath='{.status.history[0].version}')
+          new=$(oc adm release info -a /tmp/ci-credentials/pull-secret ${RELEASE_IMAGE_LATEST} | grep Version: | awk '{print $2}')
+          if [ $new == $current ]; then
+            echo "Skipping upgrade test because cluster is already at the latest version: $current (current) == $new (new)"
+            exit 0
+          fi
+
+          openshift-tests run-upgrade "${TEST_SUITE}" --to-image "${RELEASE_IMAGE_LATEST}" \
+            --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
+          exit 0
+        }
+
+        ${TEST_COMMAND}
