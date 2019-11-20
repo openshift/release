@@ -343,7 +343,7 @@ objects:
       - name: AWS_SHARED_CREDENTIALS_FILE
         value: /etc/cloud-credentials/.awscred
       - name: AWS_REGION
-        value: us-east-1
+        value: us-east-2
       - name: CLUSTER_NAME
         value: ${NAMESPACE}-${JOB_NAME_HASH}
       - name: BASE_DOMAIN
@@ -395,16 +395,16 @@ objects:
           platform:
             aws:
               zones:
-              - us-east-1a
-              - us-east-1b
+              - us-east-2a
+              - us-east-2b
         compute:
         - name: worker
           replicas: 3
           platform:
             aws:
               zones:
-              - us-east-1a
-              - us-east-1b
+              - us-east-2a
+              - us-east-2b
         networking:
           clusterNetwork:
           - cidr: 10.128.0.0/14
@@ -433,8 +433,18 @@ objects:
 
         echo "##################### start cluster metadata.json ##########################"
         cat /tmp/artifacts/installer/metadata.json
+        echo
         echo "##################### end cluster metadata.json ############################"       
 
+        echo "Confirming cluster is up"
+        oc get clusteroperators
+        rc=$?
+        if [ ! $rc -eq 0 ]; then
+          echo "Failed to communicate with newly installed cluster"
+          exit 1
+        fi
+        echo "Successfully pinged new cluster"
+        
         # the ci-operator pod will copy this secret into the ci namespace to persist
         # it for future jobs to use when accessing the long lived cluster.
         oc create secret generic endurance-cluster-credentials-${CLUSTER_TYPE}-new -n ${NAMESPACE} --from-file=kubeconfig=/tmp/artifacts/installer/auth/kubeconfig --from-file=metadata.json=/tmp/artifacts/installer/metadata.json
