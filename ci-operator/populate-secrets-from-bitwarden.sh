@@ -241,6 +241,7 @@ target_cloud="openstack"
 update_secret generic "cluster-secrets-${target_cloud}"              \
 	"$( format_attachment "quay.io" pull-secret )"               \
 	"$( format_attachment "openstack" clouds.yaml )"                 \
+	"$( format_attachment "openstack" .awscred )"                 \
 	"$( format_attachment "insights-ci-account" insights-live.yaml )" \
 	"$( format_attachment "jenkins-ci-provisioner" ssh-privatekey )" \
 	"$( format_attachment "jenkins-ci-provisioner" ssh-publickey )"
