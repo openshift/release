@@ -15,7 +15,6 @@ periodics:
         set -euo pipefail
 
         ci-operator --artifact-dir=$(ARTIFACTS) \
-          --secret-dir=/usr/local/pull-secret \
           --secret-dir=/usr/local/ci-credentials \
           --secret-dir=/usr/local/endurance-cluster-credentials-aws \
           --template=/usr/local/endurance-test/endurance-test.yaml \
@@ -58,8 +57,6 @@ periodics:
         name: job-definition
       - mountPath: /usr/local/ci-credentials
         name: ci-credentials
-      - mountPath: /usr/local/pull-secret
-        name: pull-secret
       - mountPath: /usr/local/endurance-cluster-credentials-aws
         name: endurance-cluster-credentials-aws
     serviceAccountName: ci-operator
@@ -70,9 +67,6 @@ periodics:
     - name: ci-credentials
       secret:
         secretName: cluster-secrets-aws
-    - name: pull-secret
-      secret:
-        secretName: ci-pull-credentials
     - name: endurance-cluster-credentials-aws
       secret:
         secretName: endurance-cluster-credentials-4.3-aws
@@ -92,7 +86,7 @@ periodics:
         set -euo pipefail
 
         ci-operator --artifact-dir=$(ARTIFACTS) \
-          --secret-dir=/usr/local/pull-secret \
+          --secret-dir=/usr/local/ci-credentials \
           --secret-dir=/usr/local/endurance-cluster-credentials-aws \
           --template=/usr/local/endurance-test/endurance-test.yaml \
           --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME) \
@@ -132,8 +126,8 @@ periodics:
       volumeMounts:
       - mountPath: /usr/local/endurance-test
         name: job-definition
-      - mountPath: /usr/local/pull-secret
-        name: pull-secret
+      - mountPath: /usr/local/ci-credentials
+        name: ci-credentials
       - mountPath: /usr/local/endurance-cluster-credentials-aws
         name: endurance-cluster-credentials-aws
     serviceAccountName: ci-operator
@@ -141,9 +135,9 @@ periodics:
     - configMap:
         name: prow-job-endurance-test
       name: job-definition
-    - name: pull-secret
+    - name: ci-credentials
       secret:
-        secretName: ci-pull-credentials
+        secretName: cluster-secrets-aws
     - name: endurance-cluster-credentials-aws
       secret:
         secretName: endurance-cluster-credentials-4.3-aws
@@ -167,7 +161,6 @@ periodics:
         chmod ug+x /tmp/bin/oc
         set +e
         ci-operator --artifact-dir=$(ARTIFACTS) \
-          --secret-dir=/usr/local/pull-secret \
           --secret-dir=/usr/local/ci-credentials \
           --secret-dir=/usr/local/endurance-cluster-credentials-aws \
           --secret-dir=/usr/local/aws-openshift-llc-account-credentials \
@@ -219,8 +212,6 @@ periodics:
       volumeMounts:
       - mountPath: /usr/local/endurance-install
         name: job-definition
-      - mountPath: /usr/local/pull-secret
-        name: pull-secret
       - mountPath: /usr/local/ci-credentials
         name: ci-credentials
       - mountPath: /usr/local/aws-openshift-llc-account-credentials
@@ -233,13 +224,8 @@ periodics:
         name: prow-job-endurance-install
       name: job-definition
     - name: ci-credentials
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws
-    - name: pull-secret
       secret:
-        secretName: ci-pull-credentials
+        secretName: cluster-secrets-aws
     - name: aws-openshift-llc-account-credentials
       secret:
         secretName: aws-openshift-llc-account-credentials
