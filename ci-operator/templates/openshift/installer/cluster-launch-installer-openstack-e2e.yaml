@@ -129,6 +129,12 @@ objects:
 
         echo "[INFO] Acquiring a lease ..."
         resource="$( boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" acquire --type "${CLUSTER_TYPE}-quota-slice" --state free --target-state leased --timeout 150m )"
+        boskos_exit_code=$?
+        if [ $boskos_exit_code -ne 0 ]; then
+          echo "$resource"
+          echo "Lease acquisition failed."
+          exit 1
+        fi
         touch /tmp/shared/leased
         echo "[INFO] Lease acquired!"
         echo "[INFO] Leased resource: ${resource}"
