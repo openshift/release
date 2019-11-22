@@ -349,7 +349,7 @@ objects:
 
         trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/setup-success; else touch /tmp/exit; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-
+        echo "STARTING THE SETUP SCRIPT"
         while true; do
           if [[ -f /tmp/exit ]]; then
             echo "Another process exited" 2>&1
@@ -362,34 +362,36 @@ objects:
 
           sleep 15 & wait
         done
-
+        echo "LEASE ACQUIRED"
         cp "$(command -v openshift-install)" /tmp
         mkdir /tmp/artifacts/installer
-
+        echo "COPIED OPENSHIFT-INSTALL"
         # We have to truncate cluster name to 14 chars, because there is a limitation in the install-config
         # Now it looks like "ci-op-rl6z646h-65230".
         # We will remove "ci-op-" prefix from there to keep just last 14 characters.
         export CLUSTER_NAME=${CLUSTER_NAME: -14}
-
+        echo "TRIMMED CLUSTER NAME"
         if [[ -n "${INSTALL_INITIAL_RELEASE}" && -n "${RELEASE_IMAGE_INITIAL}" ]]; then
           echo "Installing from initial release ${RELEASE_IMAGE_INITIAL}"
           OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_INITIAL}"
         else
           echo "Installing from release ${RELEASE_IMAGE_LATEST}"
         fi
-
         export EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
         export SSH_PUB_KEY=$(cat "${SSH_PUB_KEY_PATH}")
         export PULL_SECRET=$(cat "${PULL_SECRET_PATH}")
+        echo "SET UP ENV VARS"
+
+        ls -al /etc/openshift-installer/ || true
 
         # move private key to ~/.ssh/ so that installer can use it to gather logs on bootstrap failure
         mkdir -p ~/.ssh
         cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/id_rsa
         chmod 0600 ~/.ssh/id_rsa
-
+        echo "CONFIGURED THE PRIVATE KEY"
         # create a new floating ip tagged with CLUSTER_NAME so it can be deleted later
-        LB_FIP=$(openstack floating ip create --description $CLUSTER_NAME $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address')
-
+        LB_FIP=$(openstack floating ip create --debug --description $CLUSTER_NAME $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address')
+        echo "CREATED FLOATING IP"
         echo "Creating DNS record for api.$CLUSTER_NAME.$BASE_DOMAIN. -> $LB_FIP"
         cat > /tmp/artifacts/installer/api-record.json <<EOF
         {
