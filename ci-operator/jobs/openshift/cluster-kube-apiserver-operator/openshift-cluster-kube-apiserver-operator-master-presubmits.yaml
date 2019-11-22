@@ -73,15 +73,15 @@ presubmits:
     always_run: true
     branches:
     - master
-    context: ci/prow/e2e-aws-operator
+    context: ci/prow/e2e-aws-operator-encryption-serial-full
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-kube-apiserver-operator-master-e2e-aws-operator
-    rerun_command: /test e2e-aws-operator
+    name: pull-ci-openshift-cluster-kube-apiserver-operator-master-e2e-aws-operator-encryption-serial-full
+    rerun_command: /test e2e-aws-operator-encryption-serial-full
     spec:
       containers:
       - args:
@@ -91,10 +91,10 @@ presubmits:
         - --org=openshift
         - --repo=cluster-kube-apiserver-operator
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-        - --secret-dir=/usr/local/e2e-aws-operator-cluster-profile
+        - --secret-dir=/usr/local/e2e-aws-operator-encryption-serial-full-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=e2e-aws-operator
-        - --template=/usr/local/e2e-aws-operator
+        - --target=e2e-aws-operator-encryption-serial-full
+        - --template=/usr/local/e2e-aws-operator-encryption-serial-full
         command:
         - ci-operator
         env:
@@ -106,7 +106,149 @@ presubmits:
               key: openshift-cluster-kube-apiserver-operator-master.yaml
               name: ci-operator-master-configs
         - name: JOB_NAME_SAFE
-          value: e2e-aws-operator
+          value: e2e-aws-operator-encryption-serial-full
+        - name: TEST_COMMAND
+          value: |
+            mkdir -p /tmp/artifacts
+            make test-e2e-encryption-full JUNITFILE=/tmp/artifacts/unit_report.xml
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-aws-operator-encryption-serial-full-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-aws-operator-encryption-serial-full
+          name: job-definition
+          subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-src
+        name: job-definition
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )e2e-aws-operator-encryption-serial-full,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/e2e-aws-operator-encryption-serial-short
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-kube-apiserver-operator-master-e2e-aws-operator-encryption-serial-short
+    rerun_command: /test e2e-aws-operator-encryption-serial-short
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --branch=master
+        - --give-pr-author-access-to-namespace=true
+        - --org=openshift
+        - --repo=cluster-kube-apiserver-operator
+        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
+        - --secret-dir=/usr/local/e2e-aws-operator-encryption-serial-short-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=e2e-aws-operator-encryption-serial-short
+        - --template=/usr/local/e2e-aws-operator-encryption-serial-short
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-cluster-kube-apiserver-operator-master.yaml
+              name: ci-operator-master-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-aws-operator-encryption-serial-short
+        - name: TEST_COMMAND
+          value: |
+            mkdir -p /tmp/artifacts
+            make test-e2e-encryption-short JUNITFILE=/tmp/artifacts/unit_report.xml
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-aws-operator-encryption-serial-short-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-aws-operator-encryption-serial-short
+          name: job-definition
+          subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-src
+        name: job-definition
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )e2e-aws-operator-encryption-serial-short,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/e2e-aws-operator-serial
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-kube-apiserver-operator-master-e2e-aws-operator-serial
+    rerun_command: /test e2e-aws-operator-serial
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --branch=master
+        - --give-pr-author-access-to-namespace=true
+        - --org=openshift
+        - --repo=cluster-kube-apiserver-operator
+        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
+        - --secret-dir=/usr/local/e2e-aws-operator-serial-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=e2e-aws-operator-serial
+        - --template=/usr/local/e2e-aws-operator-serial
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-cluster-kube-apiserver-operator-master.yaml
+              name: ci-operator-master-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-aws-operator-serial
         - name: TEST_COMMAND
           value: |
             mkdir -p /tmp/artifacts
@@ -118,9 +260,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/e2e-aws-operator-cluster-profile
+        - mountPath: /usr/local/e2e-aws-operator-serial-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-aws-operator
+        - mountPath: /usr/local/e2e-aws-operator-serial
           name: job-definition
           subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/sentry-dsn
@@ -139,79 +281,7 @@ presubmits:
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )e2e-aws-operator,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - master
-    context: ci/prow/e2e-aws-operator-encryption
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-kube-apiserver-operator-master-e2e-aws-operator-encryption
-    rerun_command: /test e2e-aws-operator-encryption
-    run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
-        - --give-pr-author-access-to-namespace=true
-        - --org=openshift
-        - --repo=cluster-kube-apiserver-operator
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-        - --secret-dir=/usr/local/e2e-aws-operator-encryption-cluster-profile
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=e2e-aws-operator-encryption
-        - --template=/usr/local/e2e-aws-operator-encryption
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-cluster-kube-apiserver-operator-master.yaml
-              name: ci-operator-master-configs
-        - name: JOB_NAME_SAFE
-          value: e2e-aws-operator-encryption
-        - name: TEST_COMMAND
-          value: |
-            mkdir -p /tmp/artifacts
-            make test-e2e-encryption JUNITFILE=/tmp/artifacts/unit_report.xml
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/e2e-aws-operator-encryption-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-aws-operator-encryption
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )e2e-aws-operator-encryption,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-operator-serial,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
