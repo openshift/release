@@ -680,6 +680,8 @@ periodics:
     org: openshift
     repo: release
   interval: 12h
+  labels:
+    ci.openshift.io/role: infra
   name: openshift-release-master-core-apply
   spec:
     containers:
@@ -690,6 +692,12 @@ periodics:
       - "true"
       command:
       - applyconfig
+      env:
+      - name: slack_api_url
+        valueFrom:
+          secretKeyRef:
+            key: url
+            name: ci-slack-api-url
       image: registry.svc.ci.openshift.org/ci/applyconfig:latest
       imagePullPolicy: Always
       name: ""
