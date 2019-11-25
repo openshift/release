@@ -497,6 +497,12 @@ objects:
           workers=0
         fi
         if [[ "${CLUSTER_TYPE}" = "aws" ]]; then
+            master_type=null
+            if [[ "${CLUSTER_VARIANT}" =~ "xlarge" ]]; then
+              master_type=m5.8xlarge
+            elif [[ "${CLUSTER_VARIANT}" =~ "large" ]]; then
+              master_type=m5.4xlarge
+            fi
             subnets="[]"
             if [[ "${CLUSTER_VARIANT}" =~ "shared-vpc" ]]; then
               case $((RANDOM % 4)) in
@@ -518,6 +524,7 @@ objects:
           replicas: 3
           platform:
             aws:
+              type: ${master_type}
               zones:
               - us-east-1a
               - us-east-1b
@@ -588,7 +595,7 @@ objects:
         EOF
         elif [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
             # HACK: try to "poke" the token endpoint before the test starts
-            for i in `seq 1 30`; do
+            for i in $(seq 1 30); do
               code="$( curl -s -o /dev/null -w "%{http_code}" https://oauth2.googleapis.com/token -X POST -d '' )"
               if [[ "${code}" == "400" ]]; then
                 break
