@@ -357,6 +357,12 @@ objects:
           workers=0
         fi
         if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
+            master_type=null
+            if [[ "${CLUSTER_VARIANT}" =~ "xlarge" ]]; then
+              master_type=m5.8xlarge
+            elif [[ "${CLUSTER_VARIANT}" =~ "large" ]]; then
+              master_type=m5.4xlarge
+            fi
             subnets="[]"
             if [[ "${CLUSTER_VARIANT}" =~ "shared-vpc" ]]; then
               case $((RANDOM % 4)) in
@@ -378,6 +384,7 @@ objects:
           replicas: 3
           platform:
             aws:
+              type: ${master_type}
               zones:
               - us-east-1a
               - us-east-1b
