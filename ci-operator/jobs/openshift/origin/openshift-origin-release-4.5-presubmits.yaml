@@ -1,40 +1,9 @@
 presubmits:
   openshift/origin:
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
-    - master
-    context: ci/prow/artifacts
-    decorate: true
-    name: pull-ci-openshift-origin-master-artifacts
-    rerun_command: /test artifacts
-    run_if_changed: ^(hack/)|(Makefile)|(.*_(windows|linux|darwin|unsupported)(_test)?\.go)$
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --target=artifacts
-        command:
-        - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-origin-master.yaml
-              name: ci-operator-master-configs
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-      serviceAccountName: ci-operator
-    trigger: (?m)^/test( | .* )artifacts,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - master
+    - release-4.5
     context: ci/prow/e2e-aws
     decorate: true
     decoration_config:
@@ -42,13 +11,13 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-origin-master-e2e-aws
+    name: pull-ci-openshift-origin-release-4.5-e2e-aws
     rerun_command: /test e2e-aws
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
+        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --org=openshift
         - --repo=origin
@@ -65,8 +34,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-origin-master.yaml
-              name: ci-operator-master-configs
+              key: openshift-origin-release-4.5.yaml
+              name: ci-operator-4.5-configs
         - name: JOB_NAME_SAFE
           value: e2e-aws
         - name: TEST_COMMAND
@@ -101,9 +70,9 @@ presubmits:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-aws,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
-    - master
+    - release-4.5
     context: ci/prow/e2e-aws-disruptive
     decorate: true
     decoration_config:
@@ -111,14 +80,13 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-origin-master-e2e-aws-disruptive
-    optional: true
+    name: pull-ci-openshift-origin-release-4.5-e2e-aws-disruptive
     rerun_command: /test e2e-aws-disruptive
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
+        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --org=openshift
         - --repo=origin
@@ -135,8 +103,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-origin-master.yaml
-              name: ci-operator-master-configs
+              key: openshift-origin-release-4.5.yaml
+              name: ci-operator-4.5-configs
         - name: JOB_NAME_SAFE
           value: e2e-aws-disruptive
         - name: TEST_COMMAND
@@ -174,80 +142,7 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
-    context: ci/prow/e2e-aws-fips
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-origin-master-e2e-aws-fips
-    optional: true
-    rerun_command: /test e2e-aws-fips
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
-        - --give-pr-author-access-to-namespace=true
-        - --org=openshift
-        - --repo=origin
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-        - --secret-dir=/usr/local/e2e-aws-fips-cluster-profile
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=e2e-aws-fips
-        - --template=/usr/local/e2e-aws-fips
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-origin-master.yaml
-              name: ci-operator-master-configs
-        - name: ENABLE_FIPS
-          value: "true"
-        - name: JOB_NAME_SAFE
-          value: e2e-aws-fips
-        - name: TEST_COMMAND
-          value: |
-            fips_check
-            TEST_SUITE=openshift/conformance/parallel run-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/e2e-aws-fips-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-aws-fips
-          name: job-definition
-          subPath: cluster-launch-installer-e2e.yaml
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-e2e
-        name: job-definition
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )e2e-aws-fips,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - master
+    - release-4.5
     context: ci/prow/e2e-aws-image-registry
     decorate: true
     decoration_config:
@@ -255,14 +150,13 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-origin-master-e2e-aws-image-registry
+    name: pull-ci-openshift-origin-release-4.5-e2e-aws-image-registry
     rerun_command: /test e2e-aws-image-registry
-    run_if_changed: ^(pkg/image)|^(test/extended/registry)|^(test/extended/images)|^(test/extended/imageapis)|^(vendor/github.com/docker/distribution)
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
+        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --org=openshift
         - --repo=origin
@@ -279,8 +173,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-origin-master.yaml
-              name: ci-operator-master-configs
+              key: openshift-origin-release-4.5.yaml
+              name: ci-operator-4.5-configs
         - name: JOB_NAME_SAFE
           value: e2e-aws-image-registry
         - name: TEST_COMMAND
@@ -315,9 +209,9 @@ presubmits:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-aws-image-registry,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
-    - master
+    - release-4.5
     context: ci/prow/e2e-aws-jenkins
     decorate: true
     decoration_config:
@@ -325,13 +219,13 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-origin-master-e2e-aws-jenkins
+    name: pull-ci-openshift-origin-release-4.5-e2e-aws-jenkins
     rerun_command: /test e2e-aws-jenkins
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
+        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --org=openshift
         - --repo=origin
@@ -348,8 +242,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-origin-master.yaml
-              name: ci-operator-master-configs
+              key: openshift-origin-release-4.5.yaml
+              name: ci-operator-4.5-configs
         - name: JOB_NAME_SAFE
           value: e2e-aws-jenkins
         - name: TEST_COMMAND
@@ -384,152 +278,9 @@ presubmits:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-aws-jenkins,?($|\s.*)
   - agent: kubernetes
-    always_run: false
-    branches:
-    - master
-    context: ci/prow/e2e-aws-multitenant
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-origin-master-e2e-aws-multitenant
-    optional: true
-    rerun_command: /test e2e-aws-multitenant
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/e2e-aws-multitenant-cluster-profile
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=e2e-aws-multitenant
-        - --template=/usr/local/e2e-aws-multitenant
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_NETWORK_MANIFEST
-          value: |
-            apiVersion: operator.openshift.io/v1
-            kind: Network
-            metadata:
-              name: cluster
-            spec:
-              defaultNetwork:
-                type: OpenShiftSDN
-                openshiftSDNConfig:
-                  mode: Multitenant
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-origin-master.yaml
-              name: ci-operator-master-configs
-        - name: JOB_NAME_SAFE
-          value: e2e-aws-multitenant
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance/parallel run-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/e2e-aws-multitenant-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-aws-multitenant
-          name: job-definition
-          subPath: cluster-launch-installer-e2e.yaml
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-e2e
-        name: job-definition
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )e2e-aws-multitenant,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - master
-    context: ci/prow/e2e-aws-ovn-kubernetes
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-origin-master-e2e-aws-ovn-kubernetes
-    optional: true
-    rerun_command: /test e2e-aws-ovn-kubernetes
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/e2e-aws-ovn-kubernetes-cluster-profile
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=e2e-aws-ovn-kubernetes
-        - --template=/usr/local/e2e-aws-ovn-kubernetes
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_NETWORK_TYPE
-          value: OVNKubernetes
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-origin-master.yaml
-              name: ci-operator-master-configs
-        - name: JOB_NAME_SAFE
-          value: e2e-aws-ovn-kubernetes
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance/parallel run-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/e2e-aws-ovn-kubernetes-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-aws-ovn-kubernetes
-          name: job-definition
-          subPath: cluster-launch-installer-e2e.yaml
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-e2e
-        name: job-definition
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )e2e-aws-ovn-kubernetes,?($|\s.*)
-  - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - release-4.5
     context: ci/prow/e2e-aws-serial
     decorate: true
     decoration_config:
@@ -537,13 +288,13 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-origin-master-e2e-aws-serial
+    name: pull-ci-openshift-origin-release-4.5-e2e-aws-serial
     rerun_command: /test e2e-aws-serial
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
+        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --org=openshift
         - --repo=origin
@@ -560,8 +311,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-origin-master.yaml
-              name: ci-operator-master-configs
+              key: openshift-origin-release-4.5.yaml
+              name: ci-operator-4.5-configs
         - name: JOB_NAME_SAFE
           value: e2e-aws-serial
         - name: TEST_COMMAND
@@ -596,9 +347,9 @@ presubmits:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-aws-serial,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
-    - master
+    - release-4.5
     context: ci/prow/e2e-azure
     decorate: true
     decoration_config:
@@ -606,14 +357,13 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-origin-master-e2e-azure
-    optional: true
+    name: pull-ci-openshift-origin-release-4.5-e2e-azure
     rerun_command: /test e2e-azure
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
+        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --org=openshift
         - --repo=origin
@@ -630,8 +380,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-origin-master.yaml
-              name: ci-operator-master-configs
+              key: openshift-origin-release-4.5.yaml
+              name: ci-operator-4.5-configs
         - name: JOB_NAME_SAFE
           value: e2e-azure
         - name: TEST_COMMAND
@@ -668,7 +418,7 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - release-4.5
     context: ci/prow/e2e-cmd
     decorate: true
     decoration_config:
@@ -676,13 +426,13 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-origin-master-e2e-cmd
+    name: pull-ci-openshift-origin-release-4.5-e2e-cmd
     rerun_command: /test e2e-cmd
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
+        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --org=openshift
         - --repo=origin
@@ -699,8 +449,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-origin-master.yaml
-              name: ci-operator-master-configs
+              key: openshift-origin-release-4.5.yaml
+              name: ci-operator-4.5-configs
         - name: JOB_NAME_SAFE
           value: e2e-cmd
         - name: TEST_COMMAND
@@ -737,9 +487,9 @@ presubmits:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-cmd,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
-    - master
+    - release-4.5
     context: ci/prow/e2e-conformance-k8s
     decorate: true
     decoration_config:
@@ -747,13 +497,13 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-origin-master-e2e-conformance-k8s
+    name: pull-ci-openshift-origin-release-4.5-e2e-conformance-k8s
     rerun_command: /test e2e-conformance-k8s
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
+        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --org=openshift
         - --repo=origin
@@ -770,8 +520,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-origin-master.yaml
-              name: ci-operator-master-configs
+              key: openshift-origin-release-4.5.yaml
+              name: ci-operator-4.5-configs
         - name: JOB_NAME_SAFE
           value: e2e-conformance-k8s
         - name: TEST_COMMAND
@@ -808,7 +558,7 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - release-4.5
     context: ci/prow/e2e-gcp
     decorate: true
     decoration_config:
@@ -816,13 +566,13 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-origin-master-e2e-gcp
+    name: pull-ci-openshift-origin-release-4.5-e2e-gcp
     rerun_command: /test e2e-gcp
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
+        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --org=openshift
         - --repo=origin
@@ -839,8 +589,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-origin-master.yaml
-              name: ci-operator-master-configs
+              key: openshift-origin-release-4.5.yaml
+              name: ci-operator-4.5-configs
         - name: JOB_NAME_SAFE
           value: e2e-gcp
         - name: TEST_COMMAND
@@ -877,9 +627,9 @@ presubmits:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-gcp,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
-    - master
+    - release-4.5
     context: ci/prow/e2e-gcp-builds
     decorate: true
     decoration_config:
@@ -887,14 +637,13 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-origin-master-e2e-gcp-builds
+    name: pull-ci-openshift-origin-release-4.5-e2e-gcp-builds
     rerun_command: /test e2e-gcp-builds
-    run_if_changed: ^(pkg/oc/cli/startbuild/startbuild.go)|^(pkg/build)|^(staging/src/.*/pkg/.*build)|^(pkg/cmd/infra/builder)|^(test/extended/builds)|^(test/extended/testdata/builds)|^(test/extended/util)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
+        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --org=openshift
         - --repo=origin
@@ -911,8 +660,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-origin-master.yaml
-              name: ci-operator-master-configs
+              key: openshift-origin-release-4.5.yaml
+              name: ci-operator-4.5-configs
         - name: JOB_NAME_SAFE
           value: e2e-gcp-builds
         - name: TEST_COMMAND
@@ -949,9 +698,9 @@ presubmits:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-gcp-builds,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
-    - master
+    - release-4.5
     context: ci/prow/e2e-gcp-image-ecosystem
     decorate: true
     decoration_config:
@@ -959,14 +708,13 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-origin-master-e2e-gcp-image-ecosystem
+    name: pull-ci-openshift-origin-release-4.5-e2e-gcp-image-ecosystem
     rerun_command: /test e2e-gcp-image-ecosystem
-    run_if_changed: ^(test/extended/image_ecosystem)|^(examples/db-templates)|^(examples/quickstarts)|^(examples/image-streams)|^(examples/jenkins)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
+        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --org=openshift
         - --repo=origin
@@ -983,8 +731,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-origin-master.yaml
-              name: ci-operator-master-configs
+              key: openshift-origin-release-4.5.yaml
+              name: ci-operator-4.5-configs
         - name: JOB_NAME_SAFE
           value: e2e-gcp-image-ecosystem
         - name: TEST_COMMAND
@@ -1023,7 +771,7 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - release-4.5
     context: ci/prow/e2e-gcp-upgrade
     decorate: true
     decoration_config:
@@ -1031,13 +779,13 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-origin-master-e2e-gcp-upgrade
+    name: pull-ci-openshift-origin-release-4.5-e2e-gcp-upgrade
     rerun_command: /test e2e-gcp-upgrade
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
+        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --org=openshift
         - --repo=origin
@@ -1051,8 +799,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-origin-master.yaml
-              name: ci-operator-master-configs
+              key: openshift-origin-release-4.5.yaml
+              name: ci-operator-4.5-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -1079,9 +827,9 @@ presubmits:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-gcp-upgrade,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
-    - master
+    - release-4.5
     context: ci/prow/e2e-vsphere
     decorate: true
     decoration_config:
@@ -1089,14 +837,13 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-origin-master-e2e-vsphere
-    optional: true
+    name: pull-ci-openshift-origin-release-4.5-e2e-vsphere
     rerun_command: /test e2e-vsphere
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
+        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --org=openshift
         - --repo=origin
@@ -1113,8 +860,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-origin-master.yaml
-              name: ci-operator-master-configs
+              key: openshift-origin-release-4.5.yaml
+              name: ci-operator-4.5-configs
         - name: JOB_NAME_SAFE
           value: e2e-vsphere
         - name: TEST_COMMAND
@@ -1151,7 +898,7 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - release-4.5
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -1159,13 +906,13 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-origin-master-images
+    name: pull-ci-openshift-origin-release-4.5-images
     rerun_command: /test images
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
+        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --org=openshift
         - --repo=origin
@@ -1180,8 +927,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-origin-master.yaml
-              name: ci-operator-master-configs
+              key: openshift-origin-release-4.5.yaml
+              name: ci-operator-4.5-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -1201,7 +948,7 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - release-4.5
     context: ci/prow/images-artifacts
     decorate: true
     decoration_config:
@@ -1209,13 +956,13 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-origin-master-images-artifacts
+    name: pull-ci-openshift-origin-release-4.5-images-artifacts
     rerun_command: /test images-artifacts
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
+        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --org=openshift
         - --repo=origin
@@ -1228,8 +975,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-origin-master.yaml
-              name: ci-operator-master-configs
+              key: openshift-origin-release-4.5.yaml
+              name: ci-operator-4.5-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -1247,9 +994,9 @@ presubmits:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )images-artifacts,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
-    - master
+    - release-4.5
     context: ci/prow/launch-vsphere
     decorate: true
     decoration_config:
@@ -1257,14 +1004,13 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-origin-master-launch-vsphere
-    optional: true
+    name: pull-ci-openshift-origin-release-4.5-launch-vsphere
     rerun_command: /test launch-vsphere
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
+        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --org=openshift
         - --repo=origin
@@ -1281,8 +1027,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-origin-master.yaml
-              name: ci-operator-master-configs
+              key: openshift-origin-release-4.5.yaml
+              name: ci-operator-4.5-configs
         - name: JOB_NAME_SAFE
           value: launch-vsphere
         - name: TEST_COMMAND
@@ -1319,7 +1065,7 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - release-4.5
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -1327,13 +1073,13 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-origin-master-unit
+    name: pull-ci-openshift-origin-release-4.5-unit
     rerun_command: /test unit
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
+        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --org=openshift
         - --repo=origin
@@ -1346,8 +1092,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-origin-master.yaml
-              name: ci-operator-master-configs
+              key: openshift-origin-release-4.5.yaml
+              name: ci-operator-4.5-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -1367,7 +1113,7 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - release-4.5
     context: ci/prow/verify
     decorate: true
     decoration_config:
@@ -1375,13 +1121,13 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-origin-master-verify
+    name: pull-ci-openshift-origin-release-4.5-verify
     rerun_command: /test verify
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
+        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --org=openshift
         - --repo=origin
@@ -1394,8 +1140,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-origin-master.yaml
-              name: ci-operator-master-configs
+              key: openshift-origin-release-4.5.yaml
+              name: ci-operator-4.5-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -1412,33 +1158,3 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )verify,?($|\s.*)
-  - agent: jenkins
-    always_run: false
-    branches:
-    - master
-    context: ci/openshift-jenkins/extended_gssapi
-    labels:
-      master: ci.openshift.redhat.com
-    name: test_pull_request_origin_extended_gssapi
-    rerun_command: /test extended_gssapi
-    trigger: ((?m)^/test extended_gssapi,?(\s+|$))
-  - agent: jenkins
-    always_run: false
-    branches:
-    - master
-    context: ci/openshift-jenkins/extended_ldap_groups
-    labels:
-      master: ci.openshift.redhat.com
-    name: test_pull_request_origin_extended_ldap_groups
-    rerun_command: /test extended_ldap_groups
-    trigger: ((?m)^/test extended_ldap_groups,?(\s+|$))
-  - agent: jenkins
-    always_run: false
-    branches:
-    - master
-    context: ci/openshift-jenkins/extended_networking
-    labels:
-      master: ci.openshift.redhat.com
-    name: test_pull_request_origin_extended_networking
-    rerun_command: /test extended_networking
-    trigger: ((?m)^/test extended_networking,?(\s+|$))

@@ -1,9 +1,9 @@
 presubmits:
-  openshift/images:
+  openshift/kubecsr:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.5
+    - openshift-4.5
     context: ci/prow/e2e-aws
     decorate: true
     decoration_config:
@@ -11,16 +11,17 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-images-release-4.5-e2e-aws
+    name: pull-ci-openshift-kubecsr-openshift-4.5-e2e-aws
+    path_alias: github.com/coreos/kubecsr
     rerun_command: /test e2e-aws
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=release-4.5
+        - --branch=openshift-4.5
         - --give-pr-author-access-to-namespace=true
         - --org=openshift
-        - --repo=images
+        - --repo=kubecsr
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --secret-dir=/usr/local/e2e-aws-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
@@ -34,7 +35,7 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-images-release-4.5.yaml
+              key: openshift-kubecsr-openshift-4.5.yaml
               name: ci-operator-4.5-configs
         - name: JOB_NAME_SAFE
           value: e2e-aws
@@ -72,63 +73,7 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.5
-    context: ci/prow/e2e-aws-upgrade
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-images-release-4.5-e2e-aws-upgrade
-    rerun_command: /test e2e-aws-upgrade
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --branch=release-4.5
-        - --give-pr-author-access-to-namespace=true
-        - --org=openshift
-        - --repo=images
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-        - --secret-dir=/usr/local/e2e-aws-upgrade-cluster-profile
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=e2e-aws-upgrade
-        command:
-        - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-images-release-4.5.yaml
-              name: ci-operator-4.5-configs
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
-          name: cluster-profile
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )e2e-aws-upgrade,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.5
+    - openshift-4.5
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -136,28 +81,28 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-images-release-4.5-images
+    name: pull-ci-openshift-kubecsr-openshift-4.5-images
+    path_alias: github.com/coreos/kubecsr
     rerun_command: /test images
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=release-4.5
+        - --branch=openshift-4.5
         - --give-pr-author-access-to-namespace=true
         - --org=openshift
-        - --repo=images
+        - --repo=kubecsr
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=[images]
         - --target=[release:latest]
-        - --target=base
         command:
         - ci-operator
         env:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-images-release-4.5.yaml
+              key: openshift-kubecsr-openshift-4.5.yaml
               name: ci-operator-4.5-configs
         image: ci-operator:latest
         imagePullPolicy: Always
@@ -175,3 +120,52 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - openshift-4.5
+    context: ci/prow/unit
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-kubecsr-openshift-4.5-unit
+    path_alias: github.com/coreos/kubecsr
+    rerun_command: /test unit
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --branch=openshift-4.5
+        - --give-pr-author-access-to-namespace=true
+        - --org=openshift
+        - --repo=kubecsr
+        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=unit
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-kubecsr-openshift-4.5.yaml
+              name: ci-operator-4.5-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )unit,?($|\s.*)

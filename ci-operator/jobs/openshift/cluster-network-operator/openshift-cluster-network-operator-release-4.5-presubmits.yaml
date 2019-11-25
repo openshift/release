@@ -1,151 +1,9 @@
 presubmits:
   openshift/cluster-network-operator:
   - agent: kubernetes
-    always_run: false
-    branches:
-    - master
-    context: ci/prow/e2e-aws-multitenant
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-network-operator-master-e2e-aws-multitenant
-    rerun_command: /test e2e-aws-multitenant
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/e2e-aws-multitenant-cluster-profile
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=e2e-aws-multitenant
-        - --template=/usr/local/e2e-aws-multitenant
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_NETWORK_MANIFEST
-          value: |
-            apiVersion: operator.openshift.io/v1
-            kind: Network
-            metadata:
-              name: cluster
-            spec:
-              defaultNetwork:
-                type: OpenShiftSDN
-                openshiftSDNConfig:
-                  mode: Multitenant
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-cluster-network-operator-master.yaml
-              name: ci-operator-master-configs
-        - name: JOB_NAME_SAFE
-          value: e2e-aws-multitenant
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance/parallel run-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/e2e-aws-multitenant-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-aws-multitenant
-          name: job-definition
-          subPath: cluster-launch-installer-e2e.yaml
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-e2e
-        name: job-definition
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )e2e-aws-multitenant,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - master
-    context: ci/prow/e2e-aws-ovn-kubernetes
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-network-operator-master-e2e-aws-ovn-kubernetes
-    optional: true
-    rerun_command: /test e2e-aws-ovn-kubernetes
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/e2e-aws-ovn-kubernetes-cluster-profile
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=e2e-aws-ovn-kubernetes
-        - --template=/usr/local/e2e-aws-ovn-kubernetes
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_NETWORK_TYPE
-          value: OVNKubernetes
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-cluster-network-operator-master.yaml
-              name: ci-operator-master-configs
-        - name: JOB_NAME_SAFE
-          value: e2e-aws-ovn-kubernetes
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance/parallel run-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/e2e-aws-ovn-kubernetes-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-aws-ovn-kubernetes
-          name: job-definition
-          subPath: cluster-launch-installer-e2e.yaml
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-e2e
-        name: job-definition
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )e2e-aws-ovn-kubernetes,?($|\s.*)
-  - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - release-4.5
     context: ci/prow/e2e-gcp
     decorate: true
     decoration_config:
@@ -153,13 +11,13 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-network-operator-master-e2e-gcp
+    name: pull-ci-openshift-cluster-network-operator-release-4.5-e2e-gcp
     rerun_command: /test e2e-gcp
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
+        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --org=openshift
         - --repo=cluster-network-operator
@@ -176,8 +34,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-cluster-network-operator-master.yaml
-              name: ci-operator-master-configs
+              key: openshift-cluster-network-operator-release-4.5.yaml
+              name: ci-operator-4.5-configs
         - name: JOB_NAME_SAFE
           value: e2e-gcp
         - name: TEST_COMMAND
@@ -214,9 +72,9 @@ presubmits:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-gcp,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
-    - master
+    - release-4.5
     context: ci/prow/e2e-gcp-ovn-upgrade
     decorate: true
     decoration_config:
@@ -224,13 +82,13 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-network-operator-master-e2e-gcp-ovn-upgrade
+    name: pull-ci-openshift-cluster-network-operator-release-4.5-e2e-gcp-ovn-upgrade
     rerun_command: /test e2e-gcp-ovn-upgrade
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
+        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --org=openshift
         - --repo=cluster-network-operator
@@ -244,8 +102,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-cluster-network-operator-master.yaml
-              name: ci-operator-master-configs
+              key: openshift-cluster-network-operator-release-4.5.yaml
+              name: ci-operator-4.5-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -274,7 +132,7 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - release-4.5
     context: ci/prow/e2e-gcp-upgrade
     decorate: true
     decoration_config:
@@ -282,13 +140,13 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-network-operator-master-e2e-gcp-upgrade
+    name: pull-ci-openshift-cluster-network-operator-release-4.5-e2e-gcp-upgrade
     rerun_command: /test e2e-gcp-upgrade
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
+        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --org=openshift
         - --repo=cluster-network-operator
@@ -302,8 +160,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-cluster-network-operator-master.yaml
-              name: ci-operator-master-configs
+              key: openshift-cluster-network-operator-release-4.5.yaml
+              name: ci-operator-4.5-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -332,7 +190,7 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - release-4.5
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -340,13 +198,13 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-network-operator-master-images
+    name: pull-ci-openshift-cluster-network-operator-release-4.5-images
     rerun_command: /test images
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
+        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --org=openshift
         - --repo=cluster-network-operator
@@ -360,8 +218,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-cluster-network-operator-master.yaml
-              name: ci-operator-master-configs
+              key: openshift-cluster-network-operator-release-4.5.yaml
+              name: ci-operator-4.5-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -381,7 +239,7 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - release-4.5
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -389,13 +247,13 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-network-operator-master-unit
+    name: pull-ci-openshift-cluster-network-operator-release-4.5-unit
     rerun_command: /test unit
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
+        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --org=openshift
         - --repo=cluster-network-operator
@@ -408,8 +266,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-cluster-network-operator-master.yaml
-              name: ci-operator-master-configs
+              key: openshift-cluster-network-operator-release-4.5.yaml
+              name: ci-operator-4.5-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -429,7 +287,7 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - release-4.5
     context: ci/prow/verify
     decorate: true
     decoration_config:
@@ -437,13 +295,13 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-network-operator-master-verify
+    name: pull-ci-openshift-cluster-network-operator-release-4.5-verify
     rerun_command: /test verify
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
+        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --org=openshift
         - --repo=cluster-network-operator
@@ -456,8 +314,8 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-cluster-network-operator-master.yaml
-              name: ci-operator-master-configs
+              key: openshift-cluster-network-operator-release-4.5.yaml
+              name: ci-operator-4.5-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
