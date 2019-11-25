@@ -1,0 +1,88 @@
+base_images:
+  base:
+    name: "4.5"
+    namespace: ocp
+    tag: base
+  base-npm:
+    name: release
+    namespace: openshift
+    tag: nodejs-8
+  base_centos:
+    name: centos
+    namespace: openshift
+    tag: "7"
+  ruby-25:
+    name: release
+    namespace: openshift
+    tag: ruby-25
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+images:
+- dockerfile_path: test/unit/Dockerfile
+  from: ruby-25
+  to: logging-test-unit
+- context_dir: fluentd/
+  dockerfile_path: Dockerfile.centos7
+  from: ruby-25
+  to: logging-fluentd
+- context_dir: elasticsearch/
+  dockerfile_path: Dockerfile.centos7
+  from: base_centos
+  to: logging-elasticsearch5
+- context_dir: kibana/
+  dockerfile_path: Dockerfile.centos7
+  from: base_centos
+  to: logging-kibana5
+- context_dir: curator/
+  dockerfile_path: Dockerfile.centos7
+  from: base_centos
+  to: logging-curator5
+- context_dir: eventrouter/
+  dockerfile_path: Dockerfile.centos7
+  from: base_centos
+  to: logging-eventrouter
+- context_dir: rsyslog/
+  dockerfile_path: Dockerfile
+  from: base
+  to: logging-rsyslog
+promotion:
+  additional_images:
+    logging-ci-test-runner: src
+  name: "4.5"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 5Gi
+    requests:
+      cpu: "1"
+      memory: 200Mi
+  src:
+    limits:
+      memory: 2Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.5"
+  namespace: ocp
+tests:
+- as: unit
+  commands: /tmp/run.sh
+  container:
+    from: logging-test-unit
+- as: full-integ-aws
+  commands: |
+    . openshift/ci-operator/build-image/setup-logging-for-e2e.sh
+  openshift_installer_src:
+    cluster_profile: aws
+- as: upgrade-full-integ-aws
+  commands: |
+    OPENSHIFT_BUILD_NAMESPACE= IMAGE_FORMAT= USE_CUSTOM_IMAGES=true hack/deploy-logging.sh
+    export LOGGING_DEPLOY_MODE=upgrade
+    . openshift/ci-operator/build-image/setup-logging-for-e2e.sh
+  openshift_installer_src:
+    cluster_profile: aws

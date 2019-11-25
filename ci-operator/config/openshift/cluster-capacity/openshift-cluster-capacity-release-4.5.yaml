@@ -1,0 +1,36 @@
+base_images:
+  base:
+    name: "4.5"
+    namespace: ocp
+    tag: base
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+canonical_go_repository: github.com/kubernetes-incubator/cluster-capacity
+images:
+- dockerfile_path: images/cluster-capacity/Dockerfile
+  from: base
+  to: cluster-capacity
+promotion:
+  name: "4.5"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.5"
+  namespace: ocp
+test_binary_build_commands: OS_GOFLAGS='-race' make build
+tests:
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1 hack/test-go.sh
+  container:
+    from: test-bin
