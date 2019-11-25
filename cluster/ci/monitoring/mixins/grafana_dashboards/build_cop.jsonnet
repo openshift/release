@@ -165,5 +165,6 @@ dashboard.new(
     .addTarget(myPrometheusTarget('.*-aws.*'))
     .addTarget(myPrometheusTarget('.*-vsphere.*'))
     .addTarget(myPrometheusTarget('.*-gcp.*'))
-    .addTarget(myPrometheusTarget('.*-azure.*')), defaultGridPos)
+    .addTarget(myPrometheusTarget('.*-azure.*'))
+    .addTarget(myPrometheusTarget('.*-openstack.*')), defaultGridPos)
 + dashboardConfig
