@@ -1,0 +1,182 @@
+base_images:
+  base:
+    name: "4.5"
+    namespace: ocp
+    tag: base
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.12
+images:
+- dockerfile_path: images/installer/Dockerfile.ci
+  from: base
+  inputs:
+    root:
+      as:
+      - build
+      paths: null
+  to: installer
+- dockerfile_path: images/installer-artifacts/Dockerfile.rhel
+  from: installer
+  inputs:
+    root:
+      as:
+      - build
+      paths: null
+  to: installer-artifacts
+- dockerfile_path: images/nested-libvirt/Dockerfile
+  from: base
+  inputs:
+    root:
+      as:
+      - build
+      paths: null
+  to: libvirt-installer
+- dockerfile_path: images/installer/Dockerfile.upi.ci
+  from: base
+  inputs:
+    root:
+      as:
+      - build
+      paths: null
+  to: upi-installer
+- dockerfile_path: images/openstack/Dockerfile.ci
+  from: base
+  inputs:
+    root:
+      as:
+      - build
+      paths: null
+  to: openstack-installer
+- dockerfile_path: images/baremetal/Dockerfile.ci
+  from: base
+  inputs:
+    root:
+      as:
+      - build
+      paths: null
+  to: baremetal-installer
+promotion:
+  name: "4.5"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  baremetal-installer:
+    limits:
+      memory: 9Gi
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  installer:
+    limits:
+      memory: 9Gi
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  installer-artifacts:
+    limits:
+      memory: 9Gi
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  libvirt-installer:
+    limits:
+      memory: 9Gi
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  openstack-installer:
+    limits:
+      memory: 9Gi
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  unit:
+    limits:
+      memory: 9Gi
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  upi-installer:
+    limits:
+      memory: 9Gi
+    requests:
+      cpu: "3"
+      memory: 5Gi
+tag_specification:
+  name: "4.5"
+  namespace: ocp
+tests:
+- as: unit
+  commands: go test ./pkg/...
+  container:
+    from: src
+- as: gofmt
+  commands: IS_CONTAINER=TRUE ./hack/go-fmt.sh .
+  container:
+    from: src
+- as: govet
+  commands: IS_CONTAINER=TRUE ./hack/go-vet.sh ./...
+  container:
+    from: src
+- as: golint
+  commands: IS_CONTAINER=TRUE ./hack/go-lint.sh -min_confidence 0.3 $(go list -f '{{
+    .ImportPath }}' ./...)
+  container:
+    from: src
+- as: verify-vendor
+  commands: IS_CONTAINER=TRUE ./hack/verify-vendor.sh
+  container:
+    from: src
+- as: e2e-aws
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer:
+    cluster_profile: aws
+- as: e2e-gcp
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer:
+    cluster_profile: gcp
+- as: e2e-azure
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer:
+    cluster_profile: azure4
+- as: e2e-aws-upgrade
+  commands: TEST_SUITE=all run-upgrade-tests
+  openshift_installer:
+    cluster_profile: aws
+    upgrade: true
+- as: e2e-aws-upi
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer_upi:
+    cluster_profile: aws
+- as: e2e-gcp-upi
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer_upi:
+    cluster_profile: gcp
+- as: e2e-aws-scaleup-rhel7
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_ansible_40:
+    cluster_profile: aws-centos-40
+- as: e2e-aws-disruptive
+  commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance/parallel
+    run-tests
+  openshift_installer:
+    cluster_profile: aws
+- as: e2e-gcp-upgrade
+  commands: TEST_SUITE=all run-upgrade-tests
+  openshift_installer:
+    cluster_profile: gcp
+    upgrade: true
+- as: e2e-vsphere
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer_upi:
+    cluster_profile: vsphere
+- as: e2e
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer_random: {}
