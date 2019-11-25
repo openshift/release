@@ -3,35 +3,6 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
-    context: ci/prow/generate
-    decorate: true
-    name: pull-ci-openshift-cluster-monitoring-operator-generate
-    rerun_command: /test generate
-    spec:
-      containers:
-      - args:
-        - -c
-        - make generate && git diff --exit-code
-        command:
-        - sh
-        env:
-        - name: GO111MODULE
-          value: "on"
-        - name: GOPATH
-          value: /go:/home/prow/go
-        - name: USER
-          value: deadbeef
-        image: quay.io/coreos/jsonnet-ci
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 500m
-    trigger: (?m)^/test generate
-  - agent: kubernetes
-    always_run: true
-    branches:
     - release-4.5
     context: ci/prow/e2e-aws
     decorate: true
@@ -272,30 +243,6 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )images,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    context: ci/prow/shellcheck
-    decorate: true
-    name: pull-ci-openshift-cluster-monitoring-operator-release-4.5-shellcheck
-    rerun_command: /test shellcheck
-    spec:
-      containers:
-      - args:
-        - ./hack/shellcheck.sh
-        command:
-        - sh
-        env:
-        - name: IS_CONTAINER
-          value: "TRUE"
-        image: koalaman/shellcheck-alpine:stable
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 500m
-    trigger: (?m)^/test shellcheck
   - agent: kubernetes
     always_run: true
     branches:
