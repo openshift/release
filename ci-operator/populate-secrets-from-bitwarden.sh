@@ -298,8 +298,10 @@ update_secret generic "apici-ci-operator-credentials" \
 oc -n "ci-release" create secret generic "git-credentials" "--from-literal=.git-credentials=https://openshift-bot:$( field_value "openshift-bot" "GitHub OAuth Token" "oauth" )@github.com" --dry-run -o yaml | oc apply -f -
 oc -n "ci-release" label secret "git-credentials" "ci.openshift.io/managed=true" --overwrite
 
-# The private key here is used to mirror content from the ops mirror
-update_secret generic "mirror.openshift.com" "$( format_attachment "mirror.openshift.com" cert-key.pem ops-mirror.pem )"
+# The private key here is used to mirror content from the ops mirror and the redhat CDN
+update_secret generic "mirror.openshift.com" \
+	"$( format_attachment "mirror.openshift.com" cert-key.pem ops-mirror.pem )" \
+	"$( format_attachment "rh-cdn" rh-cdn.pem rh-cdn.pem )"
 
 #https://jira.coreos.com/browse/DPP-2164
 update_secret generic "aws-openshift-llc-account-credentials" \
