@@ -26,11 +26,9 @@ parameters:
 - name: BASE_DOMAIN
 - name: CLUSTER_NETWORK_MANIFEST
 - name: CLUSTER_NETWORK_TYPE
-- name: ENABLE_FIPS
-- name: ENABLE_PROXY
+- name: CLUSTER_VARIANT
 - name: BUILD_ID
   required: false
-- name: ENABLE_MIRROR
 
 objects:
 
@@ -425,8 +423,6 @@ objects:
         value: ${RELEASE_IMAGE_LATEST}
       - name: OPENSHIFT_INSTALL_INVOKER
         value: openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID}
-      - name: ENABLE_MIRROR
-        value: ${ENABLE_MIRROR}
       - name: USER
         value: test
       - name: HOME
@@ -435,8 +431,6 @@ objects:
         value: registry.svc.ci.openshift.org/${NAMESPACE}/release
       - name: INSTALL_INITIAL_RELEASE
       - name: RELEASE_IMAGE_INITIAL
-      - name: ENABLE_FIPS
-        value: ${ENABLE_FIPS}
       command:
       - /bin/bash
       - -c
@@ -466,7 +460,7 @@ objects:
         if [[ -n "${INSTALL_INITIAL_RELEASE}" && -n "${RELEASE_IMAGE_INITIAL}" ]]; then
           echo "Installing from initial release ${RELEASE_IMAGE_INITIAL}"
           OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_INITIAL}"
-        elif [[ "${ENABLE_MIRROR}" == "true" ]]; then
+        elif [[ "${CLUSTER_VARIANT}" =~ "mirror" ]]; then
           export PATH=$PATH:/tmp/shared  # gain access to oc
           while [ ! command -V oc ]; do sleep 1; done # poll to make sure that the test container has dropped oc into the shared volume
 
@@ -584,7 +578,7 @@ objects:
 
         # as a current stop gap -- this is pointing to a proxy hosted in
         # the namespace "ci-test-ewolinet" on the ci cluster
-        if [[ "${ENABLE_PROXY}" == "true" ]]; then
+        if [[ "${CLUSTER_VARIANT}" =~ "proxy" ]]; then
 
         # FIXME: due to https://bugzilla.redhat.com/show_bug.cgi?id=1750650 we need to
         # use a http endpoint for the httpsProxy value
@@ -667,14 +661,18 @@ objects:
         EOF
         fi
 
-        if [[ -n "${CLUSTER_NETWORK_TYPE}" ]]; then
+        network_type="${CLUSTER_NETWORK_TYPE-}"
+        if [[ "${CLUSTER_VARIANT}" =~ "ovn" ]]; then
+          network_type=OVNKubernetes
+        fi
+        if [[ -n "${network_type}" ]]; then
           cat >> /tmp/artifacts/installer/install-config.yaml << EOF
         networking:
-          networkType: ${CLUSTER_NETWORK_TYPE}
+          networkType: ${network_type}
         EOF
         fi
 
-        if [[ "${ENABLE_MIRROR}" == "true" ]]; then
+        if [[ "${CLUSTER_VARIANT}" =~ "mirror" ]]; then
           cat >> /tmp/artifacts/installer/install-config.yaml << EOF
         imageContentSources:
         - source: "${MIRROR_BASE}-scratch"
@@ -689,7 +687,7 @@ objects:
             echo "${CLUSTER_NETWORK_MANIFEST}" > /tmp/artifacts/installer/manifests/cluster-network-03-config.yml
         fi
 
-        if [[ "${ENABLE_FIPS}" == true ]]; then
+        if [[ "${CLUSTER_VARIANT}" =~ "fips" ]]; then
           cat >> /tmp/artifacts/installer/install-config.yaml << EOF
         fips: true
         EOF
