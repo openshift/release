@@ -1,0 +1,65 @@
+base_images:
+  base:
+    name: "4.5"
+    namespace: ocp
+    tag: base
+binary_build_commands: go build -o bin/manager sigs.k8s.io/cluster-api-provider-azure/cmd/manager/
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.12
+canonical_go_repository: sigs.k8s.io/cluster-api-provider-azure
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  to: azure-machine-controllers
+promotion:
+  name: "4.5"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.5"
+  namespace: ocp
+tests:
+- as: goimports
+  commands: IS_CONTAINER=TRUE make goimports
+  container:
+    from: src
+- as: govet
+  commands: |
+    # Instead of getting alias for cluster-api-provider-azure under
+    # /go/src/sigs.k8s.io/cluster-api-provider-azure, I get https://github.com/openshift/release
+    # instead. Recreate the alias directory until the issue is fixed.
+    if [ ! -e /go/src/sigs.k8s.io/cluster-api-provider-azure/pkg ]; then
+      rm -rf /go/src/sigs.k8s.io/cluster-api-provider-azure
+      cp -r /go/src/github.com/openshift/cluster-api-provider-azure/ /go/src/sigs.k8s.io/.
+      cd /go/src/sigs.k8s.io/cluster-api-provider-azure
+    fi
+    IS_CONTAINER=TRUE make vet
+  container:
+    from: src
+- as: unit
+  commands: |
+    go test -timeout 20m ./pkg/... ./cmd/...
+  container:
+    from: src
+- as: e2e-azure
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer:
+    cluster_profile: azure4
+- as: e2e-azure-operator
+  commands: make test-e2e
+  openshift_installer_custom_test_image:
+    cluster_profile: azure4
+    from: stable:cluster-api-actuator-pkg
+- as: git-history
+  commands: ./hack/verify_history.sh
+  container:
+    from: src

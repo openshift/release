@@ -1,0 +1,48 @@
+base_images:
+  base:
+    name: "4.5"
+    namespace: ocp
+    tag: base
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.12
+images:
+- dockerfile_path: images/router/base/Dockerfile
+  from: base
+  optional: true
+  to: base-router
+- dockerfile_path: images/router/haproxy/Dockerfile
+  from: base-router
+  to: haproxy-router
+- dockerfile_path: images/router/f5/Dockerfile
+  from: base-router
+  to: f5-router
+promotion:
+  name: "4.5"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.5"
+  namespace: ocp
+tests:
+- as: unit
+  commands: go test -race ./...
+  container:
+    from: src
+- as: e2e-aws
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer:
+    cluster_profile: aws
+- as: e2e-aws-upgrade
+  commands: TEST_SUITE=all run-upgrade-tests
+  openshift_installer:
+    cluster_profile: aws
+    upgrade: true
