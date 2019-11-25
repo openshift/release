@@ -22,7 +22,7 @@ parameters:
 - name: BASE_DOMAIN
 - name: BUILD_ID
   required: false
-- name: ENABLE_PROXY
+- name: CLUSTER_VARIANT
 - name: PROXY_IMAGE
   value: registry.svc.ci.openshift.org/origin/4.2:egress-http-proxy
 
@@ -1125,7 +1125,7 @@ objects:
         EOF
 
           # Add proxy info to install-config.yaml
-          if [[ "${ENABLE_PROXY}" == "true" ]]; then
+          if [[ "${CLUSTER_VARIANT}" =~ "proxy" ]]; then
 
             # create and sign a cert
             generate_proxy_certs
@@ -1286,7 +1286,7 @@ objects:
 
           # If we are using a proxy, create a 'black-hole' private subnet vpc TODO
           # For now this is just a placeholder...
-          if [[ "${ENABLE_PROXY}" == "true" ]]; then
+          if [[ "${CLUSTER_VARIANT}" =~ "proxy" ]]; then
             aws cloudformation create-stack  --stack-name "${CLUSTER_NAME}-vpc" \
               --template-body "$(cat "/var/lib/openshift-install/upi/${CLUSTER_TYPE}/cloudformation/01_vpc.yaml")" \
               --tags "${TAGS}" \
@@ -1362,7 +1362,7 @@ objects:
           WORKER_SECURITY_GROUP="$(echo "${SECURITY_JSON}" | jq -r '.[] | select(.OutputKey == "WorkerSecurityGroupId").OutputValue')"
           WORKER_INSTANCE_PROFILE="$(echo "${SECURITY_JSON}" | jq -r '.[] | select(.OutputKey == "WorkerInstanceProfile").OutputValue')"
 
-          if [[ "${ENABLE_PROXY}" == "true" ]]; then
+          if [[ "${CLUSTER_VARIANT}" =~ "proxy" ]]; then
             echo "creating proxy..."
 
             # define squid config
