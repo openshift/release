@@ -31,6 +31,11 @@
         channel: '#forum-devex',
         notify: 'devex',
       },
+      'endurance-cluster': {
+        team: 'build-cop',
+        channel: '#build-cop-alerts',
+        notify: 'bparees',
+      },
     },
   },
 }
