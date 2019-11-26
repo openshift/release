@@ -171,7 +171,7 @@ update_secret generic github-app-credentials "$( format_field_value prow.svc.ci.
 
 # Cookie secret to encrypt frontend and backend
 # communication is stored in the "Cookie" field
-update_secret generic cookie "$( format_field_value prow.svc.ci.openshift.org Cookie "cookie" )"
+update_secret generic cookie "$( format_field_value prow.svc.ci.openshift.org Cookie32 "cookie" )"
 
 # HMAC token for encrypting GitHub webhook payloads
 # is stored in the "HMAC Token" field
