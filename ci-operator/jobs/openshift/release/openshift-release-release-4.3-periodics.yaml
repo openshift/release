@@ -270,16 +270,9 @@ periodics:
           exit 1
         fi
 
-        SECRET_DIRS=""
-        TEMPLATES=""
-        tests=(e2e-aws e2e-aws-fips)
-        for TEST in ${tests[@]}; do
-          SECRET_DIRS="${SECRET_DIRS} --secret-dir=/usr/local/${TEST}-cluster-profile"
-          TEMPLATES="${TEMPLATES} --template=/usr/local/${TEST}"
-        done
         # verify the tests pass
         ci-operator --artifact-dir=$(ARTIFACTS) --secret-dir=/usr/local/pull-secret \
-          ${SECRET_DIRS} ${TEMPLATES} \
+          --secret-dir=/usr/local/e2e-aws-cluster-profile --template=/usr/local/e2e-aws \
           --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME) --promote
 
         # also tag the image into the art-latest stream
@@ -346,35 +339,22 @@ periodics:
           cpu: 10m
       volumeMounts:
       - mountPath: /usr/local/e2e-aws-cluster-profile
-        name: cluster-profile-aws
-      - mountPath: /usr/local/e2e-aws-fips-cluster-profile
-        name: cluster-profile-aws-fips
+        name: cluster-profile
       - mountPath: /usr/local/e2e-aws
-        name: job-definition-aws
-        subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /usr/local/e2e-aws-fips
-        name: job-definition-aws-fips
+        name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
       - mountPath: /usr/local/pull-secret
         name: pull-secret
     serviceAccountName: ci-operator
     volumes:
-    - name: cluster-profile-aws
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws
-    - name: cluster-profile-aws-fips
+    - name: cluster-profile
       projected:
         sources:
         - secret:
             name: cluster-secrets-aws
     - configMap:
         name: prow-job-cluster-launch-installer-e2e
-      name: job-definition-aws
-    - configMap:
-        name: prow-job-cluster-launch-installer-e2e
-      name: job-definition-aws-fips
+      name: job-definition
     - name: pull-secret
       secret:
         secretName: ci-pull-credentials
