@@ -1,0 +1,61 @@
+base_images:
+  os:
+    name: centos
+    namespace: openshift
+    tag: '7'
+
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      memory: 250Mi
+      cpu: 100m
+  unit:
+    limits:
+      memory: 10Gi
+    requests:
+      memory: 2Gi
+      cpu: 200m
+
+images:
+- from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/integr8ly/integreatly-operator/build
+  dockerfile_path: build/Dockerfile
+  to: integreatly-operator
+
+build_root:
+  project_image:
+    dockerfile_path: openshift-ci/Dockerfile.tools
+
+binary_build_commands: make code/compile COMPILE_TARGET="./build/_output/bin/integreatly-operator"
+
+promotion:
+  namespace: integr8ly
+  name: integreatly-operator
+
+tag_specification:
+  name: '4.2'
+  namespace: ocp
+
+tests:
+- as: unit
+  commands: make test/unit
+  container:
+    from: src
+- as: format
+  commands: make code/check
+  container:
+    from: src
+- as: e2e
+  commands: make test/e2e
+  openshift_installer_src:
+    cluster_profile: aws
+- as: e2e-olm
+  commands: make test/e2e/olm
+  openshift_installer_src:
+    cluster_profile: aws
