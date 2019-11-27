@@ -57,6 +57,10 @@ branch-cut:
 	docker run -v "${CURDIR}/ci-operator:/ci-operator" registry.svc.ci.openshift.org/ci/config-brancher:latest --config-dir /ci-operator/config --org=$(ORG) --repo=$(REPO) --current-release=4.3 --future-release=4.4 --bump-release=4.4 --confirm
 		$(MAKE) jobs
 
+new-repo:
+	docker pull registry.svc.ci.openshift.org/ci/repo-init:latest
+	docker run -it -v "${CURDIR}:/release" registry.svc.ci.openshift.org/ci/repo-init:latest --release-repo /release
+
 # LEGACY TARGETS
 # You should not need to add new targets here.
 
