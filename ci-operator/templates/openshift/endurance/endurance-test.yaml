@@ -67,6 +67,9 @@ objects:
     - name: ci-credentials
       secret:
         secretName: ci-credentials
+    - name: cloud-credentials
+      secret:
+        secretName: ${CLUSTER_TYPE}-openshift-llc-account-credentials
        
     containers:
     # Once the cluster is up, executes shared tests
@@ -86,9 +89,13 @@ objects:
         mountPath: /tmp/cluster-credentials
       - name: ci-credentials
         mountPath: /tmp/ci-credentials
+      - name: cloud-credentials
+        mountPath: /etc/cloud-credentials
       env:
       - name: ARTIFACT_DIR
         value: /tmp/artifacts
+      - name: AWS_SHARED_CREDENTIALS_FILE
+        value: /etc/cloud-credentials/.awscred
       - name: HOME
         value: /tmp/home
       - name: KUBECONFIG
