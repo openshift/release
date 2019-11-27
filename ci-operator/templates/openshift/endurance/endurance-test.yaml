@@ -116,17 +116,17 @@ objects:
 
         # set up cloud-provider-specific env vars
         export KUBE_SSH_BASTION="$( oc --insecure-skip-tls-verify get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
-        export KUBE_SSH_KEY_PATH=/tmp/cluster/ssh-privatekey
+        export KUBE_SSH_KEY_PATH=/tmp/ci-credentials/ssh-privatekey
         if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
-          export GOOGLE_APPLICATION_CREDENTIALS="/tmp/cluster/gce.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="/tmp/ci-credentials/gce.json"
           export KUBE_SSH_USER=cloud-user
           mkdir -p ~/.ssh
-          cp /tmp/cluster/ssh-privatekey ~/.ssh/google_compute_engine || true
+          cp /tmp/ci-credentials/ssh-privatekey ~/.ssh/google_compute_engine || true
           export PROVIDER_ARGS='-provider=gce -gce-zone=us-east1-c -gce-project=openshift-gce-devel-ci'
           export TEST_PROVIDER='{"type":"gce","zone":"us-east1-c","projectid":"openshift-gce-devel-ci"}'
         elif [[ "${CLUSTER_TYPE}" == "aws" ]]; then
           mkdir -p ~/.ssh
-          cp /tmp/cluster/ssh-privatekey ~/.ssh/kube_aws_rsa || true
+          cp /tmp/ci-credentials/ssh-privatekey ~/.ssh/kube_aws_rsa || true
           export PROVIDER_ARGS="-provider=aws -gce-zone=us-east-2"
           # TODO: make openshift-tests auto-discover this from cluster config
           export TEST_PROVIDER='{"type":"aws","region":"us-east-2","zone":"us-east-2a","multizone":true,"multimaster":true}'
