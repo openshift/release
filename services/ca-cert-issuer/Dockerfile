@@ -4,7 +4,10 @@ FROM centos:7
 
 COPY --from=builder /usr/bin/oc /usr/bin/oc
 
-RUN yum install -y cronie openssl && \
+RUN yum install -y cronie openssl git && \
       yum clean all && \
       rm -rf /var/cache/yum && \
-      curl https://get.acme.sh | sh
+      git clone https://github.com/Neilpang/acme.sh.git && \
+      cd acme.sh && \
+      mkdir /acme && \
+      ./acme.sh --install --home /acme
