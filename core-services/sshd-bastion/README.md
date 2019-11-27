@@ -76,3 +76,25 @@ for job in $( jobs -p ); do
 	wait "${job}"
 done
 ```
+
+Reach your service on the in-cluster network with a Pod. Create a `pod.yaml` and view the logs :
+
+```terminal
+$ cat <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bastion-${environment}
+spec:
+  restartPolicy: Never
+  containers:
+  - name: connect
+    command:
+    - /usr/bin/curl
+    args:
+    - sshd.bastion-${environment}
+	image: registry.svc.ci.openshift.org/origin/centos:8
+EOF | oc apply -f -
+$ oc logs --pod-running-timeout=10m "bastion-${environment}"
+$ oc delete pod "bastion-${environment}"
+```
