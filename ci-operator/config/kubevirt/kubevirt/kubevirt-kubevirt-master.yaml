@@ -1,0 +1,29 @@
+base_images:
+  base:
+    name: "4.2"
+    namespace: ocp
+    tag: base
+build_root:
+  project_image:
+    context_dir: hack/kubevirt-builder
+    dockerfile_path: Dockerfile
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.2"
+  namespace: ocp
+tests:
+- as: "kubevirt-e2e-test"
+  commands: |
+    export KUBEVIRT_PROVIDER=external
+    ./hack/generate.sh
+    ./hack/cluster-build.sh
+    ./hack/cluster-deploy.sh
+    ./hack/functests.sh
+  openshift_installer_src:
+    cluster_profile: gcp
