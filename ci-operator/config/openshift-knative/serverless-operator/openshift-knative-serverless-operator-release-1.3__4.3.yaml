@@ -1,0 +1,33 @@
+tag_specification:
+  name: '4.3'
+  namespace: ocp
+promotion:
+  namespace: openshift
+  name: openshift-serverless-v1.3.0
+base_images:
+  base:
+    name: '4.3'
+    namespace: ocp
+    tag: base
+build_root:
+  project_image:
+    dockerfile_path: openshift/ci-operator/build-image/Dockerfile
+tests:
+- as: e2e-aws-ocp-43
+  commands: "make test-e2e"
+  openshift_installer_src:
+    cluster_profile: aws
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+images:
+- context_dir: serving/operator
+  from: base
+  to: knative-serving-operator
+- context_dir: serving/ingress
+  from: base
+  to: knative-openshift-ingress
