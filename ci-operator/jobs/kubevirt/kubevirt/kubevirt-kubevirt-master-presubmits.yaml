@@ -40,16 +40,26 @@ presubmits:
           value: kubevirt-e2e-test
         - name: TEST_COMMAND
           value: |
+            # we hack the build process as we don't have bazel around here
+            # normally we'd only need to use automate/test.sh
             set -e
             set -o pipefail
 
+            # setup go env
             export GIMME_GO_VERSION=1.12.8
             source /etc/profile.d/gimme.sh
 
-            export KUBEVIRT_PROVIDER=external
+            # make generate
+            ./hack/dep-update.sh
+            ./hack/dep-prune.sh
             ./hack/generate.sh
+
+            # make cluster-sync
+            export KUBEVIRT_PROVIDER=external
             ./hack/cluster-build.sh
             ./hack/cluster-deploy.sh
+
+            # make functest
             ./hack/functests.sh
         image: ci-operator:latest
         imagePullPolicy: Always
