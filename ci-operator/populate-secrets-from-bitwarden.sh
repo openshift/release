@@ -293,6 +293,12 @@ update_secret generic "build-farm-credentials" \
 update_secret generic "apici-ci-operator-credentials" \
 	"$( format_attachment "build_farm" sa.ci-operator.apici.config )"
 
+# collects all the secrets for boskos
+update_secret generic "boskos-credentials" \
+	"$( format_field_value "boskos-oauth-proxy" "boskos-username" "username" )" \
+	"$( format_field_value "boskos-oauth-proxy" "boskos-password" "password" )" \
+	"$( format_attachment "boskos-oauth-proxy" ci.htpasswd )"
+
 # Configuration for the .git-credentials used by the release controller to clone
 # private repositories to generate changelogs
 oc -n "ci-release" create secret generic "git-credentials" "--from-literal=.git-credentials=https://openshift-bot:$( field_value "openshift-bot" "GitHub OAuth Token" "oauth" )@github.com" --dry-run -o yaml | oc apply -f -
