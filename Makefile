@@ -60,6 +60,8 @@ branch-cut:
 new-repo:
 	docker pull registry.svc.ci.openshift.org/ci/repo-init:latest
 	docker run -it -v "${CURDIR}:/release" registry.svc.ci.openshift.org/ci/repo-init:latest --release-repo /release
+	$(MAKE) jobs
+	$(MAKE) prow-config
 
 # LEGACY TARGETS
 # You should not need to add new targets here.
