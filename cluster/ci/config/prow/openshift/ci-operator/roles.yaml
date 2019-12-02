@@ -461,3 +461,31 @@ items:
   - kind: ServiceAccount
     name: ci-operator
     namespace: ci
+
+- kind: Role
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: groups-getter
+    namespace: ci
+  rules:
+  - apiGroups:
+    - "groups.user.openshift.io"
+    resources:
+    - groups
+    verbs:
+    - get
+    - update
+
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: groups-getter-ci-operator
+    namespace: ci
+  roleRef:
+    kind: Role
+    name: groups-getter
+    namespace: ci
+  subjects:
+  - kind: ServiceAccount
+    name: ci-operator
+    namespace: ci
