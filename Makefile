@@ -95,7 +95,7 @@ prow: prow-ci-ns prow-ci-stg-ns
 prow-ci-ns: ci-ns prow-jobs prow-scaling prow-secrets
 .PHONY: prow-ci-ns
 
-prow-ci-stg-ns: ci-stg-ns prow-cluster-jobs
+prow-ci-stg-ns: ci-stg-ns
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/ci-operator/stage.yaml
 .PHONY: prow-ci-stg-ns
 
@@ -119,31 +119,7 @@ prow-secrets:
 	ci-operator/populate-secrets-from-bitwarden.sh
 .PHONY: prow-secrets
 
-prow-cluster-jobs:
-	oc create configmap cluster-profile-gcp --from-file=cluster/test-deploy/gcp/vars.yaml --from-file=cluster/test-deploy/gcp/vars-origin.yaml -o yaml --dry-run | oc apply -f -
-	oc create configmap cluster-profile-gcp-crio --from-file=cluster/test-deploy/gcp-crio/vars.yaml --from-file=cluster/test-deploy/gcp-crio/vars-origin.yaml -o yaml --dry-run | oc apply -f -
-	oc create configmap cluster-profile-gcp-ha --from-file=cluster/test-deploy/gcp/vars.yaml --from-file=cluster/test-deploy/gcp/vars-origin.yaml -o yaml --dry-run | oc apply -f -
-	oc create configmap cluster-profile-gcp-logging --from-file=cluster/test-deploy/gcp-logging/vars.yaml --from-file=cluster/test-deploy/gcp-logging/vars-origin.yaml -o yaml --dry-run | oc apply -f -
-	oc create configmap cluster-profile-gcp-ha-static --from-file=cluster/test-deploy/gcp/vars.yaml --from-file=cluster/test-deploy/gcp/vars-origin.yaml -o yaml --dry-run | oc apply -f -
-	oc create configmap cluster-profile-aws-centos-40 --from-file=cluster/test-deploy/aws-4.0/vars.yaml -o yaml --dry-run | oc apply -f -
-	oc create configmap cluster-profile-aws-centos --from-file=cluster/test-deploy/aws-centos/vars.yaml --from-file=cluster/test-deploy/aws-centos/vars-origin.yaml -o yaml --dry-run | oc apply -f -
-	oc create configmap cluster-profile-aws-atomic --from-file=cluster/test-deploy/aws-atomic/vars.yaml --from-file=cluster/test-deploy/aws-atomic/vars-origin.yaml -o yaml --dry-run | oc apply -f -
-	oc create configmap cluster-profile-aws-gluster --from-file=cluster/test-deploy/aws-gluster/vars.yaml --from-file=cluster/test-deploy/aws-gluster/vars-origin.yaml -o yaml --dry-run | oc apply -f -
-	oc create configmap prow-job-cluster-launch-e2e --from-file=ci-operator/templates/openshift/openshift-ansible/cluster-launch-e2e.yaml -o yaml --dry-run | oc apply -f -
-	oc create configmap prow-job-cluster-launch-e2e-openshift-jenkins --from-file=ci-operator/templates/openshift/openshift-ansible/cluster-launch-e2e-openshift-jenkins.yaml -o yaml --dry-run | oc apply -f -
-	oc create configmap prow-job-cluster-launch-src --from-file=ci-operator/templates/openshift/openshift-ansible/cluster-launch-src.yaml -o yaml --dry-run | oc apply -f -
-	oc create configmap prow-job-cluster-launch-installer-e2e --from-file=ci-operator/templates/openshift/installer/cluster-launch-installer-e2e.yaml -o yaml --dry-run | oc apply -f -
-	oc create configmap prow-job-cluster-launch-installer-longlived --from-file=ci-operator/templates/openshift/installer/cluster-launch-installer-longlived.yaml -o yaml --dry-run | oc apply -f -
-	oc create configmap prow-job-cluster-launch-installer-libvirt-e2e --from-file=ci-operator/templates/openshift/installer/cluster-launch-installer-libvirt-e2e.yaml -o yaml --dry-run | oc apply -f -
-	oc create configmap prow-job-cluster-launch-installer-src --from-file=ci-operator/templates/openshift/installer/cluster-launch-installer-src.yaml -o yaml --dry-run | oc apply -f -
-	oc create configmap prow-job-cluster-launch-installer-console --from-file=ci-operator/templates/openshift/installer/cluster-launch-installer-console.yaml -o yaml --dry-run | oc apply -f -
-	oc create configmap prow-job-cluster-scaleup-openshift-ansible-e2e --from-file=ci-operator/templates/openshift/openshift-ansible/cluster-scaleup-e2e-40.yaml -o yaml --dry-run | oc apply -f -
-	oc create configmap prow-job-master-sidecar-4.2 --from-file=ci-operator/templates/master-sidecar-4.2.yaml -o yaml --dry-run | oc apply -f -
-	oc create configmap prow-job-master-sidecar-4.3 --from-file=ci-operator/templates/master-sidecar-4.3.yaml -o yaml --dry-run | oc apply -f -
-	oc create configmap prow-job-master-sidecar-3 --from-file=ci-operator/templates/master-sidecar-3.yaml -o yaml --dry-run | oc apply -f -
-.PHONY: prow-cluster-jobs
-
-prow-jobs: prow-cluster-jobs prow-artifacts
+prow-jobs: prow-artifacts
 	$(MAKE) apply WHAT=projects/prometheus/test/build.yaml
 	$(MAKE) apply WHAT=ci-operator/templates/os.yaml
 	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/ci-operator/roles.yaml
