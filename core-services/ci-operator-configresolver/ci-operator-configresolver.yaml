@@ -86,6 +86,7 @@ items:
           image: registry.svc.ci.openshift.org/ci/ci-operator-configresolver@sha256:d07a8dfad2e2605abb9776e72bf78bb869d875a3469532e4aad753ff79d43334
           args:
           - -config=/etc/configs
+          - -registry=/etc/registry
           - -log-level=debug
           - -cycle=2m
           livenessProbe:
@@ -102,6 +103,9 @@ items:
             periodSeconds: 3
             timeoutSeconds: 600
           volumeMounts:
+          - name: registry
+            mountPath: /etc/registry
+            readOnly: true
           - name: master
             mountPath: /etc/configs/master
             readOnly: true
@@ -131,6 +135,9 @@ items:
               memory: "2Gi"
               cpu: "200m"
         volumes:
+        - name: registry
+          configMap:
+            name: step-registry
         - name: master
           configMap:
             name: ci-operator-master-configs
