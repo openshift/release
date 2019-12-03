@@ -103,7 +103,7 @@ def renderHeader(dc):
     for container in containers:
         if container.get("name") == dc:
             image = container.get("image", "")
-            version = image.split(":", 1)[1]
+            version = image.split(":")[-1]
     headerColor = ''
     if desired != current:
         headerColor = RED
