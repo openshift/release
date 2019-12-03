@@ -161,11 +161,13 @@ prow-release-controller-definitions:
 	oc annotate -n ocp-ppc64le is/release-ppc64le "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.y-stable-ppc64le.json)" --overwrite
 
 	oc annotate -n origin is/4.3 "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-origin-4.3.json)" --overwrite
+	oc annotate -n origin is/4.4 "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-origin-4.4.json)" --overwrite
+	oc annotate -n origin is/4.5 "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-origin-4.5.json)" --overwrite
 	oc annotate -n origin is/release "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-origin-4.y-stable.json)" --overwrite
 .PHONY: prow-release-controller-definitions
 
 prow-release-controller-deploy:
-	$(MAKE) apply WHAT=ci-operator/infra/openshift/release-controller/
+	$(MAKE) apply WHAT=core-services/release-controller/
 .PHONY: prow-release-controller-deploy
 
 prow-release-controller: prow-release-controller-definitions prow-release-controller-deploy
