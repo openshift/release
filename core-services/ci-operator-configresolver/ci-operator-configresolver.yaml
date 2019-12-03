@@ -62,6 +62,8 @@ items:
   metadata:
     namespace: ci
     name: ci-operator-configresolver
+    annotations:
+      image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"ci-operator-configresolver:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"ci-operator-configresolver\")].image"}]'
   spec:
     replicas: 3
     strategy:
@@ -83,9 +85,11 @@ items:
           containerPort: 9090
         containers:
         - name: ci-operator-configresolver
-          image: registry.svc.ci.openshift.org/ci/ci-operator-configresolver@sha256:d07a8dfad2e2605abb9776e72bf78bb869d875a3469532e4aad753ff79d43334
+          image: ci-operator-configresolver:latest
           args:
           - -config=/etc/configs
+          - -registry=/etc/registry
+          - -flat-registry
           - -log-level=debug
           - -cycle=2m
           livenessProbe:
@@ -102,6 +106,9 @@ items:
             periodSeconds: 3
             timeoutSeconds: 600
           volumeMounts:
+          - name: registry
+            mountPath: /etc/registry
+            readOnly: true
           - name: master
             mountPath: /etc/configs/master
             readOnly: true
@@ -131,6 +138,9 @@ items:
               memory: "2Gi"
               cpu: "200m"
         volumes:
+        - name: registry
+          configMap:
+            name: step-registry
         - name: master
           configMap:
             name: ci-operator-master-configs
