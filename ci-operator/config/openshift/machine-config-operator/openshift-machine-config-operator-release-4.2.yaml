@@ -3,14 +3,6 @@ base_images:
     name: "4.2"
     namespace: ocp
     tag: base
-  base-machine:
-    name: fedora
-    namespace: openshift
-    tag: "29"
-  machine-os-content-base:
-    name: "4.2"
-    namespace: ocp
-    tag: machine-os-content
 build_root:
   image_stream_tag:
     name: release
@@ -20,33 +12,9 @@ images:
 - dockerfile_path: Dockerfile
   from: base
   to: machine-config-operator
-- context: ci/prow/images/
-  from: base
-  inputs:
-    base-machine-with-rpms:
-      as:
-      - fedora:29
-      paths: null
-    machine-os-content-base:
-      as:
-      - registry.svc.ci.openshift.org/openshift/origin-v4.0:machine-os-content
-      paths: null
-  to: machine-os-content
 promotion:
-  additional_images:
-    machine-config-operator-rpms: rpms
-  excluded_images:
-  - machine-config-operator-base-with-rpms
-  - machine-os-content
   name: "4.2"
   namespace: ocp
-raw_steps:
-- rpm_image_injection_step:
-    from: base
-    to: machine-config-operator-base-with-rpms
-- rpm_image_injection_step:
-    from: base-machine
-    to: base-machine-with-rpms
 resources:
   '*':
     limits:
@@ -54,28 +22,10 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-rpm_build_commands: |-
-  TMPDIR=$( mktemp -d )
-  RPMBUILD_DIR=_rpmbuild/
-  COMMIT=$( git rev-parse HEAD )
-  SHORTCOMMIT=$( git rev-parse --short=7 HEAD )
-  mkdir -p ${RPMBUILD_DIR}/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
-  tar -czf "${TMPDIR}/machine-config-operator-${COMMIT}.tar.gz" --exclude='.git' --transform="s|^.|machine-config-operator-${COMMIT}|" --exclude="machine-config-operator-${COMMIT}.tar.gz" ./
-  cp ./machine-config-daemon.spec "${RPMBUILD_DIR}/SPECS/"
-  cp "${TMPDIR}/machine-config-operator-${COMMIT}.tar.gz" "${RPMBUILD_DIR}/SOURCES/machine-config-operator-${SHORTCOMMIT}.tar.gz"
-  rpmbuild -ba --nodeps --define "_topdir $( pwd )/${RPMBUILD_DIR}" --define "commit ${COMMIT}" ${RPMBUILD_DIR}/SPECS/machine-config-daemon.spec
-  rm -rf /srv/repo
-  mv ${RPMBUILD_DIR}/RPMS/x86_64 /srv/repo
-  rm -rf /go/.cache ${RPMBUILD_DIR}
-rpm_build_location: _rpmbuild/RPMS/
 tag_specification:
   name: "4.2"
   namespace: ocp
 tests:
-- as: build-rpms-from-tar
-  commands: '# noop, just to force the building the `rpms` target'
-  container:
-    from: machine-config-operator-base-with-rpms
 - as: unit
   commands: make test-unit
   container:
