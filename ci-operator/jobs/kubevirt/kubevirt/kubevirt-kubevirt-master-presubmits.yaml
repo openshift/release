@@ -40,26 +40,25 @@ presubmits:
         - name: JOB_NAME_SAFE
           value: kubevirt-e2e-test
         - name: TEST_COMMAND
-          value: |
-            # we hack the build process as we don't have docker around here
-            # normally we'd only need to use automate/test.sh
+          value: |2
 
-            # setup go env
             export GIMME_GO_VERSION=1.12.8
             export GOPATH="/go"
             export GOBIN="/usr/bin"
             source /etc/profile.d/gimme.sh
             go env
 
-            # make generate
-            bash -x ./hack/generate.sh
-
-            # make cluster-sync
+            export DOCKER_PREFIX='https://api.ci.openshift.org/kubevirt/kubevirt'
+            export DOCKER_TAG='os-ci-devel'
             export KUBEVIRT_PROVIDER=external
-            bash -x ./hack/cluster-build.sh
+
+            # create manifests
+            bash -x ./hack/build-manifests.sh
+
+            # deploy
             bash -x ./hack/cluster-deploy.sh
 
-            # make functest
+            # functest
             bash -x ./hack/functests.sh
         image: ci-operator:latest
         imagePullPolicy: Always
