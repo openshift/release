@@ -1,6 +1,62 @@
 periodics:
 - agent: kubernetes
   labels:
+     ci.openshift.io/role: infra
+  cluster: default
+  cron: "@weekly"
+  decorate: true
+  name: periodic-acme-cert-issuer-for-build01
+  skip_cloning: true
+  spec:
+    containers:
+      - args:
+          - -c
+          - |
+            set -o errexit
+            set -o nounset
+            set -o pipefail
+            oc --kubeconfig=/etc/build-farm-credentials/kubeconfig whoami
+            oc --kubeconfig=/etc/build-farm-credentials/kubeconfig project
+            /acme/acme.sh --version
+            /acme/acme.sh --issue --dns dns_aws -d '*.apps.build01.ci.devcluster.openshift.com' --home /data --dnssleep 60 --fullchain-file /data/app.fullchain.cer --key-file /data/app.key --force
+            ls -al /data
+            oc --kubeconfig=/etc/build-farm-credentials/kubeconfig -n openshift-ingress create secret tls app-cert --cert=/data/app.fullchain.cer --key=/data/app.key --dry-run -o yaml | oc --kubeconfig=/etc/build-farm-credentials/kubeconfig -n openshift-ingress apply -f -
+        command:
+          - /bin/bash
+        env:
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                name: aws-ci-infra-openshift-ci-robot-credentials
+                key: AWS_ACCESS_KEY_ID
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                name: aws-ci-infra-openshift-ci-robot-credentials
+                key: AWS_SECRET_ACCESS_KEY
+        image: "registry.svc.ci.openshift.org/ci/ca-cert-issuer:latest"
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+        volumeMounts:
+          - mountPath: /data
+            name: data
+          - mountPath: /etc/build-farm-credentials
+            name: build-farm-credentials
+            readOnly: true
+    volumes:
+    - name: data
+      emptyDir: {}
+    - name: build-farm-credentials
+      secret:
+        items:
+        - key: sa.ca-cert-issuer.build01.config
+          path: kubeconfig
+        secretName: build-farm-credentials
+- agent: kubernetes
+  labels:
     ci.openshift.io/role: infra
   cron: ""
   decorate: true
