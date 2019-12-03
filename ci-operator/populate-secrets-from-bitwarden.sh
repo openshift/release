@@ -287,6 +287,7 @@ update_secret generic "build-farm-credentials" \
 	"$( format_attachment "build_farm" sa.hook.build01.config )" \
 	"$( format_attachment "build_farm" sa.plank.build01.config )" \
 	"$( format_attachment "build_farm" sa.sinker.build01.config )" \
+	"$( format_attachment "build_farm" sa.ca-cert-issuer.build01.config )" \
 	"$( format_attachment "build_farm" sa.kubeconfig )"
 
 # collects all the secrets for ci-operator
@@ -298,6 +299,12 @@ update_secret generic "boskos-credentials" \
 	"$( format_field_value "boskos-oauth-proxy" "boskos-username" "username" )" \
 	"$( format_field_value "boskos-oauth-proxy" "boskos-password" "password" )" \
 	"$( format_attachment "boskos-oauth-proxy" ci.htpasswd )"
+
+# collects all the secrets for aws iamuser openshift-ci-robot iamuser under account ci-infra
+# it is used for issue CA certificates for build01
+update_secret generic "aws-ci-infra-openshift-ci-robot-credentials" \
+	"$( format_field_value "aws_ci_infra_openshift-ci-robot" "AWS_ACCESS_KEY_ID" "AWS_ACCESS_KEY_ID" )" \
+	"$( format_field_value "aws_ci_infra_openshift-ci-robot" "AWS_SECRET_ACCESS_KEY" "AWS_SECRET_ACCESS_KEY" )"
 
 # Configuration for the .git-credentials used by the release controller to clone
 # private repositories to generate changelogs
