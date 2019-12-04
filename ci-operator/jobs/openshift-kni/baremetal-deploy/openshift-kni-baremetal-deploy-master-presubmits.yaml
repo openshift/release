@@ -1,7 +1,7 @@
 presubmits:
   openshift-kni/baremetal-deploy:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - master
     context: ci/prow/sctp-e2e
@@ -13,12 +13,14 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kni-baremetal-deploy-master-sctp-e2e
     rerun_command: /test sctp-e2e
+    run_if_changed: features/sctp/.*
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=master
         - --give-pr-author-access-to-namespace=true
+        - --lease-server=http://boskos
         - --org=openshift-kni
         - --repo=baremetal-deploy
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
