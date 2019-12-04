@@ -1,0 +1,28 @@
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.11
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+
+# PR check
+- as: verify
+  artifact_dir: /tmp/artifacts
+  commands: |
+    set -o pipefail
+
+    export HOME=$(mktemp -d)
+
+    export REPORT_DIR=/tmp/artifacts
+
+    ci/prow_pr_check.sh
+  container:
+    from: src
