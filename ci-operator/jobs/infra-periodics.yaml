@@ -914,4 +914,33 @@ periodics:
     - name: token
       secret:
         secretName: github-credentials-openshift-merge-robot
-
+- agent: kubernetes
+  labels:
+    ci.openshift.io/role: infra
+  interval: 12h
+  decorate: true
+  decoration_config:
+    oauth_token_secret:
+      name: oauth-token
+      key: oauth
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: config
+    workdir: true
+  name: periodic-openshift-priv-group-update
+  spec:
+    serviceAccountName: group-auto-updater
+    containers:
+    - args:
+      - --peribolos-config=org/config.yaml
+      - --org=openshift-priv
+      - --group=openshift-priv-admins
+      command:
+      - group-auto-updater
+      image: group-auto-updater:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
