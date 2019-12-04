@@ -7,6 +7,30 @@ postsubmits:
       oauth_token_secret:
         key: oauth
         name: oauth-token
+    name: branch-ci-openshift-config-master-group-update
+    run_if_changed: org/config.yaml
+    spec:
+      containers:
+      - args:
+        - --peribolos-config=org/config.yaml
+        - --org=openshift-priv
+        - --group=openshift-priv-admins
+        command:
+        - group-auto-updater
+        image: group-auto-updater:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+      serviceAccountName: group-auto-updater
+  - agent: kubernetes
+    clone_uri: https://github.com/openshift/config.git
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: oauth-token
     name: branch-ci-openshift-config-master-org-sync
     run_if_changed: org/config.yaml
     spec:
