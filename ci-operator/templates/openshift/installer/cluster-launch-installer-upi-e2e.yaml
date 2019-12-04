@@ -2,6 +2,7 @@ kind: Template
 apiVersion: template.openshift.io/v1
 
 parameters:
+- name: BRANCH
 - name: JOB_NAME_SAFE
   required: true
 - name: JOB_NAME_HASH
@@ -1265,7 +1266,13 @@ objects:
 
         # begin bootstrapping
         if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
-          RHCOS_AMI=ami-014ce8846db8b463d # FIXME: assumes AWS_REGION is us-east-1
+          case "${BRANCH}" in  # FIXME: assumes AWS_REGION is us-east-1
+          4.1) RHCOS_AMI=ami-046fe691f52a953f9;;
+          4.2) RHCOS_AMI=ami-01e7fdcb66157b224;;
+          4.3) RHCOS_AMI=ami-014ce8846db8b463d;;
+          *) RHCOS_AMI=ami-014ce8846db8b463d;;
+          esac
+          echo "RHCOS AMI: ${RHCOS_AMI}"
 
           # FIXME: get epel-release or otherwise add awscli to our UPI image
           export PATH="${HOME}/.local/bin:${PATH}"
