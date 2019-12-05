@@ -25,9 +25,17 @@ tests:
     set -euo pipefail
 
     echo "fetching oc and kubectl for deployment"
-    curl -L -O -o openshift-origin-client-tools-v3.11.0-0cbc58b-linux-64bit.tar.gz https://github.com/openshift/origin/releases/download/v3.11.0/openshift-origin-client-tools-v3.11.0-0cbc58b-linux-64bit.tar.gz
-    tar zxvf openshift-origin-client-tools-v3.11.0-0cbc58b-linux-64bit.tar.gz
-    export PATH=$(pwd)/openshift-origin-client-tools-v3.11.0-0cbc58b-linux-64bit:$PATH
+    export oc_filename='oc.tar.gz'
+    export oc_dirname="${oc_filename%.tar.gz}"
+    export oc_download_url_base='https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.2/linux/'
+    (
+      mkdir ${oc_dirname}
+      cd ${oc_dirname}
+      curl -L -O -o ${oc_filename} ${oc_download_url_base}/${oc_filename}
+      tar zxvf ${oc_filename}
+      ln -s $(pwd)/${oc_dirname} kubectl
+    ) || ( echo "failed to download ${oc_filename}"; exit 1 )
+    export PATH=$(pwd)/${oc_dirname}:$PATH
     which kubectl
     which oc
 
