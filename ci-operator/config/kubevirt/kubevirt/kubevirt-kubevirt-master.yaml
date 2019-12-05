@@ -8,21 +8,6 @@ build_root:
     context_dir: hack/kubevirt-builder
     dockerfile_path: Dockerfile
 canonical_go_repository: kubevirt.io/kubevirt
-binary_build_commands: |
-
-  export GIMME_GO_VERSION=1.12.8
-  export GOPATH="/go"
-  export GOBIN="/usr/bin"
-  source /etc/profile.d/gimme.sh
-  go env
-
-  export DOCKER_PREFIX='https://registry.svc.ci.openshift.org/kubevirt/kubevirt'
-  export DOCKER_TAG="$( echo "${JOB_NAME}-${BUILD_ID}" | md5sum -t | cut -c 1-8 )"
-  export KUBEVIRT_PROVIDER=external
-
-  echo "building and pushing images"
-  bash -x ./hack/bazel-push-images.sh
-
 resources:
   '*':
     limits:
@@ -37,28 +22,35 @@ tests:
 - as: "kubevirt-e2e-test"
   commands: |
 
-    export GIMME_GO_VERSION=1.12.8
-    export GOPATH="/go"
-    export GOBIN="/usr/bin"
-    source /etc/profile.d/gimme.sh
-    go env
-
-    export DOCKER_PREFIX='https://registry.svc.ci.openshift.org/kubevirt/kubevirt'
-    export DOCKER_TAG="$( echo "${JOB_NAME}-${BUILD_ID}" | md5sum -t | cut -c 1-8 )"
-    export KUBEVIRT_PROVIDER=external
-
-    echo "creating manifests"
-    bash -x ./hack/build-manifests.sh
+    set -euo pipefail
 
     echo "fetching oc and kubectl for deployment"
     curl -L -O -o openshift-origin-client-tools-v3.11.0-0cbc58b-linux-64bit.tar.gz https://github.com/openshift/origin/releases/download/v3.11.0/openshift-origin-client-tools-v3.11.0-0cbc58b-linux-64bit.tar.gz
     tar zxvf openshift-origin-client-tools-v3.11.0-0cbc58b-linux-64bit.tar.gz
-    ( cd openshift-origin-client-tools-v3.11.0-0cbc58b-linux-64bit && mv kubectl oc .. )
+    export PATH=$(pwd)/openshift-origin-client-tools-v3.11.0-0cbc58b-linux-64bit:$PATH
+    which kubectl
+    which oc
+
+    export DOCKER_PREFIX='dhiller'
+    export DOCKER_TAG="latest"
+    export KUBEVIRT_PROVIDER=external
+
+    export GIMME_GO_VERSION=1.12.8
+    export GOPATH="/go"
+    export GOBIN="/usr/bin"
+    source /etc/profile.d/gimme.sh
+
+    echo "creating manifests"
+    set +e # we set errors off because we don't care about the diff :-P
+    bash -x ./hack/build-manifests.sh
+    set -e
 
     echo "deploying"
     bash -x ./hack/cluster-deploy.sh
 
     echo "testing"
+    go get -u github.com/onsi/ginkgo/ginkgo
+    bash -x ./hack/build-func-tests.sh
     bash -x ./hack/functests.sh
 
   openshift_installer_src:
