@@ -39,7 +39,12 @@ tests:
     which kubectl
     which oc
 
+    echo "checking nodes for cluster"
     oc get nodes
+
+    echo "checking configuration"
+    env|grep KUBE
+    kubectl config view
 
     export DOCKER_PREFIX='dhiller'
     export DOCKER_TAG="latest"
@@ -51,9 +56,13 @@ tests:
     source /etc/profile.d/gimme.sh
 
     echo "creating manifests"
-    set +e # we set errors off because we don't care about the diff :-P
     bash -x ./hack/build-manifests.sh
-    set -e
+
+    echo "calling cluster-up to prepare config and check whether cluster is reachable"
+    bash -x ./cluster-up/up.sh
+
+    echo "checking cluster-up configuration"
+    cat $(cluster-up/kubeconfig.sh)
 
     echo "deploying"
     bash -x ./hack/cluster-deploy.sh
