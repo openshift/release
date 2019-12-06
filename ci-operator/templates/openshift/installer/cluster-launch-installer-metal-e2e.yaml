@@ -398,6 +398,20 @@ objects:
             echo "${CLUSTER_NETWORK_MANIFEST}" > /tmp/artifacts/installer/manifests/cluster-network-03-config.yml
         fi
 
+        cat >> /tmp/artifacts/installer/openshift/99_kernelargs_e2e_metal.yaml << EOF
+        apiVersion: machineconfiguration.openshift.io/v1
+        kind: MachineConfig
+        metadata:
+          labels:
+            machineconfiguration.openshift.io/role: "master"
+          name: 99-kernelargs-e2e-metal
+        spec:
+          kernelArguments:
+            - 'console=tty0'
+            - 'console=ttyS1,115200n8'
+            - 'rd.neednet=1'
+        EOF
+
         openshift-install --dir=/tmp/artifacts/installer create ignition-configs
 
         mkdir /tmp/artifacts/terraform
