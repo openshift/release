@@ -43,6 +43,7 @@ dashboard.new(
 .addTemplate(mytemplate('token', 'token_hash'))
 .addTemplate(mytemplate('path', 'path'))
 .addTemplate(mytemplate('status', 'status'))
+.addTemplate(mytemplate('user-agent', 'user_agent'))
 .addTemplate(
   {
         "allValue": null,
