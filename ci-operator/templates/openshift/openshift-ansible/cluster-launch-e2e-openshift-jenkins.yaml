@@ -97,7 +97,7 @@ objects:
         set -euo pipefail
 
         trap 'touch /tmp/shared/prepared' EXIT
-        trap 'jobs -p | xargs -r kill; exit 0' TERM
+        trap 'jobs -p | xargs -r kill || true; exit 0' TERM
 
         cp "$(which oc)" /tmp/shared/
 
@@ -181,7 +181,7 @@ objects:
         export PATH=/usr/libexec/origin:$PATH
 
         trap 'touch /tmp/shared/exit' EXIT
-        trap 'jobs -p | xargs -r kill; exit 0' TERM
+        trap 'jobs -p | xargs -r kill || true; exit 0' TERM
 
         cp "$(which oc)" /tmp/shared/
 
@@ -286,7 +286,7 @@ objects:
         set -euo pipefail
 
         trap 'rc=$?; if [[ $rc -ne 0 ]]; then touch /tmp/exit; fi; exit $rc' EXIT
-        trap 'jobs -p | xargs -r kill; exit 0' TERM
+        trap 'jobs -p | xargs -r kill || true; exit 0' TERM
 
         ansible-playbook -vv \
           -e openshift_test_repo=${RPM_REPO_OPENSHIFT_ORIGIN} -e 'oreg_url=${IMAGE_FORMAT}' \
@@ -363,7 +363,7 @@ objects:
         }
 
         trap 'teardown' EXIT
-        trap 'jobs -p | xargs -r kill; exit 0' TERM
+        trap 'jobs -p | xargs -r kill || true; exit 0' TERM
 
         for i in `seq 1 180`; do
           if [[ -f /tmp/shared/exit ]]; then
