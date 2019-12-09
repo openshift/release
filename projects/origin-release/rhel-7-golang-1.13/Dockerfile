@@ -6,7 +6,7 @@
 #
 FROM ocp/builder-base:rhel-7-golang-1.13
 
-ENV VERSION=1.13.1 \
+ENV VERSION=1.13.5 \
     GOCACHE=/go/.cache \
     GOARM=5 \
     GOPATH=/go \
