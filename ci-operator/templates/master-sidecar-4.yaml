@@ -122,7 +122,7 @@ objects:
         set -euo pipefail
 
         trap 'touch /tmp/shared/exit' EXIT
-        trap 'jobs -p | xargs -r kill; exit 0' TERM
+        trap 'jobs -p | xargs -r kill || true; exit 0' TERM
 
         # wait until the master job creates admin.kubeconfig
         while true; do
@@ -175,7 +175,7 @@ objects:
           cp -R /tmp/shared/logs /tmp/artifacts/
         }
         trap 'teardown' EXIT
-        trap 'jobs -p | xargs kill || true; wait; exit 0' TERM
+        trap 'jobs -p | xargs -r kill || true; wait; exit 0' TERM
 
         export HOME=/tmp/home
         export PATH=/tmp/shared/bin:$PATH
