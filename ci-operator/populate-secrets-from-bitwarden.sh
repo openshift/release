@@ -323,10 +323,10 @@ update_secret generic "aws-openshift-llc-account-credentials" \
 # Host keys for the SSHD bastions
 for target in "z" "telco"; do
 	update_secret generic "sshd-host-keys-${target}"                            \
-		"$( format_attachment "sshd-bastion-${target} " ssh_host_rsa_key )"     \
-		"$( format_attachment "sshd-bastion-${target} " ssh_host_dsa_key )"     \
-		"$( format_attachment "sshd-bastion-${target} " ssh_host_ecdsa_key )"   \
-		"$( format_attachment "sshd-bastion-${target} " ssh_host_ed25519_key )"
+		"$( format_attachment "sshd-bastion-${target}" ssh_host_rsa_key )"     \
+		"$( format_attachment "sshd-bastion-${target}" ssh_host_dsa_key )"     \
+		"$( format_attachment "sshd-bastion-${target}" ssh_host_ecdsa_key )"   \
+		"$( format_attachment "sshd-bastion-${target}" ssh_host_ed25519_key )"
 
 	# Authorized keys for the SSHD bastion
 	update_secret generic "sshd-authorized-keys-${target}" \
