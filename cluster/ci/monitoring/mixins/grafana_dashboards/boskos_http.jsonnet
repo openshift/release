@@ -116,9 +116,9 @@ dashboard.new(
         legend_sort='avg',
         legend_sortDesc=true,
     ) + legendConfig)
-    .addTarget(histogramQuantileDuration('0.99','{path=${path}}'))
-    .addTarget(histogramQuantileDuration('0.95','{path=${path}}'))
-    .addTarget(histogramQuantileDuration('0.5','{path=${path}}')), gridPos={
+    .addTarget(histogramQuantileDuration('0.99','{path="${path}"}'))
+    .addTarget(histogramQuantileDuration('0.95','{path="${path}"}'))
+    .addTarget(histogramQuantileDuration('0.5','{path="${path}"}')), gridPos={
     h: 9,
     w: 24,
     x: 0,
