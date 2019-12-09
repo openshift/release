@@ -20,7 +20,7 @@ $ podman run -it --rm neilpang/acme.sh /bin/ash
 ### BitWarden: aws_ci_infra_openshift-ci-robot
 # export  AWS_ACCESS_KEY_ID=xxx
 # export  AWS_SECRET_ACCESS_KEY=yyy
-# acme.sh --issue --dns dns_aws -d api.build01.ci.devcluster.openshift.com -d '*.apps.build01.ci.devcluster.openshift.com'
+# acme.sh --issue --dns dns_aws -d '*.apps.build01.ci.devcluster.openshift.com'
 ...
 [Sun Nov 24 18:24:26 UTC 2019] Your cert is in  /acme.sh/*.apps.build01.ci.devcluster.openshift.com/*.apps.build01.ci.devcluster.openshift.com.cer 
 [Sun Nov 24 18:24:26 UTC 2019] Your cert key is in  /acme.sh/*.apps.build01.ci.devcluster.openshift.com/*.apps.build01.ci.devcluster.openshift.com.key 
