@@ -148,7 +148,7 @@ dashboard.new(
 .addPanel(
     (graphPanel.new(
         'Boskos Requests Over Time',
-        description='sum(increase(boskos_http_request_duration_seconds_bucket[${range}]))',
+        description='sum(increase(boskos_http_request_duration_seconds_count[${range}]))',
         datasource='prometheus',
         legend_alignAsTable=true,
         legend_rightSide=true,
@@ -156,7 +156,7 @@ dashboard.new(
         legend_current=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(increase(boskos_http_request_duration_seconds_bucket[${range}]))',
+        'sum(increase(boskos_http_request_duration_seconds_count[${range}]))',
         legendFormat="Number of Requests"
     )), gridPos={
     h: 9,
