@@ -30,6 +30,7 @@ RUN go get golang.org/x/tools/cmd/cover \
         golang.org/x/tools/cmd/goimports \
         github.com/tools/godep \
         golang.org/x/lint/golint \
+        gotest.tools/gotestsum \
         github.com/openshift/release/tools/gotest2junit \
         github.com/openshift/imagebuilder/cmd/imagebuilder && \
     mv $GOPATH/bin/* /usr/bin/ && \
