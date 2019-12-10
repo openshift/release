@@ -54,8 +54,8 @@ function port-forward() {
 
 function ssh-tunnel() {
 	while true; do
-		echo "[INFO] Setting up a reverse SSH tunnel to expose port 80..."
-		if ! ssh -N -T root@127.0.0.1 -p 2222 -R "80:127.0.0.1:8080"; then
+		echo "[INFO] Setting up a reverse SSH tunnel to expose port 8080..."
+		if ! ssh -N -T root@127.0.0.1 -p 2222 -R "8080:127.0.0.1:8080"; then
 			echo "[WARNING] SSH tunnelling failed, retrying..."
 		fi
 	done
