@@ -795,10 +795,30 @@ periodics:
       - name: CLUSTER_TYPE
         value: aws
       - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-installer-fcos.yaml
-            name: ci-operator-4.3-configs
+        value: |
+          tag_specification:
+            name: "none" # don't import anything to avoid a race between 4.2 latest and the chosen version
+            namespace: ocp
+          build_root:
+            image_stream_tag:
+              cluster: https://api.ci.openshift.org
+              name: release
+              namespace: openshift
+              tag: golang-1.12
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)
+            commands: |
+              TEST_SUITE=openshift/conformance/parallel run-tests run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
       - name: JOB_NAME_SAFE
         value: e2e-aws
       - name: TEST_COMMAND
