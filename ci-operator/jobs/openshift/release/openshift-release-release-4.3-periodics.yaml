@@ -629,6 +629,7 @@ periodics:
   labels:
     ci.openshift.io/release-type: informing
     job-release: "4.3"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: promote-release-openshift-okd-machine-os-content-e2e-aws-4.3
   spec:
     containers:
@@ -677,10 +678,10 @@ periodics:
         latest="$( oc get istag -n fcos ${TAG}:${BRANCH} --template '{{ index .image.dockerImageMetadata.Config.Labels "version" }} {{ index .image.dockerImageMetadata.Config.Labels "id-artifacts" }} {{ index .image.dockerImageMetadata.Config.Labels "id-machine-config-operator-rpms" }}' )"
         candidate="${build_id} ${origin_artifacts_id} ${origin_machine_config_operator_rpms_id}"
         echo "Comparing existing '$latest' against latest '$candidate'"
-        if [[ "${latest}" == "${candidate}" ]]; then
-          echo "No build necessary, content is up to date"
-          exit 0
-        fi
+        # if [[ "${latest}" == "${candidate}" ]]; then
+        #   echo "No build necessary, content is up to date"
+        #   exit 0
+        # fi
 
         curl -L https://github.com/mikefarah/yq/releases/download/2.4.0/yq_linux_amd64 2>/dev/null >/tmp/bin/yq
         chmod ug+x $HOME/bin/yq
@@ -761,6 +762,7 @@ periodics:
 
         # Craft a release image
         MOC_SHA256=$( oc get istag -n "${namespace}" istag/machine-os-content:latest -o template='{{ .image.metadata.name }}' )
+        set -x
         export RELEASE_IMAGE_LATEST=registry.svc.ci.openshift.org/${namespace}/release:latest
         oc registry login
         oc adm release new -n origin \
@@ -777,8 +779,8 @@ periodics:
           --target=e2e-$(CLUSTER_TYPE)
 
         # promote to fcos namespace
-        oc tag ${namespace}/machine-os-content:latest fcos/machine-os-content:${BRANCH}
-        oc tag fcos/machine-os-content:${BRANCH} ${namespace}/machine-os-content@${MOC_SHA256}
+        #oc tag ${namespace}/machine-os-content:latest fcos/machine-os-content:${BRANCH}
+        #oc tag fcos/machine-os-content:${BRANCH} ${namespace}/machine-os-content@${MOC_SHA256}
       env:
       - name: TAG_NS
         value: origin
