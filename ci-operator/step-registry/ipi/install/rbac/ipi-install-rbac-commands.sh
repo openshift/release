@@ -12,7 +12,7 @@ oc adm policy add-role-to-group system:image-puller system:authenticated   --nam
 oc adm policy add-role-to-user admin system:serviceaccount:ci:ci-chat-bot --namespace "${NAMESPACE}"
 
 # Role for giving the e2e pod permissions to update imagestreams
-cat <<EOF
+cat <<EOF | oc apply -f -
 kind: Role
 apiVersion: authorization.openshift.io/v1
 metadata:
@@ -25,7 +25,7 @@ rules:
 - apiGroups: ["image.openshift.io"]
   resources: ["imagestreams", "imagestreamtags"]
   verbs: ["get", "create", "update", "delete", "list"]
-EOF | oc apply -f -
+EOF
 
 # Give the e2e pod access to the imagestream-updater role
 oc adm policy add-role-to-user ${JOB_NAME_SAFE}-imagestream-updater --serviceaccount default --namespace "${NAMESPACE}"
