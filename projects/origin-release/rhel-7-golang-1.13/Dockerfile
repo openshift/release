@@ -11,6 +11,7 @@ ENV VERSION=1.13.5 \
     GOARM=5 \
     GOPATH=/go \
     GOROOT=/usr/local/go \
+    GOFLAGS='-mod=vendor' \
     LOGNAME=deadbeef
 ENV PATH=$PATH:$GOPATH/bin
 
