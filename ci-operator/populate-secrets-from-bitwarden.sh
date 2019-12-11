@@ -153,6 +153,11 @@ for login in "openshift-bot" "openshift-build-robot" "openshift-cherrypick-robot
 	update_secret generic "github-credentials-${login}" "$( format_field_value "${login}" "GitHub OAuth Token" "oauth" )"
 done
 
+# openshift-ci-robot also has a token that grants access to
+# repositories, used by Prow jobs that need to clone
+# private repositories
+update_secret generic "github-credentials-openshift-ci-robot-private-git-cloner" "$( format_field_value "openshift-ci-robot" "private-git-cloner" "oauth" )"
+
 # openshift-publish-robot also has a token that grants read-only
 # access to private repositories.
 update_secret generic "private-git-cloner" "$( format_field_value "openshift-publish-robot" private-git-cloner "oauth" )"
