@@ -2,7 +2,8 @@
 function queue() {
   local TARGET="${1}"
   shift
-  local LIVE="$(jobs | wc -l)"
+  local LIVE
+  LIVE="$(jobs | wc -l)"
   while [[ "${LIVE}" -ge 45 ]]; do
     sleep 1
     LIVE="$(jobs | wc -l)"

@@ -492,6 +492,27 @@ presubmits:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )services-valid,?($|\s.*)
   - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/step-registry-shellcheck
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-step-registry-shellcheck
+    rerun_command: /test step-registry-shellcheck
+    spec:
+      containers:
+      - command:
+        - hack/validate-registry-commands.sh
+        image: registry.svc.ci.openshift.org/ci/shellcheck
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )step-registry-shellcheck,?($|\s.*)
+  - agent: kubernetes
     always_run: false
     branches:
     - master
