@@ -19,77 +19,8 @@ tag_specification:
   name: "4.4"
   namespace: ocp
 tests:
-- as: "kubevirt-e2e-test"
-  commands: |
-
-    set -euo pipefail
-
-    echo "fetching oc and kubectl for deployment"
-    export oc_filename='oc.tar.gz'
-    export oc_dirname="${oc_filename%.tar.gz}"
-    export oc_download_url_base='https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.2/linux/'
-    (
-      mkdir ${oc_dirname}
-      cd ${oc_dirname}
-      curl -L -O -o ${oc_filename} ${oc_download_url_base}/${oc_filename}
-      tar zxvf ${oc_filename}
-      ln -s $(pwd)/${oc_dirname} kubectl
-    ) || ( echo "failed to download ${oc_filename}"; exit 1 )
-    export PATH=$(pwd)/${oc_dirname}:$PATH
-    which kubectl
-    which oc
-
-    echo "checking nodes for cluster"
-    oc get nodes
-
-    echo "checking configuration"
-    env|grep KUBE
-    kubectl config view
-
-    export DOCKER_PREFIX='dhiller'
-    export DOCKER_TAG="latest"
-    export KUBEVIRT_PROVIDER=external
-
-    export GIMME_GO_VERSION=1.12.8
-    export GOPATH="/go"
-    export GOBIN="/usr/bin"
-    source /etc/profile.d/gimme.sh
-
-    echo "creating manifests"
-    bash -x ./hack/build-manifests.sh
-
-    echo "checking configuration location"
-    echo "KUBECONFIG: ${KUBECONFIG}"
-
-    echo "patching cluster-up external provider"
-    (
-      cd cluster-up/cluster/external
-      curl -L -O -o provider.sh https://raw.githubusercontent.com/dhiller/kubevirtci/fix-external-provider/cluster-up/cluster/external/provider.sh
-    )
-
-    echo "calling cluster-up to prepare config and check whether cluster is reachable"
-    bash -x ./cluster-up/up.sh
-
-    echo "checking cluster configuration after config prep"
-    kubectl config view
-
-    echo "deploying"
-    bash -x ./hack/cluster-deploy.sh
-
-    echo "checking pods for kubevirt"
-    oc get pods -n kubevirt
-
-    echo "testing"
-    go get -u github.com/onsi/ginkgo/ginkgo
-    bash -x ./hack/build-func-tests.sh
-    bash -x ./hack/functests.sh
-
-  openshift_installer_src:
-    cluster_profile: gcp
-=======
 - as: "dummy-test"
   commands: |
     echo "this is a dummy"
   container:
     from: src
->>>>>>> 5ecb9f0a2... Fix configuration
