@@ -70,7 +70,9 @@ func main() {
 	log.SetFlags(0)
 	opt := struct {
 		JSONSummary bool
+		Skip        bool
 	}{}
+	flag.BoolVar(&opt.Skip, "exclude-skip", false, "Exclude skipped tests when merging")
 	flag.BoolVar(&opt.JSONSummary, "json-summary", false, "Convert the result to a single JSON file that summarizes the output")
 	flag.Parse()
 
@@ -156,6 +158,9 @@ func main() {
 
 		for _, k := range keys {
 			testCase := suite.runs[k]
+			if opt.Skip && testCase.SkipMessage != nil {
+				continue
+			}
 			out.TestCases = append(out.TestCases, testCase)
 			switch {
 			case testCase.SkipMessage != nil:
@@ -165,6 +170,7 @@ func main() {
 			}
 			out.Duration += testCase.Duration
 		}
+		out.NumTests = uint(len(out.TestCases))
 		output.Suites = append(output.Suites, out)
 	}
 
