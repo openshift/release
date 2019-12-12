@@ -14,6 +14,23 @@ build_root:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
 canonical_go_repository: github.com/tektoncd/pipeline
 binary_build_commands: make install
+tests:
+- as: e2e-aws-ocp-42
+  commands: "make test-e2e"
+  openshift_installer_src:
+    cluster_profile: aws
+- as: e2e-aws-ocp-42-daily
+  commands: "make test-e2e"
+  cron: "0 */6 * * *" # every six hours
+  openshift_installer_src:
+    cluster_profile: aws
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
 images:
 - dockerfile_path: openshift/ci-operator/tekton-images/controller/Dockerfile
   from: base
@@ -90,15 +107,3 @@ images:
       - destination_dir: .
         source_path: /go/bin/.
   to: tektoncd-pipeline-gcs-fetcher
-tests:
-- as: e2e-aws-ocp-42
-  commands: "make test-e2e"
-  openshift_installer_src:
-    cluster_profile: aws
-resources:
-  '*':
-    limits:
-      memory: 4Gi
-    requests:
-      cpu: 100m
-      memory: 200Mi
