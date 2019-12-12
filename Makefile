@@ -1,3 +1,5 @@
+SHELL=/usr/bin/env bash -o errexit
+
 .PHONY: check check-core check-services dry-core-admin dry-services-admin core-admin services-admin dry-core core dry-services services all-admin all
 
 all: core-admin core services-admin services
@@ -304,6 +306,13 @@ cincinnati:
 prow-monitoring:
 	make -C cluster/ci/monitoring prow-monitoring-deploy
 .PHONY: prow-monitoring
+
+build-farm-consistency:
+	@echo "diffing ns-ttl-controller assets ..."
+	diff -Naup ./core-services/ci-ns-ttl-controller/ci-ns-ttl-controller_dc.yaml ./clusters/build-clusters/01_cluster/openshift/ci-ns-ttl-controller/ci-ns-ttl-controller_dc.yaml
+	@echo "diffing rpms-ocp assets ..."
+	for file in ./core-services/release-controller/rpms-ocp-*.yaml; do diff -Naup "$${file}" "./clusters/build-clusters/01_cluster/openshift/release-controller/$${file##*/}"; done
+.PHONY: build-farm-consistency
 
 logging:
 	$(MAKE) apply WHAT=cluster/ci/config/logging/fluentd-daemonset.yaml
