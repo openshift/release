@@ -27,6 +27,8 @@ spec:
         - --config-path=/etc/config/config.yaml
         - --github-token-path=/etc/github/oauth
         - --job-config-path=/etc/job-config
+        - --gcs-credentials-file=/etc/service-account/service-account.json
+        - --status-path=gs://openshift-prow/status-reconciler-config-checkpoint.yaml
         ports:
           - name: http
             containerPort: 8888
@@ -66,6 +68,9 @@ spec:
           readOnly: true
         - name: plugins
           mountPath: /etc/plugins
+          readOnly: true
+        - name: service-account
+          mountPath: /etc/service-account
           readOnly: true
         resources:
           requests:
@@ -108,3 +113,6 @@ spec:
       - name: plugins
         configMap:
           name: plugins
+      - name: service-account
+        secret:
+          secretName: gce-sa-credentials-gcs-tide-publisher
