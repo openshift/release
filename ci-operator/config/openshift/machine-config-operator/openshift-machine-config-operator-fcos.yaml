@@ -1,16 +1,8 @@
 base_images:
   base:
-    name: "4.3"
+    name: "4.4"
     namespace: origin
     tag: base
-  base-machine:
-    name: fedora
-    namespace: openshift
-    tag: "29"
-  machine-os-content-base:
-    name: "4.3"
-    namespace: origin
-    tag: machine-os-content
 build_root:
   image_stream_tag:
     name: release
@@ -20,33 +12,17 @@ images:
 - dockerfile_path: Dockerfile
   from: base
   to: machine-config-operator
-- context: ci/prow/images/
-  from: base
-  inputs:
-    base-machine-with-rpms:
-      as:
-      - fedora:29
-      paths: null
-    machine-os-content-base:
-      as:
-      - registry.svc.ci.openshift.org/openshift/origin-v4.0:machine-os-content
-      paths: null
-  to: machine-os-content
 promotion:
   additional_images:
     machine-config-operator-rpms: rpms
   excluded_images:
   - machine-config-operator-base-with-rpms
-  - machine-os-content
-  name: "4.3"
+  name: "4.4"
   namespace: origin
 raw_steps:
 - rpm_image_injection_step:
     from: base
     to: machine-config-operator-base-with-rpms
-- rpm_image_injection_step:
-    from: base-machine
-    to: base-machine-with-rpms
 resources:
   '*':
     limits:
@@ -69,7 +45,7 @@ rpm_build_commands: |-
   rm -rf /go/.cache ${RPMBUILD_DIR}
 rpm_build_location: _rpmbuild/RPMS/
 tag_specification:
-  name: "4.3"
+  name: "4.4"
   namespace: origin
 tests:
 - as: build-rpms-from-tar

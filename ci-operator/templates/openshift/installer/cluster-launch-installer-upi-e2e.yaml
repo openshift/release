@@ -22,9 +22,10 @@ parameters:
 - name: BASE_DOMAIN
 - name: BUILD_ID
   required: false
-- name: ENABLE_PROXY
+- name: CLUSTER_VARIANT
 - name: PROXY_IMAGE
   value: registry.svc.ci.openshift.org/origin/4.2:egress-http-proxy
+- name: USE_LEASE_CLIENT
 
 objects:
 
@@ -92,7 +93,7 @@ objects:
       # we want to gather the teardown logs no matter what
       ci-operator.openshift.io/wait-for-container-artifacts: teardown
       ci-operator.openshift.io/save-container-logs: "true"
-      ci-operator.openshift.io/container-sub-tests: "lease,setup,test,teardown"
+      ci-operator.openshift.io/container-sub-tests: "setup,test,teardown"
     labels:
       app: ${JOB_NAME_SAFE}-bootstrap-exporter
   spec:
@@ -111,68 +112,6 @@ objects:
         secretName: ${JOB_NAME_SAFE}-cluster-profile
 
     containers:
-
-
-    - name: lease
-      image: registry.svc.ci.openshift.org/ci/boskoscli:latest
-      terminationMessagePolicy: FallbackToLogsOnError
-      resources:
-        requests:
-          cpu: 10m
-          memory: 10Mi
-        limits:
-          memory: 200Mi
-      volumeMounts:
-      - name: shared-tmp
-        mountPath: /tmp/shared
-      - name: cluster-profile
-        mountPath: /tmp/cluster
-      - name: artifacts
-        mountPath: /tmp/artifacts
-      env:
-      - name: CLUSTER_TYPE
-        value: ${CLUSTER_TYPE}
-      - name: CLUSTER_NAME
-        value: ${NAMESPACE}-${JOB_NAME_HASH}
-      command:
-      - /bin/bash
-      - -c
-      - |
-        #!/bin/bash
-        set -euo pipefail
-
-        trap 'rc=$?; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi; if test "${rc}" -ne 0; then touch /tmp/shared/exit; fi; exit "${rc}"' EXIT
-
-        # hack for bazel
-        function boskosctl() {
-          /app/boskos/cmd/cli/app.binary "${@}"
-        }
-
-        echo "[INFO] Acquiring a lease ..."
-        resource="$( boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" acquire --type "${CLUSTER_TYPE}-quota-slice" --state free --target-state leased --timeout 150m )"
-        touch /tmp/shared/leased
-        echo "[INFO] Lease acquired!"
-        echo "[INFO] Leased resource: ${resource}"
-
-        function release() {
-            local resource_name; resource_name="$( jq .name --raw-output <<<"${resource}" )"
-            echo "[INFO] Releasing the lease on resouce ${resource_name}..."
-            boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" release --name "${resource_name}" --target-state free
-        }
-        trap release EXIT
-
-        echo "[INFO] Sending heartbeats to retain the lease..."
-        boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" heartbeat --resource "${resource}" &
-
-        while true; do
-          if [[ -f /tmp/shared/exit ]]; then
-            echo "Another process exited" 2>&1
-            exit 0
-          fi
-
-          sleep 15 & wait $!
-        done
-
     - name: ignition-exporter
       image: registry.svc.ci.openshift.org/openshift/origin-v4.0:artifacts
       volumeMounts:
@@ -260,7 +199,7 @@ objects:
         export PATH=/usr/libexec/origin:$PATH
 
         trap 'touch /tmp/shared/exit' EXIT
-        trap 'kill $(jobs -p); exit 0' TERM
+        trap 'jobs -p | xargs -r kill; exit 0' TERM
 
         mkdir -p "${HOME}"
 
@@ -421,20 +360,6 @@ objects:
 
           return 1
         }
-
-        while true; do
-          if [[ -f /tmp/exit ]]; then
-            echo "Another process exited" 2>&1
-            exit 1
-          fi
-          if [[ -f /tmp/leased ]]; then
-            echo "Lease acquired, installing..."
-            break
-          fi
-
-          sleep 15 & wait
-        done
-
         function generate_proxy_certs() {
 
           ROOTCA=/tmp/CA
@@ -1125,7 +1050,7 @@ objects:
         EOF
 
           # Add proxy info to install-config.yaml
-          if [[ "${ENABLE_PROXY}" == "true" ]]; then
+          if [[ "${CLUSTER_VARIANT}" =~ "proxy" ]]; then
 
             # create and sign a cert
             generate_proxy_certs
@@ -1265,8 +1190,7 @@ objects:
 
         # begin bootstrapping
         if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
-          # RHCOS_AMI=ami-0df3f99538fbef10f  # 4.1 ami FIXME: assumes AWS_REGION is us-east-1
-          RHCOS_AMI=ami-0ae2df22579e00be5  # 4.2 ami FIXME: assumes AWS_REGION is us-east-1
+          RHCOS_AMI=ami-014ce8846db8b463d # FIXME: assumes AWS_REGION is us-east-1
 
           # FIXME: get epel-release or otherwise add awscli to our UPI image
           export PATH="${HOME}/.local/bin:${PATH}"
@@ -1286,7 +1210,7 @@ objects:
 
           # If we are using a proxy, create a 'black-hole' private subnet vpc TODO
           # For now this is just a placeholder...
-          if [[ "${ENABLE_PROXY}" == "true" ]]; then
+          if [[ "${CLUSTER_VARIANT}" =~ "proxy" ]]; then
             aws cloudformation create-stack  --stack-name "${CLUSTER_NAME}-vpc" \
               --template-body "$(cat "/var/lib/openshift-install/upi/${CLUSTER_TYPE}/cloudformation/01_vpc.yaml")" \
               --tags "${TAGS}" \
@@ -1362,7 +1286,7 @@ objects:
           WORKER_SECURITY_GROUP="$(echo "${SECURITY_JSON}" | jq -r '.[] | select(.OutputKey == "WorkerSecurityGroupId").OutputValue')"
           WORKER_INSTANCE_PROFILE="$(echo "${SECURITY_JSON}" | jq -r '.[] | select(.OutputKey == "WorkerInstanceProfile").OutputValue')"
 
-          if [[ "${ENABLE_PROXY}" == "true" ]]; then
+          if [[ "${CLUSTER_VARIANT}" =~ "proxy" ]]; then
             echo "creating proxy..."
 
             # define squid config
@@ -2111,7 +2035,7 @@ objects:
         }
 
         trap 'teardown' EXIT
-        trap 'kill $(jobs -p); exit 0' TERM
+        trap 'jobs -p | xargs -r kill; exit 0' TERM
 
         for i in $(seq 1 220); do
           if [[ -f /tmp/shared/exit ]]; then

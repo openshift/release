@@ -6,11 +6,12 @@
 #
 FROM ocp/builder-base:rhel-7-golang-1.13
 
-ENV VERSION=1.13.1 \
+ENV VERSION=1.13.5 \
     GOCACHE=/go/.cache \
     GOARM=5 \
     GOPATH=/go \
     GOROOT=/usr/local/go \
+    GOFLAGS='-mod=vendor' \
     LOGNAME=deadbeef
 ENV PATH=$PATH:$GOPATH/bin
 
@@ -30,6 +31,7 @@ RUN go get golang.org/x/tools/cmd/cover \
         golang.org/x/tools/cmd/goimports \
         github.com/tools/godep \
         golang.org/x/lint/golint \
+        gotest.tools/gotestsum \
         github.com/openshift/release/tools/gotest2junit \
         github.com/openshift/imagebuilder/cmd/imagebuilder && \
     mv $GOPATH/bin/* /usr/bin/ && \

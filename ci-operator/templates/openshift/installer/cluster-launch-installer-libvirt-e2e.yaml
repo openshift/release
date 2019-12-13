@@ -127,7 +127,7 @@ objects:
         #!/bin/bash
         set -euo pipefail
         trap 'touch "${HOME}"/exit' EXIT
-        trap 'kill $(jobs -p); exit 0' TERM
+        trap 'jobs -p | xargs -r kill; exit 0' TERM
         mock-nss.sh
         gcloud auth activate-service-account \
           --quiet --key-file /tmp/cluster/gce.json
@@ -326,7 +326,7 @@ objects:
         }
 
         trap 'teardown' EXIT
-        trap 'kill $(jobs -p); exit 0' TERM
+        trap 'jobs -p | xargs -r kill; exit 0' TERM
 
         for i in `seq 1 180`; do
           if [[ -f /home/packer/exit ]]; then

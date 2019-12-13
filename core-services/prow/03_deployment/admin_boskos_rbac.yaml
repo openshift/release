@@ -13,6 +13,8 @@ rules:
 kind: ServiceAccount
 apiVersion: v1
 metadata:
+  annotations:
+    serviceaccounts.openshift.io/oauth-redirectreference.alertmanager: '{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"boskos"}}'
   name: boskos
   namespace: ci
 ---
@@ -28,3 +30,34 @@ roleRef:
   kind: ClusterRole
   name: boskos
   apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: boskos-oauth
+rules:
+- apiGroups:
+  - authentication.k8s.io
+  resources:
+  - tokenreviews
+  verbs:
+  - create
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: boskos-oauth
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: boskos-oauth
+subjects:
+- kind: ServiceAccount
+  name: boskos
+  namespace: ci

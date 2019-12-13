@@ -14,6 +14,7 @@ images:
   from: base
   to: cluster-etcd-operator
 promotion:
+  disabled: true
   name: "4.4"
   namespace: ocp
 resources:
@@ -54,6 +55,14 @@ tests:
   commands: |
     mkdir -p /tmp/artifacts
     go get -u github.com/openshift/release/tools/gotest2junit
-    make test-unit JUNITFILE=/tmp/artifacts/unit_report.xml --warn-undefined-variables
+    make test-unit JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
   container:
     from: test-bin
+- as: e2e-azure
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer:
+    cluster_profile: azure4
+- as: e2e-gcp-op
+  commands: make test-e2e
+  openshift_installer_src:
+    cluster_profile: gcp

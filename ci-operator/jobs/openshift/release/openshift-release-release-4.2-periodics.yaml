@@ -5,7 +5,7 @@ periodics:
   labels:
     ci.openshift.io/release-type: informing
     job-release: "4.2"
-  name: release-promote-openshift-machine-os-content-e2e-aws-4.2
+  name: promote-release-openshift-machine-os-content-e2e-aws-4.2
   spec:
     containers:
     - command:
@@ -40,7 +40,9 @@ periodics:
         # verify the tests pass
         ci-operator --artifact-dir=$(ARTIFACTS) --secret-dir=/usr/local/pull-secret \
           --secret-dir=/usr/local/e2e-aws-cluster-profile --template=/usr/local/e2e-aws \
-          --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME) --promote
+          --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME) \
+          --lease-server=http://boskos \
+          --promote
 
         # also tag the image into the art-latest stream
         oc tag "${to_quay}" "ocp/${BRANCH}-art-latest:${TAG}"
@@ -76,6 +78,131 @@ periodics:
               name: $(TAG)
               namespace: rhcos
               tag: "4.2"
+          raw_steps:
+          - output_image_tag_step:
+              from: $(TAG)
+              to:
+                name: stable
+                tag: $(TAG)
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-aws
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: aws
+      - name: JOB_NAME_SAFE
+        value: e2e-aws
+      - name: TEST_COMMAND
+        value: TEST_SUITE=openshift/conformance/parallel run-tests
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/e2e-aws-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/e2e-aws
+        name: job-definition
+        subPath: cluster-launch-installer-e2e.yaml
+      - mountPath: /usr/local/pull-secret
+        name: pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - configMap:
+        name: prow-job-cluster-launch-installer-e2e
+      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
+  decorate: true
+  interval: 15m
+  labels:
+    ci.openshift.io/release-type: informing
+    job-release: "4.2"
+  name: promote-release-openshift-machine-os-content-e2e-aws-4.2-s390x
+  spec:
+    containers:
+    - command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -euo pipefail
+
+        # prow doesn't allow init containers or a second container
+        export PATH=$PATH:/tmp/bin
+        mkdir /tmp/bin
+        curl https://storage.googleapis.com/origin-ci-test/_tools/4.1.0/oc >/tmp/bin/oc 2>/dev/null
+        chmod ug+x /tmp/bin/oc
+
+        # if the source and destination are identical, do nothing
+        from=$( oc get istag -n "${TAG_NS}" "${TAG_SOURCE}" -o template='{{ .image.metadata.name }}' )
+        to=$( oc get istag -n ocp-${ARCH} "${BRANCH}-art-latest-${ARCH}:${TAG}" -o template='{{ .image.metadata.name }}' )
+        if [[ "${from}" == "${to}" ]]; then
+          echo "info: ${TAG_NS}/${TAG_SOURCE} already in ${BRANCH}-art-latest-${ARCH}:${TAG}"
+          exit 0
+        fi
+        echo "Will promote ${from}, current is ${to}"
+
+        # error out if the image isn't on quay
+        to_quay="quay.io/openshift-release-dev/ocp-v4.0-art-dev@${from}"
+        if ! oc image info -a "/usr/local/pull-secret/.dockerconfigjson" "${to_quay}"; then
+          echo "error: The source image has not been pushed to quay ${from}"
+          exit 1
+        fi
+
+        # TODO: Enable e2e testing when arch specific CI is available
+
+        # Tag the image into the art-latest stream for the arch
+        oc tag "${to_quay}" "ocp-${ARCH}/${BRANCH}-art-latest-${ARCH}:${TAG}"
+      env:
+      - name: TAG_NS
+        value: rhcos
+      - name: TAG
+        value: machine-os-content
+      - name: BRANCH
+        value: "4.2"
+      - name: ARCH
+        value: s390x
+      - name: TAG_SOURCE
+        value: machine-os-content:$(BRANCH)-$(ARCH)
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: CONFIG_SPEC
+        value: |
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: "ocp-$(ARCH)"
+          promotion:
+            name: "$(BRANCH)"
+            namespace: "ocp-$(ARCH)"
+            additional_images:
+              $(TAG): $(TAG)
+          build_root:
+            image_stream_tag:
+              cluster: https://api.ci.openshift.org
+              name: release
+              namespace: openshift
+              tag: golang-1.12
+          base_images:
+            $(TAG):
+              name: $(TAG)
+              namespace: rhcos
+              tag: "$(BRANCH)-$(ARCH)"
           raw_steps:
           - output_image_tag_step:
               from: $(TAG)
@@ -166,6 +293,7 @@ periodics:
         # execute the test
         ci-operator \
           --artifact-dir=$(ARTIFACTS) \
+          --lease-server=http://boskos \
           --namespace=${namespace} \
           --secret-dir=/usr/local/pull-secret \
           --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile \
@@ -240,12 +368,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-aws-sdn-multitenant-cluster-profile
-      - --target=e2e-aws
-      - --template=/usr/local/e2e-aws
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --lease-server=http://boskos
+      - --secret-dir=/usr/local/e2e-aws-sdn-multitenant-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-aws
+      - --template=/usr/local/e2e-aws
       command:
       - ci-operator
       env:
@@ -327,12 +456,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-azure-cluster-profile
-      - --target=e2e-azure
-      - --template=/usr/local/e2e-azure
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --lease-server=http://boskos
+      - --secret-dir=/usr/local/e2e-azure-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-azure
+      - --template=/usr/local/e2e-azure
       command:
       - ci-operator
       env:
@@ -407,12 +537,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-azure-fips-cluster-profile
-      - --target=e2e-azure-fips
-      - --template=/usr/local/e2e-azure-fips
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --lease-server=http://boskos
+      - --secret-dir=/usr/local/e2e-azure-fips-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-azure-fips
+      - --template=/usr/local/e2e-azure-fips
       command:
       - ci-operator
       env:
@@ -422,8 +553,8 @@ periodics:
         value: "4.2"
       - name: CLUSTER_TYPE
         value: azure4
-      - name: ENABLE_FIPS
-        value: "true"
+      - name: CLUSTER_VARIANT
+        value: fips
       - name: CONFIG_SPEC
         value: |
           tag_specification:
@@ -489,12 +620,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-aws-fips-cluster-profile
-      - --target=e2e-aws-fips
-      - --template=/usr/local/e2e-aws-fips
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --lease-server=http://boskos
+      - --secret-dir=/usr/local/e2e-aws-fips-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-aws-fips
+      - --template=/usr/local/e2e-aws-fips
       command:
       - ci-operator
       env:
@@ -504,8 +636,8 @@ periodics:
         value: "4.2"
       - name: CLUSTER_TYPE
         value: aws
-      - name: ENABLE_FIPS
-        value: "true"
+      - name: CLUSTER_VARIANT
+        value: fips
       - name: CONFIG_SPEC
         value: |
           tag_specification:
@@ -571,12 +703,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-aws-proxy-cluster-profile
-      - --target=e2e-aws-proxy
-      - --template=/usr/local/e2e-aws-proxy
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --lease-server=http://boskos
+      - --secret-dir=/usr/local/e2e-aws-proxy-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-aws-proxy
+      - --template=/usr/local/e2e-aws-proxy
       command:
       - ci-operator
       env:
@@ -586,8 +719,8 @@ periodics:
         value: "4.2"
       - name: CLUSTER_TYPE
         value: aws
-      - name: ENABLE_PROXY
-        value: "true"
+      - name: CLUSTER_VARIANT
+        value: proxy
       - name: CONFIG_SPEC
         value: |
           tag_specification:
@@ -805,12 +938,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-azure-serial-cluster-profile
-      - --target=e2e-azure-serial
-      - --template=/usr/local/e2e-azure-serial
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --lease-server=http://boskos
+      - --secret-dir=/usr/local/e2e-azure-serial-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-azure-serial
+      - --template=/usr/local/e2e-azure-serial
       command:
       - ci-operator
       env:
@@ -885,12 +1019,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-gcp-cluster-profile
-      - --target=e2e-gcp
-      - --template=/usr/local/e2e-gcp
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --lease-server=http://boskos
+      - --secret-dir=/usr/local/e2e-gcp-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-gcp
+      - --template=/usr/local/e2e-gcp
       command:
       - ci-operator
       env:
@@ -967,12 +1102,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-gcp-cluster-profile
-      - --target=e2e-gcp
-      - --template=/usr/local/e2e-gcp
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --lease-server=http://boskos
+      - --secret-dir=/usr/local/e2e-gcp-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-gcp
+      - --template=/usr/local/e2e-gcp
       command:
       - ci-operator
       env:
@@ -1049,12 +1185,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-gcp-fips-cluster-profile
-      - --target=e2e-gcp-fips
-      - --template=/usr/local/e2e-gcp-fips
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --lease-server=http://boskos
+      - --secret-dir=/usr/local/e2e-gcp-fips-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-gcp-fips
+      - --template=/usr/local/e2e-gcp-fips
       command:
       - ci-operator
       env:
@@ -1064,8 +1201,8 @@ periodics:
         value: "4.2"
       - name: CLUSTER_TYPE
         value: gcp
-      - name: ENABLE_FIPS
-        value: "true"
+      - name: CLUSTER_VARIANT
+        value: fips
       - name: CONFIG_SPEC
         value: |
           tag_specification:
@@ -1133,12 +1270,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-azure-fips-serial-cluster-profile
-      - --target=e2e-azure-fips-serial
-      - --template=/usr/local/e2e-azure-fips-serial
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --lease-server=http://boskos
+      - --secret-dir=/usr/local/e2e-azure-fips-serial-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-azure-fips-serial
+      - --template=/usr/local/e2e-azure-fips-serial
       command:
       - ci-operator
       env:
@@ -1148,8 +1286,8 @@ periodics:
         value: "4.2"
       - name: CLUSTER_TYPE
         value: azure4
-      - name: ENABLE_FIPS
-        value: "true"
+      - name: CLUSTER_VARIANT
+        value: fips
       - name: CONFIG_SPEC
         value: |
           tag_specification:
@@ -1215,12 +1353,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-aws-fips-serial-cluster-profile
-      - --target=e2e-aws-fips-serial
-      - --template=/usr/local/e2e-aws-fips-serial
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --lease-server=http://boskos
+      - --secret-dir=/usr/local/e2e-aws-fips-serial-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-aws-fips-serial
+      - --template=/usr/local/e2e-aws-fips-serial
       command:
       - ci-operator
       env:
@@ -1230,8 +1369,8 @@ periodics:
         value: "4.2"
       - name: CLUSTER_TYPE
         value: aws
-      - name: ENABLE_FIPS
-        value: "true"
+      - name: CLUSTER_VARIANT
+        value: fips
       - name: CONFIG_SPEC
         value: |
           tag_specification:
@@ -1297,12 +1436,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-gcp-serial-cluster-profile
-      - --target=e2e-gcp-serial
-      - --template=/usr/local/e2e-gcp-serial
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --lease-server=http://boskos
+      - --secret-dir=/usr/local/e2e-gcp-serial-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-gcp-serial
+      - --template=/usr/local/e2e-gcp-serial
       command:
       - ci-operator
       env:
@@ -1379,12 +1519,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-gcp-serial-cluster-profile
-      - --target=e2e-gcp-serial
-      - --template=/usr/local/e2e-gcp-serial
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --lease-server=http://boskos
+      - --secret-dir=/usr/local/e2e-gcp-serial-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-gcp-serial
+      - --template=/usr/local/e2e-gcp-serial
       command:
       - ci-operator
       env:
@@ -1461,12 +1602,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-gcp-fips-serial-cluster-profile
-      - --target=e2e-gcp-fips-serial
-      - --template=/usr/local/e2e-gcp-fips-serial
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --lease-server=http://boskos
+      - --secret-dir=/usr/local/e2e-gcp-fips-serial-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-gcp-fips-serial
+      - --template=/usr/local/e2e-gcp-fips-serial
       command:
       - ci-operator
       env:
@@ -1476,8 +1618,8 @@ periodics:
         value: "4.2"
       - name: CLUSTER_TYPE
         value: gcp
-      - name: ENABLE_FIPS
-        value: "true"
+      - name: CLUSTER_VARIANT
+        value: fips
       - name: CONFIG_SPEC
         value: |
           tag_specification:
@@ -1547,12 +1689,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-aws-cluster-profile
-      - --target=e2e-aws
-      - --template=/usr/local/e2e-aws
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --lease-server=http://boskos
+      - --secret-dir=/usr/local/e2e-aws-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-aws
+      - --template=/usr/local/e2e-aws
       command:
       - ci-operator
       env:
@@ -1639,6 +1782,7 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --lease-server=http://boskos
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-aws-upgrade-cluster-profile
       - --target=e2e-aws-upgrade
@@ -1719,12 +1863,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-aws-serial-cluster-profile
-      - --target=e2e-aws-serial
-      - --template=/usr/local/e2e-aws-serial
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --lease-server=http://boskos
+      - --secret-dir=/usr/local/e2e-aws-serial-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-aws-serial
+      - --template=/usr/local/e2e-aws-serial
       command:
       - ci-operator
       env:
@@ -1803,7 +1948,6 @@ periodics:
     job-env: aws
     job-release: "4.2"
     job-test: e2e
-    job-type: upgrade
     release.openshift.io/verify: "true"
   name: release-openshift-origin-installer-e2e-aws-upgrade-4.2-to-nightly
   spec:
@@ -1841,6 +1985,7 @@ periodics:
         oc annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
 
         ci-operator --artifact-dir=$(ARTIFACTS) \
+          --lease-server=http://boskos \
           --secret-dir=/usr/local/pull-secret --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile \
           --target=e2e-$(CLUSTER_TYPE)-upgrade --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME)
       env:
@@ -1912,12 +2057,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-aws-console-cluster-profile
-      - --target=e2e-aws-console
-      - --template=/usr/local/e2e-aws-console
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --lease-server=http://boskos
+      - --secret-dir=/usr/local/e2e-aws-console-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-aws-console
+      - --template=/usr/local/e2e-aws-console
       command:
       - ci-operator
       env:
@@ -1948,6 +2094,8 @@ periodics:
         value: e2e-aws-console
       - name: TEST_COMMAND
         value: ./test-prow-e2e.sh release
+      - name: TEST_IMAGESTREAM_TAG
+        value: stable:console-tests
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -1959,7 +2107,7 @@ periodics:
         name: cluster-profile
       - mountPath: /usr/local/e2e-aws-console
         name: job-definition
-        subPath: cluster-launch-installer-console.yaml
+        subPath: cluster-launch-installer-custom-test-image.yaml
       - mountPath: /usr/local/pull-secret
         name: pull-secret
     serviceAccountName: ci-operator
@@ -1970,7 +2118,7 @@ periodics:
         - secret:
             name: cluster-secrets-aws
     - configMap:
-        name: prow-job-cluster-launch-installer-console
+        name: prow-job-cluster-launch-installer-custom-test-image
       name: job-definition
     - name: pull-secret
       secret:
@@ -1988,12 +2136,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-aws-cluster-profile
-      - --target=e2e-aws
-      - --template=/usr/local/e2e-aws
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --lease-server=http://boskos
+      - --secret-dir=/usr/local/e2e-aws-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-aws
+      - --template=/usr/local/e2e-aws
       command:
       - ci-operator
       env:
@@ -2077,12 +2226,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-aws-serial-cluster-profile
-      - --target=e2e-aws-serial
-      - --template=/usr/local/e2e-aws-serial
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --lease-server=http://boskos
+      - --secret-dir=/usr/local/e2e-aws-serial-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-aws-serial
+      - --template=/usr/local/e2e-aws-serial
       command:
       - ci-operator
       env:
@@ -2166,12 +2316,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-vsphere-upi-cluster-profile
-      - --target=e2e-vsphere-upi
-      - --template=/usr/local/e2e-vsphere-upi
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --lease-server=http://boskos
+      - --secret-dir=/usr/local/e2e-vsphere-upi-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-vsphere-upi
+      - --template=/usr/local/e2e-vsphere-upi
       command:
       - ci-operator
       env:
@@ -2246,12 +2397,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-vsphere-upi-serial-cluster-profile
-      - --target=e2e-vsphere-upi-serial
-      - --template=/usr/local/e2e-vsphere-upi-serial
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --lease-server=http://boskos
+      - --secret-dir=/usr/local/e2e-vsphere-upi-serial-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-vsphere-upi-serial
+      - --template=/usr/local/e2e-vsphere-upi-serial
       command:
       - ci-operator
       env:
@@ -2326,12 +2478,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-aws-upi-cluster-profile
-      - --target=e2e-aws-upi
-      - --template=/usr/local/e2e-aws-upi
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --lease-server=http://boskos
+      - --secret-dir=/usr/local/e2e-aws-upi-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-aws-upi
+      - --template=/usr/local/e2e-aws-upi
       command:
       - ci-operator
       env:
@@ -2401,7 +2554,6 @@ periodics:
     job-env: aws
     job-release: "4.2"
     job-test: e2e
-    job-type: upgrade
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
     release.openshift.io/verify: "true"
   name: release-openshift-origin-installer-e2e-aws-upgrade-4.1-to-4.2
@@ -2440,6 +2592,7 @@ periodics:
         oc annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
 
         ci-operator --artifact-dir=$(ARTIFACTS) \
+          --lease-server=http://boskos \
           --secret-dir=/usr/local/pull-secret --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile \
           --target=e2e-$(CLUSTER_TYPE)-upgrade --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME)
       env:
@@ -2506,7 +2659,6 @@ periodics:
     job-env: aws
     job-release: "4.2"
     job-test: e2e
-    job-type: upgrade
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-origin-installer-e2e-aws-upgrade-rollback-4.1-to-4.2
   spec:
@@ -2544,6 +2696,7 @@ periodics:
         oc annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
 
         ci-operator --artifact-dir=$(ARTIFACTS) \
+          --lease-server=http://boskos \
           --secret-dir=/usr/local/pull-secret --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile \
           --target=e2e-$(CLUSTER_TYPE)-upgrade --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME)
       env:
@@ -2598,7 +2751,6 @@ periodics:
     job-env: aws
     job-release: "4.2"
     job-test: e2e
-    job-type: upgrade
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-origin-installer-e2e-aws-upgrade-rollback-4.2
   spec:
@@ -2636,6 +2788,7 @@ periodics:
         oc annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
 
         ci-operator --artifact-dir=$(ARTIFACTS) \
+          --lease-server=http://boskos \
           --secret-dir=/usr/local/pull-secret --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile \
           --target=e2e-$(CLUSTER_TYPE)-upgrade --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME)
       env:
@@ -2696,12 +2849,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-aws-cnv-cluster-profile
-      - --target=e2e-aws
-      - --template=/usr/local/e2e-aws
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --lease-server=http://boskos
+      - --secret-dir=/usr/local/e2e-aws-cnv-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-aws
+      - --template=/usr/local/e2e-aws
       command:
       - ci-operator
       env:
@@ -2769,7 +2923,6 @@ periodics:
     job-env: gcp
     job-release: "4.2"
     job-test: e2e
-    job-type: upgrade
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-origin-installer-e2e-gcp-upgrade-4.2
   spec:
@@ -2807,6 +2960,7 @@ periodics:
         oc annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
 
         ci-operator --artifact-dir=$(ARTIFACTS) \
+          --lease-server=http://boskos \
           --secret-dir=/usr/local/pull-secret --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile \
           --target=e2e-$(CLUSTER_TYPE)-upgrade --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME)
       env:
@@ -2861,7 +3015,6 @@ periodics:
     job-env: azure
     job-release: "4.2"
     job-test: e2e
-    job-type: upgrade
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-origin-installer-e2e-azure-upgrade-4.2
   spec:
@@ -2899,6 +3052,7 @@ periodics:
         oc annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
 
         ci-operator --artifact-dir=$(ARTIFACTS) \
+          --lease-server=http://boskos \
           --secret-dir=/usr/local/pull-secret --secret-dir=/usr/local/e2e-azure-upgrade-cluster-profile \
           --target=e2e-azure-upgrade --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME)
       env:
@@ -2961,12 +3115,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-openstack-cluster-profile
-      - --target=e2e-openstack
-      - --template=/usr/local/e2e-openstack
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --lease-server=http://boskos
+      - --secret-dir=/usr/local/e2e-openstack-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-openstack
+      - --template=/usr/local/e2e-openstack
       command:
       - ci-operator
       env:
@@ -3042,12 +3197,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-openstack-cluster-profile
-      - --target=e2e-openstack
-      - --template=/usr/local/e2e-openstack
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --lease-server=http://boskos
+      - --secret-dir=/usr/local/e2e-openstack-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-openstack
+      - --template=/usr/local/e2e-openstack
       command:
       - ci-operator
       env:
@@ -3120,8 +3276,9 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
+      - --lease-server=http://boskos
       - --secret-dir=/usr/local/e2e-aws-scaleup-rhel7-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
       - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
       - --target=e2e-aws-scaleup-rhel7
       - --template=/usr/local/e2e-aws-scaleup-rhel7
@@ -3198,12 +3355,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-openstack-serial-cluster-profile
-      - --target=e2e-openstack-serial
-      - --template=/usr/local/e2e-openstack-serial
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --lease-server=http://boskos
+      - --secret-dir=/usr/local/e2e-openstack-serial-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-openstack-serial
+      - --template=/usr/local/e2e-openstack-serial
       command:
       - ci-operator
       env:
@@ -3283,12 +3441,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-openstack-serial-cluster-profile
-      - --target=e2e-openstack-serial
-      - --template=/usr/local/e2e-openstack-serial
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --lease-server=http://boskos
+      - --secret-dir=/usr/local/e2e-openstack-serial-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-openstack-serial
+      - --template=/usr/local/e2e-openstack-serial
       command:
       - ci-operator
       env:
@@ -3365,12 +3524,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-aws-cluster-profile
-      - --target=e2e-aws
-      - --template=/usr/local/e2e-aws
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --lease-server=http://boskos
+      - --secret-dir=/usr/local/e2e-aws-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-aws
+      - --template=/usr/local/e2e-aws
       command:
       - ci-operator
       env:
@@ -3380,6 +3540,8 @@ periodics:
         value: "4.2"
       - name: CLUSTER_TYPE
         value: aws
+      - name: CLUSTER_VARIANT
+        value: mirror
       - name: CONFIG_SPEC
         value: |
           tag_specification:
@@ -3399,8 +3561,6 @@ periodics:
               cluster_profile: aws
       - name: JOB_NAME_SAFE
         value: e2e-aws
-      - name: ENABLE_MIRROR
-        value: "true"
       - name: TEST_COMMAND
         value: |
           patch_image_specs

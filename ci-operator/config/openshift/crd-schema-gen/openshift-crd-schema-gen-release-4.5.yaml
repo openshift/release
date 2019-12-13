@@ -1,0 +1,36 @@
+base_images:
+  base:
+    name: "4.5"
+    namespace: ocp
+    tag: base
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.12
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  to: crd-schema-gen
+promotion:
+  name: "4.5"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: "3"
+      memory: 2Gi
+tag_specification:
+  name: "4.5"
+  namespace: ocp
+test_binary_build_commands: make build GOFLAGS='-race' --warn-undefined-variables
+tests:
+- as: verify
+  commands: |
+    go get -u golang.org/x/tools/imports
+    make verify -k --warn-undefined-variables
+  container:
+    from: bin

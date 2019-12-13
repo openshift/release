@@ -50,6 +50,7 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=master
         - --give-pr-author-access-to-namespace=true
+        - --lease-server=http://boskos
         - --org=openshift
         - --repo=origin
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
@@ -120,6 +121,7 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=master
         - --give-pr-author-access-to-namespace=true
+        - --lease-server=http://boskos
         - --org=openshift
         - --repo=origin
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
@@ -190,6 +192,7 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=master
         - --give-pr-author-access-to-namespace=true
+        - --lease-server=http://boskos
         - --org=openshift
         - --repo=origin
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
@@ -202,13 +205,13 @@ presubmits:
         env:
         - name: CLUSTER_TYPE
           value: aws
+        - name: CLUSTER_VARIANT
+          value: fips
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
               key: openshift-origin-master.yaml
               name: ci-operator-master-configs
-        - name: ENABLE_FIPS
-          value: "true"
         - name: JOB_NAME_SAFE
           value: e2e-aws-fips
         - name: TEST_COMMAND
@@ -264,6 +267,7 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=master
         - --give-pr-author-access-to-namespace=true
+        - --lease-server=http://boskos
         - --org=openshift
         - --repo=origin
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
@@ -333,6 +337,7 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=master
         - --give-pr-author-access-to-namespace=true
+        - --lease-server=http://boskos
         - --org=openshift
         - --repo=origin
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
@@ -401,6 +406,7 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --lease-server=http://boskos
         - --secret-dir=/usr/local/e2e-aws-multitenant-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=e2e-aws-multitenant
@@ -463,38 +469,39 @@ presubmits:
     always_run: false
     branches:
     - master
-    context: ci/prow/e2e-aws-ovn-kubernetes
+    context: ci/prow/e2e-aws-ovn
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-origin-master-e2e-aws-ovn-kubernetes
+    name: pull-ci-openshift-origin-master-e2e-aws-ovn
     optional: true
-    rerun_command: /test e2e-aws-ovn-kubernetes
+    rerun_command: /test e2e-aws-ovn
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
-        - --secret-dir=/usr/local/e2e-aws-ovn-kubernetes-cluster-profile
+        - --lease-server=http://boskos
+        - --secret-dir=/usr/local/e2e-aws-ovn-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=e2e-aws-ovn-kubernetes
-        - --template=/usr/local/e2e-aws-ovn-kubernetes
+        - --target=e2e-aws-ovn
+        - --template=/usr/local/e2e-aws-ovn
         command:
         - ci-operator
         env:
-        - name: CLUSTER_NETWORK_TYPE
-          value: OVNKubernetes
         - name: CLUSTER_TYPE
           value: aws
+        - name: CLUSTER_VARIANT
+          value: ovn
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
               key: openshift-origin-master.yaml
               name: ci-operator-master-configs
         - name: JOB_NAME_SAFE
-          value: e2e-aws-ovn-kubernetes
+          value: e2e-aws-ovn
         - name: TEST_COMMAND
           value: TEST_SUITE=openshift/conformance/parallel run-tests
         image: ci-operator:latest
@@ -504,9 +511,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/e2e-aws-ovn-kubernetes-cluster-profile
+        - mountPath: /usr/local/e2e-aws-ovn-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-aws-ovn-kubernetes
+        - mountPath: /usr/local/e2e-aws-ovn
           name: job-definition
           subPath: cluster-launch-installer-e2e.yaml
         - mountPath: /etc/sentry-dsn
@@ -525,7 +532,7 @@ presubmits:
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )e2e-aws-ovn-kubernetes,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-ovn,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -545,6 +552,7 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=master
         - --give-pr-author-access-to-namespace=true
+        - --lease-server=http://boskos
         - --org=openshift
         - --repo=origin
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
@@ -615,6 +623,7 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=master
         - --give-pr-author-access-to-namespace=true
+        - --lease-server=http://boskos
         - --org=openshift
         - --repo=origin
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
@@ -684,6 +693,7 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=master
         - --give-pr-author-access-to-namespace=true
+        - --lease-server=http://boskos
         - --org=openshift
         - --repo=origin
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
@@ -755,6 +765,7 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=master
         - --give-pr-author-access-to-namespace=true
+        - --lease-server=http://boskos
         - --org=openshift
         - --repo=origin
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
@@ -824,6 +835,7 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=master
         - --give-pr-author-access-to-namespace=true
+        - --lease-server=http://boskos
         - --org=openshift
         - --repo=origin
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
@@ -896,6 +908,7 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=master
         - --give-pr-author-access-to-namespace=true
+        - --lease-server=http://boskos
         - --org=openshift
         - --repo=origin
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
@@ -968,6 +981,7 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=master
         - --give-pr-author-access-to-namespace=true
+        - --lease-server=http://boskos
         - --org=openshift
         - --repo=origin
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
@@ -1039,6 +1053,7 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=master
         - --give-pr-author-access-to-namespace=true
+        - --lease-server=http://boskos
         - --org=openshift
         - --repo=origin
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
@@ -1098,6 +1113,7 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=master
         - --give-pr-author-access-to-namespace=true
+        - --lease-server=http://boskos
         - --org=openshift
         - --repo=origin
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
@@ -1173,6 +1189,7 @@ presubmits:
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=[images]
         - --target=[release:latest]
+        - --target=artifacts
         command:
         - ci-operator
         env:
@@ -1198,54 +1215,6 @@ presubmits:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    context: ci/prow/images-artifacts
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-origin-master-images-artifacts
-    rerun_command: /test images-artifacts
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
-        - --give-pr-author-access-to-namespace=true
-        - --org=openshift
-        - --repo=origin
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=images-artifacts
-        command:
-        - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-origin-master.yaml
-              name: ci-operator-master-configs
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )images-artifacts,?($|\s.*)
-  - agent: kubernetes
     always_run: false
     branches:
     - master
@@ -1265,6 +1234,7 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=master
         - --give-pr-author-access-to-namespace=true
+        - --lease-server=http://boskos
         - --org=openshift
         - --repo=origin
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org

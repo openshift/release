@@ -150,6 +150,12 @@ items:
         - secrets
       verbs:
         - delete
+    - apiGroups:
+        - "template.openshift.io"
+      resources:
+        - processedtemplates
+      verbs:
+        - create
 - kind: RoleBinding
   apiVersion: rbac.authorization.k8s.io/v1
   metadata:
@@ -235,6 +241,7 @@ items:
         - secrets
       verbs:
         - get
+        - patch
     - apiGroups:
         - monitoring.coreos.com
       resources:
@@ -615,3 +622,61 @@ items:
         - create
         - update
         - patch
+- kind: Role
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: config-updater
+    namespace: ci-release-ppc64le
+  rules:
+    - apiGroups:
+        - ""
+      resources:
+        - configmaps
+        - secrets
+      verbs:
+        - get
+        - create
+        - update
+        - patch
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: config-updater
+    namespace: ci-release-ppc64le
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: Role
+    name: config-updater
+  subjects:
+  - kind: ServiceAccount
+    name: config-updater
+    namespace: ci
+- kind: Role
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: config-updater
+    namespace: ci-release-s390x
+  rules:
+    - apiGroups:
+        - ""
+      resources:
+        - configmaps
+        - secrets
+      verbs:
+        - get
+        - create
+        - update
+        - patch
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: config-updater
+    namespace: ci-release-s390x
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: Role
+    name: config-updater
+  subjects:
+  - kind: ServiceAccount
+    name: config-updater
+    namespace: ci

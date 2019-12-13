@@ -55,3 +55,10 @@ items:
           severity: warning
         annotations:
           message: Ci-Op Pod {{$labels.pod}} in namespace {{$labels.namespace}} has over 150% memory usage than initially requested. Ci-Op Pod {{$labels.pod}} in namespace {{$labels.namespace}} has high memory usage {{ $value | humanize1024 }}B.
+    - name: test.rules
+      rules:
+      - record: cluster:apiserver_request_latency_seconds:mean5m
+        expr: |
+          sum(rate(apiserver_request_latencies_summary_sum{job="apiserver",subresource!="log",verb!~"^(?:LIST|WATCH|WATCHLIST|PROXY|CONNECT)$"}[5m])) without(instance, pod)
+          /
+          sum(rate(apiserver_request_latencies_summary_count{job="apiserver",subresource!="log",verb!~"^(?:LIST|WATCH|WATCHLIST|PROXY|CONNECT)$"}[5m])) without(instance, pod)

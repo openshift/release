@@ -19,7 +19,6 @@ images:
       paths: null
   to: openshift-controller-manager
 promotion:
-  disabled: true
   name: "4.3"
   namespace: ocp
 resources:
@@ -43,7 +42,7 @@ tests:
   as: unit
   commands: |
     mkdir -p /tmp/artifacts
-    make test-unit JUNITFILE=/tmp/artifacts/unit_report.xml --warn-undefined-variables
+    make test-unit JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
   container:
     from: test-bin
 - as: e2e-aws
@@ -63,3 +62,11 @@ tests:
   commands: TEST_SUITE=openshift/build run-tests
   openshift_installer:
     cluster_profile: aws
+- as: e2e-gcp
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer:
+    cluster_profile: gcp
+- as: e2e-gcp-builds
+  commands: TEST_SUITE=openshift/build run-tests
+  openshift_installer:
+    cluster_profile: gcp
