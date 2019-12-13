@@ -1,0 +1,35 @@
+base_images:
+  os:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+images:
+- dockerfile_path: Dockerfile.ocp
+  from: base-os
+  to: ironic-inspector
+promotion:
+  name: "4.5"
+  namespace: ocp
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      rm -rf /etc/yum.repos.d/*
+      curl http://base-4-3-rhel8.ocp.svc > /etc/yum.repos.d/base-4-3-rhel8.repo
+      curl http://base-openstack-4-3.ocp.svc > /etc/yum.repos.d/base-openstack-4-3.repo
+    from: os
+    to: base-os
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.5"
+  namespace: ocp

@@ -19,6 +19,7 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=release-4.3
         - --give-pr-author-access-to-namespace=true
+        - --lease-server=http://boskos
         - --org=openshift
         - --repo=machine-api-operator
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
@@ -88,6 +89,7 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=release-4.3
         - --give-pr-author-access-to-namespace=true
+        - --lease-server=http://boskos
         - --org=openshift
         - --repo=machine-api-operator
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
@@ -109,6 +111,8 @@ presubmits:
           value: e2e-aws-operator
         - name: TEST_COMMAND
           value: make test-e2e
+        - name: TEST_IMAGESTREAM_TAG
+          value: stable:cluster-api-actuator-pkg
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -120,7 +124,7 @@ presubmits:
           name: cluster-profile
         - mountPath: /usr/local/e2e-aws-operator
           name: job-definition
-          subPath: cluster-launch-installer-src.yaml
+          subPath: cluster-launch-installer-custom-test-image.yaml
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
@@ -132,14 +136,14 @@ presubmits:
           - secret:
               name: cluster-secrets-aws
       - configMap:
-          name: prow-job-cluster-launch-installer-src
+          name: prow-job-cluster-launch-installer-custom-test-image
         name: job-definition
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-aws-operator,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.3
     context: ci/prow/e2e-aws-operator-tech-preview
@@ -150,6 +154,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-api-operator-release-4.3-e2e-aws-operator-tech-preview
+    optional: true
     rerun_command: /test e2e-aws-operator-tech-preview
     spec:
       containers:
@@ -157,6 +162,7 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=release-4.3
         - --give-pr-author-access-to-namespace=true
+        - --lease-server=http://boskos
         - --org=openshift
         - --repo=machine-api-operator
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
@@ -178,6 +184,8 @@ presubmits:
           value: e2e-aws-operator-tech-preview
         - name: TEST_COMMAND
           value: make test-e2e-tech-preview
+        - name: TEST_IMAGESTREAM_TAG
+          value: stable:cluster-api-actuator-pkg
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -189,7 +197,7 @@ presubmits:
           name: cluster-profile
         - mountPath: /usr/local/e2e-aws-operator-tech-preview
           name: job-definition
-          subPath: cluster-launch-installer-src.yaml
+          subPath: cluster-launch-installer-custom-test-image.yaml
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
@@ -201,7 +209,7 @@ presubmits:
           - secret:
               name: cluster-secrets-aws
       - configMap:
-          name: prow-job-cluster-launch-installer-src
+          name: prow-job-cluster-launch-installer-custom-test-image
         name: job-definition
       - name: sentry-dsn
         secret:
@@ -227,6 +235,7 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=release-4.3
         - --give-pr-author-access-to-namespace=true
+        - --lease-server=http://boskos
         - --org=openshift
         - --repo=machine-api-operator
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
@@ -302,6 +311,7 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=release-4.3
         - --give-pr-author-access-to-namespace=true
+        - --lease-server=http://boskos
         - --org=openshift
         - --repo=machine-api-operator
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
@@ -358,6 +368,7 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=release-4.3
         - --give-pr-author-access-to-namespace=true
+        - --lease-server=http://boskos
         - --org=openshift
         - --repo=machine-api-operator
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
@@ -428,6 +439,7 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=release-4.3
         - --give-pr-author-access-to-namespace=true
+        - --lease-server=http://boskos
         - --org=openshift
         - --repo=machine-api-operator
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
@@ -449,6 +461,8 @@ presubmits:
           value: e2e-azure-operator
         - name: TEST_COMMAND
           value: make test-e2e
+        - name: TEST_IMAGESTREAM_TAG
+          value: stable:cluster-api-actuator-pkg
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -460,7 +474,7 @@ presubmits:
           name: cluster-profile
         - mountPath: /usr/local/e2e-azure-operator
           name: job-definition
-          subPath: cluster-launch-installer-src.yaml
+          subPath: cluster-launch-installer-custom-test-image.yaml
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
@@ -472,7 +486,7 @@ presubmits:
           - secret:
               name: cluster-secrets-azure4
       - configMap:
-          name: prow-job-cluster-launch-installer-src
+          name: prow-job-cluster-launch-installer-custom-test-image
         name: job-definition
       - name: sentry-dsn
         secret:
@@ -497,6 +511,7 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=release-4.3
         - --give-pr-author-access-to-namespace=true
+        - --lease-server=http://boskos
         - --org=openshift
         - --repo=machine-api-operator
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
@@ -568,6 +583,7 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=release-4.3
         - --give-pr-author-access-to-namespace=true
+        - --lease-server=http://boskos
         - --org=openshift
         - --repo=machine-api-operator
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
@@ -589,6 +605,8 @@ presubmits:
           value: e2e-gcp-operator
         - name: TEST_COMMAND
           value: make test-e2e
+        - name: TEST_IMAGESTREAM_TAG
+          value: stable:cluster-api-actuator-pkg
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -600,7 +618,7 @@ presubmits:
           name: cluster-profile
         - mountPath: /usr/local/e2e-gcp-operator
           name: job-definition
-          subPath: cluster-launch-installer-src.yaml
+          subPath: cluster-launch-installer-custom-test-image.yaml
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
@@ -614,7 +632,7 @@ presubmits:
           - configMap:
               name: cluster-profile-gcp
       - configMap:
-          name: prow-job-cluster-launch-installer-src
+          name: prow-job-cluster-launch-installer-custom-test-image
         name: job-definition
       - name: sentry-dsn
         secret:
@@ -788,6 +806,7 @@ presubmits:
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=[images]
+        - --target=[release:latest]
         command:
         - ci-operator
         env:

@@ -1,0 +1,35 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.12
+promotion:
+  name: "4.5"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.5"
+  namespace: ocp
+tests:
+- as: verify
+  commands: go get golang.org/x/tools/imports; make build verify
+  container:
+    from: src
+- as: verify-client-go
+  commands: |
+    dir=$GOPATH/src/github.com/openshift/client-go
+    git clone https://github.com/openshift/client-go $dir
+    rm -rf $dir/vendor/github.com/openshift/api/*
+    cp -Rf * $dir/vendor/github.com/openshift/api/
+    rm -rf $dir/vendor/github.com/openshift/api/vendor
+    cd $dir
+    make generate
+    go build ./...
+  container:
+    from: src

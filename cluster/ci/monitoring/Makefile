@@ -3,7 +3,7 @@ prometheus-k8s_token := $(shell oc get --as=system:serviceaccount:ci:config-upda
 .PHONY : prow-monitoring-deploy
 prow-monitoring-deploy: ci-secret-deploy
 	@echo "Deploying prow-monitoring stack ..."
-	oc apply -f ./prometheus_expose.yaml
+	oc process -n prow-monitoring -f ./prometheus_expose.yaml | oc apply -f -
 	oc apply -f ./prometheus_operator_deploy.yaml
 	oc apply -f ./sinker_service_monitor.yaml
 	oc apply -f ./boskos_service_monitor.yaml
@@ -17,13 +17,12 @@ prow-monitoring-deploy: ci-secret-deploy
 	oc apply -f ./tide_service_monitor.yaml
 	oc apply -f ./prometheus_crd.yaml
 	oc apply -f ./mixins/prometheus_out/prometheus_rule_prow.yaml
-	oc apply -f ./alert_manager_expose.yaml
-	oc apply -f ./alert_manager_proxy_secret.yaml
+	oc process -n prow-monitoring -f ./alert_manager_expose.yaml | oc apply -f -
 	oc apply -f ./alert_manager_crd.yaml
 	oc apply -f ./prometheus_service_monitor.yaml
 	oc apply -f ./alert_manager_service_monitor.yaml
 	#grafana
-	oc apply -f ./grafana_expose.yaml
+	oc process -n prow-monitoring -f ./grafana_expose.yaml | oc apply -f -
 	oc create -n prow-monitoring secret generic grafana-config --from-file=./grafana.ini --dry-run -o yaml | oc apply -f -
 
 	# Fill prometheus-k8s basicAuthPassword in datasources file.
@@ -34,7 +33,6 @@ prow-monitoring-deploy: ci-secret-deploy
 	#Those config are deployed by config_uploader; we leave those here for manual debugging
 	#oc create -n prow-monitoring configmap grafana-dashboards --from-file=./dashboards.yaml --dry-run -o yaml | oc apply -f -
 	#oc create -n prow-monitoring configmap grafana-dashboard-definitions-0 --from-file=./mixins/grafana_dashboards_out/ --dry-run -o yaml | oc apply -f -
-	oc apply -f ./grafana_proxy_secret.yaml
 	oc apply -f ./grafana_deploy.yaml
 	oc apply -f ./grafana_service_monitor.yaml
 
@@ -63,7 +61,7 @@ prow-monitoring-pre-steps:
 .PHONY : prow-monitoring-cleanup
 prow-monitoring-cleanup:
 	@echo "Cleaning up prow-monitoring stack ..."
-	oc delete -f ./prometheus_expose.yaml --ignore-not-found=true --as=system:admin
+	oc process -f ./prometheus_expose.yaml | oc delete --ignore-not-found=true --as=system:admin -f -
 	oc delete -f ./mixins/prometheus_out/prometheus_rule_prow.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./prometheus_crd.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./sinker_service_monitor.yaml --ignore-not-found=true --as=system:admin
@@ -83,16 +81,14 @@ prow-monitoring-cleanup:
 	oc delete -f ./prometheus_rbac.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./alert_manager_crd.yaml --ignore-not-found=true --as=system:admin
 	oc delete secret -n prow-monitoring alertmanager-prow --ignore-not-found=true --as=system:admin
-	oc delete -f ./alert_manager_proxy_secret.yaml --as=system:admin
-	oc delete -f ./alert_manager_expose.yaml --ignore-not-found=true --as=system:admin
+	oc process -f ./alert_manager_expose.yaml | oc delete --ignore-not-found=true --as=system:admin -f -
 	oc delete -f ./alert_manager_rbac.yaml --as=system:admin
 	oc delete -f ./grafana_deploy.yaml --ignore-not-found=true --as=system:admin
 	oc delete configmap -n prow-monitoring grafana-dashboard-definitions-0 --ignore-not-found=true --as=system:admin
 	oc delete configmap -n prow-monitoring grafana-dashboards --ignore-not-found=true --as=system:admin
 	oc delete configmap -n prow-monitoring grafana-datasources --ignore-not-found=true --as=system:admin
 	oc delete secret -n prow-monitoring grafana-config --ignore-not-found=true --as=system:admin
-	oc delete -f ./grafana_proxy_secret.yaml --as=system:admin
-	oc delete -f ./grafana_expose.yaml --ignore-not-found=true --ignore-not-found=true --as=system:admin
+	oc process -f ./grafana_expose.yaml | oc delete --ignore-not-found=true --as=system:admin -f -
 	oc delete -f ./grafana_rbac.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./client_rbac.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./ci_hook_rbac.yaml --ignore-not-found=true --as=system:admin

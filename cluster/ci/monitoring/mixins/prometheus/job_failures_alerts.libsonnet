@@ -15,7 +15,7 @@
               team: '%s' % $._config.alertManagerReceivers[$._job_failures_config.alerts[job_name].receiver].team,
             },
             annotations: {
-              message: 'Prow job %s has failures. Check on <https://prow.svc.ci.openshift.org/?type=periodic&job=%s|deck>' % [job_name, job_name],
+              message: '@%s Prow job %s has failures. Check on <https://prow.svc.ci.openshift.org/?type=periodic&job=%s|deck>' % [$._config.alertManagerReceivers[$._job_failures_config.alerts[job_name].receiver].notify, job_name, job_name],
             },
           }
           for job_name in std.objectFields($._job_failures_config.alerts)

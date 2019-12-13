@@ -1,0 +1,79 @@
+base_images:
+  base:
+    name: "4.5"
+    namespace: ocp
+    tag: base
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: tectonic-console-builder
+images:
+- from: base
+  inputs:
+    root:
+      as:
+      - quay.io/coreos/tectonic-console-builder:v17
+      paths: null
+  to: console
+promotion:
+  additional_images:
+    console-tests: src
+  name: "4.5"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  analyze:
+    limits:
+      memory: 15Gi
+    requests:
+      cpu: "1"
+      memory: 10Gi
+  console:
+    limits:
+      memory: 12Gi
+    requests:
+      cpu: "1"
+      memory: 8Gi
+  frontend:
+    limits:
+      memory: 15Gi
+    requests:
+      cpu: "1"
+      memory: 10Gi
+  test-bin:
+    limits:
+      memory: 15Gi
+    requests:
+      cpu: "1"
+      memory: 10Gi
+tag_specification:
+  name: "4.5"
+  namespace: ocp
+test_binary_build_commands: ./build.sh
+tests:
+- artifact_dir: /tmp/artifacts
+  as: backend
+  commands: export ARTIFACT_DIR=/tmp/artifacts; ./test-backend.sh
+  container:
+    from: test-bin
+- artifact_dir: /tmp/artifacts
+  as: frontend
+  commands: export ARTIFACT_DIR=/tmp/artifacts; ./test-frontend.sh
+  container:
+    from: test-bin
+- artifact_dir: /tmp/artifacts
+  as: analyze
+  commands: export ARTIFACT_DIR=/tmp/artifacts; ./analyze.sh
+  container:
+    from: test-bin
+- artifact_dir: /tmp/artifacts
+  as: e2e-gcp-console
+  commands: ./test-prow-e2e.sh
+  openshift_installer_src:
+    cluster_profile: gcp

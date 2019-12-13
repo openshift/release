@@ -68,8 +68,10 @@ def highlight(log_dir, dc):
             debug("deployment/{}: pod/{}: gathering info".format(dc, pod))
             lines.extend(renderFlavor(pod, dc))
             cmd = ['logs', '--since', '20m', 'pod/{}'.format(pod)]
-            if pod.startswith('deck-internal'):
+            if dc == 'deck-internal':
                 cmd += ['--container', 'deck']
+            if dc == 'boskos':
+                cmd += ['--container', 'boskos']
             debug("deployment/{}: pod/{}: getting logs".format(dc, pod))
             try:
                 for l in run_oc(cmd).splitlines():
@@ -101,7 +103,7 @@ def renderHeader(dc):
     for container in containers:
         if container.get("name") == dc:
             image = container.get("image", "")
-            version = image.split(":", 1)[1]
+            version = image.split(":")[-1]
     headerColor = ''
     if desired != current:
         headerColor = RED

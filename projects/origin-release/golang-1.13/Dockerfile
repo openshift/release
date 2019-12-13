@@ -6,18 +6,19 @@
 #
 FROM        centos:7
 
-ENV VERSION=1.13.1 \
+ENV VERSION=1.13.5 \
     GOCACHE=/go/.cache \
     GOARM=5 \
     GOPATH=/go \
     GOROOT=/usr/local/go \
+    GOFLAGS='-mod=vendor' \
     LOGNAME=deadbeef
 ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
 
 COPY cbs-paas7-openshift-multiarch-el7-build.repo /etc/yum.repos.d/
 RUN yum install -y epel-release && \
     rpm -V epel-release && \
-    INSTALL_PKGS="bc bind-utils bsdtar bzr ceph-common createrepo device-mapper device-mapper-persistent-data e2fsprogs ethtool file findutils gcc git glibc-static glib2-devel gpgme gpgme-devel hostname iptables jq krb5-devel libassuan libassuan-devel libseccomp-devel libvirt-devel lsof make mercurial nmap-ncat openssl protobuf-compiler rsync socat systemd-devel sysvinit-tools tar tito tree util-linux wget which xfsprogs zip goversioninfo" && \
+    INSTALL_PKGS="bc bind-utils bsdtar bzr ceph-common createrepo device-mapper device-mapper-persistent-data e2fsprogs ethtool file findutils gcc git glibc-static glib2-devel gpgme gpgme-devel hostname iptables jq krb5-devel libassuan libassuan-devel libseccomp-devel libvirt-devel lsof make mercurial nmap-ncat openssl protobuf-compiler protobuf-devel rsync socat systemd-devel sysvinit-tools tar tito tree util-linux wget which xfsprogs zip goversioninfo" && \
     yum install -y $INSTALL_PKGS && \
     rpm -V $INSTALL_PKGS && \
     yum clean all && \
@@ -34,6 +35,7 @@ RUN yum install -y /tmp/origin-rpm/*.rpm && \
         golang.org/x/tools/cmd/goimports \
         github.com/tools/godep \
         golang.org/x/lint/golint \
+        gotest.tools/gotestsum \
         github.com/openshift/release/tools/gotest2junit \
         github.com/openshift/imagebuilder/cmd/imagebuilder && \
     mv $GOPATH/bin/* /usr/bin/ && \

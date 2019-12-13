@@ -5,7 +5,7 @@ periodics:
   labels:
     ci.openshift.io/release-type: informing
     job-release: "4.2"
-  name: release-promote-openshift-machine-os-content-e2e-aws-4.1
+  name: promote-release-openshift-machine-os-content-e2e-aws-4.1
   spec:
     containers:
     - command:
@@ -40,7 +40,9 @@ periodics:
         # verify the tests pass
         ci-operator --artifact-dir=$(ARTIFACTS) --secret-dir=/usr/local/pull-secret \
           --secret-dir=/usr/local/e2e-aws-cluster-profile --template=/usr/local/e2e-aws \
-          --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME) --promote
+          --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME) \
+          --lease-server=http://boskos \
+          --promote
 
         # also tag the image into the art-latest stream
         oc tag "${to_quay}" "ocp/${BRANCH}-art-latest:${TAG}"
@@ -139,12 +141,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-aws-cluster-profile
-      - --target=e2e-aws
-      - --template=/usr/local/e2e-aws
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --lease-server=http://boskos
+      - --secret-dir=/usr/local/e2e-aws-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-aws
+      - --template=/usr/local/e2e-aws
       command:
       - ci-operator
       env:
@@ -230,6 +233,7 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --lease-server=http://boskos
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-aws-upgrade-cluster-profile
       - --target=e2e-aws-upgrade
@@ -309,12 +313,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-aws-serial-cluster-profile
-      - --target=e2e-aws-serial
-      - --template=/usr/local/e2e-aws-serial
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --lease-server=http://boskos
+      - --secret-dir=/usr/local/e2e-aws-serial-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-aws-serial
+      - --template=/usr/local/e2e-aws-serial
       command:
       - ci-operator
       env:
@@ -397,12 +402,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-aws-cluster-profile
-      - --target=e2e-aws
-      - --template=/usr/local/e2e-aws
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --lease-server=http://boskos
+      - --secret-dir=/usr/local/e2e-aws-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-aws
+      - --template=/usr/local/e2e-aws
       command:
       - ci-operator
       env:
@@ -485,12 +491,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-aws-serial-cluster-profile
-      - --target=e2e-aws-serial
-      - --template=/usr/local/e2e-aws-serial
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --lease-server=http://boskos
+      - --secret-dir=/usr/local/e2e-aws-serial-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-aws-serial
+      - --template=/usr/local/e2e-aws-serial
       command:
       - ci-operator
       env:
@@ -569,7 +576,6 @@ periodics:
     job-env: aws
     job-release: "4.1"
     job-test: e2e
-    job-type: upgrade
     release.openshift.io/verify: "true"
   name: release-openshift-origin-installer-e2e-aws-upgrade-4.1-to-nightly
   spec:
@@ -607,6 +613,7 @@ periodics:
         oc annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
 
         ci-operator --artifact-dir=$(ARTIFACTS) \
+          --lease-server=http://boskos \
           --secret-dir=/usr/local/pull-secret --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile \
           --target=e2e-$(CLUSTER_TYPE)-upgrade --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME)
       env:
@@ -673,7 +680,6 @@ periodics:
     job-env: aws
     job-release: "4.1"
     job-test: e2e
-    job-type: upgrade
   name: release-openshift-origin-installer-e2e-aws-upgrade-rollback-4.1
   spec:
     containers:
@@ -710,6 +716,7 @@ periodics:
         oc annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
 
         ci-operator --artifact-dir=$(ARTIFACTS) \
+          --lease-server=http://boskos \
           --secret-dir=/usr/local/pull-secret --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile \
           --target=e2e-$(CLUSTER_TYPE)-upgrade --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME)
       env:

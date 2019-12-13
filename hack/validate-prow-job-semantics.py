@@ -123,11 +123,6 @@ def validate_names(path, data):
                     print("[WARNING] {}: ci-operator job {} should call a target".format(path, job["name"]))
                     continue
 
-                filtered_targets = [target for target in targets if target not in ["release:latest"]]
-                if len(filtered_targets) != 1:
-                    print("[WARNING] {}: ci-operator job {} should call no more than one target, calls {}".format(path, job["name"], targets))
-                    continue
-
                 branch = "master"
                 if "branches" in job:
                     for branch_name in job["branches"]:
@@ -140,27 +135,33 @@ def validate_names(path, data):
                     prefix = "branch"
 
                 variant = job.get("labels", {}).get("ci-operator.openshift.io/variant", "")
-                target = filtered_targets[0]
-                if variant:
-                    target = variant + "-" + target
 
-                valid_name = "{}-ci-{}-{}-{}".format(prefix, repo.replace("/", "-"), branch, target)
-                if job["name"] != valid_name:
-                    print("ERROR: {}: ci-operator job {} should be named {}".format(path, job["name"], valid_name))
+                filtered_targets = [target for target in targets if target not in ["release:latest"]]
+                valid_names = {}
+                for target in filtered_targets:
+                    if variant:
+                        target = variant + "-" + target
+                    name = "{}-ci-{}-{}-{}".format(prefix, repo.replace("/", "-"), branch, target)
+                    valid_names[name] = target
+
+                if job["name"] not in valid_names:
+                    print("ERROR: {}: ci-operator job {} should be named one of {}".format(path, job["name"], list(valid_names.keys())))
                     out = False
+                    continue
+                name_target = valid_names[job["name"]]
 
                 if job_type == "presubmits":
-                    valid_context = "ci/prow/{}".format(target)
+                    valid_context = "ci/prow/{}".format(name_target)
                     if job["context"] != valid_context:
                         print("ERROR: {}: ci-operator job {} should have context {}".format(path, job["name"], valid_context))
                         out = False
 
-                    valid_rerun_command = "/test {}".format(target)
+                    valid_rerun_command = "/test {}".format(name_target)
                     if job["rerun_command"] != valid_rerun_command:
                         print("ERROR: {}: ci-operator job {} should have rerun_command {}".format(path, job["name"], valid_rerun_command))
                         out = False
 
-                    valid_trigger = r"(?m)^/test( | .* ){},?($|\s.*)".format(target)
+                    valid_trigger = r"(?m)^/test( | .* ){},?($|\s.*)".format(name_target)
                     if job["trigger"] != valid_trigger:
                         print("ERROR: {}: ci-operator job {} should have trigger {}".format(path, job["name"], valid_trigger))
                         out = False

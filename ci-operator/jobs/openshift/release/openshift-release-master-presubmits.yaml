@@ -22,6 +22,34 @@ presubmits:
     always_run: true
     branches:
     - master
+    context: ci/prow/build-farm-consistency
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-build-farm-consistency
+    rerun_command: /test build-farm-consistency
+    spec:
+      containers:
+      - args:
+        - -c
+        - |
+          set -o errexit
+          set -o nounset
+          set -o pipefail
+          make build-farm-consistency
+        command:
+        - /bin/bash
+        image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )build-farm-consistency,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
     context: ci/build-farm/build01-dry
     decorate: true
     name: pull-ci-openshift-release-master-build01-dry
@@ -147,7 +175,7 @@ presubmits:
         - mismatched-tide-lenient
         command:
         - /checkconfig
-        image: gcr.io/k8s-prow/checkconfig:v20191118-feb03b294
+        image: gcr.io/k8s-prow/checkconfig:v20191212-70b0b49fe
         imagePullPolicy: Always
         name: ""
         resources:
@@ -169,6 +197,17 @@ presubmits:
         - core-services
         command:
         - applyconfig
+        env:
+        - name: build01_ci_reg_auth_value
+          valueFrom:
+            secretKeyRef:
+              key: build01_ci_reg_auth_value.txt
+              name: build-farm-credentials
+        - name: slack_api_url
+          valueFrom:
+            secretKeyRef:
+              key: url
+              name: ci-slack-api-url
         image: registry.svc.ci.openshift.org/ci/applyconfig:latest
         imagePullPolicy: Always
         name: ""
@@ -480,6 +519,27 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )services-valid,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/step-registry-shellcheck
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-step-registry-shellcheck
+    rerun_command: /test step-registry-shellcheck
+    spec:
+      containers:
+      - command:
+        - hack/validate-registry-commands.sh
+        image: registry.svc.ci.openshift.org/ci/shellcheck
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )step-registry-shellcheck,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:

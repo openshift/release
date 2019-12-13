@@ -10,6 +10,7 @@ build_root:
     namespace: openshift
     tag: golang-1.12
 promotion:
+  disabled: true
   name: "4.4"
   namespace: ocp
 resources:
@@ -29,12 +30,6 @@ tests:
     make verify -k --warn-undefined-variables
   container:
     from: bin
-- as: verify-deps
-  commands: |
-    HOME=$( mktemp -d )
-    make verify-deps -k --warn-undefined-variables
-  container:
-    from: src
 - as: verify-alpha-build-machinery
   commands: |
     HOME=$( mktemp -d )
@@ -45,13 +40,13 @@ tests:
   as: unit
   commands: |
     mkdir -p /tmp/artifacts
-    make test-unit JUNITFILE=/tmp/artifacts/unit_report.xml --warn-undefined-variables
+    make test-unit JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
   container:
     from: test-bin
 - artifact_dir: /tmp/artifacts
   as: e2e-aws-encryption
   commands: |
     mkdir -p /tmp/artifacts
-    make test-e2e-encryption JUNITFILE=/tmp/artifacts/unit_report.xml --warn-undefined-variables
+    make test-e2e-encryption JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
   openshift_installer_src:
     cluster_profile: aws

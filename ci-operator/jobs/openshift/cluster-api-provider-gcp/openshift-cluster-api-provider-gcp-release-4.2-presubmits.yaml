@@ -20,6 +20,7 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=release-4.2
         - --give-pr-author-access-to-namespace=true
+        - --lease-server=http://boskos
         - --org=openshift
         - --repo=cluster-api-provider-gcp
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
@@ -40,7 +41,9 @@ presubmits:
         - name: JOB_NAME_SAFE
           value: e2e-gcp-operator
         - name: TEST_COMMAND
-          value: make -C /go/src/github.com/openshift/cluster-api-provider-gcp test-e2e
+          value: make test-e2e
+        - name: TEST_IMAGESTREAM_TAG
+          value: stable:cluster-api-actuator-pkg
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -52,7 +55,7 @@ presubmits:
           name: cluster-profile
         - mountPath: /usr/local/e2e-gcp-operator
           name: job-definition
-          subPath: cluster-launch-installer-src.yaml
+          subPath: cluster-launch-installer-custom-test-image.yaml
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
@@ -66,7 +69,7 @@ presubmits:
           - configMap:
               name: cluster-profile-gcp
       - configMap:
-          name: prow-job-cluster-launch-installer-src
+          name: prow-job-cluster-launch-installer-custom-test-image
         name: job-definition
       - name: sentry-dsn
         secret:
