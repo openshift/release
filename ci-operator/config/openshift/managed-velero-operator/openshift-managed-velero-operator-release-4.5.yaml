@@ -3,6 +3,7 @@ base_images:
     name: "4.5"
     namespace: ocp
     tag: base
+binary_build_commands: unset GOFLAGS && make
 build_root:
   image_stream_tag:
     name: release
@@ -10,7 +11,12 @@ build_root:
     tag: golang-1.13
 images:
 - dockerfile_path: build/Dockerfile
-  from: base
+  from: bin
+  inputs:
+    bin:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      paths: null
   to: managed-velero-operator
 promotion:
   name: "4.5"
@@ -28,6 +34,7 @@ tag_specification:
 tests:
 - as: verify
   commands: |
+    unset GOFLAGS
     export GOLANGCI_LINT_VERSION=1.21.0
     export GOLANGCI_LINT_CACHE=/tmp/.cache
     curl -sfL "https://github.com/golangci/golangci-lint/releases/download/v${GOLANGCI_LINT_VERSION}/golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64.tar.gz" | tar -C /go/bin -zx --strip-components=1 "golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64/golangci-lint"
@@ -37,6 +44,7 @@ tests:
     from: src
 - as: test
   commands: |
+    unset GOFLAGS
     make test
   container:
     from: src
