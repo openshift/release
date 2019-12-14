@@ -1,34 +1,39 @@
 base_images:
   base:
-    name: '4.0'
+    name: '4.2'
     namespace: ocp
     tag: base
-  base-machine:
-    name: fedora
-    namespace: openshift
-    tag: '29'
-  machine-os-content-base:
-    name: '4.0'
-    namespace: ocp
-    tag: machine-os-content
 
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.10
+    tag: golang-1.13
 
 
-binary_build_commands: make build GOFLAGS='-v'
-test_binary_build_commands: make build GOFLAGS='-v -race'
+binary_build_commands: make build GO_BUILD_FLAGS:='-v' --warn-undefined-variables
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-v -race' --warn-undefined-variables
 
 images:
 - dockerfile_path: images/openshift-acme-controller/Dockerfile
-  from: base
+  from: bin
   inputs:
     bin:
       as:
-      - bin
+      - builder
+    base:
+      as:
+      - runtime
+  to: openshift-acme
+- dockerfile_path: images/openshift-acme-exposer/Dockerfile
+  from: bin
+  inputs:
+    bin:
+      as:
+      - builder
+    base:
+      as:
+      - runtime
   to: openshift-acme
 
 promotion:
@@ -36,34 +41,34 @@ promotion:
   tag: latest
 
 tag_specification:
-  name: '4.0'
+  name: '4.2'
   namespace: ocp
 
 tests:
 - as: verify
-  commands: make verify -k
+  commands: make verify -k --warn-undefined-variables
   container:
     from: bin
 
 - as: unit
-  commands: make test
+  commands: make test --warn-undefined-variables
   container:
     from: test-bin
 
 - as: e2e-cluster-wide
-  commands: hack/ci-run-e2e-cluster-wide.sh
+  commands: make test-e2e-cluster-wide --warn-undefined-variables
   openshift_installer_src:
     cluster_profile: aws
 
 - as: e2e-single-namespace
-  commands: hack/ci-run-e2e-single-namespace.sh
+  commands: make test-e2e-single-namespace --warn-undefined-variables
   openshift_installer_src:
     cluster_profile: aws
 
 resources:
   '*':
     limits:
-      memory: 3Gi
+      memory: 4Gi
     requests:
       cpu: '3'
       memory: 1Gi
