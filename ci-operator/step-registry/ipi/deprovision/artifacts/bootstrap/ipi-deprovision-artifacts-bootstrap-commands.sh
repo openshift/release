@@ -1,17 +1,15 @@
 #!/bin/bash
 
 set -o nounset
-set -o errext
+set -o errexit
 set -o pipefail
-
-export PATH=$PATH:/tmp/shared
 
 echo "Gathering installer artifacts ..."
 # we don't have jq, so the python equivalent of
 # jq '.modules[].resources."aws_instance.bootstrap".primary.attributes."public_ip" | select(.)'
 bootstrap_ip=$(python -c \
     'import sys, json; d=reduce(lambda x,y: dict(x.items() + y.items()), map(lambda x: x["resources"], json.load(sys.stdin)["modules"])); k="aws_instance.bootstrap"; print d[k]["primary"]["attributes"]["public_ip"] if k in d else ""' \
-    < ${ARTIFACT_DIR}/installer/terraform.tfstate
+    < "${SHARED_DIR}/terraform.tfstate"
 )
 
 if [ -n "${bootstrap_ip}" ]
