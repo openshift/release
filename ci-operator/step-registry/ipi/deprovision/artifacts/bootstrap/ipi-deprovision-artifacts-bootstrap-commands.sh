@@ -1,7 +1,7 @@
 #!/bin/bash
 
 set -o nounset
-set -o errext
+set -o errexit
 set -o pipefail
 
 export PATH=$PATH:/tmp/shared
