@@ -326,7 +326,7 @@ update_secret generic "aws-openshift-llc-account-credentials" \
 	"$( format_attachment "AWS ci-longlivedcluster-bot" .awscred )"
 
 # Host keys for the SSHD bastions
-for target in "z" "telco"; do
+for target in "z" "telco" "ovn"; do
 	update_secret generic "sshd-host-keys-${target}"                            \
 		"$( format_attachment "sshd-bastion-${target}" ssh_host_rsa_key )"     \
 		"$( format_attachment "sshd-bastion-${target}" ssh_host_dsa_key )"     \
