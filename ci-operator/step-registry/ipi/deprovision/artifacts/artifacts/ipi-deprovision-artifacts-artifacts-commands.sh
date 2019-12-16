@@ -9,7 +9,7 @@ function queue() {
     LIVE="$(jobs | wc -l)"
   done
   echo "${@}"
-  if [[ -n "${FILTER}" ]]; then
+  if [[ -n "${FILTER:-}" ]]; then
     "${@}" | "${FILTER}" >"${TARGET}" &
   else
     "${@}" >"${TARGET}" &
