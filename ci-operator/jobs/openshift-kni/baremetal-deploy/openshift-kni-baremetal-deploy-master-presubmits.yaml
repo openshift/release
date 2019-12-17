@@ -1,20 +1,18 @@
 presubmits:
   openshift-kni/baremetal-deploy:
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
-    context: ci/prow/sctp-e2e
+    context: ci/prow/sctp-e2e-aws
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-kni-baremetal-deploy-master-sctp-e2e
-    optional: true
-    rerun_command: /test sctp-e2e
-    run_if_changed: features/sctp/.*
+    name: pull-ci-openshift-kni-baremetal-deploy-master-sctp-e2e-aws
+    rerun_command: /test sctp-e2e-aws
     spec:
       containers:
       - args:
@@ -25,10 +23,10 @@ presubmits:
         - --org=openshift-kni
         - --repo=baremetal-deploy
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-        - --secret-dir=/usr/local/sctp-e2e-cluster-profile
+        - --secret-dir=/usr/local/sctp-e2e-aws-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=sctp-e2e
-        - --template=/usr/local/sctp-e2e
+        - --target=sctp-e2e-aws
+        - --template=/usr/local/sctp-e2e-aws
         command:
         - ci-operator
         env:
@@ -40,7 +38,7 @@ presubmits:
               key: openshift-kni-baremetal-deploy-master.yaml
               name: ci-operator-master-configs
         - name: JOB_NAME_SAFE
-          value: sctp-e2e
+          value: sctp-e2e-aws
         - name: TEST_COMMAND
           value: cd features && export FEATURES=sctp && make deploy && make functests
         image: ci-operator:latest
@@ -50,9 +48,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/sctp-e2e-cluster-profile
+        - mountPath: /usr/local/sctp-e2e-aws-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/sctp-e2e
+        - mountPath: /usr/local/sctp-e2e-aws
           name: job-definition
           subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/sentry-dsn
@@ -71,7 +69,7 @@ presubmits:
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )sctp-e2e,?($|\s.*)
+    trigger: (?m)^/test( | .* )sctp-e2e-aws,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
