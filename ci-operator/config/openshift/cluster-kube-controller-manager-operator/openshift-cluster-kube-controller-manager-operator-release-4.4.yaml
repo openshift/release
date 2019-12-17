@@ -3,15 +3,15 @@ base_images:
     name: "4.4"
     namespace: ocp
     tag: base
-binary_build_commands: make build
+binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.12
+    tag: golang-1.13
 images:
 - dockerfile_path: Dockerfile.rhel7
-  from: base
+  from: bin
   to: cluster-kube-controller-manager-operator
 promotion:
   disabled: true
@@ -27,18 +27,18 @@ resources:
 tag_specification:
   name: "4.4"
   namespace: ocp
-test_binary_build_commands: make build GOFLAGS='-race'
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
 tests:
 - as: verify
   commands: |
-    make verify -k
+    make verify -k --warn-undefined-variables
   container:
     from: bin
 - artifact_dir: /tmp/artifacts
   as: unit
   commands: |
     mkdir -p /tmp/artifacts
-    make test-unit JUNITFILE=/tmp/artifacts/junit_report.xml
+    make test-unit JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
   container:
     from: test-bin
 - as: e2e-aws

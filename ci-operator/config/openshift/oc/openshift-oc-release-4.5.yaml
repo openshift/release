@@ -16,14 +16,14 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.12
+    tag: golang-1.13
 images:
 - dockerfile_path: images/cli/Dockerfile.rhel
   from: base
   inputs:
     bin:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
+      - builder
       paths: null
   to: cli
 - dockerfile_path: images/cli/Dockerfile.rhel
@@ -31,7 +31,7 @@ images:
   inputs:
     bin:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
+      - builder
       paths: null
   to: tests
 - dockerfile_path: images/cli/Dockerfile.rhel
@@ -39,7 +39,7 @@ images:
   inputs:
     bin:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
+      - builder
       paths: null
   to: must-gather
 - context_dir: images/deployer/
@@ -92,7 +92,7 @@ rpm_build_location: _rpmbuild/RPMS/
 tag_specification:
   name: "4.5"
   namespace: ocp
-test_binary_build_commands: make build GOFLAGS='-race' --warn-undefined-variables
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
 tests:
 - as: build-rpms-from-tar
   commands: '# noop, just to force the building the `rpms` target'

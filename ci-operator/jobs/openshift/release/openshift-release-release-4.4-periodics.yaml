@@ -386,7 +386,7 @@ periodics:
     org: openshift
     repo: origin
     workdir: true
-  interval: 24h
+  interval: 2h
   labels:
     job-release: "4.4"
   name: promote-release-openshift-okd-machine-os-content-e2e-aws-4.4
@@ -432,6 +432,26 @@ periodics:
         tar_url="${base_url}/$( <${dir}/meta.json jq -r .images.ostree.path )"
         commit_id="$( <${dir}/meta.json jq -r '."ostree-commit"' )"
         ostree_ref="fedora/x86_64/coreos/${stream}"
+
+        # Build a semantic version as best we can from the build id, dropping any other
+        # segments. Each version of machine-os-content is responsible for setting a
+        # semver and this is only a workaround for now.
+        if [[ ! "${build_id}" =~ ^(([0-9]+)\.)(([0-9]+)\.)?(([0-9]+)($|\.))? ]]; then
+          echo "Build ID did not contain at least one major version"
+          exit 1
+        fi
+        build_semver="${BASH_REMATCH[1]}"
+        if [[ -n ${BASH_REMATCH[4]} ]]; then
+          build_semver+="${BASH_REMATCH[3]}"
+        else
+          build_semver+="0."
+        fi
+        if [[ -n "${BASH_REMATCH[6]}" ]]; then
+          build_semver+="${BASH_REMATCH[6]}"
+        else
+          build_semver+="0"
+        fi
+
 
         # compare the latest image we have built against the potential candidate
         latest="$( oc get istag -n fcos ${TAG}:${BRANCH} --template '{{ index .image.dockerImageMetadata.Config.Labels "version" }} {{ index .image.dockerImageMetadata.Config.Labels "id-artifacts" }} {{ index .image.dockerImageMetadata.Config.Labels "id-machine-config-operator-rpms" }}' )"
@@ -506,7 +526,9 @@ periodics:
               COPY --from=build /srv/ /srv/
               LABEL version=${build_id} \\
                     id-artifacts=${origin_artifacts_id} \\
-                    id-machine-config-operator-rpms=${origin_machine_config_operator_rpms_id}
+                    id-machine-config-operator-rpms=${origin_machine_config_operator_rpms_id} \\
+                    "io.openshift.build.versions=machine-os=${build_semver}" \\
+                    "io.openshift.build.version-display-names=machine-os=Fedora CoreOS"
               ENTRYPOINT ["/noentry"]
 
           strategy:
@@ -4219,6 +4241,7 @@ periodics:
         oc annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
 
         ci-operator --artifact-dir=$(ARTIFACTS) \
+          --lease-server=http://boskos \
           --secret-dir=/usr/local/pull-secret --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile \
           --target=e2e-$(CLUSTER_TYPE)-upgrade --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME)
       env:
@@ -4483,6 +4506,7 @@ periodics:
         oc annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
 
         ci-operator --artifact-dir=$(ARTIFACTS) \
+          --lease-server=http://boskos \
           --secret-dir=/usr/local/pull-secret --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile \
           --target=e2e-$(CLUSTER_TYPE)-upgrade --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME)
       env:
@@ -4576,6 +4600,7 @@ periodics:
         oc annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
 
         ci-operator --artifact-dir=$(ARTIFACTS) \
+          --lease-server=http://boskos \
           --secret-dir=/usr/local/pull-secret --secret-dir=/usr/local/e2e-azure-upgrade-cluster-profile \
           --target=e2e-azure-upgrade --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME)
       env:

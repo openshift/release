@@ -8,7 +8,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.12
+    tag: golang-1.13
 images:
 - dockerfile_path: Dockerfile
   from: base
@@ -27,11 +27,10 @@ resources:
 tag_specification:
   name: "4.4"
   namespace: ocp
-test_binary_build_commands: make build GOFLAGS='-race' --warn-undefined-variables
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
 tests:
 - as: verify
   commands: |
-    go get -u golang.org/x/tools/imports
     make verify -k --warn-undefined-variables
   container:
     from: bin
@@ -54,7 +53,6 @@ tests:
   as: unit
   commands: |
     mkdir -p /tmp/artifacts
-    go get -u github.com/openshift/release/tools/gotest2junit
     make test-unit JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
   container:
     from: test-bin
@@ -62,7 +60,3 @@ tests:
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: azure4
-- as: e2e-gcp-op
-  commands: make test-e2e
-  openshift_installer_src:
-    cluster_profile: gcp
