@@ -1,7 +1,7 @@
 #!/bin/bash
 
 set -o nounset
-set -o errext
+set -o errexit
 set -o pipefail
 
 # We want the cluster to be able to access these images
@@ -12,7 +12,7 @@ oc adm policy add-role-to-group system:image-puller system:authenticated   --nam
 oc adm policy add-role-to-user admin system:serviceaccount:ci:ci-chat-bot --namespace "${NAMESPACE}"
 
 # Role for giving the e2e pod permissions to update imagestreams
-cat <<EOF | oc apply -f -
+oc apply -f - <<EOF
 kind: Role
 apiVersion: authorization.openshift.io/v1
 metadata:
@@ -28,4 +28,4 @@ rules:
 EOF
 
 # Give the e2e pod access to the imagestream-updater role
-oc adm policy add-role-to-user ${JOB_NAME_SAFE}-imagestream-updater --serviceaccount default --namespace "${NAMESPACE}"
+oc adm policy add-role-to-user "${JOB_NAME_SAFE}-imagestream-updater" --serviceaccount default --namespace "${NAMESPACE}" --role-namespace "${NAMESPACE}"
