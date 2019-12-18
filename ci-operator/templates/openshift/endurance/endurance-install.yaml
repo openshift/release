@@ -105,15 +105,27 @@ objects:
         rc=$?
         cat /tmp/operators.out
         if [ ! $rc -eq 0 ]; then
-          echo "Could not retrieve cluster operator objects, tearing down cluster"
+          echo "Could not retrieve cluster operator objects, collecting must-gather and tearing down cluster"
+          touch /tmp/shared/mustgather
           touch /tmp/shared/teardown
           exit 0
         fi
+
+        # to force a teardown of the cluster, create a configmap with this name on the cluster
+        oc get configmap/teardown -n openshift-config
+        rc=$?
+        if [ rc -eq 0 ]; then
+          echo "Cluster marked for teardown, tearing down and reinstalling"
+          touch /tmp/shared/mustgather
+          touch /tmp/shared/teardown
+          exit 0
+        fi
+
         awk '{print $3}' < /tmp/operators.out  | grep -v AVAILABLE | grep -v True
         rc=$?
         if [ ! $rc -eq 1 ]; then
-          echo "Some operators are not available, tearing down cluster"
-          touch /tmp/shared/teardown
+          echo "Some operators are not available, collecting must-gather from cluster"
+          touch /tmp/shared/mustgather
           exit 0
         fi          
         echo "Cluster appears healthy"
@@ -145,14 +157,11 @@ objects:
 
         export PATH=$PATH:/tmp/shared/bin
 
-        if [ ! -f /tmp/shared/teardown ];then
+        if [[ ! -f /tmp/shared/teardown && ! -f /tmp/shared/mustgather ]];then
           echo "Long lived cluster appears healthy, taking no action"
           exit 0
         fi
 
-        # flag that we're going to need to install a new endurance cluster
-        # after gathering artifacts/teardown.
-        touch /tmp/shared/install
 
         function queue() {
           local TARGET="${1}"
@@ -310,15 +319,19 @@ objects:
           echo "Waiting for logs ..."
           wait
 
-          if [ -f /tmp/artifacts/installer/metadata.json ]; then
-            echo "Deprovisioning cluster ..."
-            export AWS_SHARED_CREDENTIALS_FILE=/etc/cloud-credentials/.awscred
-            openshift-install --dir /tmp/artifacts/installer destroy cluster
-            echo "Done"
-          else
-            echo "no cluster metadata.json found so skipping teardown"
+          if [ -f /tmp/shared/teardown ];then
+            # flag that we're going to need to install a new endurance cluster
+            # after gathering artifacts/teardown.
+            touch /tmp/shared/install
+            if [ -f /tmp/artifacts/installer/metadata.json ]; then
+              echo "Deprovisioning cluster ..."
+              export AWS_SHARED_CREDENTIALS_FILE=/etc/cloud-credentials/.awscred
+              openshift-install --dir /tmp/artifacts/installer destroy cluster
+              echo "Done"
+            else
+              echo "no cluster metadata.json found so skipping teardown"
+            fi
           fi
-
         }
 
         trap 'jobs -p | xargs -r kill || true; exit 0' TERM
@@ -470,8 +483,13 @@ objects:
         set -euo pipefail
 
         if [ -f /tmp/shared/teardown ]; then
-          echo "Cluster was found to be in a failed state and torn down, artifacts gathered"
+          echo "Cluster was found to be in a failed state, artifacts gathered and cluster reinstalled"
           exit 1
         fi
+        if [ -f /tmp/shared/mustgather ]; then
+          echo "Cluster was found to be in an unhealthy state, artifacts gathered, cluster left intact"
+          exit 1
+        fi
+
         echo "Cluster was found to be healthy"
         exit 0
