@@ -1672,6 +1672,7 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -1687,6 +1688,8 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=master
         - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
         - --org=openshift
         - --repo=installer
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
@@ -1701,18 +1704,33 @@ presubmits:
             configMapKeyRef:
               key: openshift-installer-master.yaml
               name: ci-operator-master-configs
-        image: ci-operator:latest
+        image: quay.io/hongkailiu/ci-op:ci-operator-030
         imagePullPolicy: Always
         name: ""
         resources:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: pull-secret
+        secret:
+          secretName: regcred
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
