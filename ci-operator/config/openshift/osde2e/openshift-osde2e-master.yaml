@@ -299,3 +299,28 @@ tests:
     export MINOR_TARGET=2
 
     ci/prow_run_tests.sh /usr/local/osde2e-secrets scale
+
+# Addon Tests
+- as: addon-prow-operator-test
+  artifact_dir: /tmp/artifacts
+  cron: '* 8 * * *'
+  secrets:
+  - name: osde2e-common
+    mount_path: /usr/local/osde2e-common
+  - name: osde2e-prow-operator-addon
+    mount_path: /usr/local/osde2e-prow-operator-addon
+  container:
+    from: src
+  commands: |
+    set -o pipefail
+
+    export HOME=$(mktemp -d)
+
+    export REPORT_DIR=/tmp/artifacts
+    export DESTROY_CLUSTER=false
+
+    export OSD_ENV=stage
+    export MAJOR_TARGET=4
+    export MINOR_TARGET=2
+
+    ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-prow-operator-addon addon
