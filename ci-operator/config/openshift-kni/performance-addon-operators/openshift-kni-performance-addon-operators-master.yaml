@@ -1,9 +1,8 @@
 base_images:
-# TODO - enable this when we start building registry container
-#  operator-registry:
-#    name: "4.4"
-#    namespace: ocp
-#    tag: operator-registry
+  operator-registry:
+    name: "4.4"
+    namespace: ocp
+    tag: operator-registry
   os:
     name: ubi
     namespace: ocp
@@ -21,13 +20,12 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/openshift-kni/performance-addon-operators/build/_output/bin/performance-addon-operators
   to: performance-addon-operators
-# TODO - use the registry definitions below to build and test with once operator CSV generation works
-#- dockerfile_path: openshift-ci/Dockerfile.registry.intermediate
-#  from: operator-registry
-#  to: operator-registry-base
-#- dockerfile_path: openshift-ci/Dockerfile.registry.build
-#  from: operator-registry-base
-#  to: ocs-registry
+- dockerfile_path: openshift-ci/Dockerfile.registry.intermediate
+  from: operator-registry
+  to: operator-registry-base
+- dockerfile_path: openshift-ci/Dockerfile.registry.build
+  from: operator-registry-base
+  to: performance-addon-operators-registry
 resources:
   '*':
     limits:
@@ -39,8 +37,8 @@ tag_specification:
   name: "4.4"
   namespace: ocp
 tests:
-- as: unit-tests
-  commands: make unittests
+- as: ci
+  commands: make ci-job
   container:
     from: src
 - as: e2e-gcp
