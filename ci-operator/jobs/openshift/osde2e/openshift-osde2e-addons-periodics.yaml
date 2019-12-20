@@ -1,0 +1,47 @@
+periodics:
+- agent: kubernetes
+  cron: '* */4 * * *'
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: osde2e
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-osde2e-master-addon-prow-operator-stage-4.2
+  spec:
+    containers:
+    - args:
+      - /usr/local/osde2e-common,/usr/local/osde2e-prow-operator-addon
+      - addon
+      command:
+      - ci/prow_run_tests.sh
+      env:
+      - name: OSD_ENV
+        value: stage
+      - name: MAJOR_TARGET
+        value: "4"
+      - name: MINOR_TARGET
+        value: "2"
+      image: registry.svc.ci.openshift.org/ci/origin-release:golang-1.13
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/osde2e-common
+        name: osde2e-common
+        readOnly: true
+      - mountPath: /usr/local/osde2e-prow-operator-addon
+        name: osde2e-prow-operator-addon
+        readOnly: true
+    volumes:
+    - name: osde2e-common
+      secret:
+        secretName: osde2e-common
+    - name: osde2e-prow-operator-addon
+      secret:
+        secretName: osde2e-prow-operator-addon
