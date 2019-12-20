@@ -12,6 +12,11 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
+  inputs:
+    bin:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
+      paths: null
   to: cluster-kube-scheduler-operator
 promotion:
   name: "4.5"
@@ -43,6 +48,11 @@ tests:
 - as: verify
   commands: |
     make verify -k --warn-undefined-variables
+  container:
+    from: src
+- as: verify-deps
+  commands: |
+    make verify-deps -k --warn-undefined-variables
   container:
     from: src
 - as: e2e-aws-serial
