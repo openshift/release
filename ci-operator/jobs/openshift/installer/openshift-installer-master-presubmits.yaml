@@ -205,6 +205,7 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/e2e-aws-fips
     decorate: true
     decoration_config:
@@ -220,7 +221,11 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=master
         - --give-pr-author-access-to-namespace=true
-        - --lease-server=http://boskos
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
         - --org=openshift
         - --repo=installer
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
@@ -253,16 +258,37 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /usr/local/e2e-aws-fips-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/e2e-aws-fips
           name: job-definition
           subPath: cluster-launch-installer-e2e.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -271,6 +297,9 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-e2e
         name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
@@ -279,6 +308,7 @@ presubmits:
     always_run: false
     branches:
     - master
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/e2e-aws-proxy
     decorate: true
     decoration_config:
@@ -293,7 +323,11 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
-        - --lease-server=http://boskos
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
         - --secret-dir=/usr/local/e2e-aws-proxy-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=e2e-aws-proxy
@@ -321,16 +355,37 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /usr/local/e2e-aws-proxy-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/e2e-aws-proxy
           name: job-definition
           subPath: cluster-launch-installer-upi-e2e.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -339,6 +394,9 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-upi-e2e
         name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
@@ -347,6 +405,7 @@ presubmits:
     always_run: false
     branches:
     - master
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/e2e-aws-rhel8
     decorate: true
     decoration_config:
@@ -359,7 +418,11 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
-        - --lease-server=http://boskos
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
         - --secret-dir=/usr/local/e2e-aws-rhel8-cluster-profile
         - --target=e2e-aws-rhel8
         - --template=/usr/local/e2e-aws-rhel8
@@ -426,13 +489,34 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /usr/local/e2e-aws-rhel8-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/e2e-aws-rhel8
           name: job-definition
           subPath: cluster-launch-installer-e2e.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -441,6 +525,9 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-e2e
         name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
     trigger: (?m)^/test( | .* )e2e-aws-rhel8,?($|\s.*)
   - agent: kubernetes
     always_run: true
@@ -552,6 +639,7 @@ presubmits:
     always_run: false
     branches:
     - master
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/e2e-aws-shared-vpc
     decorate: true
     decoration_config:
@@ -567,7 +655,11 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=master
         - --give-pr-author-access-to-namespace=true
-        - --lease-server=http://boskos
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
         - --org=openshift
         - --repo=installer
         - --resolver-address=http://ci-operator-configresolver
@@ -598,16 +690,37 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /usr/local/e2e-aws-shared-vpc-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/e2e-aws-shared-vpc
           name: job-definition
           subPath: cluster-launch-installer-e2e.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -616,6 +729,9 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-e2e
         name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
@@ -910,6 +1026,7 @@ presubmits:
     always_run: false
     branches:
     - master
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/e2e-azure-shared-vpc
     decorate: true
     decoration_config:
@@ -925,7 +1042,11 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=master
         - --give-pr-author-access-to-namespace=true
-        - --lease-server=http://boskos
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
         - --org=openshift
         - --repo=installer
         - --resolver-address=http://ci-operator-configresolver
@@ -956,16 +1077,37 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /usr/local/e2e-azure-shared-vpc-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/e2e-azure-shared-vpc
           name: job-definition
           subPath: cluster-launch-installer-e2e.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -974,6 +1116,9 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-e2e
         name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
@@ -1084,6 +1229,7 @@ presubmits:
     always_run: false
     branches:
     - master
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/e2e-gcp-shared-vpc
     decorate: true
     decoration_config:
@@ -1099,7 +1245,11 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=master
         - --give-pr-author-access-to-namespace=true
-        - --lease-server=http://boskos
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
         - --org=openshift
         - --repo=installer
         - --resolver-address=http://ci-operator-configresolver
@@ -1130,16 +1280,37 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /usr/local/e2e-gcp-shared-vpc-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/e2e-gcp-shared-vpc
           name: job-definition
           subPath: cluster-launch-installer-e2e.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -1150,6 +1321,9 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-e2e
         name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
@@ -1348,6 +1522,7 @@ presubmits:
     always_run: false
     branches:
     - master
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/e2e-libvirt
     decorate: true
     name: pull-ci-openshift-installer-master-e2e-libvirt
@@ -1359,6 +1534,8 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
         - --secret-dir=/usr/local/e2e-libvirt-cluster-profile
         - --target=e2e-libvirt
         - --template=/usr/local/e2e-libvirt
@@ -1515,13 +1692,25 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
         - mountPath: /usr/local/e2e-libvirt-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/e2e-libvirt
           name: job-definition
           subPath: cluster-launch-installer-libvirt-e2e.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -1532,11 +1721,15 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-libvirt-e2e
         name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
     trigger: (?m)^/test( | .* )e2e-libvirt,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - master
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/e2e-metal
     decorate: true
     decoration_config:
@@ -1551,6 +1744,8 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
         - --secret-dir=/usr/local/e2e-metal-cluster-profile
         - --target=e2e-metal
         - --template=/usr/local/e2e-metal
@@ -1575,13 +1770,25 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
         - mountPath: /usr/local/e2e-metal-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/e2e-metal
           name: job-definition
           subPath: cluster-launch-installer-metal-e2e.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -1590,11 +1797,15 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-metal-e2e
         name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
     trigger: (?m)^/test( | .* )e2e-metal,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - master
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/e2e-openstack
     decorate: true
     decoration_config:
@@ -1610,7 +1821,11 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
-        - --lease-server=http://boskos
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
         - --secret-dir=/usr/local/e2e-openstack-cluster-profile
         - --target=e2e-openstack
         - --template=/usr/local/e2e-openstack
@@ -1637,13 +1852,34 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /usr/local/e2e-openstack-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/e2e-openstack
           name: job-definition
           subPath: cluster-launch-installer-openstack-e2e.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -1652,11 +1888,15 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-openstack-e2e
         name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
     trigger: (?m)^/test( | .* )e2e-openstack,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - master
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/e2e-openstack-parallel
     decorate: true
     decoration_config:
@@ -1671,7 +1911,11 @@ presubmits:
       - args:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
-        - --lease-server=http://boskos
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
         - --secret-dir=/usr/local/e2e-openstack-parallel-cluster-profile
         - --target=e2e-openstack-parallel
         - --template=/usr/local/e2e-openstack-parallel
@@ -1698,13 +1942,34 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /usr/local/e2e-openstack-parallel-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/e2e-openstack-parallel
           name: job-definition
           subPath: cluster-launch-installer-openstack-e2e.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -1713,6 +1978,9 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-openstack-e2e
         name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
     trigger: (?m)^/test( | .* )e2e-openstack-parallel,?($|\s.*)
   - agent: kubernetes
     always_run: false
@@ -2213,6 +2481,7 @@ presubmits:
     trigger: (?m)^/test( | .* )verify-vendor,?($|\s.*)
   - agent: kubernetes
     always_run: true
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/shellcheck
     decorate: true
     name: pull-ci-openshift-installer-shellcheck
@@ -2235,6 +2504,7 @@ presubmits:
     trigger: (?m)^/test shellcheck
   - agent: kubernetes
     always_run: true
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/tf-fmt
     decorate: true
     name: pull-ci-openshift-installer-tf-fmt
@@ -2258,6 +2528,7 @@ presubmits:
     trigger: (?m)^/test( | .* )tf-fmt,?($|\s.*)
   - agent: kubernetes
     always_run: true
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/tf-lint
     decorate: true
     name: pull-ci-openshift-installer-tf-lint
@@ -2280,6 +2551,7 @@ presubmits:
     trigger: (?m)^/test tf-lint
   - agent: kubernetes
     always_run: true
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/yaml-lint
     decorate: true
     name: pull-ci-openshift-installer-yaml-lint
