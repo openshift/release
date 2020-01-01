@@ -101,7 +101,15 @@ def renderHeader(dc):
     version = "<unknown-version>"
     containers = spec.get("template", {}).get("spec", {}).get("containers", [])
     for container in containers:
-        if container.get("name") == dc:
+        if dc == "boskos-metrics":
+            container_name = "metrics"
+        elif dc == "jenkins-dev-operator":
+            container_name = "jenkins-operator"
+        elif dc == "deck-internal":
+            container_name = "deck"
+        else:
+            container_name = dc
+        if container.get("name") == container_name:
             image = container.get("image", "")
             version = image.split(":")[-1]
     headerColor = ''
