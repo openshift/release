@@ -77,3 +77,56 @@ $ oc get pod -n openshift-machine-api -l cluster-autoscaler=default
 NAME                                          READY     STATUS    RESTARTS   AGE
 cluster-autoscaler-default-576944b996-h82zp   1/1       Running   0          7m54s
 ```
+
+## Prow Configuration for build cluster
+
+### Deploy admin assets: Manual
+Deploy `./**/admin_*.yaml`.
+
+### Deploy non-admin assets
+Automated by [branch-ci-openshift-release-master-build01-apply](https://github.com/openshift/release/blob/0ac7c4c6559316a5cf40c40ca7f05a0df150ef8d/ci-operator/jobs/openshift/release/openshift-release-master-postsubmits.yaml#L9) and [Prow's config-updater plugin](https://github.com/openshift/release/blob/0ac7c4c6559316a5cf40c40ca7f05a0df150ef8d/core-services/prow/02_config/_plugins.yaml#L198).
+
+## CA certificates: Semi-Manual
+
+It is semi-manual because rotation of the CAs is automated and patching to config (needed only once) is not.
+
+* API server CA: see [readme](../openshift-apiserver/README.md)
+
+* App domain: see [readme](../openshift-ingress-operator/README.md)
+
+### update BW items: Semi-Manual
+
+The item `build_farm` contains
+	
+* `sa*config`: those are `kubeconfig` for different `SAs`
+* `build01_ci_reg_auth_value.txt` and `build01_build01_reg_auth_value.txt` are used to form pull secrets for `ci-operator`'s tests.
+
+Use [generate-bw-items.sh](./hack/generate-bw-items.sh) to generate those files, and upload them to the BW item `build_farm`.
+
+### Populate secrets on build01 for prow and tests
+
+Use [ci-secret-bootstrap](../../../core-services/ci-secret-bootstrap/README.md).
+
+## OpenShift Image Registry: Manual
+
+* Expose registry service: see [readme](../openshift-image-registry/README.md). We need to run the command only once.
+
+## OpenShift-Monitoring
+
+It is automated by config-updater:
+
+* alertmanager secret for sending notification to slack
+* PVCs for monitoring stack
+
+## Destroy the cluster
+
+_Note_: [Remove the build01 config from plank](https://github.com/openshift/release/pull/6922). It would cause plank to crash otherwise.
+
+Before recreating `build01` cluster, we need to destroy it first.
+
+```bash
+### Assume you have aws credentials file ${HOME}/.aws/credentials ready for ci-infra account
+### google drive folder shared within DPTP-team
+### download/unzip/cd ./build01/20191016_162227.zip
+$ openshift-install destroy cluster --log-level=debug
+```
