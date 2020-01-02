@@ -17,6 +17,31 @@ BOLD = exec_cmd('tput', 'bold')
 RESET = exec_cmd('tput', 'sgr0')
 CLEAR = exec_cmd('tput', 'clear')
 
+BLACKLIST = [
+    "Failed to GET .",
+    "The following repos define a policy or require context",
+    "requested job is unknown to prow: rehearse",
+    "requested job is unknown to prow: promote",
+    "Not enough reviewers found in OWNERS files for files touched by this PR",
+    "failed to get path: failed to resolve sym link: failed to read",
+    "nil pointer evaluating *v1.Refs.Repo",
+    "unrecognized directory name (expected int64)",
+    "failed to get reader for GCS object: storage: object doesn't exist",
+    "failed to get reader for GCS object: storage: object doesn't exist",
+    "googleapi: Error 401: Anonymous caller does not have storage.objects.list access to origin-ci-private., required",
+    "has required jobs but has protect: false",
+    "Couldn't find/suggest approvers for each files.",
+    "remote error: upload-pack: not our ref",
+    "fatal: remote error: upload-pack: not our ref",
+    "Error getting ProwJob name for source",
+    "the cache is not started, can not read objects",
+    "owner mismatch request by",
+    "Get : unsupported protocol scheme",
+    "No available resource",
+    "context deadline exceeded",
+    "owner mismatch request by ci-op"
+]
+
 
 def run_oc(args):
     command = ['oc', '--loglevel', '10', '--namespace', 'ci'] + args
@@ -75,6 +100,8 @@ def highlight(log_dir, dc):
             debug("deployment/{}: pod/{}: getting logs".format(dc, pod))
             try:
                 for l in run_oc(cmd).splitlines():
+                    if any(word in l for word in BLACKLIST):
+                        continue
                     if warn in l:
                         log_lines.append(YELLOW + l + RESET)
                     elif error in l or fatal in l:
@@ -152,6 +179,7 @@ def renderFlavor(pod, dc):
                 lines.append(RED + "pod {} has restarted {} times".format(pod, restartCount) + RESET)
     debug("deployment/{}: pod/{}: got flavor {}".format(dc, pod, lines))
     return lines
+
 
 if __name__ == '__main__':
     main()
