@@ -1,4 +1,4 @@
-kind: Template
+p/kind: Template
 apiVersion: template.openshift.io/v1
 
 parameters:
@@ -131,12 +131,28 @@ objects:
         value: /tmp/artifacts/installer/auth/kubeconfig
       - name: MIRROR_BASE
         value: registry.svc.ci.openshift.org/${NAMESPACE}/release
+      - name: CLUSTER_NAME
+        value: ${NAMESPACE}-${JOB_NAME_HASH}
+      - name: BASE_DOMAIN
+        value: ${BASE_DOMAIN}
+      hostAliases:
+      - ip:
+        hostnames:
+        - "alertmanager-main-openshift-monitoring.apps.${CLUSTER_NAME}${BASE_DOMAIN}"
+        - "api.${CLUSTER_NAME}${BASE_DOMAIN}"
+        - "console-openshift-console.apps.${CLUSTER_NAME}${BASE_DOMAIN}"
+        - "downloads-openshift-console.apps.${CLUSTER_NAME}${BASE_DOMAIN}"
+        - "grafana-openshift-monitoring.apps.${CLUSTER_NAME}${BASE_DOMAIN}"
+        - "oauth-openshift.apps.${CLUSTER_NAME}${BASE_DOMAIN}"
+        - "prometheus-k8s-openshift-monitoring.apps.${CLUSTER_NAME}${BASE_DOMAIN}"
       command:
       - /bin/bash
       - -c
       - |
         #!/bin/bash
         set -euo pipefail
+
+        cat /etc/hosts
 
         export PATH=/usr/libexec/origin:$PATH
 
@@ -278,12 +294,25 @@ objects:
         value: sshd.bastion-z.svc.cluster.local
       - name: INSTALL_INITIAL_RELEASE
       - name: RELEASE_IMAGE_INITIAL
+      hostAliases:
+      - ip:
+        hostnames:
+        - "alertmanager-main-openshift-monitoring.apps.${CLUSTER_NAME}${BASE_DOMAIN}"
+        - "api.${CLUSTER_NAME}${BASE_DOMAIN}"
+        - "console-openshift-console.apps.${CLUSTER_NAME}${BASE_DOMAIN}"
+        - "downloads-openshift-console.apps.${CLUSTER_NAME}${BASE_DOMAIN}"
+        - "grafana-openshift-monitoring.apps.${CLUSTER_NAME}${BASE_DOMAIN}"
+        - "oauth-openshift.apps.${CLUSTER_NAME}${BASE_DOMAIN}"
+        - "prometheus-k8s-openshift-monitoring.apps.${CLUSTER_NAME}${BASE_DOMAIN}"
       command:
       - /bin/bash
       - -c
       - |
         #!/bin/sh
         set -e
+
+        # Debugging DNS records
+        cat /etc/hosts
 
         trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/setup-success; else touch /tmp/exit; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
@@ -379,6 +408,16 @@ objects:
         value: test
       - name: NSS_GROUPNAME
         value: test
+      hostAliases:
+      - ip:
+        hostnames:
+        - "alertmanager-main-openshift-monitoring.apps.${CLUSTER_NAME}${BASE_DOMAIN}"
+        - "api.${CLUSTER_NAME}${BASE_DOMAIN}"
+        - "console-openshift-console.apps.${CLUSTER_NAME}${BASE_DOMAIN}"
+        - "downloads-openshift-console.apps.${CLUSTER_NAME}${BASE_DOMAIN}"
+        - "grafana-openshift-monitoring.apps.${CLUSTER_NAME}${BASE_DOMAIN}"
+        - "oauth-openshift.apps.${CLUSTER_NAME}${BASE_DOMAIN}"
+        - "prometheus-k8s-openshift-monitoring.apps.${CLUSTER_NAME}${BASE_DOMAIN}"
       command:
       - /bin/bash
       - -c
