@@ -25,8 +25,7 @@ install:
 
 validate-latest: clean install all
 	@echo "Generating sinker.json ..."
-	git status -s ./
-	test -z "$$(git status -s ./)"
+	git diff --exit-code ./
 
 .PHONY : generate-k8s-dashboards
 generate-k8s-dashboards: clean install
