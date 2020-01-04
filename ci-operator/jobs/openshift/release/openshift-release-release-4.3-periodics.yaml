@@ -634,7 +634,9 @@ periodics:
     workdir: true
   interval: 15m
   labels:
+    ci.openshift.io/release-type: informing
     job-release: "4.3"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: promote-release-openshift-okd-machine-os-content-e2e-aws-4.3
   spec:
     containers:
@@ -683,10 +685,10 @@ periodics:
         latest="$( oc get istag -n fcos ${TAG}:${BRANCH} --template '{{ index .image.dockerImageMetadata.Config.Labels "version" }} {{ index .image.dockerImageMetadata.Config.Labels "id-artifacts" }} {{ index .image.dockerImageMetadata.Config.Labels "id-machine-config-operator-rpms" }}' )"
         candidate="${build_id} ${origin_artifacts_id} ${origin_machine_config_operator_rpms_id}"
         echo "Comparing existing '$latest' against latest '$candidate'"
-        if [[ "${latest}" == "${candidate}" ]]; then
-          echo "No build necessary, content is up to date"
-          exit 0
-        fi
+        # if [[ "${latest}" == "${candidate}" ]]; then
+        #   echo "No build necessary, content is up to date"
+        #   exit 0
+        # fi
 
         curl -L https://github.com/mikefarah/yq/releases/download/2.4.0/yq_linux_amd64 2>/dev/null >/tmp/bin/yq
         chmod ug+x $HOME/bin/yq
@@ -766,10 +768,30 @@ periodics:
         oc -n ${namespace} create is machine-os-content >/dev/null
         build ${dir}/build.yaml machine-os-content
 
+        # Craft a release image
+        set -x
+        MOC_SHA256=$(oc get -n "${namespace}" istag/machine-os-content:latest -o template='{{ .image.metadata.name }}' )
+        export RELEASE_IMAGE_LATEST=registry.svc.ci.openshift.org/${namespace}/release:latest
+        oc registry login
+        oc adm release new -n origin \
+          --from-image-stream=$(BRANCH) \
+          --to-image=${RELEASE_IMAGE_LATEST} \
+          machine-os-content=registry.svc.ci.openshift.org/${namespace}/machine-os-content@${MOC_SHA256}
+        # execute the test
+        export RELEASE_IMAGE_INITIAL=${RELEASE_IMAGE_LATEST}
+        ci-operator \
+          --artifact-dir=$(ARTIFACTS) \
+          --secret-dir=/usr/local/pull-secret \
+          --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-cluster-profile \
+          --template=/usr/local/e2e-aws \
+          --target=e2e-$(CLUSTER_TYPE) \
+          --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME) \
+          --lease-server=http://boskos
+
         # debug output
         oc describe -n ${namespace} istag/machine-os-content:latest
-        oc tag ${namespace}/machine-os-content:latest fcos/machine-os-content:${BRANCH}
-        oc tag fcos/machine-os-content:${BRANCH} ${TAG_NS}/${BRANCH}:machine-os-content
+        # oc tag ${namespace}/machine-os-content:latest fcos/machine-os-content:${BRANCH}
+        # oc tag fcos/machine-os-content:${BRANCH} ${TAG_NS}/${BRANCH}:machine-os-content
       env:
       - name: TAG_NS
         value: origin
