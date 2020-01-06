@@ -294,7 +294,7 @@ update_secret generic "build-farm-credentials" \
 	"$( format_attachment "build_farm" sa.plank.build01.config )" \
 	"$( format_attachment "build_farm" sa.sinker.build01.config )" \
 	"$( format_attachment "build_farm" sa.ca-cert-issuer.build01.config )" \
-	"$( format_attachment "build_farm" sa.kubeconfig )"
+	"$( format_attachment "build_farm" sa.config-updater.build01.config )"
 
 # collects all the secrets for ci-operator
 update_secret generic "apici-ci-operator-credentials" \
