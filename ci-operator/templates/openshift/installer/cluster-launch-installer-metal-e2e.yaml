@@ -392,11 +392,26 @@ objects:
         EOF
         fi
 
+        openshift-install --dir=/tmp/artifacts/installer/ create manifests
+
         # TODO: Replace with a more concise manifest injection approach
         if [[ -n "${CLUSTER_NETWORK_MANIFEST}" ]]; then
-            openshift-install --dir=/tmp/artifacts/installer/ create manifests
             echo "${CLUSTER_NETWORK_MANIFEST}" > /tmp/artifacts/installer/manifests/cluster-network-03-config.yml
         fi
+
+        cat >> /tmp/artifacts/installer/openshift/99_kernelargs_e2e_metal.yaml << EOF
+        apiVersion: machineconfiguration.openshift.io/v1
+        kind: MachineConfig
+        metadata:
+          labels:
+            machineconfiguration.openshift.io/role: "master"
+          name: 99-kernelargs-e2e-metal
+        spec:
+          kernelArguments:
+            - 'console=tty0'
+            - 'console=ttyS1,115200n8'
+            - 'rd.neednet=1'
+        EOF
 
         openshift-install --dir=/tmp/artifacts/installer create ignition-configs
 
@@ -441,7 +456,9 @@ objects:
         if test "${rc}" -eq 1; then echo "failed to create the infra resources"; exit 1; fi
 
         echo "Waiting for bootstrap to complete"
-        openshift-install --dir=/tmp/artifacts/installer wait-for bootstrap-complete
+        rc=1
+        for r in {1..2}; do openshift-install --dir=/tmp/artifacts/installer wait-for bootstrap-complete && rc=0 && break ; done
+        if test "${rc}" -eq 1; then echo "failed to bootstrap"; exit 1; fi
 
         echo "Removing bootstrap host from control plane api pool"
         (cd /tmp/artifacts/terraform && terraform apply -auto-approve=true -var=bootstrap_dns="false")
