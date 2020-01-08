@@ -1,3 +1,4 @@
+#TEST
 SHELL=/usr/bin/env bash -o errexit
 
 .PHONY: check check-core check-services dry-core-admin dry-services-admin core-admin services-admin dry-core core dry-services services all-admin all
