@@ -3,13 +3,20 @@ base_images:
     name: "4.4"
     namespace: ocp
     tag: base
+binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.13
 images:
-- from: base
+- dockerfile_path: Dockerfile.rhel7
+  from: base
+  inputs:
+    bin:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
+      paths: null
   to: cluster-authentication-operator
 promotion:
   disabled: true
