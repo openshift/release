@@ -15,7 +15,7 @@ images:
   inputs:
     bin:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
       paths: null
   to: cluster-kube-controller-manager-operator
 promotion:
@@ -39,10 +39,14 @@ tests:
     make verify -k --warn-undefined-variables
   container:
     from: bin
+- as: verify-deps
+  commands: |
+    make verify-deps -k --warn-undefined-variables
+  container:
+    from: src
 - artifact_dir: /tmp/artifacts
   as: unit
   commands: |
-    mkdir -p /tmp/artifacts
     make test-unit JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
   container:
     from: test-bin
@@ -53,7 +57,6 @@ tests:
 - artifact_dir: /tmp/artifacts
   as: e2e-aws-operator
   commands: |
-    mkdir -p /tmp/artifacts
     make test-e2e JUNITFILE=/tmp/artifacts/junit_report.xml
   openshift_installer_src:
     cluster_profile: aws
