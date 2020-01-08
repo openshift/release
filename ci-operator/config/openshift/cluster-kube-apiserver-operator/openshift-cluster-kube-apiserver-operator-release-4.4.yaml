@@ -12,6 +12,11 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
+  inputs:
+    bin:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
+      paths: null
   to: cluster-kube-apiserver-operator
 promotion:
   disabled: true
@@ -34,10 +39,14 @@ tests:
     make verify -k --warn-undefined-variables
   container:
     from: bin
+- as: verify-deps
+  commands: |
+    make verify-deps -k --warn-undefined-variables
+  container:
+    from: src
 - artifact_dir: /tmp/artifacts
   as: unit
   commands: |
-    mkdir -p /tmp/artifacts
     make test-unit JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
   container:
     from: test-bin
@@ -48,14 +57,12 @@ tests:
 - artifact_dir: /tmp/artifacts
   as: e2e-aws-operator
   commands: |
-    mkdir -p /tmp/artifacts
     make test-e2e JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
   openshift_installer_src:
     cluster_profile: aws
 - artifact_dir: /tmp/artifacts
   as: e2e-aws-operator-encryption
   commands: |
-    mkdir -p /tmp/artifacts
     make test-e2e-encryption JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
   openshift_installer_src:
     cluster_profile: aws
@@ -67,7 +74,6 @@ tests:
 - artifact_dir: /tmp/artifacts
   as: e2e-aws-operator-encryption-perf
   commands: |
-    mkdir -p /tmp/artifacts
     make test-e2e-encryption-perf JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
   openshift_installer_src:
     cluster_profile: aws
