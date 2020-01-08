@@ -485,60 +485,48 @@ periodics:
     - name: sentry-dsn
       secret:
         secretName: sentry-dsn
-- agent: kubernetes
-  cron: '* */4 * * *'
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: osde2e
-  labels:
-    ci-operator.openshift.io/prowgen-controlled: "true"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-osde2e-master-e2e-stage-4.2
-  spec:
-    containers:
-    - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --branch=master
-      - --give-pr-author-access-to-namespace=true
-      - --org=openshift
-      - --repo=osde2e
-      - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-      - --secret-dir=/usr/local/osde2e-secrets
-      - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-      - --target=e2e-stage-4.2
-      command:
-      - ci-operator
-      env:
-      - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-osde2e-master.yaml
-            name: ci-operator-master-configs
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /usr/local/osde2e-secrets
-        name: osde2e-secrets
-        readOnly: true
-      - mountPath: /etc/sentry-dsn
-        name: sentry-dsn
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: osde2e-secrets
-      secret:
-        secretName: osde2e-secrets
-    - name: sentry-dsn
-      secret:
-        secretName: sentry-dsn
+periodics:
+  - name: periodic-ci-openshift-osde2e-master-e2e-stage-4.2
+    artifact_dir: /tmp/artifacts
+    cron: '* */4 * * *'
+    agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    decoration_config:
+      skip_cloning: true
+    extra_refs:
+    - base_ref: master
+      org: openshift
+      repo: osde2e
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    spec:
+      serviceAccountName: ci-operator
+      containers:
+      - args:
+        - set -o pipefail;
+          export HOME=$(mktemp -d);
+          export REPORT_DIR=/tmp/artifacts;
+          export DESTROY_CLUSTER=false;
+          export OSD_ENV=stage;
+          export MAJOR_TARGET=4;
+          export MINOR_TARGET=2;
+          ci/prow_run_tests.sh /usr/local/osde2e-secrets
+        command:
+        - /bin/bash
+        - -c
+        image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+        imagePullPolicy: Always
+        name: ""
+        volumeMounts:
+        - mountPath: /usr/local/osde2e-secrets
+          name: osde2e-secrets
+          readOnly: true
+      volumes:
+      - name: osde2e-secrets
+        secret:
+          secretName: osde2e-secrets
 - agent: kubernetes
   cron: '* */4 * * *'
   decorate: true
