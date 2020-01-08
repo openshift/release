@@ -167,4 +167,22 @@ dashboard.new(
     .addTarget(myPrometheusTarget('.*-gcp.*'))
     .addTarget(myPrometheusTarget('.*-azure.*'))
     .addTarget(myPrometheusTarget('.*-openstack.*')), defaultGridPos)
+.addPanel(
+    myPanel('Job States by e2e-type for github.com/${org}/${repo}@${base_ref}',
+        description='Job success rate for the org/repo/base_ref selected in the templates. Those regexes filter out various types of tests.',
+        )
+    .addTarget(myPrometheusTarget('.*-aws-fips-.*'))
+    .addTarget(myPrometheusTarget('.*-aws-mirrors-.*'))
+    .addTarget(myPrometheusTarget('.*-aws-ovn-.*'))
+    .addTarget(myPrometheusTarget('.*-aws-proxy-.*'))
+    .addTarget(myPrometheusTarget('.*-aws-serial-.*'))
+    .addTarget(myPrometheusTarget('.*-aws-upi-.*'))
+    .addTarget(myPrometheusTarget('.*-azure-fips-.*'))
+    .addTarget(myPrometheusTarget('.*-azure-serial-.*'))
+    .addTarget(myPrometheusTarget('.*-gcp-fips-.*'))
+    .addTarget(myPrometheusTarget('.*-gcp-ovn-.*'))
+    .addTarget(myPrometheusTarget('.*-gcp-serial-.*'))
+    .addTarget(myPrometheusTarget('.*-gcp-shared-vpc-.*'))
+    .addTarget(myPrometheusTarget('.*-openstack-serial-.*'))
+    .addTarget(myPrometheusTarget('.*-vsphere-upi-serial-.*')), defaultGridPos)
 + dashboardConfig
