@@ -16,7 +16,7 @@ parameters:
   value: ovirt
 - name: TEST_COMMAND
   required: true
-- name: LEASE_STATE
+- name: LEASE_TYPE
   required: true
 - name: RELEASE_IMAGE_LATEST
   required: true
@@ -118,23 +118,44 @@ objects:
           echo "$( jq ."${1}" --raw-output "${2}" )"
         }
 
+        function acquire_lease() {
+          resource="$( boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" acquire --type "${CLUSTER_TYPE}-quota-slice" --state "free" --target-state "leased" --timeout 150m )"
+          resource_name="$(echo "${resource}"|jq .name --raw-output)"
+          lease_path="/etc/openshift-installer/${resource_name}.json"
+          ovirt_engine_template_name="$(extract_leases_info ovirt_engine_template_name ${lease_path})"
+          if [ "${LEASE_TYPE}" == "conformance" ]; then
+            bm_name="$(extract_leases_info ovirt_engine_cluster_bm ${lease_path})"
+            conformance_resource="$( boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" acquire --type "${CLUSTER_TYPE}-${bm_name}" --state "free" --target-state "leased" --timeout 150m )"
+            conformance_resource_name="$(echo "${conformance_resource}"|jq .name --raw-output)"
+            worker_cpu=8
+            worker_mem=16384
+            master_cpu=8
+            master_mem=16384
+          fi
+          if [ "${LEASE_TYPE}" == "minimal" ]; then
+            ovirt_engine_template_name="${ovirt_engine_template_name}-8G"
+            worker_cpu=4
+            worker_mem=8192
+            master_cpu=4
+            master_mem=8192
+          fi
+        }
+
         echo "[INFO] Acquiring a lease ..."
-        resource="$( boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" acquire --type "${CLUSTER_TYPE}-quota-slice" --state "${LEASE_STATE}" --target-state "${LEASE_STATE}-leased" --timeout 150m )"
-        resource_name="$(echo "${resource}"|jq .name --raw-output)"
-        lease_path="/etc/openshift-installer/${resource_name}.json"
-        
+        acquire_lease
+
         #Saving parameters for the env
         cat > /tmp/shared/ovirt-lease.conf <<EOF
         OVIRT_APIVIP="$(extract_leases_info ovirt_apivip ${lease_path})"
         OVIRT_DNSVIP="$(extract_leases_info ovirt_dnsvip ${lease_path})"
         OVIRT_INGRESSVIP="$(extract_leases_info ovirt_ingressvip ${lease_path})"
-        WORKER_CPU="$(extract_leases_info worker_cpu ${lease_path})"
-        WORKER_MEM="$(extract_leases_info worker_mem ${lease_path})"
-        MASTER_CPU="$(extract_leases_info master_cpu ${lease_path})"
-        MASTER_MEM="$(extract_leases_info master_mem ${lease_path})"
+        WORKER_CPU="${worker_cpu}"
+        WORKER_MEM="${worker_mem}"
+        MASTER_CPU="${master_cpu}"
+        MASTER_MEM="${master_mem}"
         OCP_CLUSTER="$(extract_leases_info cluster_name ${lease_path})"
         OVIRT_ENGINE_CLUSTER_ID="$(extract_leases_info ovirt_engine_cluster_id ${lease_path})"
-        OVIRT_ENGINE_TEMPLATE_NAME="$(extract_leases_info ovirt_engine_template_name ${lease_path})"
+        OVIRT_ENGINE_TEMPLATE_NAME="${ovirt_engine_template_name}"
         EOF
 
         touch /tmp/shared/leased
@@ -145,14 +166,19 @@ objects:
             echo "killing heartbeat process "${1}""
             kill -9 "${1}"
             echo "[INFO] Releasing the lease on resouce ${resource_name}"
-            boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" release --name "${resource_name}" --target-state "${LEASE_STATE}"
+            boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" release --name "${resource_name}" --target-state "free"
+            if [ "${LEASE_TYPE}" == "conformance" ]; then
+              echo "[INFO] Releasing the lease on resouce ${conformance_resource_name}"
+              boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" release --name "${conformance_resource_name}" --target-state "free"
+            fi
         }
 
         echo "[INFO] Sending heartbeats to retain the lease..."
         boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" heartbeat --resource "${resource}" &
-        install_exit_status=$!
+        heartbeats_pid=$!
 
-        trap "release "${install_exit_status}"" EXIT
+        trap "release "${heartbeats_pid}"" EXIT
+        trap 'release "${heartbeats_pid}"' TERM
 
         while true; do
           if [[ -f /tmp/shared/exit ]]; then
@@ -559,7 +585,7 @@ objects:
         }
 
         trap 'teardown; exit $DELETE_FAIL' EXIT
-        trap 'kill $(jobs -p); exit 0' TERM
+        trap 'kill $(jobs -p); teardown; exit $DELETE_FAIL' TERM
 
         for i in $(seq 1 180); do
           if [[ -f /tmp/shared/exit ]]; then
