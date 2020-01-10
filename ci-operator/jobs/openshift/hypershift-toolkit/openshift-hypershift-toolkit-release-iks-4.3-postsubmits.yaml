@@ -1,14 +1,18 @@
-postsubmits:
+presubmits:
   openshift/hypershift-toolkit:
   - agent: kubernetes
+    always_run: true
     branches:
-    - ^release-4\.3$
+    - release-4.3
+    context: ci/prow/create-cluster
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-    name: branch-ci-openshift-hypershift-toolkit-release-4.3-images
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-hypershift-toolkit-release-iks-4.3-create-cluster
+    rerun_command: /test create-cluster
     spec:
       containers:
       - args:
@@ -16,19 +20,19 @@ postsubmits:
         - --branch=release-4.3
         - --give-pr-author-access-to-namespace=true
         - --org=openshift
-        - --promote
         - --repo=hypershift-toolkit
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
+        - --secret-dir=
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=[images]
+        - --target=create-cluster
         command:
         - ci-operator
         env:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-hypershift-toolkit-release-4.3.yaml
-              name: ci-operator-4.3-configs
+              key: openshift-hypershift-toolkit-release-iks-4.3.yaml
+              name: ci-operator-misc-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -36,11 +40,18 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: ""
+          name: gate-secrets
+          readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: gate-secrets
+        secret:
+          secretName: gate-secrets
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )create-cluster,?($|\s.*)
