@@ -23,6 +23,7 @@ presubmits:
         - --org=integr8ly
         - --repo=heimdall
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
+        - --secret-dir=/usr/local/integr8ly-secrets
         - --secret-dir=/usr/local/e2e-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=e2e
@@ -50,6 +51,9 @@ presubmits:
         volumeMounts:
         - mountPath: /usr/local/e2e-cluster-profile
           name: cluster-profile
+        - mountPath: /usr/local/integr8ly-secrets
+          name: integreatly-ci-secrets
+          readOnly: true
         - mountPath: /usr/local/e2e
           name: job-definition
           subPath: cluster-launch-installer-src.yaml
@@ -63,6 +67,9 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
+      - name: integr8ly-ci-secrets
+        secret:
+          secretName: integreatly-ci-secrets
       - configMap:
           name: prow-job-cluster-launch-installer-src
         name: job-definition
