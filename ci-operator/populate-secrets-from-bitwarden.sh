@@ -251,6 +251,13 @@ update_secret generic "cluster-secrets-${target_cloud}"              \
 	"$( format_attachment "jenkins-ci-provisioner" ssh-privatekey )" \
 	"$( format_attachment "jenkins-ci-provisioner" ssh-publickey )"
 
+target_cloud="openstack-ppc64le"
+update_secret generic "cluster-secrets-${target_cloud}"         \
+	"$( format_attachment "openstack-ppc64le" pull-secret )"    \
+	"$( format_attachment "openstack-ppc64le" clouds.yaml )"    \
+	"$( format_attachment "openstack-ppc64le" ssh-privatekey )" \
+	"$( format_attachment "openstack-ppc64le" ssh-publickey )"
+
 target_cloud="vsphere"
 update_secret generic "cluster-secrets-${target_cloud}"          \
 	"$( format_attachment "quay.io" pull-secret )"               \
@@ -327,7 +334,7 @@ update_secret generic "aws-openshift-llc-account-credentials" \
 	"$( format_attachment "AWS ci-longlivedcluster-bot" .awscred )"
 
 # Host keys for the SSHD bastions
-for target in "z" "telco"; do
+for target in "z" "telco" "ppc64le"; do
 	update_secret generic "sshd-host-keys-${target}"                            \
 		"$( format_attachment "sshd-bastion-${target}" ssh_host_rsa_key )"     \
 		"$( format_attachment "sshd-bastion-${target}" ssh_host_dsa_key )"     \

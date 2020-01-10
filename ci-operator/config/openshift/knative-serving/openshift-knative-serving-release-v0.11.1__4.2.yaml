@@ -2,8 +2,9 @@ tag_specification:
   name: '4.2'
   namespace: ocp
 promotion:
+  cluster: https://api.ci.openshift.org
   namespace: openshift
-  name: knative-nightly
+  name: knative-v0.11.1
 base_images:
   base:
     name: '4.2'
@@ -18,6 +19,11 @@ test_binary_build_commands: make test-install
 tests:
 - as: e2e-aws-ocp-42
   commands: "make test-e2e"
+  openshift_installer_src:
+    cluster_profile: aws
+- as: e2e-aws-ocp-42-daily
+  commands: "make test-e2e"
+  cron: "0 */6 * * *" # every six hours
   openshift_installer_src:
     cluster_profile: aws
 resources:
@@ -44,14 +50,6 @@ images:
       - destination_dir: .
         source_path: /go/bin/activator
   to: knative-serving-activator
-- dockerfile_path: openshift/ci-operator/knative-images/istio/Dockerfile
-  from: base
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/bin/istio
-  to: knative-serving-istio
 - dockerfile_path: openshift/ci-operator/knative-images/nscert/Dockerfile
   from: base
   inputs:
@@ -60,6 +58,14 @@ images:
       - destination_dir: .
         source_path: /go/bin/nscert
   to: knative-serving-nscert
+- dockerfile_path: openshift/ci-operator/knative-images/istio/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/istio
+  to: knative-serving-istio
 - dockerfile_path: openshift/ci-operator/knative-images/controller/Dockerfile
   from: base
   inputs:

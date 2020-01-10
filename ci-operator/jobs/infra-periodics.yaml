@@ -913,6 +913,40 @@ periodics:
   cron: '@hourly'
   decorate: true
   extra_refs:
+    - base_ref: master
+      org: openshift
+      repo: release
+  max_concurrency: 1
+  name: periodic-openshift-release-private-org-sync
+  spec:
+    containers:
+      - args:
+          - --config-path=./ci-operator/config/
+          - --target-org=openshift-priv
+          - --token-path=/etc/github/oauth
+          - --confirm
+        command:
+          - private-org-sync
+        image: private-org-sync:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+        volumeMounts:
+          - mountPath: /etc/github
+            name: token
+            readOnly: true
+    volumes:
+      - name: token
+        secret:
+          secretName: github-credentials-openshift-merge-robot
+- agent: kubernetes
+  labels:
+    ci.openshift.io/role: infra
+  cron: '@hourly'
+  decorate: true
+  extra_refs:
   - base_ref: master
     org: openshift
     repo: release

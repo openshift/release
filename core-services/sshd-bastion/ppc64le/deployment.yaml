@@ -1,0 +1,95 @@
+kind: List
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    namespace: bastion-ppc64le
+    name: sshd
+    labels:
+      app: prow
+      component: sshd
+  spec:
+    selector:
+      app: prow
+      component: sshd
+    ports:
+    - name: openstack-auth
+      port: 5000
+      targetPort: openstack-auth
+    - name: api
+      port: 6443
+      targetPort: api
+    - name: http
+      port: 80
+      targetPort: http
+    - name: https
+      port: 443
+      targetPort: https
+    type: ClusterIP
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: sshd
+    namespace: bastion-ppc64le
+    labels:
+      app: prow
+      component: sshd
+  spec:
+    replicas: 1
+    revisionHistoryLimit: 2
+    selector:
+      matchLabels:
+        app: prow
+        component: sshd
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: sshd
+      spec:
+        priorityClassName: prow-critical
+        containers:
+        - name: sshd
+          image: registry.svc.ci.openshift.org/ci/sshd:latest
+          command:
+          - /usr/sbin/sshd
+          args:
+          - -D
+          - -e
+          - -f/config/sshd_config
+          ports:
+            - name: ssh
+              containerPort: 2222
+            - name: openstack-auth
+              containerPort: 5000
+            - name: api
+              containerPort: 6443
+            - name: http
+              containerPort: 80
+            - name: https
+              containerPort: 443
+          volumeMounts:
+          - name: authorized-keys
+            mountPath: /keys/authorized
+            readOnly: true
+          - name: host-keys
+            mountPath: /keys/host/
+            readOnly: true
+          - name: config
+            mountPath: /config/
+            readOnly: true
+          resources:
+            requests:
+              memory: "3Gi"
+              cpu: "100m"
+        volumes:
+        - name: authorized-keys
+          secret:
+            secretName: sshd-authorized-keys
+        - name: host-keys
+          secret:
+            secretName: sshd-host-keys
+        - name: config
+          configMap:
+            name: sshd-config
