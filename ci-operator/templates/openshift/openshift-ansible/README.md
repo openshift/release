@@ -21,14 +21,14 @@ ignition file first.
   1. sets necessary env vars based on cluster type (libvirt install on GCP)
   2. runs `create install-config`
   3. modifies install configs to change a number of masters and workers created
-  4. runs `create ignition-configs` to produce `boostrap.ign` in `/tmp/artifacts/installer`
-  5. creates `/tmp/config-success` on success, otherwise - `/tmp/exit`
+  4. runs `create ignition-qconfigs` to produce `boostrap.ign` in `/tmp/artifacts/installer`
+  5. creates `/tmp/config-success` on success, otherwise - `/tmp/setup-failed`
 
 * `setup` runs ansible playbook in `IMAGE_ANSIBLE` image:
   1. waits for `/tmp/config-success` to appear
   2. runs `test/${CLUSTER_TYPE}/launch.yml` using `RPM_REPO_OPENSHIFT_ORIGIN` as an additional repo and bootstrap ignition path set to `/tmp/artifacts/installer/bootstrap.ign`
   3. the playbook would save admin's kubeconfig in `/tmp/artifacts/installer/auth/kubeconfig` on success
-  4. creates `/tmp/setup-success` on success, otherwise - `/tmp/exit`
+  4. creates `/tmp/setup-success` on success, otherwise - `/tmp/setup-failed`
 
 * `test` runs tests in `IMAGE_TESTS`:
   1. waits for `/tmp/setup-success` to be created
