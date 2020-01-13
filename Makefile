@@ -180,7 +180,7 @@ prow-release-controller-deploy:
 prow-release-controller: prow-release-controller-definitions prow-release-controller-deploy
 .PHONY: prow-release-controller
 
-projects: ci-ns gcsweb origin-stable origin-release publishing-bot content-mirror azure metering coreos
+projects: ci-ns gcsweb origin-release publishing-bot content-mirror azure metering coreos
 .PHONY: projects
 
 content-mirror:
@@ -206,12 +206,6 @@ oauth-proxy:
 publishing-bot:
 	$(MAKE) apply WHAT=projects/publishing-bot/storage-class.yaml
 .PHONY: publishing-bot
-
-origin-stable:
-	$(MAKE) apply WHAT=projects/origin-stable/release.yaml
-	$(MAKE) apply WHAT=projects/origin-stable/stable-3.9.yaml
-	$(MAKE) apply WHAT=projects/origin-stable/stable-3.10.yaml
-.PHONY: origin-stable
 
 origin-release:
 	$(MAKE) applyTemplate WHAT=projects/origin-release/pipeline.yaml
