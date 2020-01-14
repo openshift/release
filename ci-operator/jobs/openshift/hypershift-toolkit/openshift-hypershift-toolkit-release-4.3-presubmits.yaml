@@ -23,7 +23,7 @@ presubmits:
         - --org=openshift
         - --repo=hypershift-toolkit
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-        - --secret-dir=/usr/test-secrets/
+        - --secret-dir=/usr/ibm-gate-test-secrets/
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=create-cluster
         command:
@@ -41,20 +41,20 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /usr/ibm-gate-test-secrets/
+          name: ibm-gate-test-secrets
+          readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
-        - mountPath: /usr/test-secrets/
-          name: test-secrets
-          readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: ibm-gate-test-secrets
+        secret:
+          secretName: ibm-gate-test-secrets
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-      - name: test-secrets
-        secret:
-          secretName: test-secrets
     trigger: (?m)^/test( | .* )create-cluster,?($|\s.*)
   - agent: kubernetes
     always_run: true
