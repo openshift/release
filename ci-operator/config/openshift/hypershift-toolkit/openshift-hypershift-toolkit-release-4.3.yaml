@@ -3,6 +3,10 @@ base_images:
     name: "4.3"
     namespace: ocp
     tag: base
+  iks:
+    name: "iks"
+    namespace: ibm-gate-secrets
+    tag: "4.3"
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -30,3 +34,11 @@ tests:
   commands: make verify
   container:
     from: src
+- as: create-cluster
+  commands: ./deploy_ci.sh
+  container:
+    from: iks
+  secret:
+    name: 'ibm-gate-test-secrets'
+    mount_path: '/usr/test-secrets/'
+
