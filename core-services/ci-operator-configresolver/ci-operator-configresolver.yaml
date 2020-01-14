@@ -14,11 +14,14 @@ items:
     - name: main
       port: 80
       protocol: TCP
-      targetPort: 8080
+      targetPort: main
+    - name: ui
+      protocol: TCP
+      targetPort: ui
     - name: metrics
       port: 9090
       protocol: TCP
-      targetPort: 9090
+      targetPort: metrics
     selector:
       app: prow
       component: ci-operator-configresolver
@@ -31,8 +34,12 @@ items:
     name: ci-operator-configresolver
     namespace: ci
   spec:
+    host: steps.svc.ci.openshift.org
+    tls:
+      insecureEdgeTerminationPolicy: Redirect
+      termination: edge
     port:
-      targetPort: main
+      targetPort: ui
     to:
       kind: Service
       name: ci-operator-configresolver
@@ -81,6 +88,8 @@ items:
         ports:
         - name: main
           containerPort: 8080
+        - name: ui
+          containerPort: 8082
         - name: metrics
           containerPort: 9090
         containers:
