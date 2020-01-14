@@ -23,6 +23,7 @@ presubmits:
         - --org=openshift-cnv
         - --repo=cnv-ci
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
+        - --secret-dir=/etc/cnv-installer/pull-secret
         - --secret-dir=/usr/local/e2e-test-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=e2e-test
@@ -56,6 +57,9 @@ presubmits:
         - mountPath: /usr/local/e2e-test
           name: job-definition
           subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/cnv-installer/pull-secret
+          name: openshift-cnv-dev-cnv-bot-pull-secret
+          readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
@@ -71,6 +75,9 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-src
         name: job-definition
+      - name: openshift-cnv-dev-cnv-bot-pull-secret
+        secret:
+          secretName: openshift-cnv-dev-cnv-bot-pull-secret
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
