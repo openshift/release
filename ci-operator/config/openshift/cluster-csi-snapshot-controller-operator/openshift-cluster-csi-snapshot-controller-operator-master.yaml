@@ -1,0 +1,66 @@
+base_images:
+  base:
+    name: "4.4"
+    namespace: ocp
+    tag: base
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+# TODO: when we have usable image
+#images:
+#- dockerfile_path: Dockerfile.rhel7
+#  from: base
+#  inputs:
+#    bin:
+#      as:
+#      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
+#      paths: null
+#  to: cluster-csi-snapshot-operator
+promotion:
+  name: "4.4"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.4"
+  namespace: ocp
+tests:
+- as: verify
+  commands: |
+    make verify
+  container:
+    from: src
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: |
+    mkdir -p /tmp/artifacts
+    make test-unit JUNITFILE=/tmp/artifacts/junit_report.xml
+  container:
+    from: src
+
+# TODO: when we have operator e2e tests
+#- as: e2e-aws-operator
+#  commands: |
+#    mkdir -p /tmp/artifacts
+#    make test-e2e JUNITFILE=/tmp/artifacts/junit_report.xml
+#  openshift_installer_src:
+#    cluster_profile: aws
+
+# TODO: when the operator is in CVO, make sure operator change does not break whole OCP
+#- as: e2e-aws
+#  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+#  openshift_installer:
+#    cluster_profile: aws
+#- as: e2e-aws-upgrade
+#  commands: TEST_SUITE=all run-upgrade-tests
+#  openshift_installer:
+#    cluster_profile: aws
+#    upgrade: true
