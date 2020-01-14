@@ -1220,7 +1220,8 @@ objects:
               aws cloudformation delete-stack --stack-name "${CLUSTER_NAME}-${STACK_SUFFIX}"
             done
 
-            openshift-install --dir /tmp/artifacts/installer destroy cluster
+            # Timeout after 30m to avoid continuous loop
+            timeout 30m openshift-install --dir /tmp/artifacts/installer destroy cluster
 
             for STACK_SUFFIX in compute-2 compute-1 compute-0 control-plane bootstrap security infra vpc
             do
@@ -1229,7 +1230,8 @@ objects:
           elif [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
             export PATH=${PATH}:${HOME}/shared/google-cloud-sdk/bin
             export CLOUDSDK_CONFIG=${HOME}/shared/gcloudconfig
-            openshift-install --dir ${HOME}/artifacts/installer destroy cluster
+            # Timeout after 30m to avoid continuous loop
+            timeout 30m openshift-install --dir ${HOME}/artifacts/installer destroy cluster
             gcloud deployment-manager deployments delete -q ${CLUSTER_NAME}-{worker,control-plane,bootstrap,security,infra,vpc}
           else
             cd /tmp/shared/tf

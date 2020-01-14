@@ -581,7 +581,8 @@ objects:
           sed 's|ovirt_cafile: ""|ovirt_cafile: /tmp/artifacts/installer/ovirt-engine.ca|' -i /tmp/artifacts/installer/ovirt-config.yaml
 
           echo "Destroy cluster ..."
-          openshift-install --dir /tmp/artifacts/installer destroy cluster
+          # Timeout after 30m to avoid continuous loop
+          timeout 30m openshift-install --dir /tmp/artifacts/installer destroy cluster
         }
 
         trap 'teardown; exit $DELETE_FAIL' EXIT
