@@ -1,7 +1,7 @@
 presubmits:
   openshift/hypershift-toolkit:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - master
     context: ci/prow/images
@@ -12,6 +12,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-hypershift-toolkit-master-images
+    optional: true
     rerun_command: /test images
     spec:
       containers:
@@ -49,6 +50,76 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/kube-conformance-aws
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-hypershift-toolkit-master-kube-conformance-aws
+    rerun_command: /test kube-conformance-aws
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --branch=master
+        - --give-pr-author-access-to-namespace=true
+        - --lease-server=http://boskos
+        - --org=openshift
+        - --repo=hypershift-toolkit
+        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
+        - --secret-dir=/usr/local/kube-conformance-aws-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=kube-conformance-aws
+        - --template=/usr/local/kube-conformance-aws
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-hypershift-toolkit-master.yaml
+              name: ci-operator-master-configs
+        - name: JOB_NAME_SAFE
+          value: kube-conformance-aws
+        - name: TEST_COMMAND
+          value: contrib/hack/e2e-kube-conformance.sh
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/kube-conformance-aws-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/kube-conformance-aws
+          name: job-definition
+          subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-src
+        name: job-definition
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )kube-conformance-aws,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
