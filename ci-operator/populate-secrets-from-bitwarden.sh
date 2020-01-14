@@ -251,6 +251,13 @@ update_secret generic "cluster-secrets-${target_cloud}"              \
 	"$( format_attachment "jenkins-ci-provisioner" ssh-privatekey )" \
 	"$( format_attachment "jenkins-ci-provisioner" ssh-publickey )"
 
+target_cloud="openstack-ppc64le"
+update_secret generic "cluster-secrets-${target_cloud}"         \
+	"$( format_attachment "openstack-ppc64le" pull-secret )"    \
+	"$( format_attachment "openstack-ppc64le" clouds.yaml )"    \
+	"$( format_attachment "openstack-ppc64le" ssh-privatekey )" \
+	"$( format_attachment "openstack-ppc64le" ssh-publickey )"
+
 target_cloud="vsphere"
 update_secret generic "cluster-secrets-${target_cloud}"          \
 	"$( format_attachment "quay.io" pull-secret )"               \
