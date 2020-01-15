@@ -4,6 +4,130 @@ presubmits:
     always_run: true
     branches:
     - release-next
+    context: ci/prow/44-e2e-aws-ocp-44
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: "44"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-eventing-contrib-release-next-44-e2e-aws-ocp-44
+    path_alias: knative.dev/eventing-contrib
+    rerun_command: /test 44-e2e-aws-ocp-44
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --branch=release-next
+        - --give-pr-author-access-to-namespace=true
+        - --lease-server=http://boskos
+        - --org=openshift
+        - --repo=knative-eventing-contrib
+        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
+        - --secret-dir=/usr/local/e2e-aws-ocp-44-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=e2e-aws-ocp-44
+        - --template=/usr/local/e2e-aws-ocp-44
+        - --variant=44
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-knative-eventing-contrib-release-next__44.yaml
+              name: ci-operator-misc-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-aws-ocp-44
+        - name: TEST_COMMAND
+          value: make test-e2e
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-aws-ocp-44-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-aws-ocp-44
+          name: job-definition
+          subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-src
+        name: job-definition
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )44-e2e-aws-ocp-44,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-next
+    context: ci/prow/44-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: "44"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-eventing-contrib-release-next-44-images
+    path_alias: knative.dev/eventing-contrib
+    rerun_command: /test 44-images
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --branch=release-next
+        - --give-pr-author-access-to-namespace=true
+        - --org=openshift
+        - --repo=knative-eventing-contrib
+        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=[images]
+        - --variant=44
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-knative-eventing-contrib-release-next__44.yaml
+              name: ci-operator-misc-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )44-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-next
     context: ci/prow/e2e-aws-ocp-43
     decorate: true
     decoration_config:
