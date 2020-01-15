@@ -131,8 +131,7 @@ objects:
             worker_mem=16384
             master_cpu=8
             master_mem=16384
-          fi
-          if [ "${LEASE_TYPE}" == "minimal" ]; then
+          else
             ovirt_engine_template_name="${ovirt_engine_template_name}-8G"
             worker_cpu=4
             worker_mem=8192
@@ -579,7 +578,8 @@ objects:
           export OVIRT_CONFIG=/tmp/artifacts/installer/ovirt-config.yaml
           curl -k -o "/tmp/artifacts/installer/ovirt-engine.ca" ${OVIRT_ENGINE_URL::-4}/services/pki-resource?resource=ca-certificate
           sed 's|ovirt_cafile: ""|ovirt_cafile: /tmp/artifacts/installer/ovirt-engine.ca|' -i /tmp/artifacts/installer/ovirt-config.yaml
-
+          echo "Destroy bootstrap ..."
+          openshift-install --dir /tmp/artifacts/installer destroy bootstrap
           echo "Destroy cluster ..."
           openshift-install --dir /tmp/artifacts/installer destroy cluster
         }
