@@ -2,37 +2,31 @@ periodics:
 - agent: kubernetes
   cron: '* */4 * * *'
   decorate: true
-  decoration_config:
-    skip_cloning: true
   extra_refs:
   - base_ref: master
     org: openshift
     repo: osde2e
   labels:
-    ci-operator.openshift.io/prowgen-controlled: "true"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-osde2e-master-e2e-int-4.2
   spec:
     containers:
     - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --branch=master
-      - --give-pr-author-access-to-namespace=true
-      - --org=openshift
-      - --repo=osde2e
-      - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-      - --secret-dir=/usr/local/osde2e-secrets
-      - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-      - --target=e2e-int-4.2
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        ./ci/prow_run_tests.sh /usr/local/osde2e-secrets;
       command:
-      - ci-operator
+      - /bin/bash
+      - -c
       env:
-      - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-osde2e-master.yaml
-            name: ci-operator-master-configs
-      image: ci-operator:latest
+      - name: DESTROY_CLUSTER
+        value: "false"
+      - name: MAJOR_TARGET
+        value: "4"
+      - name: MINOR_TARGET
+        value: "2"
+      - name: OSD_ENV
+        value: int
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
       imagePullPolicy: Always
       name: ""
       resources:
@@ -42,51 +36,41 @@ periodics:
       - mountPath: /usr/local/osde2e-secrets
         name: osde2e-secrets
         readOnly: true
-      - mountPath: /etc/sentry-dsn
-        name: sentry-dsn
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: osde2e-secrets
       secret:
         secretName: osde2e-secrets
-    - name: sentry-dsn
-      secret:
-        secretName: sentry-dsn
 - agent: kubernetes
   cron: '* */4 * * *'
   decorate: true
-  decoration_config:
-    skip_cloning: true
   extra_refs:
   - base_ref: master
     org: openshift
     repo: osde2e
   labels:
-    ci-operator.openshift.io/prowgen-controlled: "true"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-osde2e-master-e2e-int-4.2-4.2
   spec:
     containers:
     - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --branch=master
-      - --give-pr-author-access-to-namespace=true
-      - --org=openshift
-      - --repo=osde2e
-      - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-      - --secret-dir=/usr/local/osde2e-secrets
-      - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-      - --target=e2e-int-4.2-4.2
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        ./ci/prow_run_tests.sh /usr/local/osde2e-secrets;
       command:
-      - ci-operator
+      - /bin/bash
+      - -c
       env:
-      - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-osde2e-master.yaml
-            name: ci-operator-master-configs
-      image: ci-operator:latest
+      - name: DESTROY_CLUSTER
+        value: "false"
+      - name: MAJOR_TARGET
+        value: "4"
+      - name: MINOR_TARGET
+        value: "2"
+      - name: OSD_ENV
+        value: int
+      - name: UPGRADE_RELEASE_STREAM
+        value: 4.2.0-0.nightly
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
       imagePullPolicy: Always
       name: ""
       resources:
@@ -96,51 +80,41 @@ periodics:
       - mountPath: /usr/local/osde2e-secrets
         name: osde2e-secrets
         readOnly: true
-      - mountPath: /etc/sentry-dsn
-        name: sentry-dsn
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: osde2e-secrets
       secret:
         secretName: osde2e-secrets
-    - name: sentry-dsn
-      secret:
-        secretName: sentry-dsn
 - agent: kubernetes
   cron: '* */4 * * *'
   decorate: true
-  decoration_config:
-    skip_cloning: true
   extra_refs:
   - base_ref: master
     org: openshift
     repo: osde2e
   labels:
-    ci-operator.openshift.io/prowgen-controlled: "true"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-osde2e-master-e2e-int-4.2-4.3
   spec:
     containers:
     - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --branch=master
-      - --give-pr-author-access-to-namespace=true
-      - --org=openshift
-      - --repo=osde2e
-      - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-      - --secret-dir=/usr/local/osde2e-secrets
-      - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-      - --target=e2e-int-4.2-4.3
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        ./ci/prow_run_tests.sh /usr/local/osde2e-secrets;
       command:
-      - ci-operator
+      - /bin/bash
+      - -c
       env:
-      - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-osde2e-master.yaml
-            name: ci-operator-master-configs
-      image: ci-operator:latest
+      - name: DESTROY_CLUSTER
+        value: "false"
+      - name: MAJOR_TARGET
+        value: "4"
+      - name: MINOR_TARGET
+        value: "2"
+      - name: OSD_ENV
+        value: int
+      - name: UPGRADE_RELEASE_STREAM
+        value: 4.3.0-0.nightly
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
       imagePullPolicy: Always
       name: ""
       resources:
@@ -150,51 +124,39 @@ periodics:
       - mountPath: /usr/local/osde2e-secrets
         name: osde2e-secrets
         readOnly: true
-      - mountPath: /etc/sentry-dsn
-        name: sentry-dsn
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: osde2e-secrets
       secret:
         secretName: osde2e-secrets
-    - name: sentry-dsn
-      secret:
-        secretName: sentry-dsn
 - agent: kubernetes
   cron: '* */4 * * *'
   decorate: true
-  decoration_config:
-    skip_cloning: true
   extra_refs:
   - base_ref: master
     org: openshift
     repo: osde2e
   labels:
-    ci-operator.openshift.io/prowgen-controlled: "true"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-osde2e-master-e2e-int-4.3
   spec:
     containers:
     - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --branch=master
-      - --give-pr-author-access-to-namespace=true
-      - --org=openshift
-      - --repo=osde2e
-      - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-      - --secret-dir=/usr/local/osde2e-secrets
-      - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-      - --target=e2e-int-4.3
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        ./ci/prow_run_tests.sh /usr/local/osde2e-secrets;
       command:
-      - ci-operator
+      - /bin/bash
+      - -c
       env:
-      - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-osde2e-master.yaml
-            name: ci-operator-master-configs
-      image: ci-operator:latest
+      - name: DESTROY_CLUSTER
+        value: "false"
+      - name: MAJOR_TARGET
+        value: "4"
+      - name: MINOR_TARGET
+        value: "3"
+      - name: OSD_ENV
+        value: int
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
       imagePullPolicy: Always
       name: ""
       resources:
@@ -204,51 +166,41 @@ periodics:
       - mountPath: /usr/local/osde2e-secrets
         name: osde2e-secrets
         readOnly: true
-      - mountPath: /etc/sentry-dsn
-        name: sentry-dsn
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: osde2e-secrets
       secret:
         secretName: osde2e-secrets
-    - name: sentry-dsn
-      secret:
-        secretName: sentry-dsn
 - agent: kubernetes
   cron: '* */4 * * *'
   decorate: true
-  decoration_config:
-    skip_cloning: true
   extra_refs:
   - base_ref: master
     org: openshift
     repo: osde2e
   labels:
-    ci-operator.openshift.io/prowgen-controlled: "true"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-osde2e-master-e2e-int-4.3-4.3
   spec:
     containers:
     - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --branch=master
-      - --give-pr-author-access-to-namespace=true
-      - --org=openshift
-      - --repo=osde2e
-      - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-      - --secret-dir=/usr/local/osde2e-secrets
-      - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-      - --target=e2e-int-4.3-4.3
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        ./ci/prow_run_tests.sh /usr/local/osde2e-secrets;
       command:
-      - ci-operator
+      - /bin/bash
+      - -c
       env:
-      - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-osde2e-master.yaml
-            name: ci-operator-master-configs
-      image: ci-operator:latest
+      - name: DESTROY_CLUSTER
+        value: "false"
+      - name: MAJOR_TARGET
+        value: "4"
+      - name: MINOR_TARGET
+        value: "3"
+      - name: OSD_ENV
+        value: int
+      - name: UPGRADE_RELEASE_STREAM
+        value: 4.3.0-0.nightly
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
       imagePullPolicy: Always
       name: ""
       resources:
@@ -258,51 +210,39 @@ periodics:
       - mountPath: /usr/local/osde2e-secrets
         name: osde2e-secrets
         readOnly: true
-      - mountPath: /etc/sentry-dsn
-        name: sentry-dsn
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: osde2e-secrets
       secret:
         secretName: osde2e-secrets
-    - name: sentry-dsn
-      secret:
-        secretName: sentry-dsn
 - agent: kubernetes
   cron: '* 8 * * *'
   decorate: true
-  decoration_config:
-    skip_cloning: true
   extra_refs:
   - base_ref: master
     org: openshift
     repo: osde2e
   labels:
-    ci-operator.openshift.io/prowgen-controlled: "true"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-osde2e-master-e2e-int-scale-4.2
   spec:
     containers:
     - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --branch=master
-      - --give-pr-author-access-to-namespace=true
-      - --org=openshift
-      - --repo=osde2e
-      - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-      - --secret-dir=/usr/local/osde2e-secrets
-      - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-      - --target=e2e-int-scale-4.2
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        ./ci/prow_run_tests.sh /usr/local/osde2e-secrets scale;
       command:
-      - ci-operator
+      - /bin/bash
+      - -c
       env:
-      - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-osde2e-master.yaml
-            name: ci-operator-master-configs
-      image: ci-operator:latest
+      - name: DESTROY_CLUSTER
+        value: "false"
+      - name: MAJOR_TARGET
+        value: "4"
+      - name: MINOR_TARGET
+        value: "2"
+      - name: OSD_ENV
+        value: int
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
       imagePullPolicy: Always
       name: ""
       resources:
@@ -312,51 +252,35 @@ periodics:
       - mountPath: /usr/local/osde2e-secrets
         name: osde2e-secrets
         readOnly: true
-      - mountPath: /etc/sentry-dsn
-        name: sentry-dsn
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: osde2e-secrets
       secret:
         secretName: osde2e-secrets
-    - name: sentry-dsn
-      secret:
-        secretName: sentry-dsn
 - agent: kubernetes
   cron: '* */4 * * *'
   decorate: true
-  decoration_config:
-    skip_cloning: true
   extra_refs:
   - base_ref: master
     org: openshift
     repo: osde2e
   labels:
-    ci-operator.openshift.io/prowgen-controlled: "true"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-osde2e-master-e2e-prod-4.2
   spec:
     containers:
     - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --branch=master
-      - --give-pr-author-access-to-namespace=true
-      - --org=openshift
-      - --repo=osde2e
-      - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-      - --secret-dir=/usr/local/osde2e-secrets
-      - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-      - --target=e2e-prod-4.2
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        ./ci/prow_run_tests.sh /usr/local/osde2e-secrets;
       command:
-      - ci-operator
+      - /bin/bash
+      - -c
       env:
-      - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-osde2e-master.yaml
-            name: ci-operator-master-configs
-      image: ci-operator:latest
+      - name: DESTROY_CLUSTER
+        value: "false"
+      - name: OSD_ENV
+        value: prod
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
       imagePullPolicy: Always
       name: ""
       resources:
@@ -366,51 +290,41 @@ periodics:
       - mountPath: /usr/local/osde2e-secrets
         name: osde2e-secrets
         readOnly: true
-      - mountPath: /etc/sentry-dsn
-        name: sentry-dsn
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: osde2e-secrets
       secret:
         secretName: osde2e-secrets
-    - name: sentry-dsn
-      secret:
-        secretName: sentry-dsn
 - agent: kubernetes
   cron: '* */4 * * *'
   decorate: true
-  decoration_config:
-    skip_cloning: true
   extra_refs:
   - base_ref: master
     org: openshift
     repo: osde2e
   labels:
-    ci-operator.openshift.io/prowgen-controlled: "true"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-osde2e-master-e2e-prod-4.2-4.2
   spec:
     containers:
     - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --branch=master
-      - --give-pr-author-access-to-namespace=true
-      - --org=openshift
-      - --repo=osde2e
-      - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-      - --secret-dir=/usr/local/osde2e-secrets
-      - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-      - --target=e2e-prod-4.2-4.2
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        ./ci/prow_run_tests.sh /usr/local/osde2e-secrets;
       command:
-      - ci-operator
+      - /bin/bash
+      - -c
       env:
-      - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-osde2e-master.yaml
-            name: ci-operator-master-configs
-      image: ci-operator:latest
+      - name: DESTROY_CLUSTER
+        value: "false"
+      - name: MAJOR_TARGET
+        value: "4"
+      - name: MINOR_TARGET
+        value: "2"
+      - name: OSD_ENV
+        value: prod
+      - name: UPGRADE_RELEASE_STREAM
+        value: fast-4.2
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
       imagePullPolicy: Always
       name: ""
       resources:
@@ -420,51 +334,41 @@ periodics:
       - mountPath: /usr/local/osde2e-secrets
         name: osde2e-secrets
         readOnly: true
-      - mountPath: /etc/sentry-dsn
-        name: sentry-dsn
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: osde2e-secrets
       secret:
         secretName: osde2e-secrets
-    - name: sentry-dsn
-      secret:
-        secretName: sentry-dsn
 - agent: kubernetes
   cron: '* */4 * * *'
   decorate: true
-  decoration_config:
-    skip_cloning: true
   extra_refs:
   - base_ref: master
     org: openshift
     repo: osde2e
   labels:
-    ci-operator.openshift.io/prowgen-controlled: "true"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-osde2e-master-e2e-prod-4.2-4.3
   spec:
     containers:
     - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --branch=master
-      - --give-pr-author-access-to-namespace=true
-      - --org=openshift
-      - --repo=osde2e
-      - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-      - --secret-dir=/usr/local/osde2e-secrets
-      - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-      - --target=e2e-prod-4.2-4.3
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        ./ci/prow_run_tests.sh /usr/local/osde2e-secrets;
       command:
-      - ci-operator
+      - /bin/bash
+      - -c
       env:
-      - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-osde2e-master.yaml
-            name: ci-operator-master-configs
-      image: ci-operator:latest
+      - name: DESTROY_CLUSTER
+        value: "false"
+      - name: MAJOR_TARGET
+        value: "4"
+      - name: MINOR_TARGET
+        value: "2"
+      - name: OSD_ENV
+        value: prod
+      - name: UPGRADE_RELEASE_STREAM
+        value: candidate-4.3
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
       imagePullPolicy: Always
       name: ""
       resources:
@@ -474,51 +378,39 @@ periodics:
       - mountPath: /usr/local/osde2e-secrets
         name: osde2e-secrets
         readOnly: true
-      - mountPath: /etc/sentry-dsn
-        name: sentry-dsn
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: osde2e-secrets
       secret:
         secretName: osde2e-secrets
-    - name: sentry-dsn
-      secret:
-        secretName: sentry-dsn
 - agent: kubernetes
   cron: '* 8 * * *'
   decorate: true
-  decoration_config:
-    skip_cloning: true
   extra_refs:
   - base_ref: master
     org: openshift
     repo: osde2e
   labels:
-    ci-operator.openshift.io/prowgen-controlled: "true"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-osde2e-master-e2e-prod-scale-4.2
   spec:
     containers:
     - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --branch=master
-      - --give-pr-author-access-to-namespace=true
-      - --org=openshift
-      - --repo=osde2e
-      - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-      - --secret-dir=/usr/local/osde2e-secrets
-      - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-      - --target=e2e-prod-scale-4.2
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        ./ci/prow_run_tests.sh /usr/local/osde2e-secrets scale;
       command:
-      - ci-operator
+      - /bin/bash
+      - -c
       env:
-      - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-osde2e-master.yaml
-            name: ci-operator-master-configs
-      image: ci-operator:latest
+      - name: DESTROY_CLUSTER
+        value: "false"
+      - name: MAJOR_TARGET
+        value: "4"
+      - name: MINOR_TARGET
+        value: "2"
+      - name: OSD_ENV
+        value: prod
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
       imagePullPolicy: Always
       name: ""
       resources:
@@ -528,51 +420,39 @@ periodics:
       - mountPath: /usr/local/osde2e-secrets
         name: osde2e-secrets
         readOnly: true
-      - mountPath: /etc/sentry-dsn
-        name: sentry-dsn
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: osde2e-secrets
       secret:
         secretName: osde2e-secrets
-    - name: sentry-dsn
-      secret:
-        secretName: sentry-dsn
 - agent: kubernetes
   cron: '* */4 * * *'
   decorate: true
-  decoration_config:
-    skip_cloning: true
   extra_refs:
   - base_ref: master
     org: openshift
     repo: osde2e
   labels:
-    ci-operator.openshift.io/prowgen-controlled: "true"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-osde2e-master-e2e-stage-4.2
   spec:
     containers:
     - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --branch=master
-      - --give-pr-author-access-to-namespace=true
-      - --org=openshift
-      - --repo=osde2e
-      - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-      - --secret-dir=/usr/local/osde2e-secrets
-      - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-      - --target=e2e-stage-4.2
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        ./ci/prow_run_tests.sh /usr/local/osde2e-secrets;
       command:
-      - ci-operator
+      - /bin/bash
+      - -c
       env:
-      - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-osde2e-master.yaml
-            name: ci-operator-master-configs
-      image: ci-operator:latest
+      - name: DESTROY_CLUSTER
+        value: "false"
+      - name: MAJOR_TARGET
+        value: "4"
+      - name: MINOR_TARGET
+        value: "2"
+      - name: OSD_ENV
+        value: stage
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
       imagePullPolicy: Always
       name: ""
       resources:
@@ -582,51 +462,41 @@ periodics:
       - mountPath: /usr/local/osde2e-secrets
         name: osde2e-secrets
         readOnly: true
-      - mountPath: /etc/sentry-dsn
-        name: sentry-dsn
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: osde2e-secrets
       secret:
         secretName: osde2e-secrets
-    - name: sentry-dsn
-      secret:
-        secretName: sentry-dsn
 - agent: kubernetes
   cron: '* */4 * * *'
   decorate: true
-  decoration_config:
-    skip_cloning: true
   extra_refs:
   - base_ref: master
     org: openshift
     repo: osde2e
   labels:
-    ci-operator.openshift.io/prowgen-controlled: "true"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-osde2e-master-e2e-stage-4.2-4.2
   spec:
     containers:
     - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --branch=master
-      - --give-pr-author-access-to-namespace=true
-      - --org=openshift
-      - --repo=osde2e
-      - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-      - --secret-dir=/usr/local/osde2e-secrets
-      - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-      - --target=e2e-stage-4.2-4.2
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        ./ci/prow_run_tests.sh /usr/local/osde2e-secrets;
       command:
-      - ci-operator
+      - /bin/bash
+      - -c
       env:
-      - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-osde2e-master.yaml
-            name: ci-operator-master-configs
-      image: ci-operator:latest
+      - name: DESTROY_CLUSTER
+        value: "false"
+      - name: MAJOR_TARGET
+        value: "4"
+      - name: MINOR_TARGET
+        value: "2"
+      - name: OSD_ENV
+        value: stage
+      - name: UPGRADE_RELEASE_STREAM
+        value: fast-4.2
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
       imagePullPolicy: Always
       name: ""
       resources:
@@ -636,51 +506,41 @@ periodics:
       - mountPath: /usr/local/osde2e-secrets
         name: osde2e-secrets
         readOnly: true
-      - mountPath: /etc/sentry-dsn
-        name: sentry-dsn
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: osde2e-secrets
       secret:
         secretName: osde2e-secrets
-    - name: sentry-dsn
-      secret:
-        secretName: sentry-dsn
 - agent: kubernetes
   cron: '* */4 * * *'
   decorate: true
-  decoration_config:
-    skip_cloning: true
   extra_refs:
   - base_ref: master
     org: openshift
     repo: osde2e
   labels:
-    ci-operator.openshift.io/prowgen-controlled: "true"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-osde2e-master-e2e-stage-4.2-4.3
   spec:
     containers:
     - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --branch=master
-      - --give-pr-author-access-to-namespace=true
-      - --org=openshift
-      - --repo=osde2e
-      - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-      - --secret-dir=/usr/local/osde2e-secrets
-      - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-      - --target=e2e-stage-4.2-4.3
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        ./ci/prow_run_tests.sh /usr/local/osde2e-secrets;
       command:
-      - ci-operator
+      - /bin/bash
+      - -c
       env:
-      - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-osde2e-master.yaml
-            name: ci-operator-master-configs
-      image: ci-operator:latest
+      - name: DESTROY_CLUSTER
+        value: "false"
+      - name: MAJOR_TARGET
+        value: "4"
+      - name: MINOR_TARGET
+        value: "2"
+      - name: OSD_ENV
+        value: stage
+      - name: UPGRADE_RELEASE_STREAM
+        value: candidate-4.3
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
       imagePullPolicy: Always
       name: ""
       resources:
@@ -690,51 +550,40 @@ periodics:
       - mountPath: /usr/local/osde2e-secrets
         name: osde2e-secrets
         readOnly: true
-      - mountPath: /etc/sentry-dsn
-        name: sentry-dsn
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: osde2e-secrets
       secret:
         secretName: osde2e-secrets
-    - name: sentry-dsn
-      secret:
-        secretName: sentry-dsn
 - agent: kubernetes
   cron: '* */4 * * *'
   decorate: true
-  decoration_config:
-    skip_cloning: true
   extra_refs:
   - base_ref: master
     org: openshift
     repo: osde2e
   labels:
-    ci-operator.openshift.io/prowgen-controlled: "true"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-osde2e-master-e2e-stage-4.3
   spec:
     containers:
     - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --branch=master
-      - --give-pr-author-access-to-namespace=true
-      - --org=openshift
-      - --repo=osde2e
-      - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-      - --secret-dir=/usr/local/osde2e-secrets
-      - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-      - --target=e2e-stage-4.3
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        export DESTROY_CLUSTER=false; export OSD_ENV=stage; export MAJOR_TARGET=4;
+        export MINOR_TARGET=3; ./ci/prow_run_tests.sh /usr/local/osde2e-secrets;
       command:
-      - ci-operator
+      - /bin/bash
+      - -c
       env:
-      - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-osde2e-master.yaml
-            name: ci-operator-master-configs
-      image: ci-operator:latest
+      - name: DESTROY_CLUSTER
+        value: "false"
+      - name: MAJOR_TARGET
+        value: "4"
+      - name: MINOR_TARGET
+        value: "3"
+      - name: OSD_ENV
+        value: stage
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
       imagePullPolicy: Always
       name: ""
       resources:
@@ -744,51 +593,39 @@ periodics:
       - mountPath: /usr/local/osde2e-secrets
         name: osde2e-secrets
         readOnly: true
-      - mountPath: /etc/sentry-dsn
-        name: sentry-dsn
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: osde2e-secrets
       secret:
         secretName: osde2e-secrets
-    - name: sentry-dsn
-      secret:
-        secretName: sentry-dsn
 - agent: kubernetes
   cron: '* 8 * * *'
   decorate: true
-  decoration_config:
-    skip_cloning: true
   extra_refs:
   - base_ref: master
     org: openshift
     repo: osde2e
   labels:
-    ci-operator.openshift.io/prowgen-controlled: "true"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-osde2e-master-e2e-stage-scale-4.2
   spec:
     containers:
     - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --branch=master
-      - --give-pr-author-access-to-namespace=true
-      - --org=openshift
-      - --repo=osde2e
-      - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-      - --secret-dir=/usr/local/osde2e-secrets
-      - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-      - --target=e2e-stage-scale-4.2
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        ./ci/prow_run_tests.sh /usr/local/osde2e-secrets scale;
       command:
-      - ci-operator
+      - /bin/bash
+      - -c
       env:
-      - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-osde2e-master.yaml
-            name: ci-operator-master-configs
-      image: ci-operator:latest
+      - name: DESTROY_CLUSTER
+        value: "false"
+      - name: MAJOR_TARGET
+        value: "4"
+      - name: MINOR_TARGET
+        value: "2"
+      - name: OSD_ENV
+        value: stage
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
       imagePullPolicy: Always
       name: ""
       resources:
@@ -798,14 +635,8 @@ periodics:
       - mountPath: /usr/local/osde2e-secrets
         name: osde2e-secrets
         readOnly: true
-      - mountPath: /etc/sentry-dsn
-        name: sentry-dsn
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: osde2e-secrets
       secret:
         secretName: osde2e-secrets
-    - name: sentry-dsn
-      secret:
-        secretName: sentry-dsn
