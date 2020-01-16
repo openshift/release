@@ -285,10 +285,10 @@ objects:
       - name: INSTALL_INITIAL_RELEASE
       - name: RELEASE_IMAGE_INITIAL
       command:
-      - /bin/sh
+      - /bin/bash
       - -c
       - |
-        #!/bin/sh
+        #!/bin/bash
         set -euo pipefail
 
         trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/setup-success; else touch /tmp/exit /tmp/setup-failed; fi; exit "${rc}"' EXIT
@@ -376,7 +376,7 @@ objects:
         # What we're doing here is we generate manifests first and force that OpenShift SDN is configured. Kuryr is only
         # allowed when KURYR_ENABLED variable is set to "true".
         TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create manifests --log-level=debug
-        if [[ $KURYR_ENABLED != "true" ]]; then
+        if [[ "${KURYR_ENABLED:-false}" != "true" ]]; then
           echo "Forcing OpenShiftSDN by modifying manifests"
           sed -i -e 's/networkType: .*$/networkType: OpenShiftSDN/g' /tmp/artifacts/installer/manifests/cluster-network-02-config.yml
         fi
