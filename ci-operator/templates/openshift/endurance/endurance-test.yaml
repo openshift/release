@@ -136,23 +136,22 @@ objects:
         mkdir -p /tmp/output
         cd /tmp/output
 
-        function run-tests() {
-          openshift-tests run "${TEST_SUITE}" \
-            --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
-          exit 0
-        }
-
         function run-upgrade-tests() {
           current=$(oc get clusterversion/version -o jsonpath='{.status.history[0].version}')
           new=$(oc adm release info -a /tmp/ci-credentials/pull-secret ${RELEASE_IMAGE_LATEST} | grep Version: | awk '{print $2}')
           if [ $new == $current ]; then
             echo "Skipping upgrade test because cluster is already at the latest version: $current (current) == $new (new)"
-            exit 0
+            return 0
           fi
 
           openshift-tests run-upgrade "${TEST_SUITE}" --to-image "${RELEASE_IMAGE_LATEST}" \
+            --options "${TEST_OPTIONS}" \
             --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
-          exit 0
+        }
+
+        function run-tests() {
+          openshift-tests run "${TEST_SUITE}" \
+            --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
         }
 
         ${TEST_COMMAND}
