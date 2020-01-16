@@ -1,0 +1,96 @@
+- from:
+    ci-operator:
+      bw_item: sentry
+      field: ci-operator
+  to:
+    - cluster: default
+      namespace: ci
+      name: sentry-dsn
+    - cluster: build01
+      namespace: ci
+      name: sentry-dsn
+- from:
+    service-account.json:
+      bw_item: gcs-publisher
+      attachment: credentials.json
+  to:
+    - cluster: default
+      namespace: ci
+      name: gce-sa-credentials-gcs-publisher
+    - cluster: build01
+      namespace: ci
+      name: gce-sa-credentials-gcs-publisher
+- from:
+    sa.ci-operator.apici.config:
+      bw_item: build_farm
+      attachment: sa.ci-operator.apici.config
+  to:
+    - cluster: default
+      namespace: ci
+      name: apici-ci-operator-credentials
+    - cluster: build01
+      namespace: ci
+      name: apici-ci-operator-credentials
+- from:
+    pull-secret:
+      bw_item: quay.io
+      attachment: pull-secret
+    insights-live.yaml:
+      bw_item: insights-ci-account
+      attachment: insights-live.yaml
+    .awscred:
+      bw_item: jenkins-ci-iam
+      attachment: .awscred
+    ssh-privatekey:
+      bw_item: jenkins-ci-iam
+      attachment: ssh-privatekey
+    ssh-publickey:
+      bw_item: jenkins-ci-iam
+      attachment: ssh-publickey
+    ops-mirror.pem:
+      bw_item: mirror.openshift.com
+      attachment: cert-key.pem
+  to:
+    - cluster: default
+      namespace: ci
+      name: cluster-secrets-aws
+    - cluster: build01
+      namespace: ci
+      name: cluster-secrets-aws
+- from:
+    ci.htpasswd:
+      bw_item: boskos-oauth-proxy
+      attachment: ci.htpasswd
+    password:
+      bw_item: boskos-oauth-proxy
+      field: boskos-password
+    username:
+      bw_item: boskos-oauth-proxy
+      field: boskos-username
+  to:
+    - cluster: default
+      namespace: ci
+      name: boskos-credentials
+    - cluster: build01
+      namespace: ci
+      name: boskos-credentials
+- from:
+    ops-mirror.pem:
+      bw_item: mirror.openshift.com
+      attachment: cert-key.pem
+    rh-cdn.pem:
+      bw_item: rh-cdn
+      attachment: rh-cdn.pem
+  to:
+    - cluster: default
+      namespace: ci
+      name: mirror.openshift.com
+    - cluster: default
+      namespace: ocp
+      name: mirror.openshift.com
+    - cluster: build01
+      namespace: ocp
+      name: mirror.openshift.com
+#oc --context default get secret -n ci cluster-secrets-azure -o yaml
+#https://github.com/openshift/release/blob/master/ci-operator/SECRETS.md#cluster-secrets-azure4
+#Need to ask Abhinav why this one is not under BW script
