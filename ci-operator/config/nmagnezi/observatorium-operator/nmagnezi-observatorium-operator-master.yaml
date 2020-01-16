@@ -1,0 +1,29 @@
+base_images:
+  base:
+    name: "4.4"
+    namespace: ocp
+    tag: base
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  to: observatorium-operator
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.4"
+  namespace: ocp
+tests:
+- as: test
+  commands: unset GOFLAGS && make deploy && make test
+  openshift_installer_src:
+    cluster_profile: gcp
