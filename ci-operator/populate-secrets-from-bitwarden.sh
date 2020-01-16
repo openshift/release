@@ -174,6 +174,10 @@ update_secret generic ci-slack-api-url "$( format_field_value ci-slack-api-url "
 # as an opaque field "Client Configuration"
 update_secret generic github-app-credentials "$( format_field_value prow.svc.ci.openshift.org "Client Configuration" "config.json" )"
 
+# Configuration for GitHub OAuth Apps are stored
+# as an opaque field "Client Configuration"
+update_secret generic github-app-credentials-private "$( format_field_value deck-internal-ci.svc.ci.openshift.org "Client Configuration" "config.json" )"
+
 # Cookie secret to encrypt frontend and backend
 # communication is stored in the "Cookie" field
 update_secret generic cookie "$( format_field_value prow.svc.ci.openshift.org Cookie32 "cookie" )"
