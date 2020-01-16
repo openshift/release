@@ -298,6 +298,9 @@ objects:
         - name: deck
           image: gcr.io/k8s-prow/deck:v20200115-cf4e86a7e
           args:
+          - --github-oauth-config-file=/etc/github/config.json
+          - --github-token-path=/etc/oauth/oauth
+          - --oauth-url=/github-login
           - --config-path=/etc/config/config.yaml
           - --tide-url=http://tide/
           - --hook-url=http://hook:8888/plugin-help
@@ -320,6 +323,9 @@ objects:
           - name: extensions
             mountPath: /static/extensions
             readOnly: true
+          - name: oauth-config
+            mountPath: /etc/github
+            readOnly: true
           - name: oauth
             mountPath: /etc/oauth
             readOnly: true
@@ -337,6 +343,9 @@ objects:
         - name: oauth
           secret:
             secretName: github-credentials-openshift-ci-robot
+        - name: oauth-config
+          secret:
+            secretName: github-app-credentials-private
         - name: gce-sa-credentials-gcs-private
           secret:
             secretName: gce-sa-credentials-gcs-private
