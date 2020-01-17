@@ -382,6 +382,58 @@ periodics:
 - agent: kubernetes
   labels:
     ci.openshift.io/role: infra
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: ci-tools
+  cron: ""
+  decorate: true
+  decoration_config:
+    timeout: 8h
+  interval: 5m
+  name: periodic-ipi-deprovision-future
+  spec:
+    containers:
+    - command:
+      - ./cmd/ipi-deprovision/ipi-deprovision.sh
+      image: registry.svc.ci.openshift.org/ci/ipi-deprovision:latest
+      imagePullPolicy: Always
+      env:
+      - name: HOME
+        value: "/tmp"
+      - name: AWS_SHARED_CREDENTIALS_FILE
+        value: "/aws/.awscred"
+      - name: GOOGLE_APPLICATION_CREDENTIALS
+        value: "/gcp/gce.json"
+      - name: CLUSTER_TTL
+        value: "30 minutes ago"
+      name: "ipi-deprovision"
+      resources:
+          requests:
+            cpu: 500m
+      volumeMounts:
+      - mountPath: /aws
+        name: cluster-secrets-aws
+      - mountPath: /gcp
+        name: cluster-secrets-gcp
+    volumes:
+    - name: cluster-secrets-aws
+      secret:
+        secretName: cluster-secrets-aws
+        items:
+        - key: ".awscred"
+          path: ".awscred"
+    - name: cluster-secrets-gcp
+      secret:
+        secretName: cluster-secrets-gcp
+        items:
+        - key: "gce.json"
+          path: "gce.json"
+    serviceAccountName: ipi-deprovisioner
+- agent: kubernetes
+  labels:
+    ci.openshift.io/role: infra
   extra_refs:
   - base_ref: master
     org: openshift
