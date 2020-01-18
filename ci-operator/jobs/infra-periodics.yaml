@@ -344,44 +344,6 @@ periodics:
 - agent: kubernetes
   labels:
     ci.openshift.io/role: infra
-  cron: ""
-  decorate: true
-  decoration_config:
-    timeout: 8h
-  interval: 5m
-  name: periodic-ipi-deprovision
-  spec:
-    containers:
-    - command:
-      - /usr/bin/ipi-deprovision.sh
-      image: registry.svc.ci.openshift.org/ci/ipi-deprovision@sha256:296f4cf6c8e7493bfe6d8621df02bef8cfe5147ad56c431213a77cb81abd26eb
-      imagePullPolicy: Always
-      env:
-      - name: AWS_SHARED_CREDENTIALS_FILE
-        value: "/usr/local/e2e-aws-cluster-profile/.awscred"
-      - name: CLUSTER_TTL
-        value: "30 minutes ago"
-      - name: AWS_REGIONS
-        value: "us-east-1"
-        #more than one region
-        #value: "us-east-1;us-west-1"
-      name: "ipi-deprovision"
-      resources:
-          requests:
-            cpu: 500m
-      volumeMounts:
-      - mountPath: /usr/local/e2e-aws-cluster-profile
-        name: cluster-profile
-    volumes:
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws
-    serviceAccountName: ipi-deprovisioner
-- agent: kubernetes
-  labels:
-    ci.openshift.io/role: infra
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   extra_refs:
   - base_ref: master
@@ -392,7 +354,7 @@ periodics:
   decoration_config:
     timeout: 8h
   interval: 5m
-  name: periodic-ipi-deprovision-future
+  name: periodic-ipi-deprovision
   spec:
     containers:
     - command:
