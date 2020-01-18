@@ -4,10 +4,20 @@ base_images:
     namespace: ocp
     tag: base
 build_root:
-  project_image:
-    context_dir: hack/kubevirt-builder
-    dockerfile_path: Dockerfile
+  image_stream_tag:
+      name: release
+      namespace: openshift
+      tag: golang-1.12
 canonical_go_repository: kubevirt.io/kubevirt
+images:
+- dockerfile_path: hack/ci/Dockerfile.ci
+  from: base
+  inputs:
+    root:
+      as:
+      - builder
+      paths: null
+  to: kubevirt-test
 resources:
   '*':
     limits:
@@ -19,8 +29,10 @@ tag_specification:
   name: "4.4"
   namespace: ocp
 tests:
-- as: "dummy-test"
+- as: e2e
   commands: |
-    echo "this is a dummy"
-  container:
-    from: src
+    cd /go/src/kubevirt.io/kubevirt
+    ./hack/ci/test.sh
+  openshift_installer_custom_test_image:
+    cluster_profile: gcp
+    from: kubevirt-test
