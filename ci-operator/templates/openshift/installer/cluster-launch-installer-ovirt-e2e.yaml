@@ -121,12 +121,22 @@ objects:
         function acquire_lease() {
           resource="$( boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" acquire --type "${CLUSTER_TYPE}-quota-slice" --state "free" --target-state "leased" --timeout 150m )"
           resource_name="$(echo "${resource}"|jq .name --raw-output)"
+          echo "[INFO] Lease acquired! at $(date --utc)"
+          echo "[INFO] Leased resource: ${resource}"
           lease_path="/etc/openshift-installer/${resource_name}.json"
           ovirt_engine_template_name="$(extract_leases_info ovirt_engine_template_name ${lease_path})"
+          echo "[INFO] Sending heartbeats to retain the lease ${resource_name}"
+          boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" heartbeat --resource "${resource}" &
+          heartbeats_pid=$!
           if [ "${LEASE_TYPE}" == "conformance" ]; then
             bm_name="$(extract_leases_info ovirt_engine_cluster_bm ${lease_path})"
             conformance_resource="$( boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" acquire --type "${CLUSTER_TYPE}-${bm_name}" --state "free" --target-state "leased" --timeout 150m )"
             conformance_resource_name="$(echo "${conformance_resource}"|jq .name --raw-output)"
+            echo "[INFO] Conformance Lease acquired! at $(date --utc)"
+            echo "[INFO] Conformance Leased resource: ${conformance_resource}"
+            boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" heartbeat --resource "${resource}" &
+            conformance_heartbeats_pid=$!
+            echo "[INFO] Sending heartbeats to retain the lease ${conformance_resource_name}"
             worker_cpu=8
             worker_mem=16384
             master_cpu=8
@@ -158,26 +168,22 @@ objects:
         EOF
 
         touch /tmp/shared/leased
-        echo "[INFO] Lease acquired!"
-        echo "[INFO] Leased resource: ${resource}"
 
         function release() {
-            echo "killing heartbeat process "${1}""
-            kill -9 "${1}"
+            echo "killing heartbeat process "${heartbeats_pid}" at $(date --utc)"
+            kill -9 "${heartbeats_pid}"
             echo "[INFO] Releasing the lease on resouce ${resource_name}"
             boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" release --name "${resource_name}" --target-state "free"
             if [ "${LEASE_TYPE}" == "conformance" ]; then
+              echo "killing conformance heartbeats process "${conformance_heartbeats_pid}" at $(date --utc)"
+              kill -9 "${conformance_heartbeats_pid}"
               echo "[INFO] Releasing the lease on resouce ${conformance_resource_name}"
               boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" release --name "${conformance_resource_name}" --target-state "free"
             fi
         }
 
-        echo "[INFO] Sending heartbeats to retain the lease..."
-        boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" heartbeat --resource "${resource}" &
-        heartbeats_pid=$!
-
-        trap "release "${heartbeats_pid}"" EXIT
-        trap 'release "${heartbeats_pid}"' TERM
+        trap "release" EXIT
+        trap "release" TERM
 
         while true; do
           if [[ -f /tmp/shared/exit ]]; then
@@ -417,6 +423,8 @@ objects:
 
         # What we're doing here is we generate manifests first and force that OpenShift SDN is configured.
         TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create manifests --log-level=debug
+        # This is for debugging purposes, allows us to map a job to a VM
+        cat /tmp/artifacts/installer/manifests/cluster-infrastructure-02-config.yml
         TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create cluster --log-level=debug 2>&1 | grep -v password &
         wait "$!"
         install_exit_status=$?
