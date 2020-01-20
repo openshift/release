@@ -429,9 +429,14 @@ objects:
         fi
         if [[ "${CLUSTER_TYPE}" = "aws" ]]; then
             master_type=null
-            if [[ "${CLUSTER_VARIANT}" =~ "xlarge" ]]; then
+            worker_type=m4.xlarge
+            if [[ "${CLUSTER_VARIANT}" =~ (^|,)large_worker($|,) ]]; then
+              worker_type=m5.2xlarge
+            fi
+            if [[ "${CLUSTER_VARIANT}" =~ (^|,)xlarge($|,) ]]; then
               master_type=m5.8xlarge
-            elif [[ "${CLUSTER_VARIANT}" =~ "large" ]]; then
+            fi
+            if [[ "${CLUSTER_VARIANT}" =~ (^|,)large($|,) ]]; then
               master_type=m5.4xlarge
             fi
             subnets="[]"
@@ -464,7 +469,7 @@ objects:
           replicas: ${workers}
           platform:
             aws:
-              type: m4.xlarge
+              type: ${worker_type}
               zones:
               - us-east-1a
               - us-east-1b
