@@ -1,0 +1,46 @@
+periodics:
+- agent: kubernetes
+  decorate: true
+  interval: 12h
+  name: openshift-hypershift-toolkit-release-4.3-create-cluster-periodics
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --branch=release-4.3
+      - --give-pr-author-access-to-namespace=true
+      - --org=openshift
+      - --repo=hypershift-toolkit
+      - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
+      - --secret-dir=/usr/ibm-gate-test-secrets/
+      - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+      - --target=create-cluster
+      command:
+      - ci-operator
+      env:
+      - name: CONFIG_SPEC
+        valueFrom:
+          configMapKeyRef:
+            key: openshift-hypershift-toolkit-release-4.3.yaml
+            name: ci-operator-4.3-configs
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/ibm-gate-test-secrets/
+        name: ibm-gate-test-secrets
+        readOnly: true
+      - mountPath: /etc/sentry-dsn
+        name: sentry-dsn
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: ibm-gate-test-secrets
+      secret:
+        secretName: ibm-gate-test-secrets
+    - name: sentry-dsn
+      secret:
+        secretName: sentry-dsn
