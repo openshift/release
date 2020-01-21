@@ -89,7 +89,8 @@ presubmits:
         - name: JOB_NAME_SAFE
           value: e2e-gcp
         - name: TEST_COMMAND
-          value: make functests-on-ci
+          value: export component=sctptester; SCTPTEST_IMAGE=$(echo $IMAGE_FORMAT
+            | envsubst) make functests-on-ci
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -162,7 +163,8 @@ presubmits:
         - name: JOB_NAME_SAFE
           value: e2e-gcp-origin
         - name: TEST_COMMAND
-          value: RUN_ORIGIN_TESTS=true make functests-on-ci
+          value: export component=sctptester; SCTPTEST_IMAGE=$(echo $IMAGE_FORMAT
+            | envsubst) RUN_ORIGIN_TESTS=true make functests-on-ci
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -236,7 +238,8 @@ presubmits:
         - name: JOB_NAME_SAFE
           value: e2e-gcp-ovn
         - name: TEST_COMMAND
-          value: make functests-on-ci
+          value: export component=sctptester; SCTPTEST_IMAGE=$(echo $IMAGE_FORMAT
+            | envsubst) make functests-on-ci
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -268,3 +271,51 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-gcp-ovn,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-kni-cnf-features-deploy-master-images
+    rerun_command: /test images
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --branch=master
+        - --give-pr-author-access-to-namespace=true
+        - --org=openshift-kni
+        - --repo=cnf-features-deploy
+        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=[images]
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-kni-cnf-features-deploy-master.yaml
+              name: ci-operator-master-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )images,?($|\s.*)
