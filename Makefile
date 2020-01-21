@@ -320,3 +320,18 @@ bump-pr:
 job:
 	hack/job.sh "$(JOB)"
 .PHONY: job
+
+
+kerberos_id ?= dptp
+dry_run ?= true
+force ?= false
+bw_password_path ?= /tmp/bw_password
+kubeconfig_path ?= $(HOME)/.kube/config
+
+# these are useful for dptp-team
+# echo -n "bw_password" > /tmp/bw_password 
+# make kerberos_id=<your_kerberos_id> dry_run=true force=false bw_password_path=/tmp/bw_password kubeconfig_path=${HOME}/.kube/config ci-secret-bootstrap
+ci-secret-bootstrap:
+	docker pull registry.svc.ci.openshift.org/ci/ci-secret-bootstrap:latest
+	docker run -v "$(CURDIR)/core-services/ci-secret-bootstrap/_config.yaml:/_config.yaml" -v "$(kubeconfig_path):/_kubeconfig" -v "$(bw_password_path):/_bw_password" registry.svc.ci.openshift.org/ci/ci-secret-bootstrap:latest --bw-password-path=/_bw_password --bw-user $(kerberos_id)@redhat.com --config=/_config.yaml --kubeconfig=/_kubeconfig --dry-run=$(dry_run) --force=$(force)
+.PHONY: ci-secret-bootstrap
