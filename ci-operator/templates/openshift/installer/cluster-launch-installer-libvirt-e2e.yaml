@@ -213,6 +213,14 @@ objects:
         gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
         set -x
 
+        # Create the network and firewall rules to attach it to VM
+        gcloud compute networks create "${INSTANCE_PREFIX}" \
+          --subnet-mode=auto \
+          --bgp-routing-mode=regional
+        gcloud compute firewall-rules create "${INSTANCE_PREFIX}" \
+          --network "${INSTANCE_PREFIX}" \
+          --allow tcp:22,icmp
+
         # image-family openshift4-libvirt must exist in ${GOOGLE_COMPUTE_ZONE} for this template
         # to create the image-family see here: https://github.com/ironcladlou/openshift4-libvirt-gcp#images
         gcloud compute instances create "${INSTANCE_PREFIX}" \
@@ -222,7 +230,8 @@ objects:
           --min-cpu-platform "Intel Haswell" \
           --boot-disk-type pd-ssd \
           --boot-disk-size 256GB \
-          --metadata-from-file openshift-pull-secret=/tmp/cluster/pull-secret
+          --metadata-from-file openshift-pull-secret=/tmp/cluster/pull-secret \
+          --network "${INSTANCE_PREFIX}"
         LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
           --quiet \
           --project "${GOOGLE_PROJECT_ID}" \
@@ -325,6 +334,8 @@ objects:
           touch /home/packer/exit
           echo "Deprovisioning cluster ..."
           gcloud compute instances delete "${INSTANCE_PREFIX}" --quiet
+          gcloud compute firewall-rules delete "${INSTANCE_PREFIX}" --quiet
+          gcloud compute networks delete "${INSTANCE_PREFIX}" --quiet
         }
 
         trap 'teardown' EXIT
