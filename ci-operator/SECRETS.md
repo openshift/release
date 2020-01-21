@@ -5,8 +5,9 @@ they should be deployed to the cluster.
 
 ## Access to secrets
 
-We store secrets in bitwarden. To get access, you will need to ask in #forum-testplatform 
-on the OpenShift Slack, or open a Jira ticket to the DPTP team.
+We store secrets in a private secret storage system. To add new secrets to this storage
+please reach out to `#forum-testplatform` on Slack and be prepared to encrypt your data
+with our GPG keys.
 
 ## Secrets Listing
 
