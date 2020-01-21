@@ -1,20 +1,25 @@
 base_images:
   base:
-    name: "4.4"
+    name: "4.5"
     namespace: ocp
     tag: base
-binary_build_commands: make build
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.13
+canonical_go_repository: github.com/kubernetes-csi/external-resizer
 images:
-- dockerfile_path: Dockerfile
+- dockerfile_path: Dockerfile.openshift
   from: base
-  to: ovirt-machine-controllers
+  inputs:
+    root:
+      as:
+      - "0"
+      paths: null
+  to: csi-external-resizer
 promotion:
-  name: "4.4"
+  name: "4.5"
   namespace: ocp
 resources:
   '*':
@@ -24,5 +29,10 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.4"
+  name: "4.5"
   namespace: ocp
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
