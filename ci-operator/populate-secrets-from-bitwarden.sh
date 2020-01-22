@@ -4,6 +4,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# 20200122: This script is deprecated. Use ../core-services/ci-secret-bootstrap/_config.yaml instead.
+
 # This script uses a connection to Bitwarden to populate k8s secrets used for
 # the OKD CI infrastructure. To use this script, first get the BitWarden CLI at:
 # https://help.bitwarden.com/article/cli/#download--install
@@ -328,25 +330,6 @@ update_secret generic "aws-ci-infra-openshift-ci-robot-credentials" \
 oc -n "ci-release" create secret generic "git-credentials" "--from-literal=.git-credentials=https://openshift-bot:$( field_value "openshift-bot" "GitHub OAuth Token" "oauth" )@github.com" --dry-run -o yaml | oc apply -f -
 oc -n "ci-release" label secret "git-credentials" "ci.openshift.io/managed=true" --overwrite
 
-# The private key here is used to mirror content from the ops mirror and the redhat CDN
-update_secret generic "mirror.openshift.com" \
-	"$( format_attachment "mirror.openshift.com" cert-key.pem ops-mirror.pem )" \
-	"$( format_attachment "rh-cdn" rh-cdn.pem rh-cdn.pem )"
-
 #https://jira.coreos.com/browse/DPP-2164
 update_secret generic "aws-openshift-llc-account-credentials" \
 	"$( format_attachment "AWS ci-longlivedcluster-bot" .awscred )"
-
-# Host keys for the SSHD bastions
-for target in "z" "telco" "ppc64le"; do
-	update_secret generic "sshd-host-keys-${target}"                            \
-		"$( format_attachment "sshd-bastion-${target}" ssh_host_rsa_key )"     \
-		"$( format_attachment "sshd-bastion-${target}" ssh_host_dsa_key )"     \
-		"$( format_attachment "sshd-bastion-${target}" ssh_host_ecdsa_key )"   \
-		"$( format_attachment "sshd-bastion-${target}" ssh_host_ed25519_key )"
-
-	# Authorized keys for the SSHD bastion
-	update_secret generic "sshd-authorized-keys-${target}" \
-		"$( format_attachment "sshd-bastion-${target}" authorized_keys )"
-done
-
