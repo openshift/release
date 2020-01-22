@@ -74,6 +74,7 @@
     - cluster: build01
       namespace: ci
       name: boskos-credentials
+# The private key here is used to mirror content from the ops mirror and the redhat CDN
 - from:
     ops-mirror.pem:
       bw_item: mirror.openshift.com
@@ -83,14 +84,87 @@
       attachment: rh-cdn.pem
   to:
     - cluster: default
-      namespace: ci
-      name: mirror.openshift.com
-    - cluster: default
       namespace: ocp
       name: mirror.openshift.com
     - cluster: build01
       namespace: ocp
       name: mirror.openshift.com
+# Host keys for the SSHD bastions
+- from:
+    authorized_keys:
+      bw_item: sshd-bastion-z
+      attachment: authorized_keys
+  to:
+    - cluster: default
+      namespace: bastion-z
+      name: sshd-authorized-keys
+- from:
+    ssh_host_rsa_key:
+      bw_item: sshd-bastion-z
+      attachment: ssh_host_rsa_key
+    ssh_host_dsa_key:
+      bw_item: sshd-bastion-z
+      attachment: ssh_host_dsa_key
+    ssh_host_ecdsa_key:
+      bw_item: sshd-bastion-z
+      attachment: ssh_host_ecdsa_key
+    ssh_host_ed25519_key:
+      bw_item: sshd-bastion-z
+      attachment: ssh_host_ed25519_key
+  to:
+    - cluster: default
+      namespace: bastion-z
+      name: sshd-host-keys
+- from:
+    authorized_keys:
+      bw_item: sshd-bastion-ppc64le
+      attachment: authorized_keys
+  to:
+    - cluster: default
+      namespace: bastion-ppc64le
+      name: sshd-authorized-keys
+- from:
+    ssh_host_rsa_key:
+      bw_item: sshd-bastion-ppc64le
+      attachment: ssh_host_rsa_key
+    ssh_host_dsa_key:
+      bw_item: sshd-bastion-ppc64le
+      attachment: ssh_host_dsa_key
+    ssh_host_ecdsa_key:
+      bw_item: sshd-bastion-ppc64le
+      attachment: ssh_host_ecdsa_key
+    ssh_host_ed25519_key:
+      bw_item: sshd-bastion-ppc64le
+      attachment: ssh_host_ed25519_key
+  to:
+    - cluster: default
+      namespace: bastion-ppc64le
+      name: sshd-host-keys
+- from:
+    authorized_keys:
+      bw_item: sshd-bastion-telco
+      attachment: authorized_keys
+  to:
+    - cluster: default
+      namespace: bastion-telco
+      name: sshd-authorized-keys
+- from:
+    ssh_host_rsa_key:
+      bw_item: sshd-bastion-telco
+      attachment: ssh_host_rsa_key
+    ssh_host_dsa_key:
+      bw_item: sshd-bastion-telco
+      attachment: ssh_host_dsa_key
+    ssh_host_ecdsa_key:
+      bw_item: sshd-bastion-telco
+      attachment: ssh_host_ecdsa_key
+    ssh_host_ed25519_key:
+      bw_item: sshd-bastion-telco
+      attachment: ssh_host_ed25519_key
+  to:
+    - cluster: default
+      namespace: bastion-telco
+      name: sshd-host-keys
 #oc --context default get secret -n ci cluster-secrets-azure -o yaml
 #https://github.com/openshift/release/blob/master/ci-operator/SECRETS.md#cluster-secrets-azure4
 #Need to ask Abhinav why this one is not under BW script
