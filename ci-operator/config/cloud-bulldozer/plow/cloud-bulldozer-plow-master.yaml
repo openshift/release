@@ -1,0 +1,24 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.12
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.3"
+  namespace: ocp
+tests:
+- artifact_dir: /tmp/artifacts
+  as: etcd-azure-perf-test-daily
+  commands: |
+    TEST_OUTPUT_PATH=/tmp/artifacts/etcd-azure-perf-test-daily.log
+    workloads/etcd-perf/run_etcd_tests_fromgit.sh >> ${TEST_OUTPUT_PATH}
+  cron: "0 0 * * *" # Daily
+  openshift_installer_src:
+    cluster_profile: azure4
