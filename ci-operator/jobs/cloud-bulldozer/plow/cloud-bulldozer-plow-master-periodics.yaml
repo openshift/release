@@ -1,0 +1,72 @@
+periodics:
+- agent: kubernetes
+  cron: 0 0 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: cloud-bulldozer
+    repo: plow
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-cloud-bulldozer-plow-master-etcd-azure-perf-test-daily
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --branch=master
+      - --give-pr-author-access-to-namespace=true
+      - --lease-server=http://boskos
+      - --org=cloud-bulldozer
+      - --repo=plow
+      - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
+      - --secret-dir=/usr/local/etcd-azure-perf-test-daily-cluster-profile
+      - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+      - --target=etcd-azure-perf-test-daily
+      - --template=/usr/local/etcd-azure-perf-test-daily
+      command:
+      - ci-operator
+      env:
+      - name: CLUSTER_TYPE
+        value: azure4
+      - name: CONFIG_SPEC
+        valueFrom:
+          configMapKeyRef:
+            key: cloud-bulldozer-plow-master.yaml
+            name: ci-operator-master-configs
+      - name: JOB_NAME_SAFE
+        value: etcd-azure-perf-test-daily
+      - name: TEST_COMMAND
+        value: |
+          TEST_OUTPUT_PATH=/tmp/artifacts/etcd-azure-perf-test-daily.log
+          workloads/etcd-perf/run_etcd_tests_fromgit.sh >> ${TEST_OUTPUT_PATH}
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/etcd-azure-perf-test-daily-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/etcd-azure-perf-test-daily
+        name: job-definition
+        subPath: cluster-launch-installer-src.yaml
+      - mountPath: /etc/sentry-dsn
+        name: sentry-dsn
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-azure4
+    - configMap:
+        name: prow-job-cluster-launch-installer-src
+      name: job-definition
+    - name: sentry-dsn
+      secret:
+        secretName: sentry-dsn
