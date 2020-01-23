@@ -8,6 +8,55 @@ periodics:
     repo: osde2e
   labels:
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-osde2e-addon-integreatly-operator-stage
+  spec:
+    containers:
+    - args:
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
+        addons;
+      command:
+      - /bin/bash
+      - -c
+      env:
+      - name: ADDON_IDS
+        value: integreatly-operator
+      - name: ADDON_TEST_HARNESSES
+        value: quay.io/psturc/integreatly-operator-test-harness
+      - name: DESTROY_CLUSTER
+        value: "false"
+      - name: OSD_ENV
+        value: stage
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/osde2e-common
+        name: osde2e-common
+        readOnly: true
+      - mountPath: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: osde2e-common
+      secret:
+        secretName: osde2e-common
+    - name: osde2e-credentials
+      secret:
+        secretName: osde2e-credentials
+- agent: kubernetes
+  cron: '* */12 * * *'
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: osde2e
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-osde2e-addon-prow-operator-stage
   spec:
     containers:
