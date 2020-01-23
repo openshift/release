@@ -347,8 +347,6 @@ objects:
       env:
       - name: AWS_SHARED_CREDENTIALS_FILE
         value: /etc/openshift-installer/.awscred
-      - name: AWS_REGION
-        value: us-east-1
       - name: AZURE_AUTH_LOCATION
         value: /etc/openshift-installer/osServicePrincipal.json
       - name: GCP_REGION
@@ -442,6 +440,16 @@ objects:
             elif has_variant "large"; then
               master_type=m5.4xlarge
             fi
+            case $((RANDOM % 4)) in
+            0) AWS_REGION=us-east-1
+               ZONE_1=us-east-1b
+               ZONE_2=us-east-1c;;
+            1) AWS_REGION=us-east-2;;
+            2) AWS_REGION=us-west-1;;
+            3) AWS_REGION=us-west-2;;
+            *) echo >&2 "invalid AWS region index"; exit 1;;
+            esac
+            echo "AWS region: ${AWS_REGION} (zones: ${ZONE_1:-${AWS_REGION}a} ${ZONE_2:-${AWS_REGION}b})"
             subnets="[]"
             if has_variant "shared-vpc"; then
               case $((RANDOM % 4)) in
@@ -465,8 +473,8 @@ objects:
             aws:
               type: ${master_type}
               zones:
-              - us-east-1a
-              - us-east-1b
+              - ${ZONE_1:-${AWS_REGION}a}
+              - ${ZONE_2:-${AWS_REGION}b}
         compute:
         - name: worker
           replicas: ${workers}
@@ -474,11 +482,11 @@ objects:
             aws:
               type: m4.xlarge
               zones:
-              - us-east-1a
-              - us-east-1b
+              - ${ZONE_1:-${AWS_REGION}a}
+              - ${ZONE_2:-${AWS_REGION}b}
         platform:
           aws:
-            region:       ${AWS_REGION}
+            region: ${AWS_REGION}
             userTags:
               expirationDate: ${EXPIRATION_DATE}
             subnets: ${subnets}
