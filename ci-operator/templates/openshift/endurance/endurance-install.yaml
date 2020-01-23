@@ -113,6 +113,7 @@ objects:
         fi
 
         # to force a teardown of the cluster, create a configmap with this name on the cluster
+        set +e
         oc get configmap/teardown -n openshift-config
         rc=$?
         if [ $rc -eq 0 ]; then
@@ -121,7 +122,8 @@ objects:
           touch /tmp/shared/teardown
           exit 0
         fi
-
+        set -e
+        
         awk '{print $3}' < /tmp/operators.out  | grep -v AVAILABLE | grep -v True
         rc=$?
         if [ ! $rc -eq 1 ]; then
