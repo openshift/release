@@ -335,7 +335,7 @@ objects:
       - |
         #!/bin/bash
         set -euo pipefail
-        
+
         trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/setup-success; else touch /tmp/exit /tmp/setup-failed; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -505,9 +505,7 @@ objects:
 
         # begin bootstrapping
         if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
-          # Derived from https://github.com/openshift/installer/blob/93c78d09ed9e2badb4bf5dab708152fe6b3b6602/data/data/rhcos.json#L40
-          RHCOS_AMI=ami-0aea6a5be0fc2b3fc  # FIXME: assumes AWS_REGION is us-east-1
-
+          RHCOS_AMI="$(jq -r .amis[\"${AWS_REGION}\"].hvm /var/lib/openshift-install/rhcos.json)"
           # FIXME: get epel-release or otherwise add awscli to our UPI image
           export PATH="${HOME}/.local/bin:${PATH}"
           easy_install --user pip  # our Python 2.7.5 is even too old for ensurepip
