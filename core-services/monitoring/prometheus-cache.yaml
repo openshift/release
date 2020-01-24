@@ -24,14 +24,14 @@ items:
   kind: ConfigMap
   metadata:
     labels:
-      app: querier-cache
+      app.kubernetes.io/name: querier-cache
     name: cache-conf
     namespace: prow-monitoring
 - apiVersion: apps/v1
   kind: Deployment
   metadata:
     labels:
-      name: querier-cache
+      app.kubernetes.io/name: querier-cache
     name: querier-cache
     namespace: prow-monitoring
   spec:
@@ -61,3 +61,17 @@ items:
         - configMap:
             name: cache-conf
           name: querier-cache-config
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: querier-cache
+    namespace: prow-monitoring
+    labels:
+      app.kubernetes.io/name: querier-cache
+  spec:
+    ports:
+    - name: cache
+      port: 9090
+      targetPort: 9090
+    selector:
+      app.kubernetes.io/name: querier-cache
