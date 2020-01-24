@@ -1,0 +1,55 @@
+base_images:
+  base:
+    name: ubi
+    namespace: ocp
+    tag: "7"
+
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+
+images:
+- dockerfile_path: Dockerfile
+  from: bin
+  inputs:
+    bin:
+      as:
+        - builder
+    base:
+      as:
+        - runtime
+  to: redhat-operator-ecosystem-playground
+
+binary_build_commands: make build
+
+promotion:
+  namespace: ci
+  tag: latest
+
+tag_specification:
+  namespace: ocp
+  name: "4.4"
+
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+
+tests:
+- as: unit
+  commands: make test-unit
+  container:
+    from: src
+- as: perf
+  commands: make test-perf
+  container:
+    from: src
+- as: e2e
+  commands: make test-e2e
+  openshift_installer_src:
+    cluster_profile: aws
