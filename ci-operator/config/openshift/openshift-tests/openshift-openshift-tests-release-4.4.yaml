@@ -3,14 +3,21 @@ base_images:
     name: "4.4"
     namespace: ocp
     tag: base
+binary_build_commands: make build WHAT=cmd/extended-platform-tests
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.13
 images:
-- from: base
-  to: cluster-kube-descheduler-operator
+- dockerfile_path: Dockerfile.rhel
+  from: base
+  inputs:
+    root:
+      as:
+      - builder
+      paths: null
+  to: extended-platform-tests
 promotion:
   disabled: true
   name: "4.4"
@@ -26,15 +33,7 @@ tag_specification:
   name: "4.4"
   namespace: ocp
 tests:
-- as: verify
-  commands: make verify-gofmt
-  container:
-    from: src
 - as: unit
-  commands: make test-unit
+  commands: make test
   container:
     from: src
-- as: e2e-aws-operator
-  commands: make test-e2e
-  openshift_installer_src:
-    cluster_profile: aws
