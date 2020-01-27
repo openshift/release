@@ -1,5 +1,5 @@
 presubmits:
-  nmagnezi/observatorium-operator:
+  johnbieren/observatorium-operator:
   - agent: kubernetes
     always_run: true
     branches:
@@ -11,7 +11,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-nmagnezi-observatorium-operator-master-images
+    name: pull-ci-johnbieren-observatorium-operator-master-images
     rerun_command: /test images
     spec:
       containers:
@@ -19,7 +19,7 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=master
         - --give-pr-author-access-to-namespace=true
-        - --org=nmagnezi
+        - --org=johnbieren
         - --repo=observatorium-operator
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
@@ -30,7 +30,7 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: nmagnezi-observatorium-operator-master.yaml
+              key: johnbieren-observatorium-operator-master.yaml
               name: ci-operator-master-configs
         image: ci-operator:latest
         imagePullPolicy: Always
@@ -59,7 +59,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-nmagnezi-observatorium-operator-master-test
+    name: pull-ci-johnbieren-observatorium-operator-master-test
     rerun_command: /test test
     spec:
       containers:
@@ -67,28 +67,19 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=master
         - --give-pr-author-access-to-namespace=true
-        - --lease-server=http://boskos
-        - --org=nmagnezi
+        - --org=johnbieren
         - --repo=observatorium-operator
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-        - --secret-dir=/usr/local/test-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=test
-        - --template=/usr/local/test
         command:
         - ci-operator
         env:
-        - name: CLUSTER_TYPE
-          value: gcp
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: nmagnezi-observatorium-operator-master.yaml
+              key: johnbieren-observatorium-operator-master.yaml
               name: ci-operator-master-configs
-        - name: JOB_NAME_SAFE
-          value: test
-        - name: TEST_COMMAND
-          value: unset GOFLAGS && make deploy && make test
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -96,26 +87,11 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/test-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/test
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
