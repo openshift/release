@@ -7,10 +7,11 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: golang-1.10
 images:
-- from: base
-  to: cluster-kube-descheduler-operator
+- dockerfile_path: Dockerfile.openshift
+  from: base
+  to: route-override-cni
 promotion:
   disabled: true
   name: "4.4"
@@ -26,15 +27,7 @@ tag_specification:
   name: "4.4"
   namespace: ocp
 tests:
-- as: verify
-  commands: make verify-gofmt
-  container:
-    from: src
-- as: unit
-  commands: make test-unit
-  container:
-    from: src
-- as: e2e-aws-operator
-  commands: make test-e2e
-  openshift_installer_src:
+- as: e2e-aws
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer:
     cluster_profile: aws
