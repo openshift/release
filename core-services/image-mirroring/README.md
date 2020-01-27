@@ -21,6 +21,7 @@ are currently targeted by existing mirroring jobs:
  - [toolchain](./toolchain/): `quay.io/openshiftio`
  - [ocs-operator](./ocs-operator): `quay.io/ocs-dev`
  - [integreatly](./integr8ly): `quay.io/integreatly`
+ - [openshift-kni](./openshift-kni): `quay.io/openshift-kni`
 
 ## Configuring mirroring for new sets of images
 
