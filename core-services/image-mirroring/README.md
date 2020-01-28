@@ -16,7 +16,10 @@ by version. In a nutshell, the steps are
 
 As a prerequisite, specify `promotion` snippet in [ci-operator's config](https://github.com/openshift/ci-tools/blob/master/CONFIGURATION.md#promotion)
 to promote the image built in the CI process. _Note that the promoting image must NOT overwrite other images_.
-If the image is promoted to a new namespace, e.g., `openshift-new-production`. The admin of the namespace should allow the SA in the mirroring job defined below to access the images with `oc image mirror`, e.g., [admin_openshift-kni_list.yaml](admin_openshift-kni_list.yaml) which makes the images open to the public.
+If the image is promoted to a new namespace, e.g., `openshift-new-production`,
+
+* In [roles.yaml](../../cluster/ci/config/prow/openshift/ci-operator/roles.yaml), add role `image-tagger` and rolebinding `image-tagger-ci-operator` for `openshift-new-production`.
+* The admin of the namespace should allow the SA in the mirroring job defined below to access the images with `oc image mirror`, e.g., [admin_openshift-kni_list.yaml](admin_openshift-kni_list.yaml) which makes the images open to the public.
 
 
 Check if the image is built successfully:
