@@ -13,7 +13,8 @@ periodics:
     containers:
     - args:
       - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/integr8ly-ci-secrets addons;
+        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/integr8ly-ci-secrets
+        addons;
       command:
       - /bin/bash
       - -c
@@ -36,11 +37,17 @@ periodics:
       - mountPath: /usr/local/integr8ly-ci-secrets
         name: integr8ly-ci-secrets
         readOnly: true
+      - mountPath: /usr/local/osde2e-common
+        name: osde2e-common
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: integr8ly-ci-secrets
       secret:
         secretName: integr8ly-ci-secrets
+    - name: osde2e-common
+      secret:
+        secretName: osde2e-common
 - agent: kubernetes
   cron: '* */12 * * *'
   decorate: true
