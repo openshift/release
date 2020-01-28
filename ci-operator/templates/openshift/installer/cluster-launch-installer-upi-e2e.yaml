@@ -1851,6 +1851,8 @@ objects:
         value: test
       - name: HOME
         value: /tmp
+      - name: LC_ALL
+        value: en_US.UTF-8
       command:
       - /bin/bash
       - -c
@@ -2015,6 +2017,21 @@ objects:
             export PATH="${HOME}/.local/bin:${PATH}"
 
             export AWS_DEFAULT_REGION="${AWS_REGION}"  # CLI prefers the former
+
+            aws cloudformation describe-stack-resources --stack-name "${CLUSTER_NAME}-control-plane" \
+              --query 'StackResources[?ResourceType==`AWS::EC2::Instance`].PhysicalResourceId' --output text | sed 's,\t,\n,g' > /tmp/node-provider-IDs
+            for INDEX in 0 1 2
+            do
+              aws cloudformation describe-stack-resources --stack-name "${CLUSTER_NAME}-compute-${INDEX}" \
+                --query 'StackResources[].PhysicalResourceId' --output text | cut -d, -f1 >> /tmp/node-provider-IDs
+            done
+
+            while IFS= read -r i; do
+              mkdir -p "/tmp/artifacts/nodes/${i}"
+              if [[ "${CLUSTER_TYPE}" = "aws" ]]; then
+                queue /tmp/artifacts/nodes/$i/console aws ec2 get-console-output --instance-id "${i}" --output text
+              fi
+            done < /tmp/node-provider-IDs
 
             for STACK_SUFFIX in compute-2 compute-1 compute-0 control-plane bootstrap proxy security infra vpc
             do
