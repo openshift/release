@@ -96,7 +96,7 @@ roles: cluster-operator-roles cluster-roles
 prow: prow-ci-ns prow-ci-stg-ns
 .PHONY: prow
 
-prow-ci-ns: ci-ns prow-jobs prow-scaling prow-secrets
+prow-ci-ns: ci-ns prow-jobs prow-scaling
 .PHONY: prow-ci-ns
 
 prow-ci-stg-ns: ci-stg-ns
@@ -118,10 +118,6 @@ openshift-ns:
 prow-scaling:
 	oc apply -n kube-system -f cluster/ci/config/cluster-autoscaler.yaml
 .PHONY: prow-scaling
-
-prow-secrets:
-	ci-operator/populate-secrets-from-bitwarden.sh
-.PHONY: prow-secrets
 
 prow-jobs: prow-artifacts
 	$(MAKE) apply WHAT=projects/prometheus/test/build.yaml
@@ -261,30 +257,9 @@ azure-secrets:
 	oc create secret generic cluster-secrets-azure-env --from-literal=azure_client_id=${AZURE_ROOT_CLIENT_ID} --from-literal=azure_client_secret=${AZURE_ROOT_CLIENT_SECRET} --from-literal=azure_tenant_id=${AZURE_ROOT_TENANT_ID} --from-literal=azure_subscription_id=${AZURE_ROOT_SUBSCRIPTION_ID} -o yaml --dry-run | oc apply -n azure-private -f -
 .PHONY: azure-secrets
 
-azure4-secrets:
-	oc create secret generic cluster-secrets-azure4 \
-	--from-file=cluster/test-deploy/azure4/osServicePrincipal.json \
-	--from-file=cluster/test-deploy/azure4/pull-secret \
-	--from-file=cluster/test-deploy/azure4/ssh-privatekey \
-	--from-file=cluster/test-deploy/azure4/ssh-publickey \
-	-o yaml --dry-run | oc apply -n ocp -f -
-.PHONY: azure4-secrets
-
 metering:
 	$(MAKE) -C projects/metering
 .PHONY: metering
-
-metal-secrets:
-	oc create secret generic cluster-secrets-metal \
-	--from-file=cluster/test-deploy/metal/.awscred \
-	--from-file=cluster/test-deploy/metal/.packetcred \
-	--from-file=cluster/test-deploy/metal/matchbox-client.crt \
-	--from-file=cluster/test-deploy/metal/matchbox-client.key \
-	--from-file=cluster/test-deploy/metal/ssh-privatekey \
-	--from-file=cluster/test-deploy/metal/ssh-publickey \
-	--from-file=cluster/test-deploy/metal/pull-secret \
-	-o yaml --dry-run | oc apply -n ocp -f -
-.PHONY: metal-secrets
 
 libpod:
 	$(MAKE) apply WHAT=projects/libpod/libpod.yaml
