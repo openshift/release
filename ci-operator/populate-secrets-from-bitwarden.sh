@@ -137,15 +137,3 @@ for registry in "docker.io" "quay.io" "quay.io/openshift-knative" "quay.io/opens
 	# we want to be able to build and push out to registries
 	oc secrets link builder "registry-push-credentials-${registry//\//\-}"
 done
-
-target_cloud="azure"
-update_secret generic "cluster-secrets-${target_cloud}"                                 \
-	"$( format_attachment "quay.io" pull-secret )"                                      \
-	"$( format_attachment "os4-installer.openshift-ci.azure" osServicePrincipal.json )" \
-	"$( format_attachment "jenkins-ci-iam" ssh-privatekey )"                            \
-	"$( format_attachment "jenkins-ci-iam" ssh-publickey )"
-
-# Configuration for the .git-credentials used by the release controller to clone
-# private repositories to generate changelogs
-oc -n "ci-release" create secret generic "git-credentials" "--from-literal=.git-credentials=https://openshift-bot:$( field_value "openshift-bot" "GitHub OAuth Token" "oauth" )@github.com" --dry-run -o yaml | oc apply -f -
-oc -n "ci-release" label secret "git-credentials" "ci.openshift.io/managed=true" --overwrite
