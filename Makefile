@@ -140,7 +140,7 @@ prow-artifacts:
 .PHONY: prow-artifacts
 
 prow-release-controller-definitions:
-	for i in core-services/release-controller/_releases/*.json; do echo $$i; jq <$$i; done
+	for i in core-services/release-controller/_releases/*.json; do echo $$i; jq . <$$i; done
 	oc annotate -n ocp is/4.1-art-latest "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.1.json)" --overwrite
 	oc annotate -n ocp is/4.1 "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.1-ci.json)" --overwrite
 
