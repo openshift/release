@@ -1,0 +1,22 @@
+binary_build_commands: make bin
+build_root:
+  project_image:
+    dockerfile_path: openshift-ci/build-root/Dockerfile
+resources:
+  '*':
+    limits: null
+    requests:
+      cpu: 200m
+      memory: 6Gi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: "4.4"
+  namespace: ocp
+tests:
+- as: integration-e2e-benchmark
+  commands: scripts/openshiftci-presubmit-all-tests.sh
+  openshift_installer_src:
+    cluster_profile: aws
+  secret:
+    mount_path: /tmp/secret
+    name: odo-secret
