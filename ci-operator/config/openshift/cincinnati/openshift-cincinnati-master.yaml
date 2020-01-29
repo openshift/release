@@ -1,12 +1,28 @@
 base_images:
-  centos7:
+  centos:
     name: centos
-    namespace: openshift
+    namespace: ci
     tag: "7"
 
 build_root:
   project_image:
     dockerfile_path: dist/openshift-release/Dockerfile.builder
+
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      cargo build --release
+    from: src
+    to: bin
+
+images:
+- from: bin
+  dockerfile_path: dist/Dockerfile.deploy/Dockerfile
+  to: deploy
+
+tag_specification:
+  name: "4.4"
+  namespace: ocp
 
 resources:
   "*":
@@ -39,3 +55,7 @@ tests:
     commands: dist/prow_rustfmt.sh 1.37.0
     container:
       from: src
+  - as: e2e
+    commands: bash hack/e2e.sh
+    openshift_installer_src:
+      cluster_profile: aws
