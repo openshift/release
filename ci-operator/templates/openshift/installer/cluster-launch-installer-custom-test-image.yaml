@@ -29,7 +29,7 @@ parameters:
 - name: CLUSTER_VARIANT
 - name: BUILD_ID
   required: false
-  #- name: USE_LEASE_CLIENT
+- name: USE_LEASE_CLIENT
 
 objects:
 
@@ -250,7 +250,7 @@ objects:
           export KUBE_SSH_USER=core
           mkdir -p ~/.ssh
           cp /tmp/cluster/ssh-privatekey ~/.ssh/google_compute_engine || true
-          export TEST_PROVIDER='{"type":"gce","region":"us-east1","multizone": true,"multimaster":true,"projectid":"openshift-gce-devel"}'
+          export TEST_PROVIDER='{"type":"gce","region":"us-east1","multizone": true,"multimaster":true,"projectid":"openshift-gce-devel-ci"}'
         elif [[ "${CLUSTER_TYPE}" == "aws" ]]; then
           mkdir -p ~/.ssh
           cp /tmp/cluster/ssh-privatekey ~/.ssh/kube_aws_rsa || true
@@ -307,7 +307,7 @@ objects:
           mkdir gcloudconfig
           export CLOUDSDK_CONFIG=/tmp/gcloudconfig
           gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}"
-          gcloud config set project openshift-gce-devel
+          gcloud config set project openshift-gce-devel-ci
           popd
         }
 
@@ -352,7 +352,7 @@ objects:
       - name: GCP_REGION
         value: us-east1
       - name: GCP_PROJECT
-        value: openshift-gce-devel
+        value: openshift-gce-devel-ci
       - name: GOOGLE_CLOUD_KEYFILE_JSON
         value: /etc/openshift-installer/gce.json
       - name: CLUSTER_NAME
@@ -459,7 +459,7 @@ objects:
             2) AZURE_REGION=centralus;;
             3) AZURE_REGION=centralus;;
             4) AZURE_REGION=centralus;;
-            5) AZURE_REGION=eastus;;
+            5) AZURE_REGION=centralus;;
             6) AZURE_REGION=eastus2;;
             7) AZURE_REGION=westus;;
             *) echo >&2 "invalid Azure region index"; exit 1;;
@@ -489,7 +489,7 @@ objects:
         elif [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
             cat > /tmp/artifacts/installer/install-config.yaml << EOF
         apiVersion: v1
-        baseDomain: ${BASE_DOMAIN:-origin-gce.dev.openshift.com}
+        baseDomain: ${BASE_DOMAIN:-origin-ci-int-gce.dev.openshift.com}
         metadata:
           name: ${CLUSTER_NAME}
         controlPlane:
