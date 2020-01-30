@@ -50,6 +50,65 @@ presubmits:
     always_run: true
     branches:
     - master
+    context: ci/build-farm/build01-dry
+    decorate: true
+    name: pull-ci-openshift-release-master-build01-dry
+    rerun_command: /test build01-dry
+    spec:
+      containers:
+      - args:
+        - --config-dir
+        - clusters/build-clusters/01_cluster
+        - --kubeconfig
+        - /etc/build-farm-credentials/kubeconfig
+        - --context
+        - ci/api-build01-ci-devcluster-openshift-com:6443
+        command:
+        - applyconfig
+        env:
+        - name: build01_build01_reg_auth_value
+          valueFrom:
+            secretKeyRef:
+              key: build01_build01_reg_auth_value.txt
+              name: build-farm-credentials
+        - name: build01_ci_reg_auth_value
+          valueFrom:
+            secretKeyRef:
+              key: build01_ci_reg_auth_value.txt
+              name: build-farm-credentials
+        - name: github_client_secret
+          valueFrom:
+            secretKeyRef:
+              key: build01_github_client_secret
+              name: build-farm-credentials
+        - name: slack_api_url
+          valueFrom:
+            secretKeyRef:
+              key: url
+              name: ci-slack-api-url
+        image: registry.svc.ci.openshift.org/ci/applyconfig:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.build01.config
+            path: kubeconfig
+          secretName: build-farm-credentials
+    trigger: (?m)^/test( | .* )build01-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
     context: ci/prow/ci-operator-config
     decorate: true
     name: pull-ci-openshift-release-master-ci-operator-config
