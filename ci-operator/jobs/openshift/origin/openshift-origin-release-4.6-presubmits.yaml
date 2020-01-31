@@ -1,7 +1,40 @@
 presubmits:
   openshift/origin:
   - agent: kubernetes
-    always_run: true
+    always_run: false
+    branches:
+    - release-4.6
+    context: ci/prow/artifacts
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-origin-release-4.6-artifacts
+    rerun_command: /test artifacts
+    run_if_changed: ^(hack/)|(Makefile)|(.*_(windows|linux|darwin|unsupported)(_test)?\.go)$
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --target=artifacts
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-origin-release-4.6.yaml
+              name: ci-operator-4.6-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-operator
+    trigger: (?m)^/test( | .* )artifacts,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
     branches:
     - release-4.6
     context: ci/prow/e2e-aws
@@ -71,7 +104,7 @@ presubmits:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-aws,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.6
     context: ci/prow/e2e-aws-disruptive
@@ -82,6 +115,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-release-4.6-e2e-aws-disruptive
+    optional: true
     rerun_command: /test e2e-aws-disruptive
     spec:
       containers:
@@ -145,6 +179,80 @@ presubmits:
     always_run: true
     branches:
     - release-4.6
+    context: ci/prow/e2e-aws-fips
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-origin-release-4.6-e2e-aws-fips
+    optional: true
+    rerun_command: /test e2e-aws-fips
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --branch=master
+        - --give-pr-author-access-to-namespace=true
+        - --lease-server=http://boskos
+        - --org=openshift
+        - --repo=origin
+        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
+        - --secret-dir=/usr/local/e2e-aws-fips-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=e2e-aws-fips
+        - --template=/usr/local/e2e-aws-fips
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: CLUSTER_VARIANT
+          value: fips
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-origin-release-4.6.yaml
+              name: ci-operator-4.6-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-aws-fips
+        - name: TEST_COMMAND
+          value: |
+            fips_check
+            TEST_SUITE=openshift/conformance/parallel run-tests
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-aws-fips-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-aws-fips
+          name: job-definition
+          subPath: cluster-launch-installer-e2e.yaml
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-e2e
+        name: job-definition
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )e2e-aws-fips,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - release-4.6
     context: ci/prow/e2e-aws-image-registry
     decorate: true
     decoration_config:
@@ -154,6 +262,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-release-4.6-e2e-aws-image-registry
     rerun_command: /test e2e-aws-image-registry
+    run_if_changed: ^(pkg/image)|^(test/extended/registry)|^(test/extended/images)|^(test/extended/imageapis)|^(vendor/github.com/docker/distribution)
     spec:
       containers:
       - args:
@@ -212,7 +321,7 @@ presubmits:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-aws-image-registry,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.6
     context: ci/prow/e2e-aws-jenkins
@@ -281,6 +390,151 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-aws-jenkins,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - release-4.6
+    context: ci/prow/e2e-aws-multitenant
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-origin-release-4.6-e2e-aws-multitenant
+    optional: true
+    rerun_command: /test e2e-aws-multitenant
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --lease-server=http://boskos
+        - --secret-dir=/usr/local/e2e-aws-multitenant-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=e2e-aws-multitenant
+        - --template=/usr/local/e2e-aws-multitenant
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_NETWORK_MANIFEST
+          value: |
+            apiVersion: operator.openshift.io/v1
+            kind: Network
+            metadata:
+              name: cluster
+            spec:
+              defaultNetwork:
+                type: OpenShiftSDN
+                openshiftSDNConfig:
+                  mode: Multitenant
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-origin-release-4.6.yaml
+              name: ci-operator-4.6-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-aws-multitenant
+        - name: TEST_COMMAND
+          value: TEST_SUITE=openshift/conformance/parallel run-tests
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-aws-multitenant-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-aws-multitenant
+          name: job-definition
+          subPath: cluster-launch-installer-e2e.yaml
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-e2e
+        name: job-definition
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )e2e-aws-multitenant,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - release-4.6
+    context: ci/prow/e2e-aws-ovn
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-origin-release-4.6-e2e-aws-ovn
+    optional: true
+    rerun_command: /test e2e-aws-ovn
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --lease-server=http://boskos
+        - --secret-dir=/usr/local/e2e-aws-ovn-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=e2e-aws-ovn
+        - --template=/usr/local/e2e-aws-ovn
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: CLUSTER_VARIANT
+          value: ovn
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-origin-release-4.6.yaml
+              name: ci-operator-4.6-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-aws-ovn
+        - name: TEST_COMMAND
+          value: TEST_SUITE=openshift/conformance/parallel run-tests
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-aws-ovn-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-aws-ovn
+          name: job-definition
+          subPath: cluster-launch-installer-e2e.yaml
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-e2e
+        name: job-definition
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )e2e-aws-ovn,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -352,7 +606,7 @@ presubmits:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-aws-serial,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.6
     context: ci/prow/e2e-azure
@@ -363,6 +617,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-release-4.6-e2e-azure
+    optional: true
     rerun_command: /test e2e-azure
     spec:
       containers:
@@ -494,7 +749,7 @@ presubmits:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-cmd,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.6
     context: ci/prow/e2e-conformance-k8s
@@ -636,7 +891,7 @@ presubmits:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-gcp,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.6
     context: ci/prow/e2e-gcp-builds
@@ -648,6 +903,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-release-4.6-e2e-gcp-builds
     rerun_command: /test e2e-gcp-builds
+    run_if_changed: ^(pkg/oc/cli/startbuild/startbuild.go)|^(pkg/build)|^(staging/src/.*/pkg/.*build)|^(pkg/cmd/infra/builder)|^(test/extended/builds)|^(test/extended/testdata/builds)|^(test/extended/util)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)
     spec:
       containers:
       - args:
@@ -708,7 +964,7 @@ presubmits:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-gcp-builds,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.6
     context: ci/prow/e2e-gcp-image-ecosystem
@@ -720,6 +976,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-release-4.6-e2e-gcp-image-ecosystem
     rerun_command: /test e2e-gcp-image-ecosystem
+    run_if_changed: ^(test/extended/image_ecosystem)|^(examples/db-templates)|^(examples/quickstarts)|^(examples/image-streams)|^(examples/jenkins)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)
     spec:
       containers:
       - args:
@@ -839,7 +1096,7 @@ presubmits:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-gcp-upgrade,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.6
     context: ci/prow/e2e-vsphere
@@ -850,6 +1107,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-release-4.6-e2e-vsphere
+    optional: true
     rerun_command: /test e2e-vsphere
     spec:
       containers:
@@ -959,7 +1217,7 @@ presubmits:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.6
     context: ci/prow/launch-vsphere
@@ -970,6 +1228,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-release-4.6-launch-vsphere
+    optional: true
     rerun_command: /test launch-vsphere
     spec:
       containers:
