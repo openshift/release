@@ -143,7 +143,7 @@ presubmits:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-aws-operator,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.6
     context: ci/prow/e2e-aws-operator-tech-preview
@@ -154,6 +154,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-api-operator-release-4.6-e2e-aws-operator-tech-preview
+    optional: true
     rerun_command: /test e2e-aws-operator-tech-preview
     spec:
       containers:
@@ -226,6 +227,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-api-operator-release-4.6-e2e-aws-scaleup-rhel7
+    optional: true
     rerun_command: /test e2e-aws-scaleup-rhel7
     spec:
       containers:
@@ -359,6 +361,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-api-operator-release-4.6-e2e-azure
+    optional: true
     rerun_command: /test e2e-azure
     spec:
       containers:
@@ -429,6 +432,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-api-operator-release-4.6-e2e-azure-operator
+    optional: true
     rerun_command: /test e2e-azure-operator
     spec:
       containers:
@@ -501,6 +505,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-api-operator-release-4.6-e2e-gcp
+    optional: true
     rerun_command: /test e2e-gcp
     spec:
       containers:
@@ -573,6 +578,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-api-operator-release-4.6-e2e-gcp-operator
+    optional: true
     rerun_command: /test e2e-gcp-operator
     spec:
       containers:
@@ -876,3 +882,29 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )unit,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-4.6
+    context: ci/prow/yaml-lint
+    decorate: true
+    labels:
+      ci.openshift.io/manually-branched: "true"
+    name: pull-ci-openshift-machine-api-operator-release-4.6.yaml-lint
+    rerun_command: /test yaml-lint
+    spec:
+      containers:
+      - args:
+        - ./hack/yaml-lint.sh
+        command:
+        - sh
+        env:
+        - name: IS_CONTAINER
+          value: "TRUE"
+        image: quay.io/coreos/yamllint
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+    trigger: (?m)^/test( | .* )yaml-lint,?($|\s.*)
