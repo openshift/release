@@ -590,7 +590,14 @@ objects:
           echo "Destroy bootstrap ..."
           openshift-install --dir /tmp/artifacts/installer destroy bootstrap
           echo "Destroy cluster ..."
-          openshift-install --dir /tmp/artifacts/installer destroy cluster
+          attempts=0
+          max_attempts=5
+          until [ ${attempts} -ge ${max_attempts} ]; do
+            openshift-install --dir /tmp/artifacts/installer destroy cluster && break
+            ((attempts++))
+            echo "Deprovision failed, retrying #${attempts}"
+            sleep 5
+          done
         }
 
         trap 'teardown; exit $DELETE_FAIL' EXIT
