@@ -1,0 +1,48 @@
+periodics:
+- agent: kubernetes
+  cron: '*/5 * * * *'
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: redhat-developer
+    repo: service-binding-operator
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-redhat-developer-service-binding-operator-master-dev-release
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --branch=master
+      - --give-pr-author-access-to-namespace=true
+      - --org=redhat-developer
+      - --repo=service-binding-operator
+      - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
+      - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+      - --target=dev-release
+      command:
+      - ci-operator
+      env:
+      - name: CONFIG_SPEC
+        valueFrom:
+          configMapKeyRef:
+            key: redhat-developer-service-binding-operator-master.yaml
+            name: ci-operator-master-configs
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/sentry-dsn
+        name: sentry-dsn
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: sentry-dsn
+      secret:
+        secretName: sentry-dsn
