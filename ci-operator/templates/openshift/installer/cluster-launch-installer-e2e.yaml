@@ -347,6 +347,15 @@ objects:
           return $rv
         }
 
+        function run-remote-smoke-tests() {
+          set +e
+          ssh $SSHOPTS root@$IP openshift-tests run "${TEST_SUITE}" --dry-run \| grep -Fvf dev-scripts/filtered-tests \| grep 'Smoke' \| openshift-tests run -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit -f -
+          rv=$?
+          ssh $SSHOPTS root@$IP tar -czf - /tmp/artifacts | tar -C / -xzf - 
+          set -e
+          return $rv
+        }
+
         if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
           setup-google-cloud-sdk
         fi
@@ -979,7 +988,7 @@ objects:
       - -c
       - |
         #!/bin/sh
-        set -ex
+        set -exo pipefail
 
         if [ "${CLUSTER_TYPE}" != "metal" ] ; then
             exit 0
@@ -1077,6 +1086,7 @@ objects:
         curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar -C /usr/bin -xzf -
 
         echo "export OPENSHIFT_RELEASE_IMAGE=$MIRROR_BASE:latest" >> /root/dev-scripts/config_root.sh
+        #echo "export OPENSHIFT_RELEASE_IMAGE=registry.svc.ci.openshift.org/ocp/release:4.4.0-0.nightly-2020-01-29-012724" >> /root/dev-scripts/config_root.sh
         echo "export ADDN_DNS=\$(awk '/nameserver/ { print \$2;exit; }' /etc/resolv.conf)" >> /root/dev-scripts/config_root.sh
         echo "export OPENSHIFT_CI=true" >> /root/dev-scripts/config_root.sh
         echo "export MIRROR_IMAGES=true" >> /root/dev-scripts/config_root.sh
