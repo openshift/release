@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cron: '*/5 * * * *'
+  cron: 0 */8 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -18,19 +18,28 @@ periodics:
       - --artifact-dir=$(ARTIFACTS)
       - --branch=master
       - --give-pr-author-access-to-namespace=true
+      - --lease-server=http://boskos
       - --org=redhat-developer
       - --repo=service-binding-operator
       - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
+      - --secret-dir=/usr/local/dev-release-cluster-profile
       - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
       - --target=dev-release
+      - --template=/usr/local/dev-release
       command:
       - ci-operator
       env:
+      - name: CLUSTER_TYPE
+        value: aws
       - name: CONFIG_SPEC
         valueFrom:
           configMapKeyRef:
             key: redhat-developer-service-binding-operator-master.yaml
             name: ci-operator-master-configs
+      - name: JOB_NAME_SAFE
+        value: dev-release
+      - name: TEST_COMMAND
+        value: make dev-release
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -38,11 +47,24 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /usr/local/dev-release-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/dev-release
+        name: job-definition
+        subPath: cluster-launch-installer-src.yaml
       - mountPath: /etc/sentry-dsn
         name: sentry-dsn
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - configMap:
+        name: prow-job-cluster-launch-installer-src
+      name: job-definition
     - name: sentry-dsn
       secret:
         secretName: sentry-dsn
