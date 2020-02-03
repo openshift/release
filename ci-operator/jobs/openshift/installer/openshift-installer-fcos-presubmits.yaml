@@ -68,6 +68,70 @@ presubmits:
     branches:
     - fcos
     cluster: api.ci
+    context: ci/prow/e2e-azure
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-fcos-e2e-azure
+    optional: true
+    rerun_command: /test e2e-azure
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-password-file=/etc/boskos/password
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/usr/local/e2e-azure-cluster-profile
+        - --target=e2e-azure
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-azure-cluster-profile
+          name: cluster-profile
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-azure4
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-azure,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - fcos
+    cluster: api.ci
     context: ci/prow/e2e-gcp
     decorate: true
     decoration_config:
@@ -143,6 +207,7 @@ presubmits:
     name: pull-ci-openshift-installer-fcos-e2e-openstack
     optional: true
     rerun_command: /test e2e-openstack
+    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
     spec:
       containers:
       - args:
@@ -215,6 +280,90 @@ presubmits:
         secret:
           secretName: regcred
     trigger: (?m)^/test( | .* )e2e-openstack,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - fcos
+    cluster: api.ci
+    context: ci/prow/e2e-ovirt
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-fcos-e2e-ovirt
+    optional: true
+    rerun_command: /test e2e-ovirt
+    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --repo=installer
+        - --secret-dir=/usr/local/e2e-ovirt-cluster-profile
+        - --target=e2e-ovirt
+        - --template=/usr/local/e2e-ovirt
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: ovirt
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-installer-fcos.yaml
+              name: ci-operator-misc-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-ovirt
+        - name: LEASE_TYPE
+          value: minimal
+        - name: TEST_COMMAND
+          value: run-minimal-tests
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-ovirt-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-ovirt
+          name: job-definition
+          subPath: cluster-launch-installer-ovirt-e2e.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-ovirt
+          - secret:
+              name: ovirt-infra-secrets
+          - configMap:
+              name: cluster-profile-ovirt
+      - configMap:
+          name: prow-job-cluster-launch-installer-ovirt-e2e
+        name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
+    trigger: (?m)^/test( | .* )e2e-ovirt,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -303,16 +452,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-vsphere-upi-cluster-profile
         - --target=e2e-vsphere-upi
-        - --template=/usr/local/e2e-vsphere-upi
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: vsphere
-        - name: JOB_NAME_SAFE
-          value: e2e-vsphere-upi
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance/parallel run-tests
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -325,9 +466,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-vsphere-upi-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-vsphere-upi
-          name: job-definition
-          subPath: cluster-launch-installer-upi-e2e.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -347,9 +485,6 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-vsphere
-      - configMap:
-          name: prow-job-cluster-launch-installer-upi-e2e
-        name: job-definition
       - name: pull-secret
         secret:
           secretName: regcred
