@@ -134,6 +134,7 @@ azure4)
     5) azure_region=eastus;;
     6) azure_region=eastus2;;
     7) azure_region=westus;;
+    *) echo >&2 "invalid Azure region index"; exit 1;;
     esac
     echo "Azure region: ${azure_region}"
     vnetrg=""
