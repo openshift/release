@@ -18,7 +18,7 @@ periodics:
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
         mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/ocp-dev-preview/4.3.0-0.nightly-2019-11-13-233341/openshift-client-linux-4.3.0-0.nightly-2019-11-13-233341.tar.gz | tar xvzf - -C /tmp/bin/
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.3/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/
         chmod ug+x /tmp/bin/oc
 
         # if the source and destination are identical, do nothing
@@ -146,7 +146,7 @@ periodics:
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
         mkdir /tmp/bin
-        curl https://storage.googleapis.com/origin-ci-test/_tools/4.1.0/oc >/tmp/bin/oc 2>/dev/null
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/
         chmod ug+x /tmp/bin/oc
 
         # if the source and destination are identical, do nothing
@@ -271,7 +271,7 @@ periodics:
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
         mkdir /tmp/bin
-        curl https://storage.googleapis.com/origin-ci-test/_tools/4.1.0/oc >/tmp/bin/oc 2>/dev/null
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/
         chmod ug+x /tmp/bin/oc
 
         # if the source and destination are identical, do nothing
@@ -407,7 +407,7 @@ periodics:
         mkdir $HOME/.docker/
         cp /usr/local/pull-secret/.dockerconfigjson $HOME/.docker/config.json
         mkdir $HOME/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/ocp-dev-preview/4.4.0-0.nightly-2019-12-19-100131/openshift-client-linux-4.4.0-0.nightly-2019-12-19-100131.tar.gz 2>/dev/null | tar xzf - -C /tmp/bin/ oc
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/
         curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 2>/dev/null >/tmp/bin/jq
         chmod ug+x $HOME/bin/oc $HOME/bin/jq
 
@@ -615,7 +615,7 @@ periodics:
         mkdir $HOME/.docker/
         cp /usr/local/pull-secret/.dockerconfigjson $HOME/.docker/config.json
         mkdir $HOME/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/ocp-dev-preview/4.3.0-0.nightly-2019-11-13-233341/openshift-client-linux-4.3.0-0.nightly-2019-11-13-233341.tar.gz | tar xvzf - -C $HOME/bin/
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.3/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/
         chmod ug+x $HOME/bin/oc
 
         # create namespace and craft a release image without the machine operator
@@ -2920,7 +2920,7 @@ periodics:
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
         mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/ocp-dev-preview/4.3.0-0.nightly-2019-11-13-233341/openshift-client-linux-4.3.0-0.nightly-2019-11-13-233341.tar.gz | tar xvzf - -C /tmp/bin/
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.3/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/
         chmod ug+x /tmp/bin/oc
 
         # annotate the information about this job so that we can query for it
@@ -4039,27 +4039,38 @@ periodics:
     - command:
       - /bin/bash
       - -c
-      - "#!/bin/bash\nset -euo pipefail\n\ninitial=$(ARTIFACTS)/release-initial.json\nlatest=$(ARTIFACTS)/release-latest.json\nif
-        ! curl --fail -X GET -G https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest
-        --data-urlencode 'in=>4.3.0-0 <4.4.0-0' > ${initial}; then\n  echo \"error:
-        Could not find a stable version\"\n  exit 1\nfi\nif ! curl --fail -X GET -G
-        https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.4.0-0.ci/latest
-        > ${latest}; then\n  echo \"error: Could not find newest version\"\n  exit
-        1\nfi\n\nfrom=$( python -c 'import json,sys; print json.load(open(sys.argv[1],
-        \"r\"))[\"name\"]' \"${initial}\" )\nto=$( python -c 'import json,sys; print
-        json.load(open(sys.argv[1], \"r\"))[\"name\"]' \"${latest}\" )\nexport RELEASE_IMAGE_INITIAL=$(
-        python -c 'import json,sys; print json.load(open(sys.argv[1], \"r\"))[\"pullSpec\"]'
-        \"${initial}\" )\nexport RELEASE_IMAGE_LATEST=$( python -c 'import json,sys;
-        print json.load(open(sys.argv[1], \"r\"))[\"pullSpec\"]' \"${latest}\" )\n\n#
-        prow doesn't allow init containers or a second container\nexport PATH=$PATH:/tmp/bin\nmkdir
-        /tmp/bin\ncurl https://mirror.openshift.com/pub/openshift-v4/clients/ocp-dev-preview/4.3.0-0.nightly-2019-11-13-233341/openshift-client-linux-4.3.0-0.nightly-2019-11-13-233341.tar.gz
-        | tar xvzf - -C /tmp/bin/        \nchmod ug+x /tmp/bin/oc\n\n# annotate the
-        information about this job so that the release controller adds it to the upgrade
-        graph\noc annotate pj/${PROW_JOB_ID} \"release.openshift.io/from-tag=${from}\"
-        \"release.openshift.io/tag=${to}\" \"release.openshift.io/source=ocp/$(BRANCH)\"\n\nci-operator
-        --artifact-dir=$(ARTIFACTS) --lease-server=http://boskos\\\n  --secret-dir=/usr/local/pull-secret
-        --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile \\\n  --target=e2e-$(CLUSTER_TYPE)-upgrade
-        --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME)\n"
+      - |
+        #!/bin/bash
+        set -euo pipefail
+
+        initial=$(ARTIFACTS)/release-initial.json
+        latest=$(ARTIFACTS)/release-latest.json
+        if ! curl --fail -X GET -G https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest --data-urlencode 'in=>4.3.0-0 <4.4.0-0' > ${initial}; then
+          echo "error: Could not find a stable version"
+          exit 1
+        fi
+        if ! curl --fail -X GET -G https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.4.0-0.ci/latest > ${latest}; then
+          echo "error: Could not find newest version"
+          exit 1
+        fi
+
+        from=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${initial}" )
+        to=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${latest}" )
+        export RELEASE_IMAGE_INITIAL=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${initial}" )
+        export RELEASE_IMAGE_LATEST=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${latest}" )
+
+        # prow doesn't allow init containers or a second container
+        export PATH=$PATH:/tmp/bin
+        mkdir /tmp/bin
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.3/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/
+        chmod ug+x /tmp/bin/oc
+
+        # annotate the information about this job so that the release controller adds it to the upgrade graph
+        oc annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
+
+        ci-operator --artifact-dir=$(ARTIFACTS) --lease-server=http://boskos\
+          --secret-dir=/usr/local/pull-secret --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile \
+          --target=e2e-$(CLUSTER_TYPE)-upgrade --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME)
       env:
       - name: BRANCH
         value: "4.3"
@@ -4259,7 +4270,7 @@ periodics:
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
         mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/ocp-dev-preview/4.3.0-0.nightly-2019-11-13-233341/openshift-client-linux-4.3.0-0.nightly-2019-11-13-233341.tar.gz | tar xvzf - -C /tmp/bin/
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.3/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/
         chmod ug+x /tmp/bin/oc
 
         # annotate the information about this job so that we can query for it
@@ -4351,7 +4362,7 @@ periodics:
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
         mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/ocp-dev-preview/4.3.0-0.nightly-2019-11-13-233341/openshift-client-linux-4.3.0-0.nightly-2019-11-13-233341.tar.gz | tar xvzf - -C /tmp/bin/
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.3/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/
         chmod ug+x /tmp/bin/oc
 
         # annotate the information about this job so that we can query for it
@@ -4524,7 +4535,7 @@ periodics:
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
         mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/ocp-dev-preview/4.3.0-0.nightly-2019-11-13-233341/openshift-client-linux-4.3.0-0.nightly-2019-11-13-233341.tar.gz | tar xvzf - -C /tmp/bin/
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.3/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/
         chmod ug+x /tmp/bin/oc
 
         # annotate the information about this job so that we can query for it
@@ -4618,7 +4629,7 @@ periodics:
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
         mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/ocp-dev-preview/4.3.0-0.nightly-2019-11-13-233341/openshift-client-linux-4.3.0-0.nightly-2019-11-13-233341.tar.gz | tar xvzf - -C /tmp/bin/
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.3/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/
         chmod ug+x /tmp/bin/oc
 
         # annotate the information about this job so that we can query for it
