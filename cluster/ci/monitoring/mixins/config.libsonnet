@@ -37,6 +37,11 @@
         channel: '#build-cop-alerts',
         notify: 'bparees',
       },
+      'kni-cnf': {
+        team: 'kni-cnf',
+        channel: '#forum-kni-cnf',
+        notify: '',
+      },
     },
   },
 }
