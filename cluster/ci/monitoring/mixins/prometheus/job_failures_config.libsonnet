@@ -7,6 +7,9 @@
       'endurance-cluster-maintenance-aws-4.3': {
         receiver: 'endurance-cluster',
       },
+      'periodic-ci-openshift-kni-cnf-features-deploy-master-cnf-e2e-gcp-periodic': {
+        receiver: 'kni-cnf',
+      },
     },
   },
 }
