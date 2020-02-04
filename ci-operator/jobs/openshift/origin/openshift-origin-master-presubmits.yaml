@@ -158,107 +158,6 @@ presubmits:
     always_run: false
     branches:
     - master
-    context: ci/prow/e2e-aws-migrated
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-      ci-operator.openshift.io/semantics-ignored: "true"
-    name: pull-ci-openshift-origin-master-e2e-aws-migrated
-    rerun_command: /test e2e-aws
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --lease-server-password-file=/etc/boskos/password
-        - --lease-server-username=ci
-        - --lease-server=https://boskos-ci.svc.ci.openshift.org
-        - --org=openshift
-        - --repo=origin
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-        - --secret-dir=/usr/local/e2e-aws-cluster-profile
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=e2e-aws
-        - --template=/usr/local/e2e-aws
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-origin-master.yaml
-              name: ci-operator-master-configs
-        - name: JOB_NAME_SAFE
-          value: e2e-aws
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance/parallel run-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-aws-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-aws
-          name: job-definition
-          subPath: cluster-launch-installer-e2e.yaml
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
-      - name: boskos
-        secret:
-          items:
-          - key: password
-            path: password
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-e2e
-        name: job-definition
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )e2e-aws,?($|\s.*)
-    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
-    optional: true
-    skip_report: true
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - master
     context: ci/prow/e2e-aws-disruptive
     decorate: true
     decoration_config:
@@ -359,16 +258,18 @@ presubmits:
     always_run: false
     branches:
     - master
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/e2e-aws-disruptive-migrated
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
       ci-operator.openshift.io/semantics-ignored: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-master-e2e-aws-disruptive-migrated
     optional: true
     rerun_command: /test e2e-aws-disruptive
+    skip_report: true
     spec:
       containers:
       - args:
@@ -455,8 +356,6 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-aws-disruptive,?($|\s.*)
-    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
-    skip_report: true
   - agent: kubernetes
     always_run: true
     branches:
@@ -663,16 +562,19 @@ presubmits:
     always_run: false
     branches:
     - master
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/e2e-aws-image-registry-migrated
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
       ci-operator.openshift.io/semantics-ignored: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-master-e2e-aws-image-registry-migrated
+    optional: true
     rerun_command: /test e2e-aws-image-registry
     run_if_changed: ^(pkg/image)|^(test/extended/registry)|^(test/extended/images)|^(test/extended/imageapis)|^(vendor/github.com/docker/distribution)
+    skip_report: true
     spec:
       containers:
       - args:
@@ -758,9 +660,6 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-aws-image-registry,?($|\s.*)
-    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
-    optional: true
-    skip_report: true
   - agent: kubernetes
     always_run: false
     branches:
@@ -863,15 +762,18 @@ presubmits:
     always_run: false
     branches:
     - master
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/e2e-aws-jenkins-migrated
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
       ci-operator.openshift.io/semantics-ignored: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-master-e2e-aws-jenkins-migrated
+    optional: true
     rerun_command: /test e2e-aws-jenkins
+    skip_report: true
     spec:
       containers:
       - args:
@@ -957,9 +859,107 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-aws-jenkins,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - master
     cluster: ci/api-build01-ci-devcluster-openshift-com:6443
+    context: ci/prow/e2e-aws-migrated
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/semantics-ignored: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-origin-master-e2e-aws-migrated
     optional: true
+    rerun_command: /test e2e-aws
     skip_report: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --branch=master
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
+        - --org=openshift
+        - --repo=origin
+        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
+        - --secret-dir=/usr/local/e2e-aws-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=e2e-aws
+        - --template=/usr/local/e2e-aws
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-origin-master.yaml
+              name: ci-operator-master-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-aws
+        - name: TEST_COMMAND
+          value: TEST_SUITE=openshift/conformance/parallel run-tests
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-aws-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-aws
+          name: job-definition
+          subPath: cluster-launch-installer-e2e.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-e2e
+        name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )e2e-aws,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1273,15 +1273,18 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/e2e-aws-serial-migrated
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
       ci-operator.openshift.io/semantics-ignored: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-master-e2e-aws-serial-migrated
+    optional: true
     rerun_command: /test e2e-aws-serial
+    skip_report: true
     spec:
       containers:
       - args:
@@ -1367,9 +1370,6 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-aws-serial,?($|\s.*)
-    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
-    optional: true
-    skip_report: true
   - agent: kubernetes
     always_run: false
     branches:
@@ -1473,16 +1473,18 @@ presubmits:
     always_run: false
     branches:
     - master
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/e2e-azure-migrated
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
       ci-operator.openshift.io/semantics-ignored: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-master-e2e-azure-migrated
     optional: true
     rerun_command: /test e2e-azure
+    skip_report: true
     spec:
       containers:
       - args:
@@ -1568,8 +1570,6 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-azure,?($|\s.*)
-    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
-    skip_report: true
   - agent: kubernetes
     always_run: true
     branches:
@@ -1674,15 +1674,18 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/e2e-cmd-migrated
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
       ci-operator.openshift.io/semantics-ignored: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-master-e2e-cmd-migrated
+    optional: true
     rerun_command: /test e2e-cmd
+    skip_report: true
     spec:
       containers:
       - args:
@@ -1770,9 +1773,6 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-cmd,?($|\s.*)
-    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
-    optional: true
-    skip_report: true
   - agent: kubernetes
     always_run: false
     branches:
@@ -1875,15 +1875,18 @@ presubmits:
     always_run: false
     branches:
     - master
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/e2e-conformance-k8s-migrated
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
       ci-operator.openshift.io/semantics-ignored: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-master-e2e-conformance-k8s-migrated
+    optional: true
     rerun_command: /test e2e-conformance-k8s
+    skip_report: true
     spec:
       containers:
       - args:
@@ -1969,9 +1972,6 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-conformance-k8s,?($|\s.*)
-    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
-    optional: true
-    skip_report: true
   - agent: kubernetes
     always_run: true
     branches:
@@ -2072,109 +2072,6 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-gcp,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    context: ci/prow/e2e-gcp-migrated
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-      ci-operator.openshift.io/semantics-ignored: "true"
-    name: pull-ci-openshift-origin-master-e2e-gcp-migrated
-    rerun_command: /test e2e-gcp
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --lease-server-password-file=/etc/boskos/password
-        - --lease-server-username=ci
-        - --lease-server=https://boskos-ci.svc.ci.openshift.org
-        - --org=openshift
-        - --repo=origin
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-        - --secret-dir=/usr/local/e2e-gcp-cluster-profile
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=e2e-gcp
-        - --template=/usr/local/e2e-gcp
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: gcp
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-origin-master.yaml
-              name: ci-operator-master-configs
-        - name: JOB_NAME_SAFE
-          value: e2e-gcp
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance/parallel run-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-gcp-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-gcp
-          name: job-definition
-          subPath: cluster-launch-installer-e2e.yaml
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
-      - name: boskos
-        secret:
-          items:
-          - key: password
-            path: password
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
-      - configMap:
-          name: prow-job-cluster-launch-installer-e2e
-        name: job-definition
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )e2e-gcp,?($|\s.*)
-    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
-    optional: true
-    skip_report: true
   - agent: kubernetes
     always_run: false
     branches:
@@ -2280,16 +2177,19 @@ presubmits:
     always_run: false
     branches:
     - master
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/e2e-gcp-builds-migrated
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
       ci-operator.openshift.io/semantics-ignored: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-master-e2e-gcp-builds-migrated
+    optional: true
     rerun_command: /test e2e-gcp-builds
     run_if_changed: ^(pkg/oc/cli/startbuild/startbuild.go)|^(pkg/build)|^(staging/src/.*/pkg/.*build)|^(pkg/cmd/infra/builder)|^(test/extended/builds)|^(test/extended/testdata/builds)|^(test/extended/util)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)
+    skip_report: true
     spec:
       containers:
       - args:
@@ -2377,9 +2277,6 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-gcp-builds,?($|\s.*)
-    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
-    optional: true
-    skip_report: true
   - agent: kubernetes
     always_run: false
     branches:
@@ -2485,16 +2382,19 @@ presubmits:
     always_run: false
     branches:
     - master
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/e2e-gcp-image-ecosystem-migrated
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
       ci-operator.openshift.io/semantics-ignored: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-master-e2e-gcp-image-ecosystem-migrated
+    optional: true
     rerun_command: /test e2e-gcp-image-ecosystem
     run_if_changed: ^(test/extended/image_ecosystem)|^(examples/db-templates)|^(examples/quickstarts)|^(examples/image-streams)|^(examples/jenkins)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)
+    skip_report: true
     spec:
       containers:
       - args:
@@ -2582,9 +2482,109 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-gcp-image-ecosystem,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
     cluster: ci/api-build01-ci-devcluster-openshift-com:6443
+    context: ci/prow/e2e-gcp-migrated
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/semantics-ignored: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-origin-master-e2e-gcp-migrated
     optional: true
+    rerun_command: /test e2e-gcp
     skip_report: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --branch=master
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
+        - --org=openshift
+        - --repo=origin
+        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
+        - --secret-dir=/usr/local/e2e-gcp-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=e2e-gcp
+        - --template=/usr/local/e2e-gcp
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: gcp
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-origin-master.yaml
+              name: ci-operator-master-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-gcp
+        - name: TEST_COMMAND
+          value: TEST_SUITE=openshift/conformance/parallel run-tests
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-gcp-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-gcp
+          name: job-definition
+          subPath: cluster-launch-installer-e2e.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - configMap:
+          name: prow-job-cluster-launch-installer-e2e
+        name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )e2e-gcp,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -2676,15 +2676,18 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/e2e-gcp-upgrade-migrated
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
       ci-operator.openshift.io/semantics-ignored: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-master-e2e-gcp-upgrade-migrated
+    optional: true
     rerun_command: /test e2e-gcp-upgrade
+    skip_report: true
     spec:
       containers:
       - args:
@@ -2759,9 +2762,6 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-gcp-upgrade,?($|\s.*)
-    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
-    optional: true
-    skip_report: true
   - agent: kubernetes
     always_run: false
     branches:
@@ -2865,16 +2865,18 @@ presubmits:
     always_run: false
     branches:
     - master
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/e2e-vsphere-migrated
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
       ci-operator.openshift.io/semantics-ignored: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-master-e2e-vsphere-migrated
     optional: true
     rerun_command: /test e2e-vsphere
+    skip_report: true
     spec:
       containers:
       - args:
@@ -2960,8 +2962,6 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-vsphere,?($|\s.*)
-    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
-    skip_report: true
   - agent: kubernetes
     always_run: true
     branches:
@@ -3033,15 +3033,18 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/images-migrated
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
       ci-operator.openshift.io/semantics-ignored: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-master-images-migrated
+    optional: true
     rerun_command: /test images
+    skip_report: true
     spec:
       containers:
       - args:
@@ -3096,9 +3099,6 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )images,?($|\s.*)
-    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
-    optional: true
-    skip_report: true
   - agent: kubernetes
     always_run: false
     branches:
@@ -3202,16 +3202,18 @@ presubmits:
     always_run: false
     branches:
     - master
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/launch-vsphere-migrated
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
       ci-operator.openshift.io/semantics-ignored: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-master-launch-vsphere-migrated
     optional: true
     rerun_command: /test launch-vsphere
+    skip_report: true
     spec:
       containers:
       - args:
@@ -3297,8 +3299,6 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )launch-vsphere,?($|\s.*)
-    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
-    skip_report: true
   - agent: kubernetes
     always_run: true
     branches:
@@ -3368,15 +3368,18 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/unit-migrated
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
       ci-operator.openshift.io/semantics-ignored: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-master-unit-migrated
+    optional: true
     rerun_command: /test unit
+    skip_report: true
     spec:
       containers:
       - args:
@@ -3429,9 +3432,6 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )unit,?($|\s.*)
-    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
-    optional: true
-    skip_report: true
   - agent: kubernetes
     always_run: true
     branches:
@@ -3501,15 +3501,18 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/verify-migrated
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
       ci-operator.openshift.io/semantics-ignored: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-master-verify-migrated
+    optional: true
     rerun_command: /test verify
+    skip_report: true
     spec:
       containers:
       - args:
@@ -3562,9 +3565,6 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )verify,?($|\s.*)
-    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
-    optional: true
-    skip_report: true
   - agent: jenkins
     always_run: false
     branches:
