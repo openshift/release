@@ -106,6 +106,7 @@ items:
           args:
           - -config=/etc/configs
           - -registry=/etc/registry
+          - -prow-config=/etc/config/config.yaml
           - -flat-registry
           - -log-level=debug
           - -cycle=2m
@@ -130,6 +131,9 @@ items:
             periodSeconds: 3
             timeoutSeconds: 600
           volumeMounts:
+          - name: config
+            mountPath: /etc/config
+            readOnly: true
           - name: registry
             mountPath: /etc/registry
             readOnly: true
@@ -165,6 +169,9 @@ items:
               memory: "2Gi"
               cpu: "200m"
         volumes:
+        - name: config
+          configMap:
+            name: config
         - name: registry
           configMap:
             name: step-registry
