@@ -10,8 +10,13 @@ build_root:
     namespace: openshift
     tag: golang-1.13
 images:
-- dockerfile_path: Dockerfile
+- dockerfile_path: Dockerfile.rhel7
   from: base
+  inputs:
+    bin:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
+      paths: null
   to: cluster-etcd-operator
 promotion:
   name: "4.4"
@@ -35,10 +40,15 @@ tests:
     from: bin
 - as: verify-deps
   commands: |
-    HOME=$( mktemp -d )
-    GO111MODULE=on make verify-deps -k --warn-undefined-variables
+    make verify-deps -k --warn-undefined-variables
   container:
     from: src
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: |
+    make test-unit JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
+  container:
+    from: test-bin
 - as: e2e-aws
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
@@ -48,13 +58,6 @@ tests:
   openshift_installer:
     cluster_profile: gcp
     upgrade: true
-- artifact_dir: /tmp/artifacts
-  as: unit
-  commands: |
-    mkdir -p /tmp/artifacts
-    make test-unit JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
-  container:
-    from: test-bin
 - as: e2e-azure
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
