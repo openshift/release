@@ -184,73 +184,7 @@ $ ls -A cluster/test-deploy/azure/
 vars.yaml
 ```
 
-Example: Run e2e tests
-```console
-docker run \
---rm \
--it \
---security-opt label:disable \
---volume $HOME/.kube/config:/root/.kube/config \
---volume $(pwd):/release \
-registry.svc.ci.openshift.org/ci/ci-operator:latest \
---config /release/ci-operator/config/openshift/openshift-azure/openshift-openshift-azure-master.yaml \
---git-ref openshift/openshift-azure@master \
---namespace ${CI_OPERATOR_NAMESPACE} \
---target cluster-launch-e2e-azure \
---target=[output:stable:azure-controllers] \
---target=[output:stable:canary] \
---target=[output:stable:etcdbackup] \
---target=[output:stable:startup] \
---target=[output:stable:metricsbridge] \
---target=[output:stable:sync] \
---target=[output:stable:tlsproxy] \
---template /release/ci-operator/templates/openshift/openshift-azure/cluster-launch-e2e-azure.yaml \
---secret-dir /release/cluster/test-deploy/azure/
-```
 
-Example: Run E2E-Upgrade test
-```
-docker run \
---rm \
--it \
---security-opt label:disable \
---env JOB_SAFE_NAME=e2e-upgrade-azure \
---volume $HOME/.kube/config:/root/.kube/config \
---volume $(pwd):/release registry.svc.ci.openshift.org/ci/ci-operator:latest \
---config /release/ci-operator/config/openshift/openshift-azure/openshift-openshift-azure-master.yaml \
---git-ref openshift/openshift-azure@master \
---namespace ${CI_OPERATOR_NAMESPACE} \
---target=[output:stable:azure-controllers] \
---target=[output:stable:canary] \
---target=[output:stable:etcdbackup] \
---target=[output:stable:startup] \
---target=[output:stable:metricsbridge] \
---target=[output:stable:sync] \
---target=[output:stable:tlsproxy] \
---target=e2e-upgrade-v1.0 \
---template /release/ci-operator/templates/openshift/openshift-azure/rbac.yaml \
---secret-dir /release/cluster/test-deploy/azure \
---target=rbac
-```
-
-Example: Run origin conformance tests
-```console
-docker run \
---rm \
--it \
---security-opt label:disable \
---env TEST_COMMAND="TEST_FOCUS=Suite:openshift/conformance/parallel run-tests" \
---env TEST_IMAGE="registry.svc.ci.openshift.org/openshift/origin-v3.11:tests" \
---volume $HOME/.kube/config:/root/.kube/config \
---volume $(pwd):/release \
-registry.svc.ci.openshift.org/ci/ci-operator:latest \
---config /release/ci-operator/config/openshift/openshift-azure/openshift-openshift-azure-master.yaml \
---git-ref openshift/openshift-azure@master \
---namespace ${CI_OPERATOR_NAMESPACE} \
---target cluster-launch-e2e-azure \
---template /release/ci-operator/templates/openshift/openshift-azure/cluster-launch-e2e-azure.yaml \
---secret-dir /release/cluster/test-deploy/azure/
-```
 
 ## Testing prow jobs
 
