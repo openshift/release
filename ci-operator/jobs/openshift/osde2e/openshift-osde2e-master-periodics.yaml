@@ -376,7 +376,7 @@ periodics:
     repo: osde2e
   labels:
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-osde2e-master-e2e-prod-4.2
+  name: periodic-ci-openshift-osde2e-master-e2e-prod-default
   spec:
     containers:
     - args:
@@ -416,7 +416,7 @@ periodics:
     repo: osde2e
   labels:
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-osde2e-master-e2e-prod-4.2-4.2
+  name: periodic-ci-openshift-osde2e-master-e2e-prod-default-next
   spec:
     containers:
     - args:
@@ -430,60 +430,10 @@ periodics:
         value: "false"
       - name: GINKGO_SKIP
         value: OpenShift E2E
-      - name: MAJOR_TARGET
-        value: "4"
-      - name: MINOR_TARGET
-        value: "2"
       - name: OSD_ENV
         value: prod
-      - name: UPGRADE_RELEASE_STREAM
-        value: fast-4.2
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /usr/local/osde2e-secrets
-        name: osde2e-secrets
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: osde2e-secrets
-      secret:
-        secretName: osde2e-secrets
-- agent: kubernetes
-  cron: 0 */4 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: osde2e
-  labels:
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-osde2e-master-e2e-prod-4.2-4.3
-  spec:
-    containers:
-    - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-secrets;
-      command:
-      - /bin/bash
-      - -c
-      env:
-      - name: DESTROY_CLUSTER
-        value: "false"
-      - name: GINKGO_SKIP
-        value: OpenShift E2E
-      - name: MAJOR_TARGET
-        value: "4"
-      - name: MINOR_TARGET
-        value: "2"
-      - name: OSD_ENV
-        value: prod
-      - name: UPGRADE_RELEASE_STREAM
-        value: fast-4.3
+      - name: UPGRADE_TO_CIS_IF_POSSIBLE
+        value: "true"
       image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
       imagePullPolicy: Always
       name: ""
@@ -522,6 +472,48 @@ periodics:
         value: "false"
       - name: OSD_ENV
         value: prod
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/osde2e-secrets
+        name: osde2e-secrets
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: osde2e-secrets
+      secret:
+        secretName: osde2e-secrets
+- agent: kubernetes
+  cron: 0 */4 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: osde2e
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-osde2e-master-e2e-prod-next
+  spec:
+    containers:
+    - args:
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        ./ci/prow_run_tests.sh /usr/local/osde2e-secrets;
+      command:
+      - /bin/bash
+      - -c
+      env:
+      - name: DESTROY_CLUSTER
+        value: "false"
+      - name: GINKGO_SKIP
+        value: OpenShift E2E
+      - name: OSD_ENV
+        value: prod
+      - name: USE_LATEST_VERSION_FOR_INSTALL
+        value: "true"
       image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
       imagePullPolicy: Always
       name: ""
@@ -584,7 +576,7 @@ periodics:
     repo: osde2e
   labels:
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-osde2e-master-e2e-prod-scale-4.2
+  name: periodic-ci-openshift-osde2e-master-e2e-prod-scale-default
   spec:
     containers:
     - args:
@@ -596,10 +588,6 @@ periodics:
       env:
       - name: DESTROY_CLUSTER
         value: "false"
-      - name: MAJOR_TARGET
-        value: "4"
-      - name: MINOR_TARGET
-        value: "2"
       - name: OSD_ENV
         value: prod
       image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
