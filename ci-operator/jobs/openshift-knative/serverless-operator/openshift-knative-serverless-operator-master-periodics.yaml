@@ -141,3 +141,74 @@ periodics:
     - name: sentry-dsn
       secret:
         secretName: sentry-dsn
+- agent: kubernetes
+  cron: 0 0 * * 0
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift-knative
+    repo: serverless-operator
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: 4.3-vsphere
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-knative-serverless-operator-master-4.3-vsphere-e2e-aws-ocp-43-vsphere-continuous
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --branch=master
+      - --give-pr-author-access-to-namespace=true
+      - --lease-server=http://boskos
+      - --org=openshift-knative
+      - --repo=serverless-operator
+      - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
+      - --secret-dir=/usr/local/e2e-aws-ocp-43-vsphere-continuous-cluster-profile
+      - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+      - --target=e2e-aws-ocp-43-vsphere-continuous
+      - --template=/usr/local/e2e-aws-ocp-43-vsphere-continuous
+      - --variant=4.3-vsphere
+      command:
+      - ci-operator
+      env:
+      - name: CLUSTER_TYPE
+        value: vsphere
+      - name: CONFIG_SPEC
+        valueFrom:
+          configMapKeyRef:
+            key: openshift-knative-serverless-operator-master__4.3-vsphere.yaml
+            name: ci-operator-master-configs
+      - name: JOB_NAME_SAFE
+        value: e2e-aws-ocp-43-vsphere-continuous
+      - name: TEST_COMMAND
+        value: SCALE_UP=-1 make test-e2e
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/e2e-aws-ocp-43-vsphere-continuous-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/e2e-aws-ocp-43-vsphere-continuous
+        name: job-definition
+        subPath: cluster-launch-installer-upi-src.yaml
+      - mountPath: /etc/sentry-dsn
+        name: sentry-dsn
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-vsphere
+    - configMap:
+        name: prow-job-cluster-launch-installer-upi-src
+      name: job-definition
+    - name: sentry-dsn
+      secret:
+        secretName: sentry-dsn
