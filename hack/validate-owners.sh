@@ -2,7 +2,6 @@
 
 # This script ensures that all component config files are accompanied by OWNERS file
 
-#!/bin/bash
 set -euo pipefail
 
 WHITELIST=$(sort <<'EOF'
@@ -18,9 +17,16 @@ ci-operator/jobs/openvswitch/ovn-kubernetes
 EOF
 )
 
+base_dir="${1:-}"
+
+if [[ ! -d "${base_dir}" ]]; then
+  echo "Expected a single argument: a path to a directory with release repo layout"
+  exit 1
+fi
+
 # mindepth for "jobs" and "configs" is 2, while "step-registry" is 1, so do these in separate steps
-no_owners_jobs_configs=$(find ci-operator/config/ ci-operator/jobs/ -mindepth 2 -not -path "*openshift-priv*" -type d ! -exec test -e '{}/OWNERS' \; -print | sort)
-no_owners_reg=$(find ci-operator/step-registry -mindepth 1 -type d ! -exec test -e '{}/OWNERS' \; -print | sort)
+no_owners_jobs_configs=$(find "${base_dir}/ci-operator/config/" "${base_dir}/ci-operator/jobs/" -mindepth 2 -not -path "*openshift-priv*" -type d ! -exec test -e '{}/OWNERS' \; -print | sort | ( grep -oP "^${base_dir}/\K.*" || true ))
+no_owners_reg=$(find "${base_dir}/ci-operator/step-registry" -mindepth 1 -type d ! -exec test -e '{}/OWNERS' \; -print | sort | ( grep -oP "^${base_dir}/\K.*" || true))
 no_owners=$(echo "${no_owners_jobs_configs}"$'\n'"${no_owners_reg}" | sort)
 false_neg=$(comm -13 <(echo "$WHITELIST") <(echo "$no_owners"))
 false_pos=$(comm -23 <(echo "$WHITELIST") <(echo "$no_owners"))
@@ -42,7 +48,6 @@ $false_neg
 
 EOF
 fi
-
 
 if [[ "$false_pos" ]]; then
   cat << EOF
