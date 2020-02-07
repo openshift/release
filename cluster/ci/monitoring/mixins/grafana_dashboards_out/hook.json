@@ -433,6 +433,106 @@
                "show": true
             }
          ]
+      },
+      {
+         "aliasColors": { },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "prometheus",
+         "fill": 1,
+         "gridPos": {
+            "h": 9,
+            "w": 24,
+            "x": 12,
+            "y": 13
+         },
+         "id": 7,
+         "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": true,
+            "max": false,
+            "min": false,
+            "rightSide": true,
+            "show": true,
+            "sideWidth": 250,
+            "sort": "avg",
+            "sortDesc": true,
+            "total": false,
+            "values": true
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "histogram_quantile(0.99, sum(rate(prow_plugin_handle_duration_seconds_bucket{plugin=~\"${plugin}\", event_type=~\"${event_type}\", action=~\"${action}\"}[5m])) by (le))",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "phi=0.99",
+               "refId": "A"
+            },
+            {
+               "expr": "histogram_quantile(0.95, sum(rate(prow_plugin_handle_duration_seconds_bucket{plugin=~\"${plugin}\", event_type=~\"${event_type}\", action=~\"${action}\"}[5m])) by (le))",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "phi=0.95",
+               "refId": "B"
+            },
+            {
+               "expr": "histogram_quantile(0.5, sum(rate(prow_plugin_handle_duration_seconds_bucket{plugin=~\"${plugin}\", event_type=~\"${event_type}\", action=~\"${action}\"}[5m])) by (le))",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "phi=0.5",
+               "refId": "C"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Response latency percentiles for event type ${event_type}, action ${action} by plugin ${plugin}",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "short",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "short",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
       }
    ],
    "refresh": "",
@@ -441,7 +541,68 @@
    "style": "dark",
    "tags": [ ],
    "templating": {
-      "list": [ ]
+      "list": [
+         {
+            "allValue": ".*",
+            "current": { },
+            "datasource": "prometheus",
+            "hide": 0,
+            "includeAll": true,
+            "label": "plugin",
+            "multi": false,
+            "name": "plugin",
+            "options": [ ],
+            "query": "label_values(prow_plugin_handle_duration_seconds_bucket, plugin)",
+            "refresh": 2,
+            "regex": "",
+            "sort": 0,
+            "tagValuesQuery": "",
+            "tags": [ ],
+            "tagsQuery": "",
+            "type": "query",
+            "useTags": false
+         },
+         {
+            "allValue": ".*",
+            "current": { },
+            "datasource": "prometheus",
+            "hide": 0,
+            "includeAll": true,
+            "label": "event_type",
+            "multi": false,
+            "name": "event_type",
+            "options": [ ],
+            "query": "label_values(prow_plugin_handle_duration_seconds_bucket, event_type)",
+            "refresh": 2,
+            "regex": "",
+            "sort": 0,
+            "tagValuesQuery": "",
+            "tags": [ ],
+            "tagsQuery": "",
+            "type": "query",
+            "useTags": false
+         },
+         {
+            "allValue": ".*",
+            "current": { },
+            "datasource": "prometheus",
+            "hide": 0,
+            "includeAll": true,
+            "label": "action",
+            "multi": false,
+            "name": "action",
+            "options": [ ],
+            "query": "label_values(prow_plugin_handle_duration_seconds_bucket, action)",
+            "refresh": 2,
+            "regex": "",
+            "sort": 0,
+            "tagValuesQuery": "",
+            "tags": [ ],
+            "tagsQuery": "",
+            "type": "query",
+            "useTags": false
+         }
+      ]
    },
    "time": {
       "from": "now-1h",
