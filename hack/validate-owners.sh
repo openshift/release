@@ -19,7 +19,7 @@ EOF
 )
 
 # mindepth for "jobs" and "configs" is 2, while "step-registry" is 1, so do these in separate steps
-no_owners_jobs_configs=$(find ci-operator/config/ ci-operator/jobs/ -mindepth 2 -type d ! -exec test -e '{}/OWNERS' \; -print | sort)
+no_owners_jobs_configs=$(find ci-operator/config/ ci-operator/jobs/ -mindepth 2 -not -path "*openshift-priv*" -type d ! -exec test -e '{}/OWNERS' \; -print | sort)
 no_owners_reg=$(find ci-operator/step-registry -mindepth 1 -type d ! -exec test -e '{}/OWNERS' \; -print | sort)
 no_owners=$(echo "${no_owners_jobs_configs}"$'\n'"${no_owners_reg}" | sort)
 false_neg=$(comm -13 <(echo "$WHITELIST") <(echo "$no_owners"))
