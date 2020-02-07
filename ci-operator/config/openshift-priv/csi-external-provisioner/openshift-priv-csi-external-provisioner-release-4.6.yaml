@@ -1,0 +1,43 @@
+base_images:
+  base:
+    name: "4.6"
+    namespace: ocp
+    tag: base
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+canonical_go_repository: github.com/kubernetes-csi/external-provisioner
+images:
+- dockerfile_path: Dockerfile.openshift
+  from: base
+  inputs:
+    root:
+      as:
+      - "0"
+      paths: null
+  to: csi-external-provisioner
+promotion:
+  disabled: true
+  name: 4.6-private
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.6"
+  namespace: ocp
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
+- as: e2e-aws-csi
+  commands: TEST_INSTALL_CSI_DRIVERS=aws-ebs TEST_SUITE=openshift/csi run-tests
+  openshift_installer:
+    cluster_profile: aws

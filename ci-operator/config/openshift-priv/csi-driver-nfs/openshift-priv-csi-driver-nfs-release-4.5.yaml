@@ -1,0 +1,31 @@
+base_images:
+  os:
+    name: centos
+    namespace: openshift
+    tag: "7"
+binary_build_commands: go build -o ./bin/nfsplugin ./cmd/nfsplugin
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.11
+canonical_go_repository: github.com/kubernetes-csi/csi-driver-nfs
+promotion:
+  disabled: true
+  name: 4.5-private
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.5"
+  namespace: ocp
+tests:
+- as: e2e-aws
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer:
+    cluster_profile: aws

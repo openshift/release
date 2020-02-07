@@ -1,0 +1,47 @@
+base_images:
+  base:
+    name: "4.6"
+    namespace: ocp
+    tag: base
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+canonical_go_repository: github.com/kubernetes-csi/external-snapshotter
+images:
+- dockerfile_path: Dockerfile.openshift
+  from: base
+  inputs:
+    root:
+      as:
+      - "0"
+      paths: null
+  to: csi-external-snapshotter
+- dockerfile_path: Dockerfile.snapshot-controller.openshift
+  from: base
+  inputs:
+    root:
+      as:
+      - "0"
+      paths: null
+  to: csi-snapshot-controller
+promotion:
+  disabled: true
+  name: 4.6-private
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.6"
+  namespace: ocp
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: src

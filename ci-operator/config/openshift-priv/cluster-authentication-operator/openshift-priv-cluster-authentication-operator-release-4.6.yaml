@@ -1,0 +1,69 @@
+base_images:
+  base:
+    name: "4.6"
+    namespace: ocp
+    tag: base
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+canonical_go_repository: github.com/openshift/cluster-authentication-operator
+images:
+- dockerfile_path: Dockerfile.rhel7
+  from: base
+  inputs:
+    bin:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
+      paths: null
+  to: cluster-authentication-operator
+promotion:
+  disabled: true
+  name: 4.6-private
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.6"
+  namespace: ocp
+tests:
+- as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: src
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: |
+    mkdir -p /tmp/artifacts
+    make test-unit JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
+  container:
+    from: src
+- as: e2e-aws
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer:
+    cluster_profile: aws
+- as: e2e-aws-operator
+  commands: |
+    mkdir -p /tmp/artifacts
+    make test-e2e JUNITFILE=/tmp/artifacts/junit_report.xml
+  openshift_installer_src:
+    cluster_profile: aws
+- as: e2e-aws-upgrade
+  commands: TEST_SUITE=all run-upgrade-tests
+  openshift_installer:
+    cluster_profile: aws
+    upgrade: true
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-console-login
+  commands: ./test-prow-e2e.sh login
+  openshift_installer_custom_test_image:
+    cluster_profile: aws
+    from: stable:console-tests
