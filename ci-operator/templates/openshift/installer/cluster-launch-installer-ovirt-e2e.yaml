@@ -413,6 +413,14 @@ objects:
           ${SSH_PUB_KEY}
         EOF
 
+        function update_image_registry() {
+          while true; do
+            sleep 10;
+            oc get configs.imageregistry.operator.openshift.io/cluster > /dev/null && break
+          done
+          oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'
+        }
+
         #change the masters igntion , to use tempfs for etcd IOPS optimization
         TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create ignition-configs --log-level=debug
         python -c \
@@ -425,11 +433,13 @@ objects:
         TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create manifests --log-level=debug
         # This is for debugging purposes, allows us to map a job to a VM
         cat /tmp/artifacts/installer/manifests/cluster-infrastructure-02-config.yml
+
+        export KUBECONFIG=/tmp/artifacts/installer/auth/kubeconfig
+        update_image_registry &
+
         TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create cluster --log-level=debug 2>&1 | grep -v password &
         wait "$!"
         install_exit_status=$?
-        export KUBECONFIG=/tmp/artifacts/installer/auth/kubeconfig
-        oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'
         sleep 10m
         oc get co/image-registry
         exit $install_exit_status
