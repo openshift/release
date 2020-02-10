@@ -3,59 +3,51 @@ base_images:
     name: centos
     namespace: ci
     tag: "7"
-
 build_root:
   project_image:
     dockerfile_path: dist/openshift-release/Dockerfile.builder
-
+images:
+- dockerfile_path: dist/Dockerfile.deploy/Dockerfile
+  from: bin
+  to: deploy
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
       cargo build --release
     from: src
     to: bin
-
-images:
-- from: bin
-  dockerfile_path: dist/Dockerfile.deploy/Dockerfile
-  to: deploy
-
-tag_specification:
-  name: "4.4"
-  namespace: ocp
-
 resources:
-  "*":
-    limits:
-      memory: 4Gi
+  '*':
+    limits: {}
     requests:
       cpu: 1000m
       memory: 1Gi
   unit:
-    limits:
-      memory: 9Gi
+    limits: {}
     requests:
       cpu: "3"
       memory: 5Gi
-
+tag_specification:
+  name: "4.4"
+  namespace: ocp
 tests:
-  - as: yaml-lint
-    commands: dist/prow_yaml_lint.sh
-    container:
-      from: src
-  - as: rustfmt-1.41.0
-    commands: dist/prow_rustfmt.sh 1.41.0
-    container:
-      from: src
-  - as: rustfmt-1.40.0
-    commands: dist/prow_rustfmt.sh 1.40.0
-    container:
-      from: src
-  - as: rustfmt-1.39.0
-    commands: dist/prow_rustfmt.sh 1.39.0
-    container:
-      from: src
-  - as: e2e
-    commands: bash hack/e2e.sh
-    openshift_installer_src:
-      cluster_profile: aws
+- as: yaml-lint
+  commands: dist/prow_yaml_lint.sh
+  container:
+    from: src
+- as: rustfmt-1.41.0
+  commands: dist/prow_rustfmt.sh 1.41.0
+  container:
+    from: src
+- as: rustfmt-1.40.0
+  commands: dist/prow_rustfmt.sh 1.40.0
+  container:
+    from: src
+- as: rustfmt-1.39.0
+  commands: dist/prow_rustfmt.sh 1.39.0
+  container:
+    from: src
+- as: e2e
+  commands: bash hack/e2e.sh
+  openshift_installer_src:
+    cluster_profile: aws
