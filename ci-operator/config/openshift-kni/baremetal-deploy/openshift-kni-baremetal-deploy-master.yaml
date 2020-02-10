@@ -5,33 +5,33 @@ base_images:
     tag: base
 build_root:
   project_image:
-    dockerfile_path: Dockefile.buildimage
     context_dir: features/
-tag_specification:
-  name: "4.3"
-  namespace: ocp
+    dockerfile_path: Dockefile.buildimage
 resources:
-  "*":
-    limits:
-      memory: 4Gi
+  '*':
+    limits: {}
     requests:
       cpu: 100m
       memory: 200Mi
+tag_specification:
+  name: "4.3"
+  namespace: ocp
 tests:
-  - as: sctp-e2e-aws
-    commands: cd features && export FEATURES=sctp && make deploy && make functests
-    openshift_installer_src:
-      cluster_profile: aws
-  - as: performance-e2e-aws
-    commands: cd features && source hack/test_env.sh && export FEATURES="mcp performance" && make deploy && make functests
-    openshift_installer_src:
-      cluster_profile: aws      
-  - as: features-unit-tests
-    commands: cd features && make unittests
-    container:
-      from: src
-  - as: e2e-aws
-    cron: "* */8 * * *"
-    commands: cd features && source hack/test_env.sh && make deploy && make functests
-    openshift_installer_src:
-      cluster_profile: aws
+- as: sctp-e2e-aws
+  commands: cd features && export FEATURES=sctp && make deploy && make functests
+  openshift_installer_src:
+    cluster_profile: aws
+- as: performance-e2e-aws
+  commands: cd features && source hack/test_env.sh && export FEATURES="mcp performance"
+    && make deploy && make functests
+  openshift_installer_src:
+    cluster_profile: aws
+- as: features-unit-tests
+  commands: cd features && make unittests
+  container:
+    from: src
+- as: e2e-aws
+  commands: cd features && source hack/test_env.sh && make deploy && make functests
+  cron: '* */8 * * *'
+  openshift_installer_src:
+    cluster_profile: aws

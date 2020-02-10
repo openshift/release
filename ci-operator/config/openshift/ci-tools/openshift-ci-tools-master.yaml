@@ -1,8 +1,12 @@
 base_images:
-  os:
+  centos8:
     name: centos
-    namespace: openshift
-    tag: '7'
+    namespace: origin
+    tag: "8"
+  cli:
+    name: "4.4"
+    namespace: ocp
+    tag: cli
   git:
     name: release
     namespace: openshift
@@ -11,15 +15,16 @@ base_images:
     name: "4.4"
     namespace: ocp
     tag: installer
-  cli:
-    name: "4.4"
-    namespace: ocp
-    tag: cli
-  centos8:
+  os:
     name: centos
-    namespace: origin
-    tag: '8'
+    namespace: openshift
+    tag: "7"
 binary_build_commands: make install
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
 images:
 - context_dir: images/blocking-issue-creator/
   from: os
@@ -134,8 +139,8 @@ images:
   inputs:
     bin:
       paths:
-        - destination_dir: .
-          source_path: /go/bin/applyconfig
+      - destination_dir: .
+        source_path: /go/bin/applyconfig
     cli:
       paths:
       - destination_dir: usr/bin
@@ -218,8 +223,8 @@ images:
   inputs:
     bin:
       paths:
-        - destination_dir: .
-          source_path: /go/bin/private-org-sync
+      - destination_dir: .
+        source_path: /go/bin/private-org-sync
   to: private-org-sync
 - context_dir: images/ci-secret-bootstrap
   from: centos8
@@ -238,20 +243,15 @@ images:
         source_path: /go/bin/ci-op-configs-mirror
   to: ci-op-configs-mirror
 promotion:
+  name: ""
   namespace: ci
   tag: latest
 resources:
   '*':
-    limits:
-      memory: 10Gi
+    limits: {}
     requests:
       cpu: 100m
       memory: 200Mi
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.13
 tests:
 - artifact_dir: /tmp/artifacts
   as: unit
