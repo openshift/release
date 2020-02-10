@@ -4,23 +4,19 @@
 
 set -euo pipefail
 
-WHITELIST=$(sort <<'EOF'
-ci-operator/config/openshift/kubernetes-metrics-server
-ci-operator/jobs/openshift/kubernetes-metrics-server
-ci-operator/config/openshift/origin-metrics
-ci-operator/jobs/openshift/origin-metrics
-ci-operator/config/openshift/origin-web-console
-ci-operator/jobs/openshift/origin-web-console
-ci-operator/config/openshift/origin-web-console-server
-ci-operator/jobs/openshift/origin-web-console-server
-ci-operator/jobs/openvswitch/ovn-kubernetes
-EOF
-)
-
 base_dir="${1:-}"
 
 if [[ ! -d "${base_dir}" ]]; then
-  echo "Expected a single argument: a path to a directory with release repo layout"
+  echo "Expected at least one argument: a path to a directory with release repo layout"
+  exit 1
+fi
+
+whitelist_file="${2:-}"
+WHITELIST=""
+if [[ -f "$whitelist_file" ]]; then
+  WHITELIST="$( sort "$whitelist_file" )"
+elif [[ -n "$whitelist_file" ]]; then
+  echo "Expected second argument to be a path to a file with a whitelist: '$whitelist_file'"
   exit 1
 fi
 
@@ -54,7 +50,7 @@ if [[ "$false_pos" ]]; then
 ERROR: Directory that was previously whitelisted as not containing
 ERROR: an OWNERS file is now containing the file, so it no longer
 ERROR: needs to be whitelisted. Please remove the appropriate line
-ERROR: from hack/validate-owners.sh script.
+ERROR: from $whitelist_file.
 
 ERROR: Directories to be removed from whitelist:
 
