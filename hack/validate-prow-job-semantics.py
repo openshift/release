@@ -3,10 +3,18 @@
 import os
 import re
 import sys
+from argparse import ArgumentParser
+
 import yaml
 
 
 JOBS_DIR = 'ci-operator/jobs'
+
+
+def parse_args():
+    parser = ArgumentParser()
+    parser.add_argument("release_repo_dir", help="release directory")
+    return parser.parse_args()
 
 
 def main():
@@ -24,7 +32,8 @@ def main():
     )
     validate = lambda funcs, *args: all([f(*args) for f in funcs])
     failed = False
-    for root, _, files in os.walk(JOBS_DIR):
+    args = parse_args()
+    for root, _, files in os.walk(os.path.join(args.release_repo_dir, JOBS_DIR)):
         for filename in files:
             if filename.endswith(".yml"):
                 print(f"ERROR: Only .yaml extensions are allowed, not .yml as in {root}/{filename}")

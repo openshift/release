@@ -10,12 +10,18 @@ set -o pipefail
 workdir="$( mktemp -d )"
 trap 'rm -rf "${workdir}"' EXIT
 
-ci_operator_dir="$( dirname "${BASH_SOURCE[0]}" )/../ci-operator"
+base_dir="${1:-}"
+
+if [[ ! -d "${base_dir}" ]]; then
+  echo "Expected a single argument: a path to a directory with release repo layout"
+  exit 1
+fi
+
+ci_operator_dir="${base_dir}/ci-operator"
 
 cp -r "${ci_operator_dir}" "${workdir}"
 
 ci-operator-prowgen --from-dir "${ci_operator_dir}/config" --to-dir "${workdir}/ci-operator/jobs"
-
 
 if ! diff -Naupr "${ci_operator_dir}/jobs/" "${workdir}/ci-operator/jobs/"> "${workdir}/diff"; then
 	cat << EOF

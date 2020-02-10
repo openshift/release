@@ -10,7 +10,12 @@ set -o pipefail
 workdir="$( mktemp -d )"
 trap 'rm -rf "${workdir}"' EXIT
 
-base_dir="$( dirname "${BASH_SOURCE[0]}" )/../"
+base_dir="${1:-}"
+
+if [[ ! -d "${base_dir}" ]]; then
+  echo "Expected a single argument: a path to a directory with release repo layout"
+  exit 1
+fi
 
 if ! config-shard-validator --release-repo-dir="${base_dir}" > "${workdir}/output" 2>&1; then
 	cat << EOF
