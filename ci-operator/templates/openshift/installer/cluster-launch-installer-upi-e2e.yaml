@@ -1153,6 +1153,9 @@ objects:
             cat > /tmp/artifacts/installer/install-config.yaml << EOF
         apiVersion: v1
         baseDomain: ${base_domain}
+        compute:
+        - name: worker
+          replicas: 0
         metadata:
           name: ${CLUSTER_NAME}
         networking:
@@ -1181,6 +1184,12 @@ objects:
                 curl -L -o /tmp/rhcos/rhcos.ova "${OVA_URL}"
                 govc import.ova -options=/tmp/rhcos/rhcos.json /tmp/rhcos/rhcos.ova
             fi
+
+            openshift-install --dir=/tmp/artifacts/installer create manifests
+            rm -f /tmp/artifacts/installer/openshift/99_openshift-cluster-api_master-machines-*.yaml
+            rm -f /tmp/artifacts/installer/openshift/99_openshift-cluster-api_worker-machineset-*.yaml
+            sed -i "s;mastersSchedulable: true;mastersSchedulable: false;g" /tmp/artifacts/installer/manifests/cluster-scheduler-02-config.yml
+
         else
             echo "Unsupported cluster type '${CLUSTER_TYPE}'"
             exit 1
