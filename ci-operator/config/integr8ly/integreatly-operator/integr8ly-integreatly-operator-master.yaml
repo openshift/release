@@ -2,48 +2,39 @@ base_images:
   os:
     name: centos
     namespace: openshift
-    tag: '7'
-
-resources:
-  '*':
-    limits:
-      memory: 6Gi
-    requests:
-      memory: 250Mi
-      cpu: 100m
-  unit:
-    limits:
-      memory: 10Gi
-    requests:
-      memory: 2Gi
-      cpu: 200m
-
-images:
-- from: os
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/integr8ly/integreatly-operator/build
-  dockerfile_path: build/Dockerfile
-  to: integreatly-operator
-
+    tag: "7"
+binary_build_commands: make code/compile COMPILE_TARGET="./build/_output/bin/integreatly-operator"
 build_root:
   image_stream_tag:
     name: intly-operator-base-image
     namespace: integr8ly
     tag: latest
-
-binary_build_commands: make code/compile COMPILE_TARGET="./build/_output/bin/integreatly-operator"
-
+images:
+- dockerfile_path: build/Dockerfile
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/integr8ly/integreatly-operator/build
+  to: integreatly-operator
 promotion:
-  namespace: integr8ly
   name: integreatly-operator
-
+  namespace: integr8ly
+resources:
+  '*':
+    limits: {}
+    requests:
+      cpu: 100m
+      memory: 250Mi
+  unit:
+    limits: {}
+    requests:
+      cpu: 200m
+      memory: 2Gi
 tag_specification:
-  name: '4.2'
+  name: "4.2"
   namespace: ocp
-
 tests:
 - as: vendor
   commands: make vendor/check

@@ -4,7 +4,7 @@ base_images:
     namespace: ocp
     tag: base
   iks:
-    name: "iks"
+    name: iks
     namespace: ibm-gate-secrets
     tag: "4.3"
 binary_build_commands: make build
@@ -13,25 +13,24 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.13
-promotion:
-  name: "hypershift-4.3"
-  namespace: "hypershift-toolkit"
-resources:
-  '*':
-    limits:
-      memory: 4Gi
-    requests:
-      cpu: 100m
-      memory: 200Mi
-tag_specification:
-  name: "4.3"
-  namespace: ocp
 images:
 - from: base
   to: hypershift-toolkit
 - dockerfile_path: DockerCITest
   from: iks
   to: iks-deploy
+promotion:
+  name: hypershift-4.3
+  namespace: hypershift-toolkit
+resources:
+  '*':
+    limits: {}
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.3"
+  namespace: ocp
 tests:
 - as: verify
   commands: make verify
@@ -42,6 +41,5 @@ tests:
   container:
     from: iks-deploy
   secret:
-    name: 'ibm-gate-test-secrets'
-    mount_path: '/usr/ibm-gate-test-secrets/'
-
+    mount_path: /usr/ibm-gate-test-secrets/
+    name: ibm-gate-test-secrets
