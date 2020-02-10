@@ -5,8 +5,7 @@ build_root:
     tag: golang-1.12
 resources:
   '*':
-    limits:
-      memory: 4Gi
+    limits: {}
     requests:
       cpu: 100m
       memory: 200Mi
@@ -14,18 +13,18 @@ tag_specification:
   name: "4.3"
   namespace: ocp
 tests:
-  - as: "e2e-test-cron"
-    cron: "0 */6 * * *" # every six hours
-    commands: |
-      set -euo pipefail
-      echo "Running CNV product test"
-      ./bootstrap.sh
-    openshift_installer_src:
-      cluster_profile: gcp
-  - as: "e2e-test-presubmit"
-    commands: |
-      set -euo pipefail
-      echo "Running CNV product test"
-      ./bootstrap.sh
-    openshift_installer_src:
-      cluster_profile: gcp
+- as: e2e-test-cron
+  commands: |
+    set -euo pipefail
+    echo "Running CNV product test"
+    ./bootstrap.sh
+  cron: 0 */6 * * *
+  openshift_installer_src:
+    cluster_profile: gcp
+- as: e2e-test-presubmit
+  commands: |
+    set -euo pipefail
+    echo "Running CNV product test"
+    ./bootstrap.sh
+  openshift_installer_src:
+    cluster_profile: gcp

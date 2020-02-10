@@ -3,53 +3,44 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "8"
-
-resources:
-  '*':
-    limits:
-      memory: 6Gi
-    requests:
-      memory: 250Mi
-      cpu: 100m
-  unit:
-    limits:
-      memory: 10Gi
-    requests:
-      memory: 2Gi
-      cpu: 200m
-
-images:
-- from: os
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/integr8ly/heimdall/build
-  dockerfile_path: build/Dockerfile
-  to: heimdall
-
+binary_build_commands: make code/compile COMPILE_TARGET="./build/_output/bin/heimdall"
 build_root:
   image_stream_tag:
     name: heimdall-base-image
     namespace: integr8ly
     tag: latest
-
-binary_build_commands: make code/compile COMPILE_TARGET="./build/_output/bin/heimdall"
-
+images:
+- dockerfile_path: build/Dockerfile
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/integr8ly/heimdall/build
+  to: heimdall
 promotion:
-  namespace: integr8ly
   name: heimdall
-
+  namespace: integr8ly
+resources:
+  '*':
+    limits: {}
+    requests:
+      cpu: 100m
+      memory: 250Mi
+  unit:
+    limits: {}
+    requests:
+      cpu: 200m
+      memory: 2Gi
 tag_specification:
-  name: '4.2'
+  name: "4.2"
   namespace: ocp
-
 tests:
 - as: format
   commands: make code/check
   container:
     from: src
-- as : vendor
+- as: vendor
   commands: make vendor/check
   container:
     from: src
@@ -59,8 +50,8 @@ tests:
     from: src
 - as: e2e
   commands: make test/e2e/prow
-  secret:
-    name: integr8ly-ci-secrets
-    mount_path: /usr/local/integr8ly-ci-secrets
   openshift_installer_src:
     cluster_profile: aws
+  secret:
+    mount_path: /usr/local/integr8ly-ci-secrets
+    name: integr8ly-ci-secrets
