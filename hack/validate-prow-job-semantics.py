@@ -10,6 +10,18 @@ JOBS_DIR = 'ci-operator/jobs'
 
 
 def main():
+    PATH_CHECKS = (
+        validate_filename,
+        validate_file_structure,
+    )
+    CONTENT_CHECKS = (
+        validate_job_repo,
+        validate_names,
+        validate_sharding,
+        validate_ci_op_args,
+        validate_pod_name,
+        validate_resources,
+    )
     validate = lambda funcs, *args: all([f(*args) for f in funcs])
     failed = False
     for root, _, files in os.walk(JOBS_DIR):
@@ -22,12 +34,12 @@ def main():
             if os.path.basename(filename).startswith("infra-"):
                 continue
             path = os.path.join(root, filename)
-            if not validate([validate_filename, validate_file_structure], path):
+            if not validate(PATH_CHECKS, path):
                 failed = True
                 continue
             with open(path) as f:
                 data = yaml.load(f)
-            if not validate([validate_job_repo, validate_names, validate_sharding, validate_ci_op_args, validate_pod_name, validate_resources], path, data):
+            if not validate(CONTENT_CHECKS, path, data):
                 failed = True
 
     if failed:
