@@ -12,9 +12,9 @@ JOBS_DIR = 'ci-operator/jobs'
 def main():
     PATH_CHECKS = (
         validate_filename,
-        validate_file_structure,
     )
     CONTENT_CHECKS = (
+        validate_file_structure,
         validate_job_repo,
         validate_names,
         validate_sharding,
@@ -74,18 +74,16 @@ def validate_filename(path):
 
     return True
 
-def validate_file_structure(path):
-    with open(path) as f:
-        data = yaml.load(f)
-        if len(data) != 1:
-            print("ERROR: {}: file contains more than one type of job".format(path))
-            return False
-        if next(iter(data.keys())) == 'periodics':
-            return True
-        data = next(iter(data.values()))
-        if len(data) != 1:
-            print("ERROR: {}: file contains jobs for more than one repo".format(path))
-            return False
+def validate_file_structure(path, data):
+    if len(data) != 1:
+        print("ERROR: {}: file contains more than one type of job".format(path))
+        return False
+    if next(iter(data.keys())) == 'periodics':
+        return True
+    data = next(iter(data.values()))
+    if len(data) != 1:
+        print("ERROR: {}: file contains jobs for more than one repo".format(path))
+        return False
 
     return True
 
