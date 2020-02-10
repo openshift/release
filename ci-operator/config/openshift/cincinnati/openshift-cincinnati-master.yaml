@@ -6,16 +6,29 @@ base_images:
 build_root:
   project_image:
     dockerfile_path: dist/openshift-release/Dockerfile.builder
+
 images:
-- dockerfile_path: dist/Dockerfile.deploy/Dockerfile
-  from: bin
+- from: centos
+  inputs:
+    root:
+      as:
+      - "cincinnati:build"
+      paths: null
+  dockerfile_path: dist/Dockerfile.deploy/Dockerfile
   to: deploy
-raw_steps:
-- pipeline_image_cache_step:
-    commands: |
-      cargo build --release
-    from: src
-    to: bin
+- from: centos
+  inputs:
+    root:
+      as:
+      - "cincinnati:build"
+      paths: null
+  dockerfile_path: dist/Dockerfile.e2e/Dockerfile
+  to: e2e-test
+
+tag_specification:
+  name: "4.4"
+  namespace: ocp
+
 resources:
   '*':
     limits: {}
@@ -49,5 +62,6 @@ tests:
     from: src
 - as: e2e
   commands: bash hack/e2e.sh
-  openshift_installer_src:
+  openshift_installer_custom_test_image:
     cluster_profile: aws
+    from: pipeline:e2e-test
