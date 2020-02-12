@@ -20,8 +20,6 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=release-0.2
         - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
         - --org=openshift
         - --repo=knative-eventing
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
@@ -52,28 +50,16 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
         - mountPath: /usr/local/e2e-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/e2e
           name: job-definition
           subPath: cluster-launch-src.yaml
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -84,9 +70,6 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-src
         name: job-definition
-      - name: pull-secret
-        secret:
-          secretName: regcred
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
@@ -111,8 +94,6 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=release-0.2
         - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
         - --org=openshift
         - --repo=knative-eventing
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
@@ -133,26 +114,11 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
-      - name: pull-secret
-        secret:
-          secretName: regcred
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
