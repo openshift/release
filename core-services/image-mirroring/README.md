@@ -30,7 +30,7 @@ We will use the tag(s) in the mapping file(s) defined below.
 
 ## Configuring mirroring for new images
 
-Simply submit a PR adding the image to then appropriate mapping file. You will
+Simply submit a PR adding the image to the appropriate mapping file. You will
 need an approval of an owner of the image set. The following external repositories
 are currently targeted by existing mirroring jobs:
 
@@ -43,6 +43,7 @@ are currently targeted by existing mirroring jobs:
  - [ocs-operator](./ocs-operator): `quay.io/ocs-dev`
  - [integreatly](./integr8ly): `quay.io/integreatly`
  - [openshift-kni](./openshift-kni): `quay.io/openshift-kni`
+ - [openshift-psap](./openshift-psap/): `quay.io/openshift-psap`
 
 ## Configuring mirroring for new sets of images
 
