@@ -19,6 +19,8 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=release-4.2
         - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
         - --org=openshift
         - --repo=ocs-operator
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
@@ -40,11 +42,26 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: pull-secret
+        secret:
+          secretName: regcred
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
@@ -68,6 +85,8 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=release-4.2
         - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
         - --org=openshift
         - --repo=ocs-operator
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
@@ -88,11 +107,26 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: pull-secret
+        secret:
+          secretName: regcred
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
@@ -116,7 +150,11 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=release-4.2
         - --give-pr-author-access-to-namespace=true
-        - --lease-server=http://boskos
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
         - --org=openshift
         - --repo=ocs-operator
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
@@ -146,16 +184,37 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /usr/local/ocs-operator-e2e-aws-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/ocs-operator-e2e-aws
           name: job-definition
           subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -164,6 +223,9 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-src
         name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
@@ -188,7 +250,11 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=release-4.2
         - --give-pr-author-access-to-namespace=true
-        - --lease-server=http://boskos
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
         - --org=openshift
         - --repo=ocs-operator
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
@@ -218,16 +284,37 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /usr/local/red-hat-storage-ocs-ci-e2e-aws-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/red-hat-storage-ocs-ci-e2e-aws
           name: job-definition
           subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -236,6 +323,9 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-src
         name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
