@@ -1,29 +1,34 @@
 base_images:
   centos:
-    cluster: https://api.ci.openshift.org
     name: centos
     namespace: ci
     tag: "7"
 build_root:
   project_image:
     dockerfile_path: dist/openshift-release/Dockerfile.builder
+
 images:
-- dockerfile_path: dist/Dockerfile.deploy/Dockerfile
-  from: centos
+- from: centos
   inputs:
     root:
       as:
       - builder
       paths: null
+  dockerfile_path: dist/Dockerfile.deploy/Dockerfile
   to: deploy
-- dockerfile_path: dist/Dockerfile.e2e/Dockerfile
-  from: centos
+- from: centos
   inputs:
     root:
       as:
       - builder
       paths: null
+  dockerfile_path: dist/Dockerfile.e2e/Dockerfile
   to: e2e-test
+
+tag_specification:
+  name: "4.4"
+  namespace: ocp
+
 resources:
   '*':
     limits: {}
@@ -36,7 +41,6 @@ resources:
       cpu: "3"
       memory: 5Gi
 tag_specification:
-  cluster: https://api.ci.openshift.org
   name: "4.4"
   namespace: ocp
 tests:
