@@ -21,7 +21,11 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=release-4.2
         - --give-pr-author-access-to-namespace=true
-        - --lease-server=http://boskos
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --org=openshift-priv
         - --repo=origin
@@ -51,6 +55,12 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /usr/local/e2e-aws-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/github-credentials
@@ -59,11 +69,26 @@ presubmits:
         - mountPath: /usr/local/e2e-aws
           name: job-definition
           subPath: cluster-launch-installer-e2e.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -75,6 +100,9 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-e2e
         name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
@@ -100,7 +128,11 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=release-4.2
         - --give-pr-author-access-to-namespace=true
-        - --lease-server=http://boskos
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --org=openshift-priv
         - --repo=origin
@@ -131,6 +163,12 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /usr/local/e2e-aws-disruptive-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/github-credentials
@@ -139,11 +177,26 @@ presubmits:
         - mountPath: /usr/local/e2e-aws-disruptive
           name: job-definition
           subPath: cluster-launch-installer-e2e.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -155,6 +208,9 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-e2e
         name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
@@ -180,7 +236,11 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=release-4.2
         - --give-pr-author-access-to-namespace=true
-        - --lease-server=http://boskos
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --org=openshift-priv
         - --repo=origin
@@ -210,6 +270,12 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /usr/local/e2e-aws-image-registry-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/github-credentials
@@ -218,11 +284,26 @@ presubmits:
         - mountPath: /usr/local/e2e-aws-image-registry
           name: job-definition
           subPath: cluster-launch-installer-e2e.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -234,6 +315,9 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-e2e
         name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
@@ -259,7 +343,11 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=release-4.2
         - --give-pr-author-access-to-namespace=true
-        - --lease-server=http://boskos
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --org=openshift-priv
         - --repo=origin
@@ -289,6 +377,12 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /usr/local/e2e-aws-jenkins-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/github-credentials
@@ -297,11 +391,26 @@ presubmits:
         - mountPath: /usr/local/e2e-aws-jenkins
           name: job-definition
           subPath: cluster-launch-installer-e2e.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -313,6 +422,9 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-e2e
         name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
@@ -338,7 +450,11 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=release-4.2
         - --give-pr-author-access-to-namespace=true
-        - --lease-server=http://boskos
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --org=openshift-priv
         - --repo=origin
@@ -368,6 +484,12 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /usr/local/e2e-aws-serial-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/github-credentials
@@ -376,11 +498,26 @@ presubmits:
         - mountPath: /usr/local/e2e-aws-serial
           name: job-definition
           subPath: cluster-launch-installer-e2e.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -392,6 +529,9 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-e2e
         name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
@@ -417,7 +557,11 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=release-4.2
         - --give-pr-author-access-to-namespace=true
-        - --lease-server=http://boskos
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --org=openshift-priv
         - --repo=origin
@@ -447,6 +591,12 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /usr/local/e2e-azure-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/github-credentials
@@ -455,11 +605,26 @@ presubmits:
         - mountPath: /usr/local/e2e-azure
           name: job-definition
           subPath: cluster-launch-installer-e2e.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -471,6 +636,9 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-e2e
         name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
@@ -496,7 +664,11 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=release-4.2
         - --give-pr-author-access-to-namespace=true
-        - --lease-server=http://boskos
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --org=openshift-priv
         - --repo=origin
@@ -526,6 +698,12 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /usr/local/e2e-cmd-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/github-credentials
@@ -534,11 +712,26 @@ presubmits:
         - mountPath: /usr/local/e2e-cmd
           name: job-definition
           subPath: cluster-launch-installer-e2e.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -550,6 +743,9 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-e2e
         name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
@@ -575,7 +771,11 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=release-4.2
         - --give-pr-author-access-to-namespace=true
-        - --lease-server=http://boskos
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --org=openshift-priv
         - --repo=origin
@@ -605,6 +805,12 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /usr/local/e2e-conformance-k8s-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/github-credentials
@@ -613,11 +819,26 @@ presubmits:
         - mountPath: /usr/local/e2e-conformance-k8s
           name: job-definition
           subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -629,6 +850,9 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-src
         name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
@@ -654,7 +878,11 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=release-4.2
         - --give-pr-author-access-to-namespace=true
-        - --lease-server=http://boskos
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --org=openshift-priv
         - --repo=origin
@@ -684,6 +912,12 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /usr/local/e2e-gcp-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/github-credentials
@@ -692,11 +926,26 @@ presubmits:
         - mountPath: /usr/local/e2e-gcp
           name: job-definition
           subPath: cluster-launch-installer-e2e.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -710,6 +959,9 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-e2e
         name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
@@ -735,7 +987,11 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=release-4.2
         - --give-pr-author-access-to-namespace=true
-        - --lease-server=http://boskos
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --org=openshift-priv
         - --repo=origin
@@ -765,6 +1021,12 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /usr/local/e2e-gcp-builds-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/github-credentials
@@ -773,11 +1035,26 @@ presubmits:
         - mountPath: /usr/local/e2e-gcp-builds
           name: job-definition
           subPath: cluster-launch-installer-e2e.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -791,6 +1068,9 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-e2e
         name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
@@ -816,7 +1096,11 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=release-4.2
         - --give-pr-author-access-to-namespace=true
-        - --lease-server=http://boskos
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --org=openshift-priv
         - --repo=origin
@@ -846,6 +1130,12 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /usr/local/e2e-gcp-image-ecosystem-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/github-credentials
@@ -854,11 +1144,26 @@ presubmits:
         - mountPath: /usr/local/e2e-gcp-image-ecosystem
           name: job-definition
           subPath: cluster-launch-installer-e2e.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -872,6 +1177,9 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-e2e
         name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
@@ -897,7 +1205,11 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=release-4.2
         - --give-pr-author-access-to-namespace=true
-        - --lease-server=http://boskos
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --org=openshift-priv
         - --repo=origin
@@ -920,16 +1232,37 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /usr/local/e2e-gcp-upgrade-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
           readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -940,6 +1273,9 @@ presubmits:
       - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
+      - name: pull-secret
+        secret:
+          secretName: regcred
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
@@ -965,7 +1301,11 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=release-4.2
         - --give-pr-author-access-to-namespace=true
-        - --lease-server=http://boskos
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --org=openshift-priv
         - --repo=origin
@@ -995,6 +1335,12 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /usr/local/e2e-vsphere-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/github-credentials
@@ -1003,11 +1349,26 @@ presubmits:
         - mountPath: /usr/local/e2e-vsphere
           name: job-definition
           subPath: cluster-launch-installer-upi-e2e.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -1019,6 +1380,9 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-upi-e2e
         name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
@@ -1044,6 +1408,8 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=release-4.2
         - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --org=openshift-priv
         - --repo=origin
@@ -1066,17 +1432,32 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
           readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
       - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
+      - name: pull-secret
+        secret:
+          secretName: regcred
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
@@ -1102,6 +1483,8 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=release-4.2
         - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --org=openshift-priv
         - --repo=origin
@@ -1123,17 +1506,32 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
           readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
       - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
+      - name: pull-secret
+        secret:
+          secretName: regcred
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
@@ -1159,7 +1557,11 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=release-4.2
         - --give-pr-author-access-to-namespace=true
-        - --lease-server=http://boskos
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --org=openshift-priv
         - --repo=origin
@@ -1189,6 +1591,12 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /usr/local/launch-vsphere-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/github-credentials
@@ -1197,11 +1605,26 @@ presubmits:
         - mountPath: /usr/local/launch-vsphere
           name: job-definition
           subPath: cluster-launch-installer-upi-e2e.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -1213,6 +1636,9 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-installer-upi-e2e
         name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
@@ -1238,6 +1664,8 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=release-4.2
         - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --org=openshift-priv
         - --repo=origin
@@ -1259,17 +1687,32 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
           readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
       - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
+      - name: pull-secret
+        secret:
+          secretName: regcred
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
@@ -1295,6 +1738,8 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=release-4.2
         - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --org=openshift-priv
         - --repo=origin
@@ -1316,17 +1761,32 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
           readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
       - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
+      - name: pull-secret
+        secret:
+          secretName: regcred
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
