@@ -170,6 +170,8 @@ presubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --branch=release-3.11
         - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
         - --org=openshift
         - --repo=image-registry
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
@@ -193,14 +195,29 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
         - mountPath: /usr/local/integration
           name: job-definition
           subPath: master-sidecar-3.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
       - configMap:
           name: prow-job-master-sidecar-3
         name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
     trigger: (?m)^/test( | .* )integration,?($|\s.*)
   - agent: kubernetes
     always_run: true
