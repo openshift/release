@@ -11,8 +11,6 @@ presubmits:
     spec:
       containers:
       - args:
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
         - |
           export PREVIOUS_RPM_REPO="$( curl -q "${PREVIOUS_RPM_REPO_BASEREF}" 2>/dev/null)"
           ci-operator \
@@ -55,25 +53,13 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
         - mountPath: /usr/local/e2e-gcp-cluster-profile
           name: e2e-gcp-major-upgrade-311
         - mountPath: /usr/local/e2e-gcp-major-upgrade-311
           name: job-definition
           subPath: cluster-launch-e2e-upgrade.yaml
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
       - name: e2e-gcp-major-upgrade-311
         projected:
           sources:
@@ -84,9 +70,6 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-e2e-upgrade
         name: job-definition
-      - name: pull-secret
-        secret:
-          secretName: regcred
     trigger: (?m)^/test( | .* )gcp-major-upgrade,?($|\s.*)
   - agent: kubernetes
     always_run: false
