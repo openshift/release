@@ -12,9 +12,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
-      - --lease-server=http://boskos
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --namespace=$(NAMESPACE)
       - --secret-dir=/usr/local/launch-$(CLUSTER_TYPE)-cluster-profile
       - --secret-dir=/usr/local/pull-secret
@@ -73,6 +77,12 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/launch-aws-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/launch-aws
@@ -80,8 +90,23 @@ periodics:
         subPath: cluster-launch-installer-e2e.yaml
       - mountPath: /usr/local/pull-secret
         name: pull-secret
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -93,6 +118,9 @@ periodics:
     - name: pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: pull-secret
+      secret:
+        secretName: regcred
 - agent: kubernetes
   cron: '@yearly'
   decorate: true
@@ -106,9 +134,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
-      - --lease-server=http://boskos
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --namespace=$(NAMESPACE)
       - --secret-dir=/usr/local/launch-$(CLOUD_TYPE)-cluster-profile
       - --secret-dir=/usr/local/pull-secret
@@ -169,6 +201,12 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/launch-azure-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/launch-azure
@@ -176,8 +214,23 @@ periodics:
         subPath: cluster-launch-installer-e2e.yaml
       - mountPath: /usr/local/pull-secret
         name: pull-secret
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -189,6 +242,9 @@ periodics:
     - name: pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: pull-secret
+      secret:
+        secretName: regcred
 - agent: kubernetes
   cron: '@yearly'
   decorate: true
@@ -202,9 +258,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
-      - --lease-server=http://boskos
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --namespace=$(NAMESPACE)
       - --secret-dir=/usr/local/launch-$(CLUSTER_TYPE)-cluster-profile
       - --secret-dir=/usr/local/pull-secret
@@ -263,6 +323,12 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/launch-gcp-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/launch-gcp
@@ -270,8 +336,23 @@ periodics:
         subPath: cluster-launch-installer-e2e.yaml
       - mountPath: /usr/local/pull-secret
         name: pull-secret
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -283,6 +364,9 @@ periodics:
     - name: pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: pull-secret
+      secret:
+        secretName: regcred
 - agent: kubernetes
   cron: '@yearly'
   decorate: true
@@ -296,13 +380,15 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/launch-$(CLUSTER_TYPE)-cluster-profile
-      - --target=launch-metal
-      - --template=/usr/local/launch-$(CLUSTER_TYPE)
-      - --namespace=$(NAMESPACE)
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --namespace=$(NAMESPACE)
+      - --secret-dir=/usr/local/launch-$(CLUSTER_TYPE)-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=launch-metal
+      - --template=/usr/local/launch-$(CLUSTER_TYPE)
       command:
       - ci-operator
       env:
@@ -356,6 +442,9 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
       - mountPath: /usr/local/launch-metal-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/launch-metal
@@ -363,8 +452,17 @@ periodics:
         subPath: cluster-launch-installer-metal-e2e.yaml
       - mountPath: /usr/local/pull-secret
         name: pull-secret
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -376,6 +474,9 @@ periodics:
     - name: pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: pull-secret
+      secret:
+        secretName: regcred
 - agent: kubernetes
   cron: '@yearly'
   decorate: true
@@ -389,9 +490,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
-      - --lease-server=http://boskos
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --namespace=$(NAMESPACE)
       - --secret-dir=/usr/local/launch-$(CLUSTER_TYPE)-cluster-profile
       - --secret-dir=/usr/local/pull-secret
@@ -450,6 +555,12 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/launch-vsphere-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/launch-vsphere
@@ -457,8 +568,23 @@ periodics:
         subPath: cluster-launch-installer-upi-e2e.yaml
       - mountPath: /usr/local/pull-secret
         name: pull-secret
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -470,6 +596,9 @@ periodics:
     - name: pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: pull-secret
+      secret:
+        secretName: regcred
 - agent: kubernetes
   cron: '@yearly'
   decorate: true
@@ -484,12 +613,16 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --lease-server=http://boskos
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
-      - --target=e2e-$(CLUSTER_TYPE)-upgrade
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
+      - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-$(CLUSTER_TYPE)-upgrade
       command:
       - ci-operator
       env:
@@ -537,12 +670,33 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/pull-secret
         name: pull-secret
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -551,6 +705,9 @@ periodics:
     - name: pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: pull-secret
+      secret:
+        secretName: regcred
 - agent: kubernetes
   cron: '@yearly'
   decorate: true
@@ -564,12 +721,16 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --lease-server=http://boskos
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-azure-upgrade-cluster-profile
-      - --target=e2e-azure-upgrade
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
+      - --secret-dir=/usr/local/e2e-azure-upgrade-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-azure-upgrade
       command:
       - ci-operator
       env:
@@ -605,12 +766,33 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-azure-upgrade-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/pull-secret
         name: pull-secret
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -619,6 +801,9 @@ periodics:
     - name: pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: pull-secret
+      secret:
+        secretName: regcred
 - agent: kubernetes
   cron: '@yearly'
   decorate: true
@@ -632,12 +817,16 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --lease-server=http://boskos
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
-      - --target=e2e-$(CLUSTER_TYPE)-upgrade
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
+      - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-$(CLUSTER_TYPE)-upgrade
       command:
       - ci-operator
       env:
@@ -685,12 +874,33 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-gcp-upgrade-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/pull-secret
         name: pull-secret
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -701,3 +911,6 @@ periodics:
     - name: pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: pull-secret
+      secret:
+        secretName: regcred

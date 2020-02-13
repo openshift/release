@@ -60,6 +60,12 @@ presubmits:
           subPath: cluster-launch-e2e-upgrade.yaml
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
       - name: e2e-gcp-major-upgrade-311
         projected:
           sources:
@@ -70,6 +76,9 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-e2e-upgrade
         name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
     trigger: (?m)^/test( | .* )gcp-major-upgrade,?($|\s.*)
   - agent: kubernetes
     always_run: false
