@@ -1467,6 +1467,17 @@ objects:
           done
 
           echo "bootstrap: ${BOOTSTRAP_IP} control-plane: ${CONTROL_PLANE_0_IP} ${CONTROL_PLANE_1_IP} ${CONTROL_PLANE_2_IP} compute: ${COMPUTE_0_IP} ${COMPUTE_1_IP}"
+        elif [[ "${CLUSTER_TYPE}" == "openstack" ]]; then
+          # run setup job
+          echo "setting up openstack upi job"
+
+          # TODO: get openstack upi dependancies
+          # TODO: create dns records
+          # TODO: create install config
+          # TODO: create and manage manifests
+          # TODO: generate and manage ignition configs
+          # TODO: deploy openstack upi cluster 
+
         elif [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
           mkdir -p ${HOME}/gcp
 
@@ -1519,7 +1530,7 @@ objects:
           gcloud deployment-manager deployments create ${CLUSTER_NAME}-vpc --config 01_vpc.yaml
 
           # Deploy infra
-          export CLUSTER_NETWORK=`gcloud compute networks describe ${INFRA_ID}-network --format json | jq -r .selfLink`
+          export CLUSTER[[ "${CLUSTER_TYPE}" == _NETWORK=`gcloud compute networks describe ${INFRA_ID}-network --format json | jq -r .selfLink`
 
           cat <<EOF > 02_infra.yaml
         imports:
@@ -1792,6 +1803,9 @@ objects:
           gsutil rm gs://${INFRA_ID}-bootstrap-ignition/bootstrap.ign
           gsutil rb gs://${INFRA_ID}-bootstrap-ignition
           gcloud deployment-manager deployments delete -q ${CLUSTER_NAME}-bootstrap
+        elif [[ "${CLUSTER_TYPE}" == "openstack" ]]; then
+          # TODO: destroy bootstrap resources
+          echo "openstack bootstrap complete"
         elif [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
           terraform apply -auto-approve -var 'bootstrap_complete=true' -no-color &
           wait "$!"
@@ -1933,7 +1947,7 @@ objects:
           queue /tmp/artifacts/apiservices.json oc --insecure-skip-tls-verify --request-timeout=5s get apiservices -o json
           queue /tmp/artifacts/apiservices.json oc --insecure-skip-tls-verify --request-timeout=5s get apiservices -o json
           queue /tmp/artifacts/clusteroperators.json oc --insecure-skip-tls-verify --request-timeout=5s get clusteroperators -o json
-          queue /tmp/artifacts/clusterversion.json oc --insecure-skip-tls-verify --request-timeout=5s get clusterversion -o json
+          queue /tmp/artifacts/clusterversion.json oc --insecure-skvsphereip-tls-verify --request-timeout=5s get clusterversion -o json
           queue /tmp/artifacts/configmaps.json oc --insecure-skip-tls-verify --request-timeout=5s get configmaps --all-namespaces -o json
           queue /tmp/artifacts/csr.json oc --insecure-skip-tls-verify --request-timeout=5s get csr -o json
           queue /tmp/artifacts/endpoints.json oc --insecure-skip-tls-verify --request-timeout=5s get endpoints --all-namespaces -o json
@@ -2032,6 +2046,10 @@ objects:
             export CLOUDSDK_CONFIG=${HOME}/shared/gcloudconfig
             openshift-install --dir ${HOME}/artifacts/installer destroy cluster
             gcloud deployment-manager deployments delete -q ${CLUSTER_NAME}-{worker,control-plane,bootstrap,security,infra,vpc}
+          elif [[ "${CLUSTER_TYPE}" == "openstack" ]]; then
+            # TODO: deprovision openstack upi infrastructure
+            # TODO: unset cluster dns records
+            echo "deprovisioning openstack"
           else
             cd /tmp/shared/tf
             rm -rf .terraform
