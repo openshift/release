@@ -19,6 +19,12 @@ presubmits:
           export RPM_REPO_OPENSHIFT_ORIGIN="$( curl -q "${RPM_REPO_BASEURL_REF}" 2>/dev/null)"
           ci-operator \
             --artifact-dir=$(ARTIFACTS) \
+            --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson \
+            --kubeconfig=/etc/apici/kubeconfig \
+            --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org \
+            --org=openshift \
+            --repo=descheduler \
+            --branch=release-3.10 \
             --secret-dir=/usr/local/kubernetes-descheduler-e2e-cluster-profile \
             --template=/usr/local/e2e-gcp \
             --target=e2e-gcp
@@ -43,11 +49,17 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
         - mountPath: /usr/local/kubernetes-descheduler-e2e-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/e2e-gcp
           name: job-definition
           subPath: cluster-launch-src.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
       - name: apici-ci-operator-credentials

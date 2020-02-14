@@ -15,6 +15,12 @@ presubmits:
           export PREVIOUS_RPM_REPO="$( curl -q "${PREVIOUS_RPM_REPO_BASEREF}" 2>/dev/null)"
           ci-operator \
             --artifact-dir=$(ARTIFACTS) \
+            --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson \
+            --kubeconfig=/etc/apici/kubeconfig \
+            --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org \
+            --org=openshift \
+            --repo=openshift-ansible \
+            --branch=release-3.11 \
             --secret-dir=/usr/local/e2e-gcp-cluster-profile \
             --template=/usr/local/e2e-gcp-major-upgrade-311 \
             --target=e2e-gcp-major-upgrade-311 \
@@ -53,11 +59,17 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
         - mountPath: /usr/local/e2e-gcp-cluster-profile
           name: e2e-gcp-major-upgrade-311
         - mountPath: /usr/local/e2e-gcp-major-upgrade-311
           name: job-definition
           subPath: cluster-launch-e2e-upgrade.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
       - name: apici-ci-operator-credentials
