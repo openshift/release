@@ -7,8 +7,8 @@ items:
     namespace: ci
     labels:
       app: prow
-      component: plank
-    name: plank
+      component: crier
+    name: crier
   spec:
     ports:
     - name: metrics
@@ -17,15 +17,15 @@ items:
       targetPort: 9090
     selector:
       app: prow
-      component: plank
+      component: crier
 - apiVersion: apps/v1
   kind: Deployment
   metadata:
     namespace: ci
-    name: plank
+    name: crier
     labels:
       app: prow
-      component: plank
+      component: crier
   spec:
     # Do not scale up.
     replicas: 1
@@ -35,32 +35,25 @@ items:
     selector:
       matchLabels:
         app: prow
-        component: plank
+        component: crier
     template:
       metadata:
         labels:
           app: prow
-          component: plank
+          component: crier
       spec:
-        serviceAccountName: plank
+        serviceAccountName: crier
         priorityClassName: prow-critical
         containers:
-        - name: plank
-          image: gcr.io/k8s-prow/plank:v20200221-f50f9992a
+        - name: crier
+          image: gcr.io/k8s-prow/crier:v20200221-f50f9992a
           args:
+          - --github-workers=5
           - --config-path=/etc/config/config.yaml
-          - --tot-url=http://tot
-          - --dry-run=false
           - --job-config-path=/etc/job-config
           - --github-token-path=/etc/github/oauth
           - --github-endpoint=http://ghproxy
           - --github-endpoint=https://api.github.com
-          - --github-graphql-endpoint=http://ghproxy/graphql
-          - --kubeconfig=/etc/build-farm-credentials/kubeconfig
-          - --skip-report=true
-          ports:
-          - name: metrics
-            containerPort: 9090
           volumeMounts:
           - name: oauth
             mountPath: /etc/github
@@ -97,9 +90,6 @@ items:
             readOnly: true
           - name: job-config-46
             mountPath: /etc/job-config/4.6
-            readOnly: true
-          - mountPath: /etc/build-farm-credentials
-            name: build-farm-credentials
             readOnly: true
           resources:
             requests:
@@ -142,9 +132,3 @@ items:
         - name: job-config-46
           configMap:
             name: job-config-4.6
-        - name: build-farm-credentials
-          secret:
-            items:
-            - key: sa.plank.build01.config
-              path: kubeconfig
-            secretName: build-farm-credentials
