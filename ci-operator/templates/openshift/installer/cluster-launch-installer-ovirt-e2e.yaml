@@ -78,7 +78,7 @@ objects:
         secretName: ${JOB_NAME_SAFE}-cluster-profile
 
     containers:
-        
+
     - name: lease
       image: registry.svc.ci.openshift.org/ci/boskoscli:latest
       terminationMessagePolicy: FallbackToLogsOnError
@@ -281,7 +281,7 @@ objects:
         function run-minimal-tests() {
           # Grab all of the tests marked Feature:Builds and conformance/parallel/minimal
           openshift-tests run openshift/conformance/parallel --dry-run |
-            grep 'Smoke' |
+            grep 'Early' |
           openshift-tests run -o /tmp/artifacts/e2e.log \
             --junit-dir /tmp/artifacts/junit -f -
         }
@@ -335,16 +335,16 @@ objects:
         trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/setup-success; else touch /tmp/exit; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
         # Wait untill lease is acquired
-        while true; do	
-          if [[ -f /tmp/exit ]]; then	
-            echo "Another process exited" 2>&1	
-            exit 1	
-          fi	
-          if [[ -f /tmp/leased ]]; then	
-            echo "Lease acquired, installing..."	
-            break	
-          fi	
-          sleep 15 & wait	
+        while true; do
+          if [[ -f /tmp/exit ]]; then
+            echo "Another process exited" 2>&1
+            exit 1
+          fi
+          if [[ -f /tmp/leased ]]; then
+            echo "Lease acquired, installing..."
+            break
+          fi
+          sleep 15 & wait
         done
 
         if [[ -n "${INSTALL_INITIAL_RELEASE}" && -n "${RELEASE_IMAGE_INITIAL}" ]]; then
@@ -354,7 +354,7 @@ objects:
           echo "Installing from release ${RELEASE_IMAGE_LATEST}"
         fi
         # poll to make sure that the test container has dropped oc into the shared volume
-        while [ ! command -V oc ]; do sleep 1; done 
+        while [ ! command -V oc ]; do sleep 1; done
         cp "$(command -v openshift-install)" /tmp
         mkdir /tmp/artifacts/installer
         source /tmp/ovirt-lease.conf
