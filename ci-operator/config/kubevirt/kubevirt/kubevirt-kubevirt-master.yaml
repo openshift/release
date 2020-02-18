@@ -30,6 +30,7 @@ tag_specification:
   namespace: ocp
 tests:
 - as: e2e
+  artifact_dir: /go/src/kubevirt.io/kubevirt/_out/exported-artifacts
   commands: |
     cd /go/src/kubevirt.io/kubevirt
     #./hack/ci/test.sh
@@ -55,13 +56,9 @@ tests:
     echo "KUBECONFIG: ${KUBECONFIG}"
     # enable nested-virt
     oc get machineset -n openshift-machine-api -o json >/tmp/machinesets.json
-    echo "before:"
-    cat /tmp/machinesets.json
     MACHINE_IMAGE=$(jq -r .items[0].spec.template.spec.providerSpec.value.disks[0].image /tmp/machinesets.json)
     NESTED_VIRT_IMAGE="rhcos43-nested-virt"
     sed -i 's/'"$MACHINE_IMAGE"'/'"$NESTED_VIRT_IMAGE"'/g' /tmp/machinesets.json
-    echo "after:"
-    cat /tmp/machinesets.json
     oc apply -f /tmp/machinesets.json
     oc scale --replicas=0 machineset --all -n openshift-machine-api
     oc get machines -n openshift-machine-api -o json >/tmp/machines.json
@@ -81,13 +78,15 @@ tests:
     nodes_ready=false
     while ! "$nodes_ready"; do sleep 5 && if ! oc get nodes | grep NotReady; then nodes_ready=true; fi; done
     oc project default
-    oc apply -f /go/src/kubevirt.io/kubevirt/kvm-ds.yml
+    # apply kvm device plugin
+    oc apply -f https://raw.githubusercontent.com/kubevirt/kubernetes-device-plugins/master/manifests/kvm-ds.yml
     workers=$(oc get nodes | grep worker | awk '{ print $1 }')
     workers_each=($workers)
     for i in {0..2}; do
         if ! oc debug node/"${workers_each[i]}" -- ls /dev/kvm; then oc debug node/"${workers_each[i]}" -- ls /dev/kvm; fi
     done
     echo "calling cluster-up to prepare config and check whether cluster is reachable"
+    # TODO: remove patching of external provider, after kubevirtci#199 has been merged and kubevirt updates
     (cd cluster-up/cluster/external && curl -L -O -o provider.sh https://raw.githubusercontent.com/dhiller/kubevirtci/fix-external-provider/cluster-up/cluster/external/provider.sh)
     bash -x ./cluster-up/up.sh
     echo "checking cluster configuration after config prep"
