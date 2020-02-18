@@ -33,7 +33,7 @@ cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
 # TODO mirror variant
 # TODO manual override
 
-TF_LOG=debug openshift-install --dir="${dir}" create cluster 2>&1 | grep -v password &
+TF_LOG=debug openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v password &
 
 set +e
 wait "$!"
