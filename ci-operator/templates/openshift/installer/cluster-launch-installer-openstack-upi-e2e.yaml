@@ -13,7 +13,7 @@ parameters:
   required: true
 - name: IMAGE_TESTS
   required: true
-- name: IMAGE_UPI_OPENSTACK_INSTALLER
+- name: IMAGE_OPENSTACK_INSTALLER
   required: true
 - name: CLUSTER_TYPE
   value: "openstack"
@@ -44,18 +44,12 @@ parameters:
   required: false
 - name: INSTALLER_SOURCE_PATH
   value: /go/src/github.com/openshift/installer
-
-#what are this for
-#- name: CLUSTER_VARIANT
-#- name: PROXY_IMAGE
-#  value: registry.svc.ci.openshift.org/origin/4.2:egress-http-proxy
-
-# what USE_LEASE_CLIENT for?
+# what is USE_LEASE_CLIENT for?
 - name: USE_LEASE_CLIENT
 
 objects:
 
-# We want the cluster to be able to access these images
+# We want the cluster to be able to access the images
 - kind: RoleBinding
   apiVersion: authorization.openshift.io/v1
   metadata:
@@ -82,10 +76,7 @@ objects:
     namespace: ci
     name: ci-chat-bot
 
-# Define the pod consisting of three containers:
-# setup
-# tests
-# teardown
+# Define the pod consisting of three containers: setup, test, teardown
 - kind: Pod
   apiVersion: v1
   metadata:
@@ -103,29 +94,21 @@ objects:
     activeDeadlineSeconds: 18000
     terminationGracePeriodSeconds: 900
     volumes:
+    # containers mount them as /tmp/sif /tmp/artifacts /tmp/shared and /tmp/cluster-profile
     - name: shared-ignition-files
-      # shared-ignition-files is a temporary directory mounted by containers as /srv
       emptyDir: {}
-
     - name: artifacts
-      # artifacts is a temporary directory mounted by containers as /tmp/artifacts
       emptyDir: {}
-
     - name: shared-tmp
-      # shared-tmp is a temporary directory mounted by containers as /tmp
       emptyDir: {}
-
     - name: cluster-profile
-      # cluster-profile is a secret mounted by containers as /tmp/cluster-profile
-      #  each file under /tmp/cluster-profile in the containers maps to
-      #  a key value in defined in the secret
       secret:
         secretName: ${JOB_NAME_SAFE}-cluster-profile
 
     # openstack-tests requires access to openstackclient/cinder
     # reuse install image which contains the required binaries.
     # The following initContainer is used to copy over the
-    # latest openshift-test/oc binaries into /tmp/shared (tmp-shared).
+    # latest openshift-test/oc binaries into /tmp/shared (shared-tmp volume).
     # where test, setup, and teardwon containers may use them.
     initContainers:
     - name: cp-shared
@@ -141,28 +124,20 @@ objects:
       - /tmp/shared/
 
     containers:
-    # Runs an install
-    # container: setup
+    # setup container runs a upi install
     - name: setup
-      image: ${IMAGE_UPI_OPENSTACK_INSTALLER}
+      image: ${IMAGE_OPENSTACK_INSTALLER}
       terminationMessagePolicy: FallbackToLogsOnError
       # We use the following volumeMounts to share the common files in the
       # appropriate directories. The mounts are setup in the pod volume section.
       volumeMounts:
       - name: shared-ignition-files
-        # share-ignition-files is used to exchage boot objects like ignition files
-        mountPath: /srv
-
+        mountPath: /tmp/sif
       - name: artifacts
-        # artifacts is where all the needs to be collected for the "artifacts" of the test go.
         mountPath: /tmp/artifacts
-
       - name: shared-tmp
-        # shared-tmp is used for temp files and other.
         mountPath: /tmp/shared
-
       - name: cluster-profile
-        # cluster-profile is a secret
         mountPath: /tmp/cluster-profile
 
       env:
@@ -216,7 +191,6 @@ objects:
         value: "25"
       - name: OPENSTACK_MASTER_VOLUME_TYPE
         value: "performance"
-# do we need INSTALL_INITIAL_RELEASE and RELEASE_IMAGE_INITIAL?
       - name: INSTALL_INITIAL_RELEASE
       - name: RELEASE_IMAGE_INITIAL
       command:
@@ -234,7 +208,6 @@ objects:
         trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/shared/setup-success; else touch /tmp/shared/exit /tmp/shared/setup-failed; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-        # what does gatherr_bootstraps_and_fail do? do we need it?
         GATHER_BOOTSTRAP_ARGS=
         function gather_bootstrap_and_fail() {
         if test -n "${GATHER_BOOTSTRAP_ARGS}"; then
@@ -265,11 +238,7 @@ objects:
         cp "${SSH_PRIVATE_KEY_PATH}" ~/.ssh/id_rsa
         chmod 0600 ~/.ssh/id_rsa
 
-        # create a new floating ip tagged with CLUSTER_NAME so it can be deleted later
-        #LB_FIP=$(openstack floating ip create --description $CLUSTER_NAME.$BASE_DOMAIN $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address' )
-        # (adduarte) it would be best to use the floating ip id to delete it instead of matching on description and names because
-        # description and names arew NOT unique. The ID on the other hand is UID.
-        # perhaps
+        # create api and ingress FIPS
         LB_FIP_AND_ID=$(openstack floating ip create --description api.$CLUSTER_NAME.$BASE_DOMAIN $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address' -c 'id')
         LB_FIP=$(echo $LB_FIP_AND_ID |awk '{print $1}')
         LB_FIP_UID=$(echo $LB_FIP_AND_ID |awk '{print $2}')
@@ -341,39 +310,19 @@ objects:
         # Create ignition files
         echo "Creating ignition configs"
         cp /tmp/artifacts/installer/install-config.yaml.bkk /tmp/artifacts/installer/install-config.yaml
-        # where should the ignition files land? looks like perhaps a good place is /srv
         openshift-install --dir=/tmp/artifacts/installer create ignition-configs &
         wait "$!"
 
-        cp /tmp/artifacts/installer/bootstrap.ign /srv
+        cp /tmp/artifacts/installer/bootstrap.ign /tmp/sif
         BOOTSTRAP_URI="https://${JOB_NAME_SAFE}-bootstrap-exporter-${NAMESPACE}.svc.ci.openshift.org/bootstrap.ign"
-
-        #tested locally to here
 
 
 
         # begin bootstrapping
-        echo "TODO: OpenStack: Create the bootstrap, control plane and worker resources"
         export UPI_DIR="${INSTALLER_SOURCE_PATH}/upi/${CLUSTER_TYPE}"
         echo "OpenStack UPI directory: '$UPI_DIR'"
 
-
-        #This are a problem since installing requirements means it needs gcc.
-        #echo "OpenStack: installing openstack upi installer requirements"
-        #cat ${UPI_DIR}/requirements.txt
-        #export PATH="${HOME}/.local/bin:${PATH}"
-        #easy_install --user pip  # our Python 2.7.5 is even too old for ensurepip
-        #pip install --user -r ${UPI_DIR}/requirements.txt
-        #which ansible-playbook
-
-        echo "ready to run playbooks"
-
-
         #prepair inventory.yaml
-        #we need to edit the ${UPI_DIR}/inventory.yaml file to match our choices.
-        # at least we need to set the os_flavor_master, os_flavor_worker, os_image_rhcos,
-        # os_external_network, os_api_fip, os_ingress_fip, os_region_name
-
         cp ${UPI_DIR}/inventory.yaml ${UPI_DIR}/inventory.yaml.bkk
         sed -i "s/os_flavor_master.*/os_flavor_master: \'${OPENSTACK_FLAVOR}\'/g" ${UPI_DIR}/inventory.yaml
         sed -i "s/os_flavor_worker.*/os_flavor_worker: \'${OPENSTACK_FLAVOR}\'/g" ${UPI_DIR}/inventory.yaml
@@ -384,6 +333,7 @@ objects:
         sed -i "s/os_region_name.*/os_region_name: \'${OPENSTACK_REGION}\'/g" ${UPI_DIR}/inventory.yaml
 
 
+        # The metadata.json file needs to be in the same directory as playbooks
         cp /tmp/artifacts/installer/metadata.json ${UPI_DIR}/
 
         # We first do a dry run with --list-tasks to catch any configuration errors right up front
@@ -422,7 +372,6 @@ objects:
           done
         }
 
-        # TODO: (adduarte) what do we need this function for?
         function update_image_registry() {
          while true; do
           sleep 10;
@@ -442,14 +391,14 @@ objects:
 
     # Once the cluster is up, executes shared tests
     - name: test
-      image: ${IMAGE_UPI_OPENSTACK_INSTALLER}
+      image: ${IMAGE_OPENSTACK_INSTALLER}
       terminationMessagePolicy: FallbackToLogsOnError
-#      resources:
-#        requests:
-#          cpu: 3
-#          memory: 600Mi
-#        limits:
-#          memory: 4Gi
+      resources:
+        requests:
+          cpu: 3
+          memory: 600Mi
+        limits:
+          memory: 4Gi
       volumeMounts:
       - name: shared-tmp
         mountPath: /tmp/shared
@@ -458,7 +407,11 @@ objects:
       - name: artifacts
         mountPath: /tmp/artifacts
       env:
-      - name: ARTIFACT_DIR
+        - name: OS_CLOUD
+          value: ${OS_CLOUD}
+        - name: OS_CLIENT_CONFIG_FILE
+          value: ${OS_CLIENT_CONFIG_FILE}
+        - name: ARTIFACT_DIR
         value: /tmp/artifacts
       - name: HOME
         value: /tmp/home
@@ -522,17 +475,18 @@ objects:
         if set -o | grep xtrace.*on &>/dev/null; then
           XTRACE_ENABLED=1
         fi
-        #why are we setting this? why don't we just use the clouds.yaml file directly via a OS_CONFIG ENV?
-        set +x #make extra sure we aren't echo'ing these to stdout
-        export OS_AUTH_URL="$(get_clouds_param 'auth_url')"
-        export OS_PROJECT_ID="$(get_clouds_param 'project_id')"
-        export OS_PROJECT_NAME="$(get_clouds_param 'project_name')"
-        export OS_USERNAME="$(get_clouds_param 'username')"
-        export OS_PASSWORD="$(get_clouds_param 'password')"
-        export OS_REGION_NAME="$(get_clouds_param 'region_name')"
-        export OS_ENDPOINT_TYPE="$(get_clouds_param 'interface')"
-        export OS_IDENTITY_API_VERSION="$(get_clouds_param 'identity_api_version')"
-        export OS_USER_DOMAIN_NAME="$(get_clouds_param 'user_domain_name')"
+
+#OS_CLOUD and OS_CONFIG_FILE are set we don't need to look for the os environments
+# set +x #make extra sure we aren't echo'ing these to stdout
+# export OS_AUTH_URL="$(get_clouds_param 'auth_url')"
+# export OS_PROJECT_ID="$(get_clouds_param 'project_id')"
+# export OS_PROJECT_NAME="$(get_clouds_param 'project_name')"
+# export OS_USERNAME="$(get_clouds_param 'username')"
+# export OS_PASSWORD="$(get_clouds_param 'password')"
+# export OS_REGION_NAME="$(get_clouds_param 'region_name')"
+# export OS_ENDPOINT_TYPE="$(get_clouds_param 'interface')"
+# export OS_IDENTITY_API_VERSION="$(get_clouds_param 'identity_api_version')"
+# export OS_USER_DOMAIN_NAME="$(get_clouds_param 'user_domain_name')"
         if [[ "$XTRACE_ENABLED" == 1 ]]; then
           set -x
         fi
@@ -569,11 +523,10 @@ objects:
 
         ${TEST_COMMAND}
 
-    # Performs cleanup of all created resources
-    # container: teardown
-    # Performs cleanup of all created resources
+
+    # teardown container performs cleanup of all created resources
     - name: teardown
-      image: ${IMAGE_UPI_OPENSTACK_INSTALLER}
+      image: ${IMAGE_OPENSTACK_INSTALLER}
       terminationMessagePolicy: FallbackToLogsOnError
       volumeMounts:
       - name: shared-tmp
@@ -673,80 +626,78 @@ objects:
           oc --insecure-skip-tls-verify --request-timeout=5s get pods -l openshift.io/component=api --all-namespaces --template '{{ range .items }}-n {{ .metadata.namespace }} {{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/pods-api
 
           queue /tmp/artifacts/config-resources.json oc --insecure-skip-tls-verify --request-timeout=5s get apiserver.config.openshift.io authentication.config.openshift.io build.config.openshift.io console.config.openshift.io dns.config.openshift.io featuregate.config.openshift.io image.config.openshift.io infrastructure.config.openshift.io ingress.config.openshift.io network.config.openshift.io oauth.config.openshift.io project.config.openshift.io scheduler.config.openshift.io -o json
+          queue /tmp/artifacts/apiservices.json oc --insecure-skip-tls-verify --request-timeout=5s get apiservices -o json
+          queue /tmp/artifacts/clusteroperators.json oc --insecure-skip-tls-verify --request-timeout=5s get clusteroperators -o json
+          queue /tmp/artifacts/clusterversion.json oc --insecure-skip-tls-verify --request-timeout=5s get clusterversion -o json
+          queue /tmp/artifacts/configmaps.json oc --insecure-skip-tls-verify --request-timeout=5s get configmaps --all-namespaces -o json
+          queue /tmp/artifacts/credentialsrequests.json oc --insecure-skip-tls-verify --request-timeout=5s get credentialsrequests --all-namespaces -o json
+          queue /tmp/artifacts/csr.json oc --insecure-skip-tls-verify --request-timeout=5s get csr -o json
+          queue /tmp/artifacts/endpoints.json oc --insecure-skip-tls-verify --request-timeout=5s get endpoints --all-namespaces -o json
+          FILTER=gzip queue /tmp/artifacts/deployments.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get deployments --all-namespaces -o json
+          FILTER=gzip queue /tmp/artifacts/daemonsets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get daemonsets --all-namespaces -o json
+          queue /tmp/artifacts/events.json oc --insecure-skip-tls-verify --request-timeout=5s get events --all-namespaces -o json
+          queue /tmp/artifacts/kubeapiserver.json oc --insecure-skip-tls-verify --request-timeout=5s get kubeapiserver -o json
+          queue /tmp/artifacts/kubecontrollermanager.json oc --insecure-skip-tls-verify --request-timeout=5s get kubecontrollermanager -o json
+          queue /tmp/artifacts/machineconfigpools.json oc --insecure-skip-tls-verify --request-timeout=5s get machineconfigpools -o json
+          queue /tmp/artifacts/machineconfigs.json oc --insecure-skip-tls-verify --request-timeout=5s get machineconfigs -o json
+          queue /tmp/artifacts/machinesets.json oc --insecure-skip-tls-verify --request-timeout=5s get machinesets -A -o json
+          queue /tmp/artifacts/machines.json oc --insecure-skip-tls-verify --request-timeout=5s get machines -A -o json
+          queue /tmp/artifacts/namespaces.json oc --insecure-skip-tls-verify --request-timeout=5s get namespaces -o json
+          queue /tmp/artifacts/nodes.json oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o json
+          queue /tmp/artifacts/openshiftapiserver.json oc --insecure-skip-tls-verify --request-timeout=5s get openshiftapiserver -o json
+          queue /tmp/artifacts/pods.json oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces -o json
+          queue /tmp/artifacts/persistentvolumes.json oc --insecure-skip-tls-verify --request-timeout=5s get persistentvolumes --all-namespaces -o json
+          queue /tmp/artifacts/persistentvolumeclaims.json oc --insecure-skip-tls-verify --request-timeout=5s get persistentvolumeclaims --all-namespaces -o json
+          FILTER=gzip queue /tmp/artifacts/replicasets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get replicasets --all-namespaces -o json
+          queue /tmp/artifacts/rolebindings.json oc --insecure-skip-tls-verify --request-timeout=5s get rolebindings --all-namespaces -o json
+          queue /tmp/artifacts/roles.json oc --insecure-skip-tls-verify --request-timeout=5s get roles --all-namespaces -o json
+          queue /tmp/artifacts/services.json oc --insecure-skip-tls-verify --request-timeout=5s get services --all-namespaces -o json
+          FILTER=gzip queue /tmp/artifacts/statefulsets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get statefulsets --all-namespaces -o json
 
-          #
-          #queue /tmp/artifacts/apiservices.json oc --insecure-skip-tls-verify --request-timeout=5s get apiservices -o json
-          #queue /tmp/artifacts/clusteroperators.json oc --insecure-skip-tls-verify --request-timeout=5s get clusteroperators -o json
-          #queue /tmp/artifacts/clusterversion.json oc --insecure-skip-tls-verify --request-timeout=5s get clusterversion -o json
-          #queue /tmp/artifacts/configmaps.json oc --insecure-skip-tls-verify --request-timeout=5s get configmaps --all-namespaces -o json
-          #queue /tmp/artifacts/credentialsrequests.json oc --insecure-skip-tls-verify --request-timeout=5s get credentialsrequests --all-namespaces -o json
-          #queue /tmp/artifacts/csr.json oc --insecure-skip-tls-verify --request-timeout=5s get csr -o json
-          #queue /tmp/artifacts/endpoints.json oc --insecure-skip-tls-verify --request-timeout=5s get endpoints --all-namespaces -o json
-          #FILTER=gzip queue /tmp/artifacts/deployments.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get deployments --all-namespaces -o json
-          #FILTER=gzip queue /tmp/artifacts/daemonsets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get daemonsets --all-namespaces -o json
-          #queue /tmp/artifacts/events.json oc --insecure-skip-tls-verify --request-timeout=5s get events --all-namespaces -o json
-          #queue /tmp/artifacts/kubeapiserver.json oc --insecure-skip-tls-verify --request-timeout=5s get kubeapiserver -o json
-          #queue /tmp/artifacts/kubecontrollermanager.json oc --insecure-skip-tls-verify --request-timeout=5s get kubecontrollermanager -o json
-          #queue /tmp/artifacts/machineconfigpools.json oc --insecure-skip-tls-verify --request-timeout=5s get machineconfigpools -o json
-          #queue /tmp/artifacts/machineconfigs.json oc --insecure-skip-tls-verify --request-timeout=5s get machineconfigs -o json
-          #queue /tmp/artifacts/machinesets.json oc --insecure-skip-tls-verify --request-timeout=5s get machinesets -A -o json
-          #queue /tmp/artifacts/machines.json oc --insecure-skip-tls-verify --request-timeout=5s get machines -A -o json
-          #queue /tmp/artifacts/namespaces.json oc --insecure-skip-tls-verify --request-timeout=5s get namespaces -o json
-          #queue /tmp/artifacts/nodes.json oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o json
-          #queue /tmp/artifacts/openshiftapiserver.json oc --insecure-skip-tls-verify --request-timeout=5s get openshiftapiserver -o json
-          #queue /tmp/artifacts/pods.json oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces -o json
-          #queue /tmp/artifacts/persistentvolumes.json oc --insecure-skip-tls-verify --request-timeout=5s get persistentvolumes --all-namespaces -o json
-          #queue /tmp/artifacts/persistentvolumeclaims.json oc --insecure-skip-tls-verify --request-timeout=5s get persistentvolumeclaims --all-namespaces -o json
-          #FILTER=gzip queue /tmp/artifacts/replicasets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get replicasets --all-namespaces -o json
-          #queue /tmp/artifacts/rolebindings.json oc --insecure-skip-tls-verify --request-timeout=5s get rolebindings --all-namespaces -o json
-          #queue /tmp/artifacts/roles.json oc --insecure-skip-tls-verify --request-timeout=5s get roles --all-namespaces -o json
-          #queue /tmp/artifacts/services.json oc --insecure-skip-tls-verify --request-timeout=5s get services --all-namespaces -o json
-          #FILTER=gzip queue /tmp/artifacts/statefulsets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get statefulsets --all-namespaces -o json
-          #
-          #FILTER=gzip queue /tmp/artifacts/openapi.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get --raw /openapi/v2
-          #
-          ## gather nodes first in parallel since they may contain the most relevant debugging info
-          #while IFS= read -r i; do
-          #  mkdir -p /tmp/artifacts/nodes/$i
-          #  queue /tmp/artifacts/nodes/$i/nova.log openstack console log show $i
-          #  queue /tmp/artifacts/nodes/$i/heap oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/debug/pprof/heap
-          #done < /tmp/nodes
-          #
-          #FILTER=gzip queue /tmp/artifacts/nodes/masters-journal.gz oc --insecure-skip-tls-verify adm node-logs --role=master --unify=false
-          #FILTER=gzip queue /tmp/artifacts/nodes/workers-journal.gz oc --insecure-skip-tls-verify adm node-logs --role=worker --unify=false
-          #
-          ## Snapshot iptables-save on each node for debugging possible kube-proxy issues
-          #oc --insecure-skip-tls-verify get --request-timeout=20s -n openshift-sdn -l app=sdn pods --template '{{ range .items }}{{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/sdn-pods
-          #while IFS= read -r i; do
-          #  queue /tmp/artifacts/network/iptables-save-$i oc --insecure-skip-tls-verify rsh --timeout=20 -n openshift-sdn -c sdn $i iptables-save -c
-          #done < /tmp/sdn-pods
-          #
-          #while IFS= read -r i; do
-          #  file="$( echo "$i" | cut -d ' ' -f 3 | tr -s ' ' '_' )"
-          #  queue /tmp/artifacts/metrics/${file}-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig'
-          #  queue /tmp/artifacts/metrics/${file}-controllers-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig'
-          #done < /tmp/pods-api
-          #
-          #while IFS= read -r i; do
-          #  file="$( echo "$i" | cut -d ' ' -f 2,3,5 | tr -s ' ' '_' )"
-          #  FILTER=gzip queue /tmp/artifacts/pods/${file}.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s $i
-          #  FILTER=gzip queue /tmp/artifacts/pods/${file}_previous.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s -p $i
-          #done < /tmp/containers
-          #
-          #echo "Snapshotting prometheus (may take 15s) ..."
-          #queue /tmp/artifacts/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring prometheus-k8s-0 -- tar cvzf - -C /prometheus .
-          #
-          ## move private key to ~/.ssh/ so that installer can use it to gather logs
-          #mkdir -p ~/.ssh
-          #cp "${SSH_PRIVATE_KEY_PATH}" ~/.ssh/id_rsa
-          #chmod 0600 ~/.ssh/id_rsa
-          #
-          #echo "Running must-gather..."
-          #mkdir -p /tmp/artifacts/must-gather
-          #queue /tmp/artifacts/must-gather/must-gather.log oc --insecure-skip-tls-verify adm must-gather --dest-dir /tmp/artifacts/must-gather
-          #
-          #echo "Waiting for logs ..."
-          #wait
+          FILTER=gzip queue /tmp/artifacts/openapi.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get --raw /openapi/v2
+
+          # gather nodes first in parallel since they may contain the most relevant debugging info
+          while IFS= read -r i; do
+            mkdir -p /tmp/artifacts/nodes/$i
+            queue /tmp/artifacts/nodes/$i/nova.log openstack console log show $i
+            queue /tmp/artifacts/nodes/$i/heap oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/debug/pprof/heap
+          done < /tmp/nodes
+
+          FILTER=gzip queue /tmp/artifacts/nodes/masters-journal.gz oc --insecure-skip-tls-verify adm node-logs --role=master --unify=false
+          FILTER=gzip queue /tmp/artifacts/nodes/workers-journal.gz oc --insecure-skip-tls-verify adm node-logs --role=worker --unify=false
+
+          # Snapshot iptables-save on each node for debugging possible kube-proxy issues
+          oc --insecure-skip-tls-verify get --request-timeout=20s -n openshift-sdn -l app=sdn pods --template '{{ range .items }}{{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/sdn-pods
+          while IFS= read -r i; do
+            queue /tmp/artifacts/network/iptables-save-$i oc --insecure-skip-tls-verify rsh --timeout=20 -n openshift-sdn -c sdn $i iptables-save -c
+          done < /tmp/sdn-pods
+
+          while IFS= read -r i; do
+            file="$( echo "$i" | cut -d ' ' -f 3 | tr -s ' ' '_' )"
+            queue /tmp/artifacts/metrics/${file}-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig'
+            queue /tmp/artifacts/metrics/${file}-controllers-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig'
+          done < /tmp/pods-api
+
+          while IFS= read -r i; do
+            file="$( echo "$i" | cut -d ' ' -f 2,3,5 | tr -s ' ' '_' )"
+            FILTER=gzip queue /tmp/artifacts/pods/${file}.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s $i
+            FILTER=gzip queue /tmp/artifacts/pods/${file}_previous.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s -p $i
+          done < /tmp/containers
+
+          echo "Snapshotting prometheus (may take 15s) ..."
+          queue /tmp/artifacts/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring prometheus-k8s-0 -- tar cvzf - -C /prometheus .
+
+          # move private key to ~/.ssh/ so that installer can use it to gather logs
+          mkdir -p ~/.ssh
+          cp "${SSH_PRIVATE_KEY_PATH}" ~/.ssh/id_rsa
+          chmod 0600 ~/.ssh/id_rsa
+
+          echo "Running must-gather..."
+          mkdir -p /tmp/artifacts/must-gather
+          queue /tmp/artifacts/must-gather/must-gather.log oc --insecure-skip-tls-verify adm must-gather --dest-dir /tmp/artifacts/must-gather
+
+          echo "Waiting for logs ..."
+          wait
 
 
           if [ -z "$DO_NOT_CREATE_DNS_RECORD" ]; then
@@ -760,17 +711,13 @@ objects:
           echo "There are no DNS entries to remove"
           fi
 
-          echo "Deleting service VM FIP ... for ${CLUSTER_NAME}"
           LB_FIP_UID=`cat /tmp/shared/LB_FIP_UID`
-          echo "Deleting service VM FIP using UID: ${LB_FIP_UID}"
+          echo "Deleting api FIP ... for ${CLUSTER_NAME} with UID: ${LB_FIP_UID}"
           openstack floating ip delete $LB_FIP_UID
 
           INGRESS_FIP_UID=`cat /tmp/shared/INGRESS_FIP_UID`
-          echo "Deleting service VM FIP using UID: ${INGRESS_FIP_UID}"
+          echo "Deleting ingress FIP using UID: ${INGRESS_FIP_UID}"
           openstack floating ip delete $INGRESS_FIP_UID
-          #(adduarte) it would be best to use hte floating ip id because that is a UID
-
-
 
           echo "Deprovisioning cluster ..."
           #openshift-install --dir /tmp/artifacts/installer destroy cluster
@@ -783,7 +730,7 @@ objects:
           ansible-playbook -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/down-03_bootstrap.yaml"
           ansible-playbook -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/down-02_network.yaml"
           ansible-playbook -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/down-01_security-groups.yaml"
-          #verify_openstack_resources_where_destroyed
+          verify_openstack_resources_where_destroyed
           echo "Teardown completed succesfully"
         }
 
@@ -791,25 +738,21 @@ objects:
             echo "TODO: verify_openstack_resoruces_where_destroyed has not been implemented."
         }
 
+        #start of teardown
         # We have to truncate cluster name to 14 chars, because there is a limitation in the install-config
         # Now it looks like "ci-op-rl6z646h-65230".
         # We will remove "ci-op-" prefix from there to keep just last 14 characters.
         export CLUSTER_NAME=${CLUSTER_NAME:${#CLUSTER_NAME}<14?0:-14}
 
 
-        #verify_openstack_resources_where_destroyed
-        #verify_openstack_resources_where_destroyed
-
         trap 'teardown' EXIT
-
         trap 'jobs -p | xargs -r kill || true; exit 0' TERM
 
-        # we wait for one of the containers to flag a /tmp/shared/exit
+        # we wait for one of the containers to flag a /tmp/shared/exit, then exit (triggering teardown)
         for i in $(seq 1 220); do
           echo Waiting for /tmp/shared/exit
           if [[ -f /tmp/shared/exit ]]; then
-
             exit 0
           fi
-          sleep 5 & wait
+          sleep 6 & wait
         done
