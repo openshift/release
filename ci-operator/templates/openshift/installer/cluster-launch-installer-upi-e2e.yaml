@@ -189,6 +189,10 @@ objects:
         value: ${IMAGE_FORMAT}
       - name: KUBECONFIG
         value: /tmp/artifacts/installer/auth/kubeconfig
+      - name: OS_CLOUD
+        value: 'openstack-cloud'
+      - name: OS_CLIENT_CONFIG_FILE
+        value: '/tmp/cluster-profile/clouds.yaml'
       command:
       - /bin/bash
       - -c
@@ -263,8 +267,6 @@ objects:
           export TEST_PROVIDER='azure'
         elif [[ "${CLUSTER_TYPE}" == "openstack" ]]; then
           set +x #make extra sure we aren't echo'ing these to stdout
-          export OS_CLOUD="openstack-cloud"
-          export OS_CLIENT_CONFIG_FILE="/tmp/cluster-profile/clouds.yaml"
 
           mkdir -p ~/.ssh
           cp /tmp/cluster/ssh-privatekey ~/.ssh/kube_openstack_rsa || true
@@ -348,6 +350,10 @@ objects:
         value: /tmp
       - name: INSTALL_INITIAL_RELEASE
       - name: RELEASE_IMAGE_INITIAL
+      - name: OS_CLOUD
+        value: 'openstack-cloud'
+      - name: OS_CLIENT_CONFIG_FILE
+        value: '/tmp/cluster-profile/clouds.yaml'
       command:
       - /bin/sh
       - -c
@@ -1570,6 +1576,11 @@ objects:
           sed -i "s/os_ingress_fip.*/os_ingress_fip: \'${INGRESS_FIP}\'/g" ${UPI_DIR}/inventory.yaml
           sed -i "s/os_region_name.*/os_region_name: \'${OPENSTACK_REGION}\'/g" ${UPI_DIR}/inventory.yaml
 
+          #TODO: (adduarte) we still need to upload the ignition files to an accessible place:
+          # see https://github.com/openshift/installer/blob/master/docs/user/openstack/install_upi.md#bootstrap-ignition
+          # Then we  need to create  the ignition shim file: $INFRA_ID-bootstrap-ignition.json
+          # see https://github.com/openshift/installer/blob/master/docs/user/openstack/install_upi.md#bootstrap-ignition-shim
+          # Until that happens, the test will fail in 03_bootstrap.yaml at line: https://github.com/openshift/installer/blob/master/upi/openstack/03_bootstrap.yaml#L34
 
           # The metadata.json file needs to be in the same directory as playbooks
           cp /tmp/artifacts/installer/metadata.json ${UPI_DIR}/
@@ -1989,6 +2000,10 @@ objects:
         value: /tmp
       - name: LC_ALL
         value: en_US.UTF-8
+      - name: OS_CLOUD
+        value: 'openstack-cloud'
+      - name: OS_CLIENT_CONFIG_FILE
+        value: '/tmp/cluster-profile/clouds.yaml'
       command:
       - /bin/bash
       - -c
