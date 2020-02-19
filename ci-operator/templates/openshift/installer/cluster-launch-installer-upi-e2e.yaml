@@ -262,21 +262,9 @@ objects:
         elif [[ "${CLUSTER_TYPE}" == "azure4" ]]; then
           export TEST_PROVIDER='azure'
         elif [[ "${CLUSTER_TYPE}" == "openstack" ]]; then
-
-          # Can we just export OS_CONFIG_FILE and OS_CLOUD?
-          function get_clouds_param() {
-            awk '/^\s+'$1':/ { print $2 }' /tmp/cluster-profile/clouds.yaml | sed -e 's/^"//' -e 's/"$//'
-          }
           set +x #make extra sure we aren't echo'ing these to stdout
-          export OS_AUTH_URL="$(get_clouds_param 'auth_url')"
-          export OS_PROJECT_ID="$(get_clouds_param 'project_id')"
-          export OS_PROJECT_NAME="$(get_clouds_param 'project_name')"
-          export OS_USERNAME="$(get_clouds_param 'username')"
-          export OS_PASSWORD="$(get_clouds_param 'password')"
-          export OS_REGION_NAME="$(get_clouds_param 'region_name')"
-          export OS_ENDPOINT_TYPE="$(get_clouds_param 'interface')"
-          export OS_IDENTITY_API_VERSION="$(get_clouds_param 'identity_api_version')"
-          export OS_USER_DOMAIN_NAME="$(get_clouds_param 'user_domain_name')"
+          export OS_CLOUD="openstack-cloud"
+          export OS_CLIENT_CONFIG_FILE="/tmp/cluster-profile/clouds.yaml"
 
           mkdir -p ~/.ssh
           cp /tmp/cluster/ssh-privatekey ~/.ssh/kube_openstack_rsa || true
