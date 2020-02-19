@@ -262,8 +262,34 @@ objects:
         elif [[ "${CLUSTER_TYPE}" == "azure4" ]]; then
           export TEST_PROVIDER='azure'
         elif [[ "${CLUSTER_TYPE}" == "openstack" ]]; then
+
+          # Can we just export OS_CONFIG_FILE and OS_CLOUD?
+          function get_clouds_param() {
+            awk '/^\s+'$1':/ { print $2 }' /tmp/cluster-profile/clouds.yaml | sed -e 's/^"//' -e 's/"$//'
+          }
+          set +x #make extra sure we aren't echo'ing these to stdout
+          export OS_AUTH_URL="$(get_clouds_param 'auth_url')"
+          export OS_PROJECT_ID="$(get_clouds_param 'project_id')"
+          export OS_PROJECT_NAME="$(get_clouds_param 'project_name')"
+          export OS_USERNAME="$(get_clouds_param 'username')"
+          export OS_PASSWORD="$(get_clouds_param 'password')"
+          export OS_REGION_NAME="$(get_clouds_param 'region_name')"
+          export OS_ENDPOINT_TYPE="$(get_clouds_param 'interface')"
+          export OS_IDENTITY_API_VERSION="$(get_clouds_param 'identity_api_version')"
+          export OS_USER_DOMAIN_NAME="$(get_clouds_param 'user_domain_name')"
+
           mkdir -p ~/.ssh
           cp /tmp/cluster/ssh-privatekey ~/.ssh/kube_openstack_rsa || true
+          export TEST_PROVIDER='{"type":"openstack"}'
+
+          XTRACE_ENABLED=0
+          if set -o | grep xtrace.*on &>/dev/null; then
+            XTRACE_ENABLED=1
+          fi
+
+          if [[ "$XTRACE_ENABLED" == 1 ]]; then
+            set -x
+          fi
         fi
 
         if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
@@ -1190,6 +1216,79 @@ objects:
             rm -f /tmp/artifacts/installer/openshift/99_openshift-cluster-api_worker-machineset-*.yaml
             sed -i "s;mastersSchedulable: true;mastersSchedulable: false;g" /tmp/artifacts/installer/manifests/cluster-scheduler-02-config.yml
 
+        elif [[ "${CLUSTER_TYPE}" == "openstack" ]]; then
+            # We have to truncate cluster name to 14 chars, because there is a limitation in the install-config
+            # Now it looks like "ci-op-rl6z646h-65230".
+            # We will remove "ci-op-" prefix from there to keep just last 14 characters.
+            export CLUSTER_NAME=${CLUSTER_NAME:${#CLUSTER_NAME}<14?0:-14}
+
+            # create api and ingress FIPS
+            LB_FIP_AND_ID=$(openstack floating ip create --description api.$CLUSTER_NAME.$BASE_DOMAIN $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address' -c 'id')
+            LB_FIP=$(echo $LB_FIP_AND_ID |awk '{print $1}')
+            LB_FIP_UID=$(echo $LB_FIP_AND_ID |awk '{print $2}')
+            echo $LB_FIP_UID > /tmp/shared/LB_FIP_UID
+
+            INGRESS_FIP_AND_ID=$(openstack floating ip create --description ingress.$CLUSTER_NAME.$BASE_DOMAIN $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address' -c 'id')
+            INGRESS_FIP=$(echo $INGRESS_FIP_AND_ID |awk '{print $1}')
+            INGRESS_FIP_UID=$(echo $INGRESS_FIP_AND_ID |awk '{print $2}')
+            echo $INGRESS_FIP_UID > /tmp/shared/INGRESS_FIP_UID
+
+
+            if [ -z "$DO_NOT_CREATE_DNS_RECORD" ]; then
+            echo "Creating DNS record for api.$CLUSTER_NAME.$BASE_DOMAIN. -> $LB_FIP (${LB_FIP_UID})"
+            cat > /tmp/artifacts/installer/api-record.json <<EOF
+            {
+            "Comment": "Create the public OpenShift API record",
+            "Changes": [{
+                    "Action": "UPSERT",
+                    "ResourceRecordSet": {
+                      "Name": "api.$CLUSTER_NAME.$BASE_DOMAIN.",
+                      "Type": "A",
+                      "TTL": 300,
+                      "ResourceRecords": [{"Value": "$LB_FIP"}]
+                    }
+            }]}
+            EOF
+            export HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "shiftstack.devcluster.openshift.com" | python -c 'import json,sys;print json.load(sys.stdin)["HostedZones"][0]["Id"].split("/")[-1]')
+            aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file:///tmp/artifacts/installer/api-record.json
+            else
+            echo "DNS record for api.$CLUSTER_NAME.$BASE_DOMAIN. -> $LB_FIP was NOT created!"
+            fi
+
+
+            echo "Creating install_config.yaml"
+            # We us install_config.yaml.bkk because some of the next steps
+            # will delete install_config.yaml
+            base_domain="${BASE_DOMAIN:-origin-ci-int-gce.dev.openshift.com}"
+            cat > /tmp/artifacts/installer/install-config.yaml.bkk << EOF
+            apiVersion: v1
+            baseDomain: ${BASE_DOMAIN}
+            controlPlane:
+            name: master
+            metadata:
+              name: ${CLUSTER_NAME}
+            platform:
+              openstack:
+                cloud:            ${OS_CLOUD}
+                externalNetwork:  ${OPENSTACK_EXTERNAL_NETWORK}
+                computeFlavor:    ${OPENSTACK_FLAVOR}
+                region:           ${OPENSTACK_REGION}
+                lbFloatingIP:     ${LB_FIP}
+            pullSecret: >
+              ${PULL_SECRET}
+            sshKey: |
+              ${SSH_PUB_KEY}
+            EOF
+
+            # Create and edit manifest files
+            echo "Creating manifest files"
+            cp /tmp/artifacts/installer/install-config.yaml.bkk /tmp/artifacts/installer/install-config.yaml
+
+            openshift-install --dir=/tmp/artifacts/installer create manifests
+            rm -f /tmp/artifacts/installer/openshift/99_openshift-cluster-api_master-machines-*.yaml
+            rm -f /tmp/artifacts/installer/openshift/99_openshift-cluster-api_worker-machineset-*.yaml
+            sed -i "s;mastersSchedulable: true;mastersSchedulable: false;g" /tmp/artifacts/installer/manifests/cluster-scheduler-02-config.yml
+
         else
             echo "Unsupported cluster type '${CLUSTER_TYPE}'"
             exit 1
@@ -1468,15 +1567,39 @@ objects:
 
           echo "bootstrap: ${BOOTSTRAP_IP} control-plane: ${CONTROL_PLANE_0_IP} ${CONTROL_PLANE_1_IP} ${CONTROL_PLANE_2_IP} compute: ${COMPUTE_0_IP} ${COMPUTE_1_IP}"
         elif [[ "${CLUSTER_TYPE}" == "openstack" ]]; then
-          # run setup job
-          echo "setting up openstack upi job"
+          cp /tmp/artifacts/installer/bootstrap.ign /tmp/sif
+          BOOTSTRAP_URI="https://${JOB_NAME_SAFE}-bootstrap-exporter-${NAMESPACE}.svc.ci.openshift.org/bootstrap.ign"
+          export UPI_DIR="${INSTALLER_SOURCE_PATH}/upi/${CLUSTER_TYPE}"
+          echo "OpenStack UPI directory: '$UPI_DIR'"
 
-          # TODO: get openstack upi dependancies
-          # TODO: create dns records
-          # TODO: create install config
-          # TODO: create and manage manifests
-          # TODO: generate and manage ignition configs
-          # TODO: deploy openstack upi cluster 
+          #prepair inventory.yaml
+          cp ${UPI_DIR}/inventory.yaml ${UPI_DIR}/inventory.yaml.bkk
+          sed -i "s/os_flavor_master.*/os_flavor_master: \'${OPENSTACK_FLAVOR}\'/g" ${UPI_DIR}/inventory.yaml
+          sed -i "s/os_flavor_worker.*/os_flavor_worker: \'${OPENSTACK_FLAVOR}\'/g" ${UPI_DIR}/inventory.yaml
+          sed -i "s/os_image_rhcos.*/os_image_rhcos: \'${OPENSTACK_IMAGE}\'/g" ${UPI_DIR}/inventory.yaml
+          sed -i "s/os_external_network.*/os_external_network: \'${OPENSTACK_EXTERNAL_NETWORK}\'/g" ${UPI_DIR}/inventory.yaml
+          sed -i "s/os_api_fip.*/os_api_fip: \'${LB_FIP}\'/g" ${UPI_DIR}/inventory.yaml
+          sed -i "s/os_ingress_fip.*/os_ingress_fip: \'${INGRESS_FIP}\'/g" ${UPI_DIR}/inventory.yaml
+          sed -i "s/os_region_name.*/os_region_name: \'${OPENSTACK_REGION}\'/g" ${UPI_DIR}/inventory.yaml
+
+
+          # The metadata.json file needs to be in the same directory as playbooks
+          cp /tmp/artifacts/installer/metadata.json ${UPI_DIR}/
+
+          # We first do a dry run with --list-tasks to catch any configuration errors right up front
+          # before we start the full run.
+          ansible-playbook -vvv -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/01_security-groups.yaml" --list-tasks
+          ansible-playbook -vvv -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/02_network.yaml" --list-tasks
+          ansible-playbook -vvv -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/03_bootstrap.yaml" --list-tasks
+          ansible-playbook -vvv -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/04_control-plane.yaml" --list-tasks
+          ansible-playbook -vvv -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/05_compute-nodes.yaml" --list-tasks
+
+          # Now we do the real run
+          ansible-playbook -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/01_security-groups.yaml"
+          ansible-playbook -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/02_network.yaml"
+          ansible-playbook -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/03_bootstrap.yaml"
+          ansible-playbook -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/04_control-plane.yaml"
+          ansible-playbook -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/05_compute-nodes.yaml"
 
         elif [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
           mkdir -p ${HOME}/gcp
@@ -1805,6 +1928,7 @@ objects:
           gcloud deployment-manager deployments delete -q ${CLUSTER_NAME}-bootstrap
         elif [[ "${CLUSTER_TYPE}" == "openstack" ]]; then
           # TODO: destroy bootstrap resources
+          echo "openstack bootstrap resources were not destroyed!"
           echo "openstack bootstrap complete"
         elif [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
           terraform apply -auto-approve -var 'bootstrap_complete=true' -no-color &
@@ -1907,6 +2031,31 @@ objects:
 
           echo "Gathering artifacts ..."
           mkdir -p /tmp/artifacts/pods /tmp/artifacts/nodes /tmp/artifacts/metrics /tmp/artifacts/bootstrap /tmp/artifacts/network
+
+          if [[ "${CLUSTER_TYPE}" == "openstack" ]]; then
+            # We have to truncate cluster name to 14 chars, because there is a limitation in the install-config
+            # Now it looks like "ci-op-rl6z646h-65230".
+            # We will remove "ci-op-" prefix from there to keep just last 14 characters.
+            export CLUSTER_NAME=${CLUSTER_NAME:${#CLUSTER_NAME}<14?0:-14}
+            echo "Gathering openstack server details"
+            for server in $(openstack server list -c Name -f value | grep $CLUSTER_NAME | sort); do
+                echo -e "\n$ openstack server show $server" >>/tmp/artifacts/openstack_nodes.log
+                openstack server show $server >>/tmp/artifacts/openstack_nodes.log
+            done
+            # Get bootstrap nova logs
+            # NOTE(shadower): The server names are in the form
+            # `$CLUSTER_NAME-fmszv-bootstrap`. I could not find how to
+            # get the middle part (`fmszv`) (it's not in the shell
+            # environment here) so we'll list all the servers and look
+            # the bootstrap name up that way.
+            # (adduarte) I think the fmszv is the ${JOB_NAME_SAFE} from the pod
+            echo "Gathering openstack server logs"
+            echo "CLUSTER_NAME: ${CLUSTER_NAME}"
+            local BOOTSTRAP_NAME=$(openstack server list --format value --column Name | grep "${CLUSTER_NAME}-.*-bootstrap")
+            if [ -n "$BOOTSTRAP_NAME" ]; then
+                openstack console log show "$BOOTSTRAP_NAME" &>/tmp/artifacts/bootstrap/nova.log
+            fi
+          fi
 
           if [ -f /tmp/artifacts/installer/.openshift_install_state.json ]
           then
@@ -2047,9 +2196,40 @@ objects:
             openshift-install --dir ${HOME}/artifacts/installer destroy cluster
             gcloud deployment-manager deployments delete -q ${CLUSTER_NAME}-{worker,control-plane,bootstrap,security,infra,vpc}
           elif [[ "${CLUSTER_TYPE}" == "openstack" ]]; then
-            # TODO: deprovision openstack upi infrastructure
-            # TODO: unset cluster dns records
-            echo "deprovisioning openstack"
+            echo "Deprovisioning openstack cluster ..."
+            if [ -z "$DO_NOT_CREATE_DNS_RECORD" ]; then
+              echo "Removing entries from DNS ..."
+              export HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "shiftstack.devcluster.openshift.com" | python -c 'import json,sys;print json.load(sys.stdin)["HostedZones"][0]["Id"].split("/")[-1]')
+              sed -e's/UPSERT/DELETE/g' /tmp/artifacts/installer/api-record.json > /tmp/artifacts/installer/delete-api-record.json
+              aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file:///tmp/artifacts/installer/delete-api-record.json
+              sed -e's/UPSERT/DELETE/g' /tmp/artifacts/installer/ingress-record.json > /tmp/artifacts/installer/delete-ingress-record.json
+              aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file:///tmp/artifacts/installer/delete-ingress-record.json
+            else
+              echo "There are no DNS entries to remove"
+            fi
+
+            LB_FIP_UID=`cat /tmp/shared/LB_FIP_UID`
+            echo "Deleting api FIP ... for ${CLUSTER_NAME} with UID: ${LB_FIP_UID}"
+            openstack floating ip delete $LB_FIP_UID
+
+            INGRESS_FIP_UID=`cat /tmp/shared/INGRESS_FIP_UID`
+            echo "Deleting ingress FIP using UID: ${INGRESS_FIP_UID}"
+            openstack floating ip delete $INGRESS_FIP_UID
+
+            openshift-install --dir /tmp/artifacts/installer destroy cluster
+
+            #run teardown playbooks for upi
+            function verify_openstack_resources_where_destroyed() {
+                echo "TODO: verify_openstack_resoruces_where_destroyed has not been implemented."
+            }
+            ansible-playbook -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/down-06_load-balancers.yaml"
+            ansible-playbook -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/down-05_compute-nodes.yaml"
+            ansible-playbook -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/down-04_control-plane.yaml"
+            ansible-playbook -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/down-03_bootstrap.yaml"
+            ansible-playbook -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/down-02_network.yaml"
+            ansible-playbook -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/down-01_security-groups.yaml"
+            verify_openstack_resources_where_destroyed
+            echo "Openstack teardown playbooks completed succesfully"
           else
             cd /tmp/shared/tf
             rm -rf .terraform
