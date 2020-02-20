@@ -148,9 +148,9 @@ def validate_names(path, data):
                             print("ERROR: {}: job {} branches with underscores are not allowed: {}".format(path, job["name"], branch_name))
                     branch = make_regex_filename_label(job["branches"][0])
 
-                prefix = "pull"
+                prefixes = ["pull"]
                 if job_type == "postsubmits":
-                    prefix = "branch"
+                    prefixes = ["branch", "priv"]
 
                 variant = job.get("labels", {}).get("ci-operator.openshift.io/variant", "")
 
@@ -159,8 +159,9 @@ def validate_names(path, data):
                 for target in filtered_targets:
                     if variant:
                         target = variant + "-" + target
-                    name = "{}-ci-{}-{}-{}".format(prefix, repo.replace("/", "-"), branch, target)
-                    valid_names[name] = target
+                    for prefix in prefixes:
+                        name = "{}-ci-{}-{}-{}".format(prefix, repo.replace("/", "-"), branch, target)
+                        valid_names[name] = target
 
                 if job["name"] not in valid_names:
                     print("ERROR: {}: ci-operator job {} should be named one of {}".format(path, job["name"], list(valid_names.keys())))
