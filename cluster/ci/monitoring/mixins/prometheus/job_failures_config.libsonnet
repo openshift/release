@@ -10,6 +10,9 @@
       'periodic-ci-openshift-kni-cnf-features-deploy-master-cnf-e2e-gcp-periodic': {
         receiver: 'kni-cnf',
       },
+      'periodic-ci-redhat-developer-service-binding-operator-master-dev-release': {
+        receiver: 'openshift-dev-services',
+      },
     },
   },
 }
