@@ -110,8 +110,9 @@ presubmits:
             echo "checking pods for kubevirt"
             oc get pods -n kubevirt
             echo "testing"
+            mkdir -p "$ARTIFACTS"
             TESTS_TO_FOCUS=$(grep -E -o '\[crit\:high\]' tests/*_test.go | sort | uniq | sed -E 's/tests\/([a-z_]+)\_test\.go\:.*/\1/' | tr '\n' '|' | sed 's/|$//')
-            FUNC_TEST_ARGS='--ginkgo.focus='"$TESTS_TO_FOCUS"' --ginkgo.regexScansFilePath=true --junit-output='"$(pwd)"'/exported-artifacts/junit.functest.xml' bash -x ./hack/functests.sh
+            FUNC_TEST_ARGS='--ginkgo.noColor --ginkgo.focus='"$TESTS_TO_FOCUS"' --ginkgo.regexScansFilePath=true --junit-output='"$ARTIFACTS"'/junit.functest.xml' bash -x ./hack/functests.sh
         - name: TEST_IMAGESTREAM_TAG
           value: pipeline:kubevirt-test
         image: ci-operator:latest
