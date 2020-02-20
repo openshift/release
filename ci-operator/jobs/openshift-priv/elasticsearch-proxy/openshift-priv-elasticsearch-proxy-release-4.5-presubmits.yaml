@@ -1,118 +1,5 @@
 presubmits:
-  openshift-priv/openshift-ansible:
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.5
-    context: ci/prow/e2e-aws-scaleup-rhel7
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    hidden: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-openshift-ansible-release-4.5-e2e-aws-scaleup-rhel7
-    path_alias: github.com/openshift/openshift-ansible
-    rerun_command: /test e2e-aws-scaleup-rhel7
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --branch=release-4.5
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --lease-server-password-file=/etc/boskos/password
-        - --lease-server-username=ci
-        - --lease-server=https://boskos-ci.svc.ci.openshift.org
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --org=openshift-priv
-        - --repo=openshift-ansible
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-        - --secret-dir=/usr/local/e2e-aws-scaleup-rhel7-cluster-profile
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=e2e-aws-scaleup-rhel7
-        - --template=/usr/local/e2e-aws-scaleup-rhel7
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-priv-openshift-ansible-release-4.5.yaml
-              name: ci-operator-4.5-configs
-        - name: JOB_NAME_SAFE
-          value: e2e-aws-scaleup-rhel7
-        - name: RPM_REPO_CRIO_DIR
-          value: 4.5-priv-rhel-7
-        - name: RPM_REPO_OPENSHIFT_ORIGIN
-          value: https://rpms.svc.ci.openshift.org/openshift-origin-v4.5-priv/
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance/parallel run-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-aws-scaleup-rhel7-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
-        - mountPath: /usr/local/e2e-aws-scaleup-rhel7
-          name: job-definition
-          subPath: cluster-scaleup-e2e-40.yaml
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
-      - name: boskos
-        secret:
-          items:
-          - key: password
-            path: password
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-          - configMap:
-              name: cluster-profile-aws-centos-40
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - configMap:
-          name: prow-job-cluster-scaleup-e2e-40
-        name: job-definition
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )e2e-aws-scaleup-rhel7,?($|\s.*)
+  openshift-priv/elasticsearch-proxy:
   - agent: kubernetes
     always_run: true
     branches:
@@ -125,8 +12,8 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-openshift-ansible-release-4.5-images
-    path_alias: github.com/openshift/openshift-ansible
+    name: pull-ci-openshift-priv-elasticsearch-proxy-release-4.5-images
+    path_alias: github.com/openshift/elasticsearch-proxy
     rerun_command: /test images
     spec:
       containers:
@@ -138,7 +25,7 @@ presubmits:
         - --kubeconfig=/etc/apici/kubeconfig
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --org=openshift-priv
-        - --repo=openshift-ansible
+        - --repo=elasticsearch-proxy
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=[images]
@@ -148,7 +35,7 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-priv-openshift-ansible-release-4.5.yaml
+              key: openshift-priv-elasticsearch-proxy-release-4.5.yaml
               name: ci-operator-4.5-configs
         image: ci-operator:latest
         imagePullPolicy: Always
@@ -199,8 +86,8 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-openshift-ansible-release-4.5-unit
-    path_alias: github.com/openshift/openshift-ansible
+    name: pull-ci-openshift-priv-elasticsearch-proxy-release-4.5-unit
+    path_alias: github.com/openshift/elasticsearch-proxy
     rerun_command: /test unit
     spec:
       containers:
@@ -212,7 +99,7 @@ presubmits:
         - --kubeconfig=/etc/apici/kubeconfig
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --org=openshift-priv
-        - --repo=openshift-ansible
+        - --repo=elasticsearch-proxy
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=unit
@@ -222,7 +109,7 @@ presubmits:
         - name: CONFIG_SPEC
           valueFrom:
             configMapKeyRef:
-              key: openshift-priv-openshift-ansible-release-4.5.yaml
+              key: openshift-priv-elasticsearch-proxy-release-4.5.yaml
               name: ci-operator-4.5-configs
         image: ci-operator:latest
         imagePullPolicy: Always
