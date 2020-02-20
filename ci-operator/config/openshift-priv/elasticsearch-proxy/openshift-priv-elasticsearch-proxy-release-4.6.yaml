@@ -1,0 +1,35 @@
+base_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: 4.6-priv
+    namespace: ocp-private
+    tag: base
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.12
+canonical_go_repository: github.com/openshift/elasticsearch-proxy
+images:
+- from: base
+  to: elasticsearch-proxy
+promotion:
+  disabled: true
+  name: 4.6-priv
+  namespace: ocp-private
+resources:
+  '*':
+    limits: {}
+    requests:
+      cpu: 200m
+      memory: 200Mi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: 4.6-priv
+  namespace: ocp-private
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
