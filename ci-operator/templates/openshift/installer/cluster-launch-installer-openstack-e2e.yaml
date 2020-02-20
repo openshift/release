@@ -566,6 +566,9 @@ objects:
           echo "Waiting for logs ..."
           wait
 
+          tar -czC /tmp/artifacts/must-gather -f /tmp/artifacts/must-gather.tar.gz . &&
+          rm -rf /tmp/artifacts/must-gather
+
           echo "Removing entries from DNS ..."
           export HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "shiftstack.devcluster.openshift.com" | python -c 'import json,sys;print json.load(sys.stdin)["HostedZones"][0]["Id"].split("/")[-1]')
           sed -e's/UPSERT/DELETE/g' /tmp/artifacts/installer/api-record.json > /tmp/artifacts/installer/delete-api-record.json
