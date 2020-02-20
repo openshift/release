@@ -356,6 +356,15 @@ objects:
           return $rv
         }
 
+        function run-remote-minimal-tests() {
+          set +e
+          ssh $SSHOPTS root@$IP openshift-tests run "${TEST_SUITE}" --dry-run \| grep 'Area:Networking' \| openshift-tests run -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit -f -
+          rv=$?
+          ssh $SSHOPTS root@$IP tar -czf - /tmp/artifacts | tar -C / -xzf - 
+          set -e
+          return $rv
+        }
+
         if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
           setup-google-cloud-sdk
         fi
