@@ -1283,6 +1283,75 @@ objects:
             rm -f /tmp/artifacts/installer/openshift/99_openshift-cluster-api_worker-machineset-*.yaml
             sed -i "s;mastersSchedulable: true;mastersSchedulable: false;g" /tmp/artifacts/installer/manifests/cluster-scheduler-02-config.yml
 
+            # Make control-plane nodes unschedulable
+            python <<EOF
+        import yaml;
+        path = "manifests/cluster-scheduler-02-config.yml"
+        data = yaml.safe_load(open(path));
+        data["spec"]["mastersSchedulable"] = False;
+        open(path, "w").write(yaml.dump(data, default_flow_style=False))
+        EOF
+
+            # Generate Ignition
+            openshift-install --dir=/tmp/artifacts/installer create ignition-configs
+
+            export INFRA_ID=$(jq -r .infraID metadata.json)
+
+            # Create glance ignition image
+            openstack image create --disk-format raw --container-format bare --file /tmp/artifacts/installer/bootstrap.ign ${INFRA_ID}-bootstrap-ignition
+            IMAGE_LOCATION=$(openstack image show ${INFRA_ID}-bootstrap-ignition | grep -oh "\/.*file")
+            GLANCE_ADDRESS=$(openstack catalog show glance -c endpoints -f shell | grep "public" | cut -d ":" -f2-)
+            export OPENSTACK_TOKEN=$(openstack token issue | grep "id" | cut -d "|" -f3 | cut -d$'\n' -f 1)
+            export GLANCE_IMAGE_URL="$GLANCE_ADDRESS$IMAGE_LOCATION"
+
+            # Create Hostname Config Ignition File
+            DATA=$(echo "$INFRA_ID-bootstrap" | base64)
+            export HOSTNAME_CONFIG_DATA_URL="data:text/plain;base64,$DATA"
+
+            # Create Bootstrap Ignition Shim
+            cat > "/tmp/artifacts/installer/$INFRA_ID-bootstrap-ignition.json" << EOF
+        {
+            "ignition": {
+                "config": {
+                    "append": {
+                        "source": "$GLANCE_IMAGE_URL",
+                        "httpHeaders": {
+                            "name": "X-Auth-Token",
+                            "value": "$OPENSTACK_TOKEN"
+                        }
+                    }
+                }
+            },
+            "storage": {
+                "files": {
+                    "file":{
+                        "node":{
+                            "fileSystem":"root",
+                            "path":"/etc/hostname"
+                        },
+                        "fileEmbedded1": {
+                            "mode": 420,
+                            "contents": {
+                                "source": "$HOSTNAME_CONFIG_DATA_URL"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        EOF
+
+        # Update Master Ignition hostname
+        for index in $(seq 0 2); do
+            MASTER_HOSTNAME="$INFRA_ID-master-$index\n"
+            python -c "import base64, json, sys;
+        ignition = json.load(sys.stdin);
+        files = ignition['storage'].get('files', []);
+        files.append({'path': '/etc/hostname', 'mode': 420, 'contents': {'source': 'data:text/plain;charset=utf-8;base64,' + base64.standard_b64encode(b'$MASTER_HOSTNAME').decode().strip(), 'verification': {}}, 'filesystem': 'root'});
+        ignition['storage']['files'] = files;
+        json.dump(ignition, sys.stdout)" <master.ign >"$INFRA_ID-master-$index-ignition.json"
+        done
+
         else
             echo "Unsupported cluster type '${CLUSTER_TYPE}'"
             exit 1
