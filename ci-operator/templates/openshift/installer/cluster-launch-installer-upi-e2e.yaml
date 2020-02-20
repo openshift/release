@@ -1230,20 +1230,12 @@ objects:
         sshKey: |	
           ${SSH_PUB_KEY}	
         EOF
-            echo "Installing yq"
             export PATH=${HOME}/.local/bin:${PATH}
-            easy_install --user pip
-            pip install --user yq
 
             echo "Creating manifests"
             openshift-install --dir=/tmp/artifacts/installer create manifests
             
             pushd /tmp/artifacts/installer
-
-            export INFRA_ID=`yq -r '.status.infrastructureName' manifests/cluster-infrastructure-02-config.yml`
-            export RESOURCE_GROUP=`yq -r '.status.platformStatus.azure.resourceGroupName' manifests/cluster-infrastructure-02-config.yml`
-            echo "Infra ID: ${INFRA_ID}"
-            echo "Resource group: ${RESOURCE_GROUP}"
 
             echo "Editing manifests"
             rm -f openshift/99_openshift-cluster-api_master-machines-*.yaml	
@@ -1845,10 +1837,16 @@ objects:
 
           echo "az version:"
           az version
+
+          echo "Logging in with az"
           AZURE_AUTH_CLIENT_ID=$(cat $AZURE_AUTH_LOCATION | jq -r .clientId)
           AZURE_AUTH_CLIENT_SECRET=$(cat $AZURE_AUTH_LOCATION | jq -r .clientSecret)
           AZURE_AUTH_TENANT_ID=$(cat $AZURE_AUTH_LOCATION | jq -r .tenantId)
           az login --service-principal -u $AZURE_AUTH_CLIENT_ID -p "$AZURE_AUTH_CLIENT_SECRET" --tenant $AZURE_AUTH_TENANT_ID
+
+          INFRA_ID="$(jq -r .infraID /tmp/artifacts/installer/metadata.json)"
+          RESOURCE_GROUP="${INFRA_ID}-rg"
+          echo "Infra ID: ${INFRA_ID}"
 
           echo "Creating resource group ${RESOURCE_GROUP}"
           az group create --name $RESOURCE_GROUP --location $AZURE_REGION
@@ -1856,23 +1854,26 @@ objects:
           echo "Creating identity"
           az identity create -g $RESOURCE_GROUP -n ${INFRA_ID}-identity
 
-          export ACCOUNT_NAME=`echo ${CLUSTER_NAME}sa | tr -cd '[:alnum:]'`
+          ACCOUNT_NAME=$(echo ${CLUSTER_NAME}sa | tr -cd '[:alnum:]')
 
           echo "Creating storage account"
           az storage account create -g $RESOURCE_GROUP --location $AZURE_REGION --name $ACCOUNT_NAME --kind Storage --sku Standard_LRS
-          export ACCOUNT_KEY=`az storage account keys list -g $RESOURCE_GROUP --account-name $ACCOUNT_NAME --query "[0].value" -o tsv`          
+          ACCOUNT_KEY=$(az storage account keys list -g $RESOURCE_GROUP --account-name $ACCOUNT_NAME --query "[0].value" -o tsv)
 
-          export VHD_URL=`cat /var/lib/openshift-install/rhcos.json | jq -r .azure.url`
+          VHD_URL="$(cat /var/lib/openshift-install/rhcos.json | jq -r .azure.url)"
 
           echo "Copying VHD image from ${VHD_URL}"
           az storage container create --name vhd --account-name $ACCOUNT_NAME
           az storage blob copy start --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY --destination-blob "rhcos.vhd" --destination-container vhd --source-uri "$VHD_URL"
-          status="unknown"
-          while [ "$status" != "success" ]
+          status="pending"
+          while [ "$status" == "pending" ]
           do
-            status=`az storage blob show --container-name vhd --name "rhcos.vhd" --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY -o tsv --query properties.copy.status`
-            echo $status
+            status=$(az storage blob show --container-name vhd --name "rhcos.vhd" --account-name ${CLUSTER_NAME}sa --account-key $ACCOUNT_KEY -o tsv --query properties.copy.status)
           done
+          if [[ "$status" != "success" ]]; then
+            echo "Error copying VHD image ${VHD_URL}"
+            exit 1
+          fi
 
           echo "Uploading bootstrap.ign"
           az storage container create --name files --account-name $ACCOUNT_NAME --public-access blob          
@@ -1881,9 +1882,9 @@ objects:
           echo "Creating private DNS zone"
           az network private-dns zone create -g $RESOURCE_GROUP -n ${CLUSTER_NAME}.${base_domain}
 
-          export PRINCIPAL_ID=`az identity show -g $RESOURCE_GROUP -n ${INFRA_ID}-identity --query principalId --out tsv`
+          PRINCIPAL_ID=$(az identity show -g $RESOURCE_GROUP -n ${INFRA_ID}-identity --query principalId --out tsv)
           echo "Assigning 'Contributor' role to principal ID ${PRINCIPAL_ID}"
-          export RESOURCE_GROUP_ID=`az group show -g $RESOURCE_GROUP --query id --out tsv`
+          RESOURCE_GROUP_ID=$(az group show -g $RESOURCE_GROUP --query id --out tsv)
           az role assignment create --assignee "$PRINCIPAL_ID" --role 'Contributor' --scope "$RESOURCE_GROUP_ID"
 
           pushd /tmp/azure
@@ -1897,7 +1898,7 @@ objects:
           az network private-dns link vnet create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${base_domain} -n ${INFRA_ID}-network-link -v "${INFRA_ID}-vnet" -e false
 
           echo "Deploying 02_storage"
-          export VHD_BLOB_URL=`az storage blob url --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY -c vhd -n "rhcos.vhd" -o tsv`
+          VHD_BLOB_URL=$(az storage blob url --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY -c vhd -n "rhcos.vhd" -o tsv)
           az group deployment create -g $RESOURCE_GROUP \
             --template-file "02_storage.json" \
             --parameters vhdBlobURL="${VHD_BLOB_URL}" \
@@ -1909,21 +1910,24 @@ objects:
             --parameters privateDNSZoneName="${CLUSTER_NAME}.${base_domain}" \
             --parameters baseName="$INFRA_ID"
 
-          export PUBLIC_IP=`az network public-ip list -g $RESOURCE_GROUP --query "[?name=='${INFRA_ID}-master-pip'] | [0].ipAddress" -o tsv`
+          PUBLIC_IP=$(az network public-ip list -g $RESOURCE_GROUP --query "[?name=='${INFRA_ID}-master-pip'] | [0].ipAddress" -o tsv)
           echo "Creating 'api' record in public zone for IP ${PUBLIC_IP}"
           az network dns record-set a add-record -g $BASE_DOMAIN_RESOURCE_GROUP -z ${base_domain} -n api.${CLUSTER_NAME} -a $PUBLIC_IP --ttl 60
 
           echo "Deploying 04_bootstrap"
-          export BOOTSTRAP_URL=`az storage blob url --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY -c "files" -n "bootstrap.ign" -o tsv`
-          export BOOTSTRAP_IGNITION=`jq -rcnM --arg v "2.2.0" --arg url $BOOTSTRAP_URL '{ignition:{version:$v,config:{replace:{source:$url}}}}' | base64 -w0`
+          BOOTSTRAP_URL=$(az storage blob url --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY -c "files" -n "bootstrap.ign" -o tsv)
+          BOOTSTRAP_IGNITION=$(jq -rcnM --arg v "2.2.0" --arg url $BOOTSTRAP_URL '{ignition:{version:$v,config:{replace:{source:$url}}}}' | base64 -w0)
           az group deployment create -g $RESOURCE_GROUP \
             --template-file "04_bootstrap.json" \
             --parameters bootstrapIgnition="$BOOTSTRAP_IGNITION" \
             --parameters sshKeyData="$SSH_PUB_KEY" \
             --parameters baseName="$INFRA_ID"
+
+          BOOTSTRAP_PUBLIC_IP=$(az network public-ip list -g $RESOURCE_GROUP --query "[?name=='${INFRA_ID}-bootstrap-ssh-pip'] | [0].ipAddress" -o tsv)
+          GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --bootstrap ${BOOTSTRAP_PUBLIC_IP}"
           
           echo "Deploying 05_masters"
-          export MASTER_IGNITION=`cat /tmp/artifacts/installer/master.ign | base64`
+          MASTER_IGNITION=$(cat /tmp/artifacts/installer/master.ign | base64)
           az group deployment create -g $RESOURCE_GROUP \
             --template-file "05_masters.json" \
             --parameters masterIgnition="$MASTER_IGNITION" \
@@ -1931,6 +1935,19 @@ objects:
             --parameters privateDNSZoneName="${CLUSTER_NAME}.${base_domain}" \
             --parameters baseName="$INFRA_ID"
                     
+          MASTER0_IP=$(az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${INFRA_ID}-master-0-nic --name pipConfig --query "privateIpAddress" -o tsv)
+          MASTER1_IP=$(az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${INFRA_ID}-master-1-nic --name pipConfig --query "privateIpAddress" -o tsv)
+          MASTER2_IP=$(az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${INFRA_ID}-master-2-nic --name pipConfig --query "privateIpAddress" -o tsv)
+          GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --master ${MASTER0_IP} --master ${MASTER1_IP} --master ${MASTER2_IP}"
+
+          echo "Deploying 06_workers"
+          export WORKER_IGNITION=$(cat /tmp/artifacts/installer/worker.ign | base64)
+          az group deployment create -g $RESOURCE_GROUP \
+            --template-file "06_workers.json" \
+            --parameters workerIgnition="$WORKER_IGNITION" \
+            --parameters sshKeyData="$SSH_PUB_KEY" \
+            --parameters baseName="$INFRA_ID"
+
           popd
         fi
 
@@ -1963,13 +1980,17 @@ objects:
           az network nic delete -g $RESOURCE_GROUP --name ${INFRA_ID}-bootstrap-nic --no-wait
           az storage blob delete --account-key $ACCOUNT_KEY --account-name $ACCOUNT_NAME --container-name files --name bootstrap.ign
           az network public-ip delete -g $RESOURCE_GROUP --name ${INFRA_ID}-bootstrap-ssh-pip
+        fi
 
+        if [[ "${CLUSTER_TYPE}" == "azure4" ]]; then
+          echo "Adding ingress DNS records"
+          
           export KUBECONFIG=/tmp/artifacts/installer/auth/kubeconfig
 
           public_ip_router="<pending>"
           while [[ $public_ip_router =~ "pending" ]]
           do
-            public_ip_router=`oc -n openshift-ingress get service router-default --no-headers | awk '{print $4}'`
+            public_ip_router=$(oc -n openshift-ingress get service router-default --no-headers | awk '{print $4}')
             echo $public_ip_router
           done
           
@@ -1977,16 +1998,6 @@ objects:
           
           az network private-dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${base_domain} -n *.apps --ttl 300
           az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${base_domain} -n *.apps -a $public_ip_router
-
-          echo "Deploying 06_workers"
-          pushd /tmp/azure
-          export WORKER_IGNITION=`cat /tmp/artifacts/installer/worker.ign | base64`
-          az group deployment create -g $RESOURCE_GROUP \
-            --template-file "06_workers.json" \
-            --parameters workerIgnition="$WORKER_IGNITION" \
-            --parameters sshKeyData="$SSH_PUB_KEY" \
-            --parameters baseName="$INFRA_ID"
-          popd
         fi
 
         function approve_csrs() {
@@ -2229,7 +2240,7 @@ objects:
           elif [[ "${CLUSTER_TYPE}" == "azure4" ]]; then
             openshift-install --dir=/tmp/artifacts/installer destroy cluster
             if [[ -f /tmp/artifacts/installer/metadata.json ]]; then
-              export INFRA_ID=`cat /tmp/artifacts/installer/metadata.json | jq -r '.infraID'`
+              INFRA_ID="$(jq -r .infraID /tmp/artifacts/installer/metadata.json)"
               az group delete --name ${INFRA_ID}-rg --yes
             fi
           else
