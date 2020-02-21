@@ -4,6 +4,7 @@ base_images:
     name: "4.6"
     namespace: ocp
     tag: base
+binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
     cluster: https://api.ci.openshift.org
@@ -14,6 +15,10 @@ canonical_go_repository: github.com/coreos/etcd
 images:
 - dockerfile_path: Dockerfile.openshift
   from: base
+  inputs:
+    bin:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.12
   to: etcd
 promotion:
   name: "4.6"
@@ -30,10 +35,19 @@ tag_specification:
   namespace: ocp
 tests:
 - as: unit
-  commands: make test
+  commands: make test --warn-undefined-variables
   container:
-    from: src
+    from: bin
 - as: e2e-aws
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: aws
+- as: e2e-aws-serial
+  commands: TEST_SUITE=openshift/conformance/serial run-tests
+  openshift_installer:
+    cluster_profile: aws
+- as: e2e-aws-upgrade
+  commands: TEST_SUITE=all run-upgrade-tests
+  openshift_installer:
+    cluster_profile: aws
+    upgrade: true
