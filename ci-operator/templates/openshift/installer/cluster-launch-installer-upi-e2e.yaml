@@ -280,6 +280,15 @@ objects:
           if [[ "$XTRACE_ENABLED" == 1 ]]; then
             set -x
           fi
+
+          # we need to install openstack client and other requirements
+          echo "OpenStack: installing requirements"
+          export UPI_DIR="${INSTALLER_SOURCE_PATH}/upi/${CLUSTER_TYPE}"
+          cat ${UPI_DIR}/requirements.txt
+          export PATH="${HOME}/.local/bin:${PATH}"
+          easy_install --user pip  # our Python 2.7.5 is even too old for ensurepip
+          pip install --user -r ${UPI_DIR}/requirements.txt
+          which ansible-playbook
         fi
 
         if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
@@ -1224,6 +1233,14 @@ objects:
             # Now it looks like "ci-op-rl6z646h-65230".
             # We will remove "ci-op-" prefix from there to keep just last 14 characters.
             export CLUSTER_NAME=${CLUSTER_NAME:${#CLUSTER_NAME}<14?0:-14}
+
+            # we need to install openstack client and other requirements
+            echo "OpenStack: installing requirements"
+            cat ${UPI_DIR}/requirements.txt
+            export PATH="${HOME}/.local/bin:${PATH}"
+            easy_install --user pip  # our Python 2.7.5 is even too old for ensurepip
+            pip install --user -r ${UPI_DIR}/requirements.txt
+            which ansible-playbook
 
             # create api and ingress FIPS
             LB_FIP_AND_ID=$(openstack floating ip create --description api.$CLUSTER_NAME.$BASE_DOMAIN $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address' -c 'id')
