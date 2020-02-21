@@ -6,32 +6,71 @@ presubmits:
     - master
     context: ci/prow/cargo-test
     decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cincinnati-master-cargo-test
     rerun_command: /test cargo-test
     spec:
       containers:
-      - command:
-        - dist/cargo_test.sh
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --branch=master
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --org=openshift
+        - --repo=cincinnati
+        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
+        - --secret-dir=/usr/local/ci-secrets/cincinnati-secrets-quay
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=cargo-test
+        command:
+        - ci-operator
         env:
-        - name: CINCINNATI_TEST_CREDENTIALS_PATH
-          value: /usr/local/ci-secrets/quay/docker.config.json
-        - name: CINCINNATI_TEST_QUAY_API_TOKEN_PATH
-          value: /usr/local/ci-secrets/quay/api_access_token
-        image: registry.svc.ci.openshift.org/ci/cincinnati-build-root:latest
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-cincinnati-master.yaml
+              name: ci-operator-master-configs
+        image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
         resources:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/ci-secrets/quay
-          name: secrets-quay
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /usr/local/ci-secrets/cincinnati-secrets-quay
+          name: cincinnati-secrets-quay
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: secrets-quay
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: cincinnati-secrets-quay
         secret:
           secretName: cincinnati-secrets-quay
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
     trigger: (?m)^/test( | .* )cargo-test,?($|\s.*)
   - agent: kubernetes
     always_run: true

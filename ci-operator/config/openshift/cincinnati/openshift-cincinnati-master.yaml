@@ -40,6 +40,17 @@ tag_specification:
   name: "4.4"
   namespace: ocp
 tests:
+- as: cargo-test
+  artifact_dir: /tmp/artifacts
+  commands: |
+    env CINCINNATI_TEST_CREDENTIALS_PATH=/usr/local/ci-secrets/cincinnati-secrets-quay/docker.config.json \
+        CINCINNATI_TEST_QUAY_API_TOKEN_PATH=/usr/local/ci-secrets/cincinnati-secrets-quay/api_access_token \
+    dist/cargo_test.sh
+  container:
+    from: src
+  secret:
+    mount_path: /usr/local/ci-secrets/cincinnati-secrets-quay
+    name: cincinnati-secrets-quay
 - as: yaml-lint
   commands: dist/prow_yaml_lint.sh
   container:
