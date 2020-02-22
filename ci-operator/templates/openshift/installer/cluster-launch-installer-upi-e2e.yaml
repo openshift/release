@@ -281,14 +281,6 @@ objects:
             set -x
           fi
 
-          # we need to install openstack client and other requirements
-          echo "OpenStack: installing requirements"
-          export UPI_DIR="${INSTALLER_SOURCE_PATH}/upi/${CLUSTER_TYPE}"
-          cat ${UPI_DIR}/requirements.txt
-          export PATH="${HOME}/.local/bin:${PATH}"
-          easy_install --user pip  # our Python 2.7.5 is even too old for ensurepip
-          pip install --user -r ${UPI_DIR}/requirements.txt
-          which ansible-playbook
         fi
 
         if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
@@ -371,6 +363,8 @@ objects:
         value: /tmp
       - name: INSTALL_INITIAL_RELEASE
       - name: RELEASE_IMAGE_INITIAL
+      - name: UPI_DIR
+        value: /go/src/github.com/openshift/installer/upi/${CLUSTER_TYPE}
 
       command:
       - /bin/sh
@@ -1236,7 +1230,6 @@ objects:
 
             # we need to install openstack client and other requirements
             echo "OpenStack: installing requirements"
-            export UPI_DIR="${INSTALLER_SOURCE_PATH}/upi/${CLUSTER_TYPE}"
             cat ${UPI_DIR}/requirements.txt
             export PATH="${HOME}/.local/bin:${PATH}"
             easy_install --user pip  # our Python 2.7.5 is even too old for ensurepip
@@ -1659,7 +1652,6 @@ objects:
         elif [[ "${CLUSTER_TYPE}" == "openstack" ]]; then
           cp /tmp/artifacts/installer/bootstrap.ign /tmp/sif
           BOOTSTRAP_URI="https://${JOB_NAME_SAFE}-bootstrap-exporter-${NAMESPACE}.svc.ci.openshift.org/bootstrap.ign"
-          export UPI_DIR="${INSTALLER_SOURCE_PATH}/upi/${CLUSTER_TYPE}"
           echo "OpenStack UPI directory: '$UPI_DIR'"
 
           #prepair inventory.yaml
@@ -2099,6 +2091,9 @@ objects:
         value: 'openstack-cloud'
       - name: OS_CLIENT_CONFIG_FILE
         value: '/tmp/cluster-profile/clouds.yaml'
+      - name: INSTALLER_SOURCE_PATH
+      - name: UPI_DIR
+        value: /go/src/github.com/openshift/installer/upi/${CLUSTER_TYPE}
       command:
       - /bin/bash
       - -c
