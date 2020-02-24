@@ -1,0 +1,239 @@
+presubmits:
+  kubevirt/kubevirt:
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/e2e
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-kubevirt-kubevirt-master-e2e
+    path_alias: kubevirt.io/kubevirt
+    rerun_command: /test e2e
+    skip_report: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --branch=master
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
+        - --org=kubevirt
+        - --repo=kubevirt
+        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
+        - --secret-dir=/usr/local/e2e-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=e2e
+        - --template=/usr/local/e2e
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: gcp
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: kubevirt-kubevirt-master.yaml
+              name: ci-operator-master-configs
+        - name: JOB_NAME_SAFE
+          value: e2e
+        - name: TEST_COMMAND
+          value: |
+            cd /go/src/kubevirt.io/kubevirt
+            #./hack/ci/test.sh
+            set -xeuo pipefail
+
+            export PATH=$PATH:/usr/local/go/bin/
+            which kubectl
+            which oc
+            echo "checking nodes for cluster"
+            # in CI, this cmd fails unless you provide a ns
+            oc -n default get nodes
+            echo "checking configuration"
+            env | grep KUBE
+            kubectl config view
+            export DOCKER_PREFIX='dhiller'
+            export DOCKER_TAG="latest"
+            export KUBEVIRT_PROVIDER=external
+            export GIMME_GO_VERSION=1.12.8
+            export GOPATH="/go"
+            export GOBIN="/usr/bin"
+            source /etc/profile.d/gimme.sh
+            echo "checking configuration location"
+            echo "KUBECONFIG: ${KUBECONFIG}"
+            # enable nested-virt
+            oc get machineset -n openshift-machine-api -o json >/tmp/machinesets.json
+            MACHINE_IMAGE=$(jq -r .items[0].spec.template.spec.providerSpec.value.disks[0].image /tmp/machinesets.json)
+            NESTED_VIRT_IMAGE="rhcos43-nested-virt"
+            sed -i 's/'"$MACHINE_IMAGE"'/'"$NESTED_VIRT_IMAGE"'/g' /tmp/machinesets.json
+            oc apply -f /tmp/machinesets.json
+            oc scale --replicas=0 machineset --all -n openshift-machine-api
+            oc get machines -n openshift-machine-api -o json >/tmp/machines.json
+            num_machines=$(jq '.items | length' /tmp/machines.json)
+            while [ "$num_machines" -ne "3" ]; do
+                sleep 5
+                oc get machines -n openshift-machine-api -o json >/tmp/machines.json
+                num_machines=$(jq '.items | length' /tmp/machines.json)
+            done
+            oc scale --replicas=1 machineset --all -n openshift-machine-api
+            while [ "$num_machines" -ne "6" ]; do
+                sleep 5
+                oc get machines -n openshift-machine-api -o json >/tmp/machines.json
+                num_machines=$(jq '.items | length' /tmp/machines.json)
+            done
+            while [ $(oc get nodes | wc -l) -ne "7" ]; do oc get nodes; sleep 5; done
+            nodes_ready=false
+            while ! "$nodes_ready"; do sleep 5 && if ! oc get nodes | grep NotReady; then nodes_ready=true; fi; done
+            oc project default
+            # apply kvm device plugin
+            oc apply -f https://raw.githubusercontent.com/kubevirt/kubernetes-device-plugins/master/manifests/kvm-ds.yml
+            workers=$(oc get nodes | grep worker | awk '{ print $1 }')
+            workers_each=($workers)
+            for i in {0..2}; do
+                if ! oc debug node/"${workers_each[i]}" -- ls /dev/kvm; then oc debug node/"${workers_each[i]}" -- ls /dev/kvm; fi
+            done
+            echo "calling cluster-up to prepare config and check whether cluster is reachable"
+            # TODO: remove patching of external provider, after kubevirtci#199 has been merged and kubevirt updates
+            (cd cluster-up/cluster/external && curl -L -O -o provider.sh https://raw.githubusercontent.com/dhiller/kubevirtci/fix-external-provider/cluster-up/cluster/external/provider.sh)
+            bash -x ./cluster-up/up.sh
+            echo "checking cluster configuration after config prep"
+            kubectl config view
+            echo "deploying"
+            bash -x ./hack/cluster-deploy.sh
+            echo "checking pods for kubevirt"
+            oc get pods -n kubevirt
+            echo "testing"
+            mkdir -p "$ARTIFACT_DIR"
+            TESTS_TO_FOCUS=$(grep -E -o '\[crit\:high\]' tests/*_test.go | sort | uniq | sed -E 's/tests\/([a-z_]+)\_test\.go\:.*/\1/' | tr '\n' '|' | sed 's/|$//')
+            FUNC_TEST_ARGS='--ginkgo.noColor --ginkgo.focus='"$TESTS_TO_FOCUS"' --ginkgo.regexScansFilePath=true --junit-output='"$ARTIFACT_DIR"'/junit.functest.xml' bash -x ./hack/functests.sh
+        - name: TEST_IMAGESTREAM_TAG
+          value: pipeline:kubevirt-test
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e
+          name: job-definition
+          subPath: cluster-launch-installer-custom-test-image.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - configMap:
+          name: prow-job-cluster-launch-installer-custom-test-image
+        name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )e2e,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-kubevirt-kubevirt-master-images
+    path_alias: kubevirt.io/kubevirt
+    rerun_command: /test images
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --branch=master
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --org=kubevirt
+        - --repo=kubevirt
+        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=[images]
+        command:
+        - ci-operator
+        env:
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: kubevirt-kubevirt-master.yaml
+              name: ci-operator-master-configs
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )images,?($|\s.*)

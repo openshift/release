@@ -42,6 +42,11 @@
         channel: '#forum-kni-cnf',
         notify: '',
       },
+      'openshift-dev-services': {
+        team: 'openshift-dev-services',
+        channel: '#forum-os-dev-services',
+        notify: 'openshift-app-services',
+      },
     },
   },
 }
