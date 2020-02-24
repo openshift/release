@@ -1,6 +1,31 @@
 presubmits:
   kubevirt/kubevirt:
   - agent: kubernetes
+    always_run: false
+    annotations:
+      job_purpose: 'This job only exists to work-around the Prow branchprotector issue
+        described in https://github.com/kubernetes/test-infra/issues/14575#issuecomment-590281808.
+        It should never run (always_run: false), and it is only useful as long as
+        branchprotector plugin is entirely disabled on kubevirt/kubevirt in OpenShift
+        Prow.'
+    context: ci/prow/trick-branchprotector
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    name: pull-ci-kubevirt-kubevirt-all-branches-trick-branchprotector
+    rerun_command: /test trick-branchprotector
+    spec:
+      containers:
+      - command:
+        - "true"
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )trick-branchprotector,?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - master
