@@ -14,6 +14,11 @@ base_images:
     name: centos
     namespace: openshift
     tag: "7"
+  nodejs-10:
+    cluster: https://api.ci.openshift.org
+    name: nodejs-10-rhel7
+    namespace: openshift
+    tag: latest
   ruby-25:
     cluster: https://api.ci.openshift.org
     name: release
@@ -36,11 +41,11 @@ images:
 - context_dir: elasticsearch/
   dockerfile_path: Dockerfile.centos7
   from: base_centos
-  to: logging-elasticsearch5
+  to: logging-elasticsearch6
 - context_dir: kibana/
   dockerfile_path: Dockerfile.centos7
-  from: base_centos
-  to: logging-kibana5
+  from: nodejs-10
+  to: logging-kibana6
 - context_dir: curator/
   dockerfile_path: Dockerfile.centos7
   from: base_centos
@@ -74,15 +79,7 @@ tests:
   commands: /tmp/run.sh
   container:
     from: logging-test-unit
-- as: full-integ-aws
-  commands: |
-    . openshift/ci-operator/build-image/setup-logging-for-e2e.sh
-  openshift_installer_src:
-    cluster_profile: aws
-- as: upgrade-full-integ-aws
-  commands: |
-    OPENSHIFT_BUILD_NAMESPACE= IMAGE_FORMAT= USE_CUSTOM_IMAGES=true hack/deploy-logging.sh
-    export LOGGING_DEPLOY_MODE=upgrade
-    . openshift/ci-operator/build-image/setup-logging-for-e2e.sh
+- as: smoke
+  commands: make test
   openshift_installer_src:
     cluster_profile: aws

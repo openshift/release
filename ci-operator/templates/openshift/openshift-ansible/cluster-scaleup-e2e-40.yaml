@@ -130,6 +130,10 @@ objects:
 
         # wait for the API to come up
         while true; do
+          if [[ -f /tmp/shared/scaleup-failed ]]; then
+            echo "Scaleup reported a failure, do not report test failure" 2>&1
+            exit 0
+          fi
           if [[ -f /tmp/shared/exit ]]; then
             echo "Another process exited" 2>&1
             exit 1
@@ -317,7 +321,7 @@ objects:
         #!/bin/bash
         set -euo pipefail
 
-        trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/scaleup-success; else touch /tmp/setup-failed; fi; exit "${rc}"' EXIT
+        trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/scaleup-success; else touch /tmp/scaleup-failed; fi; exit "${rc}"' EXIT
         trap 'jobs -p | xargs -r kill || true; exit 0' TERM
 
         echo -n "Waiting for cluster setup..."
