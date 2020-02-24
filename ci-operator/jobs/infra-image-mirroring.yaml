@@ -66,12 +66,18 @@ periodics:
               oc registry login --to /tmp/config.json
               failures=0
               for mapping in /etc/imagemirror/mapping_origin*; do
-                echo "Running: oc image mirror -f=$mapping --skip-multiple-scopes"
                 if [ ! -s "${mapping}" ]; then continue; fi
-                if ! oc -v4 image mirror -a /tmp/config.json -f="$mapping" --skip-multiple-scopes; then
-                  echo "ERROR: Failed to mirror images from $mapping"
-                  failures=$((failures+1))
-                fi
+                attempts=3
+                for attempt in $( seq $attempts ); do
+                  echo "Running: oc image mirror -f=$mapping --skip-multiple-scopes"
+                  if oc -v4 image mirror -a /tmp/config.json -f="$mapping" --skip-multiple-scopes; then
+                    break
+                  fi
+                  if [[ $attempt -eq $attempts ]]; then
+                    echo "ERROR: Failed to mirror images from $mapping after $attempts attempts"
+                    failures=$((failures+1))
+                  fi
+                done
               done
               exit $failures
           command:
