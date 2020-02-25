@@ -88,6 +88,28 @@ periodics:
         secretName: build-farm-credentials
 - agent: kubernetes
   labels:
+     ci.openshift.io/role: infra
+  cluster: ci/api-build01-ci-devcluster-openshift-com:6443
+  cron: "30 7 * * *"  # Run at 07:30 UTC each day
+  decorate: true
+  name: periodic-build01-upgrade
+  skip_cloning: true
+  spec:
+    containers:
+    - args:
+      - adm
+      - upgrade
+      - --to-latest
+      command:
+      - /usr/bin/oc
+      image: "registry.svc.ci.openshift.org/ocp/4.5:cli"
+      imagePullPolicy: Always
+      resources:
+        requests:
+          cpu: 500m
+      serviceAccount: upgrader
+- agent: kubernetes
+  labels:
     ci.openshift.io/role: infra
   cron: ""
   decorate: true
