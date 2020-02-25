@@ -305,7 +305,7 @@ objects:
 
     # Runs an install
     - name: setup
-      image: ${IMAGE_UPI_INSTALLER}
+      image: ${IMAGE_OPENSTACK_INSTALLER}
       terminationMessagePolicy: FallbackToLogsOnError
       volumeMounts:
       - name: shared-tmp
@@ -366,7 +366,7 @@ objects:
       - name: INSTALL_INITIAL_RELEASE
       - name: RELEASE_IMAGE_INITIAL
       - name: UPI_DIR
-        value: /var/lib/openshift-install/upi/${CLUSTER_TYPE}
+        value: /go/src/github.com/openshift/installer/upi/${CLUSTER_TYPE}
 
       command:
       - /bin/sh
@@ -1283,7 +1283,7 @@ objects:
             # We will remove "ci-op-" prefix from there to keep just last 14 characters.
             export CLUSTER_NAME=${CLUSTER_NAME:${#CLUSTER_NAME}<14?0:-14}
 
-            # we need to install openstack client and other requirements
+            # if not using openstack-installer image we need to install openstack client and other requirements
             #echo "OpenStack: installing requirements"
             #cat ${UPI_DIR}/requirements.txt
             #export PATH="${HOME}/.local/bin:${PATH}"
@@ -2265,7 +2265,7 @@ objects:
 
     # Performs cleanup of all created resources
     - name: teardown
-      image: ${IMAGE_UPI_INSTALLER}
+      image: ${IMAGE_OPENSTACK_INSTALLER}
       terminationMessagePolicy: FallbackToLogsOnError
       volumeMounts:
       - name: shared-tmp
@@ -2303,7 +2303,7 @@ objects:
         value: '/tmp/cluster-profile/clouds.yaml'
       - name: INSTALLER_SOURCE_PATH
       - name: UPI_DIR
-        value: /var/lib/openshift-install/upi/${CLUSTER_TYPE}
+        value: /go/src/github.com/openshift/installer/upi/${CLUSTER_TYPE}
       command:
       - /bin/bash
       - -c
@@ -2337,7 +2337,7 @@ objects:
 
           if [[ "${CLUSTER_TYPE}" == "openstack" ]]; then
 
-            # we need to install openstack client and other requirements
+            # if not using openstack-installer we need to install openstack client and other requirements
             #echo "OpenStack: installing requirements"
             #cat ${UPI_DIR}/requirements.txt
             #export PATH="${HOME}/.local/bin:${PATH}"
