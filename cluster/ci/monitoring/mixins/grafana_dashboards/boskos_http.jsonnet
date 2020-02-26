@@ -45,8 +45,8 @@ dashboard.new(
   {
         "allValue": null,
         "current": {
-          "text": "3h",
-          "value": "3h"
+          "text": "5m",
+          "value": "5m"
         },
         "hide": 0,
         "includeAll": false,
@@ -56,17 +56,9 @@ dashboard.new(
         "options":
         [
           {
-            "selected": false,
-            "text": '%s' % r,
-            "value": '%s'% r,
-          },
-          for r in ['24h', '12h']
-        ] +
-        [
-          {
             "selected": true,
-            "text": '3h',
-            "value": '3h',
+            "text": '5m',
+            "value": '5m',
           }
         ] +
         [
@@ -75,7 +67,7 @@ dashboard.new(
             "text": '%s' % r,
             "value": '%s'% r,
           },
-          for r in ['1h', '30m', '15m', '10m', '5m']
+          for r in ['24h', '12h', '3h' ,'1h', '30m', '15m', '10m']
         ],
         "query": "3h,1h,30m,15m,10m,5m",
         "skipUrlSync": false,
