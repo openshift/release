@@ -317,7 +317,7 @@ objects:
         chmod 0600 ~/.ssh/id_rsa
 
         # create a new floating ip tagged with CLUSTER_NAME so it can be deleted later
-        LB_FIP=$(openstack floating ip create --description $CLUSTER_NAME $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address')
+        LB_FIP=$(openstack floating ip create --description "${CLUSTER_NAME}-api-fip"  $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address')
 
         echo "Creating DNS record for api.$CLUSTER_NAME.$BASE_DOMAIN. -> $LB_FIP"
         cat > /tmp/artifacts/installer/api-record.json <<EOF
@@ -386,7 +386,7 @@ objects:
         if [ -n "$INGRESS_PORT" ]; then
           # Assign a FIP to ingress port to allow getting to apps
           # create a new floating ip tagged with CLUSTER_NAME so it can be deleted later
-          APPS_FIP=$(openstack floating ip create --description $CLUSTER_NAME $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address' --port $INGRESS_PORT)
+          APPS_FIP=$(openstack floating ip create --description "${CLUSTER_NAME}-ingress-fip" $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address' --port $INGRESS_PORT)
           echo "Creating DNS record for *.apps.$CLUSTER_NAME.$BASE_DOMAIN. -> $APPS_FIP"
           cat > /tmp/artifacts/installer/ingress-record.json <<EOF
           {
