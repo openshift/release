@@ -96,7 +96,7 @@ prow-monitoring-cleanup:
 
 
 .PHONY : grafana-debug-deploy
-grafana-debug-deploy:
+grafana-debug-deploy: grafana-debug-generate-k8s-dashboards generate-mixins
 	$(eval grafana_password := $(shell uuidgen))
 	@echo "Running grafana-debug-deploy ... with password: $(grafana_password)"
 	# oc new-project prow-monitoring-stage --skip-config-write=true
@@ -110,6 +110,7 @@ grafana-debug-deploy:
 	oc get secret -n openshift-monitoring --as system:admin grafana-datasources -o json | jq -r '.data["prometheus.yaml"]' | base64 -d | jq '.datasources[].name = "prometheus-k8s"' > /tmp/prometheus-k8s.yaml
 	oc create -n prow-monitoring-stage configmap grafana-datasources --from-file=datasources.yaml=./debug/grafana_datasources.yaml --from-file=prometheus-k8s.yaml=/tmp/prometheus-k8s.yaml --dry-run -o yaml | oc apply -f -
 	rm -fv /tmp/prometheus-k8s.yaml
+	oc delete pod -n prow-monitoring-stage -l app=grafana --ignore-not-found=true
 	oc apply -f ./debug/grafana_deploy.yaml
 	@echo "admin password: $$(oc get secret -n prow-monitoring-stage grafana -o jsonpath='{.data.password}' | base64 -d)"
 
