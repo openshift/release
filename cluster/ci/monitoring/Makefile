@@ -1,7 +1,7 @@
 ### --as=system:serviceaccount:ci:config-updater
-prometheus-k8s_token := $(shell oc get --as=system:serviceaccount:ci:config-updater secret -n openshift-monitoring grafana-datasources -o "jsonpath={.data.prometheus\.yaml}" | base64 --decode | jq '.datasources[] | select(.name = "prometheus-k8s") .basicAuthPassword')
 .PHONY : prow-monitoring-deploy
 prow-monitoring-deploy: ci-secret-deploy
+	$(eval prometheus-k8s_token := $(shell oc get --as=system:serviceaccount:ci:config-updater secret -n openshift-monitoring grafana-datasources -o "jsonpath={.data.prometheus\.yaml}" | base64 --decode | jq '.datasources[] | select(.name = "prometheus-k8s") .basicAuthPassword'))
 	@echo "Deploying prow-monitoring stack ..."
 	oc process -n prow-monitoring -f ./prometheus_expose.yaml | oc apply -f -
 	oc apply -f ./prometheus_operator_deploy.yaml
@@ -36,10 +36,10 @@ prow-monitoring-deploy: ci-secret-deploy
 	oc apply -f ./grafana_deploy.yaml
 	oc apply -f ./grafana_service_monitor.yaml
 
-slack_api_url := $(shell oc get secret -n ci ci-slack-api-url -o json | jq -r .data.url | base64 -d)
 
 .PHONY : ci-secret-deploy
 ci-secret-deploy:
+	$(eval slack_api_url := $(shell oc get secret -n ci ci-slack-api-url -o json | jq -r .data.url | base64 -d))
 	@echo "deploy ci secret ..."
 	#TODO: reference a value should be doable with jsonnet
 	@echo "replacing the api_url in ./alertmanager.yaml ..."
@@ -94,10 +94,10 @@ prow-monitoring-cleanup:
 	oc delete -f ./ci_hook_rbac.yaml --ignore-not-found=true --as=system:admin
 	oc delete -f ./prometheus_project.yaml --wait=true --ignore-not-found=true --as=system:admin
 
-grafana_password := $(shell uuidgen)
 
 .PHONY : grafana-debug-deploy
 grafana-debug-deploy:
+	$(eval grafana_password := $(shell uuidgen))
 	@echo "Running grafana-debug-deploy ... with password: $(grafana_password)"
 	# oc new-project prow-monitoring-stage --skip-config-write=true
 	# oc adm policy add-role-to-group admin ci-admins --as system:admin -n prow-monitoring-stage
