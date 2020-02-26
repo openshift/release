@@ -70,6 +70,86 @@ presubmits:
     always_run: true
     branches:
     - release-4.4
+    context: ci/prow/e2e-libvirt
+    decorate: true
+    name: pull-ci-openshift-cluster-api-provider-libvirt-release-4.4-e2e-libvirt
+    rerun_command: /test e2e-libvirt
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --branch=master
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --org=openshift
+        - --repo=cluster-api-provider-libvirt
+        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
+        - --secret-dir=/usr/local/e2e-libvirt-cluster-profile
+        - --target=e2e-libvirt
+        - --template=/usr/local/e2e-libvirt
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: gcp
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-cluster-api-provider-libvirt-release-4.4.yaml
+              name: ci-operator-4.4-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-libvirt
+        - name: TEST_COMMAND
+          value: |
+            cat >tests <<EOTESTS
+            "[Conformance][Area:Networking][Feature:Router] The HAProxy router should override the route host for overridden domains with a custom value [Suite:openshift/conformance/parallel/minimal]"
+            EOTESTS
+            TEST_SUITE="--file=tests" run-tests
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-libvirt-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-libvirt
+          name: job-definition
+          subPath: cluster-launch-installer-libvirt-e2e.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - configMap:
+          name: prow-job-cluster-launch-installer-libvirt-e2e
+        name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
+    trigger: (?m)^/test( | .* )e2e-libvirt,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-4.4
     context: ci/prow/gofmt
     decorate: true
     decoration_config:
@@ -400,7 +480,7 @@ presubmits:
     decorate: true
     labels:
       ci.openshift.io/manually-branched: "true"
-    name: pull-ci-openshift-cluster-api-provider-libvirt-release-4.4-yaml-lint
+    name: pull-ci-openshift-cluster-api-provider-libvirt-release-4.4.yaml-lint
     rerun_command: /test yaml-lint
     spec:
       containers:
