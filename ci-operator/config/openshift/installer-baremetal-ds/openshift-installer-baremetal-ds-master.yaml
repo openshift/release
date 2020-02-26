@@ -1,0 +1,84 @@
+base_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: "4.5"
+    namespace: ocp
+    tag: base
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- dockerfile_path: images/installer/Dockerfile.ci
+  from: base
+  inputs:
+    root:
+      as:
+      - builder
+      paths: null
+  to: installer
+- dockerfile_path: images/installer-artifacts/Dockerfile.rhel
+  from: installer
+  inputs:
+    root:
+      as:
+      - builder
+      paths: null
+  to: installer-artifacts
+- dockerfile_path: images/libvirt/Dockerfile.ci
+  from: base
+  inputs:
+    root:
+      as:
+      - builder
+      paths: null
+  to: libvirt-installer
+- dockerfile_path: images/installer/Dockerfile.upi.ci
+  from: base
+  inputs:
+    root:
+      as:
+      - builder
+      paths: null
+  to: upi-installer
+promotion:
+  name: "4.5"
+  namespace: ocp
+resources:
+  '*':
+    limits: {}
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  installer:
+    limits: {}
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  installer-artifacts:
+    limits: {}
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  libvirt-installer:
+    limits: {}
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  upi-installer:
+    limits: {}
+    requests:
+      cpu: "3"
+      memory: 5Gi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: "4.5"
+  namespace: ocp
+tests:
+- as: e2e-baremetal-ds-steps
+  commands: ""
+  steps:
+    cluster_profile: packet
+    workflow: baremetal-ds-e2e
