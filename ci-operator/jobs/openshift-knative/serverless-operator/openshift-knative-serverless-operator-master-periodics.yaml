@@ -208,6 +208,107 @@ periodics:
     repo: serverless-operator
   labels:
     ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: 4.3-gcp
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-knative-serverless-operator-master-4.3-gcp-e2e-gcp-ocp-43-continuous
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --branch=master
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
+      - --org=openshift-knative
+      - --repo=serverless-operator
+      - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
+      - --secret-dir=/usr/local/e2e-gcp-ocp-43-continuous-cluster-profile
+      - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+      - --target=e2e-gcp-ocp-43-continuous
+      - --template=/usr/local/e2e-gcp-ocp-43-continuous
+      - --variant=4.3-gcp
+      command:
+      - ci-operator
+      env:
+      - name: CLUSTER_TYPE
+        value: gcp
+      - name: CONFIG_SPEC
+        valueFrom:
+          configMapKeyRef:
+            key: openshift-knative-serverless-operator-master__4.3-gcp.yaml
+            name: ci-operator-master-configs
+      - name: JOB_NAME_SAFE
+        value: e2e-gcp-ocp-43-continuous
+      - name: TEST_COMMAND
+        value: make test-e2e
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/e2e-gcp-ocp-43-continuous-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/e2e-gcp-ocp-43-continuous
+        name: job-definition
+        subPath: cluster-launch-installer-src.yaml
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/sentry-dsn
+        name: sentry-dsn
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-gcp
+        - configMap:
+            name: cluster-profile-gcp
+    - configMap:
+        name: prow-job-cluster-launch-installer-src
+      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: sentry-dsn
+      secret:
+        secretName: sentry-dsn
+- agent: kubernetes
+  cron: 0 0 * * 0
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift-knative
+    repo: serverless-operator
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
     ci-operator.openshift.io/variant: 4.3-vsphere
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-knative-serverless-operator-master-4.3-vsphere-e2e-aws-ocp-43-vsphere-continuous
