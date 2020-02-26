@@ -30,6 +30,8 @@ local mytemplate(name, labelInQuery) = template.new(
         'prometheus',
         std.format('label_values(boskos_http_request_duration_seconds_bucket, %s)', labelInQuery),
         label=name,
+        allValues='.*',
+        includeAll=true,
         refresh='time',
     );
 
@@ -40,13 +42,13 @@ dashboard.new(
       )
 .addTemplate(mytemplate('path', 'path'))
 .addTemplate(mytemplate('status', 'status'))
-.addTemplate(mytemplate('user-agent', 'user_agent'))
+.addTemplate(mytemplate('user_agent', 'user_agent'))
 .addTemplate(
   {
         "allValue": null,
         "current": {
-          "text": "3h",
-          "value": "3h"
+          "text": "5m",
+          "value": "5m"
         },
         "hide": 0,
         "includeAll": false,
@@ -56,17 +58,9 @@ dashboard.new(
         "options":
         [
           {
-            "selected": false,
-            "text": '%s' % r,
-            "value": '%s'% r,
-          },
-          for r in ['24h', '12h']
-        ] +
-        [
-          {
             "selected": true,
-            "text": '3h',
-            "value": '3h',
+            "text": '5m',
+            "value": '5m',
           }
         ] +
         [
@@ -75,7 +69,7 @@ dashboard.new(
             "text": '%s' % r,
             "value": '%s'% r,
           },
-          for r in ['1h', '30m', '15m', '10m', '5m']
+          for r in ['10m', '15m', '30m', '1h', '3h', '12h', '24h']
         ],
         "query": "3h,1h,30m,15m,10m,5m",
         "skipUrlSync": false,
@@ -84,7 +78,7 @@ dashboard.new(
 )
 .addPanel(
     (graphPanel.new(
-        'Latency Distribution for HTTP Requests',
+        'Latency Distribution for HTTP Requests for path ${path} and status ${status} with user agent ${user_agent}',
         description='histogram_quantile(%s, sum(rate(boskos_http_request_duration_seconds_bucket[${range}])) by (le))',
         datasource='prometheus',
         legend_alignAsTable=true,
@@ -95,9 +89,9 @@ dashboard.new(
         legend_sort='avg',
         legend_sortDesc=true,
     ) + legendConfig)
-    .addTarget(histogramQuantileDuration('0.99'))
-    .addTarget(histogramQuantileDuration('0.95'))
-    .addTarget(histogramQuantileDuration('0.5')), gridPos={
+    .addTarget(histogramQuantileDuration('0.99','{path=~"${path}", status=~"${status}", user_agent=~"${user_agent}"}'))
+    .addTarget(histogramQuantileDuration('0.95','{path=~"${path}", status=~"${status}", user_agent=~"${user_agent}"}'))
+    .addTarget(histogramQuantileDuration('0.5','{path=~"${path}", status=~"${status}", user_agent=~"${user_agent}"}')), gridPos={
     h: 9,
     w: 24,
     x: 0,
@@ -105,49 +99,7 @@ dashboard.new(
   })
 .addPanel(
     (graphPanel.new(
-        'Latency Distribution for HTTP Requests For ${path}',
-        description='histogram_quantile(%s, sum(rate(boskos_http_request_duration_seconds_bucket[${range}])) by (le))',
-        datasource='prometheus',
-        legend_alignAsTable=true,
-        legend_rightSide=true,
-        legend_values=true,
-        legend_current=true,
-        legend_avg=true,
-        legend_sort='avg',
-        legend_sortDesc=true,
-    ) + legendConfig)
-    .addTarget(histogramQuantileDuration('0.99','{path="${path}"}'))
-    .addTarget(histogramQuantileDuration('0.95','{path="${path}"}'))
-    .addTarget(histogramQuantileDuration('0.5','{path="${path}"}')), gridPos={
-    h: 9,
-    w: 24,
-    x: 0,
-    y: 18,
-  })
-.addPanel(
-    (graphPanel.new(
-        'Size Distribution for HTTP Requests',
-        description='histogram_quantile(%s, sum(rate(boskos_http_response_size_bytes_bucket[${range}])) by (le))',
-        datasource='prometheus',
-        legend_alignAsTable=true,
-        legend_rightSide=true,
-        legend_values=true,
-        legend_current=true,
-        legend_avg=true,
-        legend_sort='avg',
-        legend_sortDesc=true,
-    ) + legendConfig)
-    .addTarget(histogramQuantileSize('0.99'))
-    .addTarget(histogramQuantileSize('0.95'))
-    .addTarget(histogramQuantileSize('0.5')), gridPos={
-    h: 9,
-    w: 24,
-    x: 0,
-    y: 18,
-  })
-.addPanel(
-    (graphPanel.new(
-        'Boskos Requests Over Time',
+        'Request rate over ${range}',
         description='sum(increase(boskos_http_request_duration_seconds_count[${range}]))',
         datasource='prometheus',
         legend_alignAsTable=true,
@@ -156,8 +108,8 @@ dashboard.new(
         legend_current=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(increase(boskos_http_request_duration_seconds_count[${range}]))',
-        legendFormat="Number of Requests"
+       'sum(rate(boskos_http_request_duration_seconds_count{path=~"${path}", status=~"${status}", user_agent=~"${user_agent}"}[${range}])) by (path, status) >0',
+       legendFormat='{{path}} {{status}}'
     )), gridPos={
     h: 9,
     w: 24,
