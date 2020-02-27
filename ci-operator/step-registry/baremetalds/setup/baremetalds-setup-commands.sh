@@ -12,8 +12,8 @@ echo "------------ /${SHARED_DIR}"
 ls -ll ${SHARED_DIR}
 
 echo ""
-echo "------------ /tmp/secret"
-ls -ll /tmp/secret
+echo "------------ /var/run/secrets/ci.openshift.io/cluster-profile"
+ls -ll /var/run/secrets/ci.openshift.io/cluster-profile
 
 
 
