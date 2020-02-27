@@ -13,7 +13,7 @@ ls -ll ${SHARED_DIR}
 
 echo ""
 echo "------------ /var/run/secrets/ci.openshift.io/cluster-profile"
-ls -ll /var/run/secrets/ci.openshift.io/cluster-profile
+ls -la /var/run/secrets/ci.openshift.io/cluster-profile
 
 
 
