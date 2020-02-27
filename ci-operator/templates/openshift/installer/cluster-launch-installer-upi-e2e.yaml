@@ -11,7 +11,7 @@ parameters:
 - name: IMAGE_FORMAT
 - name: IMAGE_TESTS
   required: true
-- name: IMAGE_UPI_INSTALLER
+- name: IMAGE_OPENSTACK_INSTALLER
   required: true
 - name: CLUSTER_TYPE
   required: true
@@ -26,6 +26,11 @@ parameters:
 - name: PROXY_IMAGE
   value: registry.svc.ci.openshift.org/origin/4.2:egress-http-proxy
 - name: USE_LEASE_CLIENT
+
+
+env:
+- name: DO_NOT_CREATE_DNS_RECORD
+  value: true
 
 objects:
 
@@ -189,6 +194,10 @@ objects:
         value: ${IMAGE_FORMAT}
       - name: KUBECONFIG
         value: /tmp/artifacts/installer/auth/kubeconfig
+      - name: OS_CLOUD
+        value: 'openstack-cloud'
+      - name: OS_CLIENT_CONFIG_FILE
+        value: '/tmp/cluster-profile/clouds.yaml'
       command:
       - /bin/bash
       - -c
@@ -262,8 +271,21 @@ objects:
         elif [[ "${CLUSTER_TYPE}" == "azure4" ]]; then
           export TEST_PROVIDER='azure'
         elif [[ "${CLUSTER_TYPE}" == "openstack" ]]; then
+          set +x #make extra sure we aren't echo'ing these to stdout
+
           mkdir -p ~/.ssh
           cp /tmp/cluster/ssh-privatekey ~/.ssh/kube_openstack_rsa || true
+          export TEST_PROVIDER='{"type":"openstack"}'
+
+          XTRACE_ENABLED=0
+          if set -o | grep xtrace.*on &>/dev/null; then
+            XTRACE_ENABLED=1
+          fi
+
+          if [[ "$XTRACE_ENABLED" == 1 ]]; then
+            set -x
+          fi
+
         fi
 
         if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
@@ -288,7 +310,7 @@ objects:
 
     # Runs an install
     - name: setup
-      image: ${IMAGE_UPI_INSTALLER}
+      image: ${IMAGE_OPENSTACK_INSTALLER}
       terminationMessagePolicy: FallbackToLogsOnError
       volumeMounts:
       - name: shared-tmp
@@ -330,12 +352,29 @@ objects:
         value: ${RELEASE_IMAGE_LATEST}
       - name: OPENSHIFT_INSTALL_INVOKER
         value: openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID}
+      - name: OPENSTACK_IMAGE
+        value: rhcos
+      - name: OPENSTACK_REGION
+        value: moc-kzn
+      - name: OPENSTACK_FLAVOR
+        value: m1.s2.xlarge
+      - name: OPENSTACK_EXTERNAL_NETWORK
+        value: external
+      - name: OS_CLOUD
+        value: openstack-cloud
+      - name: OS_CLIENT_CONFIG_FILE
+        value: /etc/openshift-installer/clouds.yaml
       - name: USER
         value: test
       - name: HOME
         value: /tmp
       - name: INSTALL_INITIAL_RELEASE
       - name: RELEASE_IMAGE_INITIAL
+      - name: UPI_DIR
+        value: /go/src/github.com/openshift/installer/upi/${CLUSTER_TYPE}
+      - nmae: INSTALL_IMAGE
+        value: ${IMAGE_OPENSTACK_INSTALLER}
+
       command:
       - /bin/sh
       - -c
@@ -1206,56 +1245,237 @@ objects:
             esac
             echo "Azure region: ${AZURE_REGION}"
 
-            export BASE_DOMAIN_RESOURCE_GROUP="os4-common"	
+            export BASE_DOMAIN_RESOURCE_GROUP="os4-common"
             base_domain="${BASE_DOMAIN:-ci.azure.devcluster.openshift.com}"
-            echo "Base domain: ${base_domain}"	
+            echo "Base domain: ${base_domain}"
 
-            cat > /tmp/artifacts/installer/install-config.yaml << EOF	
-        apiVersion: v1	
-        baseDomain: ${base_domain}	
-        metadata:	
-          name: ${CLUSTER_NAME}	
-        controlPlane:	
-          name: master	
-          replicas: 3	
-        compute:	
-        - name: worker	
-          replicas: 0	
-        platform:	
-          azure:	
-            baseDomainResourceGroupName: ${BASE_DOMAIN_RESOURCE_GROUP}	
+            cat > /tmp/artifacts/installer/install-config.yaml << EOF
+        apiVersion: v1
+        baseDomain: ${base_domain}
+        metadata:
+          name: ${CLUSTER_NAME}
+        controlPlane:
+          name: master
+          replicas: 3
+        compute:
+        - name: worker
+          replicas: 0
+        platform:
+          azure:
+            baseDomainResourceGroupName: ${BASE_DOMAIN_RESOURCE_GROUP}
             region: ${AZURE_REGION}
-        pullSecret: >	
-          ${PULL_SECRET}	
-        sshKey: |	
-          ${SSH_PUB_KEY}	
+        pullSecret: >
+          ${PULL_SECRET}
+        sshKey: |
+          ${SSH_PUB_KEY}
         EOF
             export PATH=${HOME}/.local/bin:${PATH}
 
             echo "Creating manifests"
             openshift-install --dir=/tmp/artifacts/installer create manifests
-            
+
             pushd /tmp/artifacts/installer
 
             echo "Editing manifests"
-            rm -f openshift/99_openshift-cluster-api_master-machines-*.yaml	
-            rm -f openshift/99_openshift-cluster-api_worker-machineset-*.yaml	
+            rm -f openshift/99_openshift-cluster-api_master-machines-*.yaml
+            rm -f openshift/99_openshift-cluster-api_worker-machineset-*.yaml
             sed -i "s;mastersSchedulable: true;mastersSchedulable: false;g" manifests/cluster-scheduler-02-config.yml
-            sed -i "/publicZone/,+1d" manifests/cluster-dns-02-config.yml 
-            sed -i "/privateZone/,+1d" manifests/cluster-dns-02-config.yml 
+            sed -i "/publicZone/,+1d" manifests/cluster-dns-02-config.yml
+            sed -i "/privateZone/,+1d" manifests/cluster-dns-02-config.yml
 
             popd
+        elif [[ "${CLUSTER_TYPE}" == "openstack" ]]; then
+            #### PREP work for openstack platform
+            # We have to truncate cluster name to 14 chars, because there is a limitation in the install-config
+            # Now it looks like "ci-op-rl6z646h-65230".
+            # We will remove "ci-op-" prefix from there to keep just last 14 characters.
+            export CLUSTER_NAME=${CLUSTER_NAME:${#CLUSTER_NAME}<14?0:-14}
+
+            # if not using openstack-installer image we need to install openstack client and other requirements
+            #echo "OpenStack: installing requirements"
+            #cat ${UPI_DIR}/requirements.txt
+            #export PATH="${HOME}/.local/bin:${PATH}"
+            #echo $PATH
+            #echo "OpenStack: installing pip"
+            #easy_install --user pip  # our Python 2.7.5 is even too old for ensurepip
+            #echo "Openstack: upgrading pip and setup tools"
+            #pip install --user --upgrade pip setuptools
+            #pip install --user -r ${UPI_DIR}/requirements.txt
+            #which ansible-playbook
+            echo "OPENSTACK platform is using: ${IMAGE_OPENSTACK_INSTALLER}
+
+            # create api FIP
+            LB_FIP_AND_ID=$(openstack floating ip create --description api.$CLUSTER_NAME.$BASE_DOMAIN $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address' -c 'id')
+            LB_FIP=$(echo $LB_FIP_AND_ID |awk '{print $1}')
+            LB_FIP_UID=$(echo $LB_FIP_AND_ID |awk '{print $2}')
+            echo $LB_FIP_UID > /tmp/LB_FIP_UID
+
+            # create ingress FIP
+            INGRESS_FIP_AND_ID=$(openstack floating ip create --description ingress.$CLUSTER_NAME.$BASE_DOMAIN $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address' -c 'id')
+            INGRESS_FIP=$(echo $INGRESS_FIP_AND_ID |awk '{print $1}')
+            INGRESS_FIP_UID=$(echo $INGRESS_FIP_AND_ID |awk '{print $2}')
+            echo $INGRESS_FIP_UID > /tmp/INGRESS_FIP_UID
+
+
+            # Create DNS records
+            if [ -z "$DO_NOT_CREATE_DNS_RECORD" ]; then
+              echo "Creating DNS record for api.$CLUSTER_NAME.$BASE_DOMAIN. -> $LB_FIP (${LB_FIP_UID})"
+              cat > /tmp/artifacts/installer/api-record.json <<EOF
+            {
+            "Comment": "Create the public OpenShift API record",
+            "Changes": [{
+                    "Action": "UPSERT",
+                    "ResourceRecordSet": {
+                      "Name": "api.$CLUSTER_NAME.$BASE_DOMAIN.",
+                      "Type": "A",
+                      "TTL": 300,
+                      "ResourceRecords": [{"Value": "$LB_FIP"}]
+                    }
+            }]}
+            EOF
+              export HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "shiftstack.devcluster.openshift.com" | python -c 'import json,sys;print json.load(sys.stdin)["HostedZones"][0]["Id"].split("/")[-1]')
+              aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file:///tmp/artifacts/installer/api-record.json
+            else
+              echo "DNS record for api.$CLUSTER_NAME.$BASE_DOMAIN. -> $LB_FIP was NOT created!"
+            fi
+
+            #### CREATE install-config.yaml for openstack platform
+            echo "Creating install-config.yaml"
+            # Create install-config.yaml.bkk to use as install-config.yaml because
+            # some of the next steps will delete the install-config.yaml thus we create a permanent one.
+            base_domain="${BASE_DOMAIN:-origin-ci-int-gce.dev.openshift.com}"
+            cat > /tmp/artifacts/installer/install-config.yaml.bkk << EOF
+            apiVersion: v1
+            baseDomain: ${base_domain}
+            compute:
+            - hyperthreading: Enabled
+              name: worker
+              platform: {}
+              replicas: 0
+            controlPlane:
+              hyperthreading: Enabled
+              name: master
+              platform: {}
+              replicas: 3
+            metadata:
+              creationTimestamp: null
+              name: ${CLUSTER_NAME}
+            networking:
+              clusterNetwork:
+              - cidr: 10.128.0.0/14
+                hostPrefix: 23
+              machineCIDR: ${MACHINE_CIDR}
+              networkType: ${NETWORK_TYPE}
+              serviceNetwork:
+              - 172.30.0.0/16
+            platform:
+              openstack:
+                cloud: ${OS_CLOUD}
+                computeFlavor: ${OPENSTACK_FLAVOR}
+                externalNetwork: ${OPENSTACK_EXTERNAL_NETWORK}
+                lbFloatingIP: ${LB_FIP}
+
+            pullSecret: >
+              ${PULL_SECRET}
+            sshKey: |
+              ${SSH_PUB_KEY}
+            EOF
+
+            #### CREATE manifest files for openstack platform
+            # Create and edit manifest files
+            echo "Creating manifest files"
+            cp /tmp/artifacts/installer/install-config.yaml.bkk /tmp/artifacts/installer/install-config.yaml
+            openshift-install --dir=/tmp/artifacts/installer create manifests
+
+            #Remove Machines from manifests
+            rm -f /tmp/artifacts/installer/openshift/99_openshift-cluster-api_master-machines-*.yaml
+
+            #Remove MachineSets
+            rm -f /tmp/artifacts/installer/openshift/99_openshift-cluster-api_worker-machineset-*.yaml
+
+            # Make control-plane nodes unschedulable
+            sed -i "s;mastersSchedulable: true;mastersSchedulable: false;g" /tmp/artifacts/installer/manifests/cluster-scheduler-02-config.yml
+
+
         else
             echo "Unsupported cluster type '${CLUSTER_TYPE}'"
             exit 1
         fi
 
+
         echo "Creating ignition configs"
         openshift-install --dir=/tmp/artifacts/installer create ignition-configs &
         wait "$!"
 
-        cp /tmp/artifacts/installer/bootstrap.ign /srv
-        BOOTSTRAP_URI="https://${JOB_NAME_SAFE}-bootstrap-exporter-${NAMESPACE}.svc.ci.openshift.org/bootstrap.ign"
+        if [[ "${CLUSTER_TYPE}" == "openstack" ]]; then
+            #### CREATE ignition files for openstack plaform
+            echo "Creating ignition-configs"
+            cp /tmp/artifacts/installer/install-config.yaml.bkk /tmp/artifacts/installer/install-config.yaml
+            openshift-install --dir=/tmp/artifacts/installer create ignition-configs &
+            wait "$!"
+
+            export INFRA_ID=$(sed -n 's|.*"infraID":"\([^"]*\)".*|\1|p' /tmp/artifacts/installer/metadata.json )
+
+            #### UPLOAD bootstrap ignition file to glance for openstack platform
+            # Create glance ignition image
+            openstack image create --disk-format raw --container-format bare --file /tmp/artifacts/installer/bootstrap.ign ${INFRA_ID}-bootstrap-ignition
+            IMAGE_LOCATION=$(openstack image show ${INFRA_ID}-bootstrap-ignition | grep -oh "\/.*file")
+            GLANCE_ADDRESS=$(openstack catalog show glance -c endpoints -f shell | grep "public" | cut -d ":" -f2-)
+            export OPENSTACK_TOKEN=$(openstack token issue | grep "id" | cut -d "|" -f3 | cut -d$'\n' -f 1)
+            export GLANCE_IMAGE_URL="$GLANCE_ADDRESS$IMAGE_LOCATION"
+
+            # CREATE shim ignition file
+            DATA=$(echo "$INFRA_ID-bootstrap" | base64)
+            export HOSTNAME_CONFIG_DATA_URL="data:text/plain;base64,$DATA"
+
+            # Create Bootstrap Ignition Shim
+            cat > "/tmp/artifacts/installer/$INFRA_ID-bootstrap-ignition.json" << EOF
+        {
+            "ignition": {
+                "config": {
+                    "append": {
+                        "source": "$GLANCE_IMAGE_URL",
+                        "httpHeaders": {
+                            "name": "X-Auth-Token",
+                            "value": "$OPENSTACK_TOKEN"
+                        }
+                    }
+                }
+            },
+            "storage": {
+                "files": {
+                    "file":{
+                        "node":{
+                            "fileSystem":"root",
+                            "path":"/etc/hostname"
+                        },
+                        "fileEmbedded1": {
+                            "mode": 420,
+                            "contents": {
+                                "source": "$HOSTNAME_CONFIG_DATA_URL"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        EOF
+            #### Create Master ignition files
+            # Update Master Ignition hostname
+            for index in $(seq 0 2); do
+                MASTER_HOSTNAME="$INFRA_ID-master-$index\n"
+                python -c "import base64, json, sys;
+            ignition = json.load(sys.stdin);
+            files = ignition['storage'].get('files', []);
+            files.append({'path': '/etc/hostname', 'mode': 420, 'contents': {'source': 'data:text/plain;charset=utf-8;base64,' + base64.standard_b64encode(b'$MASTER_HOSTNAME').decode().strip(), 'verification': {}}, 'filesystem': 'root'});
+            ignition['storage']['files'] = files;
+            json.dump(ignition, sys.stdout)" <master.ign >"$INFRA_ID-master-$index-ignition.json"
+            done
+
+        else
+            cp /tmp/artifacts/installer/bootstrap.ign /srv
+            BOOTSTRAP_URI="https://${JOB_NAME_SAFE}-bootstrap-exporter-${NAMESPACE}.svc.ci.openshift.org/bootstrap.ign"
+        fi
 
         # begin bootstrapping
         if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
@@ -1522,6 +1742,38 @@ objects:
           done
 
           echo "bootstrap: ${BOOTSTRAP_IP} control-plane: ${CONTROL_PLANE_0_IP} ${CONTROL_PLANE_1_IP} ${CONTROL_PLANE_2_IP} compute: ${COMPUTE_0_IP} ${COMPUTE_1_IP}"
+        elif [[ "${CLUSTER_TYPE}" == "openstack" ]]; then
+          #### Begin bootstraping for openstack platform
+          echo "OpenStack UPI directory: '$UPI_DIR'"
+
+          #prepair inventory.yaml
+          cp ${UPI_DIR}/inventory.yaml ${UPI_DIR}/inventory.yaml.bkk
+          sed -i "s/os_flavor_master.*/os_flavor_master: \'${OPENSTACK_FLAVOR}\'/g" ${UPI_DIR}/inventory.yaml
+          sed -i "s/os_flavor_worker.*/os_flavor_worker: \'${OPENSTACK_FLAVOR}\'/g" ${UPI_DIR}/inventory.yaml
+          sed -i "s/os_image_rhcos.*/os_image_rhcos: \'${OPENSTACK_IMAGE}\'/g" ${UPI_DIR}/inventory.yaml
+          sed -i "s/os_external_network.*/os_external_network: \'${OPENSTACK_EXTERNAL_NETWORK}\'/g" ${UPI_DIR}/inventory.yaml
+          sed -i "s/os_api_fip.*/os_api_fip: \'${LB_FIP}\'/g" ${UPI_DIR}/inventory.yaml
+          sed -i "s/os_ingress_fip.*/os_ingress_fip: \'${INGRESS_FIP}\'/g" ${UPI_DIR}/inventory.yaml
+          sed -i "s/os_region_name.*/os_region_name: \'${OPENSTACK_REGION}\'/g" ${UPI_DIR}/inventory.yaml
+
+          # The metadata.json and ignition files  need to be in the same directory as playbooks
+          cp /tmp/artifacts/installer/*.json ${UPI_DIR}/
+
+          # We first do a dry run with --list-tasks to catch any configuration errors right up front
+          # before we start the full run.
+          ansible-playbook -vvv -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/01_security-groups.yaml" --list-tasks
+          ansible-playbook -vvv -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/02_network.yaml" --list-tasks
+          ansible-playbook -vvv -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/03_bootstrap.yaml" --list-tasks
+          ansible-playbook -vvv -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/04_control-plane.yaml" --list-tasks
+          ansible-playbook -vvv -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/05_compute-nodes.yaml" --list-tasks
+
+          # Now we do the real run
+          ansible-playbook -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/01_security-groups.yaml"
+          ansible-playbook -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/02_network.yaml"
+          ansible-playbook -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/03_bootstrap.yaml"
+          ansible-playbook -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/04_control-plane.yaml"
+          ansible-playbook -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/05_compute-nodes.yaml"
+
         elif [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
           mkdir -p ${HOME}/gcp
 
@@ -1876,9 +2128,9 @@ objects:
           fi
 
           echo "Uploading bootstrap.ign"
-          az storage container create --name files --account-name $ACCOUNT_NAME --public-access blob          
+          az storage container create --name files --account-name $ACCOUNT_NAME --public-access blob
           az storage blob upload --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY -c "files" -f "/tmp/artifacts/installer/bootstrap.ign" -n "bootstrap.ign"
-          
+
           echo "Creating private DNS zone"
           az network private-dns zone create -g $RESOURCE_GROUP -n ${CLUSTER_NAME}.${base_domain}
 
@@ -1893,7 +2145,7 @@ objects:
           az group deployment create -g $RESOURCE_GROUP \
             --template-file "01_vnet.json" \
             --parameters baseName="$INFRA_ID"
-        
+
           echo "Linking VNet to private DNS zone"
           az network private-dns link vnet create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${base_domain} -n ${INFRA_ID}-network-link -v "${INFRA_ID}-vnet" -e false
 
@@ -1903,7 +2155,7 @@ objects:
             --template-file "02_storage.json" \
             --parameters vhdBlobURL="${VHD_BLOB_URL}" \
             --parameters baseName="$INFRA_ID"
-          
+
           echo "Deploying 03_infra"
           az group deployment create -g $RESOURCE_GROUP \
             --template-file "03_infra.json" \
@@ -1925,7 +2177,7 @@ objects:
 
           BOOTSTRAP_PUBLIC_IP=$(az network public-ip list -g $RESOURCE_GROUP --query "[?name=='${INFRA_ID}-bootstrap-ssh-pip'] | [0].ipAddress" -o tsv)
           GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --bootstrap ${BOOTSTRAP_PUBLIC_IP}"
-          
+
           echo "Deploying 05_masters"
           MASTER_IGNITION=$(cat /tmp/artifacts/installer/master.ign | base64)
           az group deployment create -g $RESOURCE_GROUP \
@@ -1934,7 +2186,7 @@ objects:
             --parameters sshKeyData="$SSH_PUB_KEY" \
             --parameters privateDNSZoneName="${CLUSTER_NAME}.${base_domain}" \
             --parameters baseName="$INFRA_ID"
-                    
+
           MASTER0_IP=$(az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${INFRA_ID}-master-0-nic --name pipConfig --query "privateIpAddress" -o tsv)
           MASTER1_IP=$(az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${INFRA_ID}-master-1-nic --name pipConfig --query "privateIpAddress" -o tsv)
           MASTER2_IP=$(az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${INFRA_ID}-master-2-nic --name pipConfig --query "privateIpAddress" -o tsv)
@@ -1968,6 +2220,9 @@ objects:
           gsutil rm gs://${INFRA_ID}-bootstrap-ignition/bootstrap.ign
           gsutil rb gs://${INFRA_ID}-bootstrap-ignition
           gcloud deployment-manager deployments delete -q ${CLUSTER_NAME}-bootstrap
+        elif [[ "${CLUSTER_TYPE}" == "openstack" ]]; then
+          #### Destroy bootstrap resources for openstack platform
+          ansible-playbook -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/down-03_bootstrap.yaml"
         elif [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
           terraform apply -auto-approve -var 'bootstrap_complete=true' -no-color &
           wait "$!"
@@ -1984,7 +2239,7 @@ objects:
 
         if [[ "${CLUSTER_TYPE}" == "azure4" ]]; then
           echo "Adding ingress DNS records"
-          
+
           export KUBECONFIG=/tmp/artifacts/installer/auth/kubeconfig
 
           public_ip_router="<pending>"
@@ -1993,9 +2248,9 @@ objects:
             public_ip_router=$(oc -n openshift-ingress get service router-default --no-headers | awk '{print $4}')
             echo $public_ip_router
           done
-          
+
           az network dns record-set a add-record -g $BASE_DOMAIN_RESOURCE_GROUP -z ${base_domain} -n *.apps.${CLUSTER_NAME} -a $public_ip_router --ttl 300
-          
+
           az network private-dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${base_domain} -n *.apps --ttl 300
           az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${base_domain} -n *.apps -a $public_ip_router
         fi
@@ -2036,7 +2291,7 @@ objects:
 
     # Performs cleanup of all created resources
     - name: teardown
-      image: ${IMAGE_UPI_INSTALLER}
+      image: ${IMAGE_OPENSTACK_INSTALLER}
       terminationMessagePolicy: FallbackToLogsOnError
       volumeMounts:
       - name: shared-tmp
@@ -2068,6 +2323,13 @@ objects:
         value: /tmp
       - name: LC_ALL
         value: en_US.UTF-8
+      - name: OS_CLOUD
+        value: 'openstack-cloud'
+      - name: OS_CLIENT_CONFIG_FILE
+        value: '/tmp/cluster-profile/clouds.yaml'
+      - name: INSTALLER_SOURCE_PATH
+      - name: UPI_DIR
+        value: /go/src/github.com/openshift/installer/upi/${CLUSTER_TYPE}
       command:
       - /bin/bash
       - -c
@@ -2098,6 +2360,44 @@ objects:
 
           echo "Gathering artifacts ..."
           mkdir -p /tmp/artifacts/pods /tmp/artifacts/nodes /tmp/artifacts/metrics /tmp/artifacts/bootstrap /tmp/artifacts/network
+
+          if [[ "${CLUSTER_TYPE}" == "openstack" ]]; then
+
+            # if not using openstack-installer we need to install openstack client and other requirements
+            #echo "OpenStack: installing requirements"
+            #cat ${UPI_DIR}/requirements.txt
+            #export PATH="${HOME}/.local/bin:${PATH}"
+            #echo $PATH
+            #echo "OpenStack: installing pip"
+            #easy_install --user pip  # our Python 2.7.5 is even too old for ensurepip
+            #echo "Openstack: upgrading pip and setup tools"
+            #pip install --user --upgrade pip setuptools
+            #pip install --user -r ${UPI_DIR}/requirements.txt
+            #which ansible-playbook
+
+            # We have to truncate cluster name to 14 chars, because there is a limitation in the install-config
+            # Now it looks like "ci-op-rl6z646h-65230".
+            # We will remove "ci-op-" prefix from there to keep just last 14 characters.
+            export CLUSTER_NAME=${CLUSTER_NAME:${#CLUSTER_NAME}<14?0:-14}
+            echo "Gathering openstack server details"
+            for server in $(openstack server list -c Name -f value | grep $CLUSTER_NAME | sort); do
+                echo -e "\n$ openstack server show $server" >>/tmp/artifacts/openstack_nodes.log
+                openstack server show $server >>/tmp/artifacts/openstack_nodes.log
+            done
+            # Get bootstrap nova logs
+            # NOTE(shadower): The server names are in the form
+            # `$CLUSTER_NAME-fmszv-bootstrap`. I could not find how to
+            # get the middle part (`fmszv`) (it's not in the shell
+            # environment here) so we'll list all the servers and look
+            # the bootstrap name up that way.
+            # (adduarte) I think the fmszv is the ${JOB_NAME_SAFE} from the pod
+            echo "Gathering openstack server logs"
+            echo "CLUSTER_NAME: ${CLUSTER_NAME}"
+            local BOOTSTRAP_NAME=$(openstack server list --format value --column Name | grep "${CLUSTER_NAME}-.*-bootstrap")
+            if [ -n "$BOOTSTRAP_NAME" ]; then
+                openstack console log show "$BOOTSTRAP_NAME" &>/tmp/artifacts/bootstrap/nova.log
+            fi
+          fi
 
           if [ -f /tmp/artifacts/installer/.openshift_install_state.json ]
           then
@@ -2246,6 +2546,40 @@ objects:
               INFRA_ID="$(jq -r .infraID /tmp/artifacts/installer/metadata.json)"
               az group delete --name ${INFRA_ID}-rg --yes
             fi
+          elif [[ "${CLUSTER_TYPE}" == "openstack" ]]; then
+            echo "Deprovisioning openstack cluster ..."
+            if [ -z "$DO_NOT_CREATE_DNS_RECORD" ]; then
+              echo "Removing entries from DNS ..."
+              export HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "shiftstack.devcluster.openshift.com" | python -c 'import json,sys;print json.load(sys.stdin)["HostedZones"][0]["Id"].split("/")[-1]')
+              sed -e's/UPSERT/DELETE/g' /tmp/artifacts/installer/api-record.json > /tmp/artifacts/installer/delete-api-record.json
+              aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file:///tmp/artifacts/installer/delete-api-record.json
+              sed -e's/UPSERT/DELETE/g' /tmp/artifacts/installer/ingress-record.json > /tmp/artifacts/installer/delete-ingress-record.json
+              aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file:///tmp/artifacts/installer/delete-ingress-record.json
+            else
+              echo "There are no DNS entries to remove"
+            fi
+
+            LB_FIP_UID=`cat /tmp/shared/LB_FIP_UID`
+            echo "Deleting api FIP ... for ${CLUSTER_NAME} with UID: ${LB_FIP_UID}"
+            openstack floating ip delete $LB_FIP_UID
+
+            INGRESS_FIP_UID=`cat /tmp/shared/INGRESS_FIP_UID`
+            echo "Deleting ingress FIP using UID: ${INGRESS_FIP_UID}"
+            openstack floating ip delete $INGRESS_FIP_UID
+
+            openshift-install --dir /tmp/artifacts/installer destroy cluster
+
+            #run teardown playbooks for upi
+            function verify_openstack_resources_where_destroyed() {
+                echo "TODO: verify_openstack_resoruces_where_destroyed has not been implemented."
+            }
+            ansible-playbook -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/down-06_load-balancers.yaml"
+            ansible-playbook -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/down-05_compute-nodes.yaml"
+            ansible-playbook -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/down-04_control-plane.yaml"
+            ansible-playbook -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/down-02_network.yaml"
+            ansible-playbook -i "${UPI_DIR}/inventory.yaml" "${UPI_DIR}/down-01_security-groups.yaml"
+            verify_openstack_resources_where_destroyed
+            echo "Openstack teardown playbooks completed succesfully"
           else
             cd /tmp/shared/tf
             rm -rf .terraform
