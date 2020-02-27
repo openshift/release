@@ -4,13 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+echo "************ setup command ************"
 env
 
-dir=/tmp/shared
+echo "------------ /tmp"
+ls -ll /tmp
 
-echo "Copying nss artifacts from ${dir}"
-ls -ll ${dir}
-
+echo "------------ /tmp/cluster"
+ls -ll /tmp/cluster
 
 
 
