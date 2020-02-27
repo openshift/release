@@ -4,6 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+echo "************ nss wrapper hack command "************
 env
 
 dir=/tmp/shared
