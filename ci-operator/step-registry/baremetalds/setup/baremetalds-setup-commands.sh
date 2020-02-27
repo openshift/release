@@ -19,6 +19,14 @@ echo ""
 echo "------------ ${SHARED_DIR}"
 ls -ll ${SHARED_DIR}
 
+echo ""
+echo "------------ /usr/local"
+ls -ll /usr/local
+
+echo ""
+echo "------------ /usr/local/e2e-baremetalds-cluster-profile"
+ls -ll /usr/local/e2e-baremetalds-cluster-profile
+
 
 
 
