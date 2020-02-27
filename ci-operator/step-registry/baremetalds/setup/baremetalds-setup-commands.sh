@@ -8,8 +8,8 @@ env
 
 dir=/tmp/shared
 
-echo "Copying nss artifacts from ${DIR}"
-ls ${DIR}
+echo "Copying nss artifacts from ${dir}"
+ls -ll ${dir}
 
 
 

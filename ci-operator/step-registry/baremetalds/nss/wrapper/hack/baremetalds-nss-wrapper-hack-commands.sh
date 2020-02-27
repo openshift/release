@@ -9,8 +9,8 @@ env
 dir=/tmp/shared
 mkdir "${dir}/"
 
-echo "Copying nss artifacts to ${DIR}"
-cp /bin/mock-nss.sh /usr/lib64/libnss_wrapper.so ${DIR}
+echo "Copying nss artifacts to ${dir}"
+cp /bin/mock-nss.sh /usr/lib64/libnss_wrapper.so ${dir}
 
 
 
