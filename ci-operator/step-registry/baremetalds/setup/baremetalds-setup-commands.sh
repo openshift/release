@@ -58,7 +58,11 @@ rc=1
 for r in {1..5}; do terraform apply -auto-approve && rc=0 && break ; done
 if test "${rc}" -eq 1; then echo "failed to create the infra resources"; sleep 1; fi
 
+# Sharing terraform artifacts required by teardown
+cp -R ${terraform_home} ${secret_dir}
+
 # Sharing artifacts required by teardown
+touch ${secret_dir}/packet-server-ip
 jq -r '.modules[0].resources["packet_device.server"].primary.attributes.access_public_ipv4' terraform.tfstate > ${secret_dir}/packet-server-ip
 
 export HOME=${secret_dir}/nss_wrapper
@@ -70,9 +74,6 @@ bash ${SHARED_DIR}/mock-nss.sh
 
 export IP=$(cat ${secret_dir}/packet-server-ip)
 echo "Packet server IP is ${IP}"
-
-# Sharing terraform artifacts required by teardown
-cp -R ${terraform_home} ${secret_dir}
 
 #########
 
