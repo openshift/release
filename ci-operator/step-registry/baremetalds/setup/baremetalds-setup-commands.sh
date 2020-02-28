@@ -7,6 +7,9 @@ set -o pipefail
 echo "************ setup command ************"
 env
 
+echo "
+echo "CLUSTER_TYPE=${CLUSTER_TYPE}""
+
 echo ""
 echo "------------ /${SHARED_DIR}"
 ls -ll ${SHARED_DIR}
