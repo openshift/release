@@ -4,7 +4,16 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "Baremetal DS test commands executed"
+echo "************ baremetalds test command ************"
+env | sort
+
+# Initial check
+if [ "${CLUSTER_TYPE}" != "packet" ] ; then
+    echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"
+    exit 0
+fi
+
+echo "Executing baremetal ds conformance tests"
 
 #test_suite=openshift/conformance/parallel
 #if [[ -e "${SHARED_DIR}/test-suite.txt" ]]; then
