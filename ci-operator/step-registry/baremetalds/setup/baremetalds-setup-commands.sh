@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 
 cluster_profile=/var/run/secrets/ci.openshift.io/cluster-profile
-secret_dir=/tmp/secret
+### secret_dir=/tmp/secret
 
 export SSH_PRIV_KEY_PATH=${cluster_profile}/ssh-privatekey
 export PULL_SECRET_PATH=${cluster_profile}/pull-secret
