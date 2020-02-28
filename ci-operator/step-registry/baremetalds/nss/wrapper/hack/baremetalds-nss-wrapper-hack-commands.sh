@@ -22,8 +22,6 @@ fi
 echo "Copying nss artifacts to ${dir}"
 cp /bin/mock-nss.sh /usr/lib64/libnss_wrapper.so ${dir}
 
-echo "Testing artifacts dir"
-cp /bin/mock-nss.sh /usr/lib64/libnss_wrapper.so ${ARTIFACT_DIR}
 
 
 
