@@ -23,8 +23,6 @@ fi
 echo "Copying nss artifacts to ${dir}"
 cp /bin/mock-nss.sh /usr/lib64/libnss_wrapper.so ${dir}
 
-echo "shared dir test"
-touch ${SHARED_DIR}/foo.txt
 
 
 
