@@ -27,6 +27,10 @@ if [ "${CLUSTER_TYPE}" != "packet" ] ; then
     exit 1
 fi
 
+echo "-----------------------""
+ls -ll ${SHARED_DIR}
+echo "-----------------------""
+
 echo "Installing from release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 
 # Terraform setup and init for packet server
