@@ -6,7 +6,10 @@ set -o pipefail
 
 cluster_profile=/var/run/secrets/ci.openshift.io/cluster-profile
 export SSH_PRIV_KEY_PATH=${cluster_profile}/ssh-privatekey
+
+set +x
 export SSHOPTS="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90 -i ${SSH_PRIV_KEY_PATH}"
+set -x
 
 echo "************ baremetalds teardown command ************"
 env | sort
@@ -14,11 +17,17 @@ env | sort
 # Initial check
 if [ "${CLUSTER_TYPE}" != "packet" ] ; then
     echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"
-    exit 0
+    exit 1
 fi
 
 # Terraform setup and teardown for packet server
 terraform_home=${ARTIFACT_DIR}/terraform
+
+if [ ! -d ${terraform_home} ]; then
+    echo >&2 "Cannot teardown packet server, terraform config files are missing"
+    exit 1
+fi
+
 cp -R ${SHARED_DIR}/terraform ${ARTIFACT_DIR} # Retrieving shared terraform configuration
 cd ${terraform_home}
 

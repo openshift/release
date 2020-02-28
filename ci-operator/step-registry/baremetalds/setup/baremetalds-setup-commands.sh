@@ -9,11 +9,14 @@ secret_dir=/tmp/secret
 
 export SSH_PRIV_KEY_PATH=${cluster_profile}/ssh-privatekey
 export PULL_SECRET_PATH=${cluster_profile}/pull-secret
-export PACKET_AUTH_TOKEN=${cluster_profile}/.packetcrd
 export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST}
-export PACKET_PROJECT_ID=b3c1623c-ce0b-45cf-9757-c61a71e06eac
 export CLUSTER_NAME=${NAMESPACE}-${JOB_NAME_HASH}
 export SSHOPTS="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90 -i ${SSH_PRIV_KEY_PATH}"
+
+set +x
+export PACKET_PROJECT_ID=b3c1623c-ce0b-45cf-9757-c61a71e06eac
+export PACKET_AUTH_TOKEN=$(cat ${cluster_profile}/.packetcred)
+set -x
 
 echo "************ baremetalds setup command ************"
 env | sort
