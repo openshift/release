@@ -62,25 +62,32 @@ if test "${rc}" -eq 1; then
 fi
 
 # Sharing terraform artifacts required by teardown
-cp -R ${terraform_home} ${secret_dir}
+if [ ! -d ${secret_dir} ]; then
+    echo "Making ${secret_dir}"
+    mkdir -p ${secret_dir}
+fi
+
+mkdir -P ${secret_dir}/terraform
+cp -R ${terraform_home}/terraform.* ${secret_dir}/terraform #Just copying the minimum files required to avoid size limits of /tmp/secrets
+ls -ll ${secret_dir}/terraform
 
 # Sharing artifacts required by teardown
 touch ${secret_dir}/packet-server-ip
 jq -r '.modules[0].resources["packet_device.server"].primary.attributes.access_public_ipv4' terraform.tfstate > ${secret_dir}/packet-server-ip
 
-# NSS wrapper preparation
-cp ${SHARED_DIR}/libnss_wrapper.so ${secret_dir}
-cp ${SHARED_DIR}/mock-nss.sh ${secret_dir}
-
-export HOME=${secret_dir}/nss_wrapper
-mkdir -p $HOME
-
-# Note: libnss_wrapper.so and mock-nss.sh are relative to SHARED_DIR because they've been copied by the previous nss-wrapper-hack step
-export NSS_WRAPPER_PASSWD=$HOME/passwd NSS_WRAPPER_GROUP=$HOME/group NSS_USERNAME=nsswrapper NSS_GROUPNAME=nsswrapper LD_PRELOAD=${secret_dir}/libnss_wrapper.so
-bash ${secret_dir}/mock-nss.sh
-
+# Fetch packet server IP
 export IP=$(cat ${secret_dir}/packet-server-ip)
 echo "Packet server IP is ${IP}"
+
+# NSS wrapper preparation
+export HOME=/tmp/nss_wrapper
+mkdir -p $HOME
+
+cp ${SHARED_DIR}/libnss_wrapper.so ${HOME}
+cp ${SHARED_DIR}/mock-nss.sh ${HOME}
+
+export NSS_WRAPPER_PASSWD=$HOME/passwd NSS_WRAPPER_GROUP=$HOME/group NSS_USERNAME=nsswrapper NSS_GROUPNAME=nsswrapper LD_PRELOAD=${HOME}/libnss_wrapper.so
+bash ${HOME}/mock-nss.sh
 
 #########
 

@@ -15,6 +15,8 @@ fi
 
 echo "Executing baremetal ds conformance tests"
 
+ls -ll ${SHARED_DIR}
+
 #test_suite=openshift/conformance/parallel
 #if [[ -e "${SHARED_DIR}/test-suite.txt" ]]; then
 #    test_suite=$(<"${SHARED_DIR}/test-suite.txt")

@@ -23,6 +23,8 @@ fi
 # Terraform setup and teardown for packet server
 terraform_home=${ARTIFACT_DIR}/terraform
 
+ls -ll ${SHARED_DIR}
+
 if [ ! -d ${SHARED_DIR}/terraform ]; then
     echo >&2 "Cannot teardown packet server, terraform config files are missing"
     exit 1
@@ -30,6 +32,8 @@ fi
 
 cp -R ${SHARED_DIR}/terraform ${ARTIFACT_DIR} # Retrieving shared terraform configuration
 cd ${terraform_home}
+
+ls -ll
 
 
 #            if [ -n "$IP" ] ; then

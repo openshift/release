@@ -16,6 +16,7 @@ fi
 dir=/tmp/secret
 
 if [ ! -d ${dir} ]; then
+    echo "Making ${secret_dir}"
     mkdir -p ${dir}
 fi
 
