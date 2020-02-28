@@ -1,0 +1,33 @@
+base_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: "4.3"
+    namespace: ocp
+    tag: base
+binary_build_commands: make -f openshift-ci/Makefile build
+build_root:
+  project_image:
+    dockerfile_path: openshift-ci/Dockerfile.tests
+images:
+- dockerfile_path: openshift-ci/Dockerfile.tests
+  from: base
+  to: helm
+resources:
+  '*':
+    limits: {}
+    requests:
+      cpu: 200m
+      memory: 200Mi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: "4.3"
+  namespace: ocp
+tests:
+- as: unit
+  commands: make -f openshift-ci/Makefile unit
+  container:
+    from: src
+- as: lint
+  commands: make -f openshift-ci/Makefile lint
+  container:
+    from: src
