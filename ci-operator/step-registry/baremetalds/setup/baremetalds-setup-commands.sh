@@ -24,7 +24,7 @@ env | sort
 # Initial check
 if [ "${CLUSTER_TYPE}" != "packet" ] ; then
     echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"
-    exit 0
+    exit 1
 fi
 
 echo "Installing from release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
@@ -56,7 +56,10 @@ terraform init
 # therefore the terraform apply needs to be retried a few time before giving up.
 rc=1
 for r in {1..5}; do terraform apply -auto-approve && rc=0 && break ; done
-if test "${rc}" -eq 1; then echo "failed to create the infra resources"; sleep 1; fi
+if test "${rc}" -eq 1; then 
+  echo >&2 "Failed to create packet server"
+  exit 1
+fi
 
 # Sharing terraform artifacts required by teardown
 cp -R ${terraform_home} ${secret_dir}
@@ -65,12 +68,16 @@ cp -R ${terraform_home} ${secret_dir}
 touch ${secret_dir}/packet-server-ip
 jq -r '.modules[0].resources["packet_device.server"].primary.attributes.access_public_ipv4' terraform.tfstate > ${secret_dir}/packet-server-ip
 
+# NSS wrapper preparation
+cp ${SHARED_DIR}/libnss_wrapper.so ${secret_dir}
+cp ${SHARED_DIR}/mock-nss.sh ${secret_dir}
+
 export HOME=${secret_dir}/nss_wrapper
 mkdir -p $HOME
 
 # Note: libnss_wrapper.so and mock-nss.sh are relative to SHARED_DIR because they've been copied by the previous nss-wrapper-hack step
-export NSS_WRAPPER_PASSWD=$HOME/passwd NSS_WRAPPER_GROUP=$HOME/group NSS_USERNAME=nsswrapper NSS_GROUPNAME=nsswrapper LD_PRELOAD=${SHARED_DIR}/libnss_wrapper.so
-bash ${SHARED_DIR}/mock-nss.sh
+export NSS_WRAPPER_PASSWD=$HOME/passwd NSS_WRAPPER_GROUP=$HOME/group NSS_USERNAME=nsswrapper NSS_GROUPNAME=nsswrapper LD_PRELOAD=${secret_dir}/libnss_wrapper.so
+bash ${secret_dir}/mock-nss.sh
 
 export IP=$(cat ${secret_dir}/packet-server-ip)
 echo "Packet server IP is ${IP}"
