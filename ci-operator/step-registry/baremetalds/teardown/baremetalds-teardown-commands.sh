@@ -20,15 +20,12 @@ if [ "${CLUSTER_TYPE}" != "packet" ] ; then
     exit 1
 fi
 
-ls -ll ${SHARED_DIR}
-
 # Terraform setup and teardown for packet server
 terraform_home=${ARTIFACT_DIR}/terraform
 mkdir -p ${terraform_home}
 cd ${terraform_home}
 
 cp ${SHARED_DIR}/terraform.* ${terraform_home}
-ls -ll
 
 #            if [ -n "$IP" ] ; then
 #                echo "Getting logs"
