@@ -20,40 +20,25 @@ if [ "${CLUSTER_TYPE}" != "packet" ] ; then
     exit 1
 fi
 
-echo "-----------------------"
-mkdir -p /tmp/nss
-ls -ll ${SHARED_DIR} 
-cp ${SHARED_DIR}/* /tmp/nss
-ls -ll /tmp/nss
-cat ${SHARED_DIR}/mock-nss.sh
-echo "-----------------------"
+ls -ll ${SHARED_DIR}
 
+# Terraform setup and teardown for packet server
+terraform_home=${ARTIFACT_DIR}/terraform
+mkdir -p ${terraform_home}
+cd ${terraform_home}
 
-# # Terraform setup and teardown for packet server
-# terraform_home=${ARTIFACT_DIR}/terraform
+cp ${SHARED_DIR}/terraform.* ${terraform_home}
+ls -ll
 
-# ls -ll ${SHARED_DIR}
+#            if [ -n "$IP" ] ; then
+#                echo "Getting logs"
+#                ssh $SSHOPTS root@$IP tar -czf - /root/dev-scripts/logs | tar -C /tmp/artifacts -xzf -
+#                sed -i -e 's/.*auths.*/*** PULL_SECRET ***/g' /tmp/artifacts/root/dev-scripts/logs/*
+#            fi
 
-# if [ ! -d ${SHARED_DIR}/terraform ]; then
-#     echo >&2 "Cannot teardown packet server, terraform config files are missing"
-#     exit 1
-# fi
-
-# cp -R ${SHARED_DIR}/terraform ${ARTIFACT_DIR} # Retrieving shared terraform configuration
-# cd ${terraform_home}
-
-# ls -ll
-
-
-# #            if [ -n "$IP" ] ; then
-# #                echo "Getting logs"
-# #                ssh $SSHOPTS root@$IP tar -czf - /root/dev-scripts/logs | tar -C /tmp/artifacts -xzf -
-# #                sed -i -e 's/.*auths.*/*** PULL_SECRET ***/g' /tmp/artifacts/root/dev-scripts/logs/*
-# #            fi
-
-# echo "Deprovisioning cluster ..."
-# terraform init
-# for r in {1..5}; do terraform destroy -auto-approve && break ; done
+echo "Deprovisioning cluster ..."
+terraform init
+for r in {1..5}; do terraform destroy -auto-approve && break ; done
 
 
 
