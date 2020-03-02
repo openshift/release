@@ -1,7 +1,7 @@
 base_images:
   base:
     cluster: https://api.ci.openshift.org
-    name: "4.2"
+    name: "4.4"
     namespace: ocp
     tag: base
 binary_build_commands: make build GO_BUILD_FLAGS:='-v' --warn-undefined-variables
@@ -13,33 +13,22 @@ build_root:
     tag: golang-1.13
 images:
 - dockerfile_path: images/openshift-acme-controller/Dockerfile
-  from: bin
+  from: base
   inputs:
-    base:
-      as:
-      - runtime
-      paths: null
     bin:
       as:
-      - builder
-      paths: null
-  to: openshift-acme
+      - openshift/origin-release:golang-1.13
+  to: openshift-acme-controller
 - dockerfile_path: images/openshift-acme-exposer/Dockerfile
-  from: bin
+  from: base
   inputs:
-    base:
-      as:
-      - runtime
-      paths: null
     bin:
       as:
-      - builder
-      paths: null
-  to: openshift-acme
+      - openshift/origin-release:golang-1.13
+  to: openshift-acme-exposer
 promotion:
-  name: ""
+  name: "openshift-acme"
   namespace: ci
-  tag: latest
 resources:
   '*':
     limits: {}
@@ -48,7 +37,7 @@ resources:
       memory: 1Gi
 tag_specification:
   cluster: https://api.ci.openshift.org
-  name: "4.2"
+  name: "4.4"
   namespace: ocp
 test_binary_build_commands: make build GO_BUILD_FLAGS:='-v -race' --warn-undefined-variables
 tests:
@@ -56,8 +45,14 @@ tests:
   commands: make verify -k --warn-undefined-variables
   container:
     from: bin
+- as: verify-deps
+  commands: |
+    make verify-deps -k --warn-undefined-variables
+  container:
+    from: src
 - as: unit
-  commands: make test --warn-undefined-variables
+  commands: |
+    make test --warn-undefined-variables
   container:
     from: test-bin
 - as: e2e-cluster-wide
@@ -66,5 +61,9 @@ tests:
     cluster_profile: aws
 - as: e2e-single-namespace
   commands: make test-e2e-single-namespace --warn-undefined-variables
+  openshift_installer_src:
+    cluster_profile: aws
+- as: e2e-specific-namespaces
+  commands: make test-e2e-specific-namespaces --warn-undefined-variables
   openshift_installer_src:
     cluster_profile: aws
