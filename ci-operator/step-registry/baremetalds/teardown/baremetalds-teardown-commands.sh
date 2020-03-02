@@ -28,11 +28,13 @@ cd ${terraform_home}
 
 cp ${SHARED_DIR}/terraform.* ${terraform_home}
 
-#            if [ -n "$IP" ] ; then
-#                echo "Getting logs"
-#                ssh $SSHOPTS root@$IP tar -czf - /root/dev-scripts/logs | tar -C /tmp/artifacts -xzf -
-#                sed -i -e 's/.*auths.*/*** PULL_SECRET ***/g' /tmp/artifacts/root/dev-scripts/logs/*
-#            fi
+# Logs fetching
+export IP=$(cat ${SHARED_DIR}/packet-server-ip)
+if [ -n "$IP" ] ; then
+   echo "Getting logs"
+   ssh $SSHOPTS root@$IP tar -czf - /root/dev-scripts/logs | tar -C ${ARTIFACT_DIR} -xzf -
+   sed -i -e 's/.*auths.*/*** PULL_SECRET ***/g' ${ARTIFACT_DIR}/root/dev-scripts/logs/*
+fi
 
 echo "Deprovisioning cluster ..."
 terraform init
