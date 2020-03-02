@@ -1,13 +1,15 @@
 base_images:
   base:
+    cluster: https://api.ci.openshift.org
     name: "4.4"
     namespace: ocp
     tag: base
 build_root:
   image_stream_tag:
-      name: release
-      namespace: openshift
-      tag: golang-1.12
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.12
 canonical_go_repository: kubevirt.io/kubevirt
 images:
 - dockerfile_path: hack/ci/Dockerfile.ci
@@ -26,11 +28,12 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
+  cluster: https://api.ci.openshift.org
   name: "4.4"
   namespace: ocp
 tests:
-- as: e2e
-  artifact_dir: /go/src/kubevirt.io/kubevirt/_out/exported-artifacts
+- artifact_dir: /go/src/kubevirt.io/kubevirt/_out/exported-artifacts
+  as: e2e
   commands: |
     cd /go/src/kubevirt.io/kubevirt
     #./hack/ci/test.sh
@@ -99,7 +102,6 @@ tests:
     mkdir -p "$ARTIFACT_DIR"
     TESTS_TO_FOCUS=$(grep -E -o '\[crit\:high\]' tests/*_test.go | sort | uniq | sed -E 's/tests\/([a-z_]+)\_test\.go\:.*/\1/' | tr '\n' '|' | sed 's/|$//')
     FUNC_TEST_ARGS='--ginkgo.noColor --ginkgo.focus='"$TESTS_TO_FOCUS"' --ginkgo.regexScansFilePath=true --junit-output='"$ARTIFACT_DIR"'/junit.functest.xml' bash -x ./hack/functests.sh
-
   openshift_installer_custom_test_image:
     cluster_profile: gcp
     from: pipeline:kubevirt-test
