@@ -22,10 +22,12 @@ fi
 
 echo "-----------------------"
 mkdir -p /tmp/nss
+ls -ll ${SHARED_DIR} 
 cp -R ${SHARED_DIR}/nss /tmp/nss
 ls -ll /tmp/nss
 cat /tmp/nss/mock-nss.sh
 echo "-----------------------"
+
 
 
 # # Terraform setup and teardown for packet server
