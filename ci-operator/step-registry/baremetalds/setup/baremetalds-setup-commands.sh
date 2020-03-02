@@ -71,7 +71,7 @@ if [ ! -d ${secret_dir} ]; then
     mkdir -p ${secret_dir}
 fi
 
-mkdir -P ${secret_dir}/terraform
+mkdir -p ${secret_dir}/terraform
 cp -R ${terraform_home}/terraform.* ${secret_dir}/terraform #Just copying the minimum files required to avoid size limits of /tmp/secrets
 ls -ll ${secret_dir}/terraform
 
