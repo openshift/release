@@ -4,7 +4,7 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-binary_build_commands: make install
+binary_build_commands: make install && make build-cross
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
@@ -18,6 +18,21 @@ images:
       - destination_dir: .
         source_path: /go/bin/kn
   to: knative-client
+- dockerfile_path: Dockerfile.cliartifacts
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/knative-client/kn-linux-amd64
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/knative-client/kn-darwin-amd64
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/knative-client/kn-windows-amd64.exe
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/knative-client/LICENSE
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/knative-client/package-cliartifacts.sh
+  to: kn-cli-artifacts
 promotion:
   name: knative-nightly
   namespace: openshift
