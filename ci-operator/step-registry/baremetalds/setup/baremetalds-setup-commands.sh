@@ -28,70 +28,70 @@ if [ "${CLUSTER_TYPE}" != "packet" ] ; then
 fi
 
 echo "-----------------------""
-ls -ll ${SHARED_DIR}
+ls -ll ${SHARED_DIR}/nss
 echo "-----------------------""
 
-echo "Installing from release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+# echo "Installing from release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 
-# Terraform setup and init for packet server
-terraform_home=${ARTIFACT_DIR}/terraform
-mkdir -p ${terraform_home}
-cd ${terraform_home}
+# # Terraform setup and init for packet server
+# terraform_home=${ARTIFACT_DIR}/terraform
+# mkdir -p ${terraform_home}
+# cd ${terraform_home}
 
-cat > ${terraform_home}/terraform.tf <<-EOF
-provider "packet" {
-}
+# cat > ${terraform_home}/terraform.tf <<-EOF
+# provider "packet" {
+# }
 
-resource "packet_device" "server" {
-  count            = "1"
-  project_id       = "$PACKET_PROJECT_ID"
-  hostname         = "ipi-$CLUSTER_NAME"
-  plan             = "m2.xlarge.x86"
-  facilities       = ["sjc1", "ewr1"]
-  operating_system = "centos_7"
-  billing_cycle    = "hourly"
-}
-EOF
+# resource "packet_device" "server" {
+#   count            = "1"
+#   project_id       = "$PACKET_PROJECT_ID"
+#   hostname         = "ipi-$CLUSTER_NAME"
+#   plan             = "m2.xlarge.x86"
+#   facilities       = ["sjc1", "ewr1"]
+#   operating_system = "centos_7"
+#   billing_cycle    = "hourly"
+# }
+# EOF
 
-terraform init
+# terraform init
 
-# Packet returns transients errors when creating devices.
-# example, `Oh snap, something went wrong! We've logged the error and will take a look - please reach out to us if you continue having trouble.`
-# therefore the terraform apply needs to be retried a few time before giving up.
-rc=1
-for r in {1..5}; do terraform apply -auto-approve && rc=0 && break ; done
-if test "${rc}" -eq 1; then 
-  echo >&2 "Failed to create packet server"
-  exit 1
-fi
+# # Packet returns transients errors when creating devices.
+# # example, `Oh snap, something went wrong! We've logged the error and will take a look - please reach out to us if you continue having trouble.`
+# # therefore the terraform apply needs to be retried a few time before giving up.
+# rc=1
+# for r in {1..5}; do terraform apply -auto-approve && rc=0 && break ; done
+# if test "${rc}" -eq 1; then 
+#   echo >&2 "Failed to create packet server"
+#   exit 1
+# fi
 
-# Sharing terraform artifacts required by teardown
-if [ ! -d ${secret_dir} ]; then
-    echo "Making ${secret_dir}"
-    mkdir -p ${secret_dir}
-fi
+# # Sharing terraform artifacts required by teardown
+# if [ ! -d ${secret_dir} ]; then
+#     echo "Making ${secret_dir}"
+#     mkdir -p ${secret_dir}
+# fi
 
-mkdir -p ${secret_dir}/terraform
-cp -R ${terraform_home}/terraform.* ${secret_dir}/terraform #Just copying the minimum files required to avoid size limits of /tmp/secrets
-ls -ll ${secret_dir}/terraform
+# mkdir -p ${secret_dir}/terraform
+# cp -R ${terraform_home}/terraform.* ${secret_dir}/terraform #Just copying the minimum files required to avoid size limits of /tmp/secrets
+# ls -ll ${secret_dir}/terraform
 
-# Sharing artifacts required by teardown
-touch ${secret_dir}/packet-server-ip
-jq -r '.modules[0].resources["packet_device.server"].primary.attributes.access_public_ipv4' terraform.tfstate > ${secret_dir}/packet-server-ip
+# # Sharing artifacts required by teardown
+# touch ${secret_dir}/packet-server-ip
+# jq -r '.modules[0].resources["packet_device.server"].primary.attributes.access_public_ipv4' terraform.tfstate > ${secret_dir}/packet-server-ip
 
-# Fetch packet server IP
-export IP=$(cat ${secret_dir}/packet-server-ip)
-echo "Packet server IP is ${IP}"
+# # Fetch packet server IP
+# export IP=$(cat ${secret_dir}/packet-server-ip)
+# echo "Packet server IP is ${IP}"
 
-# NSS wrapper preparation
-export HOME=/tmp/nss_wrapper
-mkdir -p $HOME
+# # NSS wrapper preparation
+# export HOME=/tmp/nss_wrapper
+# mkdir -p $HOME
 
-cp ${SHARED_DIR}/libnss_wrapper.so ${HOME}
-cp ${SHARED_DIR}/mock-nss.sh ${HOME}
+# cp ${SHARED_DIR}/libnss_wrapper.so ${HOME}
+# cp ${SHARED_DIR}/mock-nss.sh ${HOME}
 
-export NSS_WRAPPER_PASSWD=$HOME/passwd NSS_WRAPPER_GROUP=$HOME/group NSS_USERNAME=nsswrapper NSS_GROUPNAME=nsswrapper LD_PRELOAD=${HOME}/libnss_wrapper.so
-bash ${HOME}/mock-nss.sh
+# export NSS_WRAPPER_PASSWD=$HOME/passwd NSS_WRAPPER_GROUP=$HOME/group NSS_USERNAME=nsswrapper NSS_GROUPNAME=nsswrapper LD_PRELOAD=${HOME}/libnss_wrapper.so
+# bash ${HOME}/mock-nss.sh
 
 #########
 

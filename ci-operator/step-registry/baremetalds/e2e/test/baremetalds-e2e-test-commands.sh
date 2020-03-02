@@ -13,9 +13,11 @@ if [ "${CLUSTER_TYPE}" != "packet" ] ; then
     exit 0
 fi
 
-echo "Executing baremetal ds conformance tests"
+echo "-----------------------""
+ls -ll ${SHARED_DIR}/nss
+echo "-----------------------""
 
-ls -ll ${SHARED_DIR}
+#echo "Executing baremetal ds conformance tests"
 
 #test_suite=openshift/conformance/parallel
 #if [[ -e "${SHARED_DIR}/test-suite.txt" ]]; then
