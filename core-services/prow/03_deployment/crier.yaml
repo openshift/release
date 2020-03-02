@@ -55,6 +55,7 @@ items:
           - --github-endpoint=http://ghproxy
           - --github-endpoint=https://api.github.com
           - --gcs-workers=10
+          - --gcs-credentials-file=/etc/service-account/service-account.json
           - --kubernetes-gcs-workers=10
           - --build-cluster=/etc/cluster/cluster
           - --kubeconfig=/etc/build-farm-credentials/kubeconfig
@@ -97,6 +98,9 @@ items:
             readOnly: true
           - mountPath: /etc/build-farm-credentials
             name: build-farm-credentials
+            readOnly: true
+          - name: service-account
+            mountPath: /etc/service-account
             readOnly: true
           resources:
             requests:
@@ -145,3 +149,6 @@ items:
             - key: sa.plank.build01.config
               path: kubeconfig
             secretName: build-farm-credentials
+        - name: service-account
+          secret:
+            secretName: gce-sa-credentials-gcs-publisher
