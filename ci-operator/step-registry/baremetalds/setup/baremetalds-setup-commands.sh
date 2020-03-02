@@ -27,9 +27,12 @@ if [ "${CLUSTER_TYPE}" != "packet" ] ; then
     exit 1
 fi
 
-echo "-----------------------""
-ls -ll ${SHARED_DIR}/nss
-echo "-----------------------""
+echo "-----------------------"
+mkdir -p /tmp/nss
+cp -R ${SHARED_DIR}/nss /tmp/nss
+ls -ll /tmp/nss
+cat /tmp/nss/mock-nss.sh
+echo "-----------------------"
 
 # echo "Installing from release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 

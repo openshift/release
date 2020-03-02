@@ -13,9 +13,13 @@ if [ "${CLUSTER_TYPE}" != "packet" ] ; then
     exit 0
 fi
 
-echo "-----------------------""
-ls -ll ${SHARED_DIR}/nss
-echo "-----------------------""
+echo "-----------------------"
+mkdir -p /tmp/nss
+cp -R ${SHARED_DIR}/nss /tmp/nss
+ls -ll /tmp/nss
+cat /tmp/nss/mock-nss.sh
+echo "-----------------------"
+
 
 #echo "Executing baremetal ds conformance tests"
 
