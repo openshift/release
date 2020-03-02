@@ -46,22 +46,22 @@ services:
 # these are useful for devs
 jobs:
 	docker pull registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest
-	docker run -v "${CURDIR}/ci-operator:/ci-operator:z" registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest --from-dir /ci-operator/config --to-dir /ci-operator/jobs
+	docker run --rm -v "${CURDIR}/ci-operator:/ci-operator:z" registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest --from-dir /ci-operator/config --to-dir /ci-operator/jobs
 	docker pull registry.svc.ci.openshift.org/ci/determinize-prow-jobs:latest
-	docker run -v "${CURDIR}/ci-operator/jobs:/ci-operator/jobs:z" registry.svc.ci.openshift.org/ci/determinize-prow-jobs:latest --prow-jobs-dir /ci-operator/jobs
+	docker run --rm -v "${CURDIR}/ci-operator/jobs:/ci-operator/jobs:z" registry.svc.ci.openshift.org/ci/determinize-prow-jobs:latest --prow-jobs-dir /ci-operator/jobs
 
 prow-config:
 	docker pull registry.svc.ci.openshift.org/ci/determinize-prow-config:latest
-	docker run -v "${CURDIR}/core-services/prow/02_config:/config:z" registry.svc.ci.openshift.org/ci/determinize-prow-config:latest --prow-config-dir /config
+	docker run --rm -v "${CURDIR}/core-services/prow/02_config:/config:z" registry.svc.ci.openshift.org/ci/determinize-prow-config:latest --prow-config-dir /config
 
 branch-cut:
 	docker pull registry.svc.ci.openshift.org/ci/config-brancher:latest
-	docker run -v "${CURDIR}/ci-operator:/ci-operator:z" registry.svc.ci.openshift.org/ci/config-brancher:latest --config-dir /ci-operator/config --org=$(ORG) --repo=$(REPO) --current-release=4.3 --future-release=4.4 --bump-release=4.4 --confirm
+	docker run --rm -v "${CURDIR}/ci-operator:/ci-operator:z" registry.svc.ci.openshift.org/ci/config-brancher:latest --config-dir /ci-operator/config --org=$(ORG) --repo=$(REPO) --current-release=4.3 --future-release=4.4 --bump-release=4.4 --confirm
 		$(MAKE) jobs
 
 new-repo:
 	docker pull registry.svc.ci.openshift.org/ci/repo-init:latest
-	docker run -it -v "${CURDIR}:/release:z" registry.svc.ci.openshift.org/ci/repo-init:latest --release-repo /release
+	docker run --rm -it -v "${CURDIR}:/release:z" registry.svc.ci.openshift.org/ci/repo-init:latest --release-repo /release
 	$(MAKE) jobs
 	$(MAKE) prow-config
 
@@ -284,5 +284,5 @@ kubeconfig_path ?= $(HOME)/.kube/config
 # make kerberos_id=<your_kerberos_id> dry_run=true force=false bw_password_path=/tmp/bw_password kubeconfig_path=${HOME}/.kube/config ci-secret-bootstrap
 ci-secret-bootstrap:
 	docker pull registry.svc.ci.openshift.org/ci/ci-secret-bootstrap:latest
-	docker run -v "$(CURDIR)/core-services/ci-secret-bootstrap/_config.yaml:/_config.yaml:z" -v "$(kubeconfig_path):/_kubeconfig:z" -v "$(bw_password_path):/_bw_password:z" registry.svc.ci.openshift.org/ci/ci-secret-bootstrap:latest --bw-password-path=/_bw_password --bw-user $(kerberos_id)@redhat.com --config=/_config.yaml --kubeconfig=/_kubeconfig --dry-run=$(dry_run) --force=$(force)
+	docker run --rm -v "$(CURDIR)/core-services/ci-secret-bootstrap/_config.yaml:/_config.yaml:z" -v "$(kubeconfig_path):/_kubeconfig:z" -v "$(bw_password_path):/_bw_password:z" registry.svc.ci.openshift.org/ci/ci-secret-bootstrap:latest --bw-password-path=/_bw_password --bw-user $(kerberos_id)@redhat.com --config=/_config.yaml --kubeconfig=/_kubeconfig --dry-run=$(dry_run) --force=$(force)
 .PHONY: ci-secret-bootstrap
