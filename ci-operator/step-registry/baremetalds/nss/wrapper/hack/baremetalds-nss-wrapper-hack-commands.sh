@@ -13,7 +13,7 @@ if [ "${CLUSTER_TYPE}" != "packet" ] ; then
     exit 0
 fi
 
-dir=/tmp/secret/nss
+dir=/tmp/secret
 
 if [ ! -d ${dir} ]; then
     echo "Making ${dir}"
