@@ -28,14 +28,21 @@ fi
 
 ### cp ${SHARED_DIR}/terraform.* ${terraform_home}
 
+# Applying NSS fix
+cp ${SHARED_DIR}/libnss_wrapper.so ${HOME}
+cp ${SHARED_DIR}/mock-nss.sh ${HOME}
+
+export NSS_WRAPPER_PASSWD=$HOME/passwd NSS_WRAPPER_GROUP=$HOME/group NSS_USERNAME=nsswrapper NSS_GROUPNAME=nsswrapper LD_PRELOAD=${HOME}/libnss_wrapper.so
+bash ${HOME}/mock-nss.sh
+
 # Logs fetching
 ### export IP=$(cat ${SHARED_DIR}/packet-server-ip)
 export IP=147.75.69.55
 if [ -n "$IP" ] ; then
    echo "Getting logs"
-### ###   ssh $SSHOPTS root@$IP tar -czf - /root/dev-scripts/logs | tar -C ${ARTIFACT_DIR} -xzf -
-   mkdir -p ${ARTIFACT_DIR}/dev-scripts/logs/
-   scp $SSHOPTS -r root@IP:/root/dev-scripts/logs ${ARTIFACT_DIR}/dev-scripts/logs/
+   ssh $SSHOPTS root@$IP tar -czf - /root/dev-scripts/logs | tar -C ${ARTIFACT_DIR} -xzf -
+   ###mkdir -p ${ARTIFACT_DIR}/dev-scripts/logs/
+   ###scp $SSHOPTS -r root@IP:/root/dev-scripts/logs ${ARTIFACT_DIR}/dev-scripts/logs/
    sed -i -e 's/.*auths.*/*** PULL_SECRET ***/g' ${ARTIFACT_DIR}/dev-scripts/logs/*
 fi
 
