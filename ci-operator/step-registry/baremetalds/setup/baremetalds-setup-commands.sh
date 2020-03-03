@@ -138,6 +138,12 @@ timeout -s 9 105m make
 
 EOF
 
+# Get dev-scripts logs
+echo "dev-scripts setup completed, fetching logs"
+ssh $SSHOPTS root@$IP tar -czf - /root/dev-scripts/logs | tar -C ${ARTIFACT_DIR} -xzf -
+sed -i -e 's/.*auths.*/*** PULL_SECRET ***/g' ${ARTIFACT_DIR}/root/dev-scripts/logs/*
+
+
 
 
 
