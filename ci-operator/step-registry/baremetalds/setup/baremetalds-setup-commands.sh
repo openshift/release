@@ -135,8 +135,6 @@ timeout -s 9 105m make
 
 EOF
 
-mkdir -p ${ARTIFACT_DIR}/installer/auth
-scp $SSHOPTS root@$IP:./dev-scripts/ocp/auth/kubeconfig ${ARTIFACT_DIR}/installer/auth/kubeconfig
 
 
 
