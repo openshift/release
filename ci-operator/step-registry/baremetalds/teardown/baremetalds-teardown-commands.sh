@@ -46,7 +46,7 @@ if [ -n "$IP" ] ; then
    ssh $SSHOPTS root@$IP tar -czf - /root/dev-scripts/logs | tar -C ${ARTIFACT_DIR} -xzf -
    ###mkdir -p ${ARTIFACT_DIR}/dev-scripts/logs/
    ###scp $SSHOPTS -r root@IP:/root/dev-scripts/logs ${ARTIFACT_DIR}/dev-scripts/logs/
-   sed -i -e 's/.*auths.*/*** PULL_SECRET ***/g' ${ARTIFACT_DIR}/dev-scripts/logs/*
+   sed -i -e 's/.*auths.*/*** PULL_SECRET ***/g' ${ARTIFACT_DIR}/root/dev-scripts/logs/*
 fi
 
 ### echo "Deprovisioning cluster ..."
