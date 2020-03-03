@@ -1,5 +1,296 @@
 periodics:
 - agent: kubernetes
+  cron: 0 0 * * 1
+  decorate: true
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: endurance-upgrade-aws-4.4
+  spec:
+    containers:
+    - command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -euo pipefail
+
+        ci-operator --artifact-dir=$(ARTIFACTS) \
+          --lease-server=http://boskos \
+          --secret-dir=/usr/local/ci-credentials \
+          --secret-dir=/usr/local/endurance-cluster-credentials-aws \
+          --secret-dir=/usr/local/aws-openshift-llc-account-credentials \
+          --secret-dir=/usr/local/pull-secret \
+          --template=/usr/local/endurance-test/endurance-test.yaml \
+          --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME) \
+          --target=endurance-test
+      env:
+      - name: BRANCH
+        value: "4.4"
+      - name: RELEASE_IMAGE_LATEST
+        value: registry.svc.ci.openshift.org/ocp/release:4.4
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: CONFIG_SPEC
+        value: |
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+          resources:
+            '*':
+              requests:
+                cpu: 10m
+          tests:
+          - as: endurance-upgrade-$(CLUSTER_TYPE)
+            commands: TEST_SUITE=all run-upgrade-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+      - name: TEST_COMMAND
+        value: TEST_SUITE=all run-upgrade-tests
+      - name: JOB_NAME_SAFE
+        value: endurance-aws-upgrade
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/endurance-test
+        name: job-definition
+      - mountPath: /usr/local/ci-credentials
+        name: ci-credentials
+      - mountPath: /usr/local/aws-openshift-llc-account-credentials
+        name: aws-openshift-llc-account-credentials
+      - mountPath: /usr/local/endurance-cluster-credentials-aws
+        name: endurance-cluster-credentials-aws
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: aws-openshift-llc-account-credentials
+      secret:
+        secretName: aws-openshift-llc-account-credentials
+    - name: ci-credentials
+      secret:
+        secretName: cluster-secrets-aws
+    - name: endurance-cluster-credentials-aws
+      secret:
+        secretName: endurance-cluster-credentials-4.4-aws
+    - configMap:
+        name: prow-job-endurance-test
+      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
+  cron: 0 6 * * 1-5
+  decorate: true
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: endurance-e2e-aws-4.4
+  spec:
+    containers:
+    - command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -euo pipefail
+
+        ci-operator --artifact-dir=$(ARTIFACTS) \
+          --secret-dir=/usr/local/ci-credentials \
+          --secret-dir=/usr/local/endurance-cluster-credentials-aws \
+          --secret-dir=/usr/local/aws-openshift-llc-account-credentials \
+          --secret-dir=/usr/local/pull-secret \
+          --template=/usr/local/endurance-test/endurance-test.yaml \
+          --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME) \
+          --target=endurance-test
+      env:
+      - name: BRANCH
+        value: "4.4"
+      - name: RELEASE_IMAGE_LATEST
+        value: registry.svc.ci.openshift.org/ocp/release:4.4
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: CONFIG_SPEC
+        value: |
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+          resources:
+            '*':
+              requests:
+                cpu: 10m
+          tests:
+          - as: endurance-e2e-$(CLUSTER_TYPE)
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: false
+      - name: TEST_COMMAND
+        value: TEST_SUITE=openshift/conformance/parallel run-tests
+      - name: JOB_NAME_SAFE
+        value: endurance-e2e-aws
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/endurance-test
+        name: job-definition
+      - mountPath: /usr/local/ci-credentials
+        name: ci-credentials
+      - mountPath: /usr/local/aws-openshift-llc-account-credentials
+        name: aws-openshift-llc-account-credentials
+      - mountPath: /usr/local/endurance-cluster-credentials-aws
+        name: endurance-cluster-credentials-aws
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: aws-openshift-llc-account-credentials
+      secret:
+        secretName: aws-openshift-llc-account-credentials
+    - name: ci-credentials
+      secret:
+        secretName: cluster-secrets-aws
+    - name: endurance-cluster-credentials-aws
+      secret:
+        secretName: endurance-cluster-credentials-4.4-aws
+    - configMap:
+        name: prow-job-endurance-test
+      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
+  cron: 0 10 * * 1-5
+  decorate: true
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: endurance-cluster-maintenance-aws-4.4
+  spec:
+    containers:
+    - command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -euo pipefail
+        export PATH=$PATH:/tmp/bin
+        mkdir /tmp/bin
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
+        chmod ug+x /tmp/bin/oc
+        set +e
+        ci-operator --artifact-dir=$(ARTIFACTS) \
+          --secret-dir=/usr/local/ci-credentials \
+          --secret-dir=/usr/local/endurance-cluster-credentials-aws \
+          --secret-dir=/usr/local/aws-openshift-llc-account-credentials \
+          --secret-dir=/usr/local/pull-secret \
+          --template=/usr/local/endurance-install/endurance-install.yaml \
+          --target=endurance-install \
+          --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME) |& tee /tmp/ci-operator.log
+        rc=$?
+        set -e
+        namespace=$(grep "Using namespace" /tmp/ci-operator.log | awk '{print $NF}')
+        # copy the cluster credentials secret that was created in the job namespace, into the ci namespace
+        # so it is persisted for future runs.
+        oc get --export secret endurance-cluster-credentials-aws-new -n $namespace -o yaml | grep -v namespace: > /tmp/secret.yaml
+        sed -i s/endurance-cluster-credentials-aws-new/endurance-cluster-credentials-4.4-aws/ /tmp/secret.yaml
+        oc apply -f /tmp/secret.yaml -n ci
+        exit $rc
+      env:
+      - name: BRANCH
+        value: "4.4"
+      - name: RELEASE_IMAGE_LATEST
+        value: registry.svc.ci.openshift.org/ocp/release:4.4
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: CONFIG_SPEC
+        value: |
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: endurance-install-$(CLUSTER_TYPE)
+            commands: sleep 9000 & wait
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: false
+      - name: JOB_NAME_SAFE
+        value: endurance-install-$(CLUSTER_TYPE)
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/endurance-install
+        name: job-definition
+      - mountPath: /usr/local/ci-credentials
+        name: ci-credentials
+      - mountPath: /usr/local/aws-openshift-llc-account-credentials
+        name: aws-openshift-llc-account-credentials
+      - mountPath: /usr/local/endurance-cluster-credentials-aws
+        name: endurance-cluster-credentials-aws
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: aws-openshift-llc-account-credentials
+      secret:
+        secretName: aws-openshift-llc-account-credentials
+    - name: ci-credentials
+      secret:
+        secretName: cluster-secrets-aws
+    - name: endurance-cluster-credentials-aws
+      secret:
+        secretName: endurance-cluster-credentials-4.4-aws
+    - configMap:
+        name: prow-job-endurance-install
+      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
   decorate: true
   interval: 15m
   labels:
@@ -18,7 +309,7 @@ periodics:
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
         mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.3/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
         chmod ug+x /tmp/bin/oc
 
         # if the source and destination are identical, do nothing
@@ -655,7 +946,7 @@ periodics:
         mkdir $HOME/.docker/
         cp /usr/local/pull-secret/.dockerconfigjson $HOME/.docker/config.json
         mkdir $HOME/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.3/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
         chmod ug+x $HOME/bin/oc
 
         # create namespace and craft a release image without the machine operator
@@ -680,7 +971,7 @@ periodics:
           --target=e2e-$(CLUSTER_TYPE)-upgrade
       env:
       - name: FROM_BRANCH
-        value: "4.3"
+        value: "4.4"
       - name: BRANCH
         value: 4.4-ci
       - name: CLUSTER_TYPE
@@ -688,7 +979,7 @@ periodics:
       - name: CONFIG_SPEC
         value: |
           tag_specification:
-            name: "none" # don't import anything to avoid a race between 4.3 latest and the chosen version
+            name: "none" # don't import anything to avoid a race between 4.4 latest and the chosen version
             namespace: ocp
           build_root:
             image_stream_tag:
@@ -3701,7 +3992,7 @@ periodics:
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
         mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.3/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
         chmod ug+x /tmp/bin/oc
 
         # annotate the information about this job so that we can query for it
@@ -5171,7 +5462,7 @@ periodics:
     job-test: e2e
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
     release.openshift.io/verify: "true"
-  name: release-openshift-origin-installer-e2e-aws-upgrade-4.3-stable-to-4.4-ci
+  name: release-openshift-origin-installer-e2e-aws-upgrade-4.4-stable-to-4.4-ci
   spec:
     containers:
     - command:
@@ -5183,7 +5474,7 @@ periodics:
 
         initial=$(ARTIFACTS)/release-initial.json
         latest=$(ARTIFACTS)/release-latest.json
-        if ! curl --fail -X GET -G https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest --data-urlencode 'in=>4.3.0-0 <4.4.0-0' > ${initial}; then
+        if ! curl --fail -X GET -G https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest --data-urlencode 'in=>4.4.0-0 <4.4.0-0' > ${initial}; then
           echo "error: Could not find a stable version"
           exit 1
         fi
@@ -5200,7 +5491,7 @@ periodics:
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
         mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.3/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
         chmod ug+x /tmp/bin/oc
 
         # annotate the information about this job so that the release controller adds it to the upgrade graph
@@ -5211,7 +5502,7 @@ periodics:
           --target=e2e-$(CLUSTER_TYPE)-upgrade --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME)
       env:
       - name: BRANCH
-        value: "4.3"
+        value: "4.4"
       - name: CLUSTER_TYPE
         value: aws
       - name: CONFIG_SPEC
@@ -5284,7 +5575,7 @@ periodics:
     job-test: e2e
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
     release.openshift.io/verify: "true"
-  name: release-openshift-origin-installer-e2e-aws-upgrade-4.3-nightly-to-4.4-nightly
+  name: release-openshift-origin-installer-e2e-aws-upgrade-4.4-nightly-to-4.4-nightly
   spec:
     containers:
     - command:
@@ -5296,8 +5587,8 @@ periodics:
 
         initial=$(ARTIFACTS)/release-initial.json
         latest=$(ARTIFACTS)/release-latest.json
-        if ! curl -G https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.3.0-0.nightly/latest > ${initial}; then
-          echo "error: Could not find a 4.3 nightly version"
+        if ! curl -G https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.4.0-0.nightly/latest > ${initial}; then
+          echo "error: Could not find a 4.4 nightly version"
           exit 1
         fi
         if ! curl -G https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.4.0-0.nightly/latest > ${latest}; then
@@ -5313,7 +5604,7 @@ periodics:
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
         mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.3/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
         chmod ug+x /tmp/bin/oc
 
         # annotate the information about this job so that the release controller adds it to the upgrade graph
@@ -5397,7 +5688,7 @@ periodics:
     job-release: "4.4"
     job-test: e2e
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: release-openshift-origin-installer-e2e-aws-upgrade-rollback-4.3-to-4.4
+  name: release-openshift-origin-installer-e2e-aws-upgrade-rollback-4.4-to-4.4
   spec:
     containers:
     - command:
@@ -5409,7 +5700,7 @@ periodics:
 
         initial=$(ARTIFACTS)/release-initial.json
         latest=$(ARTIFACTS)/release-latest.json
-        if ! curl --fail -X GET -G https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest --data-urlencode 'in=>4.3.0-0 <4.4.0-0' > ${initial}; then
+        if ! curl --fail -X GET -G https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest --data-urlencode 'in=>4.4.0-0 <4.4.0-0' > ${initial}; then
           echo "error: Could not find a stable version"
           exit 1
         fi
@@ -5426,7 +5717,7 @@ periodics:
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
         mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.3/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
         chmod ug+x /tmp/bin/oc
 
         # annotate the information about this job so that we can query for it
@@ -5438,7 +5729,7 @@ periodics:
           --target=e2e-$(CLUSTER_TYPE)-upgrade --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME)
       env:
       - name: BRANCH
-        value: "4.3"
+        value: "4.4"
       - name: CLUSTER_TYPE
         value: aws
       - name: CONFIG_SPEC
@@ -5527,7 +5818,7 @@ periodics:
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
         mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.3/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
         chmod ug+x /tmp/bin/oc
 
         # annotate the information about this job so that we can query for it
@@ -5738,7 +6029,7 @@ periodics:
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
         mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.3/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
         chmod ug+x /tmp/bin/oc
 
         # annotate the information about this job so that we can query for it
@@ -5841,7 +6132,7 @@ periodics:
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
         mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.3/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
         chmod ug+x /tmp/bin/oc
 
         # annotate the information about this job so that we can query for it
