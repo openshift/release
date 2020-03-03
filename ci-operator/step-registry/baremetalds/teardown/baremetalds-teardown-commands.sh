@@ -29,6 +29,9 @@ fi
 ### cp ${SHARED_DIR}/terraform.* ${terraform_home}
 
 # Applying NSS fix
+export HOME=/tmp/nss_wrapper
+mkdir -p $HOME
+
 cp ${SHARED_DIR}/libnss_wrapper.so ${HOME}
 cp ${SHARED_DIR}/mock-nss.sh ${HOME}
 
