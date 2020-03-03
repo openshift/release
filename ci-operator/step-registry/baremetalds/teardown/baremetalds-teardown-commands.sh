@@ -21,6 +21,9 @@ if [ "${CLUSTER_TYPE}" != "packet" ] ; then
     exit 1
 fi
 
+echo "-------[ $SHARED_DIR ]"
+ls -ll ${SHARED_DIR}
+
 # Applying NSS fix for SSH connection
 export HOME=/tmp/nss_wrapper
 mkdir -p $HOME
@@ -30,7 +33,8 @@ export NSS_WRAPPER_PASSWD=$HOME/passwd NSS_WRAPPER_GROUP=$HOME/group NSS_USERNAM
 bash ${HOME}/mock-nss.sh
 
 # Get dev-scripts logs
-export IP=$(cat ${SHARED_DIR}/packet-server-ip)
+### export IP=$(cat ${SHARED_DIR}/packet-server-ip)
+export IP=139.178.68.175
 if [ -n "$IP" ] ; then
    echo "Getting logs"
    ssh $SSHOPTS root@$IP tar -czf - /root/dev-scripts/logs | tar -C ${ARTIFACT_DIR} -xzf -
@@ -38,13 +42,13 @@ if [ -n "$IP" ] ; then
 fi
 
 # Shutdown packet server
-terraform_home=${ARTIFACT_DIR}/terraform
-mkdir -p ${terraform_home}
-cp ${SHARED_DIR}/terraform.* ${terraform_home}
-echo "Deprovisioning cluster..."
-cd ${terraform_home}
-terraform init
-for r in {1..5}; do terraform destroy -auto-approve && break ; done
+### terraform_home=${ARTIFACT_DIR}/terraform
+### mkdir -p ${terraform_home}
+### cp ${SHARED_DIR}/terraform.* ${terraform_home}
+### echo "Deprovisioning cluster..."
+### cd ${terraform_home}
+### terraform init
+### for r in {1..5}; do terraform destroy -auto-approve && break ; done
 
 
 
