@@ -1,9 +1,10 @@
+binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
     cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
-    tag: golang-1.12
+    tag: golang-1.13
 canonical_go_repository: github.com/openshift/api
 promotion:
   disabled: true
@@ -19,11 +20,29 @@ tag_specification:
   cluster: https://api.ci.openshift.org
   name: 4.6-priv
   namespace: ocp-private
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
 tests:
-- as: verify
-  commands: go get golang.org/x/tools/imports; make build verify
+- as: build
+  commands: |
+    true
   container:
-    from: src
+    from: bin
+- as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: bin
+- as: verify-deps
+  commands: |
+    make verify-deps -k --warn-undefined-variables
+  container:
+    from: bin
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: |
+    make test-unit JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
+  container:
+    from: test-bin
 - as: verify-client-go
   commands: |
     dir=$GOPATH/src/github.com/openshift/client-go
@@ -35,4 +54,4 @@ tests:
     make generate
     go build ./...
   container:
-    from: src
+    from: bin

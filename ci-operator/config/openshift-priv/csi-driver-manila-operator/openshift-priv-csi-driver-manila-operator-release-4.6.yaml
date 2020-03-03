@@ -1,0 +1,31 @@
+base_images:
+  os:
+    name: centos
+    namespace: openshift
+    tag: "7"
+binary_build_commands: go build cmd/manager/main.go
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+canonical_go_repository: github.com/openshift/csi-driver-manila-operator
+promotion:
+  disabled: true
+  name: 4.6-priv
+  namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: 4.6-priv
+  namespace: ocp-private
+tests:
+- as: go-fmt
+  commands: ./hack/go-fmt.sh .
+  container:
+    from: src
