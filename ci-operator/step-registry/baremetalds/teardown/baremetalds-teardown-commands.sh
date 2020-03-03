@@ -28,8 +28,6 @@ fi
 
 ### cp ${SHARED_DIR}/terraform.* ${terraform_home}
 
-whoami
-
 # Logs fetching
 ### export IP=$(cat ${SHARED_DIR}/packet-server-ip)
 export IP=147.75.69.55
