@@ -21,37 +21,30 @@ if [ "${CLUSTER_TYPE}" != "packet" ] ; then
     exit 1
 fi
 
-# Terraform setup and teardown for packet server
-### terraform_home=${ARTIFACT_DIR}/terraform
-### mkdir -p ${terraform_home}
-### cd ${terraform_home}
-
-### cp ${SHARED_DIR}/terraform.* ${terraform_home}
-
-# Applying NSS fix
+# Applying NSS fix for SSH connection
 export HOME=/tmp/nss_wrapper
 mkdir -p $HOME
-
 cp ${SHARED_DIR}/libnss_wrapper.so ${HOME}
 cp ${SHARED_DIR}/mock-nss.sh ${HOME}
-
 export NSS_WRAPPER_PASSWD=$HOME/passwd NSS_WRAPPER_GROUP=$HOME/group NSS_USERNAME=nsswrapper NSS_GROUPNAME=nsswrapper LD_PRELOAD=${HOME}/libnss_wrapper.so
 bash ${HOME}/mock-nss.sh
 
-# Logs fetching
-### export IP=$(cat ${SHARED_DIR}/packet-server-ip)
-export IP=147.75.69.55
+# Get dev-scripts logs
+export IP=$(cat ${SHARED_DIR}/packet-server-ip)
 if [ -n "$IP" ] ; then
    echo "Getting logs"
    ssh $SSHOPTS root@$IP tar -czf - /root/dev-scripts/logs | tar -C ${ARTIFACT_DIR} -xzf -
-   ###mkdir -p ${ARTIFACT_DIR}/dev-scripts/logs/
-   ###scp $SSHOPTS -r root@IP:/root/dev-scripts/logs ${ARTIFACT_DIR}/dev-scripts/logs/
    sed -i -e 's/.*auths.*/*** PULL_SECRET ***/g' ${ARTIFACT_DIR}/root/dev-scripts/logs/*
 fi
 
-### echo "Deprovisioning cluster ..."
-### terraform init
-### for r in {1..5}; do terraform destroy -auto-approve && break ; done
+# Shutdown packet server
+terraform_home=${ARTIFACT_DIR}/terraform
+mkdir -p ${terraform_home}
+cp ${SHARED_DIR}/terraform.* ${terraform_home}
+echo "Deprovisioning cluster..."
+cd ${terraform_home}
+terraform init
+for r in {1..5}; do terraform destroy -auto-approve && break ; done
 
 
 

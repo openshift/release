@@ -77,18 +77,15 @@ cp /tmp/packet-server-ip ${secret_dir}
 export IP=$(cat /tmp/packet-server-ip)
 echo "Packet server IP is ${IP}"
 
-# NSS wrapper preparation
+# Applying NSS fix for SSH connection
 export HOME=/tmp/nss_wrapper
 mkdir -p $HOME
-
 cp ${SHARED_DIR}/libnss_wrapper.so ${HOME}
 cp ${SHARED_DIR}/mock-nss.sh ${HOME}
-
 export NSS_WRAPPER_PASSWD=$HOME/passwd NSS_WRAPPER_GROUP=$HOME/group NSS_USERNAME=nsswrapper NSS_GROUPNAME=nsswrapper LD_PRELOAD=${HOME}/libnss_wrapper.so
 bash ${HOME}/mock-nss.sh
 
-######### dev-scripts checkout and run
-
+# Checkout dev-scripts and make
 for x in $(seq 10) ; do
     test $x == 10 && exit 1
     ssh $SSHOPTS root@$IP hostname && break
