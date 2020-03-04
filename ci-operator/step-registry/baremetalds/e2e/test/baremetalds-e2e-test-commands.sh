@@ -23,6 +23,7 @@ echo "-------[ $SHARED_DIR ]"
 ls -ll ${SHARED_DIR}
 
 # Applying NSS fix for SSH connection
+echo "### Applying NSS fix"
 export HOME=/tmp/nss_wrapper
 mkdir -p $HOME
 cp ${SHARED_DIR}/libnss_wrapper.so ${HOME}
@@ -30,12 +31,19 @@ cp ${SHARED_DIR}/mock-nss.sh ${HOME}
 export NSS_WRAPPER_PASSWD=$HOME/passwd NSS_WRAPPER_GROUP=$HOME/group NSS_USERNAME=nsswrapper NSS_GROUPNAME=nsswrapper LD_PRELOAD=${HOME}/libnss_wrapper.so
 bash ${HOME}/mock-nss.sh
 
-# Copy test runn on packet server
+# Copy test binaries on packet server
+echo "### Copying test binaries"
 scp $SSHOPTS /usr/bin/openshift-tests /usr/bin/kubectl root@$IP:/usr/local/bin
 
 # Tests execution
+set +e
+echo "### Running tests"
 ssh $SSHOPTS root@$IP openshift-tests run "openshift/conformance/parallel" --dry-run | grep 'Area:Networking' | openshift-tests run -o ${ARTIFACT_DIR}/e2e.log --junit-dir ${ARTIFACT_DIR}/junit -f -
 rv=$?
+echo "### Fetching results"
 ssh $SSHOPTS root@$IP tar -czf - ${ARTIFACT_DIR} | tar -C / -xzf - 
+set -e
+echo "### Done! (${rv})"
 return $rv
+
 
