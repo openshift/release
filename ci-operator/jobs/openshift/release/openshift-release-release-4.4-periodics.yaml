@@ -709,7 +709,9 @@ periodics:
     workdir: true
   interval: 2h
   labels:
+    ci.openshift.io/release-type: informing
     job-release: "4.4"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: promote-release-openshift-okd-machine-os-content-e2e-aws-4.4
   spec:
     containers:
@@ -773,7 +775,6 @@ periodics:
           build_semver+="0"
         fi
 
-
         # compare the latest image we have built against the potential candidate
         latest="$( oc get istag -n fcos ${TAG}:${BRANCH} --template '{{ index .image.dockerImageMetadata.Config.Labels "version" }} {{ index .image.dockerImageMetadata.Config.Labels "id-artifacts" }} {{ index .image.dockerImageMetadata.Config.Labels "id-machine-config-operator-rpms" }}' )"
         candidate="${build_id} ${origin_artifacts_id} ${origin_machine_config_operator_rpms_id}"
@@ -786,13 +787,25 @@ periodics:
         curl -L https://github.com/mikefarah/yq/releases/download/2.4.0/yq_linux_amd64 2>/dev/null >/tmp/bin/yq
         chmod ug+x $HOME/bin/yq
 
-        # create namespace and set up basic environment
         namespace="ci-op-$( echo "${JOB_NAME}-${BUILD_ID}" | md5sum -t | cut -c 1-8 )"
         echo
         echo "--- Building machine-os-content for ${build_id} in namespace ${namespace}"
         oc registry login >/dev/null
-        oc new-project ${namespace} >/dev/null
-        oc policy add-role-to-group system:image-puller -n ${namespace} system:unauthenticated system:authenticated >/dev/null
+
+        # run build to do the image imports
+        ci-operator \
+          --artifact-dir=$(ARTIFACTS) \
+          --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson \
+          --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME) \
+          --kubeconfig=/etc/apici/kubeconfig \
+          --lease-server-password-file=/etc/boskos/password \
+          --lease-server-username=ci \
+          --lease-server=https://boskos-ci.svc.ci.openshift.org \
+          --secret-dir=/usr/local/e2e-aws-cluster-profile \
+          --secret-dir=/usr/local/pull-secret \
+          --template=/usr/local/e2e-aws \
+          --namespace=${namespace} \
+          --target=[images]
 
         function build {
           oc -n ${namespace} create -f $1 >/dev/null
@@ -820,7 +833,7 @@ periodics:
           output:
             to:
               kind: ImageStreamTag
-              name: machine-os-content:latest
+              name: pipeline:machine-os-content
           source:
             dockerfile: |
               FROM registry.svc.ci.openshift.org/${TAG_NS}/${BRANCH}@${origin_artifacts_id} AS artifacts
@@ -844,7 +857,8 @@ periodics:
                   cd /tmp/working && \\
                   for i in \$(find /tmp/rpms/ -name *.rpm); do echo "Extracting \$i ..."; rpm2cpio \$i | cpio -div; done && \\
                   mv etc usr/ && mv sbin/* usr/sbin/ && rm -rf sbin/ && \\
-                  ln -s ../vmtoolsd.service usr/lib/systemd/multi-user.target.wants/vmtoolsd.service && \\
+                  mkdir -p usr/lib/systemd/system/multi-user.target.wants && \\
+                  ln -s usr/lib/systemd/system/vmtoolsd.service usr/lib/systemd/system/multi-user.target.wants/vmtoolsd.service && \\
                   coreos-assembler dev-overlay --repo /srv/repo --rev "${ostree_ref}" --add-tree /tmp/working --output-ref "${ostree_ref}"
 
               FROM scratch
@@ -862,11 +876,23 @@ periodics:
         EOF
         oc -n ${namespace} create is machine-os-content >/dev/null
         build ${dir}/build.yaml machine-os-content
+        oc describe -n ${namespace} istag/pipeline:machine-os-content
 
-        # debug output
-        oc describe -n ${namespace} istag/machine-os-content:latest
-        oc tag ${namespace}/machine-os-content:latest fcos/machine-os-content:${BRANCH}
-        oc tag fcos/machine-os-content:${BRANCH} ${TAG_NS}/${BRANCH}:machine-os-content
+        # run tests
+        ci-operator \
+          --artifact-dir=$(ARTIFACTS) \
+          --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson \
+          --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME) \
+          --kubeconfig=/etc/apici/kubeconfig \
+          --lease-server-password-file=/etc/boskos/password \
+          --lease-server-username=ci \
+          --lease-server=https://boskos-ci.svc.ci.openshift.org \
+          --secret-dir=/usr/local/e2e-aws-cluster-profile \
+          --secret-dir=/usr/local/pull-secret \
+          --template=/usr/local/e2e-aws \
+          --namespace=${namespace} \
+          --target=e2e-aws \
+          --promote
       env:
       - name: TAG_NS
         value: origin
@@ -875,14 +901,48 @@ periodics:
       - name: BRANCH
         value: "4.4"
       - name: TAG_SOURCE
-        value: $(BRANCH):$(TAG)
+        value: machine-os-content:$(BRANCH)
       - name: CLUSTER_TYPE
         value: aws
       - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-origin-release-4.4.yaml
-            name: ci-operator-4.4-configs
+        value: |
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: origin
+          promotion:
+            name: "$(BRANCH)"
+            namespace: origin
+            additional_images:
+              $(TAG): $(TAG)
+          build_root:
+            image_stream_tag:
+              cluster: https://api.ci.openshift.org
+              name: release
+              namespace: openshift
+              tag: golang-1.13
+          base_images:
+            $(TAG):
+              name: $(TAG)
+              namespace: fcos
+              tag: "4.4"
+          raw_steps:
+          - output_image_tag_step:
+              from: $(TAG)
+              to:
+                name: stable
+                tag: $(TAG)
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-aws
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: aws
       - name: JOB_NAME_SAFE
         value: e2e-aws
       - name: TEST_COMMAND
@@ -894,11 +954,20 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-aws
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
     serviceAccountName: ci-operator
@@ -909,6 +978,12 @@ periodics:
         - key: sa.ci-operator.apici.config
           path: kubeconfig
         secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
