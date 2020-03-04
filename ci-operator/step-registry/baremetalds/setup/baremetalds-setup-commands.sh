@@ -143,6 +143,9 @@ echo "dev-scripts setup completed, fetching logs"
 ssh $SSHOPTS root@$IP tar -czf - /root/dev-scripts/logs | tar -C ${ARTIFACT_DIR} -xzf -
 sed -i -e 's/.*auths.*/*** PULL_SECRET ***/g' ${ARTIFACT_DIR}/root/dev-scripts/logs/*
 
+### Workaround due the sharing dir bug, to be removed once it will be fixed ###
+echo "Copying nss artifacts to ${secret_dir}"
+cp ${HOME}/mock-nss.sh ${HOME}/libnss_wrapper.so ${secret_dir}
 
 
 
