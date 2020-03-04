@@ -80,7 +80,7 @@ applyTemplate:
 	oc process -f $(WHAT) | oc apply -f -
 .PHONY: applyTemplate
 
-postsubmit-update: origin-release libpod prow-monitoring cincinnati prow-release-controller-definitions
+postsubmit-update: origin-release prow-monitoring cincinnati prow-release-controller-definitions
 .PHONY: postsubmit-update
 
 all: roles prow projects
@@ -96,7 +96,7 @@ roles: cluster-operator-roles cluster-roles
 prow: prow-ci-ns prow-ci-stg-ns
 .PHONY: prow
 
-prow-ci-ns: ci-ns prow-jobs prow-scaling
+prow-ci-ns: ci-ns prow-jobs
 .PHONY: prow-ci-ns
 
 prow-ci-stg-ns: ci-stg-ns
@@ -114,10 +114,6 @@ ci-stg-ns:
 openshift-ns:
 	oc project openshift
 .PHONY: openshift-ns
-
-prow-scaling:
-	oc apply -n kube-system -f cluster/ci/config/cluster-autoscaler.yaml
-.PHONY: prow-scaling
 
 prow-jobs: prow-artifacts
 	$(MAKE) apply WHAT=projects/prometheus/test/build.yaml
@@ -236,10 +232,6 @@ metering:
 	$(MAKE) -C projects/metering
 .PHONY: metering
 
-libpod:
-	$(MAKE) apply WHAT=projects/libpod/libpod.yaml
-.PHONY: libpod
-
 coreos:
 	$(MAKE) apply WHAT=projects/coreos/coreos.yaml
 .PHONY: coreos
@@ -258,11 +250,6 @@ build-farm-consistency:
 	@echo "diffing rpms-ocp assets ..."
 	for file in ./core-services/release-controller/rpms-ocp-*.yaml; do diff -Naup "$${file}" "./clusters/build-clusters/01_cluster/openshift/release-controller/$${file##*/}"; done
 .PHONY: build-farm-consistency
-
-logging:
-	$(MAKE) apply WHAT=cluster/ci/config/logging/fluentd-daemonset.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/logging/fluentd-configmap.yaml
-.PHONY: logging
 
 bump-pr:
 	$(MAKE) job JOB=periodic-prow-image-autobump
