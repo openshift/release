@@ -34,8 +34,7 @@ bash ${HOME}/mock-nss.sh
 scp $SSHOPTS /usr/bin/openshift-tests /usr/bin/kubectl root@$IP:/usr/local/bin
 
 # Tests execution
-test_suite=openshift/conformance/parallel
-ssh $SSHOPTS root@$IP openshift-tests run "${TEST_SUITE}" --dry-run | grep 'Area:Networking' | openshift-tests run -o ${ARTIFACT_DIR}/e2e.log --junit-dir ${ARTIFACT_DIR}/junit -f -
+ssh $SSHOPTS root@$IP openshift-tests run "openshift/conformance/parallel" --dry-run | grep 'Area:Networking' | openshift-tests run -o ${ARTIFACT_DIR}/e2e.log --junit-dir ${ARTIFACT_DIR}/junit -f -
 rv=$?
 ssh $SSHOPTS root@$IP tar -czf - ${ARTIFACT_DIR} | tar -C / -xzf - 
 return $rv
