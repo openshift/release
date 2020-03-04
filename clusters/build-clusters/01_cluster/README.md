@@ -4,7 +4,9 @@
 
 ## Installation
 
-The aws account below is managed by DPP team with the public hosted zone (base domain for installer): `ci.devcluster.openshift.com`.
+The aws account for installation of this cluster: [aws console](https://openshift-ci-infra.signin.aws.amazon.com/console).
+
+The aws account is managed by [DPP team](https://issues.redhat.com/browse/DPP-3283) with the public hosted zone (base domain for installer): `ci.devcluster.openshift.com`.
 
 To generate `install-config.yaml` after oc-cli logs in api.ci.openshift.org:
 
