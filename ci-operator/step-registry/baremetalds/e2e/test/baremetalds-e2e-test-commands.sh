@@ -8,7 +8,8 @@ cluster_profile=/var/run/secrets/ci.openshift.io/cluster-profile
 
 export SSH_PRIV_KEY_PATH=${cluster_profile}/ssh-privatekey
 export SSHOPTS="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90 -i ${SSH_PRIV_KEY_PATH}"
-export IP=$(cat ${SHARED_DIR}/packet-server-ip)       
+IP=$(cat ${SHARED_DIR}/packet-server-ip)
+export IP
 
 echo "************ baremetalds test command ************"
 env | sort

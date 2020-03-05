@@ -15,7 +15,8 @@ export SSHOPTS="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHost
 
 set +x
 export PACKET_PROJECT_ID=b3c1623c-ce0b-45cf-9757-c61a71e06eac
-export PACKET_AUTH_TOKEN=$(cat ${cluster_profile}/.packetcred)
+PACKET_AUTH_TOKEN=$(cat ${cluster_profile}/.packetcred)
+export PACKET_AUTH_TOKEN
 set -x
 
 echo "************ baremetalds setup command ************"
@@ -58,6 +59,7 @@ terraform init
 # example, `Oh snap, something went wrong! We've logged the error and will take a look - please reach out to us if you continue having trouble.`
 # therefore the terraform apply needs to be retried a few time before giving up.
 rc=1
+# shellcheck disable=SC2034
 for r in {1..5}; do terraform apply -auto-approve && rc=0 && break ; done
 if test "${rc}" -eq 1; then 
   echo >&2 "Failed to create packet server"

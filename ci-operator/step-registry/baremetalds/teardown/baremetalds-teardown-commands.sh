@@ -31,6 +31,7 @@ cp ${SHARED_DIR}/terraform.* ${terraform_home}
 echo "Deprovisioning cluster..."
 cd ${terraform_home}
 terraform init
+# shellcheck disable=SC2034
 for r in {1..5}; do terraform destroy -auto-approve && break ; done
 
 
