@@ -59,7 +59,7 @@ terraform init
 # example, `Oh snap, something went wrong! We've logged the error and will take a look - please reach out to us if you continue having trouble.`
 # therefore the terraform apply needs to be retried a few time before giving up.
 rc=1
-# shellcheck disable=SC2034
+# shellcheck disable=SC20347
 for r in {1..5}; do terraform apply -auto-approve && rc=0 && break ; done
 if test "${rc}" -eq 1; then 
   echo >&2 "Failed to create packet server"
@@ -79,7 +79,8 @@ jq -r '.modules[0].resources["packet_device.server"].primary.attributes.access_p
 cp /tmp/packet-server-ip ${secret_dir}
 
 # Fetch packet server IP
-export IP=$(cat /tmp/packet-server-ip)
+IP=$(cat /tmp/packet-server-ip)
+export IP
 echo "Packet server IP is ${IP}"
 
 # Applying NSS fix for SSH connection

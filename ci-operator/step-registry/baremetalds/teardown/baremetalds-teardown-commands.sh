@@ -9,7 +9,8 @@ export SSH_PRIV_KEY_PATH=${cluster_profile}/ssh-privatekey
 
 set +x
 export SSHOPTS="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90 -i ${SSH_PRIV_KEY_PATH}"
-export PACKET_AUTH_TOKEN=$(cat ${cluster_profile}/.packetcred)
+PACKET_AUTH_TOKEN=$(cat ${cluster_profile}/.packetcred)
+export PACKET_AUTH_TOKEN
 set -x
 
 echo "************ baremetalds teardown command ************"
