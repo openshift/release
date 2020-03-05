@@ -8,8 +8,6 @@ cluster_profile=/var/run/secrets/ci.openshift.io/cluster-profile
 
 export SSH_PRIV_KEY_PATH=${cluster_profile}/ssh-privatekey
 export SSHOPTS="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90 -i ${SSH_PRIV_KEY_PATH}"
-IP=$(cat ${SHARED_DIR}/packet-server-ip)
-export IP
 
 echo "************ baremetalds test command ************"
 env | sort
@@ -22,6 +20,9 @@ fi
 
 echo "-------[ $SHARED_DIR ]"
 ls -ll ${SHARED_DIR}
+
+IP=$(cat ${SHARED_DIR}/server-ip)
+export IP
 
 # Applying NSS fix for SSH connection
 echo "### Applying NSS fix"
@@ -36,15 +37,15 @@ bash ${HOME}/mock-nss.sh
 echo "### Copying test binaries"
 scp $SSHOPTS /usr/bin/openshift-tests /usr/bin/kubectl root@$IP:/usr/local/bin
 
-# Tests execution
-set +e
-echo "### Running tests"
-ssh $SSHOPTS root@$IP openshift-tests run "openshift/conformance/parallel" --dry-run \| grep -v 'sig-storage' \| openshift-tests run -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit -f -
-rv=$?
-echo "### Fetching results"
-ssh $SSHOPTS root@$IP tar -czf - /tmp/artifacts | tar -C ${ARTIFACT_DIR} -xzf - 
-set -e
-echo "### Done! (${rv})"
-exit $rv
+# # Tests execution
+# set +e
+# echo "### Running tests"
+# ssh $SSHOPTS root@$IP openshift-tests run "openshift/conformance/parallel" --dry-run \| grep -v 'sig-storage' \| openshift-tests run -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit -f -
+# rv=$?
+# echo "### Fetching results"
+# ssh $SSHOPTS root@$IP tar -czf - /tmp/artifacts | tar -C ${ARTIFACT_DIR} -xzf - 
+# set -e
+# echo "### Done! (${rv})"
+# exit $rv
 
 

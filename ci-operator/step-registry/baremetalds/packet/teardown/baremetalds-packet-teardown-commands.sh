@@ -13,7 +13,7 @@ PACKET_AUTH_TOKEN=$(cat ${cluster_profile}/.packetcred)
 export PACKET_AUTH_TOKEN
 set -x
 
-echo "************ baremetalds teardown command ************"
+echo "************ baremetalds packet teardown command ************"
 env | sort
 
 # Initial check
