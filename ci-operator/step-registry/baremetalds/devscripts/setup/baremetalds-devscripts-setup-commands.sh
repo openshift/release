@@ -35,6 +35,10 @@ if [ ! -d ${secret_dir} ]; then
     mkdir -p ${secret_dir}
 fi
 
+### ### Apply temporary fix for the shared dir issue: re-copy all the current content in ARTIFACT_DIR to secret_dir to make it visible for the subsequent steps ### ###
+cp ${ARTIFACT_DIR}/* ${secret_dir}
+### ###
+
 echo "Copying nss artifacts to ${secret_dir}"
 cp /bin/mock-nss.sh /usr/lib64/libnss_wrapper.so ${secret_dir}
 
