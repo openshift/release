@@ -75,6 +75,7 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: default
     context: ci/build-farm/build01-dry
     decorate: true
     labels:
@@ -222,6 +223,7 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: default
     context: ci/prow/core-dry
     decorate: true
     labels:
@@ -419,6 +421,29 @@ presubmits:
     always_run: true
     branches:
     - master
+    context: ci/prow/generated-cluster
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-generated-cluster
+    rerun_command: /test generated-cluster
+    spec:
+      containers:
+      - args:
+        - ./hack/ensure_job_cluster.py
+        command:
+        - python3
+        image: registry.svc.ci.openshift.org/ci/python-validation:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: ((?m)^/test generated-cluster,?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
     context: ci/prow/generated-config
     decorate: true
     labels:
@@ -611,6 +636,7 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: default
     context: ci/prow/services-dry
     decorate: true
     labels:
