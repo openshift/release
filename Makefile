@@ -273,3 +273,11 @@ ci-secret-bootstrap:
 	docker pull registry.svc.ci.openshift.org/ci/ci-secret-bootstrap:latest
 	docker run --rm -v "$(CURDIR)/core-services/ci-secret-bootstrap/_config.yaml:/_config.yaml:z" -v "$(kubeconfig_path):/_kubeconfig:z" -v "$(bw_password_path):/_bw_password:z" registry.svc.ci.openshift.org/ci/ci-secret-bootstrap:latest --bw-password-path=/_bw_password --bw-user $(kerberos_id)@redhat.com --config=/_config.yaml --kubeconfig=/_kubeconfig --dry-run=$(dry_run) --force=$(force)
 .PHONY: ci-secret-bootstrap
+
+verify-core-services-v2:
+	@./hack/verify-core-services-v2.sh
+.PHONY: verify-core-services-v2
+
+update-core-services-v2:
+	@update=true ./hack/verify-core-services-v2.sh
+.PHONY: update-core-services-v2

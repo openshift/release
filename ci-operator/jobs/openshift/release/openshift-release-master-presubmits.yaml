@@ -24,6 +24,29 @@ presubmits:
     always_run: true
     branches:
     - master
+    context: ci/prow/core-v2-config
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-core-v2-config
+    rerun_command: /test core-v2-config
+    spec:
+      containers:
+      - args:
+        - verify-core-services-v2
+        command:
+        - make
+        image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )core-v2-config,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
     context: ci/prow/build-farm-consistency
     decorate: true
     labels:
