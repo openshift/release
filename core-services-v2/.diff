@@ -1,368 +1,368 @@
-diff --recursive -u --new-file '--color=always' ./hack/../core-services/prow/01_crd/admin_01_prowjob_crd.yaml ./hack/../core-services-v2/prow/01_crd/admin_01_prowjob_crd.yaml
-[1m--- ./hack/../core-services/prow/01_crd/admin_01_prowjob_crd.yaml	2020-02-04 17:30:04.948772745 +0100[0m
-[1m+++ ./hack/../core-services-v2/prow/01_crd/admin_01_prowjob_crd.yaml	1970-01-01 01:00:00.000000000 +0100[0m
-[36m@@ -1,86 +0,0 @@[0m
-[31m-apiVersion: apiextensions.k8s.io/v1beta1[0m
-[31m-kind: CustomResourceDefinition[0m
-[31m-metadata:[0m
-[31m-  name: prowjobs.prow.k8s.io[0m
-[31m-spec:[0m
-[31m-  group: prow.k8s.io[0m
-[31m-  version: v1[0m
-[31m-  scope: Namespaced[0m
-[31m-  names:[0m
-[31m-    plural: prowjobs[0m
-[31m-    singular: prowjob[0m
-[31m-    kind: ProwJob[0m
-[31m-    listKind: ProwJobList[0m
-[31m-    shortNames:[0m
-[31m-    - pj[0m
-[31m-  validation:[0m
-[31m-    openAPIV3Schema:[0m
-[31m-      properties:[0m
-[31m-        spec:[0m
-[31m-          properties:[0m
-[31m-            max_concurrency:[0m
-[31m-              type: integer[0m
-[31m-              minimum: 0[0m
-[31m-            type:[0m
-[31m-              type: string[0m
-[31m-              enum:[0m
-[31m-              - "presubmit"[0m
-[31m-              - "postsubmit"[0m
-[31m-              - "periodic"[0m
-[31m-              - "batch"[0m
-[31m-        status:[0m
-[31m-          properties:[0m
-[31m-            state:[0m
-[31m-              type: string[0m
-[31m-              enum:[0m
-[31m-              - "triggered"[0m
-[31m-              - "pending"[0m
-[31m-              - "success"[0m
-[31m-              - "failure"[0m
-[31m-              - "aborted"[0m
-[31m-              - "error"[0m
-[31m-          anyOf:[0m
-[31m-          - not:[0m
-[31m-              properties:[0m
-[31m-                state:[0m
-[31m-                  type: string[0m
-[31m-                  enum:[0m
-[31m-                  - "success"[0m
-[31m-                  - "failure"[0m
-[31m-                  - "error"[0m
-[31m-                  - "aborted"[0m
-[31m-          - required:[0m
-[31m-            - completionTime[0m
-[31m-  additionalPrinterColumns:[0m
-[31m-  - name: Job[0m
-[31m-    type: string[0m
-[31m-    description: The name of the job being run.[0m
-[31m-    JSONPath: .spec.job[0m
-[31m-  - name: BuildId[0m
-[31m-    type: string[0m
-[31m-    description: The ID of the job being run.[0m
-[31m-    JSONPath: .status.build_id[0m
-[31m-  - name: Type[0m
-[31m-    type: string[0m
-[31m-    description: The type of job being run.[0m
-[31m-    JSONPath: .spec.type[0m
-[31m-  - name: Org[0m
-[31m-    type: string[0m
-[31m-    description: The org for which the job is running.[0m
-[31m-    JSONPath: .spec.refs.org[0m
-[31m-  - name: Repo[0m
-[31m-    type: string[0m
-[31m-    description: The repo for which the job is running.[0m
-[31m-    JSONPath: .spec.refs.repo[0m
-[31m-  - name: Pulls[0m
-[31m-    type: string[0m
-[31m-    description: The pulls for which the job is running.[0m
-[31m-    JSONPath: ".spec.refs.pulls[*].number"[0m
-[31m-  - name: StartTime[0m
-[31m-    type: date[0m
-[31m-    description: When the job started running.[0m
-[31m-    JSONPath: .status.startTime[0m
-[31m-  - name: CompletionTime[0m
-[31m-    type: date[0m
-[31m-    description: When the job finished running.[0m
-[31m-    JSONPath: .status.completionTime[0m
+diff --recursive -u --new-file ./hack/../core-services/prow/01_crd/admin_01_prowjob_crd.yaml ./hack/../core-services-v2/prow/01_crd/admin_01_prowjob_crd.yaml
+--- ./hack/../core-services/prow/01_crd/admin_01_prowjob_crd.yaml	2020-02-04 17:30:04.948772745 +0100
++++ ./hack/../core-services-v2/prow/01_crd/admin_01_prowjob_crd.yaml	1970-01-01 01:00:00.000000000 +0100
+@@ -1,86 +0,0 @@
+-apiVersion: apiextensions.k8s.io/v1beta1
+-kind: CustomResourceDefinition
+-metadata:
+-  name: prowjobs.prow.k8s.io
+-spec:
+-  group: prow.k8s.io
+-  version: v1
+-  scope: Namespaced
+-  names:
+-    plural: prowjobs
+-    singular: prowjob
+-    kind: ProwJob
+-    listKind: ProwJobList
+-    shortNames:
+-    - pj
+-  validation:
+-    openAPIV3Schema:
+-      properties:
+-        spec:
+-          properties:
+-            max_concurrency:
+-              type: integer
+-              minimum: 0
+-            type:
+-              type: string
+-              enum:
+-              - "presubmit"
+-              - "postsubmit"
+-              - "periodic"
+-              - "batch"
+-        status:
+-          properties:
+-            state:
+-              type: string
+-              enum:
+-              - "triggered"
+-              - "pending"
+-              - "success"
+-              - "failure"
+-              - "aborted"
+-              - "error"
+-          anyOf:
+-          - not:
+-              properties:
+-                state:
+-                  type: string
+-                  enum:
+-                  - "success"
+-                  - "failure"
+-                  - "error"
+-                  - "aborted"
+-          - required:
+-            - completionTime
+-  additionalPrinterColumns:
+-  - name: Job
+-    type: string
+-    description: The name of the job being run.
+-    JSONPath: .spec.job
+-  - name: BuildId
+-    type: string
+-    description: The ID of the job being run.
+-    JSONPath: .status.build_id
+-  - name: Type
+-    type: string
+-    description: The type of job being run.
+-    JSONPath: .spec.type
+-  - name: Org
+-    type: string
+-    description: The org for which the job is running.
+-    JSONPath: .spec.refs.org
+-  - name: Repo
+-    type: string
+-    description: The repo for which the job is running.
+-    JSONPath: .spec.refs.repo
+-  - name: Pulls
+-    type: string
+-    description: The pulls for which the job is running.
+-    JSONPath: ".spec.refs.pulls[*].number"
+-  - name: StartTime
+-    type: date
+-    description: When the job started running.
+-    JSONPath: .status.startTime
+-  - name: CompletionTime
+-    type: date
+-    description: When the job finished running.
+-    JSONPath: .status.completionTime
 \ No newline at end of file
-diff --recursive -u --new-file '--color=always' ./hack/../core-services/prow/01_crd/admin_02_prowjob_rbac.yaml ./hack/../core-services-v2/prow/01_crd/admin_02_prowjob_rbac.yaml
-[1m--- ./hack/../core-services/prow/01_crd/admin_02_prowjob_rbac.yaml	2020-02-04 17:30:04.948772745 +0100[0m
-[1m+++ ./hack/../core-services-v2/prow/01_crd/admin_02_prowjob_rbac.yaml	1970-01-01 01:00:00.000000000 +0100[0m
-[36m@@ -1,32 +0,0 @@[0m
-[31m-kind: List[0m
-[31m-apiVersion: v1[0m
-[31m-items:[0m
-[31m-- kind: ClusterRoleBinding[0m
-[31m-  apiVersion: rbac.authorization.k8s.io/v1beta1[0m
-[31m-  metadata:[0m
-[31m-    name: ci-admins-prowjobs[0m
-[31m-  subjects:[0m
-[31m-  - kind: Group[0m
-[31m-    apiGroup: rbac.authorization.k8s.io[0m
-[31m-    name: ci-admins[0m
-[31m-  roleRef:[0m
-[31m-    kind: ClusterRole[0m
-[31m-    apiGroup: rbac.authorization.k8s.io[0m
-[31m-    name: prowjob-access[0m
-[31m-- kind: ClusterRole[0m
-[31m-  apiVersion: rbac.authorization.k8s.io/v1beta1[0m
-[31m-  metadata:[0m
-[31m-    name: prowjob-access[0m
-[31m-  rules:[0m
-[31m-    - apiGroups:[0m
-[31m-        - "prow.k8s.io"[0m
-[31m-      resources:[0m
-[31m-        - prowjobs[0m
-[31m-      verbs:[0m
-[31m-        - get[0m
-[31m-        - list[0m
-[31m-        - create[0m
-[31m-        - delete[0m
-[31m-        - update[0m
-[31m-        - patch[0m
-[31m-        - watch[0m
-diff --recursive -u --new-file '--color=always' ./hack/../core-services/prow/01_crd/admin_03_boskos_crds.yaml ./hack/../core-services-v2/prow/01_crd/admin_03_boskos_crds.yaml
-[1m--- ./hack/../core-services/prow/01_crd/admin_03_boskos_crds.yaml	2020-02-13 14:30:44.158435999 +0100[0m
-[1m+++ ./hack/../core-services-v2/prow/01_crd/admin_03_boskos_crds.yaml	1970-01-01 01:00:00.000000000 +0100[0m
-[36m@@ -1,35 +0,0 @@[0m
-[31m-apiVersion: apiextensions.k8s.io/v1beta1[0m
-[31m-kind: CustomResourceDefinition[0m
-[31m-metadata:[0m
-[31m-  name: dynamicresourcelifecycles.boskos.k8s.io[0m
-[31m-spec:[0m
-[31m-  group: boskos.k8s.io[0m
-[31m-  names:[0m
-[31m-    kind: DRLCObject[0m
-[31m-    listKind: DRLCObjectList[0m
-[31m-    plural: dynamicresourcelifecycles[0m
-[31m-    singular: dynamicresourcelifecycle[0m
-[31m-  scope: Namespaced[0m
-[31m-  version: v1[0m
-[31m-  versions:[0m
-[31m-  - name: v1[0m
-[31m-    served: true[0m
-[31m-    storage: true[0m
-[31m----[0m
-[31m-apiVersion: apiextensions.k8s.io/v1beta1[0m
-[31m-kind: CustomResourceDefinition[0m
-[31m-metadata:[0m
-[31m-  name: resources.boskos.k8s.io[0m
-[31m-spec:[0m
-[31m-  group: boskos.k8s.io[0m
-[31m-  names:[0m
-[31m-    kind: ResourceObject[0m
-[31m-    listKind: ResourceObjectList[0m
-[31m-    plural: resources[0m
-[31m-    singular: resource[0m
-[31m-  scope: Namespaced[0m
-[31m-  version: v1[0m
-[31m-  versions:[0m
-[31m-  - name: v1[0m
-[31m-    served: true[0m
-[31m-    storage: true[0m
-diff --recursive -u --new-file '--color=always' ./hack/../core-services/prow/03_deployment/admin_config_updater_rbac.yaml ./hack/../core-services-v2/prow/03_deployment/admin_config_updater_rbac.yaml
-[1m--- ./hack/../core-services/prow/03_deployment/admin_config_updater_rbac.yaml	2020-03-05 16:17:00.795568049 +0100[0m
-[1m+++ ./hack/../core-services-v2/prow/03_deployment/admin_config_updater_rbac.yaml	2020-03-06 10:34:17.304431115 +0100[0m
-[36m@@ -70,34 +70,6 @@[0m
+diff --recursive -u --new-file ./hack/../core-services/prow/01_crd/admin_02_prowjob_rbac.yaml ./hack/../core-services-v2/prow/01_crd/admin_02_prowjob_rbac.yaml
+--- ./hack/../core-services/prow/01_crd/admin_02_prowjob_rbac.yaml	2020-02-04 17:30:04.948772745 +0100
++++ ./hack/../core-services-v2/prow/01_crd/admin_02_prowjob_rbac.yaml	1970-01-01 01:00:00.000000000 +0100
+@@ -1,32 +0,0 @@
+-kind: List
+-apiVersion: v1
+-items:
+-- kind: ClusterRoleBinding
+-  apiVersion: rbac.authorization.k8s.io/v1beta1
+-  metadata:
+-    name: ci-admins-prowjobs
+-  subjects:
+-  - kind: Group
+-    apiGroup: rbac.authorization.k8s.io
+-    name: ci-admins
+-  roleRef:
+-    kind: ClusterRole
+-    apiGroup: rbac.authorization.k8s.io
+-    name: prowjob-access
+-- kind: ClusterRole
+-  apiVersion: rbac.authorization.k8s.io/v1beta1
+-  metadata:
+-    name: prowjob-access
+-  rules:
+-    - apiGroups:
+-        - "prow.k8s.io"
+-      resources:
+-        - prowjobs
+-      verbs:
+-        - get
+-        - list
+-        - create
+-        - delete
+-        - update
+-        - patch
+-        - watch
+diff --recursive -u --new-file ./hack/../core-services/prow/01_crd/admin_03_boskos_crds.yaml ./hack/../core-services-v2/prow/01_crd/admin_03_boskos_crds.yaml
+--- ./hack/../core-services/prow/01_crd/admin_03_boskos_crds.yaml	2020-02-13 14:30:44.158435999 +0100
++++ ./hack/../core-services-v2/prow/01_crd/admin_03_boskos_crds.yaml	1970-01-01 01:00:00.000000000 +0100
+@@ -1,35 +0,0 @@
+-apiVersion: apiextensions.k8s.io/v1beta1
+-kind: CustomResourceDefinition
+-metadata:
+-  name: dynamicresourcelifecycles.boskos.k8s.io
+-spec:
+-  group: boskos.k8s.io
+-  names:
+-    kind: DRLCObject
+-    listKind: DRLCObjectList
+-    plural: dynamicresourcelifecycles
+-    singular: dynamicresourcelifecycle
+-  scope: Namespaced
+-  version: v1
+-  versions:
+-  - name: v1
+-    served: true
+-    storage: true
+----
+-apiVersion: apiextensions.k8s.io/v1beta1
+-kind: CustomResourceDefinition
+-metadata:
+-  name: resources.boskos.k8s.io
+-spec:
+-  group: boskos.k8s.io
+-  names:
+-    kind: ResourceObject
+-    listKind: ResourceObjectList
+-    plural: resources
+-    singular: resource
+-  scope: Namespaced
+-  version: v1
+-  versions:
+-  - name: v1
+-    served: true
+-    storage: true
+diff --recursive -u --new-file ./hack/../core-services/prow/03_deployment/admin_config_updater_rbac.yaml ./hack/../core-services-v2/prow/03_deployment/admin_config_updater_rbac.yaml
+--- ./hack/../core-services/prow/03_deployment/admin_config_updater_rbac.yaml	2020-03-05 16:17:00.795568049 +0100
++++ ./hack/../core-services-v2/prow/03_deployment/admin_config_updater_rbac.yaml	2020-03-06 10:34:17.304431115 +0100
+@@ -70,34 +70,6 @@
    apiVersion: rbac.authorization.k8s.io/v1
    metadata:
      name: config-updater
-[31m-    namespace: openshift[0m
-[31m-  rules:[0m
-[31m-    - apiGroups:[0m
-[31m-        - image.openshift.io[0m
-[31m-      resources:[0m
-[31m-        - imagestreams[0m
-[31m-      verbs:[0m
-[31m-        - get[0m
-[31m-        - create[0m
-[31m-        - update[0m
-[31m-        - patch[0m
-[31m-- kind: RoleBinding[0m
-[31m-  apiVersion: rbac.authorization.k8s.io/v1[0m
-[31m-  metadata:[0m
-[31m-    name: config-updater[0m
-[31m-    namespace: openshift[0m
-[31m-  roleRef:[0m
-[31m-    apiGroup: rbac.authorization.k8s.io[0m
-[31m-    kind: Role[0m
-[31m-    name: config-updater[0m
-[31m-  subjects:[0m
-[31m-  - kind: ServiceAccount[0m
-[31m-    name: config-updater[0m
-[31m-    namespace: ci[0m
-[31m-- kind: Role[0m
-[31m-  apiVersion: rbac.authorization.k8s.io/v1[0m
-[31m-  metadata:[0m
-[31m-    name: config-updater[0m
+-    namespace: openshift
+-  rules:
+-    - apiGroups:
+-        - image.openshift.io
+-      resources:
+-        - imagestreams
+-      verbs:
+-        - get
+-        - create
+-        - update
+-        - patch
+-- kind: RoleBinding
+-  apiVersion: rbac.authorization.k8s.io/v1
+-  metadata:
+-    name: config-updater
+-    namespace: openshift
+-  roleRef:
+-    apiGroup: rbac.authorization.k8s.io
+-    kind: Role
+-    name: config-updater
+-  subjects:
+-  - kind: ServiceAccount
+-    name: config-updater
+-    namespace: ci
+-- kind: Role
+-  apiVersion: rbac.authorization.k8s.io/v1
+-  metadata:
+-    name: config-updater
      namespace: prow-monitoring
    rules:
      - apiGroups:
-[36m@@ -233,43 +205,6 @@[0m
+@@ -233,43 +205,6 @@
    apiVersion: rbac.authorization.k8s.io/v1
    metadata:
      name: config-updater
-[31m-    namespace: openshift-monitoring[0m
-[31m-  rules:[0m
-[31m-    - apiGroups:[0m
-[31m-        - ""[0m
-[31m-      resources:[0m
-[31m-        - secrets[0m
-[31m-      verbs:[0m
-[31m-        - get[0m
-[31m-        - patch[0m
-[31m-    - apiGroups:[0m
-[31m-        - monitoring.coreos.com[0m
-[31m-      resources:[0m
-[31m-        - prometheusrules[0m
-[31m-        - prometheuses[0m
-[31m-        - alertmanagers[0m
-[31m-      verbs:[0m
-[31m-        - get[0m
-[31m-        - create[0m
-[31m-        - update[0m
-[31m-        - patch[0m
-[31m-- kind: RoleBinding[0m
-[31m-  apiVersion: rbac.authorization.k8s.io/v1[0m
-[31m-  metadata:[0m
-[31m-    name: config-updater[0m
-[31m-    namespace: openshift-monitoring[0m
-[31m-  roleRef:[0m
-[31m-    apiGroup: rbac.authorization.k8s.io[0m
-[31m-    kind: Role[0m
-[31m-    name: config-updater[0m
-[31m-  subjects:[0m
-[31m-  - kind: ServiceAccount[0m
-[31m-    name: config-updater[0m
-[31m-    namespace: ci[0m
-[31m-- kind: Role[0m
-[31m-  apiVersion: rbac.authorization.k8s.io/v1[0m
-[31m-  metadata:[0m
-[31m-    name: config-updater[0m
+-    namespace: openshift-monitoring
+-  rules:
+-    - apiGroups:
+-        - ""
+-      resources:
+-        - secrets
+-      verbs:
+-        - get
+-        - patch
+-    - apiGroups:
+-        - monitoring.coreos.com
+-      resources:
+-        - prometheusrules
+-        - prometheuses
+-        - alertmanagers
+-      verbs:
+-        - get
+-        - create
+-        - update
+-        - patch
+-- kind: RoleBinding
+-  apiVersion: rbac.authorization.k8s.io/v1
+-  metadata:
+-    name: config-updater
+-    namespace: openshift-monitoring
+-  roleRef:
+-    apiGroup: rbac.authorization.k8s.io
+-    kind: Role
+-    name: config-updater
+-  subjects:
+-  - kind: ServiceAccount
+-    name: config-updater
+-    namespace: ci
+-- kind: Role
+-  apiVersion: rbac.authorization.k8s.io/v1
+-  metadata:
+-    name: config-updater
      namespace: ci-search
    rules:
      - apiGroups:
-[36m@@ -377,40 +312,6 @@[0m
+@@ -377,40 +312,6 @@
    subjects:
    - kind: ServiceAccount
      name: config-updater
-[31m-    namespace: ci[0m
-[31m-- kind: ClusterRole[0m
-[31m-  apiVersion: rbac.authorization.k8s.io/v1[0m
-[31m-  metadata:[0m
-[31m-    name: manage-priorityclasses[0m
-[31m-  rules:[0m
-[31m-  - apiGroups:[0m
-[31m-    - scheduling.k8s.io[0m
-[31m-    resources:[0m
-[31m-    - priorityclasses[0m
-[31m-    verbs:[0m
-[31m-      - get[0m
-[31m-      - create[0m
-[31m-      - update[0m
-[31m-      - patch[0m
-[31m-  - apiGroups:[0m
-[31m-      - ""[0m
-[31m-    resources:[0m
-[31m-      - persistentvolumes[0m
-[31m-    verbs:[0m
-[31m-      - get[0m
-[31m-      - create[0m
-[31m-      - update[0m
-[31m-      - patch[0m
-[31m-- kind: ClusterRoleBinding[0m
-[31m-  apiVersion: rbac.authorization.k8s.io/v1[0m
-[31m-  metadata:[0m
-[31m-    name: manage-priorityclasses-config-updater[0m
-[31m-  roleRef:[0m
-[31m-    kind: ClusterRole[0m
-[31m-    name: manage-priorityclasses[0m
-[31m-  subjects:[0m
-[31m-  - kind: ServiceAccount[0m
-[31m-    name: config-updater[0m
+-    namespace: ci
+-- kind: ClusterRole
+-  apiVersion: rbac.authorization.k8s.io/v1
+-  metadata:
+-    name: manage-priorityclasses
+-  rules:
+-  - apiGroups:
+-    - scheduling.k8s.io
+-    resources:
+-    - priorityclasses
+-    verbs:
+-      - get
+-      - create
+-      - update
+-      - patch
+-  - apiGroups:
+-      - ""
+-    resources:
+-      - persistentvolumes
+-    verbs:
+-      - get
+-      - create
+-      - update
+-      - patch
+-- kind: ClusterRoleBinding
+-  apiVersion: rbac.authorization.k8s.io/v1
+-  metadata:
+-    name: manage-priorityclasses-config-updater
+-  roleRef:
+-    kind: ClusterRole
+-    name: manage-priorityclasses
+-  subjects:
+-  - kind: ServiceAccount
+-    name: config-updater
      namespace: ci
  - kind: Role
    apiVersion: rbac.authorization.k8s.io/v1
-diff --recursive -u --new-file '--color=always' ./hack/../core-services/prow/03_deployment/horologium.yaml ./hack/../core-services-v2/prow/03_deployment/horologium.yaml
-[1m--- ./hack/../core-services/prow/03_deployment/horologium.yaml	2020-03-06 10:03:46.070897975 +0100[0m
-[1m+++ ./hack/../core-services-v2/prow/03_deployment/horologium.yaml	2020-03-06 10:02:49.047677918 +0100[0m
-[36m@@ -10,7 +10,7 @@[0m
+diff --recursive -u --new-file ./hack/../core-services/prow/03_deployment/horologium.yaml ./hack/../core-services-v2/prow/03_deployment/horologium.yaml
+--- ./hack/../core-services/prow/03_deployment/horologium.yaml	2020-03-06 10:03:46.070897975 +0100
++++ ./hack/../core-services-v2/prow/03_deployment/horologium.yaml	2020-03-06 10:02:49.047677918 +0100
+@@ -10,7 +10,7 @@
        app: prow
        component: horologium
    spec:
-[31m-    replicas: 1[0m
-[32m+    replicas: 0[0m
+-    replicas: 1
++    replicas: 0
      revisionHistoryLimit: 2
      selector:
        matchLabels:
-diff --recursive -u --new-file '--color=always' ./hack/../core-services/prow/03_deployment/namespaces.yaml ./hack/../core-services-v2/prow/03_deployment/namespaces.yaml
-[1m--- ./hack/../core-services/prow/03_deployment/namespaces.yaml	1970-01-01 01:00:00.000000000 +0100[0m
-[1m+++ ./hack/../core-services-v2/prow/03_deployment/namespaces.yaml	2020-03-06 10:02:49.047677918 +0100[0m
-[36m@@ -0,0 +1,51 @@[0m
-[32m+kind: List[0m
-[32m+apiVersion: v1[0m
-[32m+items:[0m
-[32m+- apiVersion: v1[0m
-[32m+  kind: Namespace[0m
-[32m+  metadata:[0m
-[32m+    name: ci[0m
-[32m+- apiVersion: v1[0m
-[32m+  kind: Namespace[0m
-[32m+  metadata:[0m
-[32m+    name: prow-monitoring[0m
-[32m+- apiVersion: v1[0m
-[32m+  kind: Namespace[0m
-[32m+  metadata:[0m
-[32m+    name: ci-stg[0m
-[32m+- apiVersion: v1[0m
-[32m+  kind: Namespace[0m
-[32m+  metadata:[0m
-[32m+    name: ci-search[0m
-[32m+- apiVersion: v1[0m
-[32m+  kind: Namespace[0m
-[32m+  metadata:[0m
-[32m+    name: ci-rpms[0m
-[32m+- apiVersion: v1[0m
-[32m+  kind: Namespace[0m
-[32m+  metadata:[0m
-[32m+    name: bastion[0m
-[32m+- apiVersion: v1[0m
-[32m+  kind: Namespace[0m
-[32m+  metadata:[0m
-[32m+    name: release-controller-test[0m
-[32m+- apiVersion: v1[0m
-[32m+  kind: Namespace[0m
-[32m+  metadata:[0m
-[32m+    name: release-controller-test-job[0m
-[32m+- apiVersion: v1[0m
-[32m+  kind: Namespace[0m
-[32m+  metadata:[0m
-[32m+    name: promecieus[0m
-[32m+- apiVersion: v1[0m
-[32m+  kind: Namespace[0m
-[32m+  metadata:[0m
-[32m+    name: ci-release-ppc64le[0m
-[32m+- apiVersion: v1[0m
-[32m+  kind: Namespace[0m
-[32m+  metadata:[0m
-[32m+    name: ci-release-s390x[0m
-[32m+- apiVersion: v1[0m
-[32m+  kind: Namespace[0m
-[32m+  metadata:[0m
-[32m+    name: ocp-private[0m
-diff --recursive -u --new-file '--color=always' ./hack/../core-services/prow/03_deployment/plank.yaml ./hack/../core-services-v2/prow/03_deployment/plank.yaml
-[1m--- ./hack/../core-services/prow/03_deployment/plank.yaml	2020-03-06 10:02:49.050677929 +0100[0m
-[1m+++ ./hack/../core-services-v2/prow/03_deployment/plank.yaml	2020-03-06 12:34:09.209353306 +0100[0m
-[36m@@ -28,7 +28,7 @@[0m
+diff --recursive -u --new-file ./hack/../core-services/prow/03_deployment/namespaces.yaml ./hack/../core-services-v2/prow/03_deployment/namespaces.yaml
+--- ./hack/../core-services/prow/03_deployment/namespaces.yaml	1970-01-01 01:00:00.000000000 +0100
++++ ./hack/../core-services-v2/prow/03_deployment/namespaces.yaml	2020-03-06 10:02:49.047677918 +0100
+@@ -0,0 +1,51 @@
++kind: List
++apiVersion: v1
++items:
++- apiVersion: v1
++  kind: Namespace
++  metadata:
++    name: ci
++- apiVersion: v1
++  kind: Namespace
++  metadata:
++    name: prow-monitoring
++- apiVersion: v1
++  kind: Namespace
++  metadata:
++    name: ci-stg
++- apiVersion: v1
++  kind: Namespace
++  metadata:
++    name: ci-search
++- apiVersion: v1
++  kind: Namespace
++  metadata:
++    name: ci-rpms
++- apiVersion: v1
++  kind: Namespace
++  metadata:
++    name: bastion
++- apiVersion: v1
++  kind: Namespace
++  metadata:
++    name: release-controller-test
++- apiVersion: v1
++  kind: Namespace
++  metadata:
++    name: release-controller-test-job
++- apiVersion: v1
++  kind: Namespace
++  metadata:
++    name: promecieus
++- apiVersion: v1
++  kind: Namespace
++  metadata:
++    name: ci-release-ppc64le
++- apiVersion: v1
++  kind: Namespace
++  metadata:
++    name: ci-release-s390x
++- apiVersion: v1
++  kind: Namespace
++  metadata:
++    name: ocp-private
+diff --recursive -u --new-file ./hack/../core-services/prow/03_deployment/plank.yaml ./hack/../core-services-v2/prow/03_deployment/plank.yaml
+--- ./hack/../core-services/prow/03_deployment/plank.yaml	2020-03-06 10:02:49.050677929 +0100
++++ ./hack/../core-services-v2/prow/03_deployment/plank.yaml	2020-03-06 12:34:09.209353306 +0100
+@@ -28,7 +28,7 @@
        component: plank
    spec:
      # Do not scale up.
-[31m-    replicas: 1[0m
-[32m+    replicas: 0[0m
+-    replicas: 1
++    replicas: 0
      revisionHistoryLimit: 2
      strategy:
        type: Recreate

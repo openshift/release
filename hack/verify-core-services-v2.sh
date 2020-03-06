@@ -16,7 +16,6 @@ actual_diff="$(diff \
   --recursive \
   -u \
   --new-file \
-  --color=always \
   $repo_root/core-services/prow/ \
   $repo_root/core-services-v2/prow/ || true)"
 
