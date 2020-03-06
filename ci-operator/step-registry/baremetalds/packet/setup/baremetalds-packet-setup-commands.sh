@@ -24,9 +24,6 @@ if [ "${CLUSTER_TYPE}" != "packet" ] ; then
     exit 1
 fi
 
-echo "-------[ $SHARED_DIR ]"
-ls -ll ${SHARED_DIR}
-
 # Terraform setup and init for packet server
 terraform_home=${ARTIFACT_DIR}/terraform
 mkdir -p ${terraform_home}
