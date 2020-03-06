@@ -57,54 +57,54 @@ for x in $(seq 10) ; do
 done
 
 scp $SSHOPTS ${PULL_SECRET_PATH} root@$IP:pull-secret
-######
-# timeout -s 9 175m ssh $SSHOPTS root@$IP bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 
-# set -ex
+timeout -s 9 175m ssh $SSHOPTS root@$IP bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 
-# yum install -y git
+set -ex
 
-# # python2-cryptography needs to come from delorean-master-testing, priority of packet.repo overrides it
-# # remove the priority and instead ensure the packet repo is named first alphabetically
-# # this way it is prefered but it isn't a hard override when newer versions are found elsewhere
-# sed -i -e 's/priority.*//g' /etc/yum.repos.d/packet.repo
-# sed -i -e 's/packet-/a_packet-/g' /etc/yum.repos.d/packet.repo
+yum install -y git
 
-# rm -rf /tmp/artifacts
-# mkdir -p /tmp/artifacts
+# python2-cryptography needs to come from delorean-master-testing, priority of packet.repo overrides it
+# remove the priority and instead ensure the packet repo is named first alphabetically
+# this way it is prefered but it isn't a hard override when newer versions are found elsewhere
+sed -i -e 's/priority.*//g' /etc/yum.repos.d/packet.repo
+sed -i -e 's/packet-/a_packet-/g' /etc/yum.repos.d/packet.repo
 
-# if [ ! -e dev-scripts ] ; then
-#   git clone https://github.com/openshift-metal3/dev-scripts.git
-# fi
-# cd dev-scripts
+rm -rf /tmp/artifacts
+mkdir -p /tmp/artifacts
 
-# set +x
-# echo "export PULL_SECRET='\$(cat /root/pull-secret)'" > /root/dev-scripts/config_root.sh
-# set -x
+if [ ! -e dev-scripts ] ; then
+  git clone https://github.com/openshift-metal3/dev-scripts.git
+fi
+cd dev-scripts
 
-# curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar -C /usr/bin -xzf -
+set +x
+echo "export PULL_SECRET='\$(cat /root/pull-secret)'" > /root/dev-scripts/config_root.sh
+set -x
 
-# echo "export OPENSHIFT_RELEASE_IMAGE=registry.svc.ci.openshift.org/ocp/release:4.4.0-0.nightly-2020-03-02-180524" >> /root/dev-scripts/config_root.sh
-# echo "export ADDN_DNS=\$(awk '/nameserver/ { print \$2;exit; }' /etc/resolv.conf)" >> /root/dev-scripts/config_root.sh
-# echo "export OPENSHIFT_CI=true" >> /root/dev-scripts/config_root.sh
-# echo "export MIRROR_IMAGES=true" >> /root/dev-scripts/config_root.sh
+curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar -C /usr/bin -xzf -
 
-# echo 'export KUBECONFIG=/root/dev-scripts/ocp/ostest/auth/kubeconfig' >> /root/.bashrc
+echo "export OPENSHIFT_RELEASE_IMAGE=registry.svc.ci.openshift.org/ocp/release:4.4.0-0.nightly-2020-03-02-180524" >> /root/dev-scripts/config_root.sh
+echo "export ADDN_DNS=\$(awk '/nameserver/ { print \$2;exit; }' /etc/resolv.conf)" >> /root/dev-scripts/config_root.sh
+echo "export OPENSHIFT_CI=true" >> /root/dev-scripts/config_root.sh
+echo "export MIRROR_IMAGES=true" >> /root/dev-scripts/config_root.sh
 
-# if [ ! -e /opt/dev-scripts/pool ] ; then
-#   mkdir -p /opt/dev-scripts/pool
-#   mount -t tmpfs -o size=100G tmpfs /opt/dev-scripts/pool
-# fi
+echo 'export KUBECONFIG=/root/dev-scripts/ocp/ostest/auth/kubeconfig' >> /root/.bashrc
 
-# timeout -s 9 105m make
+if [ ! -e /opt/dev-scripts/pool ] ; then
+  mkdir -p /opt/dev-scripts/pool
+  mount -t tmpfs -o size=100G tmpfs /opt/dev-scripts/pool
+fi
 
-# EOF
+timeout -s 9 105m make
 
-# # Get dev-scripts logs
-# echo "dev-scripts setup completed, fetching logs"
-# ssh $SSHOPTS root@$IP tar -czf - /root/dev-scripts/logs | tar -C ${ARTIFACT_DIR} -xzf -
-# sed -i -e 's/.*auths.*/*** PULL_SECRET ***/g' ${ARTIFACT_DIR}/root/dev-scripts/logs/*
-######
+EOF
+
+# Get dev-scripts logs
+echo "dev-scripts setup completed, fetching logs"
+ssh $SSHOPTS root@$IP tar -czf - /root/dev-scripts/logs | tar -C ${ARTIFACT_DIR} -xzf -
+sed -i -e 's/.*auths.*/*** PULL_SECRET ***/g' ${ARTIFACT_DIR}/root/dev-scripts/logs/*
+
 
 
 
