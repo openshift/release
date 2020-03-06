@@ -1,22 +1,28 @@
 base_images:
   base:
     cluster: https://api.ci.openshift.org
-    name: 4.5-priv
+    name: 4.4-priv
     namespace: ocp-private
     tag: base
+binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
     cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
-    tag: golang-1.10
-canonical_go_repository: github.com/metal3-io/baremetal-operator
+    tag: golang-1.13
+canonical_go_repository: github.com/openshift/oauth-proxy
 images:
-- dockerfile_path: Dockerfile
+- dockerfile_path: Dockerfile.rhel7
   from: base
-  to: baremetal-operator
+  inputs:
+    bin:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
+      paths: null
+  to: oauth-proxy-samples
 promotion:
-  name: 4.5-priv
+  name: 4.4-priv
   namespace: ocp-private
 resources:
   '*':
@@ -26,14 +32,5 @@ resources:
       memory: 200Mi
 tag_specification:
   cluster: https://api.ci.openshift.org
-  name: 4.5-priv
+  name: 4.4-priv
   namespace: ocp-private
-tests:
-- as: unit
-  commands: make unit
-  container:
-    from: src
-- as: lint
-  commands: make lint
-  container:
-    from: src
