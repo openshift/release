@@ -2,6 +2,56 @@ postsubmits:
   openshift/release:
   - agent: kubernetes
     branches:
+    - ^master$
+    decorate: true
+    labels:
+      ci.openshift.io/role: infra
+    name: branch-ci-openshift-release-master-app-ci-apply
+    spec:
+      containers:
+      - args:
+        - --config-dir
+        - clusters/app.ci
+        - --confirm
+        - "true"
+        - --level
+        - all
+        - --kubeconfig
+        - /etc/kubeconfig/kubeconfig
+        command:
+        - applyconfig
+        env:
+        - name: build01_build01_reg_auth_value
+          valueFrom:
+            secretKeyRef:
+              key: build01_build01_reg_auth_value.txt
+              name: build-farm-credentials
+        - name: build01_ci_reg_auth_value
+          valueFrom:
+            secretKeyRef:
+              key: build01_ci_reg_auth_value.txt
+              name: build-farm-credentials
+        - name: slack_api_url
+          valueFrom:
+            secretKeyRef:
+              key: url
+              name: ci-slack-api-url
+        image: registry.svc.ci.openshift.org/ci/applyconfig:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/kubeconfig
+          name: kubeconfig
+          readOnly: true
+      volumes:
+      - name: kubeconfig
+        secret:
+          secretName: app-ci-config-updater-kubeconfig
+  - agent: kubernetes
+    branches:
     - master
     decorate: true
     labels:
@@ -144,56 +194,6 @@ postsubmits:
           requests:
             cpu: 10m
       serviceAccountName: config-updater
-  - agent: kubernetes
-    branches:
-    - ^master$
-    decorate: true
-    labels:
-      ci.openshift.io/role: infra
-    name: branch-ci-openshift-release-master-core-v2-apply
-    spec:
-      containers:
-      - args:
-        - --config-dir
-        - core-services-v2
-        - --confirm
-        - "true"
-        - --level
-        - all
-        - --kubeconfig
-        - /etc/kubeconfig/kubeconfig
-        command:
-        - applyconfig
-        env:
-        - name: build01_build01_reg_auth_value
-          valueFrom:
-            secretKeyRef:
-              key: build01_build01_reg_auth_value.txt
-              name: build-farm-credentials
-        - name: build01_ci_reg_auth_value
-          valueFrom:
-            secretKeyRef:
-              key: build01_ci_reg_auth_value.txt
-              name: build-farm-credentials
-        - name: slack_api_url
-          valueFrom:
-            secretKeyRef:
-              key: url
-              name: ci-slack-api-url
-        image: registry.svc.ci.openshift.org/ci/applyconfig:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/kubeconfig
-          name: kubeconfig
-          readOnly: true
-      volumes:
-      - name: kubeconfig
-        secret:
-          secretName: app-ci-config-updater-kubeconfig
   - agent: kubernetes
     branches:
     - ^master$
