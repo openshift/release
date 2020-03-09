@@ -1,37 +1,67 @@
 kind: List
 apiVersion: v1
 items:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    namespace: ci
+    labels:
+      app: prow
+      component: crier
+    name: crier
+  spec:
+    ports:
+    - name: metrics
+      port: 9090
+      protocol: TCP
+      targetPort: 9090
+    selector:
+      app: prow
+      component: crier
 - apiVersion: apps/v1
   kind: Deployment
   metadata:
     namespace: ci
-    name: horologium
+    name: crier
     labels:
       app: prow
-      component: horologium
+      component: crier
   spec:
+    # Do not scale up.
     replicas: 1
     revisionHistoryLimit: 2
+    strategy:
+      type: Recreate
     selector:
       matchLabels:
         app: prow
-        component: horologium
+        component: crier
     template:
       metadata:
         labels:
           app: prow
-          component: horologium
+          component: crier
       spec:
-        serviceAccountName: horologium
+        serviceAccountName: crier
         priorityClassName: prow-critical
         containers:
-        - name: horologium
+        - name: crier
+          image: gcr.io/k8s-prow/crier:v20200305-e8ef9758b
           args:
+          - --github-workers=5
           - --config-path=/etc/config/config.yaml
           - --job-config-path=/etc/job-config
-          - --dry-run=false
-          image: gcr.io/k8s-prow/horologium:v20200309-685d04ec8
+          - --github-token-path=/etc/github/oauth
+          - --github-endpoint=http://ghproxy
+          - --github-endpoint=https://api.github.com
+          - --gcs-workers=10
+          - --gcs-credentials-file=/etc/service-account/service-account.json
+          - --kubernetes-gcs-workers=10
+          - --kubeconfig=/etc/build-farm-credentials/kubeconfig
           volumeMounts:
+          - name: oauth
+            mountPath: /etc/github
+            readOnly: true
           - name: config
             mountPath: /etc/config
             readOnly: true
@@ -65,11 +95,20 @@ items:
           - name: job-config-46
             mountPath: /etc/job-config/4.6
             readOnly: true
+          - mountPath: /etc/build-farm-credentials
+            name: build-farm-credentials
+            readOnly: true
+          - name: service-account
+            mountPath: /etc/service-account
+            readOnly: true
           resources:
             requests:
-              memory: "1.5Gi"
-              cpu: "150m"
+              memory: "4Gi"
+              cpu: "600m"
         volumes:
+        - name: oauth
+          secret:
+            secretName: github-credentials-openshift-ci-robot
         - name: config
           configMap:
             name: config
@@ -103,3 +142,12 @@ items:
         - name: job-config-46
           configMap:
             name: job-config-4.6
+        - name: build-farm-credentials
+          secret:
+            items:
+            - key: sa.crier.build01.config
+              path: kubeconfig
+            secretName: build-farm-credentials
+        - name: service-account
+          secret:
+            secretName: gce-sa-credentials-gcs-crier-publisher

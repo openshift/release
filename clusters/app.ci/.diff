@@ -1,0 +1,380 @@
+diff --recursive -u --new-file '--label=o' '--label=m' o m
+--- o
++++ m
+@@ -1,86 +0,0 @@
+-apiVersion: apiextensions.k8s.io/v1beta1
+-kind: CustomResourceDefinition
+-metadata:
+-  name: prowjobs.prow.k8s.io
+-spec:
+-  group: prow.k8s.io
+-  version: v1
+-  scope: Namespaced
+-  names:
+-    plural: prowjobs
+-    singular: prowjob
+-    kind: ProwJob
+-    listKind: ProwJobList
+-    shortNames:
+-    - pj
+-  validation:
+-    openAPIV3Schema:
+-      properties:
+-        spec:
+-          properties:
+-            max_concurrency:
+-              type: integer
+-              minimum: 0
+-            type:
+-              type: string
+-              enum:
+-              - "presubmit"
+-              - "postsubmit"
+-              - "periodic"
+-              - "batch"
+-        status:
+-          properties:
+-            state:
+-              type: string
+-              enum:
+-              - "triggered"
+-              - "pending"
+-              - "success"
+-              - "failure"
+-              - "aborted"
+-              - "error"
+-          anyOf:
+-          - not:
+-              properties:
+-                state:
+-                  type: string
+-                  enum:
+-                  - "success"
+-                  - "failure"
+-                  - "error"
+-                  - "aborted"
+-          - required:
+-            - completionTime
+-  additionalPrinterColumns:
+-  - name: Job
+-    type: string
+-    description: The name of the job being run.
+-    JSONPath: .spec.job
+-  - name: BuildId
+-    type: string
+-    description: The ID of the job being run.
+-    JSONPath: .status.build_id
+-  - name: Type
+-    type: string
+-    description: The type of job being run.
+-    JSONPath: .spec.type
+-  - name: Org
+-    type: string
+-    description: The org for which the job is running.
+-    JSONPath: .spec.refs.org
+-  - name: Repo
+-    type: string
+-    description: The repo for which the job is running.
+-    JSONPath: .spec.refs.repo
+-  - name: Pulls
+-    type: string
+-    description: The pulls for which the job is running.
+-    JSONPath: ".spec.refs.pulls[*].number"
+-  - name: StartTime
+-    type: date
+-    description: When the job started running.
+-    JSONPath: .status.startTime
+-  - name: CompletionTime
+-    type: date
+-    description: When the job finished running.
+-    JSONPath: .status.completionTime
+\ No newline at end of file
+diff --recursive -u --new-file '--label=o' '--label=m' o m
+--- o
++++ m
+@@ -1,32 +0,0 @@
+-kind: List
+-apiVersion: v1
+-items:
+-- kind: ClusterRoleBinding
+-  apiVersion: rbac.authorization.k8s.io/v1beta1
+-  metadata:
+-    name: ci-admins-prowjobs
+-  subjects:
+-  - kind: Group
+-    apiGroup: rbac.authorization.k8s.io
+-    name: ci-admins
+-  roleRef:
+-    kind: ClusterRole
+-    apiGroup: rbac.authorization.k8s.io
+-    name: prowjob-access
+-- kind: ClusterRole
+-  apiVersion: rbac.authorization.k8s.io/v1beta1
+-  metadata:
+-    name: prowjob-access
+-  rules:
+-    - apiGroups:
+-        - "prow.k8s.io"
+-      resources:
+-        - prowjobs
+-      verbs:
+-        - get
+-        - list
+-        - create
+-        - delete
+-        - update
+-        - patch
+-        - watch
+diff --recursive -u --new-file '--label=o' '--label=m' o m
+--- o
++++ m
+@@ -1,35 +0,0 @@
+-apiVersion: apiextensions.k8s.io/v1beta1
+-kind: CustomResourceDefinition
+-metadata:
+-  name: dynamicresourcelifecycles.boskos.k8s.io
+-spec:
+-  group: boskos.k8s.io
+-  names:
+-    kind: DRLCObject
+-    listKind: DRLCObjectList
+-    plural: dynamicresourcelifecycles
+-    singular: dynamicresourcelifecycle
+-  scope: Namespaced
+-  version: v1
+-  versions:
+-  - name: v1
+-    served: true
+-    storage: true
+----
+-apiVersion: apiextensions.k8s.io/v1beta1
+-kind: CustomResourceDefinition
+-metadata:
+-  name: resources.boskos.k8s.io
+-spec:
+-  group: boskos.k8s.io
+-  names:
+-    kind: ResourceObject
+-    listKind: ResourceObjectList
+-    plural: resources
+-    singular: resource
+-  scope: Namespaced
+-  version: v1
+-  versions:
+-  - name: v1
+-    served: true
+-    storage: true
+diff --recursive -u --new-file '--label=o' '--label=m' o m
+--- o
++++ m
+@@ -0,0 +1,51 @@
++kind: List
++apiVersion: v1
++items:
++- apiVersion: v1
++  kind: Namespace
++  metadata:
++    name: ci
++- apiVersion: v1
++  kind: Namespace
++  metadata:
++    name: prow-monitoring
++- apiVersion: v1
++  kind: Namespace
++  metadata:
++    name: ci-stg
++- apiVersion: v1
++  kind: Namespace
++  metadata:
++    name: ci-search
++- apiVersion: v1
++  kind: Namespace
++  metadata:
++    name: ci-rpms
++- apiVersion: v1
++  kind: Namespace
++  metadata:
++    name: bastion
++- apiVersion: v1
++  kind: Namespace
++  metadata:
++    name: release-controller-test
++- apiVersion: v1
++  kind: Namespace
++  metadata:
++    name: release-controller-test-job
++- apiVersion: v1
++  kind: Namespace
++  metadata:
++    name: promecieus
++- apiVersion: v1
++  kind: Namespace
++  metadata:
++    name: ci-release-ppc64le
++- apiVersion: v1
++  kind: Namespace
++  metadata:
++    name: ci-release-s390x
++- apiVersion: v1
++  kind: Namespace
++  metadata:
++    name: ocp-private
+diff --recursive -u --new-file '--label=o' '--label=m' o m
+--- o
++++ m
+@@ -13,7 +13,7 @@
+     - name: latest
+       from:
+         kind: DockerImage
+-        name: gcr.io/k8s-prow/artifact-uploader:v20200305-243ed4c3f
++        name: gcr.io/k8s-prow/artifact-uploader:v20200305-e8ef9758b
+ - apiVersion: v1
+   kind: ImageStream
+   metadata:
+diff --recursive -u --new-file '--label=o' '--label=m' o m
+--- o
++++ m
+@@ -70,34 +70,6 @@
+   apiVersion: rbac.authorization.k8s.io/v1
+   metadata:
+     name: config-updater
+-    namespace: openshift
+-  rules:
+-    - apiGroups:
+-        - image.openshift.io
+-      resources:
+-        - imagestreams
+-      verbs:
+-        - get
+-        - create
+-        - update
+-        - patch
+-- kind: RoleBinding
+-  apiVersion: rbac.authorization.k8s.io/v1
+-  metadata:
+-    name: config-updater
+-    namespace: openshift
+-  roleRef:
+-    apiGroup: rbac.authorization.k8s.io
+-    kind: Role
+-    name: config-updater
+-  subjects:
+-  - kind: ServiceAccount
+-    name: config-updater
+-    namespace: ci
+-- kind: Role
+-  apiVersion: rbac.authorization.k8s.io/v1
+-  metadata:
+-    name: config-updater
+     namespace: prow-monitoring
+   rules:
+     - apiGroups:
+@@ -233,43 +205,6 @@
+   apiVersion: rbac.authorization.k8s.io/v1
+   metadata:
+     name: config-updater
+-    namespace: openshift-monitoring
+-  rules:
+-    - apiGroups:
+-        - ""
+-      resources:
+-        - secrets
+-      verbs:
+-        - get
+-        - patch
+-    - apiGroups:
+-        - monitoring.coreos.com
+-      resources:
+-        - prometheusrules
+-        - prometheuses
+-        - alertmanagers
+-      verbs:
+-        - get
+-        - create
+-        - update
+-        - patch
+-- kind: RoleBinding
+-  apiVersion: rbac.authorization.k8s.io/v1
+-  metadata:
+-    name: config-updater
+-    namespace: openshift-monitoring
+-  roleRef:
+-    apiGroup: rbac.authorization.k8s.io
+-    kind: Role
+-    name: config-updater
+-  subjects:
+-  - kind: ServiceAccount
+-    name: config-updater
+-    namespace: ci
+-- kind: Role
+-  apiVersion: rbac.authorization.k8s.io/v1
+-  metadata:
+-    name: config-updater
+     namespace: ci-search
+   rules:
+     - apiGroups:
+@@ -377,40 +312,6 @@
+   subjects:
+   - kind: ServiceAccount
+     name: config-updater
+-    namespace: ci
+-- kind: ClusterRole
+-  apiVersion: rbac.authorization.k8s.io/v1
+-  metadata:
+-    name: manage-priorityclasses
+-  rules:
+-  - apiGroups:
+-    - scheduling.k8s.io
+-    resources:
+-    - priorityclasses
+-    verbs:
+-      - get
+-      - create
+-      - update
+-      - patch
+-  - apiGroups:
+-      - ""
+-    resources:
+-      - persistentvolumes
+-    verbs:
+-      - get
+-      - create
+-      - update
+-      - patch
+-- kind: ClusterRoleBinding
+-  apiVersion: rbac.authorization.k8s.io/v1
+-  metadata:
+-    name: manage-priorityclasses-config-updater
+-  roleRef:
+-    kind: ClusterRole
+-    name: manage-priorityclasses
+-  subjects:
+-  - kind: ServiceAccount
+-    name: config-updater
+     namespace: ci
+ - kind: Role
+   apiVersion: rbac.authorization.k8s.io/v1
+diff --recursive -u --new-file '--label=o' '--label=m' o m
+--- o
++++ m
+@@ -10,7 +10,7 @@
+       app: prow
+       component: horologium
+   spec:
+-    replicas: 1
++    replicas: 0
+     revisionHistoryLimit: 2
+     selector:
+       matchLabels:
+diff --recursive -u --new-file '--label=o' '--label=m' o m
+--- o
++++ m
+@@ -28,7 +28,7 @@
+       component: plank
+   spec:
+     # Do not scale up.
+-    replicas: 1
++    replicas: 0
+     revisionHistoryLimit: 2
+     strategy:
+       type: Recreate

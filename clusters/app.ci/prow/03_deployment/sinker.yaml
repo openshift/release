@@ -4,33 +4,36 @@ items:
 - apiVersion: apps/v1
   kind: Deployment
   metadata:
-    namespace: ci
-    name: horologium
+    name: sinker
     labels:
       app: prow
-      component: horologium
+      component: sinker
   spec:
     replicas: 1
     revisionHistoryLimit: 2
     selector:
       matchLabels:
         app: prow
-        component: horologium
+        component: sinker
     template:
       metadata:
         labels:
           app: prow
-          component: horologium
+          component: sinker
       spec:
-        serviceAccountName: horologium
+        serviceAccountName: sinker
         priorityClassName: prow-critical
         containers:
-        - name: horologium
+        - name: sinker
+          image: gcr.io/k8s-prow/sinker:v20200305-e8ef9758b
           args:
           - --config-path=/etc/config/config.yaml
           - --job-config-path=/etc/job-config
           - --dry-run=false
-          image: gcr.io/k8s-prow/horologium:v20200309-685d04ec8
+          - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+          ports:
+          - name: metrics
+            containerPort: 9090
           volumeMounts:
           - name: config
             mountPath: /etc/config
@@ -65,10 +68,13 @@ items:
           - name: job-config-46
             mountPath: /etc/job-config/4.6
             readOnly: true
+          - mountPath: /etc/build-farm-credentials
+            name: build-farm-credentials
+            readOnly: true
           resources:
             requests:
-              memory: "1.5Gi"
-              cpu: "150m"
+              memory: "1.8Gi"
+              cpu: "50m"
         volumes:
         - name: config
           configMap:
@@ -103,3 +109,26 @@ items:
         - name: job-config-46
           configMap:
             name: job-config-4.6
+        - name: build-farm-credentials
+          secret:
+            items:
+            - key: sa.sinker.build01.config
+              path: kubeconfig
+            secretName: build-farm-credentials
+- apiVersion: v1
+  kind: Service
+  metadata:
+    namespace: ci
+    labels:
+      app: prow
+      component: sinker
+    name: sinker
+  spec:
+    ports:
+    - name: metrics
+      port: 9090
+      protocol: TCP
+      targetPort: 9090
+    selector:
+      app: prow
+      component: sinker
