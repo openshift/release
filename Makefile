@@ -279,5 +279,5 @@ verify-app-ci:
 .PHONY: verify-app-ci
 
 update-app-ci:
-	@update=true @./hack/verify-app-ci.sh
+	@update=true ./hack/verify-app-ci.sh
 .PHONY: update-app-ci
