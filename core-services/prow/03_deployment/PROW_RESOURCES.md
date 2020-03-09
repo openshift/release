@@ -64,12 +64,6 @@
 * cpu: "100m"
 * ephemeral-storage: "10Mi"
 
-# [ artifact-uploader ]
-### requests:
-* memory: "2Gi"
-* cpu: "100m"
-* ephemeral-storage: "30Mi"
-
 # [ refresh ] 
 ### requests:
 * memory: "250Mi"
