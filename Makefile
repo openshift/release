@@ -83,12 +83,16 @@ applyTemplate:
 postsubmit-update: origin-release prow-monitoring cincinnati prow-release-controller-definitions
 .PHONY: postsubmit-update
 
-all: roles prow projects
+all: roles cluster-node-config prow projects
 .PHONY: all
 
 cluster-roles:
 	$(MAKE) apply WHAT=cluster/ci/config/roles.yaml
 .PHONY: cluster-roles
+
+cluster-node-config:
+	$(MAKE) apply WHAT=cluster/ci/config/node-config.yaml
+.PHONY: cluster-node-config
 
 roles: cluster-operator-roles cluster-roles
 .PHONY: roles

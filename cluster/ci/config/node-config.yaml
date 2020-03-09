@@ -1,0 +1,152 @@
+kind: List
+apiVersion: v1
+items:
+- kind: ConfigMap
+  apiVersion: v1
+  metadata:
+    name: node-config-master
+    namespace: openshift-node
+  data:
+    node-config.yaml: |
+      apiVersion: v1
+      authConfig:
+        authenticationCacheSize: 1000
+        authenticationCacheTTL: 5m
+        authorizationCacheSize: 1000
+        authorizationCacheTTL: 5m
+      dnsBindAddress: 127.0.0.1:53
+      dnsDomain: cluster.local
+      dnsIP: 0.0.0.0
+      dnsNameservers: null
+      dnsRecursiveResolvConf: /etc/origin/node/resolv.conf
+      dockerConfig:
+        dockerShimRootDirectory: /var/lib/dockershim
+        dockerShimSocket: /var/run/dockershim.sock
+        execHandlerName: native
+      enableUnidling: true
+      imageConfig:
+        format: docker.io/openshift/origin-${component}:${version}
+        latest: false
+      iptablesSyncPeriod: 30s
+      kind: NodeConfig
+      kubeletArguments:
+        bootstrap-kubeconfig:
+        - /etc/origin/node/bootstrap.kubeconfig
+        cert-dir:
+        - /etc/origin/node/certificates
+        cloud-config:
+        - /etc/origin/cloudprovider/gce.conf
+        cloud-provider:
+        - gce
+        enable-controller-attach-detach:
+        - 'true'
+        image-gc-high-threshold:
+        - '80'
+        image-gc-low-threshold:
+        - '40'
+        feature-gates:
+        - RotateKubeletClientCertificate=true,RotateKubeletServerCertificate=true
+        node-labels:
+        - node-role.kubernetes.io/master=true
+        pod-manifest-path:
+        - /etc/origin/node/pods
+        rotate-certificates:
+        - 'true'
+      masterClientConnectionOverrides:
+        acceptContentTypes: application/vnd.kubernetes.protobuf,application/json
+        burst: 40
+        contentType: application/vnd.kubernetes.protobuf
+        qps: 20
+      masterKubeConfig: node.kubeconfig
+      networkConfig:
+        mtu: 1410
+        networkPluginName: redhat/openshift-ovs-networkpolicy
+      proxyArguments:
+        cluster-cidr:
+        - 172.16.0.0/16
+      servingInfo:
+        bindAddress: 0.0.0.0:10250
+        bindNetwork: tcp4
+        clientCA: client-ca.crt
+      volumeConfig:
+        localQuota:
+          perFSGroup: null
+      volumeDirectory: /var/lib/origin/openshift.local.volumes
+- kind: ConfigMap
+  apiVersion: v1
+  metadata:
+    annotations:
+    name: node-config-node
+    namespace: openshift-node
+  data:
+    node-config.yaml: |
+      apiVersion: v1
+      authConfig:
+        authenticationCacheSize: 1000
+        authenticationCacheTTL: 5m
+        authorizationCacheSize: 1000
+        authorizationCacheTTL: 5m
+      dnsBindAddress: 127.0.0.1:53
+      dnsDomain: cluster.local
+      dnsIP: 0.0.0.0
+      dnsNameservers: null
+      dnsRecursiveResolvConf: /etc/origin/node/resolv.conf
+      dockerConfig:
+        dockerShimRootDirectory: /var/lib/dockershim
+        dockerShimSocket: /var/run/dockershim.sock
+        execHandlerName: native
+      enableUnidling: true
+      imageConfig:
+        format: docker.io/openshift/origin-${component}:${version}
+        latest: false
+      iptablesSyncPeriod: 30s
+      kind: NodeConfig
+      kubeletArguments:
+        bootstrap-kubeconfig:
+        - /etc/origin/node/bootstrap.kubeconfig
+        cert-dir:
+        - /etc/origin/node/certificates
+        cloud-config:
+        - /etc/origin/cloudprovider/gce.conf
+        cloud-provider:
+        - gce
+        enable-controller-attach-detach:
+        - 'true'
+        feature-gates:
+        - RotateKubeletClientCertificate=true,RotateKubeletServerCertificate=true
+        node-labels:
+        - node-role.kubernetes.io/compute=true,node-role.kubernetes.io/infra=true,beta.kubernetes.io/fluentd-ds-ready=true
+        pod-manifest-path:
+        - /etc/origin/node/pods
+        pods-per-core:
+        - '30'
+        rotate-certificates:
+        - 'true'
+        image-gc-low-threshold:
+        - '50'
+        image-gc-high-threshold:
+        - '80'
+        system-reserved:
+        - "cpu=500m,memory=7Gi"
+        minimum-image-ttl-duration:
+        - "30m"
+      masterClientConnectionOverrides:
+        acceptContentTypes: application/vnd.kubernetes.protobuf,application/json
+        burst: 40
+        contentType: application/vnd.kubernetes.protobuf
+        qps: 20
+      masterKubeConfig: node.kubeconfig
+      networkConfig:
+        mtu: 1410
+        networkPluginName: redhat/openshift-ovs-networkpolicy
+      proxyArguments:
+        cluster-cidr:
+        - 172.16.0.0/16
+      servingInfo:
+        bindAddress: 0.0.0.0:10250
+        bindNetwork: tcp4
+        clientCA: client-ca.crt
+      volumeConfig:
+        localQuota:
+          perFSGroup: null
+      volumeDirectory: /var/lib/origin/openshift.local.volumes
