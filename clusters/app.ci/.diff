@@ -1,4 +1,4 @@
-diff --recursive -u --new-file '--label=o' '--label=m' o m
+diff --recursive -u --new-file --label=o --label=m o m
 --- o
 +++ m
 @@ -1,86 +0,0 @@
@@ -89,7 +89,7 @@ diff --recursive -u --new-file '--label=o' '--label=m' o m
 -    description: When the job finished running.
 -    JSONPath: .status.completionTime
 \ No newline at end of file
-diff --recursive -u --new-file '--label=o' '--label=m' o m
+diff --recursive -u --new-file --label=o --label=m o m
 --- o
 +++ m
 @@ -1,32 +0,0 @@
@@ -125,7 +125,7 @@ diff --recursive -u --new-file '--label=o' '--label=m' o m
 -        - update
 -        - patch
 -        - watch
-diff --recursive -u --new-file '--label=o' '--label=m' o m
+diff --recursive -u --new-file --label=o --label=m o m
 --- o
 +++ m
 @@ -1,35 +0,0 @@
@@ -164,7 +164,80 @@ diff --recursive -u --new-file '--label=o' '--label=m' o m
 -  - name: v1
 -    served: true
 -    storage: true
-diff --recursive -u --new-file '--label=o' '--label=m' o m
+diff --recursive -u --new-file --label=o --label=m o m
+--- o
++++ m
+@@ -18,6 +18,10 @@
+           protect: false
+         toolchain-operator:
+           protect: false
++    containers:
++      repos:
++        libpod:
++          protect: false
+     cri-o:
+       required_status_checks:
+         contexts:
+@@ -378,9 +382,9 @@
+             memory: 250Mi
+       timeout: 4h0m0s
+       utility_images:
+-        clonerefs: gcr.io/k8s-prow/clonerefs:v20200309-685d04ec8
+-        entrypoint: gcr.io/k8s-prow/entrypoint:v20200309-685d04ec8
+-        initupload: gcr.io/k8s-prow/initupload:v20200309-685d04ec8
++        clonerefs: gcr.io/k8s-prow/clonerefs:v20200305-e8ef9758b
++        entrypoint: gcr.io/k8s-prow/entrypoint:v20200305-e8ef9758b
++        initupload: gcr.io/k8s-prow/initupload:v20200305-e8ef9758b
+         sidecar: registry.svc.ci.openshift.org/clayton-test-1/sidecar@sha256:3619766610babc626144cc3fce1e0529916637461611b66e45f8fb6a873b4051
+     openshift-priv:
+       gcs_configuration:
+diff --recursive -u --new-file --label=o --label=m o m
+--- o
++++ m
+@@ -181,6 +181,13 @@
+       target_release: 4.3.z
+       validate_by_default: true
+     openshift-4.4:
++      dependent_bug_states:
++      - status: MODIFIED
++      - status: ON_QA
++      - status: VERIFIED
++      - status: RELEASE_PENDING
++      - resolution: ERRATA
++        status: CLOSED
+       dependent_bug_target_release: 4.5.0
+       target_release: 4.4.0
+       validate_by_default: true
+@@ -197,6 +204,13 @@
+       target_release: 4.3.z
+       validate_by_default: true
+     release-4.4:
++      dependent_bug_states:
++      - status: MODIFIED
++      - status: ON_QA
++      - status: VERIFIED
++      - status: RELEASE_PENDING
++      - resolution: ERRATA
++        status: CLOSED
+       dependent_bug_target_release: 4.5.0
+       target_release: 4.4.0
+       validate_by_default: true
+@@ -219,13 +233,10 @@
+               - status: ON_DEV
+               - status: POST
+             master:
+-              target_release: OCS 4.4.0
++              target_release: OCS 4.3.0
+             release-4.2:
+               target_release: OCS 4.2.0
+               validate_by_default: true
+-            release-4.3:
+-              target_release: OCS 4.3.0
+-              validate_by_default: true
+ cat: {}
+ cherry_pick_unapproved:
+   branchregexp: ^release-.*$
+diff --recursive -u --new-file --label=o --label=m o m
 --- o
 +++ m
 @@ -0,0 +1,51 @@
@@ -219,7 +292,7 @@ diff --recursive -u --new-file '--label=o' '--label=m' o m
 +  kind: Namespace
 +  metadata:
 +    name: ocp-private
-diff --recursive -u --new-file '--label=o' '--label=m' o m
+diff --recursive -u --new-file --label=o --label=m o m
 --- o
 +++ m
 @@ -13,7 +13,7 @@
@@ -231,7 +304,175 @@ diff --recursive -u --new-file '--label=o' '--label=m' o m
  - apiVersion: v1
    kind: ImageStream
    metadata:
-diff --recursive -u --new-file '--label=o' '--label=m' o m
+@@ -26,7 +26,7 @@
+     - name: latest
+       from:
+         kind: DockerImage
+-        name: gcr.io/k8s-prow/branchprotector:v20200309-685d04ec8
++        name: gcr.io/k8s-prow/branchprotector:v20200305-e8ef9758b
+ - apiVersion: v1
+   kind: ImageStream
+   metadata:
+@@ -39,7 +39,7 @@
+     - name: latest
+       from:
+         kind: DockerImage
+-        name: gcr.io/k8s-prow/boskos/cli:v20200309-88bd5a18a
++        name: gcr.io/k8s-prow/boskos/cli:v20200304-cff045cb7
+ - apiVersion: v1
+   kind: ImageStream
+   metadata:
+@@ -52,7 +52,7 @@
+     - name: latest
+       from:
+         kind: DockerImage
+-        name: gcr.io/k8s-prow/cherrypicker:v20200309-685d04ec8
++        name: gcr.io/k8s-prow/cherrypicker:v20200305-e8ef9758b
+ - apiVersion: v1
+   kind: ImageStream
+   metadata:
+@@ -65,7 +65,7 @@
+     - name: latest
+       from:
+         kind: DockerImage
+-        name: gcr.io/k8s-prow/clonerefs:v20200309-685d04ec8
++        name: gcr.io/k8s-prow/clonerefs:v20200305-e8ef9758b
+ - apiVersion: v1
+   kind: ImageStream
+   metadata:
+@@ -78,7 +78,7 @@
+     - name: latest
+       from:
+         kind: DockerImage
+-        name: gcr.io/k8s-prow/crier:v20200309-685d04ec8
++        name: gcr.io/k8s-prow/crier:v20200305-e8ef9758b
+ - apiVersion: v1
+   kind: ImageStream
+   metadata:
+@@ -91,7 +91,7 @@
+     - name: latest
+       from:
+         kind: DockerImage
+-        name: gcr.io/k8s-prow/deck:v20200309-685d04ec8
++        name: gcr.io/k8s-prow/deck:v20200305-e8ef9758b
+ - apiVersion: v1
+   kind: ImageStream
+   metadata:
+@@ -104,7 +104,7 @@
+     - name: latest
+       from:
+         kind: DockerImage
+-        name: gcr.io/k8s-prow/entrypoint:v20200309-685d04ec8
++        name: gcr.io/k8s-prow/entrypoint:v20200305-e8ef9758b
+ - apiVersion: v1
+   kind: ImageStream
+   metadata:
+@@ -117,7 +117,7 @@
+     - name: latest
+       from:
+         kind: DockerImage
+-        name: gcr.io/k8s-prow/gcsupload:v20200309-685d04ec8
++        name: gcr.io/k8s-prow/gcsupload:v20200305-e8ef9758b
+ - apiVersion: v1
+   kind: ImageStream
+   metadata:
+@@ -130,7 +130,7 @@
+     - name: latest
+       from:
+         kind: DockerImage
+-        name: gcr.io/k8s-prow/hook:v20200309-685d04ec8
++        name: gcr.io/k8s-prow/hook:v20200305-e8ef9758b
+ - apiVersion: v1
+   kind: ImageStream
+   metadata:
+@@ -143,7 +143,7 @@
+     - name: latest
+       from:
+         kind: DockerImage
+-        name: gcr.io/k8s-prow/horologium:v20200309-685d04ec8
++        name: gcr.io/k8s-prow/horologium:v20200305-e8ef9758b
+ - apiVersion: v1
+   kind: ImageStream
+   metadata:
+@@ -156,7 +156,7 @@
+     - name: latest
+       from:
+         kind: DockerImage
+-        name: gcr.io/k8s-prow/initupload:v20200309-685d04ec8
++        name: gcr.io/k8s-prow/initupload:v20200305-e8ef9758b
+ - apiVersion: v1
+   kind: ImageStream
+   metadata:
+@@ -169,7 +169,7 @@
+     - name: latest
+       from:
+         kind: DockerImage
+-        name: gcr.io/k8s-prow/jenkins-operator:v20200309-685d04ec8
++        name: gcr.io/k8s-prow/jenkins-operator:v20200305-e8ef9758b
+ - apiVersion: v1
+   kind: ImageStream
+   metadata:
+@@ -182,7 +182,7 @@
+     - name: latest
+       from:
+         kind: DockerImage
+-        name: gcr.io/k8s-prow/needs-rebase:v20200309-685d04ec8
++        name: gcr.io/k8s-prow/needs-rebase:v20200305-e8ef9758b
+ - apiVersion: v1
+   kind: ImageStream
+   metadata:
+@@ -195,7 +195,7 @@
+     - name: latest
+       from:
+         kind: DockerImage
+-        name: gcr.io/k8s-prow/plank:v20200309-685d04ec8
++        name: gcr.io/k8s-prow/plank:v20200305-e8ef9758b
+ - apiVersion: v1
+   kind: ImageStream
+   metadata:
+@@ -208,7 +208,7 @@
+     - name: latest
+       from:
+         kind: DockerImage
+-        name: gcr.io/k8s-prow/refresh:v20200309-685d04ec8
++        name: gcr.io/k8s-prow/refresh:v20200305-e8ef9758b
+ - apiVersion: v1
+   kind: ImageStream
+   metadata:
+@@ -221,7 +221,7 @@
+     - name: latest
+       from:
+         kind: DockerImage
+-        name: gcr.io/k8s-prow/sidecar:v20200309-685d04ec8
++        name: gcr.io/k8s-prow/sidecar:v20200305-e8ef9758b
+ - apiVersion: v1
+   kind: ImageStream
+   metadata:
+@@ -234,7 +234,7 @@
+     - name: latest
+       from:
+         kind: DockerImage
+-        name: gcr.io/k8s-prow/sinker:v20200309-685d04ec8
++        name: gcr.io/k8s-prow/sinker:v20200305-e8ef9758b
+ - apiVersion: v1
+   kind: ImageStream
+   metadata:
+@@ -247,7 +247,7 @@
+     - name: latest
+       from:
+         kind: DockerImage
+-        name: gcr.io/k8s-prow/tide:v20200309-685d04ec8
++        name: gcr.io/k8s-prow/tide:v20200305-e8ef9758b
+ - apiVersion: v1
+   kind: ImageStream
+   metadata:
+@@ -260,4 +260,4 @@
+     - name: latest
+       from:
+         kind: DockerImage
+-        name: gcr.io/k8s-prow/tot:v20200309-685d04ec8
++        name: gcr.io/k8s-prow/tot:v20200305-e8ef9758b
+diff --recursive -u --new-file --label=o --label=m o m
 --- o
 +++ m
 @@ -70,34 +70,6 @@
@@ -313,11 +554,10 @@ diff --recursive -u --new-file '--label=o' '--label=m' o m
      namespace: ci-search
    rules:
      - apiGroups:
-@@ -377,40 +312,6 @@
-   subjects:
+@@ -378,40 +313,6 @@
    - kind: ServiceAccount
      name: config-updater
--    namespace: ci
+     namespace: ci
 -- kind: ClusterRole
 -  apiVersion: rbac.authorization.k8s.io/v1
 -  metadata:
@@ -351,10 +591,128 @@ diff --recursive -u --new-file '--label=o' '--label=m' o m
 -  subjects:
 -  - kind: ServiceAccount
 -    name: config-updater
-     namespace: ci
+-    namespace: ci
  - kind: Role
    apiVersion: rbac.authorization.k8s.io/v1
-diff --recursive -u --new-file '--label=o' '--label=m' o m
+   metadata:
+diff --recursive -u --new-file --label=o --label=m o m
+--- o
++++ m
+@@ -67,7 +67,7 @@
+           - mountPath: /etc/proxy/secrets
+             name: secret-boskos-proxy
+         - name: boskos
+-          image: gcr.io/k8s-prow/boskos/boskos:v20200309-88bd5a18a
++          image: gcr.io/k8s-prow/boskos/boskos:v20200304-cff045cb7
+           args:
+           - --config=/etc/config/boskos.yaml
+           - --namespace=${namespace}
+diff --recursive -u --new-file --label=o --label=m o m
+--- o
++++ m
+@@ -29,7 +29,7 @@
+       terminationGracePeriodSeconds: 300
+       containers:
+       - name: boskos-cleaner
+-        image: gcr.io/k8s-prow/boskos/cleaner:v20200309-88bd5a18a
++        image: gcr.io/k8s-prow/boskos/cleaner:v20200304-cff045cb7
+         args:
+         - --boskos-url=http://boskos
+         - --use-v2-implementation=true
+diff --recursive -u --new-file --label=o --label=m o m
+--- o
++++ m
+@@ -21,7 +21,7 @@
+       terminationGracePeriodSeconds: 30
+       containers:
+       - name: boskos-reaper
+-        image: gcr.io/k8s-prow/boskos/reaper:v20200309-88bd5a18a
++        image: gcr.io/k8s-prow/boskos/reaper:v20200304-cff045cb7
+         args:
+         - --boskos-url=http://boskos
+         - --resource-type=aws-quota-slice,azure4-quota-slice,gcp-quota-slice,openstack-quota-slice,openstack-ppc64le-quota-slice,vsphere-quota-slice,ovirt-quota-slice,ovirt-bm01,ovirt-bm02
+diff --recursive -u --new-file --label=o --label=m o m
+--- o
++++ m
+@@ -37,7 +37,7 @@
+       spec:
+         containers:
+         - name: cherrypick
+-          image: gcr.io/k8s-prow/cherrypicker:v20200309-685d04ec8
++          image: gcr.io/k8s-prow/cherrypicker:v20200305-e8ef9758b
+           args:
+           - --dry-run=false
+           ports:
+diff --recursive -u --new-file --label=o --label=m o m
+--- o
++++ m
+@@ -46,7 +46,7 @@
+         priorityClassName: prow-critical
+         containers:
+         - name: crier
+-          image: gcr.io/k8s-prow/crier:v20200309-685d04ec8
++          image: gcr.io/k8s-prow/crier:v20200305-e8ef9758b
+           args:
+           - --github-workers=5
+           - --config-path=/etc/config/config.yaml
+diff --recursive -u --new-file --label=o --label=m o m
+--- o
++++ m
+@@ -85,7 +85,7 @@
+         priorityClassName: prow-critical
+         containers:
+         - name: deck
+-          image: gcr.io/k8s-prow/deck:v20200309-685d04ec8
++          image: gcr.io/k8s-prow/deck:v20200305-e8ef9758b
+           args:
+           - --config-path=/etc/config/config.yaml
+           - --cookie-secret=/etc/cookie/cookie
+@@ -308,7 +308,7 @@
+           - mountPath: /etc/proxy/secrets
+             name: session-secret
+         - name: deck
+-          image: gcr.io/k8s-prow/deck:v20200309-685d04ec8
++          image: gcr.io/k8s-prow/deck:v20200305-e8ef9758b
+           args:
+           - --github-oauth-config-file=/etc/github/config.json
+           - --github-token-path=/etc/oauth/oauth
+diff --recursive -u --new-file --label=o --label=m o m
+--- o
++++ m
+@@ -45,7 +45,7 @@
+         priorityClassName: prow-critical
+         containers:
+         - name: exporter
+-          image: gcr.io/k8s-prow/exporter:v20200309-685d04ec8
++          image: gcr.io/k8s-prow/exporter:v20200305-e8ef9758b
+           args:
+           - --config-path=/etc/config/config.yaml
+           ports:
+diff --recursive -u --new-file --label=o --label=m o m
+--- o
++++ m
+@@ -56,7 +56,7 @@
+       spec:
+         containers:
+         - name: ghproxy
+-          image: gcr.io/k8s-prow/ghproxy:v20200309-685d04ec8
++          image: gcr.io/k8s-prow/ghproxy:v20200305-e8ef9758b
+           imagePullPolicy: Always
+           args:
+           - --cache-dir=/cache
+diff --recursive -u --new-file --label=o --label=m o m
+--- o
++++ m
+@@ -64,7 +64,7 @@
+         priorityClassName: prow-critical
+         containers:
+         - name: hook
+-          image: gcr.io/k8s-prow/hook:v20200309-685d04ec8
++          image: gcr.io/k8s-prow/hook:v20200305-e8ef9758b
+           args:
+           - --config-path=/etc/config/config.yaml
+           - --github-token-path=/etc/github/oauth
+diff --recursive -u --new-file --label=o --label=m o m
 --- o
 +++ m
 @@ -10,7 +10,7 @@
@@ -366,7 +724,58 @@ diff --recursive -u --new-file '--label=o' '--label=m' o m
      revisionHistoryLimit: 2
      selector:
        matchLabels:
-diff --recursive -u --new-file '--label=o' '--label=m' o m
+@@ -30,7 +30,7 @@
+           - --config-path=/etc/config/config.yaml
+           - --job-config-path=/etc/job-config
+           - --dry-run=false
+-          image: gcr.io/k8s-prow/horologium:v20200309-685d04ec8
++          image: gcr.io/k8s-prow/horologium:v20200305-e8ef9758b
+           volumeMounts:
+           - name: config
+             mountPath: /etc/config
+diff --recursive -u --new-file --label=o --label=m o m
+--- o
++++ m
+@@ -51,7 +51,7 @@
+         serviceAccountName: jenkins-operator
+         containers:
+         - name: jenkins-operator
+-          image: gcr.io/k8s-prow/jenkins-operator:v20200309-685d04ec8
++          image: gcr.io/k8s-prow/jenkins-operator:v20200305-e8ef9758b
+           args:
+           - --jenkins-url=https://ci.openshift.redhat.com/jenkins
+           - --jenkins-user=openshift-ci-robot
+@@ -193,7 +193,7 @@
+         serviceAccountName: jenkins-operator
+         containers:
+         - name: jenkins-operator
+-          image: gcr.io/k8s-prow/jenkins-operator:v20200309-685d04ec8
++          image: gcr.io/k8s-prow/jenkins-operator:v20200305-e8ef9758b
+           args:
+           - --jenkins-url=https://ci.dev.openshift.redhat.com:8443/jenkins
+           - --jenkins-user=openshift-ci-robot
+@@ -347,7 +347,7 @@
+         serviceAccountName: jenkins-operator
+         containers:
+         - name: kata-jenkins-operator
+-          image: gcr.io/k8s-prow/jenkins-operator:v20200309-685d04ec8
++          image: gcr.io/k8s-prow/jenkins-operator:v20200305-e8ef9758b
+           args:
+           - --jenkins-url=http://jenkins.katacontainers.io/
+           - --jenkins-user=katabuilder
+diff --recursive -u --new-file --label=o --label=m o m
+--- o
++++ m
+@@ -37,7 +37,7 @@
+       spec:
+         containers:
+         - name: needs-rebase
+-          image: gcr.io/k8s-prow/needs-rebase:v20200309-685d04ec8
++          image: gcr.io/k8s-prow/needs-rebase:v20200305-e8ef9758b
+           args:
+           - --github-token-path=/etc/github/oauth
+           - --hmac-secret-file=/etc/webhook/hmac
+diff --recursive -u --new-file --label=o --label=m o m
 --- o
 +++ m
 @@ -28,7 +28,7 @@
@@ -378,3 +787,72 @@ diff --recursive -u --new-file '--label=o' '--label=m' o m
      revisionHistoryLimit: 2
      strategy:
        type: Recreate
+@@ -46,7 +46,7 @@
+         priorityClassName: prow-critical
+         containers:
+         - name: plank
+-          image: gcr.io/k8s-prow/plank:v20200309-685d04ec8
++          image: gcr.io/k8s-prow/plank:v20200305-e8ef9758b
+           args:
+           - --config-path=/etc/config/config.yaml
+           - --tot-url=http://tot
+diff --recursive -u --new-file --label=o --label=m o m
+--- o
++++ m
+@@ -37,7 +37,7 @@
+       spec:
+         containers:
+         - name: refresh
+-          image: gcr.io/k8s-prow/refresh:v20200309-685d04ec8
++          image: gcr.io/k8s-prow/refresh:v20200305-e8ef9758b
+           args:
+           - --github-token-path=/etc/github/oauth
+           - --hmac-secret-file=/etc/webhook/hmac
+diff --recursive -u --new-file --label=o --label=m o m
+--- o
++++ m
+@@ -25,7 +25,7 @@
+         priorityClassName: prow-critical
+         containers:
+         - name: sinker
+-          image: gcr.io/k8s-prow/sinker:v20200309-685d04ec8
++          image: gcr.io/k8s-prow/sinker:v20200305-e8ef9758b
+           args:
+           - --config-path=/etc/config/config.yaml
+           - --job-config-path=/etc/job-config
+diff --recursive -u --new-file --label=o --label=m o m
+--- o
++++ m
+@@ -18,7 +18,7 @@
+       terminationGracePeriodSeconds: 180
+       containers:
+       - name: statusreconciler
+-        image: gcr.io/k8s-prow/status-reconciler:v20200309-685d04ec8
++        image: gcr.io/k8s-prow/status-reconciler:v20200305-e8ef9758b
+         imagePullPolicy: Always
+         args:
+         - --dry-run=false
+diff --recursive -u --new-file --label=o --label=m o m
+--- o
++++ m
+@@ -49,7 +49,7 @@
+         priorityClassName: prow-critical
+         containers:
+         - name: tide
+-          image: gcr.io/k8s-prow/tide:v20200309-685d04ec8
++          image: gcr.io/k8s-prow/tide:v20200305-e8ef9758b
+           args:
+           - --config-path=/etc/config/config.yaml
+           - --dry-run=false
+diff --recursive -u --new-file --label=o --label=m o m
+--- o
++++ m
+@@ -55,7 +55,7 @@
+         priorityClassName: prow-critical
+         containers:
+         - name: tot
+-          image: gcr.io/k8s-prow/tot:v20200309-685d04ec8
++          image: gcr.io/k8s-prow/tot:v20200305-e8ef9758b
+           args:
+           - --config-path=/etc/config/config.yaml
+           - --fallback=true
