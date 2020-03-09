@@ -1,0 +1,99 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+parameters:
+- description: The session secret for the proxy
+  name: SESSION_SECRET
+  generate: expression
+  from: "[a-zA-Z0-9]{43}"
+objects:
+- apiVersion: v1
+  kind: Route
+  metadata:
+    namespace: ci
+    name: tracer
+    annotations:
+      haproxy.router.openshift.io/timeout: 2m
+  spec:
+    tls:
+      termination: Reencrypt
+      insecureEdgeTerminationPolicy: Redirect
+    to:
+      kind: Service
+      name: tracer
+- apiVersion: v1
+  kind: Service
+  metadata:
+    namespace: ci
+    name: tracer
+    annotations:
+      service.alpha.openshift.io/serving-cert-secret-name: tracer-tls
+  spec:
+    selector:
+      app: tracer
+    ports:
+    - port: 443
+      targetPort: 8443
+    type: ClusterIP
+- apiVersion: apps.openshift.io/v1
+  kind: DeploymentConfig
+  metadata:
+    namespace: ci
+    name: tracer
+    labels:
+      app: tracer
+  spec:
+    replicas: 1
+    template:
+      metadata:
+        labels:
+          app: tracer
+      spec:
+        serviceAccountName: tracer
+        containers:
+        - name: oauth-proxy
+          image: openshift/oauth-proxy:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+          - containerPort: 8443
+            name: web
+          args:
+          - -provider=openshift
+          - -https-address=:8443
+          - -http-address=
+          - -email-domain=*
+          - -upstream=http://localhost:8080
+          - -client-id=system:serviceaccount:ci:tracer
+          - -openshift-ca=/etc/pki/tls/cert.pem
+          - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          - '-openshift-sar={"resource": "configmaps", "verb": "get", "namespace": "ci"}'
+          - '-openshift-delegate-urls={"/": {"resource": "configmaps", "verb": "get", "namespace": "ci"}}'
+          - -client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
+          - -cookie-secret-file=/etc/proxy/secrets/session_secret
+          - -tls-cert=/etc/tls/private/tls.crt
+          - -tls-key=/etc/tls/private/tls.key
+          volumeMounts:
+          - mountPath: /etc/tls/private
+            name: tracer-tls
+          - mountPath: /etc/proxy/secrets
+            name: session-secret
+        - image: tracer:latest
+          name: tracer
+          args:
+          - --label-selector=app=prow
+          - --namespace=ci
+          ports:
+          - containerPort: 8080
+        volumes:
+        - name: session-secret
+          secret:
+            secretName: session-secret
+        - name: tracer-tls
+          secret:
+            secretName: tracer-tls
+- apiVersion: v1
+  kind: Secret
+  metadata:
+    namespace: ci
+    name: session-secret
+  stringData:
+    session_secret: "${SESSION_SECRET}="

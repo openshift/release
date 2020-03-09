@@ -1,37 +1,70 @@
 kind: List
 apiVersion: v1
 items:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    namespace: ci
+    labels:
+      app: prow
+      component: plank
+    name: plank
+  spec:
+    ports:
+    - name: metrics
+      port: 9090
+      protocol: TCP
+      targetPort: 9090
+    selector:
+      app: prow
+      component: plank
 - apiVersion: apps/v1
   kind: Deployment
   metadata:
     namespace: ci
-    name: horologium
+    name: plank
     labels:
       app: prow
-      component: horologium
+      component: plank
   spec:
-    replicas: 1
+    # Do not scale up.
+    replicas: 0
     revisionHistoryLimit: 2
+    strategy:
+      type: Recreate
     selector:
       matchLabels:
         app: prow
-        component: horologium
+        component: plank
     template:
       metadata:
         labels:
           app: prow
-          component: horologium
+          component: plank
       spec:
-        serviceAccountName: horologium
+        serviceAccountName: plank
         priorityClassName: prow-critical
         containers:
-        - name: horologium
+        - name: plank
+          image: gcr.io/k8s-prow/plank:v20200305-e8ef9758b
           args:
           - --config-path=/etc/config/config.yaml
-          - --job-config-path=/etc/job-config
+          - --tot-url=http://tot
           - --dry-run=false
-          image: gcr.io/k8s-prow/horologium:v20200309-685d04ec8
+          - --job-config-path=/etc/job-config
+          - --github-token-path=/etc/github/oauth
+          - --github-endpoint=http://ghproxy
+          - --github-endpoint=https://api.github.com
+          - --github-graphql-endpoint=http://ghproxy/graphql
+          - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+          - --skip-report=true
+          ports:
+          - name: metrics
+            containerPort: 9090
           volumeMounts:
+          - name: oauth
+            mountPath: /etc/github
+            readOnly: true
           - name: config
             mountPath: /etc/config
             readOnly: true
@@ -65,11 +98,17 @@ items:
           - name: job-config-46
             mountPath: /etc/job-config/4.6
             readOnly: true
+          - mountPath: /etc/build-farm-credentials
+            name: build-farm-credentials
+            readOnly: true
           resources:
             requests:
-              memory: "1.5Gi"
-              cpu: "150m"
+              memory: "4Gi"
+              cpu: "600m"
         volumes:
+        - name: oauth
+          secret:
+            secretName: github-credentials-openshift-ci-robot
         - name: config
           configMap:
             name: config
@@ -103,3 +142,9 @@ items:
         - name: job-config-46
           configMap:
             name: job-config-4.6
+        - name: build-farm-credentials
+          secret:
+            items:
+            - key: sa.plank.build01.config
+              path: kubeconfig
+            secretName: build-farm-credentials
