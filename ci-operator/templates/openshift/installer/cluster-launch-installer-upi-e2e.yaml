@@ -1576,7 +1576,26 @@ objects:
           # Deploy infra
           export CLUSTER_NETWORK=`gcloud compute networks describe ${INFRA_ID}-network --format json | jq -r .selfLink`
 
-          cat <<EOF > 02_infra.yaml
+          if [ -f 02_dns.py ]; then # for newer workflow using 02_dns.py
+            cat <<EOF > 02_infra.yaml
+        imports:
+        - path: 02_dns.py
+        - path: 02_lb_ext.py
+        resources:
+        - name: cluster-dns
+          type: 02_dns.py
+          properties:
+            infra_id: '${INFRA_ID}'
+            cluster_domain: '${CLUSTER_NAME}.${base_domain}'
+            cluster_network: '${CLUSTER_NETWORK}'
+        - name: cluster-lb-ext
+          type: 02_lb_ext.py
+          properties:
+            infra_id: '${INFRA_ID}'
+            region: '${REGION}'
+        EOF
+          else # for older workflow not using 02_dns.py
+            cat <<EOF > 02_infra.yaml
         imports:
         - path: 02_infra.py
         resources:
@@ -1588,6 +1607,7 @@ objects:
             cluster_domain: '${CLUSTER_NAME}.${base_domain}'
             cluster_network: '${CLUSTER_NETWORK}'
         EOF
+          fi
 
           gcloud deployment-manager deployments create ${CLUSTER_NAME}-infra --config 02_infra.yaml
 
@@ -1610,21 +1630,40 @@ objects:
           export MASTER_NAT_IP=`gcloud compute addresses describe ${INFRA_ID}-master-nat-ip --region ${REGION} --format json | jq -r .address`
           export WORKER_NAT_IP=`gcloud compute addresses describe ${INFRA_ID}-worker-nat-ip --region ${REGION} --format json | jq -r .address`
 
-          cat <<EOF > 03_security.yaml
+          if [ -f 03_firewall.yaml ]; then # for newer workflow using 03_firewall.py
+            cat <<EOF > 03_security.yaml
+        imports:
+        - path: 03_firewall.py
+        - path: 03_iam.py
+        resources:
+        - name: cluster-firewall
+          type: 03_firewall.py
+          properties:
+            infra_id: '${INFRA_ID}'
+            cluster_network: '${CLUSTER_NETWORK}'
+            network_cidr: '${NETWORK_CIDR}'
+            master_nat_ip: '${MASTER_NAT_IP}'
+            worker_nat_ip: '${WORKER_NAT_IP}'
+        - name: cluster-iam
+          type: 03_iam.py
+          properties:
+            infra_id: '${INFRA_ID}'
+        EOF
+          else # for older workflow not using 03_firewall.py
+            cat <<EOF > 03_security.yaml
         imports:
         - path: 03_security.py
-
         resources:
         - name: cluster-security
           type: 03_security.py
           properties:
             infra_id: '${INFRA_ID}'
-            region: '${REGION}'
             cluster_network: '${CLUSTER_NETWORK}'
             network_cidr: '${NETWORK_CIDR}'
             master_nat_ip: '${MASTER_NAT_IP}'
             worker_nat_ip: '${WORKER_NAT_IP}'
         EOF
+          fi
 
           gcloud deployment-manager deployments create ${CLUSTER_NAME}-security --config 03_security.yaml
 
@@ -1692,7 +1731,6 @@ objects:
           type: 05_control_plane.py
           properties:
             infra_id: '${INFRA_ID}'
-            region: '${REGION}'
             zones:
             - '${ZONES[0]}'
             - '${ZONES[1]}'
@@ -1748,7 +1786,6 @@ objects:
           type: 06_worker.py
           properties:
             infra_id: '${INFRA_ID}'
-            region: '${REGION}'
             zone: '${ZONES[(( $compute % ${#ZONES[@]} ))]}'
             compute_subnet: '${COMPUTE_SUBNET}'
             image: '${CLUSTER_IMAGE}'
