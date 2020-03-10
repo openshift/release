@@ -2263,19 +2263,18 @@ presubmits:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-steps,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
-    context: ci/prow/e2e-vsphere
+    context: ci/prow/e2e-vsphere-ipi
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-master-e2e-vsphere
-    optional: true
-    rerun_command: /test e2e-vsphere
+    name: pull-ci-openshift-installer-master-e2e-vsphere-ipi
+    rerun_command: /test e2e-vsphere-ipi
     spec:
       containers:
       - args:
@@ -2290,10 +2289,10 @@ presubmits:
         - --org=openshift
         - --repo=installer
         - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-        - --secret-dir=/usr/local/e2e-vsphere-cluster-profile
+        - --secret-dir=/usr/local/e2e-vsphere-ipi-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=e2e-vsphere
-        - --template=/usr/local/e2e-vsphere
+        - --target=e2e-vsphere-ipi
+        - --template=/usr/local/e2e-vsphere-ipi
         command:
         - ci-operator
         env:
@@ -2305,7 +2304,7 @@ presubmits:
               key: openshift-installer-master.yaml
               name: ci-operator-master-configs
         - name: JOB_NAME_SAFE
-          value: e2e-vsphere
+          value: e2e-vsphere-ipi
         - name: TEST_COMMAND
           value: TEST_SUITE=openshift/conformance/parallel run-tests
         image: ci-operator:latest
@@ -2321,9 +2320,9 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-vsphere-cluster-profile
+        - mountPath: /usr/local/e2e-vsphere-ipi-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-vsphere
+        - mountPath: /usr/local/e2e-vsphere-ipi
           name: job-definition
           subPath: cluster-launch-installer-upi-e2e.yaml
         - mountPath: /etc/pull-secret
@@ -2360,7 +2359,105 @@ presubmits:
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )e2e-vsphere,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-vsphere-ipi,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/e2e-vsphere-upi
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-master-e2e-vsphere-upi
+    rerun_command: /test e2e-vsphere-upi
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --branch=master
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
+        - --org=openshift
+        - --repo=installer
+        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
+        - --secret-dir=/usr/local/e2e-vsphere-upi-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=e2e-vsphere-upi
+        - --template=/usr/local/e2e-vsphere-upi
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: vsphere
+        - name: CONFIG_SPEC
+          valueFrom:
+            configMapKeyRef:
+              key: openshift-installer-master.yaml
+              name: ci-operator-master-configs
+        - name: JOB_NAME_SAFE
+          value: e2e-vsphere-upi
+        - name: TEST_COMMAND
+          value: TEST_SUITE=openshift/conformance/parallel run-tests
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-vsphere-upi-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-vsphere-upi
+          name: job-definition
+          subPath: cluster-launch-installer-upi-e2e.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-vsphere
+      - configMap:
+          name: prow-job-cluster-launch-installer-upi-e2e
+        name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )e2e-vsphere-upi,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
