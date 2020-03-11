@@ -79,8 +79,8 @@ yum install -y git
 # python2-cryptography needs to come from delorean-master-testing, priority of packet.repo overrides it
 # remove the priority and instead ensure the packet repo is named first alphabetically
 # this way it is prefered but it isn't a hard override when newer versions are found elsewhere
-sed -i -e 's/priority.*//g' /etc/yum.repos.d/packet.repo
-sed -i -e 's/packet-/a_packet-/g' /etc/yum.repos.d/packet.repo
+### sed -i -e 's/priority.*//g' /etc/yum.repos.d/packet.repo
+### sed -i -e 's/packet-/a_packet-/g' /etc/yum.repos.d/packet.repo
 
 rm -rf /tmp/artifacts
 mkdir -p /tmp/artifacts
