@@ -74,18 +74,13 @@ timeout -s 9 175m ssh $SSHOPTS root@$IP bash - << EOF |& sed -e 's/.*auths.*/***
 
 set -ex
 
-#### For debug only, to be removed ####
-curl https://github.com/derekhiggins.keys >> /root/.ssh/authorized_keys
-curl https://github.com/andfasano.keys >> /root/.ssh/authorized_keys
-#######################################
-
 yum install -y git
 
 # python2-cryptography needs to come from delorean-master-testing, priority of packet.repo overrides it
 # remove the priority and instead ensure the packet repo is named first alphabetically
 # this way it is prefered but it isn't a hard override when newer versions are found elsewhere
-sed -i -e 's/priority.*//g' /etc/yum.repos.d/packet.repo
-sed -i -e 's/packet-/a_packet-/g' /etc/yum.repos.d/packet.repo
+### sed -i -e 's/priority.*//g' /etc/yum.repos.d/packet.repo
+### sed -i -e 's/packet-/a_packet-/g' /etc/yum.repos.d/packet.repo
 
 rm -rf /tmp/artifacts
 mkdir -p /tmp/artifacts
@@ -104,6 +99,7 @@ curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.g
 
 #echo "export OPENSHIFT_RELEASE_IMAGE=registry.svc.ci.openshift.org/ocp/release:4.5.0-0.ci-2020-03-11-134608" >> /root/dev-scripts/config_root.sh
 echo "export OPENSHIFT_RELEASE_IMAGE=registry.svc.ci.openshift.org/${NAMESPACE}/release:latest" >> /root/dev-scripts/config_root.sh
+
 
 echo "export ADDN_DNS=\$(awk '/nameserver/ { print \$2;exit; }' /etc/resolv.conf)" >> /root/dev-scripts/config_root.sh
 echo "export OPENSHIFT_CI=true" >> /root/dev-scripts/config_root.sh
