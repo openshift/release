@@ -55,6 +55,19 @@ for x in $(seq 10) ; do
     sleep 10
 done
 
+# Get dev-scripts logs
+finished()
+{
+  set +e
+
+  # Get dev-scripts logs
+  echo "dev-scripts setup completed, fetching logs"
+  ssh $SSHOPTS root@$IP tar -czf - /root/dev-scripts/logs | tar -C ${ARTIFACT_DIR} -xzf -
+  sed -i -e 's/.*auths.*/*** PULL_SECRET ***/g' ${ARTIFACT_DIR}/root/dev-scripts/logs/*
+}
+trap finished EXIT TERM
+
+# Prepare configuration and run dev-scripts 
 scp $SSHOPTS ${PULL_SECRET_PATH} root@$IP:pull-secret
 
 timeout -s 9 175m ssh $SSHOPTS root@$IP bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
@@ -98,11 +111,6 @@ fi
 timeout -s 9 105m make
 
 EOF
-
-# Get dev-scripts logs
-echo "dev-scripts setup completed, fetching logs"
-ssh $SSHOPTS root@$IP tar -czf - /root/dev-scripts/logs | tar -C ${ARTIFACT_DIR} -xzf -
-sed -i -e 's/.*auths.*/*** PULL_SECRET ***/g' ${ARTIFACT_DIR}/root/dev-scripts/logs/*
 
 
 
