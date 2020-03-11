@@ -217,8 +217,12 @@ objects:
 
         # Create the network and firewall rules to attach it to VM
         gcloud compute networks create "${INSTANCE_PREFIX}" \
-          --subnet-mode=auto \
+          --subnet-mode=custom \
           --bgp-routing-mode=regional
+        gcloud compute networks subnets create "${INSTANCE_PREFIX}" \
+          --network "${INSTANCE_PREFIX}" \
+          --region "${GOOGLE_COMPUTE_REGION}" \
+          --range=10.0.0.0/9
         gcloud compute firewall-rules create "${INSTANCE_PREFIX}" \
           --network "${INSTANCE_PREFIX}" \
           --allow tcp:22,icmp
@@ -338,6 +342,7 @@ objects:
           echo "Deprovisioning cluster ..."
           gcloud compute instances delete "${INSTANCE_PREFIX}" --quiet
           gcloud compute firewall-rules delete "${INSTANCE_PREFIX}" --quiet
+          gcloud compute networks subnets delete "${INSTANCE_PREFIX}" --quiet
           gcloud compute networks delete "${INSTANCE_PREFIX}" --quiet
         }
 
