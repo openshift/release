@@ -80,6 +80,7 @@ set +e
 echo "### Running tests"
 ssh $SSHOPTS root@$IP openshift-tests run "openshift/conformance/parallel" --dry-run \| grep -Fvf <(echo "$EXCL") \| openshift-tests run -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit -f -
 rv=$?
+
 echo "### Fetching results"
 ssh $SSHOPTS root@$IP tar -czf - /tmp/artifacts | tar -C ${ARTIFACT_DIR} -xzf - 
 set -e

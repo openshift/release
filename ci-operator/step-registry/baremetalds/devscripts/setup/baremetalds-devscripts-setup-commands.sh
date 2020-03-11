@@ -9,7 +9,6 @@ secret_dir=/tmp/secret
 
 export SSH_PRIV_KEY_PATH=${cluster_profile}/ssh-privatekey
 export PULL_SECRET_PATH=${cluster_profile}/pull-secret
-export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST}
 export SSHOPTS="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90 -i ${SSH_PRIV_KEY_PATH}"
 
 echo "************ baremetalds devscripts setup command ************"
@@ -56,11 +55,29 @@ for x in $(seq 10) ; do
     sleep 10
 done
 
+# Get dev-scripts logs
+finished()
+{
+  set +e
+
+  # Get dev-scripts logs
+  echo "dev-scripts setup completed, fetching logs"
+  ssh $SSHOPTS root@$IP tar -czf - /root/dev-scripts/logs | tar -C ${ARTIFACT_DIR} -xzf -
+  sed -i -e 's/.*auths.*/*** PULL_SECRET ***/g' ${ARTIFACT_DIR}/root/dev-scripts/logs/*
+}
+trap finished EXIT TERM
+
+# Prepare configuration and run dev-scripts 
 scp $SSHOPTS ${PULL_SECRET_PATH} root@$IP:pull-secret
 
 timeout -s 9 175m ssh $SSHOPTS root@$IP bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 
 set -ex
+
+#### For debug only, to be removed ####
+curl https://github.com/derekhiggins.keys >> /root/.ssh/authorized_keys
+curl https://github.com/andfasano.keys >> /root/.ssh/authorized_keys
+#######################################
 
 yum install -y git
 
@@ -84,7 +101,10 @@ set -x
 
 curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar -C /usr/bin -xzf -
 
-echo "export OPENSHIFT_RELEASE_IMAGE=registry.svc.ci.openshift.org/ocp/release:4.5.0-0.nightly-2020-03-10-172025" >> /root/dev-scripts/config_root.sh
+
+echo "export OPENSHIFT_RELEASE_IMAGE=registry.svc.ci.openshift.org/ocp/release:4.5.0-0.ci-2020-03-11-134608" >> /root/dev-scripts/config_root.sh
+#echo "export OPENSHIFT_RELEASE_IMAGE=registry.svc.ci.openshift.org/${NAMESPACE}/release:latest" >> /root/dev-scripts/config_root.sh
+
 echo "export ADDN_DNS=\$(awk '/nameserver/ { print \$2;exit; }' /etc/resolv.conf)" >> /root/dev-scripts/config_root.sh
 echo "export OPENSHIFT_CI=true" >> /root/dev-scripts/config_root.sh
 echo "export MIRROR_IMAGES=true" >> /root/dev-scripts/config_root.sh
@@ -99,11 +119,6 @@ fi
 timeout -s 9 105m make
 
 EOF
-
-# Get dev-scripts logs
-echo "dev-scripts setup completed, fetching logs"
-ssh $SSHOPTS root@$IP tar -czf - /root/dev-scripts/logs | tar -C ${ARTIFACT_DIR} -xzf -
-sed -i -e 's/.*auths.*/*** PULL_SECRET ***/g' ${ARTIFACT_DIR}/root/dev-scripts/logs/*
 
 
 
