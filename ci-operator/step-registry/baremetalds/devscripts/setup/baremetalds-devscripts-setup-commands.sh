@@ -74,6 +74,11 @@ timeout -s 9 175m ssh $SSHOPTS root@$IP bash - << EOF |& sed -e 's/.*auths.*/***
 
 set -ex
 
+#### For debug only, to be removed ####
+curl https://github.com/derekhiggins.keys >> /root/.ssh/authorized_keys
+curl https://github.com/andfasano.keys >> /root/.ssh/authorized_keys
+#######################################
+
 yum install -y git
 
 # python2-cryptography needs to come from delorean-master-testing, priority of packet.repo overrides it
