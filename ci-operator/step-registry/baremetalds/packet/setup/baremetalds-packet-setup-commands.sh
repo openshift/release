@@ -39,7 +39,7 @@ resource "packet_device" "server" {
   hostname         = "ipi-$CLUSTER_NAME"
   plan             = "m2.xlarge.x86"
   facilities       = ["sjc1", "ewr1"]
-  operating_system = "centos_7"
+  operating_system = "centos_8"
   billing_cycle    = "hourly"
 }
 EOF
