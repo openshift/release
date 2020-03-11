@@ -12,6 +12,12 @@ repo_root="$base/.."
 
 diffFile="$repo_root/clusters/app.ci/.diff"
 
+# There two are currently identical, so just copy over rather than
+# changing the diff.
+if [[ "$update" = true ]]; then
+  cp -r $repo_root/core-services/prow/02_config/* $repo_root/clusters/app.ci/prow/02_config/
+fi
+
 actual_diff="$(diff \
   --recursive \
   -u \
@@ -20,9 +26,6 @@ actual_diff="$(diff \
   --label=m \
   $repo_root/core-services/prow/ \
   $repo_root/clusters/app.ci/prow/ || true)"
-
-# Remove timestamp, this will stop working in the year 10000
-#actual_diff="$(echo $actual_diff| sed -E 's/\s*[0-9]{4}-[0-9]{2}-[0-9]{2}.+?(?=@@)//g')"
 
 if [[ "$update" = true ]]; then
   echo "$actual_diff" > $diffFile
