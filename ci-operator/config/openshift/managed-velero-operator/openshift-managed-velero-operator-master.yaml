@@ -4,6 +4,11 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "8"
+  golangci-lint:
+    cluster: https://docker.io
+    name: golangci-lint
+    namespace: golangci
+    tag: v1.23.8
 build_root:
   image_stream_tag:
     cluster: https://api.ci.openshift.org
@@ -30,6 +35,11 @@ tests:
     make verify
   container:
     from: src
+- as: verify-docker
+  commands: |
+    golangci-lint run -v
+  container:
+    from: golangci-lint
 - as: test
   commands: |
     make test
