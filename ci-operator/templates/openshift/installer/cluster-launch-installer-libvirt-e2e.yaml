@@ -181,6 +181,8 @@ objects:
         value: openshift-gce-devel-ci
       - name: GOOGLE_COMPUTE_ZONE
         value: us-east1-c
+      - name: GOOGLE_COMPUTE_REGION
+        value: us-east1
       - name: INSTANCE_PREFIX
         value: ${NAMESPACE}-${JOB_NAME_HASH}
       command:
@@ -213,6 +215,7 @@ objects:
           --quiet --key-file /tmp/cluster/gce.json
         gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
         gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
+        gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
         set -x
 
         # Create the network and firewall rules to attach it to VM
@@ -221,7 +224,6 @@ objects:
           --bgp-routing-mode=regional
         gcloud compute networks subnets create "${INSTANCE_PREFIX}" \
           --network "${INSTANCE_PREFIX}" \
-          --region "${GOOGLE_COMPUTE_REGION}" \
           --range=10.0.0.0/9
         gcloud compute firewall-rules create "${INSTANCE_PREFIX}" \
           --network "${INSTANCE_PREFIX}" \
@@ -237,6 +239,7 @@ objects:
           --boot-disk-type pd-ssd \
           --boot-disk-size 256GB \
           --metadata-from-file openshift-pull-secret=/tmp/cluster/pull-secret \
+          --subnet "${INSTANCE_PREFIX}" \
           --network "${INSTANCE_PREFIX}"
         LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
           --quiet \
