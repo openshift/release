@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 
 cluster_profile=/var/run/secrets/ci.openshift.io/cluster-profile
-secret_dir=/tmp/secret
+#### secret_dir=/tmp/secret
 
 export SSH_PRIV_KEY_PATH=${cluster_profile}/ssh-privatekey
 export PULL_SECRET_PATH=${cluster_profile}/pull-secret
@@ -29,22 +29,22 @@ export IP
 echo "Packet server IP is ${IP}"
 
 # Applying NSS fix for SSH connection and share artifacts
-if [ ! -d ${secret_dir} ]; then
-    echo "Making ${secret_dir}"
-    mkdir -p ${secret_dir}
-fi
+#### if [ ! -d ${secret_dir} ]; then
+####    echo "Making ${secret_dir}"
+####    mkdir -p ${secret_dir}
+#### fi
 
-### ### Apply temporary fix for the shared dir issue: re-copy all the current content in ARTIFACT_DIR to secret_dir to make it visible for the subsequent steps ### ###
-cp ${SHARED_DIR}/* ${secret_dir}
-### ###
+#### ### ### Apply temporary fix for the shared dir issue: re-copy all the current content in ARTIFACT_DIR to secret_dir to make it visible for the subsequent steps ### ###
+#### cp ${SHARED_DIR}/* ${secret_dir}
+#### ### ###
 
-echo "Copying nss artifacts to ${secret_dir}"
-cp /bin/mock-nss.sh /usr/lib64/libnss_wrapper.so ${secret_dir}
+echo "Copying nss artifacts to ${SHARED_DIR}"
+cp /bin/mock-nss.sh /usr/lib64/libnss_wrapper.so ${SHARED_DIR}
 
 export HOME=/tmp/nss_wrapper
 mkdir -p $HOME
-cp ${secret_dir}/libnss_wrapper.so ${HOME}
-cp ${secret_dir}/mock-nss.sh ${HOME}
+cp /usr/lib64/libnss_wrapper.so ${HOME}
+cp /bin/mock-nss.sh ${HOME}
 export NSS_WRAPPER_PASSWD=$HOME/passwd NSS_WRAPPER_GROUP=$HOME/group NSS_USERNAME=nsswrapper NSS_GROUPNAME=nsswrapper LD_PRELOAD=${HOME}/libnss_wrapper.so
 bash ${HOME}/mock-nss.sh
 
