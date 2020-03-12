@@ -30,18 +30,15 @@
           },
           {
             alert: 'ghproxy-running-out-github-tokens-in-a-hour',
-            // check 30% of the capacity (5000): 1500
             expr: |||
-              github_token_usage{job="ghproxy"} <  1500
-              and
-              predict_linear(github_token_usage{job="ghproxy"}[1h], 1 * 3600) < 0
+              github_token_usage + deriv(github_token_usage[10m]) * github_token_reset / 1e9 < 100
             |||,
             'for': '5m',
             labels: {
               severity: 'critical',
             },
             annotations: {
-              message: 'token {{ $labels.token_hash }} will run out of API quota before the next reset.',
+              message: 'token {{ $labels.token_hash }} may run out of API quota before the next reset.',
             },
           }
         ],
