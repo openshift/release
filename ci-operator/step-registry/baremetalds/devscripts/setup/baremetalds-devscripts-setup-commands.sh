@@ -38,14 +38,13 @@ echo "Packet server IP is ${IP}"
 #### cp ${SHARED_DIR}/* ${secret_dir}
 #### ### ###
 
-echo "Copying nss artifacts to ${SHARED_DIR}"
-cp /bin/mock-nss.sh /usr/lib64/libnss_wrapper.so ${SHARED_DIR}
+# echo "Copying nss artifacts to ${SHARED_DIR}"
+# cp /bin/mock-nss.sh /usr/lib64/libnss_wrapper.so ${SHARED_DIR}
 
 export HOME=/tmp/nss_wrapper
 mkdir -p $HOME
-cp /usr/lib64/libnss_wrapper.so ${HOME}
 cp /bin/mock-nss.sh ${HOME}
-export NSS_WRAPPER_PASSWD=$HOME/passwd NSS_WRAPPER_GROUP=$HOME/group NSS_USERNAME=nsswrapper NSS_GROUPNAME=nsswrapper LD_PRELOAD=${HOME}/libnss_wrapper.so
+export NSS_WRAPPER_PASSWD=$HOME/passwd NSS_WRAPPER_GROUP=$HOME/group NSS_USERNAME=nsswrapper NSS_GROUPNAME=nsswrapper LD_PRELOAD=/usr/lib64/libnss_wrapper.so
 bash ${HOME}/mock-nss.sh
 
 # Checkout dev-scripts and make
