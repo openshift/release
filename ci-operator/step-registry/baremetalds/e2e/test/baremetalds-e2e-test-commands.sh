@@ -33,11 +33,15 @@ cp ${SHARED_DIR}/mock-nss.sh ${HOME}
 export NSS_WRAPPER_PASSWD=$HOME/passwd NSS_WRAPPER_GROUP=$HOME/group NSS_USERNAME=nsswrapper NSS_GROUPNAME=nsswrapper LD_PRELOAD=${HOME}/libnss_wrapper.so
 bash ${HOME}/mock-nss.sh
 
+echo "Show /usr/bin content"
+ls -ll /usr/bin/o* /usr/bin/k*
+
 # Copy test binaries on packet server
 echo "### Copying test binaries"
-scp $SSHOPTS /usr/bin/openshift-tests /usr/bin/kubectl root@$IP:/usr/local/bin
+scp -v $SSHOPTS /usr/bin/openshift-tests /usr/bin/kubectl root@$IP:/usr/local/bin
 
 # List of exclude cases
+echo "### Preparing filter"
 read -d '' EXCL << EOF
 sig-storage
 custom build with buildah being created from new-build
@@ -75,16 +79,16 @@ deploymentconfigs with multiple image change triggers
 deploymentconfigs should respect image stream tag reference policy
 EOF
 
-# Tests execution
-set +e
-echo "### Running tests"
-ssh $SSHOPTS root@$IP openshift-tests run "openshift/conformance/parallel" --dry-run \| grep -Fvf <(echo "$EXCL") \| openshift-tests run -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit -f -
-rv=$?
+# # Tests execution
+# set +e
+# echo "### Running tests"
+# ssh $SSHOPTS root@$IP openshift-tests run "openshift/conformance/parallel" --dry-run \| grep -Fvf <(echo "$EXCL") \| openshift-tests run -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit -f -
+# rv=$?
 
-echo "### Fetching results"
-ssh $SSHOPTS root@$IP tar -czf - /tmp/artifacts | tar -C ${ARTIFACT_DIR} -xzf - 
-set -e
-echo "### Done! (${rv})"
-exit $rv
+# echo "### Fetching results"
+# ssh $SSHOPTS root@$IP tar -czf - /tmp/artifacts | tar -C ${ARTIFACT_DIR} -xzf - 
+# set -e
+# echo "### Done! (${rv})"
+# exit $rv
 
 
