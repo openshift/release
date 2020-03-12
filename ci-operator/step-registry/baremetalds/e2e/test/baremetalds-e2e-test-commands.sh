@@ -42,7 +42,7 @@ scp -v $SSHOPTS /usr/bin/openshift-tests /usr/bin/kubectl root@$IP:/usr/local/bi
 
 # List of exclude cases
 echo "### Preparing filter"
-read -d '' EXCL << EOF
+read -d '*' EXCL << EOF
 sig-storage
 custom build with buildah being created from new-build
 docker build using a pull secret Building from a template
@@ -77,6 +77,7 @@ Prometheus when installed on the cluster
 build can reference a cluster service with a build being created from new-build
 deploymentconfigs with multiple image change triggers
 deploymentconfigs should respect image stream tag reference policy
+*
 EOF
 
 # # Tests execution
