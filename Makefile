@@ -283,3 +283,7 @@ verify-app-ci:
 update-app-ci:
 	@update=true ./hack/verify-app-ci.sh
 .PHONY: update-app-ci
+
+mixins:
+	$(CONTAINER_ENGINE) run --user=$(UID) --rm -v "$(CURDIR):/release:z" registry.svc.ci.openshift.org/ci/dashboards-validation:latest make -C /release/cluster/ci/monitoring/mixins install all
+.PHONY: mixins
