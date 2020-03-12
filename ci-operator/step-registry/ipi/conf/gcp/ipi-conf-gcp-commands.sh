@@ -77,6 +77,5 @@ platform:
 EOF
 
 # TODO proxy variant
-# TODO CLUSTER_NETWORK_TYPE / ovn variant
 # TODO mirror variant
 # TODO CLUSTER_NETWORK_MANIFEST
