@@ -290,13 +290,10 @@ objects:
           # This can be used if we just want to check the installer exits 0
           echo "WARNING: No tests were run against the installed cluster"
         }
-
         ${TEST_COMMAND}
 
     # Runs an install
     - name: setup
-      # A midstep till we have the installer work merged, then we
-      # can use the CI artifact
       image: ${IMAGE_INSTALLER}
       terminationMessagePolicy: FallbackToLogsOnError
       volumeMounts:
@@ -416,9 +413,9 @@ objects:
         function update_image_registry() {
           while true; do
             sleep 10;
-            oc get configs.imageregistry.operator.openshift.io/cluster > /dev/null && break
+            oc --insecure-skip-tls-verify get configs.imageregistry.operator.openshift.io/cluster > /dev/null && break
           done
-          oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'
+          oc --insecure-skip-tls-verify patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'
         }
 
         #change the masters igntion , to use tempfs for etcd IOPS optimization
@@ -441,7 +438,11 @@ objects:
         wait "$!"
         install_exit_status=$?
         sleep 10m
-        oc get co/image-registry
+        # This is a workaround for https://bugzilla.redhat.com/show_bug.cgi?id=1794714
+        for n in $(oc --insecure-skip-tls-verify get nodes|awk '{print $1}'|grep worker);do
+          oc -n default --insecure-skip-tls-verify debug node/$n --image=centos/tools -- ethtool --offload vxlan_sys_4789 tx off
+        done
+        oc --insecure-skip-tls-verify get co/image-registry
         exit $install_exit_status
 
     # Performs cleanup of all created resources
