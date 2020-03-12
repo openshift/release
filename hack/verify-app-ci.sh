@@ -18,22 +18,22 @@ if [[ "$update" = true ]]; then
   cp -r $repo_root/core-services/prow/02_config/* $repo_root/clusters/app.ci/prow/02_config/
 fi
 
-actual_diff="$(diff \
-  --recursive \
-  -u \
-  --new-file \
-  --label=o \
-  --label=m \
-  $repo_root/core-services/prow/ \
-  $repo_root/clusters/app.ci/prow/ || true)"
+diff_command="git diff --no-index -- ./core-services/prow/ ./clusters/app.ci/prow/ || true"
+if [[ -z "${CI:-}" ]]; then
+  diff_command="docker run --rm --user=$UID -v $PWD:/repo:z --workdir /repo docker.io/openshift/origin-release:golang-1.13 $diff_command"
+fi
+
+actual_diff="$(eval $diff_command)"
 
 if [[ "$update" = true ]]; then
   echo "$actual_diff" > $diffFile
 fi
 
-expected_diff="$(cat $repo_root/clusters/app.ci/.diff)"
+# The filename is part of the diff, so must stay stable
+actual_diff_file="$repo_root/clusters/app.ci/.actual_diff"
+echo "$actual_diff" > $actual_diff_file
 
-diffDiff="$(diff <(echo "$actual_diff") <(echo "$expected_diff") || true)"
+diffDiff="$(git diff --no-index -- $actual_diff_file $diffFile || true)"
 
 if [[ -n "$diffDiff" ]]; then
   echo "ERROR: Diff does not match expected"
