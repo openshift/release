@@ -5,7 +5,6 @@ set -o errexit
 set -o pipefail
 
 cluster_profile=/var/run/secrets/ci.openshift.io/cluster-profile
-#### secret_dir=/tmp/secret
 
 export CLUSTER_NAME=${NAMESPACE}-${JOB_NAME_HASH}
 
@@ -57,15 +56,10 @@ if test "${rc}" -eq 1; then
   exit 1
 fi
 
-#### # Sharing terraform artifacts required by teardown
-#### if [ ! -d ${secret_dir} ]; then
-####     echo "Making ${secret_dir}"
-####     mkdir -p ${secret_dir}
-#### fi
-
+# Sharing terraform artifacts required by teardown
 cp ${terraform_home}/terraform.* ${SHARED_DIR}
 
-# Sharing artifacts required by teardown
+# Sharing artifacts required by other steps
 jq -r '.modules[0].resources["packet_device.server"].primary.attributes.access_public_ipv4' terraform.tfstate > /tmp/server-ip
 cp /tmp/server-ip ${SHARED_DIR}
 
