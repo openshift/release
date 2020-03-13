@@ -40,7 +40,6 @@ wait "$!"
 ret=$?
 set -e
 
-mkdir /tmp/secret
 cp \
     -t /tmp/secret \
     "${dir}/auth/kubeconfig" \
