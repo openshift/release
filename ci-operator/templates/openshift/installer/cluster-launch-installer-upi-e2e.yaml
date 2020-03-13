@@ -1679,6 +1679,7 @@ objects:
         - name: cluster-firewall
           type: 03_firewall.py
           properties:
+            allowed_external_cidr: '0.0.0.0/0'
             infra_id: '${INFRA_ID}'
             cluster_network: '${CLUSTER_NETWORK}'
             network_cidr: '${NETWORK_CIDR}'
@@ -1728,8 +1729,8 @@ objects:
 
           gcloud deployment-manager deployments create ${CLUSTER_NAME}-security --config 03_security.yaml
 
-          export MASTER_SERVICE_ACCOUNT=$(gcloud iam service-accounts list | grep "^${INFRA_ID}-master-node " | awk '{print $2}')
-          export WORKER_SERVICE_ACCOUNT=$(gcloud iam service-accounts list | grep "^${INFRA_ID}-worker-node " | awk '{print $2}')
+          export MASTER_SERVICE_ACCOUNT=$(gcloud iam service-accounts list --filter "email~^${INFRA_ID}-m@${PROJECT_NAME}." --format json | jq -r '.[0].email')
+          export WORKER_SERVICE_ACCOUNT=$(gcloud iam service-accounts list --filter "email~^${INFRA_ID}-w@${PROJECT_NAME}." --format json | jq -r '.[0].email')
 
           gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${MASTER_SERVICE_ACCOUNT}" --role "roles/compute.instanceAdmin"
           gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${MASTER_SERVICE_ACCOUNT}" --role "roles/compute.networkAdmin"
