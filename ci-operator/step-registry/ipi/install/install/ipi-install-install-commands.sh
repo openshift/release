@@ -41,7 +41,7 @@ ret=$?
 set -e
 
 cp \
-    -t /tmp/secret \
+    -t "${SHARED_DIR}" \
     "${dir}/auth/kubeconfig" \
     "${dir}/metadata.json" \
     "${dir}/terraform.tfstate"
