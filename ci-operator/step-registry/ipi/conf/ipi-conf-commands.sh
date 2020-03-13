@@ -9,7 +9,7 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 cluster_profile=/var/run/secrets/ci.openshift.io/cluster-profile
 cluster_name=${NAMESPACE}-${JOB_NAME_HASH}
 
-out=/tmp/secret/install-config.yaml
+out=${SHARED_DIR}/install-config.yaml
 
 cluster_variant=
 if [[ -e "${SHARED_DIR}/install-config-variant.txt" ]]; then
