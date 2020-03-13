@@ -41,11 +41,13 @@ echo "Packet server IP is ${IP}"
 # echo "Copying nss artifacts to ${SHARED_DIR}"
 # cp /bin/mock-nss.sh /usr/lib64/libnss_wrapper.so ${SHARED_DIR}
 
-export HOME=/tmp/nss_wrapper
-mkdir -p $HOME
-cp /bin/mock-nss.sh ${HOME}
-export NSS_WRAPPER_PASSWD=$HOME/passwd NSS_WRAPPER_GROUP=$HOME/group NSS_USERNAME=nsswrapper NSS_GROUPNAME=nsswrapper LD_PRELOAD=/usr/lib64/libnss_wrapper.so
-bash ${HOME}/mock-nss.sh
+# export HOME=/tmp/nss_wrapper
+# mkdir -p $HOME
+# cp /bin/mock-nss.sh ${HOME}
+# export NSS_WRAPPER_PASSWD=$HOME/passwd NSS_WRAPPER_GROUP=$HOME/group NSS_USERNAME=nsswrapper NSS_GROUPNAME=nsswrapper LD_PRELOAD=/usr/lib64/libnss_wrapper.so
+# bash ${HOME}/mock-nss.sh
+
+echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
 
 # Checkout dev-scripts and make
 for x in $(seq 10) ; do
