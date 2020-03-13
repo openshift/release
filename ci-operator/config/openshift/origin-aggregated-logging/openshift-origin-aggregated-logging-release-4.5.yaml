@@ -31,6 +31,9 @@ build_root:
     namespace: openshift
     tag: golang-1.10
 images:
+- dockerfile_path: openshift/ci-operator/build-image/Dockerfile
+  from: src
+  to: origin-aggregated-logging-tests
 - dockerfile_path: test/unit/Dockerfile
   from: ruby-25
   to: logging-test-unit
@@ -82,5 +85,7 @@ tests:
     from: logging-test-unit
 - as: smoke
   commands: make test
-  openshift_installer_src:
+  openshift_installer_custom_test_image:
     cluster_profile: aws
+    from: stable:origin-aggregated-logging-tests
+    nested_virt_image: ""
