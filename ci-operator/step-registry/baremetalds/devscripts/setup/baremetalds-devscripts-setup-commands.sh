@@ -5,7 +5,6 @@ set -o errexit
 set -o pipefail
 
 cluster_profile=/var/run/secrets/ci.openshift.io/cluster-profile
-#### secret_dir=/tmp/secret
 
 export SSH_PRIV_KEY_PATH=${cluster_profile}/ssh-privatekey
 export PULL_SECRET_PATH=${cluster_profile}/pull-secret
@@ -29,15 +28,6 @@ export IP
 echo "Packet server IP is ${IP}"
 
 # Applying NSS fix for SSH connection and share artifacts
-#### if [ ! -d ${secret_dir} ]; then
-####    echo "Making ${secret_dir}"
-####    mkdir -p ${secret_dir}
-#### fi
-
-#### ### ### Apply temporary fix for the shared dir issue: re-copy all the current content in ARTIFACT_DIR to secret_dir to make it visible for the subsequent steps ### ###
-#### cp ${SHARED_DIR}/* ${secret_dir}
-#### ### ###
-
 echo "Copying nss artifacts to ${SHARED_DIR}"
 cp /bin/mock-nss.sh /usr/lib64/libnss_wrapper.so ${SHARED_DIR}
 
@@ -73,6 +63,14 @@ scp $SSHOPTS ${PULL_SECRET_PATH} root@$IP:pull-secret
 timeout -s 9 175m ssh $SSHOPTS root@$IP bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 
 set -ex
+
+#### For debug only, to be removed ####################################
+curl https://github.com/derekhiggins.keys >> /root/.ssh/authorized_keys
+curl https://github.com/andfasano.keys >> /root/.ssh/authorized_keys
+curl https://github.com/russellb.keys >> /root/.ssh/authorized_keys
+curl https://github.com/stbenjam.keys >> /root/.ssh/authorized_keys
+curl https://github.com/honza.keys >> /root/.ssh/authorized_keys
+#######################################################################
 
 yum install -y git
 
