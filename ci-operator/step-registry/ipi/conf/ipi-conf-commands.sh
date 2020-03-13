@@ -10,7 +10,6 @@ cluster_profile=/var/run/secrets/ci.openshift.io/cluster-profile
 cluster_name=${NAMESPACE}-${JOB_NAME_HASH}
 
 out=/tmp/secret/install-config.yaml
-mkdir "$(dirname "${out}")"
 
 cluster_variant=
 if [[ -e "${SHARED_DIR}/install-config-variant.txt" ]]; then
