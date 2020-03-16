@@ -741,6 +741,24 @@ objects:
             echo "${CLUSTER_NETWORK_MANIFEST}" > /tmp/artifacts/installer/manifests/cluster-network-03-config.yml
         fi
 
+        if has_variant "rt"; then
+          if [[ -n "${CLUSTER_NETWORK_MANIFEST:-}" ]]; then
+            echo 'error: CLUSTER_NETWORK_MANIFEST is incompatible with the `rt` variant'
+            exit 1
+          fi
+          openshift-install --dir=/tmp/artifacts/installer/ create manifests
+          cat > /tmp/artifacts/installer/manifests/realtime-worker-machine-config.yml << EOF
+        apiVersion: machineconfiguration.openshift.io/v1
+        kind: MachineConfig
+        metadata:
+          labels:
+            machineconfiguration.openshift.io/role: worker
+          name: realtime-worker
+        spec:
+          kernelType: realtime
+        EOF
+        fi
+
         TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create cluster 2>&1 | grep --line-buffered -v password &
         wait "$!"
 
