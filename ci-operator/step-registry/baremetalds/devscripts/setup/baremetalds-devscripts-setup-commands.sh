@@ -13,6 +13,14 @@ export SSHOPTS="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHost
 echo "************ baremetalds devscripts setup command ************"
 env | sort
 
+# Ensure our UID, which is randomly generated, is in /etc/passwd. This is required
+# to be able to SSH.
+if ! whoami &> /dev/null; then
+    if [[ -w /etc/passwd ]]; then
+        echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+    fi
+fi
+
 # Initial check
 if [ "${CLUSTER_TYPE}" != "packet" ] ; then
     echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"
@@ -26,17 +34,6 @@ ls -ll ${SHARED_DIR}
 IP=$(cat ${SHARED_DIR}/server-ip)
 export IP
 echo "Packet server IP is ${IP}"
-
-# Applying NSS fix for SSH connection and share artifacts
-echo "Copying nss artifacts to ${SHARED_DIR}"
-cp /bin/mock-nss.sh /usr/lib64/libnss_wrapper.so ${SHARED_DIR}
-
-export HOME=/tmp/nss_wrapper
-mkdir -p $HOME
-cp /usr/lib64/libnss_wrapper.so ${HOME}
-cp /bin/mock-nss.sh ${HOME}
-export NSS_WRAPPER_PASSWD=$HOME/passwd NSS_WRAPPER_GROUP=$HOME/group NSS_USERNAME=nsswrapper NSS_GROUPNAME=nsswrapper LD_PRELOAD=${HOME}/libnss_wrapper.so
-bash ${HOME}/mock-nss.sh
 
 # Checkout dev-scripts and make
 for x in $(seq 10) ; do
