@@ -18,6 +18,9 @@ env | sort
 if ! whoami &> /dev/null; then
     if [[ -w /etc/passwd ]]; then
         echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+    else
+        echo "/etc/passwd is not writeable, and user matching this uid is not found."
+        exit 1
     fi
 fi
 
