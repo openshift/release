@@ -50,7 +50,7 @@ terraform init
 # therefore the terraform apply needs to be retried a few time before giving up.
 rc=1
 # shellcheck disable=SC20347
-for r in {1..5}; do terraform apply -auto-approve && rc=0 && break ; done
+for _ in {1..5}; do terraform apply -auto-approve && rc=0 && break ; done
 if test "${rc}" -eq 1; then 
   echo >&2 "Failed to create packet server"
   exit 1
