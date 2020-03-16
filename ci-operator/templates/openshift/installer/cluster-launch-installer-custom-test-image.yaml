@@ -20,11 +20,7 @@ parameters:
 - name: CLUSTER_TYPE
   required: true
 - name: CLUSTER_ENABLE_NESTED_VIRT
-  value: "false"
-  required: false
 - name: CLUSTER_NESTED_VIRT_IMAGE
-  value: "rhcos43-nested-virt"
-  required: false
 - name: TEST_COMMAND
   required: true
 - name: RELEASE_IMAGE_LATEST
@@ -238,8 +234,8 @@ objects:
             continue
           fi
           # don't let clients impact the global kubeconfig
-          cp "${KUBECONFIG}" /tmp/admin.kubeconfig
-          export KUBECONFIG=/tmp/admin.kubeconfig
+          cp "${KUBECONFIG}" /tmp/shared/admin.kubeconfig
+          export KUBECONFIG=/tmp/shared/admin.kubeconfig
           break
         done
 
@@ -394,9 +390,12 @@ objects:
         trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/shared/setup-success; else touch /tmp/shared/exit /tmp/shared/setup-failed; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-        if [[ "${CLUSTER_TYPE}" != "gcp" ]] && [[ "${CLUSTER_ENABLE_NESTED_VIRT-false}" == "true" ]]; then
-            echo "CLUSTER_ENABLE_NESTED_VIRT is unsupported for cluster type '${CLUSTER_TYPE}'"
-            exit 1
+        if [[ "${CLUSTER_ENABLE_NESTED_VIRT:=false}" == "true" ]]; then
+            if [[ "${CLUSTER_TYPE}" != "gcp" ]]; then
+                echo "CLUSTER_ENABLE_NESTED_VIRT is unsupported for cluster type '${CLUSTER_TYPE}'"
+                exit 1
+            fi
+            echo "will enable nested-virt on gcp cluster with image '${CLUSTER_NESTED_VIRT_IMAGE:=rhcos43-nested-virt}'"
         fi
 
         export PATH=/tmp/shared:$PATH  # gain access to oc
@@ -409,7 +408,7 @@ objects:
             exit 1
         fi
 
-        cp "$(command -v openshift-install)" /tmp
+        cp "$(command -v openshift-install)" /tmp/shared
         mkdir /tmp/artifacts/installer
 
         if [[ -n "${INSTALL_INITIAL_RELEASE}" && -n "${RELEASE_IMAGE_INITIAL}" ]]; then
@@ -653,13 +652,14 @@ objects:
         TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create cluster 2>&1 | grep --line-buffered -v password &
         wait "$!"
 
-        if [[ "${CLUSTER_TYPE}" == "gcp" ]] && [[ "${CLUSTER_ENABLE_NESTED_VIRT-false}" == "true" ]]; then
-          ### enable nested-virt ###
+        if [[ "${CLUSTER_TYPE}" == "gcp" ]] && [[ "${CLUSTER_ENABLE_NESTED_VIRT}" == "true" ]]; then
+          echo "starting to enable nested-virt on gcp cluster with image '${CLUSTER_NESTED_VIRT_IMAGE:=rhcos43-nested-virt}'"
           export KUBECONFIG=/tmp/artifacts/installer/auth/kubeconfig
           oc get machineset -n openshift-machine-api -o json >/tmp/machinesets.json
-          MACHINE_IMAGE=$(jq -r .items[0].spec.template.spec.providerSpec.value.disks[0].image /tmp/machinesets.json)
-          sed -i 's/'"$MACHINE_IMAGE"'/'"$CLUSTER_NESTED_VIRT_IMAGE"'/g' /tmp/machinesets.json
-          oc apply -f /tmp/machinesets.json
+          # this image lives in gce-devel project: "rhcos43-nested-virt"
+          jq '(.items[] | .spec.template.spec.providerSpec.value.disks[0].image) |= "change-me"' /tmp/machinesets.json > /tmp/machinesets-nested.json
+          sed -i 's/change-me/'"$CLUSTER_NESTED_VIRT_IMAGE"'/g' /tmp/machinesets-nested.json
+          oc apply -f /tmp/machinesets-nested.json
           oc scale --replicas=0 machineset --all -n openshift-machine-api
           oc get machines -n openshift-machine-api -o json >/tmp/machines.json
           num_machines=$(jq '.items | length' /tmp/machines.json)
@@ -684,7 +684,17 @@ objects:
           workers=$(oc get nodes | grep worker | awk '{ print $1 }')
           workers_each=($workers)
           for i in {0..2}; do
-            if ! oc debug node/"${workers_each[i]}" -- ls /dev/kvm; then oc debug node/"${workers_each[i]}" -- ls /dev/kvm; fi
+            for j in {0..3}; do
+              out=$(oc debug node/"${workers_each[i]}" -- ls /dev/kvm || true)
+              if [[ ! "${out}" =~ "No such file" ]]; then
+                break
+              else
+                if [[ $j -eq 3 ]]; then
+                  echo "nested virt not enabled, exiting" 2>&1
+                  exit 1
+                fi
+              fi
+            done
           done
         fi
 
