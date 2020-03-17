@@ -12,13 +12,7 @@ repo_root="$base/.."
 
 diffFile="$repo_root/clusters/app.ci/.diff"
 
-# There two are currently identical, so just copy over rather than
-# changing the diff.
-if [[ "$update" = true ]]; then
-  cp -r $repo_root/core-services/prow/02_config/* $repo_root/clusters/app.ci/prow/02_config/
-fi
-
-diff_command="git diff --no-index -- ./core-services/prow/ ./clusters/app.ci/prow/ || true"
+diff_command="git diff --no-index -- ./core-services/prow/03_deployment/ ./clusters/app.ci/prow/03_deployment/ || true"
 if [[ -z "${CI:-}" ]]; then
   diff_command="docker run --rm --user=$UID -v $PWD:/repo:z --workdir /repo docker.io/openshift/origin-release:golang-1.13 $diff_command"
 fi
