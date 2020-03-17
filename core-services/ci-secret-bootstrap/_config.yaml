@@ -110,6 +110,9 @@
     - cluster: default
       namespace: ci
       name: bugzilla-credentials-openshift-bugzilla-robot
+    - cluster: app.ci
+      namespace: ci
+      name: bugzilla-credentials-openshift-bugzilla-robot
 # Jenkins credentials are stored as separate items in Bitwarden,
 # with the token recorded as the password for the account
 - from:
@@ -120,12 +123,18 @@
     - cluster: default
       namespace: ci
       name: jenkins-credentials-ci.openshift.redhat.com
+    - cluster: app.ci
+      namespace: ci
+      name: jenkins-credentials-ci.openshift.redhat.com
 - from:
     password:
       bw_item: kata-jenkins-ci.westus2.cloudapp.azure.com
       attribute: password
   to:
     - cluster: default
+      namespace: ci
+      name: jenkins-credentials-kata-jenkins-ci.westus2.cloudapp.azure.com
+    - cluster: app.ci
       namespace: ci
       name: jenkins-credentials-kata-jenkins-ci.westus2.cloudapp.azure.com
 # Client certificates for the ci.dev Jenkins
@@ -145,6 +154,9 @@
       attachment: ca.pem
   to:
     - cluster: default
+      namespace: ci
+      name: jenkins-credentials-ci.dev.openshift.redhat.com
+    - cluster: app.ci
       namespace: ci
       name: jenkins-credentials-ci.dev.openshift.redhat.com
 # OAuth tokens for GitHub are stored as a text field named
@@ -173,6 +185,9 @@
     - cluster: default
       namespace: ci
       name: github-credentials-openshift-cherrypick-robot
+    - cluster: app.ci
+      namespace: ci
+      name: github-credentials-openshift-cherrypick-robot
 - from:
     oauth:
       bw_item: openshift-ci-robot
@@ -181,12 +196,18 @@
     - cluster: default
       namespace: ci
       name: github-credentials-openshift-ci-robot
+    - cluster: app.ci
+      namespace: ci
+      name: github-credentials-openshift-ci-robot
 - from:
     oauth:
       bw_item: openshift-merge-robot
       field: GitHub OAuth Token
   to:
     - cluster: default
+      namespace: ci
+      name: github-credentials-openshift-merge-robot
+    - cluster: app.ci
       namespace: ci
       name: github-credentials-openshift-merge-robot
 - from:
@@ -248,6 +269,9 @@
     - cluster: default
       namespace: ci
       name: github-app-credentials
+    - cluster: app.ci
+      namespace: ci
+      name: github-app-credentials
 # Configuration for GitHub OAuth Apps are stored
 # as an opaque field "Client Configuration"
 - from:
@@ -256,6 +280,9 @@
       field: Client Configuration
   to:
     - cluster: default
+      namespace: ci
+      name: github-app-credentials-private
+    - cluster: app.ci
       namespace: ci
       name: github-app-credentials-private
 # Cookie secret to encrypt frontend and backend
@@ -268,6 +295,9 @@
     - cluster: default
       namespace: ci
       name: cookie
+    - cluster: app.ci
+      namespace: ci
+      name: cookie
 # HMAC token for encrypting GitHub webhook payloads
 # is stored in the "HMAC Token" field
 - from:
@@ -276,6 +306,9 @@
       field: HMAC Token
   to:
     - cluster: default
+      namespace: ci
+      name: github-webhook-credentials
+    - cluster: app.ci
       namespace: ci
       name: github-webhook-credentials
 # DeploymentConfig token is used to auth trigger events
@@ -335,6 +368,9 @@
     - cluster: default
       namespace: ci
       name: gce-sa-credentials-gcs-tide-publisher
+    - cluster: app.ci
+      namespace: ci
+      name: gce-sa-credentials-gcs-tide-publisher
 - from:
     service-account.json:
       bw_item: gcs-private
@@ -343,6 +379,20 @@
     - cluster: default
       namespace: ci
       name: gce-sa-credentials-gcs-private
+    - cluster: app.ci
+      namespace: ci
+      name: gce-sa-credentials-gcs-private
+- from:
+    service-account.json:
+      bw_item: gcs-crier-publisher
+      attachment: credentials.json
+  to:
+    - cluster: default
+      namespace: ci
+      name: gce-sa-credentials-gcs-crier-publisher
+    - cluster: app.ci
+      namespace: ci
+      name: gce-sa-credentials-gcs-crier-publisher
 # Some GCE serviceaccounts also have SSH keys
 - from:
     service-account.json:
@@ -450,12 +500,12 @@
 - from:
     config.json:
       bw_item: quay.io/openshift-psap
-      field: Push Credentials
+      attachment: config.json
   to:
     - cluster: default
       namespace: ci
       name: registry-push-credentials-quay.io-openshift-psap
-#Pull Credentials 
+#Pull Credentials
 - from:
     config.json:
       bw_item: quay.io
@@ -736,10 +786,29 @@
     sa.config-updater.build01.config:
       bw_item: build_farm
       attachment: sa.config-updater.build01.config
+    sa.hook.app.ci.config:
+      bw_item: build_farm
+      attachment: sa.hook.app.ci.config
+    sa.hook.build01.and.app.ci.merged.config:
+      bw_item: build_farm
+      attachment: sa.hook.build01.and.app.ci.merged.config
   to:
     - cluster: default
       namespace: ci
       name: build-farm-credentials
+    - cluster: app.ci
+      namespace: ci
+      name: build-farm-credentials
+# config updater for app.ci cluster
+- from:
+    kubeconfig:
+      bw_item: app-ci-config-updater-kubeconfig
+      attachment: app-ci-config-updater-kubeconfig
+  to:
+    - cluster: default
+      namespace: ci
+      name: app-ci-config-updater-kubeconfig
+
 # collects all the secrets for ci-operator
 - from:
     sa.ci-operator.apici.config:
@@ -768,6 +837,9 @@
       namespace: ci
       name: boskos-credentials
     - cluster: build01
+      namespace: ci
+      name: boskos-credentials
+    - cluster: app.ci
       namespace: ci
       name: boskos-credentials
 # collects all the secrets for aws iamuser openshift-ci-robot iamuser under account ci-infra

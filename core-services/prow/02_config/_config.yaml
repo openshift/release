@@ -18,10 +18,6 @@ branch-protection:
           protect: false
         toolchain-operator:
           protect: false
-    containers:
-      repos:
-        libpod:
-          protect: false
     cri-o:
       required_status_checks:
         contexts:
@@ -66,6 +62,10 @@ branch-protection:
           required_status_checks:
             contexts:
             - ci.ext.devshift.net PR build
+        cloud-ingress-operator:
+          required_status_checks:
+            contexts:
+            - ci.ext.devshift.net PR build
         cluster-capacity:
           required_status_checks:
             contexts:
@@ -79,6 +79,10 @@ branch-protection:
             contexts:
             - ci.ext.devshift.net PR build
         dedicated-admin-operator:
+          required_status_checks:
+            contexts:
+            - ci.ext.devshift.net PR build
+        gcp-project-operator:
           required_status_checks:
             contexts:
             - ci.ext.devshift.net PR build
@@ -104,11 +108,17 @@ branch-protection:
             users: null
         knative-client:
           branches:
+            pr/olm-fix-release-next:
+              protect: false
+            pr/release-next-fix:
+              protect: false
+            pr/release-next-olm-fix:
+              protect: false
+            pr/update-serving-v0.7.1:
+              protect: false
             release-next:
               protect: false
             release-next-ci:
-              protect: false
-            release-v0.9.0:
               protect: false
         knative-eventing:
           branches:
@@ -354,13 +364,38 @@ plank:
           log: text/plain
         path_strategy: single
       gcs_credentials_secret: gce-sa-credentials-gcs-publisher
-      grace_period: 1m0s
+      grace_period: 15m0s
+      resources:
+        clonerefs:
+          limits:
+            memory: 3Gi
+          requests:
+            cpu: 100m
+            memory: 500Mi
+        initupload:
+          limits:
+            memory: 200Mi
+          requests:
+            cpu: 100m
+            memory: 50Mi
+        place_entrypoint:
+          limits:
+            memory: 100Mi
+          requests:
+            cpu: 100m
+            memory: 25Mi
+        sidecar:
+          limits:
+            memory: 2Gi
+          requests:
+            cpu: 100m
+            memory: 20Mi
       timeout: 4h0m0s
       utility_images:
-        clonerefs: gcr.io/k8s-prow/clonerefs:v20200304-c42b857fc
-        entrypoint: gcr.io/k8s-prow/entrypoint:v20200304-308dab8f7
-        initupload: gcr.io/k8s-prow/initupload:v20200304-308dab8f7
-        sidecar: gcr.io/k8s-prow/sidecar:v20200304-c42b857fc
+        clonerefs: gcr.io/k8s-prow/clonerefs:v20200317-673b1adb5
+        entrypoint: gcr.io/k8s-prow/entrypoint:v20200317-673b1adb5
+        initupload: gcr.io/k8s-prow/initupload:v20200317-673b1adb5
+        sidecar: registry.svc.ci.openshift.org/clayton-test-1/sidecar@sha256:3619766610babc626144cc3fce1e0529916637461611b66e45f8fb6a873b4051
     openshift-priv:
       gcs_configuration:
         bucket: origin-ci-private
@@ -383,9 +418,9 @@ plank:
     eq .Spec.Type "presubmit"}}/{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}{{else
     if eq .Spec.Type "batch"}}/batch{{end}}/{{.Spec.Job}}/{{.Status.BuildID}}/
   max_goroutines: 20
-  pod_pending_timeout: 24h0m0s
+  pod_pending_timeout: 15m0s
   pod_running_timeout: 48h0m0s
-  pod_unscheduled_timeout: 24h0m0s
+  pod_unscheduled_timeout: 5m0s
   report_template: '[Full PR test history](https://prow.svc.ci.openshift.org/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
     index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://prow.svc.ci.openshift.org/pr?query=is:pr+state:open+author:{{with
     index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}). Please help us cut down on flakes
@@ -426,6 +461,10 @@ tide:
             skip-unknown-contexts: true
           service-binding-operator:
             skip-unknown-contexts: true
+      redhat-operator-ecosystem:
+        repos:
+          release:
+            skip-unknown-contexts: true
   max_goroutines: 20
   merge_label: tide/merge-method-merge
   merge_method:
@@ -445,7 +484,7 @@ tide:
     openshift-knative/serverless-operator: squash
     openshift-knative/serving-operator: squash
     openshift-kni/baremetal-deploy: squash
-    openshift-psap/special-resource-operator: rebase
+    openshift-psap/special-resource-operator: squash
     openshift/ansible-service-broker: squash
     openshift/cluster-api: rebase
     openshift/cluster-api-provider-azure: rebase
@@ -487,7 +526,6 @@ tide:
     - bugzilla/valid-bug
     missingLabels:
     - needs-rebase
-    - do-not-merge/blocked-paths
     - do-not-merge/hold
     - do-not-merge/work-in-progress
     - do-not-merge/invalid-owners-file
@@ -507,7 +545,6 @@ tide:
     - approved
     missingLabels:
     - needs-rebase
-    - do-not-merge/blocked-paths
     - do-not-merge/hold
     - do-not-merge/work-in-progress
     - do-not-merge/invalid-owners-file
@@ -519,6 +556,7 @@ tide:
     - release-4.1
     - release-4.2
     - release-4.3
+    - release-4.4
     - release-4.5
     - release-4.6
     - openshift-4.1
@@ -532,167 +570,6 @@ tide:
     - cherry-pick-approved
     missingLabels:
     - needs-rebase
-    - do-not-merge/blocked-paths
-    - do-not-merge/hold
-    - do-not-merge/work-in-progress
-    - do-not-merge/invalid-owners-file
-    - bugzilla/invalid-bug
-    repos:
-    - openshift/ansible-service-broker
-    - openshift/api
-    - openshift/apiserver-library-go
-    - openshift/baremetal-operator
-    - openshift/baremetal-runtimecfg
-    - openshift/builder
-    - openshift/client-go
-    - openshift/cloud-credential-operator
-    - openshift/cloud-provider-openstack
-    - openshift/cluster-api-actuator-pkg
-    - openshift/cluster-api-provider-aws
-    - openshift/cluster-api-provider-azure
-    - openshift/cluster-api-provider-baremetal
-    - openshift/cluster-api-provider-gcp
-    - openshift/cluster-api-provider-kubemark
-    - openshift/cluster-api-provider-libvirt
-    - openshift/cluster-api-provider-openstack
-    - openshift/cluster-api-provider-ovirt
-    - openshift/cluster-authentication-operator
-    - openshift/cluster-autoscaler-operator
-    - openshift/cluster-bootstrap
-    - openshift/cluster-config-operator
-    - openshift/cluster-csi-snapshot-controller-operator
-    - openshift/cluster-dns-operator
-    - openshift/cluster-etcd-operator
-    - openshift/cluster-image-registry-operator
-    - openshift/cluster-ingress-operator
-    - openshift/cluster-kube-apiserver-operator
-    - openshift/cluster-kube-controller-manager-operator
-    - openshift/cluster-kube-descheduler-operator
-    - openshift/cluster-kube-scheduler-operator
-    - openshift/cluster-kube-storage-version-migrator-operator
-    - openshift/cluster-logging-operator
-    - openshift/cluster-machine-approver
-    - openshift/cluster-monitoring-operator
-    - openshift/cluster-network-operator
-    - openshift/cluster-nfd-operator
-    - openshift/cluster-node-tuning-operator
-    - openshift/cluster-openshift-apiserver-operator
-    - openshift/cluster-openshift-controller-manager-operator
-    - openshift/cluster-policy-controller
-    - openshift/cluster-resource-override-admission
-    - openshift/cluster-resource-override-admission-operator
-    - openshift/cluster-samples-operator
-    - openshift/cluster-storage-operator
-    - openshift/cluster-svcat-apiserver-operator
-    - openshift/cluster-svcat-controller-manager-operator
-    - openshift/cluster-update-keys
-    - openshift/cluster-version-operator
-    - openshift/compliance-operator
-    - openshift/configmap-reload
-    - openshift/console
-    - openshift/console-operator
-    - openshift/coredns
-    - openshift/coredns-mdns
-    - openshift/csi-cluster-driver-registrar
-    - openshift/csi-driver-registrar
-    - openshift/csi-external-attacher
-    - openshift/csi-external-provisioner
-    - openshift/csi-external-resizer
-    - openshift/csi-external-snapshotter
-    - openshift/csi-livenessprobe
-    - openshift/csi-node-driver-registrar
-    - openshift/csi-operator
-    - openshift/custom-resource-status
-    - openshift/elasticsearch-operator
-    - openshift/elasticsearch-proxy
-    - openshift/etcd
-    - openshift/external-storage
-    - openshift/federation-v2-operator
-    - openshift/grafana
-    - openshift/image-registry
-    - openshift/images
-    - openshift/insights-operator
-    - openshift/installer
-    - openshift/ironic-hardware-inventory-recorder-image
-    - openshift/ironic-image
-    - openshift/ironic-inspector-image
-    - openshift/ironic-ipa-downloader
-    - openshift/ironic-rhcos-downloader
-    - openshift/ironic-static-ip-manager
-    - openshift/jenkins
-    - openshift/k8s-prometheus-adapter
-    - openshift/kubecsr
-    - openshift/kubernetes
-    - openshift/kube-rbac-proxy
-    - openshift/kube-state-metrics
-    - openshift/kubernetes-kube-storage-version-migrator
-    - openshift/kuryr-kubernetes
-    - openshift/leader-elector
-    - openshift/library-go
-    - openshift/local-storage-operator
-    - openshift/loki
-    - openshift/metal3-smart-exporter
-    - openshift/sig-storage-local-static-provisioner
-    - openshift/machine-api-operator
-    - openshift/kubernetes-autoscaler
-    - openshift/machine-config-operator
-    - openshift/mdns-publisher
-    - openshift/multus-cni
-    - openshift/must-gather
-    - openshift/node_exporter
-    - openshift/node-feature-discovery
-    - openshift/node-problem-detector
-    - openshift/node-problem-detector-operator
-    - openshift/oauth-proxy
-    - openshift/oauth-server
-    - openshift/oc
-    - openshift/openshift-ansible
-    - openshift/openshift-apiserver
-    - openshift/openshift-controller-manager
-    - openshift/openshift-state-metrics
-    - openshift/openshift-tuned
-    - openshift/oauth-apiserver
-    - openshift/origin
-    - openshift/origin-aggregated-logging
-    - openshift/ovirt-csi-driver
-    - openshift/ovn-kubernetes
-    - openshift/prometheus
-    - openshift/prometheus-alertmanager
-    - openshift/prometheus-operator
-    - openshift/prom-label-proxy
-    - openshift/route-override-cni
-    - openshift/router
-    - openshift/runtime-utils
-    - openshift/sdn
-    - openshift/service-catalog
-    - openshift/service-ca-operator
-    - openshift/telemeter
-    - openshift/template-service-broker
-    - openshift/template-service-broker-operator
-    - openshift/thanos
-    - openshift/vertical-pod-autoscaler-operator
-    - openshift/whereabouts-cni
-    - operator-framework/ghostunnel
-    - operator-framework/hadoop
-    - operator-framework/helm
-    - operator-framework/hive
-    - operator-framework/operator-lifecycle-manager
-    - operator-framework/operator-marketplace
-    - operator-framework/operator-metering
-    - operator-framework/operator-registry
-    - operator-framework/presto
-    - openshift/file-integrity-operator
-    - openshift/openshift-tests
-    - openshift/csi-driver-nfs
-  - includedBranches:
-    - release-4.4
-    labels:
-    - lgtm
-    - approved
-    - bugzilla/valid-bug
-    missingLabels:
-    - needs-rebase
-    - do-not-merge/blocked-paths
     - do-not-merge/hold
     - do-not-merge/work-in-progress
     - do-not-merge/invalid-owners-file
@@ -849,6 +726,7 @@ tide:
     - release-4.1
     - release-4.2
     - release-4.3
+    - release-4.4
     - release-4.5
     - release-4.6
     - openshift-4.1
@@ -858,33 +736,6 @@ tide:
     - cherry-pick-approved
     missingLabels:
     - needs-rebase
-    - do-not-merge/blocked-paths
-    - do-not-merge/hold
-    - do-not-merge/work-in-progress
-    - do-not-merge/invalid-owners-file
-    - bugzilla/invalid-bug
-    repos:
-    - openshift/cluster-capacity
-    - openshift/containernetworking-plugins
-    - openshift/coredns
-    - openshift/descheduler
-    - openshift/multus-admission-controller
-    - openshift/ocp-release-operator-sdk
-    - openshift/service-ca-operator
-    - openshift/sriov-cni
-    - openshift/sriov-dp-admission-controller
-    - openshift/sriov-network-device-plugin
-    - openshift/sriov-network-operator
-    - openshift/linuxptp-daemon
-    - openshift/ptp-operator
-  - includedBranches:
-    - release-4.4
-    labels:
-    - lgtm
-    - bugzilla/valid-bug
-    missingLabels:
-    - needs-rebase
-    - do-not-merge/blocked-paths
     - do-not-merge/hold
     - do-not-merge/work-in-progress
     - do-not-merge/invalid-owners-file
@@ -923,7 +774,6 @@ tide:
     - approved
     missingLabels:
     - needs-rebase
-    - do-not-merge/blocked-paths
     - do-not-merge/hold
     - do-not-merge/work-in-progress
     - do-not-merge/invalid-owners-file
@@ -1097,7 +947,6 @@ tide:
     - operator-framework/operator-registry
     - operator-framework/presto
     - openshift/file-integrity-operator
-    - openshift-priv/ci-experiment-origin
     - openshift/openshift-tests
     - openshift/csi-driver-nfs
     - openshift/network-metrics-daemon
@@ -1109,16 +958,16 @@ tide:
     - approved
     missingLabels:
     - needs-rebase
-    - do-not-merge/blocked-paths
     - do-not-merge/hold
     - do-not-merge/work-in-progress
     - do-not-merge/invalid-owners-file
     - bugzilla/invalid-bug
     repos:
-    - openshift/openshift-ansible
-    - openshift/origin
+    - openshift/api
     - openshift/cluster-logging-operator
     - openshift/elasticsearch-operator
+    - openshift/openshift-ansible
+    - openshift/origin
     - openshift/origin-aggregated-logging
   - includedBranches:
     - feature-prom-connector
@@ -1127,7 +976,6 @@ tide:
     - approved
     missingLabels:
     - needs-rebase
-    - do-not-merge/blocked-paths
     - do-not-merge/hold
     - do-not-merge/work-in-progress
     - do-not-merge/invalid-owners-file
@@ -1139,7 +987,6 @@ tide:
     - approved
     missingLabels:
     - needs-rebase
-    - do-not-merge/blocked-paths
     - do-not-merge/hold
     - do-not-merge/work-in-progress
     - do-not-merge/invalid-owners-file
@@ -1161,7 +1008,6 @@ tide:
     - lgtm
     missingLabels:
     - needs-rebase
-    - do-not-merge/blocked-paths
     - do-not-merge/hold
     - do-not-merge/work-in-progress
     - do-not-merge/invalid-owners-file
@@ -1190,7 +1036,6 @@ tide:
     - approved
     missingLabels:
     - needs-rebase
-    - do-not-merge/blocked-paths
     - do-not-merge/hold
     - do-not-merge/work-in-progress
     - do-not-merge/invalid-owners-file
@@ -1204,7 +1049,6 @@ tide:
     - approved
     missingLabels:
     - needs-rebase
-    - do-not-merge/blocked-paths
     - do-not-merge/hold
     - do-not-merge/work-in-progress
     - do-not-merge/invalid-owners-file
@@ -1216,7 +1060,6 @@ tide:
     - approved
     missingLabels:
     - needs-rebase
-    - do-not-merge/blocked-paths
     - do-not-merge/hold
     - do-not-merge/work-in-progress
     - do-not-merge/invalid-owners-file
@@ -1233,7 +1076,6 @@ tide:
     - approved
     missingLabels:
     - needs-rebase
-    - do-not-merge/blocked-paths
     - do-not-merge/hold
     - do-not-merge/work-in-progress
     - do-not-merge/invalid-owners-file
@@ -1250,7 +1092,6 @@ tide:
     - approved
     missingLabels:
     - needs-rebase
-    - do-not-merge/blocked-paths
     - do-not-merge/hold
     - do-not-merge/work-in-progress
     - do-not-merge/invalid-owners-file
@@ -1262,7 +1103,6 @@ tide:
     - approved
     missingLabels:
     - needs-rebase
-    - do-not-merge/blocked-paths
     - do-not-merge/hold
     - do-not-merge/work-in-progress
     - do-not-merge/invalid-owners-file
@@ -1273,7 +1113,6 @@ tide:
     - approved
     missingLabels:
     - needs-rebase
-    - do-not-merge/blocked-paths
     - do-not-merge/hold
     - do-not-merge/work-in-progress
     - do-not-merge/invalid-owners-file
@@ -1285,22 +1124,22 @@ tide:
     - approved
     missingLabels:
     - needs-rebase
-    - do-not-merge/blocked-paths
     - do-not-merge/hold
     - do-not-merge/work-in-progress
     - do-not-merge/invalid-owners-file
     repos:
     - integr8ly/integreatly-operator
+    - integr8ly/application-monitoring-operator
     - integr8ly/cloud-resource-operator
     - integr8ly/installation
     - integr8ly/heimdall
     - integr8ly/ansible-tower-configuration
+    - integr8ly/rhmi-utils
   - labels:
     - lgtm
     - approved
     missingLabels:
     - needs-rebase
-    - do-not-merge/blocked-paths
     - do-not-merge/hold
     - do-not-merge/work-in-progress
     - do-not-merge/invalid-owners-file
@@ -1325,7 +1164,6 @@ tide:
     - do-not-merge/hold
     - do-not-merge/work-in-progress
     - do-not-merge/invalid-owners-file
-    - do-not-merge/blocked-paths
     - bugzilla/invalid-bug
     repos:
     - openshift/sriov-tests
@@ -1335,7 +1173,6 @@ tide:
     - 'dco-signoff: yes'
     missingLabels:
     - needs-rebase
-    - do-not-merge/blocked-paths
     - do-not-merge/hold
     - do-not-merge/work-in-progress
     - do-not-merge/invalid-owners-file
@@ -1347,7 +1184,6 @@ tide:
     - approved
     missingLabels:
     - needs-rebase
-    - do-not-merge/blocked-paths
     - do-not-merge/hold
     - do-not-merge/work-in-progress
     - do-not-merge/invalid-owners-file
@@ -1359,7 +1195,6 @@ tide:
     - approved
     missingLabels:
     - needs-rebase
-    - do-not-merge/blocked-paths
     - do-not-merge/hold
     - do-not-merge/work-in-progress
     - do-not-merge/invalid-owners-file
@@ -1405,7 +1240,6 @@ tide:
     - approved
     missingLabels:
     - needs-rebase
-    - do-not-merge/blocked-paths
     - do-not-merge/hold
     - do-not-merge/work-in-progress
     - do-not-merge/invalid-owners-file
@@ -1419,6 +1253,8 @@ tide:
     - openshift/deadmanssnitch-operator
     - openshift/dedicated-admin-operator
     - openshift/elasticsearch-proxy
+    - openshift/gcp-project-operator
+    - openshift/cloud-ingress-operator
     - openshift/library
     - openshift/library-go
     - openshift/managed-cluster-config
@@ -1444,7 +1280,6 @@ tide:
     - approved
     missingLabels:
     - needs-rebase
-    - do-not-merge/blocked-paths
     - do-not-merge/hold
     - do-not-merge/work-in-progress
     - do-not-merge/invalid-owners-file
