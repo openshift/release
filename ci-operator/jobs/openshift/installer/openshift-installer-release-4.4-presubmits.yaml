@@ -1922,6 +1922,116 @@ presubmits:
     branches:
     - release-4.4
     cluster: api.ci
+    context: ci/prow/e2e-openstack-vexxhost
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-release-4.4-e2e-openstack-vexxhost
+    optional: true
+    rerun_command: /test e2e-openstack-vexxhost
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
+        - --org=openshift
+        - --repo=installer
+        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
+        - --secret-dir=/usr/local/e2e-openstack-vexxhost-cluster-profile
+        - --target=e2e-openstack-vexxhost
+        - --template=/usr/local/e2e-openstack-vexxhost
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: openstack
+        - name: JOB_NAME_SAFE
+          value: e2e-openstack-vexxhost
+        - name: KURYR_ENABLED
+          value: "false"
+        - name: OPENSTACK_EXTERNAL_NETWORK
+          value: public
+        - name: OPENSTACK_FLAVOR
+          value: v1-standard-4
+        - name: OPENSTACK_MASTER_VOLUME_TYPE
+          value: rbd
+        - name: OS_CLOUD
+          value: openstack
+        - name: TEST_COMMAND
+          value: TEST_SUITE=openshift/conformance/parallel run-tests
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-openstack-vexxhost-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-openstack-vexxhost
+          name: job-definition
+          subPath: cluster-launch-installer-openstack-e2e.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              items:
+              - key: clouds.yaml
+                path: clouds.yaml
+              name: cluster-secrets-openstack-vexxhost
+          - secret:
+              items:
+              - key: .awscred
+                path: .awscred
+              - key: ssh-privatekey
+                path: ssh-privatekey
+              - key: ssh-publickey
+                path: ssh-publickey
+              - key: pull-secret
+                path: pull-secret
+              name: cluster-secrets-openstack
+      - configMap:
+          name: prow-job-cluster-launch-installer-openstack-e2e
+        name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
+    trigger: (?m)^/test( | .* )e2e-openstack-vexxhost,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - release-4.4
+    cluster: api.ci
     context: ci/prow/e2e-ovirt
     decorate: true
     decoration_config:
