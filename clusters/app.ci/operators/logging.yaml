@@ -1,0 +1,62 @@
+# Docs: https://docs.openshift.com/container-platform/4.3/logging/cluster-logging-deploying.html
+kind: List
+metadata:
+  resourceVersion: ""
+  selfLink: ""
+apiVersion: v1
+items:
+- apiVersion: operators.coreos.com/v1alpha1
+  kind: Subscription
+  metadata:
+    name: elasticsearch-operator
+    namespace: openshift-logging
+  spec:
+    channel: "4.3"
+    installPlanApproval: Automatic
+    name: elasticsearch-operator
+    source: osd-curated-redhat-operators
+    sourceNamespace: openshift-marketplace
+    startingCSV: elasticsearch-operator.4.3.5-202003020549
+- apiVersion: operators.coreos.com/v1alpha1
+  kind: Subscription
+  metadata:
+    generation: 1
+    name: cluster-logging
+    namespace: openshift-logging
+  spec:
+    channel: "4.3"
+    installPlanApproval: Automatic
+    name: cluster-logging
+    source: osd-curated-redhat-operators
+    sourceNamespace: openshift-marketplace
+    startingCSV: clusterlogging.4.3.5-202003020549
+- apiVersion: "logging.openshift.io/v1"
+  kind: "ClusterLogging"
+  metadata:
+    name: "instance"
+    namespace: "openshift-logging"
+  spec:
+    managementState: "Managed"
+    logStore:
+      type: "elasticsearch"
+      elasticsearch:
+        nodeCount: 3
+        storage:
+          storageClassName: gp2
+          size: 200G
+        redundancyPolicy: "SingleRedundancy"
+        resources:
+          requests:
+            memory: 8G
+    visualization:
+      type: "kibana"
+      kibana:
+        replicas: 1
+    curation:
+      type: "curator"
+      curator:
+        schedule: "30 3 * * *"
+    collection:
+      logs:
+        type: "fluentd"
+        fluentd: {}
