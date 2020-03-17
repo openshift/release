@@ -39,9 +39,8 @@ echo "Packet server IP is ${IP}"
 
 timeout -s 9 15m ssh $SSHOPTS root@$IP bash - << EOF
 mkdir -p /tmp/artifacts/must-gather
-
 oc --insecure-skip-tls-verify adm must-gather --dest-dir /tmp/artifacts/must-gather > /tmp/artifacts/must-gather/must-gather.log
 EOF
 
-echo "### Fetching results and logs"
-ssh $SSHOPTS root@$IP tar -czf - /tmp/artifacts | tar -C ${ARTIFACT_DIR} -xzf -
+echo "### Fetching logs..."
+ssh $SSHOPTS root@$IP tar -czf - /tmp/artifacts/must-gather | tar -C ${ARTIFACT_DIR} -xzf -
