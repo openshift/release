@@ -4,8 +4,6 @@ presubmits:
     always_run: false
     context: ci/openshift/promrules
     decorate: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: check_prometheus_rules
     rerun_command: /test promrules
     run_if_changed: ^(projects/prometheus/prometheus.rules.yaml)$
@@ -20,6 +18,29 @@ presubmits:
           requests:
             cpu: 10m
     trigger: ((?m)^/test promrules,?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/app-ci-config
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-app-ci-config
+    rerun_command: /test app-ci-config
+    spec:
+      containers:
+      - args:
+        - verify-app-ci
+        command:
+        - make
+        image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )app-ci-config,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -52,6 +73,7 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: default
     context: ci/build-farm/build01-dry
     decorate: true
     labels:
@@ -188,7 +210,7 @@ presubmits:
         - mismatched-tide-lenient
         command:
         - /checkconfig
-        image: gcr.io/k8s-prow/checkconfig:v20200304-c42b857fc
+        image: gcr.io/k8s-prow/checkconfig:v20200317-673b1adb5
         imagePullPolicy: Always
         name: ""
         resources:
@@ -199,6 +221,7 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: default
     context: ci/prow/core-dry
     decorate: true
     labels:
@@ -253,23 +276,13 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
-        - --org=openshift
-        - --repo=release
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=core-valid
         command:
         - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-release-master.yaml
-              name: ci-operator-master-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -305,6 +318,64 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
+    context: ci/prow/core-valid-build01
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-core-valid-build01
+    optional: true
+    rerun_command: /test core-valid-build01
+    skip_report: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=core-valid
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )core-valid-build01,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
     context: ci/prow/correctly-sharded-config
     decorate: true
     labels:
@@ -324,6 +395,29 @@ presubmits:
           requests:
             cpu: 10m
     trigger: (?m)^/test( | .* )correctly-sharded-config,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/generated-cluster
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-generated-cluster
+    rerun_command: /test generated-cluster
+    spec:
+      containers:
+      - args:
+        - ./hack/ensure_job_cluster.py
+        command:
+        - python3
+        image: registry.svc.ci.openshift.org/ci/python-validation:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: ((?m)^/test generated-cluster,?(\s+|$))
   - agent: kubernetes
     always_run: true
     branches:
@@ -520,6 +614,7 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: default
     context: ci/prow/services-dry
     decorate: true
     labels:
@@ -558,23 +653,13 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
-        - --org=openshift
-        - --repo=release
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=services-valid
         command:
         - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-release-master.yaml
-              name: ci-operator-master-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -606,6 +691,64 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )services-valid,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
+    context: ci/prow/services-valid-build01
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-services-valid-build01
+    optional: true
+    rerun_command: /test services-valid-build01
+    skip_report: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=services-valid
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )services-valid-build01,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:

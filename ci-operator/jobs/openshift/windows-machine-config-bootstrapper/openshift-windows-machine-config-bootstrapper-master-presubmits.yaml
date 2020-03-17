@@ -17,23 +17,13 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
-        - --org=openshift
-        - --repo=windows-machine-config-bootstrapper
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=build
         command:
         - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-windows-machine-config-bootstrapper-master.yaml
-              name: ci-operator-master-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -69,6 +59,64 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
+    context: ci/prow/build-build01
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-windows-machine-config-bootstrapper-master-build-build01
+    optional: true
+    rerun_command: /test build-build01
+    skip_report: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=build
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )build-build01,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
     context: ci/prow/e2e-wmcb
     decorate: true
     decoration_config:
@@ -81,16 +129,13 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
         - --lease-server-password-file=/etc/boskos/password
         - --lease-server-username=ci
         - --lease-server=https://boskos-ci.svc.ci.openshift.org
-        - --org=openshift
         - --repo=windows-machine-config-bootstrapper
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --secret-dir=/usr/local/e2e-wmcb-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=e2e-wmcb
@@ -102,11 +147,6 @@ presubmits:
           value: aws
         - name: CLUSTER_VARIANT
           value: ovn
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-windows-machine-config-bootstrapper-master.yaml
-              name: ci-operator-master-configs
         - name: JOB_NAME_SAFE
           value: e2e-wmcb
         - name: TEST_COMMAND
@@ -180,16 +220,13 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
         - --lease-server-password-file=/etc/boskos/password
         - --lease-server-username=ci
         - --lease-server=https://boskos-ci.svc.ci.openshift.org
-        - --org=openshift
         - --repo=windows-machine-config-bootstrapper
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --secret-dir=/usr/local/e2e-wsu-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=e2e-wsu
@@ -201,17 +238,12 @@ presubmits:
           value: aws
         - name: CLUSTER_VARIANT
           value: ovn
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-windows-machine-config-bootstrapper-master.yaml
-              name: ci-operator-master-configs
         - name: JOB_NAME_SAFE
           value: e2e-wsu
         - name: TEST_COMMAND
           value: make run-wsu-ci-e2e-test
         - name: TEST_IMAGESTREAM_TAG
-          value: pipeline:ansible-test
+          value: pipeline:windows-machine-config-bootstrapper-tests
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -282,24 +314,14 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
-        - --org=openshift
-        - --repo=windows-machine-config-bootstrapper
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=[images]
         - --target=[release:latest]
         command:
         - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-windows-machine-config-bootstrapper-master.yaml
-              name: ci-operator-master-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -335,6 +357,65 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
+    context: ci/prow/images-build01
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-windows-machine-config-bootstrapper-master-images-build01
+    optional: true
+    rerun_command: /test images-build01
+    skip_report: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=[images]
+        - --target=[release:latest]
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )images-build01,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
     context: ci/prow/test-e2e-tools
     decorate: true
     decoration_config:
@@ -347,16 +428,13 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
         - --lease-server-password-file=/etc/boskos/password
         - --lease-server-username=ci
         - --lease-server=https://boskos-ci.svc.ci.openshift.org
-        - --org=openshift
         - --repo=windows-machine-config-bootstrapper
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --secret-dir=/usr/local/test-e2e-tools-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=test-e2e-tools
@@ -368,11 +446,6 @@ presubmits:
           value: aws
         - name: CLUSTER_VARIANT
           value: ovn
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-windows-machine-config-bootstrapper-master.yaml
-              name: ci-operator-master-configs
         - name: JOB_NAME_SAFE
           value: test-e2e-tools
         - name: TEST_COMMAND
@@ -447,23 +520,13 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
-        - --org=openshift
-        - --repo=windows-machine-config-bootstrapper
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=verify
         command:
         - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-windows-machine-config-bootstrapper-master.yaml
-              name: ci-operator-master-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -495,3 +558,61 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )verify,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
+    context: ci/prow/verify-build01
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-windows-machine-config-bootstrapper-master-verify-build01
+    optional: true
+    rerun_command: /test verify-build01
+    skip_report: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=verify
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )verify-build01,?($|\s.*)

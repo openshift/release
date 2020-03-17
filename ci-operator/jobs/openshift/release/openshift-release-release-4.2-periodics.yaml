@@ -3777,7 +3777,7 @@ periodics:
     job-env: aws
     job-release: "4.2"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: canary-release-openshift-origin-installer-e2e-aws-4.2-cnv
+  name: release-openshift-origin-installer-e2e-aws-4.2-cnv
   spec:
     containers:
     - args:
@@ -4191,6 +4191,10 @@ periodics:
         secretName: ci-pull-credentials
 - agent: kubernetes
   decorate: true
+  extra_refs:
+  - base_ref: release-4.2
+    org: openshift
+    repo: openshift-ansible
   interval: 12h
   labels:
     ci.openshift.io/release-type: informing
@@ -4212,6 +4216,8 @@ periodics:
       - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
       - --target=e2e-aws-scaleup-rhel7
       - --template=/usr/local/e2e-aws-scaleup-rhel7
+      - --org=openshift
+      - --branch=release-4.2
       command:
       - ci-operator
       env:
@@ -4221,11 +4227,6 @@ periodics:
         value: "4.2"
       - name: CLUSTER_TYPE
         value: aws
-      - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-openshift-ansible-release-4.2.yaml
-            name: ci-operator-4.2-configs
       - name: JOB_NAME_SAFE
         value: e2e-aws-scaleup-rhel7
       - name: RPM_REPO_CRIO_DIR

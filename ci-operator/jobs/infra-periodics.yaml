@@ -107,11 +107,10 @@ periodics:
       resources:
         requests:
           cpu: 500m
-    serviceAccount: upgrader
+    serviceAccountName: upgrader
 - agent: kubernetes
   labels:
     ci.openshift.io/role: infra
-  cron: ""
   decorate: true
   cron: "@yearly"
   name: periodic-bugzilla-refresh
@@ -134,7 +133,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20200304-308dab8f7
+      image: gcr.io/k8s-prow/commenter:v20200317-673b1adb5
       imagePullPolicy: Always
       name: ""
       resources:
@@ -188,7 +187,7 @@ periodics:
       - --random
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20200304-308dab8f7
+      image: gcr.io/k8s-prow/commenter:v20200317-673b1adb5
       imagePullPolicy: Always
       name: ""
       resources:
@@ -237,7 +236,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20200304-308dab8f7
+      image: gcr.io/k8s-prow/commenter:v20200317-673b1adb5
       imagePullPolicy: Always
       name: ""
       resources:
@@ -290,7 +289,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20200304-308dab8f7
+      image: gcr.io/k8s-prow/commenter:v20200317-673b1adb5
       imagePullPolicy: Always
       name: ""
       resources:
@@ -342,7 +341,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20200304-308dab8f7
+      image: gcr.io/k8s-prow/commenter:v20200317-673b1adb5
       imagePullPolicy: Always
       name: ""
       resources:
@@ -370,14 +369,14 @@ periodics:
     - args:
       - --config=/etc/config/labels.yaml
       - --confirm=true
-      - --orgs=openshift,cri-o,operator-framework,openshift-priv,redhat-operator-ecosystem
+      - --orgs=openshift,cri-o,operator-framework,openshift-priv,redhat-operator-ecosystem,openshift-psap
       - --token=/etc/github/oauth
       - --endpoint=http://ghproxy
       - --graphql-endpoint=http://ghproxy/graphql
       - --debug
       command:
       - /app/label_sync/app.binary
-      image: gcr.io/k8s-prow/label_sync:v20200304-c42b857fc
+      image: gcr.io/k8s-prow/label_sync:v20200317-673b1adb5
       imagePullPolicy: Always
       name: ""
       resources:
@@ -538,7 +537,7 @@ periodics:
   - base_ref: master
     org: openshift
     repo: release
-  cron: "30 10 * * 1"  # Run at 10:30 UTC each Monday
+  cron: "30 7 * * *"  # Run daily at 7:30 UTC
   decorate: true
   name: periodic-prow-auto-owners
   spec:
@@ -555,6 +554,8 @@ periodics:
       - --git-name=openshift-bot
       - --git-email=openshift-bot@redhat.com
       - --target-dir=.
+      - --self-approve=true
+      - --assign=ghost
       ### copied from https://github.com/openshift/release/blob/bc31bc6647941f999ceb968a6dc88e06be23905c/hack/validate-owners.sh#L8-L17
       - --ignore-repo=ci-operator/config/openshift/kubernetes-metrics-server
       - --ignore-repo=ci-operator/jobs/openshift/kubernetes-metrics-server
@@ -614,106 +615,6 @@ periodics:
   cron: ""
   decorate: true
   interval: 30m
-  name: periodic-branch-protector
-  skip_cloning: true
-  spec:
-    containers:
-    - args:
-      - --config-path=/etc/config/config.yaml
-      - --job-config-path=/etc/job-config
-      - --confirm=true
-      - --github-token-path=/etc/github/oauth
-      - --github-endpoint=http://ghproxy
-      - --github-endpoint=https://api.github.com
-      - --github-graphql-endpoint=http://ghproxy/graphql
-      command:
-      - /app/prow/cmd/branchprotector/app.binary
-      image: gcr.io/k8s-prow/branchprotector:v20200304-308dab8f7
-      imagePullPolicy: Always
-      name: ""
-      resources:
-          requests:
-            cpu: 500m
-      volumeMounts:
-      - mountPath: /etc/github
-        name: token
-        readOnly: true
-      - mountPath: /etc/config
-        name: config
-        readOnly: true
-      - name: job-config-misc
-        mountPath: /etc/job-config/misc
-        readOnly: true
-      - name: job-config-master
-        mountPath: /etc/job-config/master
-        readOnly: true
-      - name: job-config-3x
-        mountPath: /etc/job-config/3.x
-        readOnly: true
-      - name: job-config-40
-        mountPath: /etc/job-config/4.0
-        readOnly: true
-      - name: job-config-41
-        mountPath: /etc/job-config/4.1
-        readOnly: true
-      - name: job-config-42
-        mountPath: /etc/job-config/4.2
-        readOnly: true
-      - name: job-config-43
-        mountPath: /etc/job-config/4.3
-        readOnly: true
-      - name: job-config-44
-        mountPath: /etc/job-config/4.4
-        readOnly: true
-      - name: job-config-45
-        mountPath: /etc/job-config/4.5
-        readOnly: true
-      - name: job-config-46
-        mountPath: /etc/job-config/4.6
-        readOnly: true
-    volumes:
-    - name: token
-      secret:
-        secretName: github-credentials-openshift-merge-robot
-    - name: config
-      configMap:
-        name: config
-    - name: job-config-misc
-      configMap:
-        name: job-config-misc
-    - name: job-config-master
-      configMap:
-        name: job-config-master
-    - name: job-config-3x
-      configMap:
-        name: job-config-3.x
-    - name: job-config-40
-      configMap:
-        name: job-config-4.0
-    - name: job-config-41
-      configMap:
-        name: job-config-4.1
-    - name: job-config-42
-      configMap:
-        name: job-config-4.2
-    - name: job-config-43
-      configMap:
-        name: job-config-4.3
-    - name: job-config-44
-      configMap:
-        name: job-config-4.4
-    - name: job-config-45
-      configMap:
-        name: job-config-4.5
-    - name: job-config-46
-      configMap:
-        name: job-config-4.6
-- agent: kubernetes
-  labels:
-    ci.openshift.io/role: infra
-  cron: ""
-  decorate: true
-  interval: 30m
   name: periodic-org-sync
   skip_cloning: true
   spec:
@@ -732,7 +633,7 @@ periodics:
       - --fix-team-repos
       command:
       - /app/prow/cmd/peribolos/app.binary
-      image: gcr.io/k8s-prow/peribolos:v20200304-308dab8f7
+      image: gcr.io/k8s-prow/peribolos:v20200317-673b1adb5
       imagePullPolicy: Always
       name: ""
       resources:
@@ -784,51 +685,6 @@ periodics:
           cpu: 2
           memory: 8Gi
     serviceAccountName: "image-pruner"
-- agent: kubernetes
-  cron: "@midnight"
-  decorate: true
-  interval: ""
-  name: periodic-owners-check
-  decoration_config:
-    skip_cloning: true
-  spec:
-    containers:
-      - args:
-          - --config-path=/etc/config/config.yaml
-          - --plugin-config=/etc/plugins/plugins.yaml
-          - --github-token-path=/etc/github/oauth
-          - --github-endpoint=http://ghproxy
-          - --github-endpoint=https://api.github.com
-          - --warnings=verify-owners-presence
-          - --strict
-        command:
-          - /checkconfig
-        image: gcr.io/k8s-prow/checkconfig:v20200304-c42b857fc
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 500m
-        volumeMounts:
-          - mountPath: /etc/github
-            name: token
-            readOnly: true
-          - mountPath: /etc/config
-            name: config
-            readOnly: true
-          - mountPath: /etc/plugins
-            name: plugins
-            readOnly: true
-    volumes:
-      - name: token
-        secret:
-          secretName: github-credentials-openshift-merge-robot
-      - name: config
-        configMap:
-          name: config
-      - name: plugins
-        configMap:
-          name: plugins
 - agent: kubernetes
   decorate: true
   extra_refs:
@@ -939,7 +795,7 @@ periodics:
       - --kubeconfig=/etc/build-farm-credentials/kubeconfig
       command:
       - /app/prow/cmd/config-bootstrapper/app.binary
-      image: gcr.io/k8s-prow/config-bootstrapper:v20200304-c42b857fc
+      image: gcr.io/k8s-prow/config-bootstrapper:v20200317-673b1adb5
       imagePullPolicy: Always
       name: ""
       resources:
@@ -954,7 +810,7 @@ periodics:
     - name: build-farm-credentials
       secret:
         items:
-        - key: sa.hook.build01.config
+        - key: sa.hook.build01.and.app.ci.merged.config
           path: kubeconfig
         secretName: build-farm-credentials
 - agent: kubernetes

@@ -2,6 +2,8 @@ SHELL=/usr/bin/env bash -o errexit
 
 .PHONY: check check-core check-services dry-core-admin dry-services-admin core-admin services-admin dry-core core dry-services services all-admin all
 
+CONTAINER_ENGINE ?= docker
+
 all: core-admin core services-admin services
 
 all-admin: core-admin services-admin
@@ -45,23 +47,23 @@ services:
 
 # these are useful for devs
 jobs:
-	docker pull registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest
-	docker run --rm -v "${CURDIR}/ci-operator:/ci-operator:z" registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest --from-dir /ci-operator/config --to-dir /ci-operator/jobs
-	docker pull registry.svc.ci.openshift.org/ci/determinize-prow-jobs:latest
-	docker run --rm -v "${CURDIR}/ci-operator/jobs:/ci-operator/jobs:z" registry.svc.ci.openshift.org/ci/determinize-prow-jobs:latest --prow-jobs-dir /ci-operator/jobs
+	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest
+	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/ci-operator:/ci-operator:z" registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest --from-dir /ci-operator/config --to-dir /ci-operator/jobs
+	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/determinize-prow-jobs:latest
+	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/ci-operator/jobs:/ci-operator/jobs:z" registry.svc.ci.openshift.org/ci/determinize-prow-jobs:latest --prow-jobs-dir /ci-operator/jobs
 
 prow-config:
-	docker pull registry.svc.ci.openshift.org/ci/determinize-prow-config:latest
-	docker run --rm -v "${CURDIR}/core-services/prow/02_config:/config:z" registry.svc.ci.openshift.org/ci/determinize-prow-config:latest --prow-config-dir /config
+	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/determinize-prow-config:latest
+	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/core-services/prow/02_config:/config:z" registry.svc.ci.openshift.org/ci/determinize-prow-config:latest --prow-config-dir /config
 
 branch-cut:
-	docker pull registry.svc.ci.openshift.org/ci/config-brancher:latest
-	docker run --rm -v "${CURDIR}/ci-operator:/ci-operator:z" registry.svc.ci.openshift.org/ci/config-brancher:latest --config-dir /ci-operator/config --org=$(ORG) --repo=$(REPO) --current-release=4.3 --future-release=4.4 --bump-release=4.4 --confirm
+	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/config-brancher:latest
+	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/ci-operator:/ci-operator:z" registry.svc.ci.openshift.org/ci/config-brancher:latest --config-dir /ci-operator/config --org=$(ORG) --repo=$(REPO) --current-release=4.3 --future-release=4.4 --bump-release=4.4 --confirm
 		$(MAKE) jobs
 
 new-repo:
-	docker pull registry.svc.ci.openshift.org/ci/repo-init:latest
-	docker run --rm -it -v "${CURDIR}:/release:z" registry.svc.ci.openshift.org/ci/repo-init:latest --release-repo /release
+	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/repo-init:latest
+	$(CONTAINER_ENGINE) run --rm -it -v "$(CURDIR):/release:z" registry.svc.ci.openshift.org/ci/repo-init:latest --release-repo /release
 	$(MAKE) jobs
 	$(MAKE) prow-config
 
@@ -80,7 +82,7 @@ applyTemplate:
 	oc process -f $(WHAT) | oc apply -f -
 .PHONY: applyTemplate
 
-postsubmit-update: origin-release libpod prow-monitoring cincinnati prow-release-controller-definitions
+postsubmit-update: origin-release prow-monitoring cincinnati prow-release-controller-definitions
 .PHONY: postsubmit-update
 
 all: roles prow projects
@@ -96,7 +98,7 @@ roles: cluster-operator-roles cluster-roles
 prow: prow-ci-ns prow-ci-stg-ns
 .PHONY: prow
 
-prow-ci-ns: ci-ns prow-jobs prow-scaling
+prow-ci-ns: ci-ns prow-jobs
 .PHONY: prow-ci-ns
 
 prow-ci-stg-ns: ci-stg-ns
@@ -114,10 +116,6 @@ ci-stg-ns:
 openshift-ns:
 	oc project openshift
 .PHONY: openshift-ns
-
-prow-scaling:
-	oc apply -n kube-system -f cluster/ci/config/cluster-autoscaler.yaml
-.PHONY: prow-scaling
 
 prow-jobs: prow-artifacts
 	$(MAKE) apply WHAT=projects/prometheus/test/build.yaml
@@ -236,10 +234,6 @@ metering:
 	$(MAKE) -C projects/metering
 .PHONY: metering
 
-libpod:
-	$(MAKE) apply WHAT=projects/libpod/libpod.yaml
-.PHONY: libpod
-
 coreos:
 	$(MAKE) apply WHAT=projects/coreos/coreos.yaml
 .PHONY: coreos
@@ -259,11 +253,6 @@ build-farm-consistency:
 	for file in ./core-services/release-controller/rpms-ocp-*.yaml; do diff -Naup "$${file}" "./clusters/build-clusters/01_cluster/openshift/release-controller/$${file##*/}"; done
 .PHONY: build-farm-consistency
 
-logging:
-	$(MAKE) apply WHAT=cluster/ci/config/logging/fluentd-daemonset.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/logging/fluentd-configmap.yaml
-.PHONY: logging
-
 bump-pr:
 	$(MAKE) job JOB=periodic-prow-image-autobump
 .PHONY: bump-pr
@@ -280,9 +269,25 @@ bw_password_path ?= /tmp/bw_password
 kubeconfig_path ?= $(HOME)/.kube/config
 
 # these are useful for dptp-team
-# echo -n "bw_password" > /tmp/bw_password 
+# echo -n "bw_password" > /tmp/bw_password
 # make kerberos_id=<your_kerberos_id> dry_run=true force=false bw_password_path=/tmp/bw_password kubeconfig_path=${HOME}/.kube/config ci-secret-bootstrap
 ci-secret-bootstrap:
-	docker pull registry.svc.ci.openshift.org/ci/ci-secret-bootstrap:latest
-	docker run --rm -v "$(CURDIR)/core-services/ci-secret-bootstrap/_config.yaml:/_config.yaml:z" -v "$(kubeconfig_path):/_kubeconfig:z" -v "$(bw_password_path):/_bw_password:z" registry.svc.ci.openshift.org/ci/ci-secret-bootstrap:latest --bw-password-path=/_bw_password --bw-user $(kerberos_id)@redhat.com --config=/_config.yaml --kubeconfig=/_kubeconfig --dry-run=$(dry_run) --force=$(force)
+	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/ci-secret-bootstrap:latest
+	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/core-services/ci-secret-bootstrap/_config.yaml:/_config.yaml:z" \
+		-v "$(kubeconfig_path):/_kubeconfig:z" \
+		-v "$(bw_password_path):/_bw_password:z" \
+		registry.svc.ci.openshift.org/ci/ci-secret-bootstrap:latest \
+		--bw-password-path=/_bw_password --bw-user $(kerberos_id)@redhat.com --config=/_config.yaml --kubeconfig=/_kubeconfig --dry-run=$(dry_run) --force=$(force) --cluster=$(cluster)
 .PHONY: ci-secret-bootstrap
+
+verify-app-ci:
+	@./hack/verify-app-ci.sh
+.PHONY: verify-app-ci
+
+update-app-ci:
+	@update=true ./hack/verify-app-ci.sh
+.PHONY: update-app-ci
+
+mixins:
+	$(CONTAINER_ENGINE) run --user=$(UID) --rm -v "$(CURDIR):/release:z" registry.svc.ci.openshift.org/ci/dashboards-validation:latest make -C /release/cluster/ci/monitoring/mixins install all
+.PHONY: mixins

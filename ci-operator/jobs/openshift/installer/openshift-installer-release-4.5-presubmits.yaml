@@ -17,16 +17,12 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
         - --lease-server-password-file=/etc/boskos/password
         - --lease-server-username=ci
         - --lease-server=https://boskos-ci.svc.ci.openshift.org
-        - --org=openshift
-        - --repo=installer
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --secret-dir=/usr/local/e2e-aws-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=e2e-aws
@@ -36,11 +32,6 @@ presubmits:
         env:
         - name: CLUSTER_TYPE
           value: aws
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-installer-release-4.5.yaml
-              name: ci-operator-4.5-configs
         - name: JOB_NAME_SAFE
           value: e2e-aws
         - name: TEST_COMMAND
@@ -115,16 +106,12 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
         - --lease-server-password-file=/etc/boskos/password
         - --lease-server-username=ci
         - --lease-server=https://boskos-ci.svc.ci.openshift.org
-        - --org=openshift
-        - --repo=installer
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --secret-dir=/usr/local/e2e-aws-disruptive-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=e2e-aws-disruptive
@@ -134,11 +121,6 @@ presubmits:
         env:
         - name: CLUSTER_TYPE
           value: aws
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-installer-release-4.5.yaml
-              name: ci-operator-4.5-configs
         - name: JOB_NAME_SAFE
           value: e2e-aws-disruptive
         - name: TEST_COMMAND
@@ -214,16 +196,12 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
         - --lease-server-password-file=/etc/boskos/password
         - --lease-server-username=ci
         - --lease-server=https://boskos-ci.svc.ci.openshift.org
-        - --org=openshift
-        - --repo=installer
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --secret-dir=/usr/local/e2e-aws-scaleup-rhel7-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=e2e-aws-scaleup-rhel7
@@ -233,11 +211,6 @@ presubmits:
         env:
         - name: CLUSTER_TYPE
           value: aws
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-installer-release-4.5.yaml
-              name: ci-operator-4.5-configs
         - name: JOB_NAME_SAFE
           value: e2e-aws-scaleup-rhel7
         - name: RPM_REPO_CRIO_DIR
@@ -305,6 +278,81 @@ presubmits:
     always_run: true
     branches:
     - release-4.5
+    context: ci/prow/e2e-aws-steps
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-release-4.5-e2e-aws-steps
+    rerun_command: /test e2e-aws-steps
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
+        - --secret-dir=/usr/local/e2e-aws-steps-cluster-profile
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=e2e-aws-steps
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-aws-steps-cluster-profile
+          name: cluster-profile
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )e2e-aws-steps,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-4.5
     context: ci/prow/e2e-aws-upgrade
     decorate: true
     decoration_config:
@@ -318,27 +366,17 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
         - --lease-server-password-file=/etc/boskos/password
         - --lease-server-username=ci
         - --lease-server=https://boskos-ci.svc.ci.openshift.org
-        - --org=openshift
-        - --repo=installer
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --secret-dir=/usr/local/e2e-aws-upgrade-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=e2e-aws-upgrade
         command:
         - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-installer-release-4.5.yaml
-              name: ci-operator-4.5-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -403,16 +441,12 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
         - --lease-server-password-file=/etc/boskos/password
         - --lease-server-username=ci
         - --lease-server=https://boskos-ci.svc.ci.openshift.org
-        - --org=openshift
-        - --repo=installer
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --secret-dir=/usr/local/e2e-aws-upi-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=e2e-aws-upi
@@ -422,11 +456,6 @@ presubmits:
         env:
         - name: CLUSTER_TYPE
           value: aws
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-installer-release-4.5.yaml
-              name: ci-operator-4.5-configs
         - name: JOB_NAME_SAFE
           value: e2e-aws-upi
         - name: TEST_COMMAND
@@ -501,16 +530,12 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
         - --lease-server-password-file=/etc/boskos/password
         - --lease-server-username=ci
         - --lease-server=https://boskos-ci.svc.ci.openshift.org
-        - --org=openshift
-        - --repo=installer
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --secret-dir=/usr/local/e2e-azure-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=e2e-azure
@@ -520,11 +545,6 @@ presubmits:
         env:
         - name: CLUSTER_TYPE
           value: azure4
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-installer-release-4.5.yaml
-              name: ci-operator-4.5-configs
         - name: JOB_NAME_SAFE
           value: e2e-azure
         - name: TEST_COMMAND
@@ -599,16 +619,12 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
         - --lease-server-password-file=/etc/boskos/password
         - --lease-server-username=ci
         - --lease-server=https://boskos-ci.svc.ci.openshift.org
-        - --org=openshift
-        - --repo=installer
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --secret-dir=/usr/local/e2e-azure-upi-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=e2e-azure-upi
@@ -618,11 +634,6 @@ presubmits:
         env:
         - name: CLUSTER_TYPE
           value: azure4
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-installer-release-4.5.yaml
-              name: ci-operator-4.5-configs
         - name: JOB_NAME_SAFE
           value: e2e-azure-upi
         - name: TEST_COMMAND
@@ -697,16 +708,12 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
         - --lease-server-password-file=/etc/boskos/password
         - --lease-server-username=ci
         - --lease-server=https://boskos-ci.svc.ci.openshift.org
-        - --org=openshift
-        - --repo=installer
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --secret-dir=/usr/local/e2e-gcp-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=e2e-gcp
@@ -716,11 +723,6 @@ presubmits:
         env:
         - name: CLUSTER_TYPE
           value: gcp
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-installer-release-4.5.yaml
-              name: ci-operator-4.5-configs
         - name: JOB_NAME_SAFE
           value: e2e-gcp
         - name: TEST_COMMAND
@@ -797,27 +799,17 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
         - --lease-server-password-file=/etc/boskos/password
         - --lease-server-username=ci
         - --lease-server=https://boskos-ci.svc.ci.openshift.org
-        - --org=openshift
-        - --repo=installer
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --secret-dir=/usr/local/e2e-gcp-upgrade-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=e2e-gcp-upgrade
         command:
         - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-installer-release-4.5.yaml
-              name: ci-operator-4.5-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -884,16 +876,12 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
         - --lease-server-password-file=/etc/boskos/password
         - --lease-server-username=ci
         - --lease-server=https://boskos-ci.svc.ci.openshift.org
-        - --org=openshift
-        - --repo=installer
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --secret-dir=/usr/local/e2e-gcp-upi-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=e2e-gcp-upi
@@ -903,11 +891,6 @@ presubmits:
         env:
         - name: CLUSTER_TYPE
           value: gcp
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-installer-release-4.5.yaml
-              name: ci-operator-4.5-configs
         - name: JOB_NAME_SAFE
           value: e2e-gcp-upi
         - name: TEST_COMMAND
@@ -968,43 +951,44 @@ presubmits:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-gcp-upi,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.5
-    context: ci/prow/e2e-steps
+    context: ci/prow/e2e-openstack
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-release-4.5-e2e-steps
-    rerun_command: /test e2e-steps
+    name: pull-ci-openshift-installer-release-4.5-e2e-openstack
+    optional: true
+    rerun_command: /test e2e-openstack
+    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
     spec:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
         - --lease-server-password-file=/etc/boskos/password
         - --lease-server-username=ci
         - --lease-server=https://boskos-ci.svc.ci.openshift.org
-        - --org=openshift
         - --repo=installer
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-        - --secret-dir=/usr/local/e2e-steps-cluster-profile
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=e2e-steps
+        - --secret-dir=/usr/local/e2e-openstack-cluster-profile
+        - --target=e2e-openstack
+        - --template=/usr/local/e2e-openstack
         command:
         - ci-operator
         env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-installer-release-4.5.yaml
-              name: ci-operator-4.5-configs
+        - name: CLUSTER_TYPE
+          value: openstack
+        - name: JOB_NAME_SAFE
+          value: e2e-openstack
+        - name: KURYR_ENABLED
+          value: "false"
+        - name: TEST_COMMAND
+          value: run-minimal-tests
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -1018,13 +1002,13 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-steps-cluster-profile
+        - mountPath: /usr/local/e2e-openstack-cluster-profile
           name: cluster-profile
+        - mountPath: /usr/local/e2e-openstack
+          name: job-definition
+          subPath: cluster-launch-installer-openstack-e2e.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
-          readOnly: true
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
@@ -1044,14 +1028,14 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-aws
+              name: cluster-secrets-openstack
+      - configMap:
+          name: prow-job-cluster-launch-installer-openstack-e2e
+        name: job-definition
       - name: pull-secret
         secret:
           secretName: regcred
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )e2e-steps,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-openstack,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -1069,16 +1053,12 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
         - --lease-server-password-file=/etc/boskos/password
         - --lease-server-username=ci
         - --lease-server=https://boskos-ci.svc.ci.openshift.org
-        - --org=openshift
-        - --repo=installer
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --secret-dir=/usr/local/e2e-vsphere-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=e2e-vsphere
@@ -1088,11 +1068,6 @@ presubmits:
         env:
         - name: CLUSTER_TYPE
           value: vsphere
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-installer-release-4.5.yaml
-              name: ci-operator-4.5-configs
         - name: JOB_NAME_SAFE
           value: e2e-vsphere
         - name: TEST_COMMAND
@@ -1167,23 +1142,13 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
-        - --org=openshift
-        - --repo=installer
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=gofmt
         command:
         - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-installer-release-4.5.yaml
-              name: ci-operator-4.5-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -1219,6 +1184,64 @@ presubmits:
     always_run: true
     branches:
     - release-4.5
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
+    context: ci/prow/gofmt-build01
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-release-4.5-gofmt-build01
+    optional: true
+    rerun_command: /test gofmt-build01
+    skip_report: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=gofmt
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )gofmt-build01,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-4.5
     context: ci/prow/golint
     decorate: true
     decoration_config:
@@ -1232,23 +1255,13 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
-        - --org=openshift
-        - --repo=installer
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=golint
         command:
         - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-installer-release-4.5.yaml
-              name: ci-operator-4.5-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -1284,6 +1297,64 @@ presubmits:
     always_run: true
     branches:
     - release-4.5
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
+    context: ci/prow/golint-build01
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-release-4.5-golint-build01
+    optional: true
+    rerun_command: /test golint-build01
+    skip_report: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=golint
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )golint-build01,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-4.5
     context: ci/prow/govet
     decorate: true
     decoration_config:
@@ -1297,23 +1368,13 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
-        - --org=openshift
-        - --repo=installer
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=govet
         command:
         - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-installer-release-4.5.yaml
-              name: ci-operator-4.5-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -1349,6 +1410,64 @@ presubmits:
     always_run: true
     branches:
     - release-4.5
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
+    context: ci/prow/govet-build01
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-release-4.5-govet-build01
+    optional: true
+    rerun_command: /test govet-build01
+    skip_report: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=govet
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )govet-build01,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-4.5
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -1362,23 +1481,13 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
-        - --org=openshift
-        - --repo=installer
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=[images]
         command:
         - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-installer-release-4.5.yaml
-              name: ci-operator-4.5-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -1410,6 +1519,64 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-4.5
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
+    context: ci/prow/images-build01
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-release-4.5-images-build01
+    optional: true
+    rerun_command: /test images-build01
+    skip_report: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=[images]
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )images-build01,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -1506,23 +1673,13 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
-        - --org=openshift
-        - --repo=installer
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=unit
         command:
         - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-installer-release-4.5.yaml
-              name: ci-operator-4.5-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -1558,6 +1715,64 @@ presubmits:
     always_run: true
     branches:
     - release-4.5
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
+    context: ci/prow/unit-build01
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-release-4.5-unit-build01
+    optional: true
+    rerun_command: /test unit-build01
+    skip_report: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=unit
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )unit-build01,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-4.5
     context: ci/prow/verify-vendor
     decorate: true
     decoration_config:
@@ -1571,23 +1786,13 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=release-4.5
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
-        - --org=openshift
-        - --repo=installer
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=verify-vendor
         command:
         - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-installer-release-4.5.yaml
-              name: ci-operator-4.5-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -1619,6 +1824,64 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )verify-vendor,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-4.5
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
+    context: ci/prow/verify-vendor-build01
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-release-4.5-verify-vendor-build01
+    optional: true
+    rerun_command: /test verify-vendor-build01
+    skip_report: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=verify-vendor
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )verify-vendor-build01,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:

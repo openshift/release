@@ -128,9 +128,7 @@ def renderHeader(dc):
     version = "<unknown-version>"
     containers = spec.get("template", {}).get("spec", {}).get("containers", [])
     for container in containers:
-        if dc == "boskos-metrics":
-            container_name = "metrics"
-        elif dc == "jenkins-dev-operator":
+        if dc == "jenkins-dev-operator":
             container_name = "jenkins-operator"
         elif dc == "deck-internal":
             container_name = "deck"

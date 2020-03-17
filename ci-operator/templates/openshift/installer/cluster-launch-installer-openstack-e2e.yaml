@@ -23,6 +23,16 @@ parameters:
   required: true
 - name: KURYR_ENABLED
   value: "false"
+- name: OS_CLOUD
+  value: openstack-cloud
+- name: OPENSTACK_EXTERNAL_NETWORK
+  value: external
+- name: OPENSTACK_FLAVOR
+  value: m1.s2.xlarge
+- name: OPENSTACK_MASTER_VOLUME_SIZE
+  value: "25"
+- name: OPENSTACK_MASTER_VOLUME_TYPE
+  value: "performance"
 - name: BUILD_ID
   required: false
 - name: USE_LEASE_CLIENT
@@ -207,10 +217,11 @@ objects:
         }
 
         function run-minimal-tests() {
-          # Only execute Early tests while the test infrastructure is getting
-          # prepared to run the actual suite reliably.
+          # Only execute Smoke (<4.4) or Early (>= 4.4) tests while the test
+          # infrastructure is getting prepared to run the actual suite
+          # reliably.
           openshift-tests run openshift/conformance/parallel --dry-run |
-            grep 'Early' |
+            grep 'Smoke\|Early' |
           openshift-tests run -o /tmp/artifacts/e2e.log \
             --junit-dir /tmp/artifacts/junit -f -
           return 0
@@ -265,11 +276,11 @@ objects:
       - name: OPENSTACK_REGION
         value: moc-kzn
       - name: OPENSTACK_FLAVOR
-        value: m1.s2.xlarge
+        value: "${OPENSTACK_FLAVOR}"
       - name: OPENSTACK_EXTERNAL_NETWORK
-        value: external
+        value: "${OPENSTACK_EXTERNAL_NETWORK}"
       - name: OS_CLOUD
-        value: openstack-cloud
+        value: "${OS_CLOUD}"
       - name: OS_CLIENT_CONFIG_FILE
         value: /etc/openshift-installer/clouds.yaml
       - name: USER
@@ -278,9 +289,9 @@ objects:
         value: /tmp
       # we must boot from performance volumes to reduce disk speed related etcd failures
       - name: OPENSTACK_MASTER_VOLUME_SIZE
-        value: "25"
+        value: "${OPENSTACK_MASTER_VOLUME_SIZE}"
       - name: OPENSTACK_MASTER_VOLUME_TYPE
-        value: "performance"
+        value: "${OPENSTACK_MASTER_VOLUME_TYPE}"
       - name: INSTALL_INITIAL_RELEASE
       - name: RELEASE_IMAGE_INITIAL
       command:
@@ -431,7 +442,7 @@ objects:
       - name: KUBECONFIG
         value: /tmp/artifacts/installer/auth/kubeconfig
       - name: OS_CLOUD
-        value: openstack-cloud
+        value: ${OS_CLOUD}
       - name: OS_CLIENT_CONFIG_FILE
         value: /etc/openshift-installer/clouds.yaml
       - name: SSH_PRIV_KEY_PATH

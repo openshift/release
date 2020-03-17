@@ -454,11 +454,14 @@ periodics:
     name: periodic-image-mirroring-openshift-psap
     skip_cloning: true
     spec:
+      automountServiceAccountToken: true
       containers:
         - args:
             - -c
             - |
               set -o errexit
+              cp ~/.docker/config.json /tmp/config.json
+              oc registry login --to /tmp/config.json
               failures=0
               for mapping in /etc/imagemirror/mapping_openshift-psap*; do
                 echo "Running: oc image mirror -f=$mapping --skip-multiple-scopes"

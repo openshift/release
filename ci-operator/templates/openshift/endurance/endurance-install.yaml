@@ -99,7 +99,7 @@ objects:
         set +e
         cp /tmp/cluster-credentials/metadata.json /tmp/artifacts/installer
         cp /tmp/cluster-credentials/kubeconfig /tmp/shared/auth
-        set -e
+        cp /tmp/cluster-credentials/kubeadmin /tmp/shared/auth/kubeadmin-password
 
         # check if all the operators are reporting available. If anything
         # goes wrong or any operator is not reporting available, we will 
@@ -116,8 +116,15 @@ objects:
           exit 0
         fi
 
+        awk '{print $3}' < /tmp/operators.out  | grep -v AVAILABLE | grep -v True
+        rc=$?
+        if [ ! $rc -eq 1 ]; then
+          echo "Some operators are not available, collecting must-gather from cluster"
+          touch /tmp/shared/mustgather
+          exit 0
+        fi          
+
         # to force a teardown of the cluster, create a configmap with this name on the cluster
-        set +e
         oc get configmap/teardown -n openshift-config
         rc=$?
         if [ $rc -eq 0 ]; then
@@ -127,9 +134,20 @@ objects:
           exit 0
         fi
         
-        awk '{print $3}' < /tmp/operators.out  | grep -v AVAILABLE | grep -v True
+        echo "Fetching node status...."
+        oc get nodes &> /tmp/nodes.out
         rc=$?
-        if [ ! $rc -eq 1 ]; then
+        cat /tmp/nodes.out
+        if [ ! $rc -eq 0 ]; then
+          echo "Could not retrieve nodes, collecting must-gather and tearing down cluster"
+          touch /tmp/shared/mustgather
+          touch /tmp/shared/teardown
+          exit 0
+        fi
+
+        grep NotReady /tmp/nodes.out
+        rc=$?
+        if [ $rc -eq 0 ]; then
           echo "Some operators are not available, collecting must-gather from cluster"
           touch /tmp/shared/mustgather
           exit 0
@@ -359,7 +377,7 @@ objects:
 
         if [ ! -f /tmp/shared/install ];then
           echo "Existing long lived cluster is healthy, not reinstalling"
-          oc create secret generic endurance-cluster-credentials-${CLUSTER_TYPE}-new -n ${NAMESPACE} --from-file=kubeconfig=/tmp/shared/auth/kubeconfig --from-file=metadata.json=/tmp/artifacts/installer/metadata.json
+          oc create secret generic endurance-cluster-credentials-${CLUSTER_TYPE}-new -n ${NAMESPACE} --from-file=kubeconfig=/tmp/shared/auth/kubeconfig --from-file=kubeadmin=/tmp/shared/auth/kubeadmin-password --from-file=metadata.json=/tmp/artifacts/installer/metadata.json
           exit 0
         fi
 
@@ -421,6 +439,9 @@ objects:
 
         TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create cluster 2>&1 | grep --line-buffered -v password &
         wait "$!"
+
+        grep -v password /tmp/artifacts/installer/.openshift_install.log > /tmp/artifacts/installer/install.log
+        mv /tmp/artifacts/installer/install.log /tmp/artifacts/installer/.openshift_installer.log
 
         echo "##################### start cluster metadata.json ##########################"
         cat /tmp/artifacts/installer/metadata.json

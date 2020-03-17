@@ -17,16 +17,12 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=fcos
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
         - --lease-server-password-file=/etc/boskos/password
         - --lease-server-username=ci
         - --lease-server=https://boskos-ci.svc.ci.openshift.org
-        - --org=openshift
-        - --repo=installer
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --secret-dir=/usr/local/e2e-aws-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=e2e-aws
@@ -36,11 +32,6 @@ presubmits:
         env:
         - name: CLUSTER_TYPE
           value: aws
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-installer-fcos.yaml
-              name: ci-operator-misc-configs
         - name: JOB_NAME_SAFE
           value: e2e-aws
         - name: TEST_COMMAND
@@ -115,16 +106,12 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=fcos
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
         - --lease-server-password-file=/etc/boskos/password
         - --lease-server-username=ci
         - --lease-server=https://boskos-ci.svc.ci.openshift.org
-        - --org=openshift
-        - --repo=installer
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --secret-dir=/usr/local/e2e-vsphere-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=e2e-vsphere
@@ -134,11 +121,6 @@ presubmits:
         env:
         - name: CLUSTER_TYPE
           value: vsphere
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-installer-fcos.yaml
-              name: ci-operator-misc-configs
         - name: JOB_NAME_SAFE
           value: e2e-vsphere
         - name: TEST_COMMAND
@@ -213,23 +195,13 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=fcos
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
-        - --org=openshift
-        - --repo=installer
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=gofmt
         command:
         - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-installer-fcos.yaml
-              name: ci-operator-misc-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -265,6 +237,64 @@ presubmits:
     always_run: true
     branches:
     - fcos
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
+    context: ci/prow/gofmt-build01
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-fcos-gofmt-build01
+    optional: true
+    rerun_command: /test gofmt-build01
+    skip_report: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=gofmt
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )gofmt-build01,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - fcos
     context: ci/prow/golint
     decorate: true
     decoration_config:
@@ -278,23 +308,13 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=fcos
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
-        - --org=openshift
-        - --repo=installer
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=golint
         command:
         - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-installer-fcos.yaml
-              name: ci-operator-misc-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -330,6 +350,64 @@ presubmits:
     always_run: true
     branches:
     - fcos
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
+    context: ci/prow/golint-build01
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-fcos-golint-build01
+    optional: true
+    rerun_command: /test golint-build01
+    skip_report: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=golint
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )golint-build01,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - fcos
     context: ci/prow/govet
     decorate: true
     decoration_config:
@@ -343,23 +421,13 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=fcos
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
-        - --org=openshift
-        - --repo=installer
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=govet
         command:
         - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-installer-fcos.yaml
-              name: ci-operator-misc-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -395,6 +463,64 @@ presubmits:
     always_run: true
     branches:
     - fcos
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
+    context: ci/prow/govet-build01
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-fcos-govet-build01
+    optional: true
+    rerun_command: /test govet-build01
+    skip_report: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=govet
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )govet-build01,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - fcos
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -408,23 +534,13 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=fcos
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
-        - --org=openshift
-        - --repo=installer
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=[images]
         command:
         - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-installer-fcos.yaml
-              name: ci-operator-misc-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -460,6 +576,64 @@ presubmits:
     always_run: true
     branches:
     - fcos
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
+    context: ci/prow/images-build01
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-fcos-images-build01
+    optional: true
+    rerun_command: /test images-build01
+    skip_report: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=[images]
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )images-build01,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - fcos
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -473,23 +647,13 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=fcos
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
-        - --org=openshift
-        - --repo=installer
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=unit
         command:
         - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-installer-fcos.yaml
-              name: ci-operator-misc-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -525,6 +689,64 @@ presubmits:
     always_run: true
     branches:
     - fcos
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
+    context: ci/prow/unit-build01
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-fcos-unit-build01
+    optional: true
+    rerun_command: /test unit-build01
+    skip_report: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=unit
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )unit-build01,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - fcos
     context: ci/prow/verify-vendor
     decorate: true
     decoration_config:
@@ -538,23 +760,13 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=fcos
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
-        - --org=openshift
-        - --repo=installer
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=verify-vendor
         command:
         - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-installer-fcos.yaml
-              name: ci-operator-misc-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -586,3 +798,61 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )verify-vendor,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - fcos
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
+    context: ci/prow/verify-vendor-build01
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-fcos-verify-vendor-build01
+    optional: true
+    rerun_command: /test verify-vendor-build01
+    skip_report: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=verify-vendor
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )verify-vendor-build01,?($|\s.*)

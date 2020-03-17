@@ -80,6 +80,8 @@ $ make grafana-debug-cleanup
 
 ### Debugging locally
 
+We can `make mixins` at the root level of this repo, _or_
+
 * Install required binary: See [dashboards-validation/Dockerfile](https://github.com/openshift/release/blob/master/projects/origin-release/dashboards-validation/Dockerfile) for details of installation of dependencies on a centos-based image used in our CI system. The following commands should give us a working development environment on Fedroa:
 
     ```

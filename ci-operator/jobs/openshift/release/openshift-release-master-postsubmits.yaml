@@ -2,6 +2,53 @@ postsubmits:
   openshift/release:
   - agent: kubernetes
     branches:
+    - ^master$
+    decorate: true
+    labels:
+      ci.openshift.io/role: infra-canary
+    name: branch-ci-openshift-release-master-app-ci-apply-canary
+    spec:
+      containers:
+      - args:
+        - --config-dir=clusters/app.ci
+        - --confirm=true
+        - --level=all
+        - --kubeconfig=/etc/kubeconfig/kubeconfig
+        - --as=
+        command:
+        - applyconfig
+        env:
+        - name: build01_build01_reg_auth_value
+          valueFrom:
+            secretKeyRef:
+              key: build01_build01_reg_auth_value.txt
+              name: build-farm-credentials
+        - name: build01_ci_reg_auth_value
+          valueFrom:
+            secretKeyRef:
+              key: build01_ci_reg_auth_value.txt
+              name: build-farm-credentials
+        - name: slack_api_url
+          valueFrom:
+            secretKeyRef:
+              key: url
+              name: ci-slack-api-url
+        image: registry.svc.ci.openshift.org/ci/applyconfig:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/kubeconfig
+          name: kubeconfig
+          readOnly: true
+      volumes:
+      - name: kubeconfig
+        secret:
+          secretName: app-ci-config-updater-kubeconfig
+  - agent: kubernetes
+    branches:
     - master
     decorate: true
     labels:
@@ -115,10 +162,8 @@ postsubmits:
     spec:
       containers:
       - args:
-        - --config-dir
-        - core-services
-        - --confirm
-        - "true"
+        - --config-dir=core-services
+        - --confirm=true
         command:
         - applyconfig
         env:
@@ -166,7 +211,7 @@ postsubmits:
         - --debug
         command:
         - /app/label_sync/app.binary
-        image: gcr.io/k8s-prow/label_sync:v20200304-c42b857fc
+        image: gcr.io/k8s-prow/label_sync:v20200317-673b1adb5
         imagePullPolicy: Always
         name: ""
         resources:
@@ -188,10 +233,8 @@ postsubmits:
     spec:
       containers:
       - args:
-        - --config-dir
-        - services
-        - --confirm
-        - "true"
+        - --config-dir=services
+        - --confirm=true
         command:
         - applyconfig
         image: registry.svc.ci.openshift.org/ci/applyconfig:latest

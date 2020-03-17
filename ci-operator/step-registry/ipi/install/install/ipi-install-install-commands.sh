@@ -29,10 +29,6 @@ cp "${SHARED_DIR}/install-config.yaml" "${dir}/"
 mkdir -p ~/.ssh
 cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
 
-# TODO RELEASE_IMAGE_INITIAL / upgrade tests
-# TODO mirror variant
-# TODO manual override
-
 TF_LOG=debug openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v password &
 
 set +e
@@ -40,9 +36,8 @@ wait "$!"
 ret=$?
 set -e
 
-mkdir /tmp/secret
 cp \
-    -t /tmp/secret \
+    -t "${SHARED_DIR}" \
     "${dir}/auth/kubeconfig" \
     "${dir}/metadata.json" \
     "${dir}/terraform.tfstate"

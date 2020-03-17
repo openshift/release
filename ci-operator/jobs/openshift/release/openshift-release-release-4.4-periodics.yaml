@@ -735,7 +735,7 @@ periodics:
         chmod ug+x $HOME/bin/oc $HOME/bin/jq
 
         # guard against starting if no okd stream exists yet
-        if ! oc get istag -n fcos ${TAG}:${BRANCH}; then
+        if ! oc get istag -n origin ${BRANCH}:${TAG}; then
           echo "No build possible, no image stream"
           exit 0
         fi
@@ -776,7 +776,7 @@ periodics:
         fi
 
         # compare the latest image we have built against the potential candidate
-        latest="$( oc get istag -n fcos ${TAG}:${BRANCH} --template '{{ index .image.dockerImageMetadata.Config.Labels "version" }} {{ index .image.dockerImageMetadata.Config.Labels "id-artifacts" }} {{ index .image.dockerImageMetadata.Config.Labels "id-machine-config-operator-rpms" }}' )"
+        latest="$( oc get istag -n origin ${BRANCH}:${TAG} --template '{{ index .image.dockerImageMetadata.Config.Labels "version" }} {{ index .image.dockerImageMetadata.Config.Labels "id-artifacts" }} {{ index .image.dockerImageMetadata.Config.Labels "id-machine-config-operator-rpms" }}' )"
         candidate="${build_id} ${origin_artifacts_id} ${origin_machine_config_operator_rpms_id}"
         echo "Comparing existing '$latest' against latest '$candidate'"
         if [[ "${latest}" == "${candidate}" ]]; then
@@ -1512,6 +1512,121 @@ periodics:
         name: boskos
         readOnly: true
       - mountPath: /usr/local/e2e-gcp-ovn-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/e2e-gcp
+        name: job-definition
+        subPath: cluster-launch-installer-e2e.yaml
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-gcp
+    - configMap:
+        name: prow-job-cluster-launch-installer-e2e
+      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
+  decorate: true
+  interval: 48h
+  labels:
+    ci.openshift.io/release-type: informing
+    job-release: "4.4"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: release-openshift-ocp-installer-e2e-gcp-rt-4.4
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
+      - --secret-dir=/usr/local/e2e-gcp-rt-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-gcp
+      - --template=/usr/local/e2e-gcp
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_LATEST
+        value: registry.svc.ci.openshift.org/ocp/release:4.4
+      - name: BRANCH
+        value: "4.4"
+      - name: CLUSTER_TYPE
+        value: gcp
+      - name: CLUSTER_VARIANT
+        value: rt
+      - name: CONFIG_SPEC
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)-rt
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+      - name: JOB_NAME_SAFE
+        value: e2e-gcp-rt
+      - name: TEST_COMMAND
+        value: TEST_SUITE=openshift/conformance/parallel run-tests
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/e2e-gcp-rt-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-gcp
         name: job-definition
@@ -5642,6 +5757,125 @@ periodics:
         secretName: ci-pull-credentials
 - agent: kubernetes
   decorate: true
+  interval: 24h
+  labels:
+    ci.openshift.io/release-type: informing
+    job-env: aws
+    job-release: "4.4"
+    job-test: e2e
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    release.openshift.io/verify: "true"
+  name: release-openshift-origin-installer-e2e-aws-upgrade-4.1-to-4.2-to-4.3-to-4.4-nightly
+  spec:
+    containers:
+    - command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -exuo pipefail
+
+        data=$(ARTIFACTS)/release.json
+
+        if ! curl --fail -X GET -G https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest --data-urlencode 'in=>4.1.0 <4.2.0-0' > ${data}; then
+          echo "error: Could not find an initial version"
+          exit 1
+        fi
+        export RELEASE_IMAGE_INITIAL=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${data}" )
+
+        if ! curl --fail -X GET -G https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest --data-urlencode 'in=>4.2.0 <4.3.0-0' > ${data}; then
+          echo "error: Could not find a middle version"
+          exit 1
+        fi
+        next_0=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${data}" )
+
+        if ! curl --fail -X GET -G https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest --data-urlencode 'in=>4.3.0 <4.4.0-0' > ${data}; then
+          echo "error: Could not find newest version"
+          exit 1
+        fi
+        next_1=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${data}" )
+
+        if ! curl --fail -X GET -G https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.4.0-0.nightly/latest > ${data}; then
+          echo "error: Could not find newest version"
+          exit 1
+        fi
+        next_2=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${data}" )
+
+        export RELEASE_IMAGE_LATEST=${next_2}
+        export CONFIG_SPEC="${CONFIG_SPEC/RELEASE_IMAGES/$next_0,$next_1,$next_2}"
+
+        ci-operator --artifact-dir=$(ARTIFACTS) --lease-server=http://boskos\
+          --secret-dir=/usr/local/pull-secret --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile \
+          --target=e2e-$(CLUSTER_TYPE)-upgrade --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME)
+      env:
+      - name: BRANCH
+        value: "4.2"
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: CONFIG_SPEC
+        value: |
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-serial
+            commands: TEST_SUITE=openshift/conformance/serial run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-upgrade
+            commands: |
+              TEST_SUITE=all IMAGE=RELEASE_IMAGES run-upgrade-tests
+              TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: launch-$(CLUSTER_TYPE)
+            commands: sleep 9000 & wait
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
+  decorate: true
   interval: 48h
   labels:
     ci.openshift.io/release-type: informing
@@ -5965,7 +6199,7 @@ periodics:
     job-release: "4.4"
     job-test: e2e
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: canary-release-openshift-origin-installer-e2e-aws-4.4-cnv
+  name: release-openshift-origin-installer-e2e-aws-4.4-cnv
   spec:
     containers:
     - args:
@@ -6408,16 +6642,13 @@ periodics:
       - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
       - --target=e2e-aws-scaleup-rhel7
       - --template=/usr/local/e2e-aws-scaleup-rhel7
+      - --org=openshift
+      - --branch=release-4.4
       command:
       - ci-operator
       env:
       - name: CLUSTER_TYPE
         value: aws
-      - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-openshift-ansible-release-4.4.yaml
-            name: ci-operator-4.4-configs
       - name: JOB_NAME_SAFE
         value: e2e-aws-scaleup-rhel7
       - name: RPM_REPO_CRIO_DIR

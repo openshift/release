@@ -17,7 +17,6 @@ images:
   from: base
   to: azure-machine-controllers
 promotion:
-  disabled: true
   name: 4.6-priv
   namespace: ocp-private
 resources:
@@ -50,7 +49,7 @@ tests:
     from: src
 - as: unit
   commands: |
-    go test -timeout 20m ./pkg/... ./cmd/...
+    NO_DOCKER=1 make unit
   container:
     from: src
 - as: e2e-azure
@@ -62,6 +61,7 @@ tests:
   openshift_installer_custom_test_image:
     cluster_profile: azure4
     from: stable:cluster-api-actuator-pkg
+    nested_virt_image: ""
 - as: git-history
   commands: ./hack/verify_history.sh
   container:

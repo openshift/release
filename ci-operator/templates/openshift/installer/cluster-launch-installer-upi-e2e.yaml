@@ -1544,16 +1544,22 @@ objects:
           easy_install --user pip
           pip install --user pyopenssl
 
-          export BASE_DOMAIN_ZONE_NAME=`gcloud dns managed-zones list --filter "DNS_NAME=${base_domain}." --format json | jq -r .[0].name`
+          export BASE_DOMAIN_ZONE_NAME=$(gcloud dns managed-zones list --filter "DNS_NAME=${base_domain}." --format json | jq -r .[0].name)
           export NETWORK_CIDR='10.0.0.0/16'
           export MASTER_SUBNET_CIDR='10.0.0.0/19'
           export WORKER_SUBNET_CIDR='10.0.32.0/19'
 
           export KUBECONFIG=${HOME}/artifacts/installer/auth/kubeconfig
-          export CLUSTER_NAME=`jq -r .clusterName ${HOME}/artifacts/installer/metadata.json`
-          export INFRA_ID=`jq -r .infraID ${HOME}/artifacts/installer/metadata.json`
-          export PROJECT_NAME=`jq -r .gcp.projectID ${HOME}/artifacts/installer/metadata.json`
-          export REGION=`jq -r .gcp.region ${HOME}/artifacts/installer/metadata.json`
+          export CLUSTER_NAME=$(jq -r .clusterName ${HOME}/artifacts/installer/metadata.json)
+          export INFRA_ID=$(jq -r .infraID ${HOME}/artifacts/installer/metadata.json)
+          export PROJECT_NAME=$(jq -r .gcp.projectID ${HOME}/artifacts/installer/metadata.json)
+          export REGION=$(jq -r .gcp.region ${HOME}/artifacts/installer/metadata.json)
+          export ZONE_0=$(gcloud compute regions describe ${REGION} --format=json | jq -r .zones[0] | cut -d "/" -f9)
+          export ZONE_1=$(gcloud compute regions describe ${REGION} --format=json | jq -r .zones[1] | cut -d "/" -f9)
+          export ZONE_2=$(gcloud compute regions describe ${REGION} --format=json | jq -r .zones[2] | cut -d "/" -f9)
+
+          export MASTER_IGNITION=$(cat ${HOME}/artifacts/installer/master.ign)
+          export WORKER_IGNITION=$(cat ${HOME}/artifacts/installer/worker.ign)
 
           pushd ${HOME}/gcp
 
@@ -1573,10 +1579,61 @@ objects:
 
           gcloud deployment-manager deployments create ${CLUSTER_NAME}-vpc --config 01_vpc.yaml
 
-          # Deploy infra
-          export CLUSTER_NETWORK=`gcloud compute networks describe ${INFRA_ID}-network --format json | jq -r .selfLink`
+          export CLUSTER_NETWORK=$(gcloud compute networks describe ${INFRA_ID}-network --format json | jq -r .selfLink)
+          export CONTROL_SUBNET=$(gcloud compute networks subnets describe ${INFRA_ID}-master-subnet --region=${REGION} --format json | jq -r .selfLink)
+          export COMPUTE_SUBNET=$(gcloud compute networks subnets describe ${INFRA_ID}-worker-subnet --region=${REGION} --format json | jq -r .selfLink)
 
-          cat <<EOF > 02_infra.yaml
+          # Deploy infra
+          if [ -f 02_lb_int.py ]; then # for internal lb workflow using 02_lb_int.py
+            cat <<EOF > 02_infra.yaml
+        imports:
+        - path: 02_dns.py
+        - path: 02_lb_ext.py
+        - path: 02_lb_int.py
+        resources:
+        - name: cluster-dns
+          type: 02_dns.py
+          properties:
+            infra_id: '${INFRA_ID}'
+            cluster_domain: '${CLUSTER_NAME}.${base_domain}'
+            cluster_network: '${CLUSTER_NETWORK}'
+        - name: cluster-lb-ext
+          type: 02_lb_ext.py
+          properties:
+            infra_id: '${INFRA_ID}'
+            region: '${REGION}'
+        - name: cluster-lb-int
+          type: 02_lb_int.py
+          properties:
+            cluster_network: '${CLUSTER_NETWORK}'
+            control_subnet: '${CONTROL_SUBNET}'
+            infra_id: '${INFRA_ID}'
+            region: '${REGION}'
+            zones:
+            - '${ZONE_0}'
+            - '${ZONE_1}'
+            - '${ZONE_2}'
+        EOF
+          elif [ -f 02_dns.py ]; then # for broken up workflow using 02_dns.py
+            cat <<EOF > 02_infra.yaml
+        imports:
+        - path: 02_dns.py
+        - path: 02_lb_ext.py
+        resources:
+        - name: cluster-dns
+          type: 02_dns.py
+          properties:
+            infra_id: '${INFRA_ID}'
+            cluster_domain: '${CLUSTER_NAME}.${base_domain}'
+            cluster_network: '${CLUSTER_NETWORK}'
+        - name: cluster-lb-ext
+          type: 02_lb_ext.py
+          properties:
+            infra_id: '${INFRA_ID}'
+            region: '${REGION}'
+        EOF
+          else # for older workflow not using 02_dns.py
+            cat <<EOF > 02_infra.yaml
         imports:
         - path: 02_infra.py
         resources:
@@ -1588,16 +1645,16 @@ objects:
             cluster_domain: '${CLUSTER_NAME}.${base_domain}'
             cluster_network: '${CLUSTER_NETWORK}'
         EOF
+          fi
 
           gcloud deployment-manager deployments create ${CLUSTER_NAME}-infra --config 02_infra.yaml
 
-          export CLUSTER_IP=`gcloud compute addresses describe ${INFRA_ID}-cluster-public-ip --region=${REGION} --format json | jq -r .address`
-
-          # Add external DNS entries
-          if [ -f transaction.yaml ]; then rm transaction.yaml; fi
-          gcloud dns record-sets transaction start --zone ${BASE_DOMAIN_ZONE_NAME}
-          gcloud dns record-sets transaction add ${CLUSTER_IP} --name api.${CLUSTER_NAME}.${base_domain}. --ttl 60 --type A --zone ${BASE_DOMAIN_ZONE_NAME}
-          gcloud dns record-sets transaction execute --zone ${BASE_DOMAIN_ZONE_NAME}
+          if [ -f 02_lb_int.py ]; then # for internal lb workflow using 02_lb_int.py
+            export CLUSTER_IP=$(gcloud compute addresses describe ${INFRA_ID}-cluster-ip --region=${REGION} --format json | jq -r .address)
+          else # for older workflow
+            export CLUSTER_IP=$(gcloud compute addresses describe ${INFRA_ID}-cluster-public-ip --region=${REGION} --format json | jq -r .address)
+          fi
+          export CLUSTER_PUBLIC_IP=$(gcloud compute addresses describe ${INFRA_ID}-cluster-public-ip --region=${REGION} --format json | jq -r .address)
 
           # Add internal DNS entries
           if [ -f transaction.yaml ]; then rm transaction.yaml; fi
@@ -1606,53 +1663,95 @@ objects:
           gcloud dns record-sets transaction add ${CLUSTER_IP} --name api-int.${CLUSTER_NAME}.${base_domain}. --ttl 60 --type A --zone ${INFRA_ID}-private-zone
           gcloud dns record-sets transaction execute --zone ${INFRA_ID}-private-zone
 
-          # Deploy security
-          export MASTER_NAT_IP=`gcloud compute addresses describe ${INFRA_ID}-master-nat-ip --region ${REGION} --format json | jq -r .address`
-          export WORKER_NAT_IP=`gcloud compute addresses describe ${INFRA_ID}-worker-nat-ip --region ${REGION} --format json | jq -r .address`
+          # Add external DNS entries
+          if [ -f transaction.yaml ]; then rm transaction.yaml; fi
+          gcloud dns record-sets transaction start --zone ${BASE_DOMAIN_ZONE_NAME}
+          gcloud dns record-sets transaction add ${CLUSTER_PUBLIC_IP} --name api.${CLUSTER_NAME}.${base_domain}. --ttl 60 --type A --zone ${BASE_DOMAIN_ZONE_NAME}
+          gcloud dns record-sets transaction execute --zone ${BASE_DOMAIN_ZONE_NAME}
 
-          cat <<EOF > 03_security.yaml
+          # Deploy security
+          if [ -f 02_lb_int.py ]; then # for internal lb workflow using 02_lb_int.py
+            cat <<EOF > 03_security.yaml
+        imports:
+        - path: 03_firewall.py
+        - path: 03_iam.py
+        resources:
+        - name: cluster-firewall
+          type: 03_firewall.py
+          properties:
+            allowed_external_cidr: '0.0.0.0/0'
+            infra_id: '${INFRA_ID}'
+            cluster_network: '${CLUSTER_NETWORK}'
+            network_cidr: '${NETWORK_CIDR}'
+        - name: cluster-iam
+          type: 03_iam.py
+          properties:
+            infra_id: '${INFRA_ID}'
+        EOF
+          elif [ -f 03_firewall.py ]; then # for broken up workflow using 03_firewall.py
+            export MASTER_NAT_IP=$(gcloud compute addresses describe ${INFRA_ID}-master-nat-ip --region ${REGION} --format json | jq -r .address)
+            export WORKER_NAT_IP=$(gcloud compute addresses describe ${INFRA_ID}-worker-nat-ip --region ${REGION} --format json | jq -r .address)
+            cat <<EOF > 03_security.yaml
+        imports:
+        - path: 03_firewall.py
+        - path: 03_iam.py
+        resources:
+        - name: cluster-firewall
+          type: 03_firewall.py
+          properties:
+            infra_id: '${INFRA_ID}'
+            cluster_network: '${CLUSTER_NETWORK}'
+            network_cidr: '${NETWORK_CIDR}'
+            master_nat_ip: '${MASTER_NAT_IP}'
+            worker_nat_ip: '${WORKER_NAT_IP}'
+        - name: cluster-iam
+          type: 03_iam.py
+          properties:
+            infra_id: '${INFRA_ID}'
+        EOF
+          else # for older workflow not using 03_firewall.py
+            export MASTER_NAT_IP=$(gcloud compute addresses describe ${INFRA_ID}-master-nat-ip --region ${REGION} --format json | jq -r .address)
+            export WORKER_NAT_IP=$(gcloud compute addresses describe ${INFRA_ID}-worker-nat-ip --region ${REGION} --format json | jq -r .address)
+            cat <<EOF > 03_security.yaml
         imports:
         - path: 03_security.py
-
         resources:
         - name: cluster-security
           type: 03_security.py
           properties:
             infra_id: '${INFRA_ID}'
-            region: '${REGION}'
             cluster_network: '${CLUSTER_NETWORK}'
             network_cidr: '${NETWORK_CIDR}'
             master_nat_ip: '${MASTER_NAT_IP}'
             worker_nat_ip: '${WORKER_NAT_IP}'
         EOF
+          fi
 
           gcloud deployment-manager deployments create ${CLUSTER_NAME}-security --config 03_security.yaml
 
-          export MASTER_SA=${INFRA_ID}-m@${PROJECT_NAME}.iam.gserviceaccount.com
-          gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${MASTER_SA}" --role "roles/compute.instanceAdmin"
-          gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${MASTER_SA}" --role "roles/compute.networkAdmin"
-          gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${MASTER_SA}" --role "roles/compute.securityAdmin"
-          gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${MASTER_SA}" --role "roles/iam.serviceAccountUser"
-          gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${MASTER_SA}" --role "roles/storage.admin"
+          export MASTER_SERVICE_ACCOUNT=$(gcloud iam service-accounts list --filter "email~^${INFRA_ID}-m@${PROJECT_NAME}." --format json | jq -r '.[0].email')
+          export WORKER_SERVICE_ACCOUNT=$(gcloud iam service-accounts list --filter "email~^${INFRA_ID}-w@${PROJECT_NAME}." --format json | jq -r '.[0].email')
 
-          export WORKER_SA=${INFRA_ID}-w@${PROJECT_NAME}.iam.gserviceaccount.com
-          gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${WORKER_SA}" --role "roles/compute.viewer"
-          gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${WORKER_SA}" --role "roles/storage.admin"
+          gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${MASTER_SERVICE_ACCOUNT}" --role "roles/compute.instanceAdmin"
+          gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${MASTER_SERVICE_ACCOUNT}" --role "roles/compute.networkAdmin"
+          gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${MASTER_SERVICE_ACCOUNT}" --role "roles/compute.securityAdmin"
+          gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${MASTER_SERVICE_ACCOUNT}" --role "roles/iam.serviceAccountUser"
+          gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${MASTER_SERVICE_ACCOUNT}" --role "roles/storage.admin"
 
-          gcloud iam service-accounts keys create service-account-key.json --iam-account=${MASTER_SA}
+          gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${WORKER_SERVICE_ACCOUNT}" --role "roles/compute.viewer"
+          gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${WORKER_SERVICE_ACCOUNT}" --role "roles/storage.admin"
+
+          gcloud iam service-accounts keys create service-account-key.json --iam-account=${MASTER_SERVICE_ACCOUNT}
 
           # Deploy bootstrap
-          export IMAGE_SOURCE=`cat /var/lib/openshift-install/rhcos.json | jq -r .gcp.url`
+          export IMAGE_SOURCE=$(cat /var/lib/openshift-install/rhcos.json | jq -r .gcp.url)
           gcloud compute images create "${INFRA_ID}-rhcos-image" --source-uri="${IMAGE_SOURCE}"
-
-          export CONTROL_SUBNET=`gcloud compute networks subnets describe ${INFRA_ID}-master-subnet --region=${REGION} --format json | jq -r .selfLink`
-          export CLUSTER_IMAGE=`gcloud compute images describe ${INFRA_ID}-rhcos-image --format json | jq -r .selfLink`
-          export ZONES=(`gcloud compute regions describe ${REGION} --format=json | jq -r .zones[] | cut -d "/" -f9`)
+          export CLUSTER_IMAGE=$(gcloud compute images describe ${INFRA_ID}-rhcos-image --format json | jq -r .selfLink)
 
           gsutil mb gs://${INFRA_ID}-bootstrap-ignition
           gsutil cp ${HOME}/artifacts/installer/bootstrap.ign gs://${INFRA_ID}-bootstrap-ignition/
 
-          export BOOTSTRAP_IGN=`gsutil signurl -d 1h service-account-key.json gs://${INFRA_ID}-bootstrap-ignition/bootstrap.ign | grep "^gs:" | awk '{print $5}'`
+          export BOOTSTRAP_IGN=$(gsutil signurl -d 1h service-account-key.json gs://${INFRA_ID}-bootstrap-ignition/bootstrap.ign | grep "^gs:" | awk '{print $5}')
 
           cat <<EOF > 04_bootstrap.yaml
         imports:
@@ -1663,7 +1762,7 @@ objects:
           properties:
             infra_id: '${INFRA_ID}'
             region: '${REGION}'
-            zone: '${ZONES[0]}'
+            zone: '${ZONE_0}'
             cluster_network: '${CLUSTER_NETWORK}'
             control_subnet: '${CONTROL_SUBNET}'
             image: '${CLUSTER_IMAGE}'
@@ -1674,16 +1773,17 @@ objects:
 
           gcloud deployment-manager deployments create ${CLUSTER_NAME}-bootstrap --config 04_bootstrap.yaml
 
-          gcloud compute target-pools add-instances ${INFRA_ID}-api-target-pool --instances-zone="${ZONES[0]}" --instances=${INFRA_ID}-bootstrap
-          gcloud compute target-pools add-instances ${INFRA_ID}-ign-target-pool --instances-zone="${ZONES[0]}" --instances=${INFRA_ID}-bootstrap
+          if [ -f 02_lb_int.py ]; then # for internal lb workflow using 02_lb_int.py
+            gcloud compute instance-groups unmanaged add-instances ${INFRA_ID}-master-${ZONE_0}-instance-group --zone=${ZONE_0} --instances=${INFRA_ID}-bootstrap
+          else # for older workflow
+            gcloud compute target-pools add-instances ${INFRA_ID}-ign-target-pool --instances-zone="${ZONE_0}" --instances=${INFRA_ID}-bootstrap
+          fi
+          gcloud compute target-pools add-instances ${INFRA_ID}-api-target-pool --instances-zone=${ZONE_0} --instances=${INFRA_ID}-bootstrap
 
-          BOOTSTRAP_IP=`gcloud compute instances describe ${INFRA_ID}-bootstrap --zone ${ZONES[0]} --format json | jq -r .networkInterfaces[0].networkIP`
+          BOOTSTRAP_IP=$(gcloud compute instances describe ${INFRA_ID}-bootstrap --zone ${ZONE_0} --format json | jq -r .networkInterfaces[0].networkIP)
           GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --bootstrap ${BOOTSTRAP_IP}"
 
           # Deploy control plane
-          export MASTER_SERVICE_ACCOUNT_EMAIL=`gcloud iam service-accounts list | grep "^${INFRA_ID}-master-node " | awk '{print $2}'`
-          export MASTER_IGNITION=`cat ${HOME}/artifacts/installer/master.ign`
-
           cat <<EOF > 05_control_plane.yaml
         imports:
         - path: 05_control_plane.py
@@ -1692,24 +1792,24 @@ objects:
           type: 05_control_plane.py
           properties:
             infra_id: '${INFRA_ID}'
-            region: '${REGION}'
             zones:
-            - '${ZONES[0]}'
-            - '${ZONES[1]}'
-            - '${ZONES[2]}'
+            - '${ZONE_0}'
+            - '${ZONE_1}'
+            - '${ZONE_2}'
             control_subnet: '${CONTROL_SUBNET}'
             image: '${CLUSTER_IMAGE}'
             machine_type: 'n1-standard-4'
             root_volume_size: '128'
-            service_account_email: '${MASTER_SERVICE_ACCOUNT_EMAIL}'
+            service_account_email: '${MASTER_SERVICE_ACCOUNT}'
             ignition: '${MASTER_IGNITION}'
         EOF
 
           gcloud deployment-manager deployments create ${CLUSTER_NAME}-control-plane --config 05_control_plane.yaml
 
-          export MASTER0_IP=`gcloud compute instances describe ${INFRA_ID}-m-0 --zone ${ZONES[0]} --format json | jq -r .networkInterfaces[0].networkIP`
-          export MASTER1_IP=`gcloud compute instances describe ${INFRA_ID}-m-1 --zone ${ZONES[1]} --format json | jq -r .networkInterfaces[0].networkIP`
-          export MASTER2_IP=`gcloud compute instances describe ${INFRA_ID}-m-2 --zone ${ZONES[2]} --format json | jq -r .networkInterfaces[0].networkIP`
+          export MASTER0_IP=$(gcloud compute instances describe ${INFRA_ID}-m-0 --zone ${ZONE_0} --format json | jq -r .networkInterfaces[0].networkIP)
+          export MASTER1_IP=$(gcloud compute instances describe ${INFRA_ID}-m-1 --zone ${ZONE_1} --format json | jq -r .networkInterfaces[0].networkIP)
+          export MASTER2_IP=$(gcloud compute instances describe ${INFRA_ID}-m-2 --zone ${ZONE_2} --format json | jq -r .networkInterfaces[0].networkIP)
+
           if [ -f transaction.yaml ]; then rm transaction.yaml; fi
           gcloud dns record-sets transaction start --zone ${INFRA_ID}-private-zone
           gcloud dns record-sets transaction add ${MASTER0_IP} --name etcd-0.${CLUSTER_NAME}.${base_domain}. --ttl 60 --type A --zone ${INFRA_ID}-private-zone
@@ -1722,20 +1822,24 @@ objects:
             --name _etcd-server-ssl._tcp.${CLUSTER_NAME}.${base_domain}. --ttl 60 --type SRV --zone ${INFRA_ID}-private-zone
           gcloud dns record-sets transaction execute --zone ${INFRA_ID}-private-zone
 
-          gcloud compute target-pools add-instances ${INFRA_ID}-api-target-pool --instances-zone="${ZONES[0]}" --instances=${INFRA_ID}-m-0
-          gcloud compute target-pools add-instances ${INFRA_ID}-api-target-pool --instances-zone="${ZONES[1]}" --instances=${INFRA_ID}-m-1
-          gcloud compute target-pools add-instances ${INFRA_ID}-api-target-pool --instances-zone="${ZONES[2]}" --instances=${INFRA_ID}-m-2
-          gcloud compute target-pools add-instances ${INFRA_ID}-ign-target-pool --instances-zone="${ZONES[0]}" --instances=${INFRA_ID}-m-0
-          gcloud compute target-pools add-instances ${INFRA_ID}-ign-target-pool --instances-zone="${ZONES[1]}" --instances=${INFRA_ID}-m-1
-          gcloud compute target-pools add-instances ${INFRA_ID}-ign-target-pool --instances-zone="${ZONES[2]}" --instances=${INFRA_ID}-m-2
+          if [ -f 02_lb_int.py ]; then # for internal lb workflow using 02_lb_int.py
+            gcloud compute instance-groups unmanaged add-instances ${INFRA_ID}-master-${ZONE_0}-instance-group --zone=${ZONE_0} --instances=${INFRA_ID}-m-0
+            gcloud compute instance-groups unmanaged add-instances ${INFRA_ID}-master-${ZONE_1}-instance-group --zone=${ZONE_1} --instances=${INFRA_ID}-m-1
+            gcloud compute instance-groups unmanaged add-instances ${INFRA_ID}-master-${ZONE_2}-instance-group --zone=${ZONE_2} --instances=${INFRA_ID}-m-2
+          else # for older workflow
+            gcloud compute target-pools add-instances ${INFRA_ID}-ign-target-pool --instances-zone="${ZONE_0}" --instances=${INFRA_ID}-m-0
+            gcloud compute target-pools add-instances ${INFRA_ID}-ign-target-pool --instances-zone="${ZONE_1}" --instances=${INFRA_ID}-m-1
+            gcloud compute target-pools add-instances ${INFRA_ID}-ign-target-pool --instances-zone="${ZONE_2}" --instances=${INFRA_ID}-m-2
+          fi
+
+          gcloud compute target-pools add-instances ${INFRA_ID}-api-target-pool --instances-zone="${ZONE_0}" --instances=${INFRA_ID}-m-0
+          gcloud compute target-pools add-instances ${INFRA_ID}-api-target-pool --instances-zone="${ZONE_1}" --instances=${INFRA_ID}-m-1
+          gcloud compute target-pools add-instances ${INFRA_ID}-api-target-pool --instances-zone="${ZONE_2}" --instances=${INFRA_ID}-m-2
 
           GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --master ${MASTER0_IP} --master ${MASTER1_IP} --master ${MASTER2_IP}"
 
           # Deploy compute
-          export COMPUTE_SUBNET=`gcloud compute networks subnets describe ${INFRA_ID}-worker-subnet --region=${REGION} --format json | jq -r .selfLink`
-          export WORKER_SERVICE_ACCOUNT_EMAIL=`gcloud iam service-accounts list | grep "^${INFRA_ID}-worker-node " | awk '{print $2}'`
-          export WORKER_IGNITION=`cat ${HOME}/artifacts/installer/worker.ign`
-
+          export ZONES=($(gcloud compute regions describe ${REGION} --format=json | jq -r .zones[] | cut -d '/' -f9))
           cat <<EOF > 06_worker.yaml
         imports:
         - path: 06_worker.py
@@ -1748,13 +1852,12 @@ objects:
           type: 06_worker.py
           properties:
             infra_id: '${INFRA_ID}'
-            region: '${REGION}'
             zone: '${ZONES[(( $compute % ${#ZONES[@]} ))]}'
             compute_subnet: '${COMPUTE_SUBNET}'
             image: '${CLUSTER_IMAGE}'
             machine_type: 'n1-standard-4'
             root_volume_size: '128'
-            service_account_email: '${WORKER_SERVICE_ACCOUNT_EMAIL}'
+            service_account_email: '${WORKER_SERVICE_ACCOUNT}'
             ignition: '${WORKER_IGNITION}'
         EOF
           done;
@@ -1963,8 +2066,12 @@ objects:
           aws cloudformation wait stack-delete-complete --stack-name "${CLUSTER_NAME}-bootstrap" &
           wait "$!"
         elif [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
-          gcloud compute target-pools remove-instances ${INFRA_ID}-api-target-pool --instances-zone="${ZONES[0]}" --instances=${INFRA_ID}-bootstrap
-          gcloud compute target-pools remove-instances ${INFRA_ID}-ign-target-pool --instances-zone="${ZONES[0]}" --instances=${INFRA_ID}-bootstrap
+          if [ -f ${HOME}/gcp/02_lb_int.py ]; then # for internal lb workflow using 02_lb_int.py
+            gcloud compute instance-groups unmanaged remove-instances ${INFRA_ID}-master-${ZONE_0}-instance-group --zone=${ZONE_0} --instances=${INFRA_ID}-bootstrap
+          else # for older workflow
+            gcloud compute target-pools remove-instances ${INFRA_ID}-ign-target-pool --instances-zone="${ZONE_0}" --instances=${INFRA_ID}-bootstrap
+          fi
+          gcloud compute target-pools remove-instances ${INFRA_ID}-api-target-pool --instances-zone="${ZONE_0}" --instances=${INFRA_ID}-bootstrap
           gsutil rm gs://${INFRA_ID}-bootstrap-ignition/bootstrap.ign
           gsutil rb gs://${INFRA_ID}-bootstrap-ignition
           gcloud deployment-manager deployments delete -q ${CLUSTER_NAME}-bootstrap
