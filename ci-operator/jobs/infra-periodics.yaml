@@ -792,9 +792,12 @@ periodics:
       - --source-path=../../redhat-operator-ecosystem/release
       - --config-path=core-services/prow/02_config/_config.yaml
       - --plugin-config=core-services/prow/02_config/_plugins.yaml
-      - --kubeconfig=/etc/build-farm-credentials/kubeconfig
       command:
       - /app/prow/cmd/config-bootstrapper/app.binary
+      env:
+      # Multiple configs can only be passed via the env var and not via the flag
+      - name: KUBECONFIG
+        value: /etc/build-farm-credentials/kubeconfig:/etc/app-ci-config-updater-kubeconfig/kubeconfig
       image: gcr.io/k8s-prow/config-bootstrapper:v20200317-673b1adb5
       imagePullPolicy: Always
       name: ""
@@ -805,14 +808,20 @@ periodics:
       - mountPath: /etc/build-farm-credentials
         name: build-farm-credentials
         readOnly: true
+      - mountPath: /etc/app-ci-config-updater-kubeconfig
+        name: app-ci-config-updater-kubeconfig
+        readOnly: true
     serviceAccountName: config-updater
     volumes:
     - name: build-farm-credentials
       secret:
         items:
-        - key: sa.hook.build01.and.app.ci.merged.config
+        - key: sa.hook.build01.config
           path: kubeconfig
         secretName: build-farm-credentials
+    - name: app-ci-config-updater-kubeconfig
+      secret:
+        secretName: app-ci-config-updater-kubeconfig
 - agent: kubernetes
   labels:
     ci.openshift.io/role: infra
