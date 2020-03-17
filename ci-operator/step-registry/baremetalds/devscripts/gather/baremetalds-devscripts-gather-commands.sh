@@ -37,11 +37,11 @@ IP=$(cat ${SHARED_DIR}/server-ip)
 export IP
 echo "Packet server IP is ${IP}"
 
-mkdir -p ${ARTIFACT_DIR}
-
 timeout -s 9 15m ssh $SSHOPTS root@$IP bash - << EOF
-oc --insecure-skip-tls-verify adm must-gather --dest-dir ${ARTIFACT_DIR}/must-gather > ${ARTIFACT_DIR}/must-gather/must-gather.log
+mkdir -p /tmp/artifacts/must-gather
+
+oc --insecure-skip-tls-verify adm must-gather --dest-dir /tmp/artifacts/must-gather > /tmp/artifacts/must-gather/must-gather.log
 EOF
 
-echo "### Fetching results"
+echo "### Fetching results and logs"
 ssh $SSHOPTS root@$IP tar -czf - /tmp/artifacts | tar -C ${ARTIFACT_DIR} -xzf -
