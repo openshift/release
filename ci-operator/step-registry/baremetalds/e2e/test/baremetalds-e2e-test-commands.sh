@@ -12,6 +12,17 @@ export SSHOPTS="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHost
 echo "************ baremetalds test command ************"
 env | sort
 
+# Ensure our UID, which is randomly generated, is in /etc/passwd. This is required
+# to be able to SSH.
+if ! whoami &> /dev/null; then
+    if [[ -w /etc/passwd ]]; then
+        echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+    else
+        echo "/etc/passwd is not writeable, and user matching this uid is not found."
+        exit 1
+    fi
+fi
+
 # Initial check
 if [ "${CLUSTER_TYPE}" != "packet" ] ; then
     echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"
@@ -23,15 +34,6 @@ ls -ll ${SHARED_DIR}
 
 IP=$(cat ${SHARED_DIR}/server-ip)
 export IP
-
-# Applying NSS fix for SSH connection
-echo "### Applying NSS fix"
-export HOME=/tmp/nss_wrapper
-mkdir -p $HOME
-cp ${SHARED_DIR}/libnss_wrapper.so ${HOME}
-cp ${SHARED_DIR}/mock-nss.sh ${HOME}
-export NSS_WRAPPER_PASSWD=$HOME/passwd NSS_WRAPPER_GROUP=$HOME/group NSS_USERNAME=nsswrapper NSS_GROUPNAME=nsswrapper LD_PRELOAD=${HOME}/libnss_wrapper.so
-bash ${HOME}/mock-nss.sh
 
 # Copy test binaries on packet server
 echo "### Copying test binaries"
@@ -88,5 +90,3 @@ ssh $SSHOPTS root@$IP tar -czf - /tmp/artifacts | tar -C ${ARTIFACT_DIR} -xzf -
 set -e
 echo "### Done! (${rv})"
 exit $rv
-
-
