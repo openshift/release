@@ -75,7 +75,10 @@ items:
           - --github-graphql-endpoint=http://ghproxy/graphql
           - --bugzilla-endpoint=https://bugzilla.redhat.com
           - --bugzilla-api-key-path=/etc/bugzilla/api
-          - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+          env:
+          # Multiple configs can only be passed via the env var and not via the flag
+          - name: KUBECONFIG
+            value: /etc/build-farm-credentials/build01.kubeconfig:/etc/build-farm-credentials/app.ci.kubeconfig
           ports:
             - name: main
               containerPort: 8888
@@ -185,8 +188,10 @@ items:
         - name: build-farm-credentials
           secret:
             items:
-            - key: sa.hook.build01.and.app.ci.merged.config
-              path: kubeconfig
+            - key: sa.hook.build01.config
+              path: build01.kubeconfig
+            - key: sa.hook.app.ci.config
+              path: app.ci.kubeconfig
             secretName: build-farm-credentials
         - name: tmp
           emptyDir: {}
