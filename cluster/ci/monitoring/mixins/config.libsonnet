@@ -38,9 +38,9 @@
         notify: 'bparees',
       },
       'kni-cnf': {
-        team: 'kni-cnf',
-        channel: '#forum-kni-cnf',
-        notify: '',
+        team: 'cnf-cop',
+        channel: '#cnf-alerts',
+        notify: 'cnf-cop',
       },
       'openshift-dev-services': {
         team: 'openshift-dev-services',
