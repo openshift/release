@@ -1774,11 +1774,12 @@ objects:
           gcloud deployment-manager deployments create ${CLUSTER_NAME}-bootstrap --config 04_bootstrap.yaml
 
           if [ -f 02_lb_int.py ]; then # for internal lb workflow using 02_lb_int.py
-            gcloud compute instance-groups unmanaged add-instances ${INFRA_ID}-master-${ZONE_0}-instance-group --zone=${ZONE_0} --instances=${INFRA_ID}-bootstrap
+            gcloud compute instance-groups unmanaged add-instances ${INFRA_ID}-bootstrap-instance-group --zone=${ZONE_0} --instances=${INFRA_ID}-bootstrap
+            gcloud compute backend-services add-backend ${INFRA_ID}-api-internal-backend-service --region=${REGION} --instance-group=${INFRA_ID}-bootstrap-instance-group --instance-group-zone=${ZONE_0}
           else # for older workflow
             gcloud compute target-pools add-instances ${INFRA_ID}-ign-target-pool --instances-zone="${ZONE_0}" --instances=${INFRA_ID}-bootstrap
+            gcloud compute target-pools add-instances ${INFRA_ID}-api-target-pool --instances-zone=${ZONE_0} --instances=${INFRA_ID}-bootstrap
           fi
-          gcloud compute target-pools add-instances ${INFRA_ID}-api-target-pool --instances-zone=${ZONE_0} --instances=${INFRA_ID}-bootstrap
 
           BOOTSTRAP_IP=$(gcloud compute instances describe ${INFRA_ID}-bootstrap --zone ${ZONE_0} --format json | jq -r .networkInterfaces[0].networkIP)
           GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --bootstrap ${BOOTSTRAP_IP}"
@@ -2067,11 +2068,11 @@ objects:
           wait "$!"
         elif [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
           if [ -f ${HOME}/gcp/02_lb_int.py ]; then # for internal lb workflow using 02_lb_int.py
-            gcloud compute instance-groups unmanaged remove-instances ${INFRA_ID}-master-${ZONE_0}-instance-group --zone=${ZONE_0} --instances=${INFRA_ID}-bootstrap
+            gcloud compute backend-services remove-backend ${INFRA_ID}-api-internal-backend-service --region=${REGION} --instance-group=${INFRA_ID}-bootstrap-instance-group --instance-group-zone=${ZONE_0}
           else # for older workflow
             gcloud compute target-pools remove-instances ${INFRA_ID}-ign-target-pool --instances-zone="${ZONE_0}" --instances=${INFRA_ID}-bootstrap
+            gcloud compute target-pools remove-instances ${INFRA_ID}-api-target-pool --instances-zone="${ZONE_0}" --instances=${INFRA_ID}-bootstrap
           fi
-          gcloud compute target-pools remove-instances ${INFRA_ID}-api-target-pool --instances-zone="${ZONE_0}" --instances=${INFRA_ID}-bootstrap
           gsutil rm gs://${INFRA_ID}-bootstrap-ignition/bootstrap.ign
           gsutil rb gs://${INFRA_ID}-bootstrap-ignition
           gcloud deployment-manager deployments delete -q ${CLUSTER_NAME}-bootstrap
