@@ -55,32 +55,31 @@ index 0000000..3697cad
 +  kind: Namespace
 +  metadata:
 +    name: ocp-private
-diff --git a/./clusters/app.ci/prow/03_deployment/admin_config_updater_app_ci_rbac.yaml b/./clusters/app.ci/prow/03_deployment/admin_config_updater_app_ci_rbac.yaml
-new file mode 100644
-index 0000000..da48694
---- /dev/null
-+++ b/./clusters/app.ci/prow/03_deployment/admin_config_updater_app_ci_rbac.yaml
-@@ -0,0 +1,12 @@
-+apiVersion: rbac.authorization.k8s.io/v1
-+kind: ClusterRoleBinding
-+metadata:
-+  name: dedicated-admins-cluster-config-updater
-+roleRef:
-+  apiGroup: rbac.authorization.k8s.io
-+  kind: ClusterRole
-+  name: dedicated-admins-cluster
-+subjects:
-+- kind: ServiceAccount
-+  name: config-updater
-+  namespace: ci
 diff --git a/./core-services/prow/03_deployment/admin_config_updater_rbac.yaml b/./clusters/app.ci/prow/03_deployment/admin_config_updater_rbac.yaml
-index 19cee9b..a76fff5 100644
+index 19cee9b..13016bb 100644
 --- a/./core-services/prow/03_deployment/admin_config_updater_rbac.yaml
 +++ b/./clusters/app.ci/prow/03_deployment/admin_config_updater_rbac.yaml
-@@ -70,34 +70,6 @@ items:
-   apiVersion: rbac.authorization.k8s.io/v1
+@@ -5,7 +5,10 @@ items:
+   kind: ServiceAccount
    metadata:
      name: config-updater
+-    namespace: ci
++    # Must be in the dedicated-admin namespace, because a set of rolebindings are automatically generated
++    # that apply to members of the `dedicated-admin` grup (group members can not be service accounts) and
++    # to service accounts in the dedicated-admin namespace.
++    namespace: dedicated-admin
+ - kind: Role
+   apiVersion: rbac.authorization.k8s.io/v1
+   metadata:
+@@ -65,35 +68,7 @@ items:
+   subjects:
+   - kind: ServiceAccount
+     name: config-updater
+-    namespace: ci
+-- kind: Role
+-  apiVersion: rbac.authorization.k8s.io/v1
+-  metadata:
+-    name: config-updater
 -    namespace: openshift
 -  rules:
 -    - apiGroups:
@@ -105,17 +104,28 @@ index 19cee9b..a76fff5 100644
 -  - kind: ServiceAccount
 -    name: config-updater
 -    namespace: ci
++    namespace: dedicated-admin
+ - kind: Role
+   apiVersion: rbac.authorization.k8s.io/v1
+   metadata:
+@@ -168,7 +143,7 @@ items:
+   subjects:
+   - kind: ServiceAccount
+     name: config-updater
+-    namespace: ci
++    namespace: dedicated-admin
+ - kind: Role
+   apiVersion: rbac.authorization.k8s.io/v1
+   metadata:
+@@ -228,44 +203,7 @@ items:
+   subjects:
+   - kind: ServiceAccount
+     name: config-updater
+-    namespace: ci
 -- kind: Role
 -  apiVersion: rbac.authorization.k8s.io/v1
 -  metadata:
 -    name: config-updater
-     namespace: prow-monitoring
-   rules:
-     - apiGroups:
-@@ -233,43 +205,6 @@ items:
-   apiVersion: rbac.authorization.k8s.io/v1
-   metadata:
-     name: config-updater
 -    namespace: openshift-monitoring
 -  rules:
 -    - apiGroups:
@@ -149,17 +159,24 @@ index 19cee9b..a76fff5 100644
 -  - kind: ServiceAccount
 -    name: config-updater
 -    namespace: ci
--- kind: Role
--  apiVersion: rbac.authorization.k8s.io/v1
--  metadata:
--    name: config-updater
-     namespace: ci-search
-   rules:
-     - apiGroups:
-@@ -378,40 +313,6 @@ items:
++    namespace: dedicated-admin
+ - kind: Role
+   apiVersion: rbac.authorization.k8s.io/v1
+   metadata:
+@@ -364,7 +302,7 @@ items:
+   subjects:
+     - kind: ServiceAccount
+       name: config-updater
+-      namespace: ci
++      namespace: dedicated-admin
+ - kind: RoleBinding
+   apiVersion: rbac.authorization.k8s.io/v1
+   metadata:
+@@ -377,41 +315,7 @@ items:
+   subjects:
    - kind: ServiceAccount
      name: config-updater
-     namespace: ci
+-    namespace: ci
 -- kind: ClusterRole
 -  apiVersion: rbac.authorization.k8s.io/v1
 -  metadata:
@@ -194,9 +211,70 @@ index 19cee9b..a76fff5 100644
 -  - kind: ServiceAccount
 -    name: config-updater
 -    namespace: ci
++    namespace: dedicated-admin
  - kind: Role
    apiVersion: rbac.authorization.k8s.io/v1
    metadata:
+@@ -470,7 +374,7 @@ items:
+   subjects:
+   - kind: ServiceAccount
+     name: config-updater
+-    namespace: ci
++    namespace: dedicated-admin
+ - kind: Role
+   apiVersion: rbac.authorization.k8s.io/v1
+   metadata:
+@@ -499,7 +403,7 @@ items:
+   subjects:
+   - kind: ServiceAccount
+     name: config-updater
+-    namespace: ci
++    namespace: dedicated-admin
+   - kind: ServiceAccount
+     name: hook
+     namespace: ci
+@@ -531,7 +435,7 @@ items:
+   subjects:
+   - kind: ServiceAccount
+     name: config-updater
+-    namespace: ci
++    namespace: dedicated-admin
+ - kind: RoleBinding
+   apiVersion: rbac.authorization.k8s.io/v1
+   metadata:
+@@ -544,7 +448,7 @@ items:
+   subjects:
+   - kind: ServiceAccount
+     name: config-updater
+-    namespace: ci
++    namespace: dedicated-admin
+ - kind: Role
+   apiVersion: rbac.authorization.k8s.io/v1
+   metadata:
+@@ -659,7 +563,7 @@ items:
+   subjects:
+   - kind: ServiceAccount
+     name: config-updater
+-    namespace: ci
++    namespace: dedicated-admin
+ - kind: Role
+   apiVersion: rbac.authorization.k8s.io/v1
+   metadata:
+@@ -697,7 +601,7 @@ items:
+   subjects:
+   - kind: ServiceAccount
+     name: config-updater
+-    namespace: ci
++    namespace: dedicated-admin
+ 
+ - kind: Role
+   apiVersion: rbac.authorization.k8s.io/v1
+@@ -727,4 +631,4 @@ items:
+   subjects:
+   - kind: ServiceAccount
+     name: config-updater
+-    namespace: ci
++    namespace: dedicated-admin
 diff --git a/./core-services/prow/03_deployment/boskos.yaml b/./clusters/app.ci/prow/03_deployment/boskos.yaml
 index 295c8ca..92fcbb2 100644
 --- a/./core-services/prow/03_deployment/boskos.yaml
