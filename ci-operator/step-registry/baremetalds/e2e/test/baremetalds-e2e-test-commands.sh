@@ -86,7 +86,8 @@ ssh $SSHOPTS root@$IP openshift-tests run "openshift/conformance/parallel" --dry
 rv=$?
 
 echo "### Fetching results"
-ssh $SSHOPTS root@$IP tar -czf - /tmp/artifacts | tar -C ${ARTIFACT_DIR} -xzf - 
+ssh $SSHOPTS root@$IP tar -czf - /tmp/artifacts | tar -C ${ARTIFACT_DIR} -xzf -
+
 set -e
 echo "### Done! (${rv})"
 exit $rv
