@@ -37,6 +37,12 @@ IP=$(cat ${SHARED_DIR}/server-ip)
 export IP
 echo "Packet server IP is ${IP}"
 
+if [[ ! -e ${SHARED_DIR}/server-ip ]]
+then
+  echo "No server IP found; skipping log gathering."
+  exit 1
+fi
+
 timeout -s 9 15m ssh $SSHOPTS root@$IP bash - << EOF
 mkdir -p /tmp/artifacts/must-gather
 oc --insecure-skip-tls-verify adm must-gather --dest-dir /tmp/artifacts/must-gather > /tmp/artifacts/must-gather/must-gather.log
