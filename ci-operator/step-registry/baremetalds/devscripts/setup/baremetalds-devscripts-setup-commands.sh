@@ -94,11 +94,6 @@ echo "export MIRROR_IMAGES=true" >> /root/dev-scripts/config_root.sh
 
 echo 'export KUBECONFIG=/root/dev-scripts/ocp/ostest/auth/kubeconfig' >> /root/.bashrc
 
-### if [ ! -e /opt/dev-scripts/pool ] ; then
-###  mkdir -p /opt/dev-scripts/pool
-###  mount -t tmpfs -o size=100G tmpfs /opt/dev-scripts/pool
-### fi
-
 timeout -s 9 105m make
 
 EOF
