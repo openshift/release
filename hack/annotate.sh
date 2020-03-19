@@ -4,7 +4,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-base=$( dirname "${BASH_SOURCE[0]}")
+base="$( dirname "${BASH_SOURCE[0]}" )/.."
 
 function annotate() {
 	local namespace="$1"
