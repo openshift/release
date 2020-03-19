@@ -53,9 +53,16 @@ To abort/remove a release tag:
 
 * `deploy-*.yaml` - the controller definitions
 * `images-*.yaml` - definitions of the image streams used by the publish / build rules
-* `releases/release-*.json` - definitions of the build and publishing rules for sets of images
-* `repos/ocp-*-*.repo` - definitions where RPMs are loaded from for OCP builds
+* `_releases/release-*.json` - definitions of the build and publishing rules for sets of images
+* `_repos/ocp-*-*.repo` - definitions where RPMs are loaded from for OCP builds
 * `rpms-*.yaml` - definitions of the services that exposed mirrored RPMs within the clutser
+
+### Release gating jobs
+
+Release gating jobs are configured via the `verify` property in `_releases/release-*.json`, with the `optional` property distinguishing between blocking and informing jobs.
+
+TestGrid dashboards also include blocking and informing jobs, which are in part drawn from the release-controller configuration.
+To update TestGrid after making changes, use [`testgrid-config-generator`][testgrid-config-generator].
 
 ### RPM Mirrors
 
@@ -68,3 +75,5 @@ See `rpms-ocp-*.yaml` for the definition of each proxy service, `ocp-*.repo` for
 In general, new RPMs should be added to the correct Brew tags at Red Hat for OCP first (since we need those to eventualyl build). Those are mirrored nightly by the SRE team to `https://mirror.openshift.com/enterprise/reposync/4.Y`.  If a set of RPMs need to be added (a separate brew tag) that is compatible with the existing RPM sets, then we would add it to the appropriate `ocp-4.Y-default.repo` (which all images can use). If the repo is incompatible with any of the RPMs in the default repos (like the OpenStack project), a new type of `ocp-4.Y-NAME.repo` has to be created (similar to `ocp-4.2-openstack.repo`) that points to the correct mirrors. Then the images that want to use that as a base have to inject the correct RPM repo (TODO: future changes will mount these automatically) and then depend on that base. For an example, see the `kuryr` ci-operator definitions.
 
 See the OWNERS file in this directory for approvers.
+
+[testgrid-config-generator]: https://github.com/openshift/ci-tools/tree/master/cmd/testgrid-config-generator
