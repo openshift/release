@@ -15,5 +15,13 @@
       },
     }
     for severity in ['warning', 'critical']
+  ] + [
+    {
+      repeat_interval: '5m',
+      receiver: 'slack-warnings',
+      match: {
+        alertname: 'Watchdog',
+      },
+    },
   ],
 }
