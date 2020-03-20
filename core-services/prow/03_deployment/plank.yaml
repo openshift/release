@@ -56,8 +56,11 @@ items:
           - --github-endpoint=http://ghproxy
           - --github-endpoint=https://api.github.com
           - --github-graphql-endpoint=http://ghproxy/graphql
-          - --kubeconfig=/etc/build-farm-credentials/kubeconfig
           - --skip-report=true
+          env:
+          # Multiple configs can only be passed via the env var and not via the flag
+          - name: KUBECONFIG
+            value: /etc/build-farm-credentials/api.ci.kubeconfig:/etc/build-farm-credentials/build01.kubeconfig
           ports:
           - name: metrics
             containerPort: 9090
@@ -139,6 +142,8 @@ items:
         - name: build-farm-credentials
           secret:
             items:
+            - key: sa.plank.api.ci.config
+              path: api.ci.kubeconfig
             - key: sa.plank.build01.config
-              path: kubeconfig
+              path: build01.kubeconfig
             secretName: build-farm-credentials
