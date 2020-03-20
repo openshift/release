@@ -1,0 +1,58 @@
+base_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: 4.6-priv
+    namespace: ocp-private
+    tag: base
+binary_build_commands: hack/build-go.sh
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.12
+canonical_go_repository: github.com/openshift/cluster-network-operator
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  to: cluster-network-operator
+promotion:
+  name: 4.6-priv
+  namespace: ocp-private
+resources:
+  '*':
+    limits: {}
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: 4.6-priv
+  namespace: ocp-private
+tests:
+- as: unit
+  commands: go test ./...
+  container:
+    from: src
+- as: verify
+  commands: "export GOLANGCI_LINT_VERSION=$(cat .golangciversion 2&> /dev/null ||
+    echo \"1.23.8\")  \nexport GOLANGCI_LINT_CACHE=/tmp/.cache\ncurl -sfL \"https://github.com/golangci/golangci-lint/releases/download/v${GOLANGCI_LINT_VERSION:?'golangci-lint
+    version is unset'}/golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64.tar.gz\"
+    | tar -C /go/bin -zx --strip-components=1 \"golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64/golangci-lint\"\ngo
+    get -u github.com/golang/dep/cmd/dep\n./hack/verify-style.sh\n"
+  container:
+    from: src
+- as: e2e-gcp
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer:
+    cluster_profile: gcp
+- as: e2e-gcp-ovn-upgrade
+  commands: CLUSTER_NETWORK_TYPE=OVNKubernetes TEST_SUITE=all run-upgrade-tests
+  openshift_installer:
+    cluster_profile: gcp
+    upgrade: true
+- as: e2e-gcp-upgrade
+  commands: TEST_SUITE=all run-upgrade-tests
+  openshift_installer:
+    cluster_profile: gcp
+    upgrade: true

@@ -1,0 +1,56 @@
+base_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: 4.4-priv
+    namespace: ocp-private
+    tag: base
+binary_build_commands: hack/build-go.sh
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.12
+canonical_go_repository: github.com/openshift/cluster-network-operator
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  to: cluster-network-operator
+promotion:
+  name: 4.4-priv
+  namespace: ocp-private
+resources:
+  '*':
+    limits: {}
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: 4.4-priv
+  namespace: ocp-private
+tests:
+- as: unit
+  commands: go test ./...
+  container:
+    from: src
+- as: verify
+  commands: |
+    go get -u github.com/golang/dep/cmd/dep
+    ./hack/verify-style.sh
+  container:
+    from: src
+- as: e2e-gcp
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer:
+    cluster_profile: gcp
+- as: e2e-gcp-ovn-upgrade
+  commands: CLUSTER_NETWORK_TYPE=OVNKubernetes TEST_SUITE=all run-upgrade-tests
+  openshift_installer:
+    cluster_profile: gcp
+    upgrade: true
+- as: e2e-gcp-upgrade
+  commands: TEST_SUITE=all run-upgrade-tests
+  openshift_installer:
+    cluster_profile: gcp
+    upgrade: true

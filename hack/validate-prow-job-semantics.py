@@ -3,15 +3,37 @@
 import os
 import re
 import sys
+from argparse import ArgumentParser
+
 import yaml
 
 
 JOBS_DIR = 'ci-operator/jobs'
 
 
+def parse_args():
+    parser = ArgumentParser()
+    parser.add_argument("release_repo_dir", help="release directory")
+    return parser.parse_args()
+
+
 def main():
+    PATH_CHECKS = (
+        validate_filename,
+    )
+    CONTENT_CHECKS = (
+        validate_file_structure,
+        validate_job_repo,
+        validate_names,
+        validate_sharding,
+        validate_ci_op_args,
+        validate_pod_name,
+        validate_resources,
+    )
+    validate = lambda funcs, *args: all([f(*args) for f in funcs])
     failed = False
-    for root, _, files in os.walk(JOBS_DIR):
+    args = parse_args()
+    for root, _, files in os.walk(os.path.join(args.release_repo_dir, JOBS_DIR)):
         for filename in files:
             if filename.endswith(".yml"):
                 print(f"ERROR: Only .yaml extensions are allowed, not .yml as in {root}/{filename}")
@@ -21,15 +43,13 @@ def main():
             if os.path.basename(filename).startswith("infra-"):
                 continue
             path = os.path.join(root, filename)
-            for file_check in [validate_filename, validate_file_structure]:
-                if not file_check(path):
-                    failed = True
-                else:
-                    with open(path) as f:
-                        data = yaml.load(f)
-                        for content_check in [validate_job_repo, validate_names, validate_sharding, validate_ci_op_args, validate_pod_name, validate_resources]:
-                            if not content_check(path, data):
-                                failed = True
+            if not validate(PATH_CHECKS, path):
+                failed = True
+                continue
+            with open(path) as f:
+                data = yaml.load(f)
+            if not validate(CONTENT_CHECKS, path, data):
+                failed = True
 
     if failed:
         sys.exit(1)
@@ -63,18 +83,16 @@ def validate_filename(path):
 
     return True
 
-def validate_file_structure(path):
-    with open(path) as f:
-        data = yaml.load(f)
-        if len(data) != 1:
-            print("ERROR: {}: file contains more than one type of job".format(path))
-            return False
-        if next(iter(data.keys())) == 'periodics':
-            return True
-        data = next(iter(data.values()))
-        if len(data) != 1:
-            print("ERROR: {}: file contains jobs for more than one repo".format(path))
-            return False
+def validate_file_structure(path, data):
+    if len(data) != 1:
+        print("ERROR: {}: file contains more than one type of job".format(path))
+        return False
+    if next(iter(data.keys())) == 'periodics':
+        return True
+    data = next(iter(data.values()))
+    if len(data) != 1:
+        print("ERROR: {}: file contains jobs for more than one repo".format(path))
+        return False
 
     return True
 
@@ -114,6 +132,10 @@ def validate_names(path, data):
                     print("[INFO] {}: ci-operator job {} is ignored because of a label says so".format(path, job["name"]))
                     continue
 
+                if ("labels" in job) and ("ci-operator.openshift.io/prowgen-controlled" in job["labels"]) and job["labels"]["ci-operator.openshift.io/prowgen-controlled"] == "true":
+                    print("[INFO] {}: ci-operator job {} is ignored because it's generated and assumed to be right".format(path, job["name"]))
+                    continue
+
                 targets = []
                 for arg in job["spec"]["containers"][0].get("args", []) + job["spec"]["containers"][0]["command"]:
                     if arg.startswith("--target="):
@@ -130,9 +152,9 @@ def validate_names(path, data):
                             print("ERROR: {}: job {} branches with underscores are not allowed: {}".format(path, job["name"], branch_name))
                     branch = make_regex_filename_label(job["branches"][0])
 
-                prefix = "pull"
+                prefixes = ["pull"]
                 if job_type == "postsubmits":
-                    prefix = "branch"
+                    prefixes = ["branch", "priv"]
 
                 variant = job.get("labels", {}).get("ci-operator.openshift.io/variant", "")
 
@@ -141,8 +163,9 @@ def validate_names(path, data):
                 for target in filtered_targets:
                     if variant:
                         target = variant + "-" + target
-                    name = "{}-ci-{}-{}-{}".format(prefix, repo.replace("/", "-"), branch, target)
-                    valid_names[name] = target
+                    for prefix in prefixes:
+                        name = "{}-ci-{}-{}-{}".format(prefix, repo.replace("/", "-"), branch, target)
+                        valid_names[name] = target
 
                 if job["name"] not in valid_names:
                     print("ERROR: {}: ci-operator job {} should be named one of {}".format(path, job["name"], list(valid_names.keys())))

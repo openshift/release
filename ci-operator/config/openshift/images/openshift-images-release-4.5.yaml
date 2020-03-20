@@ -1,10 +1,12 @@
 base_images:
   os:
+    cluster: https://api.ci.openshift.org
     name: ubi
     namespace: ocp
     tag: "7"
 build_root:
   image_stream_tag:
+    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.10
@@ -31,23 +33,24 @@ images:
 promotion:
   additional_images:
     base: base
+  disabled: true
   name: "4.5"
   namespace: ocp
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
       rm -rf /etc/yum.repos.d/*
-      curl http://base-4-4.ocp.svc > /etc/yum.repos.d/content.repo
+      curl http://base-4.5.ocp.svc > /etc/yum.repos.d/content.repo
     from: os
     to: base-os
 resources:
   '*':
-    limits:
-      memory: 6Gi
+    limits: {}
     requests:
       cpu: 100m
       memory: 200Mi
 tag_specification:
+  cluster: https://api.ci.openshift.org
   name: "4.5"
   namespace: ocp
 tests:

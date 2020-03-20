@@ -1,0 +1,36 @@
+base_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: "4.3"
+    namespace: ocp
+    tag: base
+binary_build_commands: make build
+build_root:
+  project_image:
+    dockerfile_path: openshift-ci/Dockerfile.tools
+images:
+- context_dir: tools/sctptester
+  dockerfile_path: Dockerfile
+  from: base
+  to: sctptester
+promotion:
+  excluded_images:
+  - sctptester
+  name: ""
+  namespace: ""
+resources:
+  '*':
+    limits: {}
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: "4.3"
+  namespace: ocp
+tests:
+- as: ci
+  commands: make ci-job
+  container:
+    from: src
+

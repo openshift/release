@@ -9,13 +9,20 @@ set -o nounset
 set -o pipefail
 
 workdir="$( mktemp -d )"
-# trap 'rm -rf "${workdir}"' EXIT
+trap 'rm -rf "${workdir}"' EXIT
 
-jobs_dir="$( dirname "${BASH_SOURCE[0]}" )/../ci-operator/jobs"
+base_dir="${1:-}"
+
+if [[ ! -d "${base_dir}" ]]; then
+  echo "Expected a single argument: a path to a directory with release repo layout"
+  exit 1
+fi
+
+jobs_dir="${base_dir}/ci-operator/jobs"
 
 cp -r "${jobs_dir}" "${workdir}"
 
-"$( dirname "${BASH_SOURCE[0]}" )/order-prow-job-config.sh"
+/bin/bash "$( dirname "${BASH_SOURCE[0]}" )/order-prow-job-config.sh" "${base_dir}"
 
 if ! diff -Naupr -I '^[[:space:]]*#.*' "${workdir}/jobs" "${jobs_dir}"> "${workdir}/diff"; then
   cat << EOF

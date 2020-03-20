@@ -1,10 +1,12 @@
 base_images:
   base:
-    name: "4.4"
+    cluster: https://api.ci.openshift.org
+    name: "4.5"
     namespace: ocp
     tag: base
 build_root:
   image_stream_tag:
+    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.13
@@ -66,71 +68,62 @@ images:
       paths: null
   to: ovirt-installer
 promotion:
-  name: "4.4"
+  name: "4.5"
   namespace: ocp
 resources:
   '*':
-    limits:
-      memory: 4Gi
+    limits: {}
     requests:
       cpu: 100m
       memory: 200Mi
   baremetal-installer:
-    limits:
-      memory: 9Gi
+    limits: {}
     requests:
       cpu: "3"
       memory: 5Gi
   govet:
-    limits:
-      memory: 9Gi
+    limits: {}
     requests:
       cpu: "3"
       memory: 5Gi
   installer:
-    limits:
-      memory: 9Gi
+    limits: {}
     requests:
       cpu: "3"
       memory: 5Gi
   installer-artifacts:
-    limits:
-      memory: 9Gi
+    limits: {}
     requests:
       cpu: "3"
       memory: 5Gi
   libvirt-installer:
-    limits:
-      memory: 9Gi
+    limits: {}
     requests:
       cpu: "3"
       memory: 5Gi
   openstack-installer:
-    limits:
-      memory: 9Gi
+    limits: {}
     requests:
       cpu: "3"
       memory: 5Gi
   ovirt-installer:
-    limits:
-      memory: 9Gi
+    limits: {}
     requests:
       cpu: "3"
       memory: 5Gi
   unit:
-    limits:
-      memory: 9Gi
+    limits: {}
     requests:
       cpu: "3"
       memory: 5Gi
   upi-installer:
-    limits:
-      memory: 9Gi
+    limits: {}
     requests:
       cpu: "3"
       memory: 5Gi
 tag_specification:
-  name: "4.4"
+  cluster: https://api.ci.openshift.org
+  name: "4.5"
   namespace: ocp
 tests:
 - as: unit
@@ -179,6 +172,10 @@ tests:
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer_upi:
     cluster_profile: gcp
+- as: e2e-azure-upi
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer_upi:
+    cluster_profile: azure4
 - as: e2e-aws-scaleup-rhel7
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_ansible_40:
@@ -197,3 +194,11 @@ tests:
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer_upi:
     cluster_profile: vsphere
+- as: e2e-aws-steps
+  steps:
+    cluster_profile: aws
+    workflow: origin-e2e-aws
+- as: e2e-metal-ipi
+  steps:
+    cluster_profile: packet
+    workflow: baremetalds-e2e

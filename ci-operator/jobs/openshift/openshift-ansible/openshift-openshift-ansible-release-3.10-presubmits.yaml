@@ -1,9 +1,10 @@
 presubmits:
   openshift/openshift-ansible:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-3.10
+    cluster: api.ci
     context: ci/prow/gcp-major-upgrade
     decorate: true
     name: pull-ci-openshift-openshift-ansible-310-gcp-major-upgrade
@@ -16,6 +17,12 @@ presubmits:
           export RPM_REPO_OPENSHIFT_ORIGIN="$( curl -q "${RPM_REPO_BASEREF}" 2>/dev/null)"
           ci-operator \
             --artifact-dir=$(ARTIFACTS) \
+            --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson \
+            --kubeconfig=/etc/apici/kubeconfig \
+            --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org \
+            --org=openshift \
+            --repo=openshift-ansible \
+            --branch=release-3.10 \
             --secret-dir=/usr/local/e2e-gcp-cluster-profile \
             --template=/usr/local/e2e-gcp-major-upgrade-310 \
             --target=e2e-gcp-major-upgrade-310 \
@@ -54,13 +61,25 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
         - mountPath: /usr/local/e2e-gcp-cluster-profile
           name: e2e-gcp-major-upgrade-310
         - mountPath: /usr/local/e2e-gcp-major-upgrade-310
           name: job-definition
           subPath: cluster-launch-e2e-upgrade.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
       - name: e2e-gcp-major-upgrade-310
         projected:
           sources:
@@ -71,11 +90,15 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-e2e-upgrade
         name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
     trigger: (?m)^/test( | .* )gcp-major-upgrade,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - release-3.10
+    cluster: api.ci
     context: ci/prow/gcp
     decorate: true
     name: pull-ci-openshift-openshift-ansible-e2e-gcp-310
@@ -91,6 +114,12 @@ presubmits:
           export RPM_REPO_OPENSHIFT_ORIGIN="$( curl -q "${RPM_REPO_BASEURL_REF}" 2>/dev/null)"
           ci-operator \
             --artifact-dir=$(ARTIFACTS) \
+            --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson \
+            --kubeconfig=/etc/apici/kubeconfig \
+            --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org \
+            --org=openshift \
+            --repo=openshift-ansible \
+            --branch=release-3.10 \
             --secret-dir=/usr/local/e2e-gcp-cluster-profile --template=/usr/local/e2e-gcp \
             --target=e2e-gcp
         env:
@@ -114,13 +143,25 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
         - mountPath: /usr/local/e2e-gcp-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/e2e-gcp
           name: job-definition
           subPath: cluster-launch-e2e.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -131,11 +172,15 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-e2e
         name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
     trigger: (?m)^/test( | .* )gcp,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - release-3.10
+    cluster: api.ci
     context: ci/prow/e2e-atomic
     decorate: true
     name: pull-ci-openshift-openshift-ansible-release-3.10-e2e-atomic
@@ -148,6 +193,12 @@ presubmits:
           export RPM_REPO_OPENSHIFT_ORIGIN="$( curl -q "${RPM_REPO_BASEREF}" 2>/dev/null)"
           ci-operator \
             --artifact-dir=$(ARTIFACTS) \
+            --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson \
+            --kubeconfig=/etc/apici/kubeconfig \
+            --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org \
+            --org=openshift \
+            --repo=openshift-ansible \
+            --branch=release-3.10 \
             --secret-dir=/usr/local/e2e-atomic-cluster-profile \
             --template=/usr/local/e2e-atomic \
             --target=e2e-atomic \
@@ -176,13 +227,25 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
         - mountPath: /usr/local/e2e-atomic-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/e2e-atomic
           name: job-definition
           subPath: cluster-launch-e2e-openshift-ansible.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -193,11 +256,15 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-e2e-openshift-ansible
         name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
     trigger: (?m)^/test( | .* )e2e-atomic,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - release-3.10
+    cluster: api.ci
     context: ci/prow/e2e-aws
     decorate: true
     name: pull-ci-openshift-openshift-ansible-release-3.10-e2e-aws
@@ -209,6 +276,12 @@ presubmits:
           export RPM_REPO_OPENSHIFT_ORIGIN="$( curl -q "${RPM_REPO_BASEREF}" 2>/dev/null)"
           ci-operator \
             --artifact-dir=$(ARTIFACTS) \
+            --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson \
+            --kubeconfig=/etc/apici/kubeconfig \
+            --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org \
+            --org=openshift \
+            --repo=openshift-ansible \
+            --branch=release-3.10 \
             --secret-dir=/usr/local/e2e-aws-cluster-profile \
             --template=/usr/local/e2e-aws \
             --target=e2e-aws \
@@ -237,13 +310,25 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
         - mountPath: /usr/local/e2e-aws-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/e2e-aws
           name: job-definition
           subPath: cluster-launch-e2e-openshift-ansible.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -254,11 +339,15 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-e2e-openshift-ansible
         name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
     trigger: (?m)^/test( | .* )e2e-aws,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - release-3.10
+    cluster: api.ci
     context: ci/prow/e2e-gluster
     decorate: true
     decoration_config:
@@ -275,6 +364,12 @@ presubmits:
           export RPM_REPO_OPENSHIFT_ORIGIN="$( curl -q "${RPM_REPO_BASEREF}" 2>/dev/null)"
           ci-operator \
             --artifact-dir=$(ARTIFACTS) \
+            --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson \
+            --kubeconfig=/etc/apici/kubeconfig \
+            --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org \
+            --org=openshift \
+            --repo=openshift-ansible \
+            --branch=release-3.10 \
             --give-pr-author-access-to-namespace=true \
             --secret-dir=/usr/local/e2e-gluster-cluster-profile \
             --target=e2e-gluster \
@@ -304,13 +399,25 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
         - mountPath: /usr/local/e2e-gluster-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/e2e-gluster
           name: job-definition
           subPath: cluster-launch-e2e-openshift-ansible.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -321,11 +428,15 @@ presubmits:
       - configMap:
           name: prow-job-cluster-launch-e2e-openshift-ansible
         name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
     trigger: ((?m)^/test( all| e2e-gluster),?(\s+|$))
   - agent: kubernetes
     always_run: true
     branches:
     - release-3.10
+    cluster: api.ci
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -339,21 +450,13 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=release-3.10
         - --give-pr-author-access-to-namespace=true
-        - --org=openshift
-        - --repo=openshift-ansible
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=[images]
         command:
         - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-openshift-ansible-release-3.10.yaml
-              name: ci-operator-3.x-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -361,11 +464,26 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: pull-secret
+        secret:
+          secretName: regcred
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
@@ -374,6 +492,65 @@ presubmits:
     always_run: true
     branches:
     - release-3.10
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
+    context: ci/prow/images-build01
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-openshift-ansible-release-3.10-images-build01
+    optional: true
+    rerun_command: /test images-build01
+    skip_report: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=[images]
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )images-build01,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-3.10
+    cluster: api.ci
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -387,21 +564,13 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=release-3.10
         - --give-pr-author-access-to-namespace=true
-        - --org=openshift
-        - --repo=openshift-ansible
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=unit
         command:
         - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-openshift-ansible-release-3.10.yaml
-              name: ci-operator-3.x-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -409,19 +578,93 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: pull-secret
+        secret:
+          secretName: regcred
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )unit,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-3.10
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
+    context: ci/prow/unit-build01
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-openshift-ansible-release-3.10-unit-build01
+    optional: true
+    rerun_command: /test unit-build01
+    skip_report: true
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --target=unit
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/sentry-dsn
+          name: sentry-dsn
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: sentry-dsn
+        secret:
+          secretName: sentry-dsn
+    trigger: (?m)^/test( | .* )unit-build01,?($|\s.*)
   - agent: jenkins
     always_run: false
     branches:
     - release-3.10
+    cluster: api.ci
     context: ci/openshift-jenkins/gcp-ha
     labels:
       master: ci.openshift.redhat.com
@@ -433,6 +676,7 @@ presubmits:
     always_run: false
     branches:
     - release-3.10
+    cluster: api.ci
     context: ci/openshift-jenkins/install
     labels:
       master: ci.openshift.redhat.com
@@ -444,6 +688,7 @@ presubmits:
     always_run: true
     branches:
     - release-3.10
+    cluster: api.ci
     context: ci/openshift-jenkins/extended_conformance_install_crio_rpm
     labels:
       master: ci.openshift.redhat.com
@@ -456,6 +701,7 @@ presubmits:
     always_run: false
     branches:
     - release-3.10
+    cluster: api.ci
     context: ci/openshift-jenkins/upgrade
     labels:
       master: ci.openshift.redhat.com
@@ -468,6 +714,7 @@ presubmits:
     always_run: false
     branches:
     - release-3.10
+    cluster: api.ci
     context: ci/openshift-jenkins/gcp-upgrade
     labels:
       master: ci.openshift.redhat.com
@@ -480,6 +727,7 @@ presubmits:
     always_run: false
     branches:
     - release-3.10
+    cluster: api.ci
     context: ci/openshift-jenkins/launch-gcp
     labels:
       master: ci.openshift.redhat.com
@@ -491,6 +739,7 @@ presubmits:
     always_run: false
     branches:
     - release-3.10
+    cluster: api.ci
     context: ci/openshift-jenkins/logging
     labels:
       master: ci.openshift.redhat.com

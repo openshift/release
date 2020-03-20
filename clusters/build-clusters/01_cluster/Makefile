@@ -5,6 +5,7 @@ all:
 
 #Reusing the pull secret from secret -n ci cluster-secrets-aws
 #It requires that oc-cli logs in api.ci.openshift.org
+#and is used only for installation
 pull_secret := $(shell oc get secret -n ci cluster-secrets-aws -o jsonpath='{.data.pull-secret}' | base64 -d)
 
 .PHONY : generate-install-config
@@ -14,18 +15,17 @@ generate-install-config:
 	@sed -e 's|{{ pull_secret }}|$(pull_secret)|g' ./_install/install-config.yaml > /tmp/install-config.yaml
 	@echo "run 'cp /tmp/install-config.yaml ~/install-config.yaml' before installing the cluster"
 
-#TODO (hongkliu): rest api for lastest
-release_image := registry.svc.ci.openshift.org/ocp/release:4.2.0-0.nightly-2019-10-11-230724
+ocp_version := 4.3.0
 
+#See the prerequisites in ./_install/install_cluster.sh before running
 .PHONY: install-dptp-managed-cluster
 install-dptp-managed-cluster:
-	@echo "installing dptp-managed cluster ..."
-	./_install/install_cluster.sh $(release_image)
+	@echo "installing dptp-managed cluster with version $(ocp_version) ..."
+	./_install/install_cluster.sh $(ocp_version)
 
-###pip install --user yq
-secret_file := "/tmp/secret.yaml"
-client_id := $(shell yq -r .github.client_id $(secret_file))
-client_secret := $(shell yq -r .github.client_secret $(secret_file))
+#Saved in BW build_farm_01_cluster
+client_id := "change_me"
+client_secret := "change_me"
 
 .PHONY: set-up-github-oauth
 set-up-github-oauth:

@@ -61,7 +61,7 @@ objects:
       ci-operator.openshift.io/container-sub-tests: "setup,test,teardown"
   spec:
     restartPolicy: Never
-    activeDeadlineSeconds: 18000
+    activeDeadlineSeconds: 21600
     terminationGracePeriodSeconds: 900
     volumes:
     - name: artifacts
@@ -205,8 +205,6 @@ objects:
       env:
       - name: AWS_SHARED_CREDENTIALS_FILE
         value: /etc/openshift-installer/.awscred
-      - name: AWS_REGION
-        value: us-east-1
       - name: AZURE_AUTH_LOCATION
         value: /etc/openshift-installer/osServicePrincipal.json
       - name: GCP_REGION
@@ -292,13 +290,35 @@ objects:
             elif [[ "${CLUSTER_VARIANT}" =~ "large" ]]; then
               master_type=m5.4xlarge
             fi
+            case $((RANDOM % 4)) in
+            0) AWS_REGION=us-east-1
+               ZONE_1=us-east-1b
+               ZONE_2=us-east-1c;;
+            1) AWS_REGION=us-east-2;;
+            2) AWS_REGION=us-west-1;;
+            3) AWS_REGION=us-west-2;;
+            *) echo >&2 "invalid AWS region index"; exit 1;;
+            esac
+            echo "AWS region: ${AWS_REGION} (zones: ${ZONE_1:-${AWS_REGION}a} ${ZONE_2:-${AWS_REGION}b})"
             subnets="[]"
             if [[ "${CLUSTER_VARIANT}" =~ "shared-vpc" ]]; then
-              case $((RANDOM % 4)) in
-              0) subnets="['subnet-030a88e6e97101ab2','subnet-0e07763243186cac5','subnet-02c5fea7482f804fb','subnet-0291499fd1718ee01','subnet-01c4667ad446c8337','subnet-025e9043c44114baa']";;
-              1) subnets="['subnet-0170ee5ccdd7e7823','subnet-0d50cac95bebb5a6e','subnet-0094864467fc2e737','subnet-0daa3919d85296eb6','subnet-0ab1e11d3ed63cc97','subnet-07681ad7ce2b6c281']";;
-              2) subnets="['subnet-00de9462cf29cd3d3','subnet-06595d2851257b4df','subnet-04bbfdd9ca1b67e74','subnet-096992ef7d807f6b4','subnet-0b3d7ba41fc6278b2','subnet-0b99293450e2edb13']";;
-              3) subnets="['subnet-047f6294332aa3c1c','subnet-0c3bce80bbc2c8f1c','subnet-038c38c7d96364d7f','subnet-027a025e9d9db95ce','subnet-04d9008469025b101','subnet-02f75024b00b20a75']";;
+              case "${AWS_REGION}_$((RANDOM % 4))" in
+              us-east-1_0) subnets="['subnet-030a88e6e97101ab2','subnet-0e07763243186cac5','subnet-02c5fea7482f804fb','subnet-0291499fd1718ee01','subnet-01c4667ad446c8337','subnet-025e9043c44114baa']";;
+              us-east-1_1) subnets="['subnet-0170ee5ccdd7e7823','subnet-0d50cac95bebb5a6e','subnet-0094864467fc2e737','subnet-0daa3919d85296eb6','subnet-0ab1e11d3ed63cc97','subnet-07681ad7ce2b6c281']";;
+              us-east-1_2) subnets="['subnet-00de9462cf29cd3d3','subnet-06595d2851257b4df','subnet-04bbfdd9ca1b67e74','subnet-096992ef7d807f6b4','subnet-0b3d7ba41fc6278b2','subnet-0b99293450e2edb13']";;
+              us-east-1_3) subnets="['subnet-047f6294332aa3c1c','subnet-0c3bce80bbc2c8f1c','subnet-038c38c7d96364d7f','subnet-027a025e9d9db95ce','subnet-04d9008469025b101','subnet-02f75024b00b20a75']";;
+              us-east-2_0) subnets="['subnet-0a568760cd74bf1d7','subnet-0320ee5b3bb78863e','subnet-015658a21d26e55b7','subnet-0c3ce64c4066f37c7','subnet-0d57b6b056e1ee8f6','subnet-0b118b86d1517483a']";;
+              us-east-2_1) subnets="['subnet-0f6c106c48187d0a9','subnet-0d543986b85c9f106','subnet-05ef94f36de5ac8c4','subnet-031cdc26c71c66e83','subnet-0f1e0d62680e8b883','subnet-00e92f507a7cbd8ac']";;
+              us-east-2_2) subnets="['subnet-0310771820ebb25c7','subnet-0396465c0cb089722','subnet-02e316495d39ce361','subnet-0c5bae9b575f1b9af','subnet-0b3de1f0336c54cfe','subnet-03f164174ccbc1c60']";;
+              us-east-2_3) subnets="['subnet-045c43b4de0092f74','subnet-0a78d4ddcc6434061','subnet-0ed28342940ef5902','subnet-02229d912f99fc84f','subnet-0c9b3aaa6a1ad2030','subnet-0c93fb4760f95dbe4']";;
+              us-west-1_0) subnets="['subnet-0919ede122e5d3e46','subnet-0cf9da97d102fff0d','subnet-000378d8042931770','subnet-0c8720acadbb099fc']";;
+              us-west-1_1) subnets="['subnet-0129b0f0405beca97','subnet-073caab166af2207e','subnet-0f07362330db0ac66','subnet-007d6444690f88b33']";;
+              us-west-1_2) subnets="['subnet-09affff50a1a3a9d0','subnet-0838fdfcbe4da6471','subnet-08b9c065aefd9b8de','subnet-027fcc48c429b9865']";;
+              us-west-1_3) subnets="['subnet-0cd3dde41e1d187fe','subnet-0e78f426f8938df2d','subnet-03edeaf52c46468fa','subnet-096fb5b3a7da814c2']";;
+              us-west-2_0) subnets="['subnet-04055d49cdf149e87','subnet-0b658a04c438ef43c','subnet-015f32caeff1bd736','subnet-0c96a7bb6ac78323c','subnet-0b7387e251953bdcf','subnet-0c19695d20ce05c60']";;
+              us-west-2_1) subnets="['subnet-0483607b3e3c2514f','subnet-01139c6c5e3c1e28e','subnet-0cc9500f56a1df779','subnet-001b2c8acd2bac389','subnet-093f66b9d6deffafc','subnet-095b373699fb51212']";;
+              us-west-2_2) subnets="['subnet-057c716b8953f834a','subnet-096f21593f10b44cb','subnet-0f281491881970222','subnet-0fec3730729e452d9','subnet-0381cfcc0183cb0ba','subnet-0f1189be41a2a2a2f']";;
+              us-west-2_3) subnets="['subnet-072d00dcf02ad90a6','subnet-0ad913e4bd6ff53fa','subnet-09f90e069238e4105','subnet-064ecb1b01098ff35','subnet-068d9cdd93c0c66e6','subnet-0b7d1a5a6ae1d9adf']";;
               *) echo >&2 "invalid subnets index"; exit 1;;
               esac
               echo "Subnets : ${subnets}"
@@ -315,8 +335,8 @@ objects:
             aws:
               type: ${master_type}
               zones:
-              - us-east-1a
-              - us-east-1b
+              - ${ZONE_1:-${AWS_REGION}a}
+              - ${ZONE_2:-${AWS_REGION}b}
         compute:
         - name: worker
           replicas: ${workers}
@@ -324,11 +344,11 @@ objects:
             aws:
               type: m4.xlarge
               zones:
-              - us-east-1a
-              - us-east-1b
+              - ${ZONE_1:-${AWS_REGION}a}
+              - ${ZONE_2:-${AWS_REGION}b}
         platform:
           aws:
-            region:       ${AWS_REGION}
+            region: ${AWS_REGION}
             userTags:
               expirationDate: ${EXPIRATION_DATE}
             subnets: ${subnets}
@@ -345,7 +365,7 @@ objects:
             2) AZURE_REGION=centralus;;
             3) AZURE_REGION=centralus;;
             4) AZURE_REGION=centralus;;
-            5) AZURE_REGION=eastus;;
+            5) AZURE_REGION=centralus;;
             6) AZURE_REGION=eastus2;;
             7) AZURE_REGION=westus;;
             *) echo >&2 "invalid Azure region index"; exit 1;;
@@ -534,7 +554,7 @@ objects:
             echo "${CLUSTER_NETWORK_MANIFEST}" > /tmp/artifacts/installer/manifests/cluster-network-03-config.yml
         fi
 
-        TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create cluster 2>&1 | grep -v password &
+        TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create cluster 2>&1 | grep --line-buffered -v password &
         wait "$!"
 
     # Performs cleanup of all created resources
@@ -591,42 +611,6 @@ objects:
 
           echo "Gathering artifacts ..."
           mkdir -p /tmp/artifacts/pods /tmp/artifacts/nodes /tmp/artifacts/metrics /tmp/artifacts/bootstrap /tmp/artifacts/network
-
-          if [ -f /tmp/artifacts/installer/terraform.tfstate ]
-          then
-              # we don't have jq, so the python equivalent of
-              # jq '.modules[].resources."aws_instance.bootstrap".primary.attributes."public_ip" | select(.)'
-              bootstrap_ip=$(python -c \
-                  'import sys, json; d=reduce(lambda x,y: dict(x.items() + y.items()), map(lambda x: x["resources"], json.load(sys.stdin)["modules"])); k="aws_instance.bootstrap"; print d[k]["primary"]["attributes"]["public_ip"] if k in d else ""' \
-                  < /tmp/artifacts/installer/terraform.tfstate
-              )
-
-              if [ -n "${bootstrap_ip}" ]
-              then
-                for service in bootkube openshift kubelet crio
-                do
-                    queue "/tmp/artifacts/bootstrap/${service}.service" curl \
-                        --insecure \
-                        --silent \
-                        --connect-timeout 5 \
-                        --retry 3 \
-                        --cert /tmp/artifacts/installer/tls/journal-gatewayd.crt \
-                        --key /tmp/artifacts/installer/tls/journal-gatewayd.key \
-                        --url "https://${bootstrap_ip}:19531/entries?_SYSTEMD_UNIT=${service}.service"
-                done
-                if ! whoami &> /dev/null; then
-                  if [ -w /etc/passwd ]; then
-                    echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
-                  fi
-                fi
-                eval $(ssh-agent)
-                ssh-add /etc/openshift-installer/ssh-privatekey
-                ssh -A -o PreferredAuthentications=publickey -o StrictHostKeyChecking=false -o UserKnownHostsFile=/dev/null core@${bootstrap_ip} /bin/bash -x /usr/local/bin/installer-gather.sh
-                scp -o PreferredAuthentications=publickey -o StrictHostKeyChecking=false -o UserKnownHostsFile=/dev/null core@${bootstrap_ip}:log-bundle.tar.gz /tmp/artifacts/installer/bootstrap-logs.tar.gz
-              fi
-          else
-              echo "No terraform statefile found. Skipping collection of bootstrap logs."
-          fi
 
           oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' > /tmp/nodes
           oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces --template '{{ range .items }}{{ $name := .metadata.name }}{{ $ns := .metadata.namespace }}{{ range .spec.containers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ range .spec.initContainers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ end }}' > /tmp/containers
@@ -699,6 +683,9 @@ objects:
 
           echo "Waiting for logs ..."
           wait
+
+          tar -czC /tmp/artifacts/must-gather -f /tmp/artifacts/must-gather.tar.gz . &&
+          rm -rf /tmp/artifacts/must-gather
 
           echo "Deprovisioning cluster ..."
           openshift-install --dir /tmp/artifacts/installer destroy cluster

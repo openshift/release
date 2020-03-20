@@ -4,9 +4,13 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-current_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-echo "current_dir: ${current_dir}"
-mixins_dir="$(readlink -f ${current_dir}/../cluster/ci/monitoring/mixins)"
-echo "mixins_dir: ${mixins_dir}"
+base_dir="${1:-}"
+
+if [[ ! -d "${base_dir}" ]]; then
+  echo "Expected a single argument: a path to a directory with release repo layout"
+  exit 1
+fi
+
+mixins_dir="${base_dir}/cluster/ci/monitoring/mixins"
 
 make -C "${mixins_dir}" validate-latest

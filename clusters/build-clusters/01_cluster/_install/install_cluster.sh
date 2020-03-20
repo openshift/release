@@ -1,15 +1,7 @@
 #!/bin/bash
 
 ### prerequisites
-### 1. (latest version of) /usr/bin/oc, otherwise download https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/
-### 2. ~/.aws/credentials contains aws_access_key_id and aws_secret_access_key for an IAMUSER under openshift-ci-infra account
-### 3. ~/.docker/config.json contains auth entry for registry.svc.ci.openshift.org and the entries from the pull secret
-###    the pull secret used in the install-config.yaml has to include all auth entries above
-###    https://mojo.redhat.com/docs/DOC-1081313#jive_content_id_Deploying_test_clusters_off_CI_builds
-
-### find a release image: 
-### ocp: https://openshift-release.svc.ci.openshift.org/
-### okd: https://origin-release.svc.ci.openshift.org
+### 1. ~/.aws/credentials contains aws_access_key_id and aws_secret_access_key for an IAMUSER under openshift-ci-infra account
 
 set -o errexit
 set -o nounset
@@ -20,22 +12,27 @@ readonly SCRIPT
 
 if [[ "$#" -lt  1 ]]; then
   >&2 echo "[FATAL] Illegal number of parameters"
-  >&2 echo "[INFO] usage: $SCRIPT <release> [path_to_install_config]"
-  >&2 echo "[INFO] e.g., $SCRIPT registry.svc.ci.openshift.org/ocp/release:4.2.0-0.nightly-2019-10-08-232417"
+  >&2 echo "[INFO] usage: $SCRIPT <ocp_version> [path_to_install_config]"
+  >&2 echo "[INFO] e.g., $SCRIPT 4.3.0"
   exit 1
 fi
 
-RELEASE_IMAGE="$1"
-readonly RELEASE_IMAGE
-
-OC_CLI="/usr/bin/oc"
-readonly OC_CLI
+OCP_VERSION="$1"
+readonly OCP_VERSION
 
 INSTALL_FOLDER="${HOME}/install_openshift/$(date '+%Y%m%d_%H%M%S')"
 readonly INSTALL_FOLDER
 mkdir -pv "${INSTALL_FOLDER}"
 
-"$OC_CLI" adm release extract --tools "${RELEASE_IMAGE}" --to="${INSTALL_FOLDER}"
+unameOut="$(uname -s)"
+readonly unameOut
+case "${unameOut}" in
+    Linux*)     machine=linux;;
+    Darwin*)    machine=mac;;
+    *)          >&2 echo "[FATAL] Unknow OS" and exit 1;;
+esac
+
+curl -o "${INSTALL_FOLDER}/openshift-install-${machine}-${OCP_VERSION}.tar.gz" "https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/${OCP_VERSION}/openshift-install-${machine}-${OCP_VERSION}.tar.gz"
 tar xzvf "${INSTALL_FOLDER}"/openshift-install*.tar.gz -C "${INSTALL_FOLDER}"
 
 INSTALLER_BIN="${INSTALL_FOLDER}/openshift-install"

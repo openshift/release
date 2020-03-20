@@ -2,6 +2,8 @@ SHELL=/usr/bin/env bash -o errexit
 
 .PHONY: check check-core check-services dry-core-admin dry-services-admin core-admin services-admin dry-core core dry-services services all-admin all
 
+CONTAINER_ENGINE ?= docker
+
 all: core-admin core services-admin services
 
 all-admin: core-admin services-admin
@@ -45,23 +47,23 @@ services:
 
 # these are useful for devs
 jobs:
-	docker pull registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest
-	docker run -v "${CURDIR}/ci-operator:/ci-operator" registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest --from-dir /ci-operator/config --to-dir /ci-operator/jobs
-	docker pull registry.svc.ci.openshift.org/ci/determinize-prow-jobs:latest
-	docker run -v "${CURDIR}/ci-operator/jobs:/ci-operator/jobs" registry.svc.ci.openshift.org/ci/determinize-prow-jobs:latest --prow-jobs-dir /ci-operator/jobs
+	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest
+	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/ci-operator:/ci-operator:z" registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest --from-dir /ci-operator/config --to-dir /ci-operator/jobs
+	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/determinize-prow-jobs:latest
+	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/ci-operator/jobs:/ci-operator/jobs:z" registry.svc.ci.openshift.org/ci/determinize-prow-jobs:latest --prow-jobs-dir /ci-operator/jobs
 
 prow-config:
-	docker pull registry.svc.ci.openshift.org/ci/determinize-prow-config:latest
-	docker run -v "${CURDIR}/core-services/prow/02_config:/config" registry.svc.ci.openshift.org/ci/determinize-prow-config:latest --prow-config-dir /config
+	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/determinize-prow-config:latest
+	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/core-services/prow/02_config:/config:z" registry.svc.ci.openshift.org/ci/determinize-prow-config:latest --prow-config-dir /config
 
 branch-cut:
-	docker pull registry.svc.ci.openshift.org/ci/config-brancher:latest
-	docker run -v "${CURDIR}/ci-operator:/ci-operator" registry.svc.ci.openshift.org/ci/config-brancher:latest --config-dir /ci-operator/config --org=$(ORG) --repo=$(REPO) --current-release=4.3 --future-release=4.4 --bump-release=4.4 --confirm
+	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/config-brancher:latest
+	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/ci-operator:/ci-operator:z" registry.svc.ci.openshift.org/ci/config-brancher:latest --config-dir /ci-operator/config --org=$(ORG) --repo=$(REPO) --current-release=4.3 --future-release=4.4 --bump-release=4.4 --confirm
 		$(MAKE) jobs
 
 new-repo:
-	docker pull registry.svc.ci.openshift.org/ci/repo-init:latest
-	docker run -it -v "${CURDIR}:/release" registry.svc.ci.openshift.org/ci/repo-init:latest --release-repo /release
+	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/repo-init:latest
+	$(CONTAINER_ENGINE) run --rm -it -v "$(CURDIR):/release:z" registry.svc.ci.openshift.org/ci/repo-init:latest --release-repo /release
 	$(MAKE) jobs
 	$(MAKE) prow-config
 
@@ -80,7 +82,7 @@ applyTemplate:
 	oc process -f $(WHAT) | oc apply -f -
 .PHONY: applyTemplate
 
-postsubmit-update: origin-release libpod prow-monitoring cincinnati prow-release-controller-definitions
+postsubmit-update: origin-release prow-monitoring cincinnati prow-release-controller-definitions
 .PHONY: postsubmit-update
 
 all: roles prow projects
@@ -96,7 +98,7 @@ roles: cluster-operator-roles cluster-roles
 prow: prow-ci-ns prow-ci-stg-ns
 .PHONY: prow
 
-prow-ci-ns: ci-ns prow-jobs prow-scaling prow-secrets
+prow-ci-ns: ci-ns prow-jobs
 .PHONY: prow-ci-ns
 
 prow-ci-stg-ns: ci-stg-ns
@@ -115,14 +117,6 @@ openshift-ns:
 	oc project openshift
 .PHONY: openshift-ns
 
-prow-scaling:
-	oc apply -n kube-system -f cluster/ci/config/cluster-autoscaler.yaml
-.PHONY: prow-scaling
-
-prow-secrets:
-	ci-operator/populate-secrets-from-bitwarden.sh
-.PHONY: prow-secrets
-
 prow-jobs: prow-artifacts
 	$(MAKE) apply WHAT=projects/prometheus/test/build.yaml
 	$(MAKE) apply WHAT=ci-operator/templates/os.yaml
@@ -140,37 +134,7 @@ prow-artifacts:
 .PHONY: prow-artifacts
 
 prow-release-controller-definitions:
-	oc annotate -n ocp is/4.1-art-latest "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.1.json)" --overwrite
-	oc annotate -n ocp is/4.1 "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.1-ci.json)" --overwrite
-
-	oc annotate -n ocp is/4.2-art-latest "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.2.json)" --overwrite
-	oc annotate -n ocp-s390x is/4.2-art-latest-s390x "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.2-s390x.json)" --overwrite
-	oc annotate -n ocp-ppc64le is/4.2-art-latest-ppc64le "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.2-ppc64le.json)" --overwrite
-	oc annotate -n ocp is/4.2 "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.2-ci.json)" --overwrite
-
-	oc annotate -n ocp is/4.3-art-latest "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.3.json)" --overwrite
-	oc annotate -n ocp-s390x is/4.3-art-latest-s390x "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.3-s390x.json)" --overwrite
-	oc annotate -n ocp-ppc64le is/4.3-art-latest-ppc64le "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.3-ppc64le.json)" --overwrite
-	oc annotate -n ocp is/4.3 "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.3-ci.json)" --overwrite
-
-	oc annotate -n ocp is/4.4-art-latest "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.4.json)" --overwrite
-	oc annotate -n ocp-s390x is/4.4-art-latest-s390x "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.4-s390x.json)" --overwrite
-	oc annotate -n ocp-ppc64le is/4.4-art-latest-ppc64le "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.4-ppc64le.json)" --overwrite
-	oc annotate -n ocp is/4.4 "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.4-ci.json)" --overwrite
-
-	oc annotate -n ocp is/4.5-art-latest "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.5.json)" --overwrite
-	oc annotate -n ocp-s390x is/4.5-art-latest-s390x "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.5-s390x.json)" --overwrite
-	oc annotate -n ocp-ppc64le is/4.5-art-latest-ppc64le "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.5-ppc64le.json)" --overwrite
-	oc annotate -n ocp is/4.5 "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.5-ci.json)" --overwrite
-
-	oc annotate -n ocp is/release "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.y-stable.json)" --overwrite
-	oc annotate -n ocp-s390x is/release-s390x "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.y-stable-s390x.json)" --overwrite
-	oc annotate -n ocp-ppc64le is/release-ppc64le "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-ocp-4.y-stable-ppc64le.json)" --overwrite
-
-	oc annotate -n origin is/4.3 "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-origin-4.3.json)" --overwrite
-	oc annotate -n origin is/4.4 "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-origin-4.4.json)" --overwrite
-	oc annotate -n origin is/4.5 "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-origin-4.5.json)" --overwrite
-	oc annotate -n origin is/release "release.openshift.io/config=$$(cat core-services/release-controller/_releases/release-origin-4.y-stable.json)" --overwrite
+	hack/annotate.sh
 .PHONY: prow-release-controller-definitions
 
 prow-release-controller-deploy:
@@ -180,7 +144,7 @@ prow-release-controller-deploy:
 prow-release-controller: prow-release-controller-definitions prow-release-controller-deploy
 .PHONY: prow-release-controller
 
-projects: ci-ns gcsweb origin-release publishing-bot content-mirror azure metering coreos
+projects: ci-ns gcsweb origin-stable origin-release publishing-bot content-mirror azure metering coreos
 .PHONY: projects
 
 content-mirror:
@@ -206,6 +170,12 @@ oauth-proxy:
 publishing-bot:
 	$(MAKE) apply WHAT=projects/publishing-bot/storage-class.yaml
 .PHONY: publishing-bot
+
+origin-stable:
+	$(MAKE) apply WHAT=projects/origin-stable/release.yaml
+	$(MAKE) apply WHAT=projects/origin-stable/stable-3.9.yaml
+	$(MAKE) apply WHAT=projects/origin-stable/stable-3.10.yaml
+.PHONY: origin-stable
 
 origin-release:
 	$(MAKE) applyTemplate WHAT=projects/origin-release/pipeline.yaml
@@ -260,34 +230,9 @@ azure-secrets:
 	oc create secret generic cluster-secrets-azure-env --from-literal=azure_client_id=${AZURE_ROOT_CLIENT_ID} --from-literal=azure_client_secret=${AZURE_ROOT_CLIENT_SECRET} --from-literal=azure_tenant_id=${AZURE_ROOT_TENANT_ID} --from-literal=azure_subscription_id=${AZURE_ROOT_SUBSCRIPTION_ID} -o yaml --dry-run | oc apply -n azure-private -f -
 .PHONY: azure-secrets
 
-azure4-secrets:
-	oc create secret generic cluster-secrets-azure4 \
-	--from-file=cluster/test-deploy/azure4/osServicePrincipal.json \
-	--from-file=cluster/test-deploy/azure4/pull-secret \
-	--from-file=cluster/test-deploy/azure4/ssh-privatekey \
-	--from-file=cluster/test-deploy/azure4/ssh-publickey \
-	-o yaml --dry-run | oc apply -n ocp -f -
-.PHONY: azure4-secrets
-
 metering:
 	$(MAKE) -C projects/metering
 .PHONY: metering
-
-metal-secrets:
-	oc create secret generic cluster-secrets-metal \
-	--from-file=cluster/test-deploy/metal/.awscred \
-	--from-file=cluster/test-deploy/metal/.packetcred \
-	--from-file=cluster/test-deploy/metal/matchbox-client.crt \
-	--from-file=cluster/test-deploy/metal/matchbox-client.key \
-	--from-file=cluster/test-deploy/metal/ssh-privatekey \
-	--from-file=cluster/test-deploy/metal/ssh-publickey \
-	--from-file=cluster/test-deploy/metal/pull-secret \
-	-o yaml --dry-run | oc apply -n ocp -f -
-.PHONY: metal-secrets
-
-libpod:
-	$(MAKE) apply WHAT=projects/libpod/libpod.yaml
-.PHONY: libpod
 
 coreos:
 	$(MAKE) apply WHAT=projects/coreos/coreos.yaml
@@ -308,11 +253,6 @@ build-farm-consistency:
 	for file in ./core-services/release-controller/rpms-ocp-*.yaml; do diff -Naup "$${file}" "./clusters/build-clusters/01_cluster/openshift/release-controller/$${file##*/}"; done
 .PHONY: build-farm-consistency
 
-logging:
-	$(MAKE) apply WHAT=cluster/ci/config/logging/fluentd-daemonset.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/logging/fluentd-configmap.yaml
-.PHONY: logging
-
 bump-pr:
 	$(MAKE) job JOB=periodic-prow-image-autobump
 .PHONY: bump-pr
@@ -320,3 +260,34 @@ bump-pr:
 job:
 	hack/job.sh "$(JOB)"
 .PHONY: job
+
+
+kerberos_id ?= dptp
+dry_run ?= true
+force ?= false
+bw_password_path ?= /tmp/bw_password
+kubeconfig_path ?= $(HOME)/.kube/config
+
+# these are useful for dptp-team
+# echo -n "bw_password" > /tmp/bw_password
+# make kerberos_id=<your_kerberos_id> dry_run=true force=false bw_password_path=/tmp/bw_password kubeconfig_path=${HOME}/.kube/config ci-secret-bootstrap
+ci-secret-bootstrap:
+	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/ci-secret-bootstrap:latest
+	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/core-services/ci-secret-bootstrap/_config.yaml:/_config.yaml:z" \
+		-v "$(kubeconfig_path):/_kubeconfig:z" \
+		-v "$(bw_password_path):/_bw_password:z" \
+		registry.svc.ci.openshift.org/ci/ci-secret-bootstrap:latest \
+		--bw-password-path=/_bw_password --bw-user $(kerberos_id)@redhat.com --config=/_config.yaml --kubeconfig=/_kubeconfig --dry-run=$(dry_run) --force=$(force) --cluster=$(cluster)
+.PHONY: ci-secret-bootstrap
+
+verify-app-ci:
+	@./hack/verify-app-ci.sh
+.PHONY: verify-app-ci
+
+update-app-ci:
+	@update=true ./hack/verify-app-ci.sh
+.PHONY: update-app-ci
+
+mixins:
+	$(CONTAINER_ENGINE) run --user=$(UID) --rm -v "$(CURDIR):/release:z" registry.svc.ci.openshift.org/ci/dashboards-validation:latest make -C /release/cluster/ci/monitoring/mixins install all
+.PHONY: mixins

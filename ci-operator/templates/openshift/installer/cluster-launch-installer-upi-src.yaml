@@ -97,7 +97,7 @@ objects:
       app: ${JOB_NAME_SAFE}-bootstrap-exporter
   spec:
     restartPolicy: Never
-    activeDeadlineSeconds: 18000
+    activeDeadlineSeconds: 21600
     terminationGracePeriodSeconds: 900
     volumes:
     - name: shared-ignition-files
@@ -335,7 +335,7 @@ objects:
       - |
         #!/bin/bash
         set -euo pipefail
-        
+
         trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/setup-success; else touch /tmp/exit /tmp/setup-failed; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -463,10 +463,13 @@ objects:
             cat > /tmp/artifacts/installer/install-config.yaml << EOF
         apiVersion: v1
         baseDomain: ${base_domain}
+        compute:
+        - name: worker
+          replicas: 0
         metadata:
           name: ${CLUSTER_NAME}
         networking:
-          machineCIDR: 139.178.73.0/26
+          machineCIDR: 139.178.87.128/25
         platform:
           vsphere:
             vCenter: vcsa-ci.vmware.devcluster.openshift.com
@@ -474,6 +477,7 @@ objects:
             password: "${VSPHERE_PASSWORD}"
             datacenter: dc1
             defaultDatastore: nvme-ds1
+            cluster: devel
         pullSecret: >
           ${PULL_SECRET}
         sshKey: |
@@ -491,6 +495,12 @@ objects:
                 curl -L -o /tmp/rhcos/rhcos.ova "${OVA_URL}"
                 govc import.ova -options=/tmp/rhcos/rhcos.json /tmp/rhcos/rhcos.ova
             fi
+
+            openshift-install --dir=/tmp/artifacts/installer create manifests
+            rm -f /tmp/artifacts/installer/openshift/99_openshift-cluster-api_master-machines-*.yaml
+            rm -f /tmp/artifacts/installer/openshift/99_openshift-cluster-api_worker-machineset-*.yaml
+            sed -i "s;mastersSchedulable: true;mastersSchedulable: false;g" /tmp/artifacts/installer/manifests/cluster-scheduler-02-config.yml
+
         else
             echo "Unsupported cluster type '${CLUSTER_TYPE}'"
             exit 1
@@ -505,9 +515,7 @@ objects:
 
         # begin bootstrapping
         if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
-          # Derived from https://github.com/openshift/installer/blob/93c78d09ed9e2badb4bf5dab708152fe6b3b6602/data/data/rhcos.json#L40
-          RHCOS_AMI=ami-0aea6a5be0fc2b3fc  # FIXME: assumes AWS_REGION is us-east-1
-
+          RHCOS_AMI="$(jq -r .amis[\"${AWS_REGION}\"].hvm /var/lib/openshift-install/rhcos.json)"
           # FIXME: get epel-release or otherwise add awscli to our UPI image
           export PATH="${HOME}/.local/bin:${PATH}"
           easy_install --user pip  # our Python 2.7.5 is even too old for ensurepip
@@ -928,7 +936,7 @@ objects:
           export WORKER_IGN=$(cat /tmp/artifacts/installer/worker.ign)
 
           cat > /tmp/tf/terraform.tfvars <<-EOF
-          machine_cidr = "139.178.73.0/26"
+          machine_cidr = "139.178.87.128/25"
 
           vm_template = "${VM_TEMPLATE}"
 
@@ -1034,8 +1042,9 @@ objects:
           update_image_registry &
         fi
 
+        set +x
         echo "Completing UPI setup"
-        openshift-install --dir=/tmp/artifacts/installer wait-for install-complete 2>&1 | grep -v password &
+        openshift-install --dir=/tmp/artifacts/installer wait-for install-complete 2>&1 | grep --line-buffered -v password &
         wait "$!"
         touch /tmp/install-complete
 
@@ -1114,33 +1123,6 @@ objects:
               mv /tmp/artifacts/installer/openshift_install_state_updated.json /tmp/artifacts/installer/.openshift_install_state.json
           fi
 
-          if [ -f /tmp/artifacts/installer/terraform.tfstate ]
-          then
-              # we don't have jq, so the python equivalent of
-              # jq '.modules[].resources."aws_instance.bootstrap".primary.attributes."public_ip" | select(.)'
-              bootstrap_ip=$(python -c \
-                  'import sys, json; d=reduce(lambda x,y: dict(x.items() + y.items()), map(lambda x: x["resources"], json.load(sys.stdin)["modules"])); k="aws_instance.bootstrap"; print d[k]["primary"]["attributes"]["public_ip"] if k in d else ""' \
-                  < /tmp/artifacts/installer/terraform.tfstate
-              )
-
-              if [ -n "${bootstrap_ip}" ]
-              then
-                for service in bootkube openshift kubelet crio
-                do
-                    queue "/tmp/artifacts/bootstrap/${service}.service" curl \
-                        --insecure \
-                        --silent \
-                        --connect-timeout 5 \
-                        --retry 3 \
-                        --cert /tmp/artifacts/installer/tls/journal-gatewayd.crt \
-                        --key /tmp/artifacts/installer/tls/journal-gatewayd.key \
-                        --url "https://${bootstrap_ip}:19531/entries?_SYSTEMD_UNIT=${service}.service"
-                done
-              fi
-          else
-              echo "No terraform statefile found. Skipping collection of bootstrap logs."
-          fi
-
           oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' > /tmp/nodes
           oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces --template '{{ range .items }}{{ $name := .metadata.name }}{{ $ns := .metadata.namespace }}{{ range .spec.containers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ range .spec.initContainers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ end }}' > /tmp/containers
           oc --insecure-skip-tls-verify --request-timeout=5s get pods -l openshift.io/component=api --all-namespaces --template '{{ range .items }}-n {{ .metadata.namespace }} {{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/pods-api
@@ -1208,6 +1190,9 @@ objects:
 
           echo "Waiting for logs ..."
           wait
+
+          tar -czC /tmp/artifacts/must-gather -f /tmp/artifacts/must-gather.tar.gz . &&
+          rm -rf /tmp/artifacts/must-gather
 
           echo "Deprovisioning cluster ..."
           if [[ "${CLUSTER_TYPE}" == "aws" ]]; then

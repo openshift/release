@@ -41,7 +41,7 @@ generate_kubeconfig() {
   #we leave it there for simplicity
 }
 
-declare -a SAArray=( "config-updater" "deck" "plank" "sinker" "hook" "ci-operator" "ca-cert-issuer" )
+declare -a SAArray=( "config-updater" "deck" "plank" "sinker" "hook" "ca-cert-issuer" )
  
 # Iterate the string array using for loop
 for name in ${SAArray[@]}; do
@@ -55,7 +55,7 @@ generate_reg_auth_value() {
   config=$2
   local registry
   registry=$3
-  oc --kubeconfig "${config}" -n ci get secret $( oc --kubeconfig "${KUBECONFIG_BUILD01}" get secret -n ci -o "jsonpath={.items[?(@.metadata.annotations.kubernetes\.io/service-account\.name==\"build01\")].metadata.name}" ) -o "jsonpath={.items[?(@.type==\"kubernetes.io/dockercfg\")].data.\.dockercfg}" | base64 --decode | jq --arg reg "${registry}" -r '.[$reg].auth' > "${WORKDIR}/build01_${cluster}_reg_auth_value.txt"
+  oc --kubeconfig "${config}" -n ci get secret $( oc --kubeconfig "${KUBECONFIG_BUILD01}" get secret -n ci -o "jsonpath={.items[?(@.metadata.annotations.kubernetes\.io/service-account\.name==\"build01\")].metadata.name}" ) -o "jsonpath={.items[?(@.type==\"kubernetes.io/dockercfg\")].data.\.dockercfg}" | base64 --decode | jq --arg reg "${registry}" -r '.[$reg].auth' | tr -d '\n' > "${WORKDIR}/build01_${cluster}_reg_auth_value.txt"
 }
 
 generate_reg_auth_value build01 "${KUBECONFIG_BUILD01}" "image-registry.openshift-image-registry.svc:5000"

@@ -46,7 +46,7 @@ items:
         priorityClassName: prow-critical
         containers:
         - name: plank
-          image: gcr.io/k8s-prow/plank:v20200115-cf4e86a7e
+          image: gcr.io/k8s-prow/plank:v20200320-d45985e9c
           args:
           - --config-path=/etc/config/config.yaml
           - --tot-url=http://tot
@@ -56,7 +56,11 @@ items:
           - --github-endpoint=http://ghproxy
           - --github-endpoint=https://api.github.com
           - --github-graphql-endpoint=http://ghproxy/graphql
-          - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+          - --skip-report=true
+          env:
+          # Multiple configs can only be passed via the env var and not via the flag
+          - name: KUBECONFIG
+            value: /etc/build-farm-credentials/api.ci.kubeconfig:/etc/build-farm-credentials/build01.kubeconfig
           ports:
           - name: metrics
             containerPort: 9090
@@ -76,9 +80,6 @@ items:
           - name: job-config-3x
             mountPath: /etc/job-config/3.x
             readOnly: true
-          - name: job-config-40
-            mountPath: /etc/job-config/4.0
-            readOnly: true
           - name: job-config-41
             mountPath: /etc/job-config/4.1
             readOnly: true
@@ -93,6 +94,9 @@ items:
             readOnly: true
           - name: job-config-45
             mountPath: /etc/job-config/4.5
+            readOnly: true
+          - name: job-config-46
+            mountPath: /etc/job-config/4.6
             readOnly: true
           - mountPath: /etc/build-farm-credentials
             name: build-farm-credentials
@@ -117,9 +121,6 @@ items:
         - name: job-config-3x
           configMap:
             name: job-config-3.x
-        - name: job-config-40
-          configMap:
-            name: job-config-4.0
         - name: job-config-41
           configMap:
             name: job-config-4.1
@@ -135,9 +136,14 @@ items:
         - name: job-config-45
           configMap:
             name: job-config-4.5
+        - name: job-config-46
+          configMap:
+            name: job-config-4.6
         - name: build-farm-credentials
           secret:
             items:
+            - key: sa.plank.api.ci.config
+              path: api.ci.kubeconfig
             - key: sa.plank.build01.config
-              path: kubeconfig
+              path: build01.kubeconfig
             secretName: build-farm-credentials

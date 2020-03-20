@@ -37,6 +37,16 @@
         channel: '#build-cop-alerts',
         notify: 'bparees',
       },
+      'kni-cnf': {
+        team: 'cnf-cop',
+        channel: '#cnf-alerts',
+        notify: 'cnf-cop',
+      },
+      'openshift-dev-services': {
+        team: 'openshift-dev-services',
+        channel: '#forum-os-dev-services',
+        notify: 'openshift-app-services',
+      },
     },
   },
 }

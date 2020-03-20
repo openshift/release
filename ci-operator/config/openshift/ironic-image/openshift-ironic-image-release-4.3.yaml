@@ -1,16 +1,23 @@
 base_images:
   os:
+    cluster: https://api.ci.openshift.org
     name: ubi
     namespace: ocp
     tag: "8"
 build_root:
   image_stream_tag:
+    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.12
 images:
 - dockerfile_path: Dockerfile.ocp
   from: base-os
+  inputs:
+    base-os:
+      as:
+      - ironic-builder
+      paths: null
   to: ironic
 promotion:
   name: "4.3"
@@ -24,11 +31,11 @@ raw_steps:
     to: base-os
 resources:
   '*':
-    limits:
-      memory: 4Gi
+    limits: {}
     requests:
       cpu: 100m
       memory: 200Mi
 tag_specification:
+  cluster: https://api.ci.openshift.org
   name: "4.3"
   namespace: ocp

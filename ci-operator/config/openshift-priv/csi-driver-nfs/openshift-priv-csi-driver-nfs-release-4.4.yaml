@@ -1,0 +1,36 @@
+base_images:
+  os:
+    cluster: https://api.ci.openshift.org
+    name: centos
+    namespace: openshift
+    tag: "7"
+binary_build_commands: go build -o ./bin/nfsplugin ./cmd/nfsplugin
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.11
+canonical_go_repository: github.com/kubernetes-csi/csi-driver-nfs
+promotion:
+  name: 4.4-priv
+  namespace: ocp-private
+resources:
+  '*':
+    limits: {}
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: 4.4-priv
+  namespace: ocp-private
+tests:
+- as: go-fmt
+  commands: make test-fmt
+  container:
+    from: src
+- as: go-vet
+  commands: make test-vet
+  container:
+    from: src

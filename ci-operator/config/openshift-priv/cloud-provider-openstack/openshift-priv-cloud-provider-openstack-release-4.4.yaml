@@ -1,0 +1,43 @@
+base_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: 4.4-priv
+    namespace: ocp-private
+    tag: base
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+canonical_go_repository: k8s.io/cloud-provider-openstack
+images:
+- dockerfile_path: images/manila-provisioner/Dockerfile.openshift.ci
+  from: base
+  inputs:
+    root:
+      as:
+      - "0"
+      paths: null
+  to: manila-provisioner
+- dockerfile_path: images/manila-csi-plugin/Dockerfile
+  from: base
+  to: csi-driver-manila
+promotion:
+  name: 4.4-priv
+  namespace: ocp-private
+resources:
+  '*':
+    limits: {}
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: 4.4-priv
+  namespace: ocp-private
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: src

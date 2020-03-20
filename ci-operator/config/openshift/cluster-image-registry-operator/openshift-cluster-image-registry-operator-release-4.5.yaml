@@ -1,10 +1,12 @@
 base_images:
   base:
+    cluster: https://api.ci.openshift.org
     name: "4.5"
     namespace: ocp
     tag: base
 build_root:
   image_stream_tag:
+    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.12
@@ -12,16 +14,17 @@ images:
 - from: base
   to: cluster-image-registry-operator
 promotion:
+  disabled: true
   name: "4.5"
   namespace: ocp
 resources:
   '*':
-    limits:
-      memory: 4Gi
+    limits: {}
     requests:
       cpu: 100m
       memory: 200Mi
 tag_specification:
+  cluster: https://api.ci.openshift.org
   name: "4.5"
   namespace: ocp
 tests:
@@ -66,6 +69,15 @@ tests:
   commands: JUNIT_REPORT=1 make test-e2e
   openshift_installer_src:
     cluster_profile: azure4
+- as: e2e-vsphere
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer_upi:
+    cluster_profile: vsphere
+- artifact_dir: /tmp/artifacts
+  as: e2e-vsphere-operator
+  commands: JUNIT_REPORT=1 make test-e2e
+  openshift_installer_upi_src:
+    cluster_profile: vsphere
 - as: verify
   commands: make verify
   container:

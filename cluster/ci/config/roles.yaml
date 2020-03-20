@@ -66,6 +66,7 @@ items:
   - AlexNPavel
   - jupierce
   - bradmwilliams
+  - alvaroaleman
 - kind: Group
   apiVersion: v1
   metadata:
@@ -653,6 +654,13 @@ items:
   users:
   - ankitathomas
   - bradmwilliams
+- kind: Group
+  apiVersion: v1
+  metadata:
+    name: cpaas-optional-operator-ci
+  users:
+  - dirgim
+  - arilivigni
 - kind: RoleBinding
   apiVersion: rbac.authorization.k8s.io/v1
   metadata:
@@ -665,6 +673,35 @@ items:
   - kind: Group
     apiGroup: rbac.authorization.k8s.io
     name: prowjob-readers
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: cpaas-optional-operator-ci
+
+- kind: Role
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: prowjob-create
+    namespace: ci
+  rules:
+  - apiGroups:
+    - prow.k8s.io
+    resources:
+    - prowjobs
+    verbs:
+    - create
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: prowjob-creators
+    namespace: ci
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: Role
+    name: prowjob-create
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: cpaas-optional-operator-ci
 
 - kind: Namespace
   apiVersion: v1
@@ -781,3 +818,72 @@ items:
     apiGroup: rbac.authorization.k8s.io
     name: admin
 
+- kind: ClusterRole
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: ci-admins-secret
+  rules:
+    - apiGroups:
+        - ""
+      resources:
+        - secrets
+      verbs:
+        - get
+        - create
+        - update
+        - patch
+- kind: ClusterRoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: ci-admins-secret
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: ci-admins
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: ci-admins-secret
+
+- kind: Namespace
+  apiVersion: v1
+  metadata:
+    name: hypershift-toolkit
+- kind: Group
+  apiVersion: v1
+  metadata:
+    name: hypershift-admin
+  users:
+  - csrwng
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: admin
+    namespace: hypershift-toolkit
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: hypershift-admin
+  - kind: Group
+    name: ci-admins
+    apiGroup: rbac.authorization.k8s.io
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: admin
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: image-puller
+    namespace: hypershift-toolkit
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:unauthenticated
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:authenticated
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: system:image-puller

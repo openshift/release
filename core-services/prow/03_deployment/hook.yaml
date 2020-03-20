@@ -64,7 +64,7 @@ items:
         priorityClassName: prow-critical
         containers:
         - name: hook
-          image: gcr.io/k8s-prow/hook:v20200115-cf4e86a7e
+          image: gcr.io/k8s-prow/hook:v20200320-d45985e9c
           args:
           - --config-path=/etc/config/config.yaml
           - --github-token-path=/etc/github/oauth
@@ -76,7 +76,10 @@ items:
           - --github-graphql-endpoint=http://ghproxy/graphql
           - --bugzilla-endpoint=https://bugzilla.redhat.com
           - --bugzilla-api-key-path=/etc/bugzilla/api
-          - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+          env:
+          # Multiple configs can only be passed via the env var and not via the flag
+          - name: KUBECONFIG
+            value: /etc/build-farm-credentials/api.ci.kubeconfig:/etc/build-farm-credentials/app.ci.kubeconfig:/etc/build-farm-credentials/build01.kubeconfig
           ports:
             - name: main
               containerPort: 8888
@@ -112,9 +115,6 @@ items:
           - name: job-config-3x
             mountPath: /etc/job-config/3.x
             readOnly: true
-          - name: job-config-40
-            mountPath: /etc/job-config/4.0
-            readOnly: true
           - name: job-config-41
             mountPath: /etc/job-config/4.1
             readOnly: true
@@ -129,6 +129,9 @@ items:
             readOnly: true
           - name: job-config-45
             mountPath: /etc/job-config/4.5
+            readOnly: true
+          - name: job-config-46
+            mountPath: /etc/job-config/4.6
             readOnly: true
           - mountPath: /etc/build-farm-credentials
             name: build-farm-credentials
@@ -165,9 +168,6 @@ items:
         - name: job-config-3x
           configMap:
             name: job-config-3.x
-        - name: job-config-40
-          configMap:
-            name: job-config-4.0
         - name: job-config-41
           configMap:
             name: job-config-4.1
@@ -183,11 +183,18 @@ items:
         - name: job-config-45
           configMap:
             name: job-config-4.5
+        - name: job-config-46
+          configMap:
+            name: job-config-4.6
         - name: build-farm-credentials
           secret:
             items:
+            - key: sa.hook.api.ci.config
+              path: api.ci.kubeconfig
+            - key: sa.hook.app.ci.config
+              path: app.ci.kubeconfig
             - key: sa.hook.build01.config
-              path: kubeconfig
+              path: build01.kubeconfig
             secretName: build-farm-credentials
         - name: tmp
           emptyDir: {}

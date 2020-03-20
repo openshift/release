@@ -98,7 +98,7 @@ objects:
       app: ${JOB_NAME_SAFE}-bootstrap-exporter
   spec:
     restartPolicy: Never
-    activeDeadlineSeconds: 18000
+    activeDeadlineSeconds: 21600
     terminationGracePeriodSeconds: 900
     volumes:
     - name: shared-ignition-files
@@ -274,8 +274,8 @@ objects:
         cd /tmp/output
 
         function run-upgrade-tests() {
-          openshift-tests run-upgrade "${TEST_SUITE}" --to-image "${RELEASE_IMAGE_LATEST}" \
-            --options "${TEST_OPTIONS}" \
+          openshift-tests run-upgrade "${TEST_SUITE}" --to-image "${IMAGE:-${RELEASE_IMAGE_LATEST}}" \
+            --options "${TEST_OPTIONS:-}" \
             --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
         }
 
@@ -304,6 +304,8 @@ objects:
         value: ${CLUSTER_TYPE}
       - name: AWS_SHARED_CREDENTIALS_FILE
         value: /etc/openshift-installer/.awscred
+      - name: AZURE_AUTH_LOCATION
+        value: /etc/openshift-installer/osServicePrincipal.json
       - name: AWS_REGION
         value: us-east-1
       - name: CLUSTER_NAME
@@ -1103,6 +1105,7 @@ objects:
           openshift-install --dir=/tmp/artifacts/installer create manifests
           rm -f /tmp/artifacts/installer/openshift/99_openshift-cluster-api_master-machines-*.yaml
           rm -f /tmp/artifacts/installer/openshift/99_openshift-cluster-api_worker-machineset-*.yaml
+          sed -i "s;mastersSchedulable: true;mastersSchedulable: false;g" /tmp/artifacts/installer/manifests/cluster-scheduler-02-config.yml
         elif [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
           base_domain="${BASE_DOMAIN:-origin-ci-int-gce.dev.openshift.com}"
           cat > /tmp/artifacts/installer/install-config.yaml << EOF
@@ -1152,6 +1155,9 @@ objects:
             cat > /tmp/artifacts/installer/install-config.yaml << EOF
         apiVersion: v1
         baseDomain: ${base_domain}
+        compute:
+        - name: worker
+          replicas: 0
         metadata:
           name: ${CLUSTER_NAME}
         networking:
@@ -1180,6 +1186,65 @@ objects:
                 curl -L -o /tmp/rhcos/rhcos.ova "${OVA_URL}"
                 govc import.ova -options=/tmp/rhcos/rhcos.json /tmp/rhcos/rhcos.ova
             fi
+
+            openshift-install --dir=/tmp/artifacts/installer create manifests
+            rm -f /tmp/artifacts/installer/openshift/99_openshift-cluster-api_master-machines-*.yaml
+            rm -f /tmp/artifacts/installer/openshift/99_openshift-cluster-api_worker-machineset-*.yaml
+            sed -i "s;mastersSchedulable: true;mastersSchedulable: false;g" /tmp/artifacts/installer/manifests/cluster-scheduler-02-config.yml
+
+        elif [[ "${CLUSTER_TYPE}" == "azure4" ]]; then
+            case $((RANDOM % 8)) in
+            0) AZURE_REGION=centralus;;
+            1) AZURE_REGION=centralus;;
+            2) AZURE_REGION=centralus;;
+            3) AZURE_REGION=centralus;;
+            4) AZURE_REGION=centralus;;
+            5) AZURE_REGION=centralus;;
+            6) AZURE_REGION=eastus2;;
+            7) AZURE_REGION=westus;;
+            *) echo >&2 "invalid Azure region index"; exit 1;;
+            esac
+            echo "Azure region: ${AZURE_REGION}"
+
+            export BASE_DOMAIN_RESOURCE_GROUP="os4-common"	
+            base_domain="${BASE_DOMAIN:-ci.azure.devcluster.openshift.com}"
+            echo "Base domain: ${base_domain}"	
+
+            cat > /tmp/artifacts/installer/install-config.yaml << EOF	
+        apiVersion: v1	
+        baseDomain: ${base_domain}	
+        metadata:	
+          name: ${CLUSTER_NAME}	
+        controlPlane:	
+          name: master	
+          replicas: 3	
+        compute:	
+        - name: worker	
+          replicas: 0	
+        platform:	
+          azure:	
+            baseDomainResourceGroupName: ${BASE_DOMAIN_RESOURCE_GROUP}	
+            region: ${AZURE_REGION}
+        pullSecret: >	
+          ${PULL_SECRET}	
+        sshKey: |	
+          ${SSH_PUB_KEY}	
+        EOF
+            export PATH=${HOME}/.local/bin:${PATH}
+
+            echo "Creating manifests"
+            openshift-install --dir=/tmp/artifacts/installer create manifests
+            
+            pushd /tmp/artifacts/installer
+
+            echo "Editing manifests"
+            rm -f openshift/99_openshift-cluster-api_master-machines-*.yaml	
+            rm -f openshift/99_openshift-cluster-api_worker-machineset-*.yaml	
+            sed -i "s;mastersSchedulable: true;mastersSchedulable: false;g" manifests/cluster-scheduler-02-config.yml
+            sed -i "/publicZone/,+1d" manifests/cluster-dns-02-config.yml 
+            sed -i "/privateZone/,+1d" manifests/cluster-dns-02-config.yml 
+
+            popd
         else
             echo "Unsupported cluster type '${CLUSTER_TYPE}'"
             exit 1
@@ -1194,8 +1259,7 @@ objects:
 
         # begin bootstrapping
         if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
-          # Derived from https://github.com/openshift/installer/blob/93c78d09ed9e2badb4bf5dab708152fe6b3b6602/data/data/rhcos.json#L40
-          RHCOS_AMI=ami-0aea6a5be0fc2b3fc  # FIXME: assumes AWS_REGION is us-east-1
+          RHCOS_AMI="$(jq -r .amis[\"${AWS_REGION}\"].hvm /var/lib/openshift-install/rhcos.json)"
 
           # FIXME: get epel-release or otherwise add awscli to our UPI image
           export PATH="${HOME}/.local/bin:${PATH}"
@@ -1480,16 +1544,22 @@ objects:
           easy_install --user pip
           pip install --user pyopenssl
 
-          export BASE_DOMAIN_ZONE_NAME=`gcloud dns managed-zones list --filter "DNS_NAME=${base_domain}." --format json | jq -r .[0].name`
+          export BASE_DOMAIN_ZONE_NAME=$(gcloud dns managed-zones list --filter "DNS_NAME=${base_domain}." --format json | jq -r .[0].name)
           export NETWORK_CIDR='10.0.0.0/16'
           export MASTER_SUBNET_CIDR='10.0.0.0/19'
           export WORKER_SUBNET_CIDR='10.0.32.0/19'
 
           export KUBECONFIG=${HOME}/artifacts/installer/auth/kubeconfig
-          export CLUSTER_NAME=`jq -r .clusterName ${HOME}/artifacts/installer/metadata.json`
-          export INFRA_ID=`jq -r .infraID ${HOME}/artifacts/installer/metadata.json`
-          export PROJECT_NAME=`jq -r .gcp.projectID ${HOME}/artifacts/installer/metadata.json`
-          export REGION=`jq -r .gcp.region ${HOME}/artifacts/installer/metadata.json`
+          export CLUSTER_NAME=$(jq -r .clusterName ${HOME}/artifacts/installer/metadata.json)
+          export INFRA_ID=$(jq -r .infraID ${HOME}/artifacts/installer/metadata.json)
+          export PROJECT_NAME=$(jq -r .gcp.projectID ${HOME}/artifacts/installer/metadata.json)
+          export REGION=$(jq -r .gcp.region ${HOME}/artifacts/installer/metadata.json)
+          export ZONE_0=$(gcloud compute regions describe ${REGION} --format=json | jq -r .zones[0] | cut -d "/" -f9)
+          export ZONE_1=$(gcloud compute regions describe ${REGION} --format=json | jq -r .zones[1] | cut -d "/" -f9)
+          export ZONE_2=$(gcloud compute regions describe ${REGION} --format=json | jq -r .zones[2] | cut -d "/" -f9)
+
+          export MASTER_IGNITION=$(cat ${HOME}/artifacts/installer/master.ign)
+          export WORKER_IGNITION=$(cat ${HOME}/artifacts/installer/worker.ign)
 
           pushd ${HOME}/gcp
 
@@ -1509,10 +1579,61 @@ objects:
 
           gcloud deployment-manager deployments create ${CLUSTER_NAME}-vpc --config 01_vpc.yaml
 
-          # Deploy infra
-          export CLUSTER_NETWORK=`gcloud compute networks describe ${INFRA_ID}-network --format json | jq -r .selfLink`
+          export CLUSTER_NETWORK=$(gcloud compute networks describe ${INFRA_ID}-network --format json | jq -r .selfLink)
+          export CONTROL_SUBNET=$(gcloud compute networks subnets describe ${INFRA_ID}-master-subnet --region=${REGION} --format json | jq -r .selfLink)
+          export COMPUTE_SUBNET=$(gcloud compute networks subnets describe ${INFRA_ID}-worker-subnet --region=${REGION} --format json | jq -r .selfLink)
 
-          cat <<EOF > 02_infra.yaml
+          # Deploy infra
+          if [ -f 02_lb_int.py ]; then # for internal lb workflow using 02_lb_int.py
+            cat <<EOF > 02_infra.yaml
+        imports:
+        - path: 02_dns.py
+        - path: 02_lb_ext.py
+        - path: 02_lb_int.py
+        resources:
+        - name: cluster-dns
+          type: 02_dns.py
+          properties:
+            infra_id: '${INFRA_ID}'
+            cluster_domain: '${CLUSTER_NAME}.${base_domain}'
+            cluster_network: '${CLUSTER_NETWORK}'
+        - name: cluster-lb-ext
+          type: 02_lb_ext.py
+          properties:
+            infra_id: '${INFRA_ID}'
+            region: '${REGION}'
+        - name: cluster-lb-int
+          type: 02_lb_int.py
+          properties:
+            cluster_network: '${CLUSTER_NETWORK}'
+            control_subnet: '${CONTROL_SUBNET}'
+            infra_id: '${INFRA_ID}'
+            region: '${REGION}'
+            zones:
+            - '${ZONE_0}'
+            - '${ZONE_1}'
+            - '${ZONE_2}'
+        EOF
+          elif [ -f 02_dns.py ]; then # for broken up workflow using 02_dns.py
+            cat <<EOF > 02_infra.yaml
+        imports:
+        - path: 02_dns.py
+        - path: 02_lb_ext.py
+        resources:
+        - name: cluster-dns
+          type: 02_dns.py
+          properties:
+            infra_id: '${INFRA_ID}'
+            cluster_domain: '${CLUSTER_NAME}.${base_domain}'
+            cluster_network: '${CLUSTER_NETWORK}'
+        - name: cluster-lb-ext
+          type: 02_lb_ext.py
+          properties:
+            infra_id: '${INFRA_ID}'
+            region: '${REGION}'
+        EOF
+          else # for older workflow not using 02_dns.py
+            cat <<EOF > 02_infra.yaml
         imports:
         - path: 02_infra.py
         resources:
@@ -1524,16 +1645,16 @@ objects:
             cluster_domain: '${CLUSTER_NAME}.${base_domain}'
             cluster_network: '${CLUSTER_NETWORK}'
         EOF
+          fi
 
           gcloud deployment-manager deployments create ${CLUSTER_NAME}-infra --config 02_infra.yaml
 
-          export CLUSTER_IP=`gcloud compute addresses describe ${INFRA_ID}-cluster-public-ip --region=${REGION} --format json | jq -r .address`
-
-          # Add external DNS entries
-          if [ -f transaction.yaml ]; then rm transaction.yaml; fi
-          gcloud dns record-sets transaction start --zone ${BASE_DOMAIN_ZONE_NAME}
-          gcloud dns record-sets transaction add ${CLUSTER_IP} --name api.${CLUSTER_NAME}.${base_domain}. --ttl 60 --type A --zone ${BASE_DOMAIN_ZONE_NAME}
-          gcloud dns record-sets transaction execute --zone ${BASE_DOMAIN_ZONE_NAME}
+          if [ -f 02_lb_int.py ]; then # for internal lb workflow using 02_lb_int.py
+            export CLUSTER_IP=$(gcloud compute addresses describe ${INFRA_ID}-cluster-ip --region=${REGION} --format json | jq -r .address)
+          else # for older workflow
+            export CLUSTER_IP=$(gcloud compute addresses describe ${INFRA_ID}-cluster-public-ip --region=${REGION} --format json | jq -r .address)
+          fi
+          export CLUSTER_PUBLIC_IP=$(gcloud compute addresses describe ${INFRA_ID}-cluster-public-ip --region=${REGION} --format json | jq -r .address)
 
           # Add internal DNS entries
           if [ -f transaction.yaml ]; then rm transaction.yaml; fi
@@ -1542,53 +1663,95 @@ objects:
           gcloud dns record-sets transaction add ${CLUSTER_IP} --name api-int.${CLUSTER_NAME}.${base_domain}. --ttl 60 --type A --zone ${INFRA_ID}-private-zone
           gcloud dns record-sets transaction execute --zone ${INFRA_ID}-private-zone
 
-          # Deploy security
-          export MASTER_NAT_IP=`gcloud compute addresses describe ${INFRA_ID}-master-nat-ip --region ${REGION} --format json | jq -r .address`
-          export WORKER_NAT_IP=`gcloud compute addresses describe ${INFRA_ID}-worker-nat-ip --region ${REGION} --format json | jq -r .address`
+          # Add external DNS entries
+          if [ -f transaction.yaml ]; then rm transaction.yaml; fi
+          gcloud dns record-sets transaction start --zone ${BASE_DOMAIN_ZONE_NAME}
+          gcloud dns record-sets transaction add ${CLUSTER_PUBLIC_IP} --name api.${CLUSTER_NAME}.${base_domain}. --ttl 60 --type A --zone ${BASE_DOMAIN_ZONE_NAME}
+          gcloud dns record-sets transaction execute --zone ${BASE_DOMAIN_ZONE_NAME}
 
-          cat <<EOF > 03_security.yaml
+          # Deploy security
+          if [ -f 02_lb_int.py ]; then # for internal lb workflow using 02_lb_int.py
+            cat <<EOF > 03_security.yaml
+        imports:
+        - path: 03_firewall.py
+        - path: 03_iam.py
+        resources:
+        - name: cluster-firewall
+          type: 03_firewall.py
+          properties:
+            allowed_external_cidr: '0.0.0.0/0'
+            infra_id: '${INFRA_ID}'
+            cluster_network: '${CLUSTER_NETWORK}'
+            network_cidr: '${NETWORK_CIDR}'
+        - name: cluster-iam
+          type: 03_iam.py
+          properties:
+            infra_id: '${INFRA_ID}'
+        EOF
+          elif [ -f 03_firewall.py ]; then # for broken up workflow using 03_firewall.py
+            export MASTER_NAT_IP=$(gcloud compute addresses describe ${INFRA_ID}-master-nat-ip --region ${REGION} --format json | jq -r .address)
+            export WORKER_NAT_IP=$(gcloud compute addresses describe ${INFRA_ID}-worker-nat-ip --region ${REGION} --format json | jq -r .address)
+            cat <<EOF > 03_security.yaml
+        imports:
+        - path: 03_firewall.py
+        - path: 03_iam.py
+        resources:
+        - name: cluster-firewall
+          type: 03_firewall.py
+          properties:
+            infra_id: '${INFRA_ID}'
+            cluster_network: '${CLUSTER_NETWORK}'
+            network_cidr: '${NETWORK_CIDR}'
+            master_nat_ip: '${MASTER_NAT_IP}'
+            worker_nat_ip: '${WORKER_NAT_IP}'
+        - name: cluster-iam
+          type: 03_iam.py
+          properties:
+            infra_id: '${INFRA_ID}'
+        EOF
+          else # for older workflow not using 03_firewall.py
+            export MASTER_NAT_IP=$(gcloud compute addresses describe ${INFRA_ID}-master-nat-ip --region ${REGION} --format json | jq -r .address)
+            export WORKER_NAT_IP=$(gcloud compute addresses describe ${INFRA_ID}-worker-nat-ip --region ${REGION} --format json | jq -r .address)
+            cat <<EOF > 03_security.yaml
         imports:
         - path: 03_security.py
-
         resources:
         - name: cluster-security
           type: 03_security.py
           properties:
             infra_id: '${INFRA_ID}'
-            region: '${REGION}'
             cluster_network: '${CLUSTER_NETWORK}'
             network_cidr: '${NETWORK_CIDR}'
             master_nat_ip: '${MASTER_NAT_IP}'
             worker_nat_ip: '${WORKER_NAT_IP}'
         EOF
+          fi
 
           gcloud deployment-manager deployments create ${CLUSTER_NAME}-security --config 03_security.yaml
 
-          export MASTER_SA=${INFRA_ID}-m@${PROJECT_NAME}.iam.gserviceaccount.com
-          gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${MASTER_SA}" --role "roles/compute.instanceAdmin"
-          gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${MASTER_SA}" --role "roles/compute.networkAdmin"
-          gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${MASTER_SA}" --role "roles/compute.securityAdmin"
-          gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${MASTER_SA}" --role "roles/iam.serviceAccountUser"
-          gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${MASTER_SA}" --role "roles/storage.admin"
+          export MASTER_SERVICE_ACCOUNT=$(gcloud iam service-accounts list --filter "email~^${INFRA_ID}-m@${PROJECT_NAME}." --format json | jq -r '.[0].email')
+          export WORKER_SERVICE_ACCOUNT=$(gcloud iam service-accounts list --filter "email~^${INFRA_ID}-w@${PROJECT_NAME}." --format json | jq -r '.[0].email')
 
-          export WORKER_SA=${INFRA_ID}-w@${PROJECT_NAME}.iam.gserviceaccount.com
-          gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${WORKER_SA}" --role "roles/compute.viewer"
-          gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${WORKER_SA}" --role "roles/storage.admin"
+          gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${MASTER_SERVICE_ACCOUNT}" --role "roles/compute.instanceAdmin"
+          gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${MASTER_SERVICE_ACCOUNT}" --role "roles/compute.networkAdmin"
+          gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${MASTER_SERVICE_ACCOUNT}" --role "roles/compute.securityAdmin"
+          gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${MASTER_SERVICE_ACCOUNT}" --role "roles/iam.serviceAccountUser"
+          gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${MASTER_SERVICE_ACCOUNT}" --role "roles/storage.admin"
 
-          gcloud iam service-accounts keys create service-account-key.json --iam-account=${MASTER_SA}
+          gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${WORKER_SERVICE_ACCOUNT}" --role "roles/compute.viewer"
+          gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${WORKER_SERVICE_ACCOUNT}" --role "roles/storage.admin"
+
+          gcloud iam service-accounts keys create service-account-key.json --iam-account=${MASTER_SERVICE_ACCOUNT}
 
           # Deploy bootstrap
-          export IMAGE_SOURCE=`cat /var/lib/openshift-install/rhcos.json | jq -r .gcp.url`
+          export IMAGE_SOURCE=$(cat /var/lib/openshift-install/rhcos.json | jq -r .gcp.url)
           gcloud compute images create "${INFRA_ID}-rhcos-image" --source-uri="${IMAGE_SOURCE}"
-
-          export CONTROL_SUBNET=`gcloud compute networks subnets describe ${INFRA_ID}-master-subnet --region=${REGION} --format json | jq -r .selfLink`
-          export CLUSTER_IMAGE=`gcloud compute images describe ${INFRA_ID}-rhcos-image --format json | jq -r .selfLink`
-          export ZONES=(`gcloud compute regions describe ${REGION} --format=json | jq -r .zones[] | cut -d "/" -f9`)
+          export CLUSTER_IMAGE=$(gcloud compute images describe ${INFRA_ID}-rhcos-image --format json | jq -r .selfLink)
 
           gsutil mb gs://${INFRA_ID}-bootstrap-ignition
           gsutil cp ${HOME}/artifacts/installer/bootstrap.ign gs://${INFRA_ID}-bootstrap-ignition/
 
-          export BOOTSTRAP_IGN=`gsutil signurl -d 1h service-account-key.json gs://${INFRA_ID}-bootstrap-ignition/bootstrap.ign | grep "^gs:" | awk '{print $5}'`
+          export BOOTSTRAP_IGN=$(gsutil signurl -d 1h service-account-key.json gs://${INFRA_ID}-bootstrap-ignition/bootstrap.ign | grep "^gs:" | awk '{print $5}')
 
           cat <<EOF > 04_bootstrap.yaml
         imports:
@@ -1599,7 +1762,7 @@ objects:
           properties:
             infra_id: '${INFRA_ID}'
             region: '${REGION}'
-            zone: '${ZONES[0]}'
+            zone: '${ZONE_0}'
             cluster_network: '${CLUSTER_NETWORK}'
             control_subnet: '${CONTROL_SUBNET}'
             image: '${CLUSTER_IMAGE}'
@@ -1610,16 +1773,17 @@ objects:
 
           gcloud deployment-manager deployments create ${CLUSTER_NAME}-bootstrap --config 04_bootstrap.yaml
 
-          gcloud compute target-pools add-instances ${INFRA_ID}-api-target-pool --instances-zone="${ZONES[0]}" --instances=${INFRA_ID}-bootstrap
-          gcloud compute target-pools add-instances ${INFRA_ID}-ign-target-pool --instances-zone="${ZONES[0]}" --instances=${INFRA_ID}-bootstrap
+          if [ -f 02_lb_int.py ]; then # for internal lb workflow using 02_lb_int.py
+            gcloud compute instance-groups unmanaged add-instances ${INFRA_ID}-master-${ZONE_0}-instance-group --zone=${ZONE_0} --instances=${INFRA_ID}-bootstrap
+          else # for older workflow
+            gcloud compute target-pools add-instances ${INFRA_ID}-ign-target-pool --instances-zone="${ZONE_0}" --instances=${INFRA_ID}-bootstrap
+          fi
+          gcloud compute target-pools add-instances ${INFRA_ID}-api-target-pool --instances-zone=${ZONE_0} --instances=${INFRA_ID}-bootstrap
 
-          BOOTSTRAP_IP=`gcloud compute instances describe ${INFRA_ID}-bootstrap --zone ${ZONES[0]} --format json | jq -r .networkInterfaces[0].networkIP`
+          BOOTSTRAP_IP=$(gcloud compute instances describe ${INFRA_ID}-bootstrap --zone ${ZONE_0} --format json | jq -r .networkInterfaces[0].networkIP)
           GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --bootstrap ${BOOTSTRAP_IP}"
 
           # Deploy control plane
-          export MASTER_SERVICE_ACCOUNT_EMAIL=`gcloud iam service-accounts list | grep "^${INFRA_ID}-master-node " | awk '{print $2}'`
-          export MASTER_IGNITION=`cat ${HOME}/artifacts/installer/master.ign`
-
           cat <<EOF > 05_control_plane.yaml
         imports:
         - path: 05_control_plane.py
@@ -1628,24 +1792,24 @@ objects:
           type: 05_control_plane.py
           properties:
             infra_id: '${INFRA_ID}'
-            region: '${REGION}'
             zones:
-            - '${ZONES[0]}'
-            - '${ZONES[1]}'
-            - '${ZONES[2]}'
+            - '${ZONE_0}'
+            - '${ZONE_1}'
+            - '${ZONE_2}'
             control_subnet: '${CONTROL_SUBNET}'
             image: '${CLUSTER_IMAGE}'
             machine_type: 'n1-standard-4'
             root_volume_size: '128'
-            service_account_email: '${MASTER_SERVICE_ACCOUNT_EMAIL}'
+            service_account_email: '${MASTER_SERVICE_ACCOUNT}'
             ignition: '${MASTER_IGNITION}'
         EOF
 
           gcloud deployment-manager deployments create ${CLUSTER_NAME}-control-plane --config 05_control_plane.yaml
 
-          export MASTER0_IP=`gcloud compute instances describe ${INFRA_ID}-m-0 --zone ${ZONES[0]} --format json | jq -r .networkInterfaces[0].networkIP`
-          export MASTER1_IP=`gcloud compute instances describe ${INFRA_ID}-m-1 --zone ${ZONES[1]} --format json | jq -r .networkInterfaces[0].networkIP`
-          export MASTER2_IP=`gcloud compute instances describe ${INFRA_ID}-m-2 --zone ${ZONES[2]} --format json | jq -r .networkInterfaces[0].networkIP`
+          export MASTER0_IP=$(gcloud compute instances describe ${INFRA_ID}-m-0 --zone ${ZONE_0} --format json | jq -r .networkInterfaces[0].networkIP)
+          export MASTER1_IP=$(gcloud compute instances describe ${INFRA_ID}-m-1 --zone ${ZONE_1} --format json | jq -r .networkInterfaces[0].networkIP)
+          export MASTER2_IP=$(gcloud compute instances describe ${INFRA_ID}-m-2 --zone ${ZONE_2} --format json | jq -r .networkInterfaces[0].networkIP)
+
           if [ -f transaction.yaml ]; then rm transaction.yaml; fi
           gcloud dns record-sets transaction start --zone ${INFRA_ID}-private-zone
           gcloud dns record-sets transaction add ${MASTER0_IP} --name etcd-0.${CLUSTER_NAME}.${base_domain}. --ttl 60 --type A --zone ${INFRA_ID}-private-zone
@@ -1658,20 +1822,24 @@ objects:
             --name _etcd-server-ssl._tcp.${CLUSTER_NAME}.${base_domain}. --ttl 60 --type SRV --zone ${INFRA_ID}-private-zone
           gcloud dns record-sets transaction execute --zone ${INFRA_ID}-private-zone
 
-          gcloud compute target-pools add-instances ${INFRA_ID}-api-target-pool --instances-zone="${ZONES[0]}" --instances=${INFRA_ID}-m-0
-          gcloud compute target-pools add-instances ${INFRA_ID}-api-target-pool --instances-zone="${ZONES[1]}" --instances=${INFRA_ID}-m-1
-          gcloud compute target-pools add-instances ${INFRA_ID}-api-target-pool --instances-zone="${ZONES[2]}" --instances=${INFRA_ID}-m-2
-          gcloud compute target-pools add-instances ${INFRA_ID}-ign-target-pool --instances-zone="${ZONES[0]}" --instances=${INFRA_ID}-m-0
-          gcloud compute target-pools add-instances ${INFRA_ID}-ign-target-pool --instances-zone="${ZONES[1]}" --instances=${INFRA_ID}-m-1
-          gcloud compute target-pools add-instances ${INFRA_ID}-ign-target-pool --instances-zone="${ZONES[2]}" --instances=${INFRA_ID}-m-2
+          if [ -f 02_lb_int.py ]; then # for internal lb workflow using 02_lb_int.py
+            gcloud compute instance-groups unmanaged add-instances ${INFRA_ID}-master-${ZONE_0}-instance-group --zone=${ZONE_0} --instances=${INFRA_ID}-m-0
+            gcloud compute instance-groups unmanaged add-instances ${INFRA_ID}-master-${ZONE_1}-instance-group --zone=${ZONE_1} --instances=${INFRA_ID}-m-1
+            gcloud compute instance-groups unmanaged add-instances ${INFRA_ID}-master-${ZONE_2}-instance-group --zone=${ZONE_2} --instances=${INFRA_ID}-m-2
+          else # for older workflow
+            gcloud compute target-pools add-instances ${INFRA_ID}-ign-target-pool --instances-zone="${ZONE_0}" --instances=${INFRA_ID}-m-0
+            gcloud compute target-pools add-instances ${INFRA_ID}-ign-target-pool --instances-zone="${ZONE_1}" --instances=${INFRA_ID}-m-1
+            gcloud compute target-pools add-instances ${INFRA_ID}-ign-target-pool --instances-zone="${ZONE_2}" --instances=${INFRA_ID}-m-2
+          fi
+
+          gcloud compute target-pools add-instances ${INFRA_ID}-api-target-pool --instances-zone="${ZONE_0}" --instances=${INFRA_ID}-m-0
+          gcloud compute target-pools add-instances ${INFRA_ID}-api-target-pool --instances-zone="${ZONE_1}" --instances=${INFRA_ID}-m-1
+          gcloud compute target-pools add-instances ${INFRA_ID}-api-target-pool --instances-zone="${ZONE_2}" --instances=${INFRA_ID}-m-2
 
           GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --master ${MASTER0_IP} --master ${MASTER1_IP} --master ${MASTER2_IP}"
 
           # Deploy compute
-          export COMPUTE_SUBNET=`gcloud compute networks subnets describe ${INFRA_ID}-worker-subnet --region=${REGION} --format json | jq -r .selfLink`
-          export WORKER_SERVICE_ACCOUNT_EMAIL=`gcloud iam service-accounts list | grep "^${INFRA_ID}-worker-node " | awk '{print $2}'`
-          export WORKER_IGNITION=`cat ${HOME}/artifacts/installer/worker.ign`
-
+          export ZONES=($(gcloud compute regions describe ${REGION} --format=json | jq -r .zones[] | cut -d '/' -f9))
           cat <<EOF > 06_worker.yaml
         imports:
         - path: 06_worker.py
@@ -1684,13 +1852,12 @@ objects:
           type: 06_worker.py
           properties:
             infra_id: '${INFRA_ID}'
-            region: '${REGION}'
             zone: '${ZONES[(( $compute % ${#ZONES[@]} ))]}'
             compute_subnet: '${COMPUTE_SUBNET}'
             image: '${CLUSTER_IMAGE}'
             machine_type: 'n1-standard-4'
             root_volume_size: '128'
-            service_account_email: '${WORKER_SERVICE_ACCOUNT_EMAIL}'
+            service_account_email: '${WORKER_SERVICE_ACCOUNT}'
             ignition: '${WORKER_IGNITION}'
         EOF
           done;
@@ -1764,6 +1931,127 @@ objects:
           CONTROL_PLANE_2_IP=$(terraform state show 'module.control_plane.external.ip_address[2]' | grep ip_address | awk '{print $3}')
 
           GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --master ${CONTROL_PLANE_0_IP} --master ${CONTROL_PLANE_1_IP} --master ${CONTROL_PLANE_2_IP}"
+
+        elif [[ "${CLUSTER_TYPE}" == "azure4" ]]; then
+          mkdir -p /tmp/azure
+
+          # Copy sample UPI files
+          cp -r /var/lib/openshift-install/upi/azure/* /tmp/azure
+
+          echo "az version:"
+          az version
+
+          echo "Logging in with az"
+          AZURE_AUTH_CLIENT_ID=$(cat $AZURE_AUTH_LOCATION | jq -r .clientId)
+          AZURE_AUTH_CLIENT_SECRET=$(cat $AZURE_AUTH_LOCATION | jq -r .clientSecret)
+          AZURE_AUTH_TENANT_ID=$(cat $AZURE_AUTH_LOCATION | jq -r .tenantId)
+          az login --service-principal -u $AZURE_AUTH_CLIENT_ID -p "$AZURE_AUTH_CLIENT_SECRET" --tenant $AZURE_AUTH_TENANT_ID
+
+          INFRA_ID="$(jq -r .infraID /tmp/artifacts/installer/metadata.json)"
+          RESOURCE_GROUP="${INFRA_ID}-rg"
+          echo "Infra ID: ${INFRA_ID}"
+
+          echo "Creating resource group ${RESOURCE_GROUP}"
+          az group create --name $RESOURCE_GROUP --location $AZURE_REGION
+
+          echo "Creating identity"
+          az identity create -g $RESOURCE_GROUP -n ${INFRA_ID}-identity
+
+          ACCOUNT_NAME=$(echo ${CLUSTER_NAME}sa | tr -cd '[:alnum:]')
+
+          echo "Creating storage account"
+          az storage account create -g $RESOURCE_GROUP --location $AZURE_REGION --name $ACCOUNT_NAME --kind Storage --sku Standard_LRS
+          ACCOUNT_KEY=$(az storage account keys list -g $RESOURCE_GROUP --account-name $ACCOUNT_NAME --query "[0].value" -o tsv)
+
+          VHD_URL="$(cat /var/lib/openshift-install/rhcos.json | jq -r .azure.url)"
+
+          echo "Copying VHD image from ${VHD_URL}"
+          az storage container create --name vhd --account-name $ACCOUNT_NAME
+          az storage blob copy start --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY --destination-blob "rhcos.vhd" --destination-container vhd --source-uri "$VHD_URL"
+          status="pending"
+          while [ "$status" == "pending" ]
+          do
+            status=$(az storage blob show --container-name vhd --name "rhcos.vhd" --account-name ${CLUSTER_NAME}sa --account-key $ACCOUNT_KEY -o tsv --query properties.copy.status)
+          done
+          if [[ "$status" != "success" ]]; then
+            echo "Error copying VHD image ${VHD_URL}"
+            exit 1
+          fi
+
+          echo "Uploading bootstrap.ign"
+          az storage container create --name files --account-name $ACCOUNT_NAME --public-access blob          
+          az storage blob upload --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY -c "files" -f "/tmp/artifacts/installer/bootstrap.ign" -n "bootstrap.ign"
+          
+          echo "Creating private DNS zone"
+          az network private-dns zone create -g $RESOURCE_GROUP -n ${CLUSTER_NAME}.${base_domain}
+
+          PRINCIPAL_ID=$(az identity show -g $RESOURCE_GROUP -n ${INFRA_ID}-identity --query principalId --out tsv)
+          echo "Assigning 'Contributor' role to principal ID ${PRINCIPAL_ID}"
+          RESOURCE_GROUP_ID=$(az group show -g $RESOURCE_GROUP --query id --out tsv)
+          az role assignment create --assignee "$PRINCIPAL_ID" --role 'Contributor' --scope "$RESOURCE_GROUP_ID"
+
+          pushd /tmp/azure
+
+          echo "Deploying 01_vnet"
+          az group deployment create -g $RESOURCE_GROUP \
+            --template-file "01_vnet.json" \
+            --parameters baseName="$INFRA_ID"
+        
+          echo "Linking VNet to private DNS zone"
+          az network private-dns link vnet create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${base_domain} -n ${INFRA_ID}-network-link -v "${INFRA_ID}-vnet" -e false
+
+          echo "Deploying 02_storage"
+          VHD_BLOB_URL=$(az storage blob url --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY -c vhd -n "rhcos.vhd" -o tsv)
+          az group deployment create -g $RESOURCE_GROUP \
+            --template-file "02_storage.json" \
+            --parameters vhdBlobURL="${VHD_BLOB_URL}" \
+            --parameters baseName="$INFRA_ID"
+          
+          echo "Deploying 03_infra"
+          az group deployment create -g $RESOURCE_GROUP \
+            --template-file "03_infra.json" \
+            --parameters privateDNSZoneName="${CLUSTER_NAME}.${base_domain}" \
+            --parameters baseName="$INFRA_ID"
+
+          PUBLIC_IP=$(az network public-ip list -g $RESOURCE_GROUP --query "[?name=='${INFRA_ID}-master-pip'] | [0].ipAddress" -o tsv)
+          echo "Creating 'api' record in public zone for IP ${PUBLIC_IP}"
+          az network dns record-set a add-record -g $BASE_DOMAIN_RESOURCE_GROUP -z ${base_domain} -n api.${CLUSTER_NAME} -a $PUBLIC_IP --ttl 60
+
+          echo "Deploying 04_bootstrap"
+          BOOTSTRAP_URL=$(az storage blob url --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY -c "files" -n "bootstrap.ign" -o tsv)
+          BOOTSTRAP_IGNITION=$(jq -rcnM --arg v "2.2.0" --arg url $BOOTSTRAP_URL '{ignition:{version:$v,config:{replace:{source:$url}}}}' | base64 -w0)
+          az group deployment create -g $RESOURCE_GROUP \
+            --template-file "04_bootstrap.json" \
+            --parameters bootstrapIgnition="$BOOTSTRAP_IGNITION" \
+            --parameters sshKeyData="$SSH_PUB_KEY" \
+            --parameters baseName="$INFRA_ID"
+
+          BOOTSTRAP_PUBLIC_IP=$(az network public-ip list -g $RESOURCE_GROUP --query "[?name=='${INFRA_ID}-bootstrap-ssh-pip'] | [0].ipAddress" -o tsv)
+          GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --bootstrap ${BOOTSTRAP_PUBLIC_IP}"
+          
+          echo "Deploying 05_masters"
+          MASTER_IGNITION=$(cat /tmp/artifacts/installer/master.ign | base64)
+          az group deployment create -g $RESOURCE_GROUP \
+            --template-file "05_masters.json" \
+            --parameters masterIgnition="$MASTER_IGNITION" \
+            --parameters sshKeyData="$SSH_PUB_KEY" \
+            --parameters privateDNSZoneName="${CLUSTER_NAME}.${base_domain}" \
+            --parameters baseName="$INFRA_ID"
+                    
+          MASTER0_IP=$(az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${INFRA_ID}-master-0-nic --name pipConfig --query "privateIpAddress" -o tsv)
+          MASTER1_IP=$(az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${INFRA_ID}-master-1-nic --name pipConfig --query "privateIpAddress" -o tsv)
+          MASTER2_IP=$(az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${INFRA_ID}-master-2-nic --name pipConfig --query "privateIpAddress" -o tsv)
+          GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --master ${MASTER0_IP} --master ${MASTER1_IP} --master ${MASTER2_IP}"
+
+          echo "Deploying 06_workers"
+          export WORKER_IGNITION=$(cat /tmp/artifacts/installer/worker.ign | base64)
+          az group deployment create -g $RESOURCE_GROUP \
+            --template-file "06_workers.json" \
+            --parameters workerIgnition="$WORKER_IGNITION" \
+            --parameters sshKeyData="$SSH_PUB_KEY" \
+            --parameters baseName="$INFRA_ID"
+
+          popd
         fi
 
         echo "Waiting for bootstrap to complete"
@@ -1778,14 +2066,45 @@ objects:
           aws cloudformation wait stack-delete-complete --stack-name "${CLUSTER_NAME}-bootstrap" &
           wait "$!"
         elif [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
-          gcloud compute target-pools remove-instances ${INFRA_ID}-api-target-pool --instances-zone="${ZONES[0]}" --instances=${INFRA_ID}-bootstrap
-          gcloud compute target-pools remove-instances ${INFRA_ID}-ign-target-pool --instances-zone="${ZONES[0]}" --instances=${INFRA_ID}-bootstrap
+          if [ -f ${HOME}/gcp/02_lb_int.py ]; then # for internal lb workflow using 02_lb_int.py
+            gcloud compute instance-groups unmanaged remove-instances ${INFRA_ID}-master-${ZONE_0}-instance-group --zone=${ZONE_0} --instances=${INFRA_ID}-bootstrap
+          else # for older workflow
+            gcloud compute target-pools remove-instances ${INFRA_ID}-ign-target-pool --instances-zone="${ZONE_0}" --instances=${INFRA_ID}-bootstrap
+          fi
+          gcloud compute target-pools remove-instances ${INFRA_ID}-api-target-pool --instances-zone="${ZONE_0}" --instances=${INFRA_ID}-bootstrap
           gsutil rm gs://${INFRA_ID}-bootstrap-ignition/bootstrap.ign
           gsutil rb gs://${INFRA_ID}-bootstrap-ignition
           gcloud deployment-manager deployments delete -q ${CLUSTER_NAME}-bootstrap
         elif [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
           terraform apply -auto-approve -var 'bootstrap_complete=true' -no-color &
           wait "$!"
+        elif [[ "${CLUSTER_TYPE}" == "azure4" ]]; then
+          az network nsg rule delete -g $RESOURCE_GROUP --nsg-name ${INFRA_ID}-controlplane-nsg --name bootstrap_ssh_in
+          az vm stop -g $RESOURCE_GROUP --name ${INFRA_ID}-bootstrap
+          az vm deallocate -g $RESOURCE_GROUP --name ${INFRA_ID}-bootstrap
+          az vm delete -g $RESOURCE_GROUP --name ${INFRA_ID}-bootstrap --yes
+          az disk delete -g $RESOURCE_GROUP --name ${INFRA_ID}-bootstrap_OSDisk --no-wait --yes
+          az network nic delete -g $RESOURCE_GROUP --name ${INFRA_ID}-bootstrap-nic --no-wait
+          az storage blob delete --account-key $ACCOUNT_KEY --account-name $ACCOUNT_NAME --container-name files --name bootstrap.ign
+          az network public-ip delete -g $RESOURCE_GROUP --name ${INFRA_ID}-bootstrap-ssh-pip
+        fi
+
+        if [[ "${CLUSTER_TYPE}" == "azure4" ]]; then
+          echo "Adding ingress DNS records"
+          
+          export KUBECONFIG=/tmp/artifacts/installer/auth/kubeconfig
+
+          public_ip_router="<pending>"
+          while [[ $public_ip_router =~ "pending" ]]
+          do
+            public_ip_router=$(oc -n openshift-ingress get service router-default --no-headers | awk '{print $4}')
+            echo $public_ip_router
+          done
+          
+          az network dns record-set a add-record -g $BASE_DOMAIN_RESOURCE_GROUP -z ${base_domain} -n *.apps.${CLUSTER_NAME} -a $public_ip_router --ttl 300
+          
+          az network private-dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${base_domain} -n *.apps --ttl 300
+          az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${base_domain} -n *.apps -a $public_ip_router
         fi
 
         function approve_csrs() {
@@ -1816,8 +2135,9 @@ objects:
           update_image_registry &
         fi
 
+        set +x
         echo "Completing UPI setup"
-        openshift-install --dir=/tmp/artifacts/installer wait-for install-complete 2>&1 | grep -v password &
+        openshift-install --dir=/tmp/artifacts/installer wait-for install-complete 2>&1 | grep --line-buffered -v password &
         wait "$!"
         touch /tmp/install-complete
 
@@ -1841,6 +2161,8 @@ objects:
         value: /tmp/artifacts/installer/auth/kubeconfig
       - name: AWS_SHARED_CREDENTIALS_FILE
         value: /etc/openshift-installer/.awscred
+      - name: AZURE_AUTH_LOCATION
+        value: /etc/openshift-installer/osServicePrincipal.json
       - name: TFVARS_PATH
         value: /etc/openshift-installer/secret.auto.tfvars
       - name: AWS_REGION
@@ -1851,6 +2173,8 @@ objects:
         value: test
       - name: HOME
         value: /tmp
+      - name: LC_ALL
+        value: en_US.UTF-8
       command:
       - /bin/bash
       - -c
@@ -1894,33 +2218,6 @@ objects:
               rm -rf /tmp/artifacts/installer/bootstrap.ign
               jq -r '."*bootstrap.Bootstrap" |= {"Config": "REDACTED"}' /tmp/artifacts/installer/.openshift_install_state.json > /tmp/artifacts/installer/openshift_install_state_updated.json
               mv /tmp/artifacts/installer/openshift_install_state_updated.json /tmp/artifacts/installer/.openshift_install_state.json
-          fi
-
-          if [ -f /tmp/artifacts/installer/terraform.tfstate ]
-          then
-              # we don't have jq, so the python equivalent of
-              # jq '.modules[].resources."aws_instance.bootstrap".primary.attributes."public_ip" | select(.)'
-              bootstrap_ip=$(python -c \
-                  'import sys, json; d=reduce(lambda x,y: dict(x.items() + y.items()), map(lambda x: x["resources"], json.load(sys.stdin)["modules"])); k="aws_instance.bootstrap"; print d[k]["primary"]["attributes"]["public_ip"] if k in d else ""' \
-                  < /tmp/artifacts/installer/terraform.tfstate
-              )
-
-              if [ -n "${bootstrap_ip}" ]
-              then
-                for service in bootkube openshift kubelet crio
-                do
-                    queue "/tmp/artifacts/bootstrap/${service}.service" curl \
-                        --insecure \
-                        --silent \
-                        --connect-timeout 5 \
-                        --retry 3 \
-                        --cert /tmp/artifacts/installer/tls/journal-gatewayd.crt \
-                        --key /tmp/artifacts/installer/tls/journal-gatewayd.key \
-                        --url "https://${bootstrap_ip}:19531/entries?_SYSTEMD_UNIT=${service}.service"
-                done
-              fi
-          else
-              echo "No terraform statefile found. Skipping collection of bootstrap logs."
           fi
 
           # collect logs from the proxy
@@ -2008,6 +2305,9 @@ objects:
           echo "Waiting for logs ..."
           wait
 
+          tar -czC /tmp/artifacts/must-gather -f /tmp/artifacts/must-gather.tar.gz . &&
+          rm -rf /tmp/artifacts/must-gather
+
           echo "Deprovisioning cluster ..."
           if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
             # FIXME: picking up awscli installed by the setup container
@@ -2015,6 +2315,21 @@ objects:
             export PATH="${HOME}/.local/bin:${PATH}"
 
             export AWS_DEFAULT_REGION="${AWS_REGION}"  # CLI prefers the former
+
+            aws cloudformation describe-stack-resources --stack-name "${CLUSTER_NAME}-control-plane" \
+              --query 'StackResources[?ResourceType==`AWS::EC2::Instance`].PhysicalResourceId' --output text | sed 's,\t,\n,g' > /tmp/node-provider-IDs
+            for INDEX in 0 1 2
+            do
+              aws cloudformation describe-stack-resources --stack-name "${CLUSTER_NAME}-compute-${INDEX}" \
+                --query 'StackResources[].PhysicalResourceId' --output text | cut -d, -f1 >> /tmp/node-provider-IDs
+            done
+
+            while IFS= read -r i; do
+              mkdir -p "/tmp/artifacts/nodes/${i}"
+              if [[ "${CLUSTER_TYPE}" = "aws" ]]; then
+                queue /tmp/artifacts/nodes/$i/console aws ec2 get-console-output --instance-id "${i}" --output text
+              fi
+            done < /tmp/node-provider-IDs
 
             for STACK_SUFFIX in compute-2 compute-1 compute-0 control-plane bootstrap proxy security infra vpc
             do
@@ -2032,6 +2347,12 @@ objects:
             export CLOUDSDK_CONFIG=${HOME}/shared/gcloudconfig
             openshift-install --dir ${HOME}/artifacts/installer destroy cluster
             gcloud deployment-manager deployments delete -q ${CLUSTER_NAME}-{worker,control-plane,bootstrap,security,infra,vpc}
+          elif [[ "${CLUSTER_TYPE}" == "azure4" ]]; then
+            openshift-install --dir=/tmp/artifacts/installer destroy cluster
+            if [[ -f /tmp/artifacts/installer/metadata.json ]]; then
+              INFRA_ID="$(jq -r .infraID /tmp/artifacts/installer/metadata.json)"
+              az group delete --name ${INFRA_ID}-rg --yes
+            fi
           else
             cd /tmp/shared/tf
             rm -rf .terraform

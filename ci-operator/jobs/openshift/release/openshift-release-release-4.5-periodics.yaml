@@ -18,7 +18,7 @@ periodics:
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
         mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/ocp-dev-preview/4.4.0-0.nightly-2019-12-03-002545/openshift-client-linux-4.4.0-0.nightly-2019-12-03-002545.tar.gz | tar xvzf - -C /tmp/bin/
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
         chmod ug+x /tmp/bin/oc
 
         # if the source and destination are identical, do nothing
@@ -46,6 +46,9 @@ periodics:
 
         # also tag the image into the art-latest stream
         oc tag "${to_quay}" "ocp/${BRANCH}-art-latest:${TAG}"
+
+        # also tag the image into the ocp private stream
+        oc tag "${to_quay}" "ocp-private/${BRANCH}-priv:${TAG}"
       env:
       - name: TAG_NS
         value: rhcos
@@ -113,9 +116,15 @@ periodics:
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
       - mountPath: /usr/local/pull-secret
-        name: pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -125,6 +134,9 @@ periodics:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -146,7 +158,7 @@ periodics:
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
         mkdir /tmp/bin
-        curl https://storage.googleapis.com/origin-ci-test/_tools/4.1.0/oc >/tmp/bin/oc 2>/dev/null
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
         chmod ug+x /tmp/bin/oc
 
         # if the source and destination are identical, do nothing
@@ -238,9 +250,15 @@ periodics:
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
       - mountPath: /usr/local/pull-secret
-        name: pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -250,6 +268,9 @@ periodics:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -271,7 +292,7 @@ periodics:
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
         mkdir /tmp/bin
-        curl https://storage.googleapis.com/origin-ci-test/_tools/4.1.0/oc >/tmp/bin/oc 2>/dev/null
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
         chmod ug+x /tmp/bin/oc
 
         # if the source and destination are identical, do nothing
@@ -363,9 +384,15 @@ periodics:
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
       - mountPath: /usr/local/pull-secret
-        name: pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -375,6 +402,9 @@ periodics:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -407,7 +437,7 @@ periodics:
         mkdir $HOME/.docker/
         cp /usr/local/pull-secret/.dockerconfigjson $HOME/.docker/config.json
         mkdir $HOME/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/ocp-dev-preview/4.4.0-0.nightly-2019-12-03-002545/openshift-client-linux-4.4.0-0.nightly-2019-12-03-002545.tar.gz 2>/dev/null | tar xzf - -C /tmp/bin/ oc
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
         curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 2>/dev/null >/tmp/bin/jq
         chmod ug+x $HOME/bin/oc $HOME/bin/jq
 
@@ -512,14 +542,18 @@ periodics:
               RUN set -xeuo pipefail && \\
                   mkdir -p /srv/repo /tmp/working && \\
                   curl -L "${tar_url}" | tar xf - -C /srv/repo/ && \\
-                  rm -rf /etc/yum.repos.d/* && \\
+                  rm -rf /etc/yum.repos.d && \\
+                  ostree --repo=/srv/repo checkout "${ostree_ref}" --subpath /usr/etc/yum.repos.d --user-mode /etc/yum.repos.d && \\
+                  sed -i 's/enabled=0/enabled=1/g' /etc/yum.repos.d/fedora-updates-testing-modular.repo && \\
                   rpm-ostree db list --repo /srv/repo "${ostree_ref}" > /tmp/packages && \\
-                  curl http://base-${BRANCH//\./-}-rhel8.ocp.svc > /etc/yum.repos.d/rhel8.repo && \\
-                  if ! grep -q cri-o /tmp/packages; then yumdownloader -y --disablerepo=* --enablerepo=rhel-8* --destdir=/tmp/rpms cri-o cri-tools; fi && \\
-                  if ! grep -q glusterfs-fuse /tmp/packages; then yumdownloader -y --disablerepo=* --enablerepo=rhel-8* --destdir=/tmp/rpms attr glusterfs glusterfs-client-xlators glusterfs-fuse glusterfs-libs psmisc; fi && \\
+                  dnf module enable -y cri-o:1.17 && \\
+                  if ! grep -q cri-o /tmp/packages; then yumdownloader -y --archlist=x86_64 --disablerepo=* --enablerepo=updates-testing-modular --destdir=/tmp/rpms cri-o cri-tools; fi && \\
+                  if ! grep -q glusterfs-fuse /tmp/packages; then yumdownloader -y --archlist=x86_64 --disablerepo=* --enablerepo=fedora --enablerepo=updates --destdir=/tmp/rpms  glusterfs glusterfs-client-xlators glusterfs-fuse glusterfs-libs psmisc; fi && \\
+                  if ! grep -q open-vm-tools /tmp/packages; then yumdownloader -y --archlist=x86_64 --disablerepo=* --enablerepo=fedora --enablerepo=updates --destdir=/tmp/rpms  open-vm-tools; fi && \\
                   cd /tmp/working && \\
                   for i in \$(find /tmp/rpms/ -name *.rpm); do echo "Extracting \$i ..."; rpm2cpio \$i | cpio -div; done && \\
                   mv etc usr/ && mv sbin/* usr/sbin/ && rm -rf sbin/ && \\
+                  ln -s ../vmtoolsd.service usr/lib/systemd/multi-user.target.wants/vmtoolsd.service && \\
                   coreos-assembler dev-overlay --repo /srv/repo --rev "${ostree_ref}" --add-tree /tmp/working --output-ref "${ostree_ref}"
 
               FROM scratch
@@ -575,9 +609,15 @@ periodics:
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
       - mountPath: /usr/local/pull-secret
-        name: pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -587,6 +627,9 @@ periodics:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -612,7 +655,7 @@ periodics:
         mkdir $HOME/.docker/
         cp /usr/local/pull-secret/.dockerconfigjson $HOME/.docker/config.json
         mkdir $HOME/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/ocp-dev-preview/4.4.0-0.nightly-2019-12-03-002545/openshift-client-linux-4.4.0-0.nightly-2019-12-03-002545.tar.gz | tar xvzf - -C $HOME/bin/
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
         chmod ug+x $HOME/bin/oc
 
         # create namespace and craft a release image without the machine operator
@@ -681,15 +724,24 @@ periodics:
       - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/pull-secret
-        name: pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
     - name: cluster-profile
       projected:
         sources:
         - secret:
             name: cluster-secrets-aws
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -705,9 +757,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
-      - --lease-server=http://boskos
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-sdn-multitenant-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
@@ -734,9 +790,6 @@ periodics:
                 mode: Multitenant
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -744,6 +797,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)-multitenant
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -760,15 +817,36 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-sdn-multitenant-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-aws
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -778,6 +856,9 @@ periodics:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -791,9 +872,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
-      - --lease-server=http://boskos
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-ovn-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
@@ -811,9 +896,6 @@ periodics:
         value: ovn
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -821,6 +903,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)-ovn
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -837,15 +923,36 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-ovn-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-aws
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -855,6 +962,9 @@ periodics:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -870,9 +980,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
-      - --lease-server=http://boskos
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-ovn-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
@@ -890,9 +1004,6 @@ periodics:
         value: ovn
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -900,6 +1011,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)-ovn
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -916,15 +1031,36 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-ovn-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-aws
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -934,6 +1070,9 @@ periodics:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -949,9 +1088,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
-      - --lease-server=http://boskos
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-gcp-ovn-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-gcp
@@ -969,9 +1112,6 @@ periodics:
         value: ovn
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -979,6 +1119,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)-ovn
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -995,15 +1139,36 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-gcp-ovn-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-gcp
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -1013,6 +1178,124 @@ periodics:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
+  decorate: true
+  interval: 48h
+  labels:
+    ci.openshift.io/release-type: informing
+    job-release: "4.5"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: release-openshift-ocp-installer-e2e-gcp-rt-4.5
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
+      - --secret-dir=/usr/local/e2e-gcp-rt-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-gcp
+      - --template=/usr/local/e2e-gcp
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_LATEST
+        value: registry.svc.ci.openshift.org/ocp/release:4.5
+      - name: BRANCH
+        value: "4.5"
+      - name: CLUSTER_TYPE
+        value: gcp
+      - name: CLUSTER_VARIANT
+        value: rt
+      - name: CONFIG_SPEC
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)-rt
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+      - name: JOB_NAME_SAFE
+        value: e2e-gcp-rt
+      - name: TEST_COMMAND
+        value: TEST_SUITE=openshift/conformance/parallel run-tests
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/e2e-gcp-rt-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/e2e-gcp
+        name: job-definition
+        subPath: cluster-launch-installer-e2e.yaml
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-gcp
+    - configMap:
+        name: prow-job-cluster-launch-installer-e2e
+      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -1028,9 +1311,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
-      - --lease-server=http://boskos
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-azure-ovn-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-azure
@@ -1048,9 +1335,6 @@ periodics:
         value: ovn
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -1058,6 +1342,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)-ovn
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -1074,15 +1362,36 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-azure-ovn-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-azure
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -1092,6 +1401,9 @@ periodics:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -1107,9 +1419,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
-      - --lease-server=http://boskos
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-azure-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-azure
@@ -1125,9 +1441,6 @@ periodics:
         value: azure4
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -1135,6 +1448,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -1155,15 +1472,36 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-azure-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-azure
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -1173,6 +1511,9 @@ periodics:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -1188,9 +1529,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
-      - --lease-server=http://boskos
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-azure-fips-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-azure-fips
@@ -1208,9 +1553,6 @@ periodics:
         value: fips
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -1218,6 +1560,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)-fips
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -1238,15 +1584,36 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-azure-fips-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-azure-fips
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -1256,6 +1623,9 @@ periodics:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -1271,9 +1641,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
-      - --lease-server=http://boskos
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-fips-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws-fips
@@ -1291,9 +1665,6 @@ periodics:
         value: fips
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -1301,6 +1672,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)-fips
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -1321,15 +1696,36 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-fips-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-aws-fips
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -1339,6 +1735,9 @@ periodics:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -1354,12 +1753,14 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-aws-proxy-cluster-profile
-      - --target=e2e-aws-proxy
-      - --template=/usr/local/e2e-aws-proxy
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --secret-dir=/usr/local/e2e-aws-proxy-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-aws-proxy
+      - --template=/usr/local/e2e-aws-proxy
       command:
       - ci-operator
       env:
@@ -1373,9 +1774,6 @@ periodics:
         value: proxy
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -1383,6 +1781,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)-proxy
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -1403,15 +1805,27 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-proxy-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-aws-proxy
         name: job-definition
         subPath: cluster-launch-installer-upi-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -1421,6 +1835,9 @@ periodics:
         name: prow-job-cluster-launch-installer-upi-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -1436,12 +1853,14 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-metal-cluster-profile
-      - --target=e2e-metal
-      - --template=/usr/local/e2e-metal
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --secret-dir=/usr/local/e2e-metal-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-metal
+      - --template=/usr/local/e2e-metal
       command:
       - ci-operator
       env:
@@ -1453,9 +1872,6 @@ periodics:
         value: metal
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -1463,6 +1879,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-aws
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -1479,15 +1899,27 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-metal-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-metal
         name: job-definition
         subPath: cluster-launch-installer-metal-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -1497,6 +1929,9 @@ periodics:
         name: prow-job-cluster-launch-installer-metal-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -1512,12 +1947,14 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-metal-serial-cluster-profile
-      - --target=e2e-metal-serial
-      - --template=/usr/local/e2e-metal-serial
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --secret-dir=/usr/local/e2e-metal-serial-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-metal-serial
+      - --template=/usr/local/e2e-metal-serial
       command:
       - ci-operator
       env:
@@ -1529,9 +1966,6 @@ periodics:
         value: metal
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -1539,6 +1973,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-aws
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -1555,15 +1993,27 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-metal-serial-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-metal-serial
         name: job-definition
         subPath: cluster-launch-installer-metal-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -1573,6 +2023,9 @@ periodics:
         name: prow-job-cluster-launch-installer-metal-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -1588,9 +2041,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
-      - --lease-server=http://boskos
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-azure-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-azure-serial
@@ -1606,9 +2063,6 @@ periodics:
         value: azure4
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -1616,6 +2070,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -1636,15 +2094,36 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-azure-serial-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-azure-serial
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -1654,6 +2133,9 @@ periodics:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -1669,9 +2151,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
-      - --lease-server=http://boskos
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-gcp-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-gcp
@@ -1687,9 +2173,6 @@ periodics:
         value: gcp
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -1697,6 +2180,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -1717,15 +2204,36 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-gcp-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-gcp
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -1737,6 +2245,9 @@ periodics:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -1752,9 +2263,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
-      - --lease-server=http://boskos
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-gcp-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-gcp
@@ -1770,9 +2285,6 @@ periodics:
         value: gcp
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -1780,6 +2292,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -1800,15 +2316,36 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-gcp-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-gcp
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -1820,6 +2357,9 @@ periodics:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -1835,9 +2375,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
-      - --lease-server=http://boskos
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-gcp-fips-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-gcp-fips
@@ -1855,9 +2399,6 @@ periodics:
         value: fips
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -1865,6 +2406,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)-fips
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -1885,15 +2430,36 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-gcp-fips-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-gcp-fips
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -1905,6 +2471,9 @@ periodics:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -1920,9 +2489,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
-      - --lease-server=http://boskos
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-azure-fips-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-azure-fips-serial
@@ -1940,9 +2513,6 @@ periodics:
         value: fips
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -1950,6 +2520,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)-fips
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -1970,15 +2544,36 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-azure-fips-serial-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-azure-fips-serial
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -1988,6 +2583,9 @@ periodics:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -2003,9 +2601,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
-      - --lease-server=http://boskos
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-fips-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws-fips-serial
@@ -2023,9 +2625,6 @@ periodics:
         value: fips
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -2033,6 +2632,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)-fips
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -2053,15 +2656,36 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-fips-serial-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-aws-fips-serial
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -2071,6 +2695,9 @@ periodics:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -2086,9 +2713,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
-      - --lease-server=http://boskos
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-gcp-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-gcp-serial
@@ -2104,9 +2735,6 @@ periodics:
         value: gcp
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -2114,6 +2742,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -2134,15 +2766,36 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-gcp-serial-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-gcp-serial
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -2154,6 +2807,9 @@ periodics:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -2169,9 +2825,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
-      - --lease-server=http://boskos
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-gcp-fips-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-gcp-fips-serial
@@ -2189,9 +2849,6 @@ periodics:
         value: fips
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -2199,6 +2856,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)-fips
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -2219,15 +2880,36 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-gcp-fips-serial-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-gcp-fips-serial
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -2239,6 +2921,9 @@ periodics:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -2256,9 +2941,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
-      - --lease-server=http://boskos
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
@@ -2274,9 +2963,6 @@ periodics:
         value: aws
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: origin
           resources:
             '*':
               limits:
@@ -2284,6 +2970,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: origin
           tests:
           - as: e2e-$(CLUSTER_TYPE)
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -2313,15 +3003,36 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-aws
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -2331,6 +3042,9 @@ periodics:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -2348,9 +3062,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
-      - --lease-server=http://boskos
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
@@ -2366,9 +3084,6 @@ periodics:
         value: aws
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -2376,6 +3091,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -2405,15 +3124,36 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-aws
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -2423,6 +3163,9 @@ periodics:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -2440,9 +3183,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
-      - --lease-server=http://boskos
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
@@ -2460,9 +3207,6 @@ periodics:
         value: compact
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -2470,6 +3214,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -2499,15 +3247,36 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-aws
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -2517,6 +3286,9 @@ periodics:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -2534,9 +3306,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
-      - --lease-server=http://boskos
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
@@ -2554,9 +3330,6 @@ periodics:
         value: shared-vpc
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -2564,6 +3337,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -2593,15 +3370,36 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-aws
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -2611,6 +3409,9 @@ periodics:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -2626,9 +3427,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
-      - --lease-server=http://boskos
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-gcp-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-gcp
@@ -2646,9 +3451,6 @@ periodics:
         value: shared-vpc
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -2656,6 +3458,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -2685,15 +3491,36 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-gcp-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-gcp
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -2705,6 +3532,9 @@ periodics:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -2720,9 +3550,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
-      - --lease-server=http://boskos
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-azure-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-azure
@@ -2740,9 +3574,6 @@ periodics:
         value: shared-vpc
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -2750,6 +3581,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -2779,15 +3614,36 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-azure-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-azure
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -2797,6 +3653,9 @@ periodics:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -2812,9 +3671,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
-      - --lease-server=http://boskos
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-gcp-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-gcp
@@ -2832,9 +3695,6 @@ periodics:
         value: compact
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -2842,6 +3702,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -2858,15 +3722,36 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-gcp-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-gcp
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -2878,6 +3763,9 @@ periodics:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -2893,9 +3781,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
-      - --lease-server=http://boskos
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-azure-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-azure
@@ -2913,9 +3805,6 @@ periodics:
         value: compact
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -2923,6 +3812,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -2939,15 +3832,36 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-azure-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-azure
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -2957,6 +3871,9 @@ periodics:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -2974,9 +3891,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
-      - --lease-server=http://boskos
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-disruptive-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws-disruptive
@@ -2992,9 +3913,6 @@ periodics:
         value: aws
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -3002,6 +3920,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)
             commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance/parallel
@@ -3020,15 +3942,36 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-disruptive-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-aws-disruptive
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -3038,6 +3981,9 @@ periodics:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -3054,9 +4000,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
-      - --lease-server=http://boskos
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws-serial
@@ -3072,9 +4022,6 @@ periodics:
         value: aws
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -3082,6 +4029,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -3111,15 +4062,36 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-serial-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-aws-serial
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -3129,6 +4101,9 @@ periodics:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -3145,9 +4120,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
-      - --lease-server=http://boskos
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-gcp-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-gcp-serial
@@ -3163,9 +4142,6 @@ periodics:
         value: gcp
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -3173,6 +4149,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -3202,15 +4182,36 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-gcp-serial-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-gcp-serial
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -3222,6 +4223,9 @@ periodics:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -3237,9 +4241,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
-      - --lease-server=http://boskos
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-console-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws-console
@@ -3255,9 +4263,6 @@ periodics:
         value: aws
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -3265,6 +4270,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)-console
             commands: ./test-prow-e2e.sh release
@@ -3283,15 +4292,36 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-console-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-aws-console
         name: job-definition
         subPath: cluster-launch-installer-custom-test-image.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -3301,6 +4331,9 @@ periodics:
         name: prow-job-cluster-launch-installer-custom-test-image
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -3316,9 +4349,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
-      - --lease-server=http://boskos
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
@@ -3334,9 +4371,6 @@ periodics:
         value: aws
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -3344,6 +4378,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -3373,15 +4411,36 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-aws
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -3391,6 +4450,9 @@ periodics:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -3406,9 +4468,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
-      - --lease-server=http://boskos
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws-serial
@@ -3424,9 +4490,6 @@ periodics:
         value: aws
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -3434,6 +4497,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -3463,15 +4530,36 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-serial-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-aws-serial
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -3481,6 +4569,9 @@ periodics:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -3496,12 +4587,14 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-vsphere-upi-cluster-profile
-      - --target=e2e-vsphere-upi
-      - --template=/usr/local/e2e-vsphere-upi
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --secret-dir=/usr/local/e2e-vsphere-upi-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-vsphere-upi
+      - --template=/usr/local/e2e-vsphere-upi
       command:
       - ci-operator
       env:
@@ -3513,9 +4606,6 @@ periodics:
         value: vsphere
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -3523,6 +4613,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -3543,15 +4637,27 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-vsphere-upi-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-vsphere-upi
         name: job-definition
         subPath: cluster-launch-installer-upi-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -3561,6 +4667,9 @@ periodics:
         name: prow-job-cluster-launch-installer-upi-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -3576,12 +4685,14 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-vsphere-upi-serial-cluster-profile
-      - --target=e2e-vsphere-upi-serial
-      - --template=/usr/local/e2e-vsphere-upi-serial
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --secret-dir=/usr/local/e2e-vsphere-upi-serial-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-vsphere-upi-serial
+      - --template=/usr/local/e2e-vsphere-upi-serial
       command:
       - ci-operator
       env:
@@ -3593,9 +4704,6 @@ periodics:
         value: vsphere
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -3603,6 +4711,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -3623,15 +4735,27 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-vsphere-upi-serial-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-vsphere-upi-serial
         name: job-definition
         subPath: cluster-launch-installer-upi-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -3641,6 +4765,9 @@ periodics:
         name: prow-job-cluster-launch-installer-upi-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -3656,12 +4783,14 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-aws-upi-cluster-profile
-      - --target=e2e-aws-upi
-      - --template=/usr/local/e2e-aws-upi
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --secret-dir=/usr/local/e2e-aws-upi-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-aws-upi
+      - --template=/usr/local/e2e-aws-upi
       command:
       - ci-operator
       env:
@@ -3673,9 +4802,6 @@ periodics:
         value: aws
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -3683,6 +4809,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -3703,15 +4833,27 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-upi-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-aws-upi
         name: job-definition
         subPath: cluster-launch-installer-upi-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -3721,6 +4863,128 @@ periodics:
         name: prow-job-cluster-launch-installer-upi-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
+  decorate: true
+  interval: 24h
+  labels:
+    ci.openshift.io/release-type: informing
+    job-env: aws
+    job-release: "4.5"
+    job-test: e2e
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    release.openshift.io/verify: "true"
+  name: release-openshift-origin-installer-e2e-aws-upgrade-4.2-to-4.3-to-4.4-to-4.5-ci
+  spec:
+    containers:
+    - command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -exuo pipefail
+
+        data=$(ARTIFACTS)/release.json
+
+        if ! curl --fail -X GET -G https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest --data-urlencode 'in=>4.2.0 <4.3.0-0' > ${data}; then
+          echo "error: Could not find an initial version"
+          exit 1
+        fi
+        export RELEASE_IMAGE_INITIAL=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${data}" )
+
+        if ! curl --fail -X GET -G https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest --data-urlencode 'in=>4.3.0 <4.4.0-0' > ${data}; then
+          echo "error: Could not find a middle version"
+          exit 1
+        fi
+        next_0=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${data}" )
+
+        if ! curl --fail -X GET -G https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.4.0-0.nightly/latest > ${data}; then
+          echo "error: Could not find newest version"
+          exit 1
+        fi
+        next_1=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${data}" )
+
+        if ! curl --fail -X GET -G https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.5.0-0.ci/latest > ${data}; then
+          echo "error: Could not find newest version"
+          exit 1
+        fi
+        next_2=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${data}" )
+
+        export RELEASE_IMAGE_LATEST=${next_2}
+        export CONFIG_SPEC="${CONFIG_SPEC/RELEASE_IMAGES/$next_0,$next_1,$next_2}"
+
+        ci-operator --artifact-dir=$(ARTIFACTS) --lease-server=http://boskos\
+          --secret-dir=/usr/local/pull-secret --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile \
+          --target=e2e-$(CLUSTER_TYPE)-upgrade --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME)
+      env:
+      - name: BRANCH
+        value: "4.2"
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: CONFIG_SPEC
+        value: |
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-serial
+            commands: TEST_SUITE=openshift/conformance/serial run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-upgrade
+            commands: |
+              TEST_SUITE=all IMAGE=RELEASE_IMAGES run-upgrade-tests
+              TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: launch-$(CLUSTER_TYPE)
+            commands: sleep 9000 & wait
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -3739,27 +5003,38 @@ periodics:
     - command:
       - /bin/bash
       - -c
-      - "#!/bin/bash\nset -euo pipefail\n\ninitial=$(ARTIFACTS)/release-initial.json\nlatest=$(ARTIFACTS)/release-latest.json\nif
-        ! curl --fail -X GET -G https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest
-        --data-urlencode 'in=>4.4.0-0 <4.5.0-0' > ${initial}; then\n  echo \"error:
-        Could not find a stable version\"\n  exit 1\nfi\nif ! curl --fail -X GET -G
-        https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.5.0-0.ci/latest
-        > ${latest}; then\n  echo \"error: Could not find newest version\"\n  exit
-        1\nfi\n\nfrom=$( python -c 'import json,sys; print json.load(open(sys.argv[1],
-        \"r\"))[\"name\"]' \"${initial}\" )\nto=$( python -c 'import json,sys; print
-        json.load(open(sys.argv[1], \"r\"))[\"name\"]' \"${latest}\" )\nexport RELEASE_IMAGE_INITIAL=$(
-        python -c 'import json,sys; print json.load(open(sys.argv[1], \"r\"))[\"pullSpec\"]'
-        \"${initial}\" )\nexport RELEASE_IMAGE_LATEST=$( python -c 'import json,sys;
-        print json.load(open(sys.argv[1], \"r\"))[\"pullSpec\"]' \"${latest}\" )\n\n#
-        prow doesn't allow init containers or a second container\nexport PATH=$PATH:/tmp/bin\nmkdir
-        /tmp/bin\ncurl https://mirror.openshift.com/pub/openshift-v4/clients/ocp-dev-preview/4.4.0-0.nightly-2019-12-03-002545/openshift-client-linux-4.4.0-0.nightly-2019-12-03-002545.tar.gz
-        | tar xvzf - -C /tmp/bin/        \nchmod ug+x /tmp/bin/oc\n\n# annotate the
-        information about this job so that the release controller adds it to the upgrade
-        graph\noc annotate pj/${PROW_JOB_ID} \"release.openshift.io/from-tag=${from}\"
-        \"release.openshift.io/tag=${to}\" \"release.openshift.io/source=ocp/$(BRANCH)\"\n\nci-operator
-        --artifact-dir=$(ARTIFACTS) --lease-server=http://boskos\\\n  --secret-dir=/usr/local/pull-secret
-        --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile \\\n  --target=e2e-$(CLUSTER_TYPE)-upgrade
-        --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME)\n"
+      - |
+        #!/bin/bash
+        set -euo pipefail
+
+        initial=$(ARTIFACTS)/release-initial.json
+        latest=$(ARTIFACTS)/release-latest.json
+        if ! curl --fail -X GET -G https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest --data-urlencode 'in=>4.4.0-0 <4.5.0-0' > ${initial}; then
+          echo "error: Could not find a stable version"
+          exit 1
+        fi
+        if ! curl --fail -X GET -G https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.5.0-0.ci/latest > ${latest}; then
+          echo "error: Could not find newest version"
+          exit 1
+        fi
+
+        from=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${initial}" )
+        to=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${latest}" )
+        export RELEASE_IMAGE_INITIAL=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${initial}" )
+        export RELEASE_IMAGE_LATEST=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${latest}" )
+
+        # prow doesn't allow init containers or a second container
+        export PATH=$PATH:/tmp/bin
+        mkdir /tmp/bin
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
+        chmod ug+x /tmp/bin/oc
+
+        # annotate the information about this job so that the release controller adds it to the upgrade graph
+        oc annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
+
+        ci-operator --artifact-dir=$(ARTIFACTS) --lease-server=http://boskos\
+          --secret-dir=/usr/local/pull-secret --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile \
+          --target=e2e-$(CLUSTER_TYPE)-upgrade --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME)
       env:
       - name: BRANCH
         value: "4.4"
@@ -3805,15 +5080,24 @@ periodics:
       - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/pull-secret
-        name: pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
     - name: cluster-profile
       projected:
         sources:
         - secret:
             name: cluster-secrets-aws
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -3854,7 +5138,7 @@ periodics:
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
         mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/ocp-dev-preview/4.4.0-0.nightly-2019-12-03-002545/openshift-client-linux-4.4.0-0.nightly-2019-12-03-002545.tar.gz | tar xvzf - -C /tmp/bin/
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
         chmod ug+x /tmp/bin/oc
 
         # annotate the information about this job so that we can query for it
@@ -3897,15 +5181,24 @@ periodics:
       - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/pull-secret
-        name: pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
     - name: cluster-profile
       projected:
         sources:
         - secret:
             name: cluster-secrets-aws
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -3946,7 +5239,7 @@ periodics:
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
         mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/ocp-dev-preview/4.4.0-0.nightly-2019-12-03-002545/openshift-client-linux-4.4.0-0.nightly-2019-12-03-002545.tar.gz | tar xvzf - -C /tmp/bin/
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
         chmod ug+x /tmp/bin/oc
 
         # annotate the information about this job so that we can query for it
@@ -3989,15 +5282,24 @@ periodics:
       - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/pull-secret
-        name: pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
     - name: cluster-profile
       projected:
         sources:
         - secret:
             name: cluster-secrets-aws
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -4015,12 +5317,14 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-aws-cnv-cluster-profile
-      - --target=e2e-aws
-      - --template=/usr/local/e2e-aws
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --secret-dir=/usr/local/e2e-aws-cnv-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-aws
+      - --template=/usr/local/e2e-aws
       command:
       - ci-operator
       env:
@@ -4032,9 +5336,6 @@ periodics:
         value: aws
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -4042,6 +5343,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -4060,15 +5365,27 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-cnv-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-aws
         name: job-definition
         subPath: cluster-launch-installer-custom-test-image.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -4078,6 +5395,9 @@ periodics:
         name: prow-job-cluster-launch-installer-custom-test-image
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -4118,7 +5438,7 @@ periodics:
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
         mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/ocp-dev-preview/4.4.0-0.nightly-2019-12-03-002545/openshift-client-linux-4.4.0-0.nightly-2019-12-03-002545.tar.gz | tar xvzf - -C /tmp/bin/
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
         chmod ug+x /tmp/bin/oc
 
         # annotate the information about this job so that we can query for it
@@ -4161,9 +5481,15 @@ periodics:
       - mountPath: /usr/local/e2e-gcp-upgrade-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/pull-secret
-        name: pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -4172,6 +5498,9 @@ periodics:
         - configMap:
             name: cluster-profile-gcp
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -4212,7 +5541,7 @@ periodics:
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
         mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/ocp-dev-preview/4.4.0-0.nightly-2019-12-03-002545/openshift-client-linux-4.4.0-0.nightly-2019-12-03-002545.tar.gz | tar xvzf - -C /tmp/bin/
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
         chmod ug+x /tmp/bin/oc
 
         # annotate the information about this job so that we can query for it
@@ -4255,15 +5584,24 @@ periodics:
       - mountPath: /usr/local/e2e-azure-upgrade-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/pull-secret
-        name: pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
     - name: cluster-profile
       projected:
         sources:
         - secret:
             name: cluster-secrets-azure4
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -4282,12 +5620,17 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-openstack-cluster-profile
-      - --target=e2e-openstack
-      - --template=/usr/local/e2e-openstack
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
+      - --secret-dir=/usr/local/e2e-openstack-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-openstack
+      - --template=/usr/local/e2e-openstack
       command:
       - ci-operator
       env:
@@ -4299,9 +5642,6 @@ periodics:
         value: openstack
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -4309,6 +5649,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -4327,15 +5671,36 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-openstack-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-openstack
         name: job-definition
         subPath: cluster-launch-installer-openstack-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -4345,6 +5710,9 @@ periodics:
         name: prow-job-cluster-launch-installer-openstack-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -4365,20 +5733,19 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --kubeconfig=/etc/apici/kubeconfig
       - --secret-dir=/usr/local/e2e-aws-scaleup-rhel7-cluster-profile
       - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
       - --target=e2e-aws-scaleup-rhel7
       - --template=/usr/local/e2e-aws-scaleup-rhel7
+      - --org=openshift
+      - --branch=release-4.5
       command:
       - ci-operator
       env:
       - name: CLUSTER_TYPE
         value: aws
-      - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-openshift-ansible-release-4.5.yaml
-            name: ci-operator-4.5-configs
       - name: JOB_NAME_SAFE
         value: e2e-aws-scaleup-rhel7
       - name: RPM_REPO_CRIO_DIR
@@ -4394,16 +5761,28 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-scaleup-rhel7-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-aws-scaleup-rhel7
         name: job-definition
         subPath: cluster-scaleup-e2e-40.yaml
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
       - mountPath: /etc/sentry-dsn
         name: sentry-dsn
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -4414,6 +5793,9 @@ periodics:
     - configMap:
         name: prow-job-cluster-scaleup-e2e-40
       name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: regcred
     - name: sentry-dsn
       secret:
         secretName: sentry-dsn
@@ -4433,12 +5815,17 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-openstack-serial-cluster-profile
-      - --target=e2e-openstack-serial
-      - --template=/usr/local/e2e-openstack-serial
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
+      - --secret-dir=/usr/local/e2e-openstack-serial-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-openstack-serial
+      - --template=/usr/local/e2e-openstack-serial
       command:
       - ci-operator
       env:
@@ -4450,9 +5837,6 @@ periodics:
         value: openstack
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -4460,6 +5844,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -4482,15 +5870,36 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-openstack-serial-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-openstack-serial
         name: job-definition
         subPath: cluster-launch-installer-openstack-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -4500,6 +5909,9 @@ periodics:
         name: prow-job-cluster-launch-installer-openstack-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
@@ -4515,9 +5927,13 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
-      - --lease-server=http://boskos
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
@@ -4535,9 +5951,6 @@ periodics:
         value: mirror
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -4545,6 +5958,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
           tests:
           - as: e2e-aws
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -4563,15 +5980,36 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-aws
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /usr/local/pull-secret
+      - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -4581,5 +6019,8 @@ periodics:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
     - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials

@@ -1,41 +1,76 @@
 base_images:
-  centos7:
+  centos:
+    cluster: https://api.ci.openshift.org
     name: centos
-    namespace: openshift
+    namespace: ci
     tag: "7"
-
 build_root:
   project_image:
     dockerfile_path: dist/openshift-release/Dockerfile.builder
-
+images:
+- dockerfile_path: dist/Dockerfile.deploy/Dockerfile
+  from: centos
+  inputs:
+    root:
+      as:
+      - quay.io/app-sre/cincinnati:builder
+      paths: null
+  to: deploy
+- dockerfile_path: dist/Dockerfile.e2e/Dockerfile
+  from: centos
+  inputs:
+    root:
+      as:
+      - quay.io/app-sre/cincinnati:builder
+      paths: null
+  to: e2e-test
 resources:
-  "*":
-    limits:
-      memory: 4Gi
+  '*':
+    limits: {}
     requests:
       cpu: 1000m
       memory: 1Gi
   unit:
-    limits:
-      memory: 9Gi
+    limits: {}
     requests:
       cpu: "3"
       memory: 5Gi
-
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: "4.4"
+  namespace: ocp
 tests:
-  - as: yaml-lint
-    commands: dist/prow_yaml_lint.sh
-    container:
-      from: src
-  - as: rustfmt-1.39.0
-    commands: dist/prow_rustfmt.sh 1.39.0
-    container:
-      from: src
-  - as: rustfmt-1.38.0
-    commands: dist/prow_rustfmt.sh 1.38.0
-    container:
-      from: src
-  - as: rustfmt-1.37.0
-    commands: dist/prow_rustfmt.sh 1.37.0
-    container:
-      from: src
+- artifact_dir: /tmp/artifacts
+  as: cargo-test
+  commands: |
+    env CINCINNATI_TEST_CREDENTIALS_PATH=/usr/local/ci-secrets/cincinnati-secrets-cincinnati-credentials/registry_credentials_docker.json \
+        CINCINNATI_TEST_QUAY_API_TOKEN_PATH=/usr/local/ci-secrets/cincinnati-secrets-cincinnati-credentials/quay_api_access_token.key \
+        CINCINNATI_GITHUB_SCRAPER_OAUTH_TOKEN_PATH=/usr/local/ci-secrets/cincinnati-secrets-cincinnati-credentials/github_token.key \
+    dist/cargo_test.sh
+  container:
+    from: src
+  secret:
+    mount_path: /usr/local/ci-secrets/cincinnati-secrets-cincinnati-credentials
+    name: cincinnati-secrets-cincinnati-credentials
+- as: yaml-lint
+  commands: dist/prow_yaml_lint.sh
+  container:
+    from: src
+- as: rustfmt-1.41.0
+  commands: dist/prow_rustfmt.sh 1.41.0
+  container:
+    from: src
+- as: rustfmt-1.40.0
+  commands: dist/prow_rustfmt.sh 1.40.0
+  container:
+    from: src
+- as: rustfmt-1.42.0
+  commands: dist/prow_rustfmt.sh 1.42.0
+  container:
+    from: src
+- as: e2e
+  artifact_dir: /tmp/artifacts
+  commands: env ARTIFACTS_DIR=/tmp/artifacts bash hack/e2e.sh
+  openshift_installer_custom_test_image:
+    cluster_profile: aws
+    from: pipeline:e2e-test

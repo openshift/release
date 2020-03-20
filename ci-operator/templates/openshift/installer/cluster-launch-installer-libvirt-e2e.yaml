@@ -63,7 +63,7 @@ objects:
       ci-operator.openshift.io/container-sub-tests: "setup,test,teardown"
   spec:
     restartPolicy: Never
-    activeDeadlineSeconds: 18000
+    activeDeadlineSeconds: 21600
     terminationGracePeriodSeconds: 900
     volumes:
     - name: artifacts
@@ -213,6 +213,14 @@ objects:
         gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
         set -x
 
+        # Create the network and firewall rules to attach it to VM
+        gcloud compute networks create "${INSTANCE_PREFIX}" \
+          --subnet-mode=auto \
+          --bgp-routing-mode=regional
+        gcloud compute firewall-rules create "${INSTANCE_PREFIX}" \
+          --network "${INSTANCE_PREFIX}" \
+          --allow tcp:22,icmp
+
         # image-family openshift4-libvirt must exist in ${GOOGLE_COMPUTE_ZONE} for this template
         # to create the image-family see here: https://github.com/ironcladlou/openshift4-libvirt-gcp#images
         gcloud compute instances create "${INSTANCE_PREFIX}" \
@@ -222,7 +230,8 @@ objects:
           --min-cpu-platform "Intel Haswell" \
           --boot-disk-type pd-ssd \
           --boot-disk-size 256GB \
-          --metadata-from-file openshift-pull-secret=/tmp/cluster/pull-secret
+          --metadata-from-file openshift-pull-secret=/tmp/cluster/pull-secret \
+          --network "${INSTANCE_PREFIX}"
         LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
           --quiet \
           --project "${GOOGLE_PROJECT_ID}" \
@@ -302,7 +311,8 @@ objects:
           LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
             --zone "${GOOGLE_COMPUTE_ZONE}" \
             packer@"${INSTANCE_PREFIX}" \
-            --command 'mkdir -p $HOME/must-gather && export KUBECONFIG=$HOME/clusters/installer/auth/kubeconfig && bash -ce "oc adm must-gather --dest-dir $HOME/must-gather || true"'
+            --command 'mkdir -p $HOME/must-gather && export KUBECONFIG=$HOME/clusters/installer/auth/kubeconfig && bash -ce "oc adm must-gather --dest-dir $HOME/must-gather || true && tar -czC "$HOME/must-gather -f $HOME/must-gather.tar.gz"'
+
           echo "scp everything related to installer back to pod"
           LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
             --quiet \
@@ -314,7 +324,7 @@ objects:
             --quiet \
             --project "${GOOGLE_PROJECT_ID}" \
             --zone "${GOOGLE_COMPUTE_ZONE}" \
-            --recurse packer@"${INSTANCE_PREFIX}":$HOME/must-gather /tmp/artifacts
+            --recurse packer@"${INSTANCE_PREFIX}":$HOME/must-gather.tar.gz /tmp/artifacts
           echo "scp junit logs back to test pod"
           LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
             --quiet \
@@ -325,6 +335,8 @@ objects:
           touch /home/packer/exit
           echo "Deprovisioning cluster ..."
           gcloud compute instances delete "${INSTANCE_PREFIX}" --quiet
+          gcloud compute firewall-rules delete "${INSTANCE_PREFIX}" --quiet
+          gcloud compute networks delete "${INSTANCE_PREFIX}" --quiet
         }
 
         trap 'teardown' EXIT

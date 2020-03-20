@@ -1,7 +1,7 @@
 kind: ImageStream
 apiVersion: image.openshift.io/v1
 metadata:
-  namespace: ci-search
+  namespace: ci
   name: ci-search
 spec:
   lookupPolicy:
@@ -12,7 +12,7 @@ spec:
 kind: Service
 apiVersion: v1
 metadata:
-  namespace: ci-search
+  namespace: ci
   name: search
 spec:
   selector:
@@ -25,7 +25,7 @@ spec:
 kind: Route
 apiVersion: v1
 metadata:
-  namespace: ci-search
+  namespace: ci
   name: search
 spec:
   host: search.svc.ci.openshift.org
@@ -40,7 +40,7 @@ spec:
 kind: Deployment
 apiVersion: apps/v1
 metadata:
-  namespace: ci-search
+  namespace: ci
   name: search
   annotations:
     image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"ci-search:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"web\")].image"}]'
@@ -53,10 +53,14 @@ spec:
       labels:
         app: search
     spec:
+      automountServiceAccountToken: false
       volumes:
+      - name: bugzilla-token
+        secret:
+          secretName: bugzilla-credentials-bugzilla.redhat.com
       - name: job-config
         configMap:
-          name: job-config
+          name: ci-search-job-config
       - name: cache
         emptyDir: {}
       containers:
@@ -67,13 +71,19 @@ spec:
             cpu: 100m
             memory: 200Mi
         volumeMounts:
+        - name: bugzilla-token
+          mountPath: /etc/bugzilla/
         - name: job-config
           mountPath: /etc/ci-search/
         - name: cache
           mountPath: /var/lib/ci-search/
         command:
         - /usr/bin/search
+        - --v=6
         - --config=/etc/ci-search/config.yaml
         - --interval=10m
         - --path=/var/lib/ci-search/
         - --deck-uri=https://prow.svc.ci.openshift.org
+        - --bugzilla-url=https://bugzilla.redhat.com/rest
+        - --bugzilla-token-file=/etc/bugzilla/api
+        - --bugzilla-search=OPEN version:4.7,4.6,4.5,4.4,4.3 product="OpenShift Container Platform" AND delta_ts>-2w

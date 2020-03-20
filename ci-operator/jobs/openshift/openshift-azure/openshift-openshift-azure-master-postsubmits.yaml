@@ -3,6 +3,7 @@ postsubmits:
   - agent: kubernetes
     branches:
     - master
+    cluster: api.ci
     context: e2e
     decorate: true
     name: branch-ci-openshift-azure-master-e2e
@@ -20,6 +21,7 @@ postsubmits:
   - agent: kubernetes
     branches:
     - master
+    cluster: api.ci
     context: unit
     decorate: true
     name: branch-ci-openshift-azure-master-unit
@@ -35,6 +37,7 @@ postsubmits:
   - agent: kubernetes
     branches:
     - master
+    cluster: api.ci
     context: verify
     decorate: true
     name: branch-ci-openshift-azure-master-verify
@@ -50,6 +53,7 @@ postsubmits:
   - agent: kubernetes
     branches:
     - ^master$
+    cluster: api.ci
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -60,22 +64,14 @@ postsubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=master
         - --give-pr-author-access-to-namespace=true
-        - --org=openshift
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
         - --promote
-        - --repo=openshift-azure
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=[images]
         command:
         - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-openshift-azure-master.yaml
-              name: ci-operator-master-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -83,11 +79,26 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: pull-secret
+        secret:
+          secretName: regcred
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn

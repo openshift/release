@@ -1,40 +1,14 @@
-tag_specification:
-  name: '4.3'
-  namespace: ocp
-promotion:
-  cluster: https://api.ci.openshift.org
-  namespace: openshift
-  name: knative-nightly
 base_images:
   base:
-    name: '4.3'
+    cluster: https://api.ci.openshift.org
+    name: "4.3"
     namespace: ocp
     tag: base
+binary_build_commands: make install
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
 canonical_go_repository: knative.dev/eventing
-binary_build_commands: make install
-test_binary_build_commands: make test-install
-tests:
-- as: e2e-aws-ocp-43
-  commands: "make test-e2e"
-  openshift_installer_src:
-    cluster_profile: aws
-resources:
-  '*':
-    limits:
-      memory: 6Gi
-    requests:
-      cpu: 4
-      memory: 6Gi
-  'bin':
-    limits:
-      memory: 6Gi
-    requests:
-      cpu: 4
-      memory: 6Gi
-
 images:
 - dockerfile_path: openshift/ci-operator/knative-images/apiserver_receive_adapter/Dockerfile
   from: base
@@ -44,6 +18,14 @@ images:
       - destination_dir: .
         source_path: /go/bin/apiserver_receive_adapter
   to: knative-eventing-apiserver-receive-adapter
+- dockerfile_path: openshift/ci-operator/knative-images/channel_broker/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/channel_broker
+  to: knative-eventing-channel-broker
 - dockerfile_path: openshift/ci-operator/knative-images/channel_controller/Dockerfile
   from: base
   inputs:
@@ -68,14 +50,6 @@ images:
       - destination_dir: .
         source_path: /go/bin/controller
   to: knative-eventing-controller
-- dockerfile_path: openshift/ci-operator/knative-images/cronjob_receive_adapter/Dockerfile
-  from: base
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/bin/cronjob_receive_adapter
-  to: knative-eventing-cronjob-receive-adapter
 - dockerfile_path: openshift/ci-operator/knative-images/filter/Dockerfile
   from: base
   inputs:
@@ -92,6 +66,22 @@ images:
       - destination_dir: .
         source_path: /go/bin/ingress
   to: knative-eventing-ingress
+- dockerfile_path: openshift/ci-operator/knative-images/jobrunner/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/jobrunner
+  to: knative-eventing-jobrunner
+- dockerfile_path: openshift/ci-operator/knative-images/adapter/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/adapter
+  to: knative-eventing-adapter
 - dockerfile_path: openshift/ci-operator/knative-images/pong/Dockerfile
   from: base
   inputs:
@@ -108,14 +98,6 @@ images:
       - destination_dir: .
         source_path: /go/bin/sendevent
   to: knative-eventing-sendevent
-- dockerfile_path: openshift/ci-operator/knative-images/sources_controller/Dockerfile
-  from: base
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/bin/sources_controller
-  to: knative-eventing-sources-controller
 - dockerfile_path: openshift/ci-operator/knative-images/webhook/Dockerfile
   from: base
   inputs:
@@ -132,6 +114,14 @@ images:
       - destination_dir: .
         source_path: /go/bin/eventdetails
   to: knative-eventing-test-eventdetails
+- dockerfile_path: openshift/ci-operator/knative-test-images/recordevents/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/recordevents
+  to: knative-eventing-test-recordevents
 - dockerfile_path: openshift/ci-operator/knative-test-images/filterevents/Dockerfile
   from: base
   inputs:
@@ -196,3 +186,27 @@ images:
       - destination_dir: .
         source_path: /go/bin/transformevents
   to: knative-eventing-test-transformevents
+promotion:
+  name: knative-nightly
+  namespace: openshift
+resources:
+  '*':
+    limits: {}
+    requests:
+      cpu: "4"
+      memory: 6Gi
+  bin:
+    limits: {}
+    requests:
+      cpu: "4"
+      memory: 6Gi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: "4.3"
+  namespace: ocp
+test_binary_build_commands: make test-install
+tests:
+- as: e2e-aws-ocp-43
+  commands: make test-e2e
+  openshift_installer_src:
+    cluster_profile: aws

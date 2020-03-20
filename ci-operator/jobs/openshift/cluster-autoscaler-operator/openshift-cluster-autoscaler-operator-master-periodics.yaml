@@ -1,6 +1,10 @@
 periodics:
 - agent: kubernetes
   decorate: true
+  extra_refs:
+  - base_ref: master
+    org: cluster-autoscaler-operator
+    repo: verification-tests
   interval: 3h
   name: periodic-ci-openshift-cluster-autoscaler-operator-e2e-aws-master
   spec:
@@ -8,7 +12,12 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --git-ref=openshift/cluster-autoscaler-operator@master
-      - --lease-server=http://boskos
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
+      - --repo=verification-tests
       - --secret-dir=/usr/local/e2e-aws-operator-cluster-profile
       - --target=e2e-aws-operator
       - --template=/usr/local/e2e-aws-operator
@@ -17,11 +26,6 @@ periodics:
       env:
       - name: CLUSTER_TYPE
         value: aws
-      - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-cluster-autoscaler-operator-master.yaml
-            name: ci-operator-master-configs
       - name: JOB_NAME_SAFE
         value: e2e-aws-operator
       - name: TEST_COMMAND
@@ -33,13 +37,34 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-operator-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-aws-operator
         name: job-definition
         subPath: cluster-launch-installer-src.yaml
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -48,8 +73,16 @@ periodics:
     - configMap:
         name: prow-job-cluster-launch-installer-src
       name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: regcred
 - agent: kubernetes
+  cluster: api.ci
   decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: cluster-autoscaler-operator
   interval: 3h
   name: periodic-ci-openshift-cluster-autoscaler-operator-e2e-azure-master
   spec:
@@ -57,7 +90,12 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --git-ref=openshift/cluster-autoscaler-operator@master
-      - --lease-server=http://boskos
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
+      - --repo=cluster-autoscaler-operator
       - --secret-dir=/usr/local/e2e-azure-operator-cluster-profile
       - --target=e2e-azure-operator
       - --template=/usr/local/e2e-azure-operator
@@ -66,11 +104,6 @@ periodics:
       env:
       - name: CLUSTER_TYPE
         value: azure4
-      - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-cluster-autoscaler-operator-master.yaml
-            name: ci-operator-master-configs
       - name: JOB_NAME_SAFE
         value: e2e-azure-operator
       - name: TEST_COMMAND
@@ -82,13 +115,34 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-azure-operator-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-azure-operator
         name: job-definition
         subPath: cluster-launch-installer-src.yaml
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -97,8 +151,16 @@ periodics:
     - configMap:
         name: prow-job-cluster-launch-installer-src
       name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: regcred
 - agent: kubernetes
+  cluster: api.ci
   decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: cluster-autoscaler-operator
   interval: 3h
   name: periodic-ci-openshift-cluster-autoscaler-operator-e2e-gcp-master
   spec:
@@ -106,7 +168,12 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --git-ref=openshift/cluster-autoscaler-operator@master
-      - --lease-server=http://boskos
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
+      - --repo=cluster-autoscaler-operator
       - --secret-dir=/usr/local/e2e-gcp-operator-cluster-profile
       - --target=e2e-gcp-operator
       - --template=/usr/local/e2e-gcp-operator
@@ -115,11 +182,6 @@ periodics:
       env:
       - name: CLUSTER_TYPE
         value: gcp
-      - name: CONFIG_SPEC
-        valueFrom:
-          configMapKeyRef:
-            key: openshift-cluster-autoscaler-operator-master.yaml
-            name: ci-operator-master-configs
       - name: JOB_NAME_SAFE
         value: e2e-gcp-operator
       - name: TEST_COMMAND
@@ -131,13 +193,34 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-gcp-operator-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-gcp-operator
         name: job-definition
         subPath: cluster-launch-installer-src.yaml
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -146,3 +229,6 @@ periodics:
     - configMap:
         name: prow-job-cluster-launch-installer-src
       name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: regcred

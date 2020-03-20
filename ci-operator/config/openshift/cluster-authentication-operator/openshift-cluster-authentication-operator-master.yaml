@@ -1,11 +1,13 @@
 base_images:
   base:
-    name: "4.4"
+    cluster: https://api.ci.openshift.org
+    name: "4.5"
     namespace: ocp
     tag: base
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
+    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.13
@@ -19,22 +21,27 @@ images:
       paths: null
   to: cluster-authentication-operator
 promotion:
-  name: "4.4"
+  name: "4.5"
   namespace: ocp
 resources:
   '*':
-    limits:
-      memory: 4Gi
+    limits: {}
     requests:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.4"
+  cluster: https://api.ci.openshift.org
+  name: "4.5"
   namespace: ocp
 tests:
 - as: verify
   commands: |
     make verify -k --warn-undefined-variables
+  container:
+    from: src
+- as: verify-deps
+  commands: |
+    make verify-deps -k --warn-undefined-variables
   container:
     from: src
 - artifact_dir: /tmp/artifacts
@@ -65,3 +72,4 @@ tests:
   openshift_installer_custom_test_image:
     cluster_profile: aws
     from: stable:console-tests
+    nested_virt_image: ""

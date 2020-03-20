@@ -23,6 +23,16 @@ parameters:
   required: true
 - name: KURYR_ENABLED
   value: "false"
+- name: OS_CLOUD
+  value: openstack-cloud
+- name: OPENSTACK_EXTERNAL_NETWORK
+  value: external
+- name: OPENSTACK_FLAVOR
+  value: m1.s2.xlarge
+- name: OPENSTACK_MASTER_VOLUME_SIZE
+  value: "25"
+- name: OPENSTACK_MASTER_VOLUME_TYPE
+  value: "performance"
 - name: BUILD_ID
   required: false
 - name: USE_LEASE_CLIENT
@@ -69,7 +79,7 @@ objects:
       ci-operator.openshift.io/container-sub-tests: "setup,test,teardown"
   spec:
     restartPolicy: Never
-    activeDeadlineSeconds: 18000
+    activeDeadlineSeconds: 21600
     terminationGracePeriodSeconds: 900
     volumes:
     - name: artifacts
@@ -196,8 +206,8 @@ objects:
         cd /tmp/output
 
         function run-upgrade-tests() {
-          openshift-tests run-upgrade "${TEST_SUITE}" --to-image "${RELEASE_IMAGE_LATEST}" \
-            --options "${TEST_OPTIONS}" \
+          openshift-tests run-upgrade "${TEST_SUITE}" --to-image "${IMAGE:-${RELEASE_IMAGE_LATEST}}" \
+            --options "${TEST_OPTIONS:-}" \
             --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
         }
 
@@ -207,10 +217,11 @@ objects:
         }
 
         function run-minimal-tests() {
-          # Only execute Smoke tests while the test infrastructure is getting
-          # prepared to run the actual suite reliably.
+          # Only execute Smoke (<4.4) or Early (>= 4.4) tests while the test
+          # infrastructure is getting prepared to run the actual suite
+          # reliably.
           openshift-tests run openshift/conformance/parallel --dry-run |
-            grep 'Smoke' |
+            grep 'Smoke\|Early' |
           openshift-tests run -o /tmp/artifacts/e2e.log \
             --junit-dir /tmp/artifacts/junit -f -
           return 0
@@ -260,16 +271,12 @@ objects:
         value: ${RELEASE_IMAGE_LATEST}
       - name: OPENSHIFT_INSTALL_INVOKER
         value: openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID}
-      - name: OPENSTACK_IMAGE
-        value: rhcos
-      - name: OPENSTACK_REGION
-        value: moc-kzn
       - name: OPENSTACK_FLAVOR
-        value: m1.s2.xlarge
+        value: "${OPENSTACK_FLAVOR}"
       - name: OPENSTACK_EXTERNAL_NETWORK
-        value: external
+        value: "${OPENSTACK_EXTERNAL_NETWORK}"
       - name: OS_CLOUD
-        value: openstack-cloud
+        value: "${OS_CLOUD}"
       - name: OS_CLIENT_CONFIG_FILE
         value: /etc/openshift-installer/clouds.yaml
       - name: USER
@@ -278,9 +285,9 @@ objects:
         value: /tmp
       # we must boot from performance volumes to reduce disk speed related etcd failures
       - name: OPENSTACK_MASTER_VOLUME_SIZE
-        value: "25"
+        value: "${OPENSTACK_MASTER_VOLUME_SIZE}"
       - name: OPENSTACK_MASTER_VOLUME_TYPE
-        value: "performance"
+        value: "${OPENSTACK_MASTER_VOLUME_TYPE}"
       - name: INSTALL_INITIAL_RELEASE
       - name: RELEASE_IMAGE_INITIAL
       command:
@@ -317,7 +324,7 @@ objects:
         chmod 0600 ~/.ssh/id_rsa
 
         # create a new floating ip tagged with CLUSTER_NAME so it can be deleted later
-        LB_FIP=$(openstack floating ip create --description $CLUSTER_NAME $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address')
+        LB_FIP=$(openstack floating ip create --description "${CLUSTER_NAME}-api-fip"  $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address')
 
         echo "Creating DNS record for api.$CLUSTER_NAME.$BASE_DOMAIN. -> $LB_FIP"
         cat > /tmp/artifacts/installer/api-record.json <<EOF
@@ -354,7 +361,6 @@ objects:
             cloud:            ${OS_CLOUD}
             externalNetwork:  ${OPENSTACK_EXTERNAL_NETWORK}
             computeFlavor:    ${OPENSTACK_FLAVOR}
-            region:           ${OPENSTACK_REGION}
             lbFloatingIP:     ${LB_FIP}
         pullSecret: >
           ${PULL_SECRET}
@@ -379,14 +385,14 @@ objects:
           echo "Forcing OpenShiftSDN by modifying manifests"
           sed -i -e 's/networkType: .*$/networkType: OpenShiftSDN/g' /tmp/artifacts/installer/manifests/cluster-network-02-config.yml
         fi
-        TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create cluster --log-level=debug 2>&1 | grep -v password &
+        TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create cluster --log-level=debug 2>&1 | grep --line-buffered -v password &
         wait "$!"
 
         INGRESS_PORT=$(openstack port list --format value -c Name | awk "/${CLUSTER_NAME}.*-ingress-port/ {print}")
         if [ -n "$INGRESS_PORT" ]; then
           # Assign a FIP to ingress port to allow getting to apps
           # create a new floating ip tagged with CLUSTER_NAME so it can be deleted later
-          APPS_FIP=$(openstack floating ip create --description $CLUSTER_NAME $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address' --port $INGRESS_PORT)
+          APPS_FIP=$(openstack floating ip create --description "${CLUSTER_NAME}-ingress-fip" $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address' --port $INGRESS_PORT)
           echo "Creating DNS record for *.apps.$CLUSTER_NAME.$BASE_DOMAIN. -> $APPS_FIP"
           cat > /tmp/artifacts/installer/ingress-record.json <<EOF
           {
@@ -431,7 +437,7 @@ objects:
       - name: KUBECONFIG
         value: /tmp/artifacts/installer/auth/kubeconfig
       - name: OS_CLOUD
-        value: openstack-cloud
+        value: ${OS_CLOUD}
       - name: OS_CLIENT_CONFIG_FILE
         value: /etc/openshift-installer/clouds.yaml
       - name: SSH_PRIV_KEY_PATH
@@ -456,7 +462,7 @@ objects:
             LIVE="$(jobs | wc -l)"
           done
           echo "${@}"
-          if [[ -n "${FILTER}" ]]; then
+          if [[ -n "${FILTER:-}" ]]; then
             "${@}" | "${FILTER}" >"${TARGET}" &
           else
             "${@}" >"${TARGET}" &
@@ -565,6 +571,9 @@ objects:
 
           echo "Waiting for logs ..."
           wait
+
+          tar -czC /tmp/artifacts/must-gather -f /tmp/artifacts/must-gather.tar.gz . &&
+          rm -rf /tmp/artifacts/must-gather
 
           echo "Removing entries from DNS ..."
           export HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "shiftstack.devcluster.openshift.com" | python -c 'import json,sys;print json.load(sys.stdin)["HostedZones"][0]["Id"].split("/")[-1]')

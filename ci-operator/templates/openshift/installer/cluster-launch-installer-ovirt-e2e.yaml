@@ -78,7 +78,7 @@ objects:
         secretName: ${JOB_NAME_SAFE}-cluster-profile
 
     containers:
-        
+
     - name: lease
       image: registry.svc.ci.openshift.org/ci/boskoscli:latest
       terminationMessagePolicy: FallbackToLogsOnError
@@ -121,12 +121,22 @@ objects:
         function acquire_lease() {
           resource="$( boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" acquire --type "${CLUSTER_TYPE}-quota-slice" --state "free" --target-state "leased" --timeout 150m )"
           resource_name="$(echo "${resource}"|jq .name --raw-output)"
+          echo "[INFO] Lease acquired! at $(date --utc)"
+          echo "[INFO] Leased resource: ${resource}"
           lease_path="/etc/openshift-installer/${resource_name}.json"
           ovirt_engine_template_name="$(extract_leases_info ovirt_engine_template_name ${lease_path})"
+          echo "[INFO] Sending heartbeats to retain the lease ${resource_name}"
+          boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" heartbeat --resource "${resource}" &
+          heartbeats_pid=$!
           if [ "${LEASE_TYPE}" == "conformance" ]; then
             bm_name="$(extract_leases_info ovirt_engine_cluster_bm ${lease_path})"
             conformance_resource="$( boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" acquire --type "${CLUSTER_TYPE}-${bm_name}" --state "free" --target-state "leased" --timeout 150m )"
             conformance_resource_name="$(echo "${conformance_resource}"|jq .name --raw-output)"
+            echo "[INFO] Conformance Lease acquired! at $(date --utc)"
+            echo "[INFO] Conformance Leased resource: ${conformance_resource}"
+            boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" heartbeat --resource "${resource}" &
+            conformance_heartbeats_pid=$!
+            echo "[INFO] Sending heartbeats to retain the lease ${conformance_resource_name}"
             worker_cpu=8
             worker_mem=16384
             master_cpu=8
@@ -158,26 +168,22 @@ objects:
         EOF
 
         touch /tmp/shared/leased
-        echo "[INFO] Lease acquired!"
-        echo "[INFO] Leased resource: ${resource}"
 
         function release() {
-            echo "killing heartbeat process "${1}""
-            kill -9 "${1}"
+            echo "killing heartbeat process "${heartbeats_pid}" at $(date --utc)"
+            kill -9 "${heartbeats_pid}"
             echo "[INFO] Releasing the lease on resouce ${resource_name}"
             boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" release --name "${resource_name}" --target-state "free"
             if [ "${LEASE_TYPE}" == "conformance" ]; then
+              echo "killing conformance heartbeats process "${conformance_heartbeats_pid}" at $(date --utc)"
+              kill -9 "${conformance_heartbeats_pid}"
               echo "[INFO] Releasing the lease on resouce ${conformance_resource_name}"
               boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" release --name "${conformance_resource_name}" --target-state "free"
             fi
         }
 
-        echo "[INFO] Sending heartbeats to retain the lease..."
-        boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" heartbeat --resource "${resource}" &
-        heartbeats_pid=$!
-
-        trap "release "${heartbeats_pid}"" EXIT
-        trap 'release "${heartbeats_pid}"' TERM
+        trap "release" EXIT
+        trap "release" TERM
 
         while true; do
           if [[ -f /tmp/shared/exit ]]; then
@@ -262,8 +268,8 @@ objects:
         cd /tmp/output
 
         function run-upgrade-tests() {
-          openshift-tests run-upgrade "${TEST_SUITE}" --to-image "${RELEASE_IMAGE_LATEST}" \
-            --options "${TEST_OPTIONS}" \
+          openshift-tests run-upgrade "${TEST_SUITE}" --to-image "${IMAGE:-${RELEASE_IMAGE_LATEST}}" \
+            --options "${TEST_OPTIONS:-}" \
             --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
         }
 
@@ -275,7 +281,7 @@ objects:
         function run-minimal-tests() {
           # Grab all of the tests marked Feature:Builds and conformance/parallel/minimal
           openshift-tests run openshift/conformance/parallel --dry-run |
-            grep 'Smoke' |
+            grep 'Early' |
           openshift-tests run -o /tmp/artifacts/e2e.log \
             --junit-dir /tmp/artifacts/junit -f -
         }
@@ -291,7 +297,7 @@ objects:
     - name: setup
       # A midstep till we have the installer work merged, then we
       # can use the CI artifact
-      image: quay.io/rgolangh/openshift-installer:latest
+      image: ${IMAGE_INSTALLER}
       terminationMessagePolicy: FallbackToLogsOnError
       volumeMounts:
       - name: shared-tmp
@@ -312,7 +318,7 @@ objects:
       - name: PULL_SECRET_PATH
         value: /etc/openshift-installer/pull-secret
       - name: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
-        value: registry.svc.ci.openshift.org/ovirt/ovirt-release:latest
+        value: ${RELEASE_IMAGE_LATEST}
       - name: USER
         value: test
       - name: HOME
@@ -329,16 +335,16 @@ objects:
         trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/setup-success; else touch /tmp/exit; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
         # Wait untill lease is acquired
-        while true; do	
-          if [[ -f /tmp/exit ]]; then	
-            echo "Another process exited" 2>&1	
-            exit 1	
-          fi	
-          if [[ -f /tmp/leased ]]; then	
-            echo "Lease acquired, installing..."	
-            break	
-          fi	
-          sleep 15 & wait	
+        while true; do
+          if [[ -f /tmp/exit ]]; then
+            echo "Another process exited" 2>&1
+            exit 1
+          fi
+          if [[ -f /tmp/leased ]]; then
+            echo "Lease acquired, installing..."
+            break
+          fi
+          sleep 15 & wait
         done
 
         if [[ -n "${INSTALL_INITIAL_RELEASE}" && -n "${RELEASE_IMAGE_INITIAL}" ]]; then
@@ -348,7 +354,7 @@ objects:
           echo "Installing from release ${RELEASE_IMAGE_LATEST}"
         fi
         # poll to make sure that the test container has dropped oc into the shared volume
-        while [ ! command -V oc ]; do sleep 1; done 
+        while [ ! command -V oc ]; do sleep 1; done
         cp "$(command -v openshift-install)" /tmp
         mkdir /tmp/artifacts/installer
         source /tmp/ovirt-lease.conf
@@ -407,6 +413,14 @@ objects:
           ${SSH_PUB_KEY}
         EOF
 
+        function update_image_registry() {
+          while true; do
+            sleep 10;
+            oc get configs.imageregistry.operator.openshift.io/cluster > /dev/null && break
+          done
+          oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'
+        }
+
         #change the masters igntion , to use tempfs for etcd IOPS optimization
         TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create ignition-configs --log-level=debug
         python -c \
@@ -417,11 +431,15 @@ objects:
 
         # What we're doing here is we generate manifests first and force that OpenShift SDN is configured.
         TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create manifests --log-level=debug
-        TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create cluster --log-level=debug 2>&1 | grep -v password &
+        # This is for debugging purposes, allows us to map a job to a VM
+        cat /tmp/artifacts/installer/manifests/cluster-infrastructure-02-config.yml
+
+        export KUBECONFIG=/tmp/artifacts/installer/auth/kubeconfig
+        update_image_registry &
+
+        TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create cluster --log-level=debug 2>&1 | grep --line-buffered -v password &
         wait "$!"
         install_exit_status=$?
-        export KUBECONFIG=/tmp/artifacts/installer/auth/kubeconfig
-        oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'
         sleep 10m
         oc get co/image-registry
         exit $install_exit_status
@@ -430,7 +448,7 @@ objects:
     - name: teardown
       # A midstep till we have the installer work merged, then we
       # can use the CI artifact
-      image: quay.io/rgolangh/openshift-installer:latest
+      image: ${IMAGE_INSTALLER}
       terminationMessagePolicy: FallbackToLogsOnError
       volumeMounts:
       - name: shared-tmp
@@ -478,35 +496,6 @@ objects:
           echo "Gathering artifacts ..."
           mkdir -p /tmp/artifacts/pods /tmp/artifacts/nodes /tmp/artifacts/metrics /tmp/artifacts/bootstrap /tmp/artifacts/network
 
-
-          if [ -f /tmp/artifacts/installer/terraform.tfstate ]
-          then
-              if [ -n "${bootstrap_ip}" ]
-              then
-                for service in bootkube openshift kubelet crio
-                do
-                    queue "/tmp/artifacts/bootstrap/${service}.service" curl \
-                        --insecure \
-                        --silent \
-                        --connect-timeout 5 \
-                        --retry 3 \
-                        --cert /tmp/artifacts/installer/tls/journal-gatewayd.crt \
-                        --key /tmp/artifacts/installer/tls/journal-gatewayd.key \
-                        --url "https://${bootstrap_ip}:19531/entries?_SYSTEMD_UNIT=${service}.service"
-                done
-                if ! whoami &> /dev/null; then
-                  if [ -w /etc/passwd ]; then
-                    echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
-                  fi
-                fi
-                eval $(ssh-agent)
-                ssh-add /etc/openshift-installer/ssh-privatekey
-                ssh -A -o PreferredAuthentications=publickey -o StrictHostKeyChecking=false -o UserKnownHostsFile=/dev/null core@${bootstrap_ip} /bin/bash -x /usr/local/bin/installer-gather.sh
-                scp -o PreferredAuthentications=publickey -o StrictHostKeyChecking=false -o UserKnownHostsFile=/dev/null core@${bootstrap_ip}:log-bundle.tar.gz /tmp/artifacts/installer/bootstrap-logs.tar.gz
-              fi
-          else
-              echo "No terraform statefile found. Skipping collection of bootstrap logs."
-          fi
           # WORKAROUND https://github.com/openshift/installer/issues/1467
           # We need this to be able to collect logs
           oc --insecure-skip-tls-verify --request-timeout=5s get csr -o name | xargs oc --insecure-skip-tls-verify --request-timeout=5s adm certificate approve
@@ -583,6 +572,8 @@ objects:
           openshift-install --dir /tmp/artifacts/installer destroy bootstrap
           echo "Destroy cluster ..."
           openshift-install --dir /tmp/artifacts/installer destroy cluster
+          # Clean up
+          rm -f /tmp/artifacts/installer/ovirt-config.yaml
         }
 
         trap 'teardown; exit $DELETE_FAIL' EXIT

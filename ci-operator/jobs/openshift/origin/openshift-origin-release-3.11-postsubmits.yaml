@@ -3,12 +3,14 @@ postsubmits:
   - agent: jenkins
     branches:
     - release-3.11
+    cluster: api.ci
     labels:
       master: ci.openshift.redhat.com
     name: ami_build_origin_int_rhel_build-release-3.11
   - agent: kubernetes
     branches:
     - ^release-3\.11$
+    cluster: api.ci
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -19,24 +21,16 @@ postsubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
-        - --branch=release-3.11
         - --give-pr-author-access-to-namespace=true
-        - --org=openshift
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
         - --promote
-        - --repo=origin
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=[images]
         - --target=artifacts
         - --target=base
         command:
         - ci-operator
-        env:
-        - name: CONFIG_SPEC
-          valueFrom:
-            configMapKeyRef:
-              key: openshift-origin-release-3.11.yaml
-              name: ci-operator-3.x-configs
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -44,23 +38,40 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
         - mountPath: /etc/sentry-dsn
           name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: pull-secret
+        secret:
+          secretName: regcred
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
   - agent: jenkins
     branches:
     - release-3.11
+    cluster: api.ci
     labels:
       master: ci.openshift.redhat.com
     name: test_branch_origin_extended_conformance_gce-release-3.11
   - agent: jenkins
     branches:
     - release-3.11
+    cluster: api.ci
     labels:
       master: ci.openshift.redhat.com
     name: test_branch_origin_extended_conformance_install-release-3.11

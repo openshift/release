@@ -1,25 +1,36 @@
 base_images:
-  os:
+  centos8:
+    cluster: https://api.ci.openshift.org
     name: centos
-    namespace: openshift
-    tag: '7'
+    namespace: origin
+    tag: "8"
+  cli:
+    cluster: https://api.ci.openshift.org
+    name: "4.5"
+    namespace: ocp
+    tag: cli
   git:
+    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.13
   installer:
-    name: "4.4"
+    cluster: https://api.ci.openshift.org
+    name: "4.5"
     namespace: ocp
     tag: installer
-  cli:
-    name: "4.4"
-    namespace: ocp
-    tag: cli
-  centos8:
+  os:
+    cluster: https://api.ci.openshift.org
     name: centos
-    namespace: origin
-    tag: '8'
+    namespace: openshift
+    tag: "7"
 binary_build_commands: make install
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.13
 images:
 - context_dir: images/blocking-issue-creator/
   from: os
@@ -98,6 +109,10 @@ images:
         source_path: /go/bin/determinize-ci-operator
       - destination_dir: .
         source_path: /go/bin/ci-operator-prowgen
+      - destination_dir: .
+        source_path: /go/bin/ci-op-configs-mirror
+      - destination_dir: .
+        source_path: /go/bin/private-prow-configs-mirror
   to: auto-config-brancher
 - context_dir: images/repo-brancher/
   from: git
@@ -132,8 +147,8 @@ images:
   inputs:
     bin:
       paths:
-        - destination_dir: .
-          source_path: /go/bin/applyconfig
+      - destination_dir: .
+        source_path: /go/bin/applyconfig
     cli:
       paths:
       - destination_dir: usr/bin
@@ -216,24 +231,43 @@ images:
   inputs:
     bin:
       paths:
-        - destination_dir: .
-          source_path: /go/bin/private-org-sync
+      - destination_dir: .
+        source_path: /go/bin/private-org-sync
   to: private-org-sync
+- context_dir: images/ci-secret-bootstrap
+  from: centos8
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/ci-secret-bootstrap
+  to: ci-secret-bootstrap
+- context_dir: images/ci-op-configs-mirror
+  from: centos8
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/ci-op-configs-mirror
+  to: ci-op-configs-mirror
+- context_dir: images/private-prow-configs-mirror/
+  from: centos8
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/private-prow-configs-mirror
+  to: private-prow-configs-mirror
 promotion:
+  name: ""
   namespace: ci
   tag: latest
 resources:
   '*':
-    limits:
-      memory: 10Gi
+    limits: {}
     requests:
       cpu: 100m
       memory: 200Mi
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.13
 tests:
 - artifact_dir: /tmp/artifacts
   as: unit

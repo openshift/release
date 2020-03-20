@@ -11,6 +11,8 @@ objects:
   metadata:
     name: deck
     namespace: ci
+    annotations:
+      haproxy.router.openshift.io/timeout: "90s"
   spec:
     port:
       targetPort: 8080
@@ -25,6 +27,8 @@ objects:
   metadata:
     namespace: ci
     name: prow
+    annotations:
+      haproxy.router.openshift.io/timeout: "90s"
   spec:
     port:
       targetPort: 8080
@@ -81,19 +85,25 @@ objects:
         priorityClassName: prow-critical
         containers:
         - name: deck
-          image: gcr.io/k8s-prow/deck:v20200115-cf4e86a7e
+          image: gcr.io/k8s-prow/deck:v20200320-d45985e9c
           args:
           - --config-path=/etc/config/config.yaml
           - --cookie-secret=/etc/cookie/cookie
           - --github-oauth-config-file=/etc/github/config.json
           - --github-token-path=/etc/oauth/oauth
+          - --github-endpoint=http://ghproxy
+          - --github-endpoint=https://api.github.com
+          - --github-graphql-endpoint=http://ghproxy/graphql
           - --tide-url=http://tide/
           - --hook-url=http://hook:8888/plugin-help
           - --oauth-url=/github-login
           - --job-config-path=/etc/job-config
           - --spyglass=true
           - --rerun-creates-job=true
-          - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+          env:
+          # Multiple configs can only be passed via the env var and not via the flag
+          - name: KUBECONFIG
+            value: /etc/build-farm-credentials/api.ci.kubeconfig:/etc/build-farm-credentials/build01.kubeconfig
           ports:
             - name: main
               containerPort: 8080
@@ -103,14 +113,14 @@ objects:
             httpGet:
               path: /healthz
               port: 8081
-            initialDelaySeconds: 3
-            periodSeconds: 3
+            initialDelaySeconds: 10
+            periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /healthz/ready
               port: 8081
-            initialDelaySeconds: 10
-            periodSeconds: 3
+            initialDelaySeconds: 30
+            periodSeconds: 10
             timeoutSeconds: 600
           volumeMounts:
           - name: config
@@ -137,9 +147,6 @@ objects:
           - name: job-config-3x
             mountPath: /etc/job-config/3.x
             readOnly: true
-          - name: job-config-40
-            mountPath: /etc/job-config/4.0
-            readOnly: true
           - name: job-config-41
             mountPath: /etc/job-config/4.1
             readOnly: true
@@ -154,6 +161,9 @@ objects:
             readOnly: true
           - name: job-config-45
             mountPath: /etc/job-config/4.5
+            readOnly: true
+          - name: job-config-46
+            mountPath: /etc/job-config/4.6
             readOnly: true
           - mountPath: /etc/build-farm-credentials
             name: build-farm-credentials
@@ -187,9 +197,6 @@ objects:
         - name: job-config-3x
           configMap:
             name: job-config-3.x
-        - name: job-config-40
-          configMap:
-            name: job-config-4.0
         - name: job-config-41
           configMap:
             name: job-config-4.1
@@ -205,17 +212,24 @@ objects:
         - name: job-config-45
           configMap:
             name: job-config-4.5
+        - name: job-config-46
+          configMap:
+            name: job-config-4.6
         - name: build-farm-credentials
           secret:
             items:
+            - key: sa.deck.api.ci.config
+              path: api.ci.kubeconfig
             - key: sa.deck.build01.config
-              path: kubeconfig
+              path: build01.kubeconfig
             secretName: build-farm-credentials
 - apiVersion: v1
   kind: Route
   metadata:
     namespace: ci
     name: deck-internal
+    annotations:
+      haproxy.router.openshift.io/timeout: "90s"
   spec:
     tls:
       insecureEdgeTerminationPolicy: Redirect
@@ -296,10 +310,13 @@ objects:
           - mountPath: /etc/proxy/secrets
             name: session-secret
         - name: deck
-          image: gcr.io/k8s-prow/deck:v20200115-cf4e86a7e
+          image: gcr.io/k8s-prow/deck:v20200320-d45985e9c
           args:
           - --github-oauth-config-file=/etc/github/config.json
           - --github-token-path=/etc/oauth/oauth
+          - --github-endpoint=http://ghproxy
+          - --github-endpoint=https://api.github.com
+          - --github-graphql-endpoint=http://ghproxy/graphql
           - --oauth-url=/github-login
           - --config-path=/etc/config/config.yaml
           - --tide-url=http://tide/

@@ -1,0 +1,60 @@
+base_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: ubi
+    namespace: ocp
+    tag: "8"
+base_rpm_images:
+  rpm:
+    cluster: https://api.ci.openshift.org
+    name: ubi
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+images:
+- dockerfile_path: openshift-kuryr-tester-rhel8.Dockerfile
+  from: src
+  optional: true
+  to: kuryr-tester
+- dockerfile_path: openshift-kuryr-cni-ci-rhel8.Dockerfile
+  from: rpm-os
+  to: kuryr-cni
+- dockerfile_path: openshift-kuryr-controller-ci-rhel8.Dockerfile
+  from: rpm-os
+  to: kuryr-controller
+promotion:
+  name: "4.6"
+  namespace: ocp
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      curl http://base-4-4-rhel8.ocp.svc > /etc/yum.repos.d/base-4-4-rhel8.repo
+      curl http://openstack-beta-4-4.ocp.svc > /etc/yum.repos.d/openstack-beta-4-4.repo
+    from: rpm
+    to: rpm-os
+resources:
+  '*':
+    limits: {}
+    requests:
+      cpu: 100m
+      memory: 200Mi
+rpm_build_commands: tools/build-rpm-rhel8.sh
+rpm_build_location: _output/RPMS/noarch
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: "4.6"
+  namespace: ocp
+tests:
+- as: unit
+  commands: HOME=`dirname .` tox -e py3
+  container:
+    from: kuryr-tester
+- as: verify
+  commands: HOME=`dirname .` tox -e pep8
+  container:
+    from: kuryr-tester

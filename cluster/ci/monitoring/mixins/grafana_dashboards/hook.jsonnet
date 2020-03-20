@@ -3,6 +3,7 @@ local dashboard = grafana.dashboard;
 local graphPanel = grafana.graphPanel;
 local singlestat = grafana.singlestat;
 local prometheus = grafana.prometheus;
+local template = grafana.template;
 
 local legendConfig = {
         legend+: {
@@ -19,6 +20,39 @@ dashboard.new(
         time_from='now-1h',
         schemaVersion=18,
       )
+.addTemplate(
+  template.new(
+    'plugin',
+    'prometheus',
+    'label_values(prow_plugin_handle_duration_seconds_bucket, plugin)',
+    label='plugin',
+    allValues='.*',
+    includeAll=true,
+    refresh='time',
+  )
+)
+.addTemplate(
+  template.new(
+    'event_type',
+    'prometheus',
+    'label_values(prow_plugin_handle_duration_seconds_bucket, event_type)',
+    label='event_type',
+    allValues='.*',
+    includeAll=true,
+    refresh='time',
+  )
+)
+.addTemplate(
+  template.new(
+    'action',
+    'prometheus',
+    'label_values(prow_plugin_handle_duration_seconds_bucket, action)',
+    label='action',
+    allValues='.*',
+    includeAll=true,
+    refresh='time',
+  )
+)
 .addPanel(
     singlestat.new(
         'webhook counter',
@@ -99,6 +133,35 @@ dashboard.new(
     .addTarget(prometheus.target(
         'prow_configmap_size_bytes / 1048576',
         legendFormat='{{namespace}}/{{name}}',
+    )), gridPos={
+    h: 9,
+    w: 24,
+    x: 12,
+    y: 13,
+  })
+.addPanel(
+    (graphPanel.new(
+        'Response latency percentiles for event type ${event_type}, action ${action} by plugin ${plugin}',
+        datasource='prometheus',
+        legend_alignAsTable=true,
+        legend_rightSide=true,
+        legend_values=true,
+        legend_current=true,
+        legend_avg=true,
+        legend_sort='avg',
+        legend_sortDesc=true,
+    ) + legendConfig)
+    .addTarget(prometheus.target(
+        'histogram_quantile(0.99, sum(rate(prow_plugin_handle_duration_seconds_bucket{plugin=~"${plugin}", event_type=~"${event_type}", action=~"${action}"}[5m])) by (le))',
+        legendFormat='phi=0.99',
+    ))
+    .addTarget(prometheus.target(
+        'histogram_quantile(0.95, sum(rate(prow_plugin_handle_duration_seconds_bucket{plugin=~"${plugin}", event_type=~"${event_type}", action=~"${action}"}[5m])) by (le))',
+        legendFormat='phi=0.95',
+    ))
+    .addTarget(prometheus.target(
+        'histogram_quantile(0.5, sum(rate(prow_plugin_handle_duration_seconds_bucket{plugin=~"${plugin}", event_type=~"${event_type}", action=~"${action}"}[5m])) by (le))',
+        legendFormat='phi=0.5',
     )), gridPos={
     h: 9,
     w: 24,

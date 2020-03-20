@@ -1,4 +1,4 @@
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: boskos-reaper
@@ -8,6 +8,9 @@ metadata:
   namespace: ci
 spec:
   replicas: 1
+  selector:
+    matchLabels:
+      component: boskos-reaper
   template:
     metadata:
       labels:
@@ -18,8 +21,8 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
       - name: boskos-reaper
-        image: gcr.io/k8s-prow/boskos/reaper:v20200114-6d2c48318
+        image: gcr.io/k8s-prow/boskos/reaper:v20200320-ab0fede83
         args:
         - --boskos-url=http://boskos
-        - --resource-type=aws-quota-slice,azure4-quota-slice,gcp-quota-slice,openstack-quota-slice,vsphere-quota-slice,ovirt-quota-slice,ovirt-bm01,ovirt-bm02
+        - --resource-type=aws-quota-slice,azure4-quota-slice,gcp-quota-slice,openstack-quota-slice,openstack-ppc64le-quota-slice,vsphere-quota-slice,ovirt-quota-slice,ovirt-bm01,ovirt-bm02
         - --target-state=free

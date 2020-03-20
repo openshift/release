@@ -1,0 +1,77 @@
+kind: List
+apiVersion: v1
+items:
+- apiVersion: v1
+  data:
+    cache-conf.yaml: |-
+      "auth_enabled": false
+      "frontend":
+        "align_queries_with_step": true
+        "cache_results": true
+        "compress_responses": true
+        "results_cache":
+          "cache":
+            "enable_fifocache": true
+            "fifocache":
+              "size": 1024
+              "validity": "6h"
+          "max_freshness": "1m"
+        "split_queries_by_day": true
+      "http_prefix": null
+      "server":
+        "http_listen_port": 9090
+      "target": "query-frontend"
+  kind: ConfigMap
+  metadata:
+    labels:
+      app.kubernetes.io/name: querier-cache
+    name: cache-conf
+    namespace: prow-monitoring
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    labels:
+      app.kubernetes.io/name: querier-cache
+    name: querier-cache
+    namespace: prow-monitoring
+  spec:
+    replicas: 3
+    selector:
+      matchLabels:
+        app.kubernetes.io/name: querier-cache
+    template:
+      metadata:
+        labels:
+          app.kubernetes.io/name: querier-cache
+      spec:
+        containers:
+        - args:
+          - -config.file=/etc/cache-config/cache-conf.yaml
+          - -frontend.downstream-url=http://prometheus.prow-monitoring.svc.cluster.local:9090
+          image: quay.io/cortexproject/cortex:master-8533a216
+          name: querier-cache
+          ports:
+          - containerPort: 9001
+            name: http
+          volumeMounts:
+          - mountPath: /etc/cache-config/
+            name: querier-cache-config
+            readOnly: false
+        volumes:
+        - configMap:
+            name: cache-conf
+          name: querier-cache-config
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: querier-cache
+    namespace: prow-monitoring
+    labels:
+      app.kubernetes.io/name: querier-cache
+  spec:
+    ports:
+    - name: cache
+      port: 9090
+      targetPort: 9090
+    selector:
+      app.kubernetes.io/name: querier-cache

@@ -46,7 +46,7 @@ objects:
       ci-operator.openshift.io/container-sub-tests: "checkcluster,teardown,reinstall,test"
   spec:
     restartPolicy: Never
-    activeDeadlineSeconds: 18000
+    activeDeadlineSeconds: 21600
     terminationGracePeriodSeconds: 900
     volumes:
     - name: artifacts
@@ -86,7 +86,7 @@ objects:
         # fetch the oc binary so we can talk to the cluster.  
         export PATH=$PATH:/tmp/shared/bin
         mkdir /tmp/shared/bin
-        curl https://storage.googleapis.com/origin-ci-test/_tools/4.1.0/oc >/tmp/shared/bin/oc 2>/dev/null
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.3/linux/oc.tar.gz | tar xvzf - -C /tmp/shared/bin/ oc
         chmod ug+x /tmp/shared/bin/oc
 
         # setup the persisted metadata.json and kubeconfig files that 
@@ -94,8 +94,12 @@ objects:
         # (endurance cluster credentials injected by ci-operator)
         mkdir -p /tmp/shared/auth
         mkdir -p /tmp/artifacts/installer
+        
+        # files may not exist if cluster is brand new
+        set +e
         cp /tmp/cluster-credentials/metadata.json /tmp/artifacts/installer
         cp /tmp/cluster-credentials/kubeconfig /tmp/shared/auth
+        cp /tmp/cluster-credentials/kubeadmin /tmp/shared/auth/kubeadmin-password
 
         # check if all the operators are reporting available. If anything
         # goes wrong or any operator is not reporting available, we will 
@@ -112,6 +116,14 @@ objects:
           exit 0
         fi
 
+        awk '{print $3}' < /tmp/operators.out  | grep -v AVAILABLE | grep -v True
+        rc=$?
+        if [ ! $rc -eq 1 ]; then
+          echo "Some operators are not available, collecting must-gather from cluster"
+          touch /tmp/shared/mustgather
+          exit 0
+        fi          
+
         # to force a teardown of the cluster, create a configmap with this name on the cluster
         oc get configmap/teardown -n openshift-config
         rc=$?
@@ -121,14 +133,27 @@ objects:
           touch /tmp/shared/teardown
           exit 0
         fi
-
-        awk '{print $3}' < /tmp/operators.out  | grep -v AVAILABLE | grep -v True
+        
+        echo "Fetching node status...."
+        oc get nodes &> /tmp/nodes.out
         rc=$?
-        if [ ! $rc -eq 1 ]; then
+        cat /tmp/nodes.out
+        if [ ! $rc -eq 0 ]; then
+          echo "Could not retrieve nodes, collecting must-gather and tearing down cluster"
+          touch /tmp/shared/mustgather
+          touch /tmp/shared/teardown
+          exit 0
+        fi
+
+        grep NotReady /tmp/nodes.out
+        rc=$?
+        if [ $rc -eq 0 ]; then
           echo "Some operators are not available, collecting must-gather from cluster"
           touch /tmp/shared/mustgather
           exit 0
         fi          
+        set -e
+
         echo "Cluster appears healthy"
 
     - name: teardown
@@ -186,43 +211,6 @@ objects:
 
           echo "Gathering artifacts ..."
           mkdir -p /tmp/artifacts/pods /tmp/artifacts/nodes /tmp/artifacts/metrics /tmp/artifacts/bootstrap /tmp/artifacts/network
-
-
-          if [ -f /tmp/artifacts/installer/terraform.tfstate ]
-          then
-              # we don't have jq, so the python equivalent of
-              # jq '.modules[].resources."aws_instance.bootstrap".primary.attributes."public_ip" | select(.)'
-              bootstrap_ip=$(python -c \
-                  'import sys, json; d=reduce(lambda x,y: dict(x.items() + y.items()), map(lambda x: x["resources"], json.load(sys.stdin)["modules"])); k="aws_instance.bootstrap"; print d[k]["primary"]["attributes"]["public_ip"] if k in d else ""' \
-                  < /tmp/artifacts/installer/terraform.tfstate
-              )
-
-              if [ -n "${bootstrap_ip}" ]
-              then
-                for service in bootkube openshift kubelet crio
-                do
-                    queue "/tmp/artifacts/bootstrap/${service}.service" curl \
-                        --insecure \
-                        --silent \
-                        --connect-timeout 5 \
-                        --retry 3 \
-                        --cert /tmp/artifacts/installer/tls/journal-gatewayd.crt \
-                        --key /tmp/artifacts/installer/tls/journal-gatewayd.key \
-                        --url "https://${bootstrap_ip}:19531/entries?_SYSTEMD_UNIT=${service}.service"
-                done
-                if ! whoami &> /dev/null; then
-                  if [ -w /etc/passwd ]; then
-                    echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
-                  fi
-                fi
-                eval $(ssh-agent)
-                ssh-add /etc/openshift-installer/ssh-privatekey
-                ssh -A -o PreferredAuthentications=publickey -o StrictHostKeyChecking=false -o UserKnownHostsFile=/dev/null core@${bootstrap_ip} /bin/bash -x /usr/local/bin/installer-gather.sh
-                scp -o PreferredAuthentications=publickey -o StrictHostKeyChecking=false -o UserKnownHostsFile=/dev/null core@${bootstrap_ip}:log-bundle.tar.gz /tmp/artifacts/installer/bootstrap-logs.tar.gz
-              fi
-          else
-              echo "No terraform statefile found. Skipping collection of bootstrap logs."
-          fi
 
           oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' > /tmp/nodes
           oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces --template '{{ range .items }}{{ $name := .metadata.name }}{{ $ns := .metadata.namespace }}{{ range .spec.containers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ range .spec.initContainers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ end }}' > /tmp/containers
@@ -321,6 +309,9 @@ objects:
           echo "Waiting for logs ..."
           wait
 
+          tar -czC /tmp/artifacts/must-gather -f /tmp/artifacts/must-gather.tar.gz . &&
+          rm -rf /tmp/artifacts/must-gather
+
           if [ -f /tmp/shared/teardown ];then
             # flag that we're going to need to install a new endurance cluster
             # after gathering artifacts/teardown.
@@ -386,7 +377,7 @@ objects:
 
         if [ ! -f /tmp/shared/install ];then
           echo "Existing long lived cluster is healthy, not reinstalling"
-          oc create secret generic endurance-cluster-credentials-${CLUSTER_TYPE}-new -n ${NAMESPACE} --from-file=kubeconfig=/tmp/shared/auth/kubeconfig --from-file=metadata.json=/tmp/artifacts/installer/metadata.json
+          oc create secret generic endurance-cluster-credentials-${CLUSTER_TYPE}-new -n ${NAMESPACE} --from-file=kubeconfig=/tmp/shared/auth/kubeconfig --from-file=kubeadmin=/tmp/shared/auth/kubeadmin-password --from-file=metadata.json=/tmp/artifacts/installer/metadata.json
           exit 0
         fi
 
@@ -417,6 +408,7 @@ objects:
         - name: worker
           replicas: 3
           platform:
+            type: m4.xlarge
             aws:
               zones:
               - us-east-2a
@@ -445,8 +437,11 @@ objects:
             exit 1
         fi
 
-        TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create cluster 2>&1 | grep -v password &
+        TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create cluster 2>&1 | grep --line-buffered -v password &
         wait "$!"
+
+        grep -v password /tmp/artifacts/installer/.openshift_install.log > /tmp/artifacts/installer/install.log
+        mv /tmp/artifacts/installer/install.log /tmp/artifacts/installer/.openshift_installer.log
 
         echo "##################### start cluster metadata.json ##########################"
         cat /tmp/artifacts/installer/metadata.json
@@ -464,7 +459,7 @@ objects:
         
         # the ci-operator pod will copy this secret into the ci namespace to persist
         # it for future jobs to use when accessing the long lived cluster.
-        oc create secret generic endurance-cluster-credentials-${CLUSTER_TYPE}-new -n ${NAMESPACE} --from-file=kubeconfig=/tmp/artifacts/installer/auth/kubeconfig --from-file=metadata.json=/tmp/artifacts/installer/metadata.json
+        oc create secret generic endurance-cluster-credentials-${CLUSTER_TYPE}-new -n ${NAMESPACE} --from-file=kubeconfig=/tmp/artifacts/installer/auth/kubeconfig --from-file=metadata.json=/tmp/artifacts/installer/metadata.json --from-file=kubeadmin=/tmp/artifacts/installer/auth/kubeadmin-password
 
     containers:
     - name: test

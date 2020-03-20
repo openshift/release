@@ -1,15 +1,18 @@
 base_images:
   base:
+    cluster: https://api.ci.openshift.org
     name: ubi
     namespace: ocp
     tag: "8"
 base_rpm_images:
   rpm:
+    cluster: https://api.ci.openshift.org
     name: ubi
     namespace: ocp
     tag: "8"
 build_root:
   image_stream_tag:
+    cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.10
@@ -35,22 +38,22 @@ raw_steps:
     to: rpm-os
 resources:
   '*':
-    limits:
-      memory: 4Gi
+    limits: {}
     requests:
       cpu: 100m
       memory: 200Mi
 rpm_build_commands: tools/build-rpm-rhel8.sh
 rpm_build_location: _output/RPMS/noarch
 tag_specification:
+  cluster: https://api.ci.openshift.org
   name: "4.3"
   namespace: ocp
 tests:
 - as: unit
-  commands: tox -e py3
+  commands: HOME=`dirname .` tox -e py3
   container:
     from: kuryr-tester
 - as: verify
-  commands: tox -e pep8
+  commands: HOME=`dirname .` tox -e pep8
   container:
     from: kuryr-tester
