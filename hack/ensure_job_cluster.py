@@ -103,4 +103,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    print("disabled")
+    # TODO @alvaroaleman: fix
+    # main()
