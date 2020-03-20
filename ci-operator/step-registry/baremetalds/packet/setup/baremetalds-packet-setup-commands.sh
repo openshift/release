@@ -36,7 +36,7 @@ resource "packet_device" "server" {
   count            = "1"
   project_id       = "$PACKET_PROJECT_ID"
   hostname         = "ipi-$CLUSTER_NAME"
-  plan             = "c3.medium.x86"
+  plan             = "c2.medium.x86"
   facilities       = ["sjc1", "ewr1"]
   operating_system = "centos_8"
   billing_cycle    = "hourly"
