@@ -328,6 +328,9 @@ objects:
           ports:
             - name: http
               containerPort: 8080
+          env:
+          - name: KUBECONFIG
+            value: /etc/build-farm-credentials/api.ci.kubeconfig:/etc/build-farm-credentials/build01.kubeconfig
           volumeMounts:
           - name: gce-sa-credentials-gcs-private
             mountPath: /etc/gce-sa-credentials-gcs-private
@@ -345,6 +348,9 @@ objects:
             readOnly: true
           - name: oauth
             mountPath: /etc/oauth
+            readOnly: true
+          - mountPath: /etc/build-farm-credentials
+            name: build-farm-credentials
             readOnly: true
           resources:
             requests:
@@ -372,6 +378,14 @@ objects:
         - name: deck-internal-tls
           secret:
             secretName: deck-internal-tls
+        - name: build-farm-credentials
+          secret:
+            items:
+            - key: sa.deck.api.ci.config
+              path: api.ci.kubeconfig
+            - key: sa.deck.build01.config
+              path: build01.kubeconfig
+            secretName: build-farm-credentials
 - apiVersion: v1
   kind: Secret
   metadata:
