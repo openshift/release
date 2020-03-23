@@ -11,11 +11,13 @@ data:
       type = "file"
       include = ["/host/var/log/openshift-apiserver/audit.log"]
       ignore_older = 86400
-    #For debug only, will switch to https://vector.dev/docs/reference/sinks/aws_cloudwatch_logs/
-    #when debugging is done
-    [sinks.console]
-      type = "console"
+
+    [sinks.aws_cloudwatch_logs]
+      type = "aws_cloudwatch_logs"
       inputs = ["kube_apiserver_audit_logs", "openshift_apiserver_audit_logs"]
+      group_name = "ci-build01-audit-logs"
+      region = "us-east-1"
+      stream_name = "{{ host }}"
       encoding = "json"
 metadata:
   name: vector-audit-log-config
