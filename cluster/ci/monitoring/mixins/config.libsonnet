@@ -47,6 +47,11 @@
         channel: '#forum-os-dev-services',
         notify: 'openshift-app-services',
       },
+      'OLM-rh-operators': {
+        team: 'OLM',
+        channel: '#operator-test',
+        notify: 'olmcop',
+      },
     },
   },
 }
