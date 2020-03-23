@@ -1,12 +1,10 @@
 SHELL=/usr/bin/env bash -o errexit
 
-.PHONY: check check-core check-services dry-core-admin dry-services-admin core-admin services-admin dry-core core dry-services services all-admin all
+.PHONY: check check-core check-services dry-core core dry-services services all
 
 CONTAINER_ENGINE ?= docker
 
-all: core-admin core services-admin services
-
-all-admin: core-admin services-admin
+all: core services
 
 check: check-core check-services
 	@echo "Service config check: PASS"
@@ -20,18 +18,6 @@ check-services:
 	@echo "Service config check: PASS"
 
 # applyconfig is https://github.com/openshift/ci-tools/tree/master/cmd/applyconfig
-
-dry-core-admin:
-	applyconfig --config-dir core-services --level=admin
-
-dry-services-admin:
-	applyconfig --config-dir services --level=admin
-
-core-admin:
-	applyconfig --config-dir core-services --level=admin --confirm=true
-
-services-admin:
-	applyconfig --config-dir services --level=admin --confirm=true
 
 dry-core:
 	applyconfig --config-dir core-services

@@ -36,27 +36,24 @@ rely on a currently set OpenShift project.
 
 ## How to apply
 
-There are three types of configuration: admin resources, other resources and
-ConfigMaps.
+There are two types of configuration: resources and ConfigMaps.
 
 ### Automation
 
-1. Admin resources are not automatically applied to the cluster.
-2. Other resources are automatically applied to the cluster by a Prow
+1. Everything is automatically applied to the cluster by a prow
    [postsubmit](https://prow.svc.ci.openshift.org/?job=branch-ci-openshift-release-master-core-apply)
    after each PR is merged, and also [periodically](https://prow.svc.ci.openshift.org/?job=openshift-release-master-core-apply).
-3. ConfigMaps are automatically updated by the `config-updater` Prow plugin,
+1. ConfigMaps are automatically updated by the `config-updater` Prow plugin,
    configured in its [config.yaml](02_config/_config.yaml) file.
    Additionally, they are [periodically](https://prow.svc.ci.openshift.org/?job=openshift-release-master-config-bootstrapper)
    synced by a Prow job.
 
+
 ### Manual
 
-1. Admin resources can be created by users with `--as=system:admin` rights by
-   `make core-admin`.
-2. Other resources can be created by `make core`, provided the user has rights
+1. Resources can be created by `make core`, provided the user has rights
    to perform all necessary actions
-3. ConfigMaps can be manually created by the [config-bootstrapper](https://github.com/kubernetes/test-infra/tree/master/prow/cmd/config-bootstrapper)
+1. ConfigMaps can be manually created by the [config-bootstrapper](https://github.com/kubernetes/test-infra/tree/master/prow/cmd/config-bootstrapper)
    tool.
 
 Additionally, the [`applyconfig`](https://github.com/openshift/ci-tools/tree/master/cmd/applyconfig) can be used directly.
