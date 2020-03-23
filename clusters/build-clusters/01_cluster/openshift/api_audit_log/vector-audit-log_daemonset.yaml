@@ -22,12 +22,23 @@ spec:
       containers:
       - name: vector-audit-log
         image: docker.io/timberio/vector:0.8.2-alpine
+        env:
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: aws-ci-infra-ci-build01-audit-logs-uploader-credentials
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: aws-ci-infra-ci-build01-audit-logs-uploader-credentials
+              key: AWS_SECRET_ACCESS_KEY
         securityContext:
           privileged: true
         resources:
           requests:
-            cpu: 500m
-            memory: 700Mi
+            cpu: 100m
+            memory: 300Mi
         volumeMounts:
         - name: varlog
           mountPath: /host/var/log
@@ -35,7 +46,7 @@ spec:
         - name: config-volume
           mountPath: /etc/vector
           readOnly: true
-        - name: cache-volume
+        - name: data-volume
           mountPath: /var/lib/vector
       nodeSelector:
         node-role.kubernetes.io/master: ""
@@ -51,5 +62,7 @@ spec:
       - name: config-volume
         configMap:
           name: vector-audit-log-config
-      - name: cache-volume
-        emptyDir: {}
+      - name: data-volume
+        hostPath:
+          path: /var/lib/vector
+          type: DirectoryOrCreate
