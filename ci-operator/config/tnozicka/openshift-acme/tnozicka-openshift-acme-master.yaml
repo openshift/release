@@ -51,23 +51,27 @@ tests:
   container:
     from: src
 - as: unit
+  artifact_dir: /tmp/artifacts
   commands: |
     make test-unit JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
   container:
     from: test-bin
 - as: e2e-cluster-wide
+  artifact_dir: /tmp/artifacts
   commands: |
     ./hack/ci-deploy.sh cluster-wide
     make ci-test-e2e-cluster-wide E2E_JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
   openshift_installer_src:
     cluster_profile: aws
 - as: e2e-single-namespace
+  artifact_dir: /tmp/artifacts
   commands: |
     ./hack/ci-deploy.sh single-namespace
     make ci-test-e2e-single-namespace E2E_JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
   openshift_installer_src:
     cluster_profile: aws
 - as: e2e-specific-namespaces
+  artifact_dir: /tmp/artifacts
   commands: |
     ./hack/ci-deploy.sh specific-namespaces
     make ci-test-e2e-specific-namespaces E2E_JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
