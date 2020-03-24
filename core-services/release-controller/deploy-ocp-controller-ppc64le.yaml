@@ -83,6 +83,12 @@ items:
         - name: job-config-46
           configMap:
             name: job-config-4.6
+        - name: prowjob-kubeconfig
+          secret:
+            secretName: release-controller-prowjob-kubeconfig
+            items:
+            - key: sa.release-controller.api.ci.config
+              path: kubeconfig
         containers:
         - name: controller
           image: release-controller:latest
@@ -117,6 +123,9 @@ items:
           - name: job-config-46
             mountPath: /etc/job-config/4.6
             readOnly: true
+          - name: prowjob-kubeconfig
+            mountPath: /etc/prowjob-kubeconfig
+            readOnly: true
           command:
           - /usr/bin/release-controller
           - --to=release
@@ -125,5 +134,6 @@ items:
           - --job-config=/etc/job-config
           - --artifacts=openshift-release-artifacts.svc.ci.openshift.org
           - --prow-namespace=ci
+          - --prow-job-kubeconfig=/etc/prowjob-kubeconfig/kubeconfig
           - --job-namespace=ci-release
           - -v=4
