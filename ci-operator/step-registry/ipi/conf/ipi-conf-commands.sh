@@ -9,6 +9,11 @@ cluster_name=${NAMESPACE}-${JOB_NAME_HASH}
 
 out=${SHARED_DIR}/install-config.yaml
 
+if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
+  echo "RELEASE_IMAGE_LATEST is an empty string, exiting"
+  exit 1
+fi
+
 echo "Installing from release ${RELEASE_IMAGE_LATEST}"
 
 ssh_pub_key=$(<"${cluster_profile}/ssh-publickey")
