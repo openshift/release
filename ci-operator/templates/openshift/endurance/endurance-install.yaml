@@ -101,6 +101,16 @@ objects:
         cp /tmp/cluster-credentials/kubeconfig /tmp/shared/auth
         cp /tmp/cluster-credentials/kubeadmin /tmp/shared/auth/kubeadmin-password
 
+        # to force a teardown of the cluster, create a configmap with this name on the cluster
+        oc get configmap/teardown -n openshift-config
+        rc=$?
+        if [ $rc -eq 0 ]; then
+          echo "Cluster marked for teardown, tearing down and reinstalling"
+          touch /tmp/shared/mustgather
+          touch /tmp/shared/teardown
+          exit 0
+        fi
+
         # check if all the operators are reporting available. If anything
         # goes wrong or any operator is not reporting available, we will 
         # gather artifacts, tear down the endurance cluster, install a new one, 
@@ -123,17 +133,7 @@ objects:
           touch /tmp/shared/mustgather
           exit 0
         fi          
-
-        # to force a teardown of the cluster, create a configmap with this name on the cluster
-        oc get configmap/teardown -n openshift-config
-        rc=$?
-        if [ $rc -eq 0 ]; then
-          echo "Cluster marked for teardown, tearing down and reinstalling"
-          touch /tmp/shared/mustgather
-          touch /tmp/shared/teardown
-          exit 0
-        fi
-        
+       
         echo "Fetching node status...."
         oc get nodes &> /tmp/nodes.out
         rc=$?
