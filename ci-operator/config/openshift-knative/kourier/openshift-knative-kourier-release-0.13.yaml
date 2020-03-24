@@ -1,24 +1,21 @@
 base_images:
   base:
     cluster: https://api.ci.openshift.org
-    name: "4.5"
+    name: "4.3"
     namespace: ocp
     tag: base
-binary_build_commands: make build
 build_root:
   image_stream_tag:
     cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
-    tag: golang-1.10
+    tag: golang-1.13
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  to: baremetal-machine-controllers
+- from: base
+  to: kourier
 promotion:
-  disabled: true
-  name: "4.5"
-  namespace: ocp
+  name: knative-v0.13.1
+  namespace: openshift
 resources:
   '*':
     limits: {}
@@ -27,14 +24,5 @@ resources:
       memory: 200Mi
 tag_specification:
   cluster: https://api.ci.openshift.org
-  name: "4.5"
+  name: "4.3"
   namespace: ocp
-tests:
-- as: gofmt
-  commands: IS_CONTAINER=TRUE make fmt
-  container:
-    from: src
-- as: govet
-  commands: IS_CONTAINER=TRUE make vet
-  container:
-    from: src

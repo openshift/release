@@ -62,6 +62,8 @@ postsubmits:
       - args:
         - --config-dir=clusters/build-clusters/01_cluster
         - --confirm=true
+        - --level=all
+        - --as=
         - --kubeconfig=/etc/build-farm-credentials/kubeconfig
         - --context=ci/api-build01-ci-devcluster-openshift-com:6443
         command:
@@ -76,6 +78,11 @@ postsubmits:
           valueFrom:
             secretKeyRef:
               key: build01_ci_reg_auth_value.txt
+              name: build-farm-credentials
+        - name: github_client_id
+          valueFrom:
+            secretKeyRef:
+              key: build01_github_client_id
               name: build-farm-credentials
         - name: github_client_secret
           valueFrom:
@@ -169,7 +176,9 @@ postsubmits:
       containers:
       - args:
         - --config-dir=core-services
+        - --level=all
         - --confirm=true
+        - --as=
         command:
         - applyconfig
         env:
@@ -218,7 +227,7 @@ postsubmits:
         - --debug
         command:
         - /app/label_sync/app.binary
-        image: gcr.io/k8s-prow/label_sync:v20200320-cfc63beb6
+        image: gcr.io/k8s-prow/label_sync:v20200323-ecb75feef
         imagePullPolicy: Always
         name: ""
         resources:
@@ -261,7 +270,9 @@ postsubmits:
       containers:
       - args:
         - --config-dir=services
+        - --level=all
         - --confirm=true
+        - --as=
         command:
         - applyconfig
         image: registry.svc.ci.openshift.org/ci/applyconfig:latest

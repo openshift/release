@@ -19,6 +19,8 @@ parameters:
   required: true
 - name: CLUSTER_TYPE
   required: true
+- name: CLUSTER_ENABLE_NESTED_VIRT
+- name: CLUSTER_NESTED_VIRT_IMAGE
 - name: TEST_COMMAND
   required: true
 - name: RELEASE_IMAGE_LATEST
@@ -227,12 +229,13 @@ objects:
             exit 1
           fi
           if [[ ! -f /tmp/shared/setup-success ]]; then
+            echo "Waiting for setup to finish..."
             sleep 15 & wait
             continue
           fi
           # don't let clients impact the global kubeconfig
-          cp "${KUBECONFIG}" /tmp/admin.kubeconfig
-          export KUBECONFIG=/tmp/admin.kubeconfig
+          cp "${KUBECONFIG}" /tmp/shared/admin.kubeconfig
+          export KUBECONFIG=/tmp/shared/admin.kubeconfig
           break
         done
 
@@ -335,7 +338,7 @@ objects:
       terminationMessagePolicy: FallbackToLogsOnError
       volumeMounts:
       - name: shared-tmp
-        mountPath: /tmp
+        mountPath: /tmp/shared
       - name: cluster-profile
         mountPath: /etc/openshift-installer
       - name: artifacts
@@ -384,17 +387,34 @@ objects:
         #!/bin/bash
         set -euo pipefail
 
-        trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/setup-success; else touch /tmp/exit /tmp/setup-failed; fi; exit "${rc}"' EXIT
+        trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/shared/setup-success; else touch /tmp/shared/exit /tmp/shared/setup-failed; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-        cp "$(command -v openshift-install)" /tmp
+
+        if [[ "${CLUSTER_ENABLE_NESTED_VIRT:=false}" == "true" ]]; then
+            if [[ "${CLUSTER_TYPE}" != "gcp" ]]; then
+                echo "CLUSTER_ENABLE_NESTED_VIRT is unsupported for cluster type '${CLUSTER_TYPE}'"
+                exit 1
+            fi
+            echo "will enable nested-virt on gcp cluster with image '${CLUSTER_NESTED_VIRT_IMAGE:=rhcos43-nested-virt}'"
+        fi
+
+        export PATH=/tmp/shared:$PATH  # gain access to oc
+        while ! command -V oc; do sleep 1; done # poll to make sure that the test container has dropped oc into the shared volume
+
+        # we need jq for later machine rescaling
+        (cd /tmp/shared && curl -L -o jq https://github.com/stedolan/jq/releases/download/jq-1.5/jq-linux64 && chmod +x jq)
+        if ! command -V jq; then
+            echo "Failed to fetch jq"
+            exit 1
+        fi
+
+        cp "$(command -v openshift-install)" /tmp/shared
         mkdir /tmp/artifacts/installer
 
         if [[ -n "${INSTALL_INITIAL_RELEASE}" && -n "${RELEASE_IMAGE_INITIAL}" ]]; then
           echo "Installing from initial release ${RELEASE_IMAGE_INITIAL}"
           OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_INITIAL}"
         elif [[ "${CLUSTER_VARIANT}" =~ "mirror" ]]; then
-          export PATH=$PATH:/tmp/shared  # gain access to oc
-          while [ ! command -V oc ]; do sleep 1; done # poll to make sure that the test container has dropped oc into the shared volume
 
           # mirror the release image and override the release image to point to the mirrored one
           mkdir /tmp/.docker && cp /etc/openshift-installer/pull-secret /tmp/.docker/config.json
@@ -631,6 +651,52 @@ objects:
 
         TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create cluster 2>&1 | grep --line-buffered -v password &
         wait "$!"
+
+        if [[ "${CLUSTER_TYPE}" == "gcp" ]] && [[ "${CLUSTER_ENABLE_NESTED_VIRT}" == "true" ]]; then
+          echo "starting to enable nested-virt on gcp cluster with image '${CLUSTER_NESTED_VIRT_IMAGE:=rhcos43-nested-virt}'"
+          export KUBECONFIG=/tmp/artifacts/installer/auth/kubeconfig
+          oc get machineset -n openshift-machine-api -o json >/tmp/machinesets.json
+          # this image lives in gce-devel project: "rhcos43-nested-virt"
+          jq '(.items[] | .spec.template.spec.providerSpec.value.disks[0].image) |= "change-me"' /tmp/machinesets.json > /tmp/machinesets-nested.json
+          sed -i 's/change-me/'"$CLUSTER_NESTED_VIRT_IMAGE"'/g' /tmp/machinesets-nested.json
+          oc apply -f /tmp/machinesets-nested.json
+          oc scale --replicas=0 machineset --all -n openshift-machine-api
+          oc get machines -n openshift-machine-api -o json >/tmp/machines.json
+          num_machines=$(jq '.items | length' /tmp/machines.json)
+          while [ "$num_machines" -ne "3" ]; do
+            sleep 5
+            oc get machines -n openshift-machine-api -o json >/tmp/machines.json
+            num_machines=$(jq '.items | length' /tmp/machines.json)
+          done
+          oc scale --replicas=1 machineset --all -n openshift-machine-api
+          while [ "$num_machines" -ne "6" ]; do
+            sleep 5
+            oc get machines -n openshift-machine-api -o json >/tmp/machines.json
+            num_machines=$(jq '.items | length' /tmp/machines.json)
+          done
+          while [ $(oc get nodes | wc -l) -ne "7" ]; do oc get nodes; sleep 5; done
+          nodes_ready=false
+          while ! "$nodes_ready"; do sleep 5 && if ! oc get nodes | grep NotReady; then nodes_ready=true; fi; done
+          oc project default
+
+          # apply kvm device plugin
+          oc apply -f https://raw.githubusercontent.com/kubevirt/kubernetes-device-plugins/master/manifests/kvm-ds.yml
+          workers=$(oc get nodes | grep worker | awk '{ print $1 }')
+          workers_each=($workers)
+          for i in {0..2}; do
+            for j in {0..3}; do
+              out=$(oc debug node/"${workers_each[i]}" -- ls /dev/kvm || true)
+              if [[ ! "${out}" =~ "No such file" ]]; then
+                break
+              else
+                if [[ $j -eq 3 ]]; then
+                  echo "nested virt not enabled, exiting" 2>&1
+                  exit 1
+                fi
+              fi
+            done
+          done
+        fi
 
     # Performs cleanup of all created resources
     - name: teardown
