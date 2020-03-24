@@ -4,18 +4,17 @@ base_images:
     name: 4.5-priv
     namespace: ocp-private
     tag: base
-binary_build_commands: make build
 build_root:
   image_stream_tag:
     cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
-    tag: golang-1.10
-canonical_go_repository: github.com/openshift/cluster-api-provider-baremetal
+    tag: golang-1.13
+canonical_go_repository: github.com/openshift/network-metrics-daemon
 images:
-- dockerfile_path: Dockerfile
+- dockerfile_path: Dockerfile.openshift
   from: base
-  to: baremetal-machine-controllers
+  to: network-metrics-daemon
 promotion:
   name: 4.5-priv
   namespace: ocp-private
@@ -30,15 +29,7 @@ tag_specification:
   name: 4.5-priv
   namespace: ocp-private
 tests:
-- as: e2e-metal-ipi
-  steps:
-    cluster_profile: packet
-    workflow: baremetalds-e2e
-- as: gofmt
-  commands: make fmt
-  container:
-    from: src
-- as: govet
-  commands: make vet
+- as: unit
+  commands: make unittests
   container:
     from: src
