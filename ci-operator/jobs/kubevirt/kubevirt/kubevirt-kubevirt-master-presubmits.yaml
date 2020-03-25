@@ -57,24 +57,30 @@ presubmits:
             export GOBIN="/usr/bin"
             source /etc/profile.d/gimme.sh
 
-            export DOCKER_PREFIX='dhiller'
-            export DOCKER_TAG="latest"
-            export KUBEVIRT_PROVIDER=external
+            # we are using the provided openshift cluster, the external provider picks up the KUBECONFIG and
+            # provides other values (like oc binary path) to the test configuration
+            export KUBEVIRT_PROVIDER='external'
 
-            oc config view
+            # we are not running in privileged mode, therefore we need to run unnested (i.e. no docker in docker)
+            export KUBEVIRT_RUN_UNNESTED=true
 
-            echo "calling cluster-up to prepare config and check whether cluster is reachable"
-            # TODO: remove patching of external provider, after kubevirtci#199 has been merged and kubevirt updates
-            (
-                cd cluster-up/cluster/external &&
-                    curl -L -O https://raw.githubusercontent.com/dhiller/kubevirtci/fix-external-provider/cluster-up/cluster/external/provider.sh
-            )
+            # TODO: make this to another registry that is officially pushed during kubevirt build
+            export DOCKER_PREFIX=dhiller
+            export DOCKER_TAG=${PULL_PULL_SHA}
+
+            echo
+            echo "--- calling cluster-up to prepare config and check whether cluster is reachable ---"
+            echo
             bash -x ./cluster-up/up.sh
 
-            echo "deploying"
+            echo
+            echo "--- deploying ---"
+            echo
             bash -x ./hack/cluster-deploy.sh
 
-            echo "testing"
+            echo
+            echo "--- testing ---"
+            echo
             mkdir -p "$ARTIFACT_DIR"
             TESTS_TO_FOCUS=$(grep -E -o '\[crit\:high\]' tests/*_test.go | sort | uniq | sed -E 's/tests\/([a-z_]+)\.go\:.*/\1/' | tr '\n' '|' | sed 's/|$//')
             FUNC_TEST_ARGS='--ginkgo.noColor --ginkgo.focus='"$TESTS_TO_FOCUS"' --ginkgo.regexScansFilePath=true --junit-output='"$ARTIFACT_DIR"'/junit.functest.xml' \
