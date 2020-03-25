@@ -22,6 +22,7 @@ case "${CLUSTER_TYPE}" in
 aws) export AWS_SHARED_CREDENTIALS_FILE=${cluster_profile}/.awscred;;
 azure4) export AZURE_AUTH_LOCATION=${cluster_profile}/osServicePrincipal.json;;
 gcp) export GOOGLE_CLOUD_KEYFILE_JSON=${cluster_profile}/gce.json;;
+vsphere) ;;
 *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"
 esac
 
