@@ -39,13 +39,13 @@ TF_LOG=debug openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-
 
 set +e
 wait "$!"
-ret=$?
+ret="$?"
 set -e
 
+sed 's/password: .*/password: REDACTED/' "${dir}/.openshift_install.log" >"${ARTIFACT_DIR}/.openshift_install.log"
+cp "${dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null || :
 cp \
     -t "${SHARED_DIR}" \
     "${dir}/auth/kubeconfig" \
     "${dir}/metadata.json"
-cp "${dir}/.openshift_install.log" "${ARTIFACT_DIR}/"
-cp "${dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null || :
 exit "$ret"
