@@ -414,6 +414,8 @@ periodics:
         value: /aws/.awscred
       - name: GOOGLE_APPLICATION_CREDENTIALS
         value: /gcp/gce.json
+      - name: AZURE_AUTH_LOCATION
+        value: /azure/osServicePrincipal.json
       - name: CLUSTER_TTL
         value: 30 minutes ago
       image: registry.svc.ci.openshift.org/ci/ipi-deprovision:latest
@@ -427,6 +429,8 @@ periodics:
         name: cluster-secrets-aws
       - mountPath: /gcp
         name: cluster-secrets-gcp
+      - mountPath: /azure
+        name: cluster-secrets-azure
     serviceAccountName: ipi-deprovisioner
     volumes:
     - name: cluster-secrets-aws
@@ -441,6 +445,12 @@ periodics:
         - key: gce.json
           path: gce.json
         secretName: cluster-secrets-gcp
+    - name: cluster-secrets-azure
+      secret:
+        items:
+        - key: osServicePrincipal.json
+          path: osServicePrincipal.json
+        secretName: cluster-secrets-azure4
 - agent: kubernetes
   cluster: api.ci
   decorate: true
