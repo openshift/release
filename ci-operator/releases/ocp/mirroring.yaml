@@ -1,0 +1,27 @@
+# This controls generation of the mirror stanzas for image streams within this directory. Each stream can be published
+# to multiple locations, and each source image can be tagged multiple times
+targets:
+- name: Public Origin Images
+  # The list of output version strings (per input source image).
+  versions:
+  - "{stream}"
+  - "{stream}.0"
+  # If specified, the stream name that will get tagged as latest.
+  version_latest: "4.5"
+  # The destination name for each source image.
+  # - {image} is the name of the image within a stream
+  # - {version} is the destination name as determined by the release (generally '4.5', '4.5.0', and 'latest' if master)
+  patterns:
+  - quay.io/openshift/origin-{image}:{version}
+  # Images in these locations take priority over images here because they include public versions.
+  # - {stream} is inferred from the name of the image stream
+  override_from:
+  - origin/{stream}
+  # Thes names images are never pulled from the source (they can however be provided by the override). They are
+  # string matches within the name. Use this to prevent images that contain private source from being
+  # exposed to a public audience.
+  skip_names:
+  - machine-os
+  - ironic-ipa-downloader
+  - ironic-machine-os-downloader
+  - ironic-static-ip-manager
