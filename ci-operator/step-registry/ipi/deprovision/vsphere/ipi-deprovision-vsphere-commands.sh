@@ -11,7 +11,7 @@ export AWS_SHARED_CREDENTIALS_FILE=${cluster_profile}/.awscred
 echo "Deprovisioning cluster ..."
 cp -ar "${SHARED_DIR}" /tmp/installer
 openshift-install --dir /tmp/installer destroy cluster
-cp /tmp/installer/.openshift_install.log "${ARTIFACT_DIR}/"
+cp /tmp/installer/.openshift_install.log "${ARTIFACT_DIR}/.openshift_install.deprovision.log"
 
 hosted_zone_id="$(aws route53 list-hosted-zones-by-name \
             --dns-name "${base_domain}" \

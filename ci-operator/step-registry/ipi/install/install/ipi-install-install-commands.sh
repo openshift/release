@@ -46,6 +46,6 @@ cp \
     -t "${SHARED_DIR}" \
     "${dir}/auth/kubeconfig" \
     "${dir}/metadata.json"
-cp "${dir}/.openshift_install.log" "${ARTIFACT_DIR}/"
+cp "${dir}/.openshift_install.log" "${ARTIFACT_DIR}/.openshift_install.install.log"
 cp "${dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null || :
 exit "$ret"

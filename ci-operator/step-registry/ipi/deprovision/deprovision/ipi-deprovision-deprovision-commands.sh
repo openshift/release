@@ -11,4 +11,4 @@ export AZURE_AUTH_LOCATION=$cluster_profile/osServicePrincipal.json
 echo "Deprovisioning cluster ..."
 cp -ar "${SHARED_DIR}" /tmp/installer
 openshift-install --dir /tmp/installer destroy cluster
-cp /tmp/installer/.openshift_install.log "${ARTIFACT_DIR}/"
+cp /tmp/installer/.openshift_install.log "${ARTIFACT_DIR}/.openshift_install.deprovision.log"
