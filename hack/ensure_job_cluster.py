@@ -66,9 +66,8 @@ def migrated(file_path):
     # due to https://github.com/openshift/release/pull/7178
     if file_path.endswith('periodics.yaml') and 'openshift/release/' in file_path:
         return False
-    # Will uncomment in the next step
-    #if file_path.endswith('presubmits.yaml'):
-    #    return True
+    if file_path.endswith('presubmits.yaml') and 'ci-operator/jobs/openshift-priv/' in file_path:
+        return True
     return False
 
 def ensure(job_dir, overwrite):
