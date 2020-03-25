@@ -1,1 +1,1 @@
-../deprovision/ipi-deprovision-deprovision-commands.sh
+../ipi-deprovision-commands.sh
