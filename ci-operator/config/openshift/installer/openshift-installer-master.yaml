@@ -4,6 +4,11 @@ base_images:
     name: "4.5"
     namespace: ocp
     tag: base
+  os:
+    cluster: https://api.ci.openshift.org
+    name: ubi
+    namespace: ocp
+    tag: "8"
 build_root:
   image_stream_tag:
     cluster: https://api.ci.openshift.org
@@ -52,7 +57,7 @@ images:
       paths: null
   to: openstack-installer
 - dockerfile_path: images/baremetal/Dockerfile.ci
-  from: base
+  from: base-os
   inputs:
     root:
       as:
@@ -70,6 +75,13 @@ images:
 promotion:
   name: "4.5"
   namespace: ocp
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      rm -rf /etc/yum.repos.d/*
+      curl http://base-4-5-rhel8.ocp.svc > /etc/yum.repos.d/base-4-5-rhel8.repo
+    from: os
+    to: base-os
 resources:
   '*':
     limits: {}
