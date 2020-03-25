@@ -24,7 +24,7 @@ hosted_zone_id="$(aws route53 list-hosted-zones-by-name \
             --dns-name "${base_domain}" \
             --query "HostedZones[? Config.PrivateZone != \`true\` && Name == \`${base_domain}.\`].Id" \
             --output text)"
-
+echo "${hosted_zone_id}" > "${SHARED_DIR}/hosted-zone.txt"
 
 echo "Creating DNS records..."
 cat > "${SHARED_DIR}"/dns-create.json <<EOF
