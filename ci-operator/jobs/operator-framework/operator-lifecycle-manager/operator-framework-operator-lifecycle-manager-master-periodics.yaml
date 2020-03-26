@@ -1,5 +1,6 @@
 periodics:
 - agent: kubernetes
+  cluster: api.ci
   cron: 0 6 * * *
   decorate: true
   decoration_config:
@@ -32,7 +33,37 @@ periodics:
       - name: JOB_NAME_SAFE
         value: e2e-operator-metrics
       - name: TEST_COMMAND
-        value: make e2e-operator-metrics
+        value: |
+          #!/bin/bash
+
+          git clone https://github.com/openshift/origin.git -b master
+          cd origin
+
+          export GO111MODULE=off
+
+          # install Kubectl required by the test.
+          curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.17.0/bin/linux/amd64/kubectl
+          chmod +x ./kubectl
+          mkdir -p /tmp/shared
+          export PATH=$PATH:/tmp/shared
+          mv ./kubectl /tmp/shared/kubectl
+
+          # make and run test
+          make WHAT=cmd/openshift-tests
+
+          cd ..
+          DIR="./origin/_output/local/bin/$(go env GOHOSTOS)/$(go env GOHOSTARCH)"
+
+          # OLM sanity tests
+          ${DIR}/openshift-tests run all --dry-run | grep "\[sig-operator\].*OLM" | ${DIR}/openshift-tests run --junit-dir=${ARTIFACT_DIR} -f -
+
+          # Install and uninstall rh-operators and run metric tests after
+          EXIT_CODE=0
+          make e2e-operator-metrics || EXIT_CODE=1
+
+          ${DIR}/openshift-tests run all --dry-run | grep "\[sig-instrumentation\].*Prometheus.*should report telemetry if a cloud.openshift.com token is present" | ${DIR}/openshift-tests run --junit-dir=${ARTIFACT_DIR} -f -
+          ${DIR}/openshift-tests run all --dry-run | grep "\[sig-instrumentation\].*Prometheus\|\[sig-instrumentation\].*Alerts"| grep "should have a Watchdog alert in firing state the entire cluster run\|should report telemetry if a cloud.openshift.com token is present\|should start and expose a secured proxy and unsecured metrics" | ${DIR}/openshift-tests run --junit-dir=${ARTIFACT_DIR} -f -
+          exit $EXIT_CODE
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""

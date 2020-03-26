@@ -11,7 +11,6 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.10
-canonical_go_repository: github.com/metal3-io/cluster-api-provider-baremetal
 images:
 - dockerfile_path: Dockerfile
   from: base
@@ -30,11 +29,15 @@ tag_specification:
   name: "4.6"
   namespace: ocp
 tests:
+- as: e2e-metal-ipi
+  steps:
+    cluster_profile: packet
+    workflow: baremetalds-e2e
 - as: gofmt
-  commands: IS_CONTAINER=TRUE make fmt
+  commands: make fmt
   container:
     from: src
 - as: govet
-  commands: IS_CONTAINER=TRUE make vet
+  commands: make vet
   container:
     from: src

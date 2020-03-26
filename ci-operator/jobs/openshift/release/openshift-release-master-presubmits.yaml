@@ -2,6 +2,7 @@ presubmits:
   openshift/release:
   - agent: kubernetes
     always_run: false
+    cluster: api.ci
     context: ci/openshift/promrules
     decorate: true
     name: check_prometheus_rules
@@ -22,6 +23,7 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: api.ci
     context: ci/prow/app-ci-config
     decorate: true
     labels:
@@ -45,6 +47,7 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: api.ci
     context: ci/prow/build-farm-consistency
     decorate: true
     labels:
@@ -73,7 +76,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: default
+    cluster: api.ci
     context: ci/build-farm/build01-dry
     decorate: true
     labels:
@@ -89,6 +92,8 @@ presubmits:
         - /etc/build-farm-credentials/kubeconfig
         - --context
         - ci/api-build01-ci-devcluster-openshift-com:6443
+        - --level=all
+        - --as=
         command:
         - applyconfig
         env:
@@ -101,6 +106,11 @@ presubmits:
           valueFrom:
             secretKeyRef:
               key: build01_ci_reg_auth_value.txt
+              name: build-farm-credentials
+        - name: github_client_id
+          valueFrom:
+            secretKeyRef:
+              key: build01_github_client_id
               name: build-farm-credentials
         - name: github_client_secret
           valueFrom:
@@ -135,6 +145,7 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: api.ci
     context: ci/prow/ci-operator-config
     decorate: true
     labels:
@@ -159,6 +170,7 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: api.ci
     context: ci/prow/ci-operator-registry
     decorate: true
     labels:
@@ -188,6 +200,7 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: api.ci
     context: ci/prow/config
     decorate: true
     labels:
@@ -210,7 +223,7 @@ presubmits:
         - mismatched-tide-lenient
         command:
         - /checkconfig
-        image: gcr.io/k8s-prow/checkconfig:v20200317-190894183
+        image: gcr.io/k8s-prow/checkconfig:v20200325-b114fe7f2
         imagePullPolicy: Always
         name: ""
         resources:
@@ -221,7 +234,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: default
+    cluster: api.ci
     context: ci/prow/core-dry
     decorate: true
     labels:
@@ -233,6 +246,8 @@ presubmits:
       - args:
         - --config-dir
         - core-services
+        - --level=all
+        - --as=
         command:
         - applyconfig
         env:
@@ -263,6 +278,7 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/core-valid
     decorate: true
     decoration_config:
@@ -318,64 +334,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
-    context: ci/prow/core-valid-build01
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-release-master-core-valid-build01
-    optional: true
-    rerun_command: /test core-valid-build01
-    skip_report: true
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=core-valid
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )core-valid-build01,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
+    cluster: api.ci
     context: ci/prow/correctly-sharded-config
     decorate: true
     labels:
@@ -399,6 +358,7 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: api.ci
     context: ci/prow/generated-cluster
     decorate: true
     labels:
@@ -422,6 +382,7 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: api.ci
     context: ci/prow/generated-config
     decorate: true
     labels:
@@ -445,6 +406,7 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: api.ci
     context: ci/prow/generated-dashboards
     decorate: true
     labels:
@@ -468,6 +430,7 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: api.ci
     context: ci/prow/ordered-prow-config
     decorate: true
     labels:
@@ -480,7 +443,7 @@ presubmits:
         - ./
         command:
         - hack/validate-prow-job-ordering.sh
-        image: determinize-prow-jobs:latest
+        image: sanitize-prow-jobs:latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -491,6 +454,7 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: api.ci
     context: ci/prow/owners
     decorate: true
     labels:
@@ -515,6 +479,7 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: api.ci
     context: ci/prow/pj-rehearse
     decorate: true
     name: pull-ci-openshift-release-master-pj-rehearse
@@ -544,6 +509,7 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: api.ci
     context: ci/prow/prow-config
     decorate: true
     labels:
@@ -567,6 +533,7 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: api.ci
     context: ci/prow/prow-config-filenames
     decorate: true
     labels:
@@ -591,6 +558,7 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: api.ci
     context: ci/prow/prow-config-semantics
     decorate: true
     labels:
@@ -614,7 +582,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: default
+    cluster: api.ci
     context: ci/prow/services-dry
     decorate: true
     labels:
@@ -626,6 +594,8 @@ presubmits:
       - args:
         - --config-dir
         - services
+        - --level=all
+        - --as=
         command:
         - applyconfig
         image: registry.svc.ci.openshift.org/ci/applyconfig:latest
@@ -640,6 +610,7 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/services-valid
     decorate: true
     decoration_config:
@@ -695,64 +666,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
-    context: ci/prow/services-valid-build01
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-release-master-services-valid-build01
-    optional: true
-    rerun_command: /test services-valid-build01
-    skip_report: true
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=services-valid
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )services-valid-build01,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
+    cluster: api.ci
     context: ci/prow/step-registry-shellcheck
     decorate: true
     labels:
@@ -776,6 +690,7 @@ presubmits:
     always_run: false
     branches:
     - master
+    cluster: api.ci
     context: ci/prow/pylint
     decorate: true
     labels:

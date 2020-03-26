@@ -6,6 +6,11 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
+  echo "RELEASE_IMAGE_LATEST is an empty string, exiting"
+  exit 1
+fi
+
 cluster_profile=/var/run/secrets/ci.openshift.io/cluster-profile
 export SSH_PRIV_KEY_PATH=${cluster_profile}/ssh-privatekey
 export PULL_SECRET_PATH=${cluster_profile}/pull-secret
@@ -17,6 +22,7 @@ case "${CLUSTER_TYPE}" in
 aws) export AWS_SHARED_CREDENTIALS_FILE=${cluster_profile}/.awscred;;
 azure4) export AZURE_AUTH_LOCATION=${cluster_profile}/osServicePrincipal.json;;
 gcp) export GOOGLE_CLOUD_KEYFILE_JSON=${cluster_profile}/gce.json;;
+vsphere) ;;
 *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"
 esac
 
@@ -39,7 +45,7 @@ set -e
 cp \
     -t "${SHARED_DIR}" \
     "${dir}/auth/kubeconfig" \
-    "${dir}/metadata.json" \
-    "${dir}/terraform.tfstate"
+    "${dir}/metadata.json"
 cp "${dir}/.openshift_install.log" "${ARTIFACT_DIR}/"
+cp "${dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null || :
 exit "$ret"

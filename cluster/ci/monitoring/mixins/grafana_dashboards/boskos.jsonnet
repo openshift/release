@@ -69,6 +69,10 @@ dashboard.new(
         legendFormat='azure',
     ))
     .addTarget(prometheus.target(
+        'sum(kube_pod_container_status_running{pod=~".*-packet(-.*)?",container="teardown"})',
+        legendFormat='packet',
+    ))
+    .addTarget(prometheus.target(
         'sum(kube_pod_container_status_running{pod=~".*-openstack(-.*)?",container="teardown"})',
         legendFormat='openstack',
     )), gridPos={
@@ -81,5 +85,6 @@ dashboard.new(
 .addPanel(statePanel(iaas="gcp", displayName="GCP"), gridPos={h: 9, w: 24, x: 0, y: 0})
 .addPanel(statePanel(iaas="azure4", displayName="Azure"), gridPos={h: 9, w: 24, x: 0, y: 0})
 .addPanel(statePanel(iaas="vsphere", displayName="vSphere"), gridPos={h: 9, w: 24, x: 0, y: 0})
+.addPanel(statePanel(iaas="packet", displayName="Packet.net"), gridPos={h: 9, w: 24, x: 0, y: 0})
 .addPanel(statePanel(iaas="openstack", displayName="OpenStack"), gridPos={h: 9, w: 24, x: 0, y: 0})
 + dashboardConfig

@@ -46,7 +46,7 @@ items:
         priorityClassName: prow-critical
         containers:
         - name: crier
-          image: gcr.io/k8s-prow/crier:v20200317-190894183
+          image: gcr.io/k8s-prow/crier:v20200325-b114fe7f2
           args:
           - --github-workers=5
           - --config-path=/etc/config/config.yaml
@@ -57,7 +57,10 @@ items:
           - --gcs-workers=10
           - --gcs-credentials-file=/etc/service-account/service-account.json
           - --kubernetes-gcs-workers=10
-          - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+          env:
+          # Multiple configs can only be passed via the env var and not via the flag
+          - name: KUBECONFIG
+            value: /etc/build-farm-credentials/api.ci.kubeconfig:/etc/build-farm-credentials/build01.kubeconfig
           volumeMounts:
           - name: oauth
             mountPath: /etc/github
@@ -139,8 +142,10 @@ items:
         - name: build-farm-credentials
           secret:
             items:
+            - key: sa.crier.api.ci.config
+              path: api.ci.kubeconfig
             - key: sa.crier.build01.config
-              path: kubeconfig
+              path: build01.kubeconfig
             secretName: build-farm-credentials
         - name: service-account
           secret:

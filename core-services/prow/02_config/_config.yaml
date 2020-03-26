@@ -2,6 +2,10 @@ branch-protection:
   allow_disabled_job_policies: true
   allow_disabled_policies: true
   orgs:
+    ComplianceAsCode:
+      repos:
+        content:
+          protect: false
     codeready-toolchain:
       repos:
         api:
@@ -316,20 +320,18 @@ deck:
   - openshift/ose
   - openshift/online-registration
   - openshift/private-ci-testing
-  rerun_auth_config:
-    github_users:
-    - stevekuznetsov
-    - petr-muller
-    - droslean
-    - bbguimaraes
-    - hongkailiu
-    - vikaslaad
-    - dobbymoodge
-    - alvaroaleman
+  rerun_auth_configs:
+    '*':
+      github_users:
+      - stevekuznetsov
+      - petr-muller
+      - droslean
+      - bbguimaraes
+      - hongkailiu
+      - vikaslaad
+      - dobbymoodge
+      - alvaroaleman
   spyglass:
-    announcement: 'The old job viewer, Gubernator, has been deprecated in favour of
-      this page, Spyglass.{{if .ArtifactPath}} For now, the old page is <a href=''https://openshift-gce-devel.appspot.com/build/{{.ArtifactPath}}''>still
-      available</a>.{{end}} Please send feedback to #forum-testplatform.'
     gcs_browser_prefix: https://gcsweb-ci.svc.ci.openshift.org/gcs/
     lenses:
     - lens:
@@ -345,6 +347,8 @@ deck:
           - panic\b
           - ^E\d{4} \d\d:\d\d:\d\d\.\d\d\d]
           - Resolved release
+          - '"level":"error"'
+          - level=error
         name: buildlog
       required_files:
       - build-log.txt
@@ -447,10 +451,10 @@ plank:
             memory: 20Mi
       timeout: 4h0m0s
       utility_images:
-        clonerefs: gcr.io/k8s-prow/clonerefs:v20200317-190894183
-        entrypoint: gcr.io/k8s-prow/entrypoint:v20200317-190894183
-        initupload: gcr.io/k8s-prow/initupload:v20200317-190894183
-        sidecar: registry.svc.ci.openshift.org/clayton-test-1/sidecar@sha256:3619766610babc626144cc3fce1e0529916637461611b66e45f8fb6a873b4051
+        clonerefs: gcr.io/k8s-prow/clonerefs:v20200325-b114fe7f2
+        entrypoint: gcr.io/k8s-prow/entrypoint:v20200325-b114fe7f2
+        initupload: gcr.io/k8s-prow/initupload:v20200325-b114fe7f2
+        sidecar: gcr.io/k8s-prow/sidecar:v20200325-b114fe7f2
     openshift-priv:
       gcs_configuration:
         bucket: origin-ci-private
@@ -545,10 +549,12 @@ tide:
     openshift-priv/jenkins-client-plugin: rebase
     openshift-priv/jenkins-openshift-login-plugin: rebase
     openshift-priv/jenkins-sync-plugin: rebase
+    openshift-priv/network-metrics-daemon: squash
     openshift-priv/special-resource-operator: squash
     openshift-priv/template-service-broker-operator: squash
     openshift-psap/special-resource-operator: squash
     openshift/ansible-service-broker: squash
+    openshift/bond-cni: squash
     openshift/cluster-api: rebase
     openshift/cluster-api-provider-azure: rebase
     openshift/custom-resource-status: squash
@@ -1109,6 +1115,7 @@ tide:
     - openshift-priv/multus-admission-controller
     - openshift-priv/multus-cni
     - openshift-priv/must-gather
+    - openshift-priv/network-metrics-daemon
     - openshift-priv/node-feature-discovery
     - openshift-priv/node-problem-detector
     - openshift-priv/node-problem-detector-operator
@@ -1157,6 +1164,7 @@ tide:
     - openshift/autoheal
     - openshift/baremetal-operator
     - openshift/baremetal-runtimecfg
+    - openshift/bond-cni
     - openshift/builder
     - openshift/client-go
     - openshift/cloud-credential-operator
@@ -1521,6 +1529,7 @@ tide:
     - integr8ly/ansible-tower-configuration
     - integr8ly/application-monitoring-operator
     - integr8ly/cloud-resource-operator
+    - integr8ly/delorean
     - integr8ly/heimdall
     - integr8ly/installation
     - integr8ly/integreatly-operator

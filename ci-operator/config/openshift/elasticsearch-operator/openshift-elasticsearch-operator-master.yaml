@@ -11,9 +11,14 @@ build_root:
     namespace: openshift
     tag: golang-1.12
 images:
+- from: base
+  to: elasticsearch-operator
 - dockerfile_path: olm_deploy/operatorregistry/Dockerfile
   from: base
   to: elasticsearch-operator-registry
+- dockerfile_path: Dockerfile.src
+  from: src
+  to: elasticsearch-operator-src
 promotion:
   name: "4.5"
   namespace: ocp
@@ -33,6 +38,6 @@ tests:
   container:
     from: src
 - as: e2e-operator
-  commands: make test-e2e
+  commands: make test-e2e-olm
   openshift_installer_src:
     cluster_profile: aws

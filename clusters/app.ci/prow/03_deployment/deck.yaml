@@ -83,7 +83,7 @@ objects:
         serviceAccountName: deck
         containers:
         - name: deck
-          image: gcr.io/k8s-prow/deck:v20200317-190894183
+          image: gcr.io/k8s-prow/deck:v20200325-b114fe7f2
           args:
           - --config-path=/etc/config/config.yaml
           - --cookie-secret=/etc/cookie/cookie
@@ -98,8 +98,11 @@ objects:
           - --job-config-path=/etc/job-config
           - --spyglass=true
           - --rerun-creates-job=true
-          - --kubeconfig=/etc/build-farm-credentials/kubeconfig
           - --gcs-no-auth=true
+          env:
+          # Multiple configs can only be passed via the env var and not via the flag
+          - name: KUBECONFIG
+            value: /etc/build-farm-credentials/api.ci.kubeconfig:/etc/build-farm-credentials/build01.kubeconfig
           ports:
             - name: main
               containerPort: 8080
@@ -214,8 +217,10 @@ objects:
         - name: build-farm-credentials
           secret:
             items:
+            - key: sa.deck.api.ci.config
+              path: api.ci.kubeconfig
             - key: sa.deck.build01.config
-              path: kubeconfig
+              path: build01.kubeconfig
             secretName: build-farm-credentials
 - apiVersion: v1
   kind: Route
@@ -304,7 +309,7 @@ objects:
           - mountPath: /etc/proxy/secrets
             name: session-secret
         - name: deck
-          image: gcr.io/k8s-prow/deck:v20200317-190894183
+          image: gcr.io/k8s-prow/deck:v20200325-b114fe7f2
           args:
           - --github-oauth-config-file=/etc/github/config.json
           - --github-token-path=/etc/oauth/oauth
@@ -322,6 +327,9 @@ objects:
           ports:
             - name: http
               containerPort: 8080
+          env:
+          - name: KUBECONFIG
+            value: /etc/build-farm-credentials/api.ci.kubeconfig:/etc/build-farm-credentials/build01.kubeconfig
           volumeMounts:
           - name: gce-sa-credentials-gcs-private
             mountPath: /etc/gce-sa-credentials-gcs-private
@@ -339,6 +347,9 @@ objects:
             readOnly: true
           - name: oauth
             mountPath: /etc/oauth
+            readOnly: true
+          - mountPath: /etc/build-farm-credentials
+            name: build-farm-credentials
             readOnly: true
           resources:
             requests:
@@ -366,6 +377,14 @@ objects:
         - name: deck-internal-tls
           secret:
             secretName: deck-internal-tls
+        - name: build-farm-credentials
+          secret:
+            items:
+            - key: sa.deck.api.ci.config
+              path: api.ci.kubeconfig
+            - key: sa.deck.build01.config
+              path: build01.kubeconfig
+            secretName: build-farm-credentials
 - apiVersion: v1
   kind: Secret
   metadata:

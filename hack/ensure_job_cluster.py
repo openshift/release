@@ -8,16 +8,36 @@ import logging
 import os
 import yaml
 
+DEFAULT_CLUSTER = "api.ci"
+BUILD01_CLUSTER = "ci/api-build01-ci-devcluster-openshift-com:6443"
+JOB_MAP = {
+    "pull-ci-openshift-ci-tools-master-integration": DEFAULT_CLUSTER,
+    "pull-ci-openshift-release-master-build01-dry": DEFAULT_CLUSTER,
+    "pull-ci-openshift-release-master-core-dry": DEFAULT_CLUSTER,
+    "pull-ci-openshift-release-master-services-dry": DEFAULT_CLUSTER,
+    "periodic-acme-cert-issuer-for-build01": DEFAULT_CLUSTER,
+    "periodic-build01-upgrade": BUILD01_CLUSTER,
+}
+
+def load_dup_jobs():
+    """load the duplicated jobs."""
+    with open(os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                           "ensure_job_cluster_dup_jobs.yaml")) as file:
+        return yaml.safe_load(file)
+
+
+DUP_JOBS = load_dup_jobs()
+
 
 def get_desired_cluster(file_path, job):
     """get the desired cluster for a given job defined in file_path."""
     if job.get("agent", "") != "kubernetes":
-        return ""
+        return DEFAULT_CLUSTER
     if job["name"] in JOB_MAP:
         return JOB_MAP[job["name"]]
-    if job["name"].endswith("-build01") or migrated(file_path):
+    if job["name"].endswith("-build01") or migrated(file_path) or job["name"] in DUP_JOBS:
         return BUILD01_CLUSTER
-    return ""
+    return DEFAULT_CLUSTER
 
 
 def identify_jobs_to_update(file_path, jobs):
@@ -46,6 +66,8 @@ def migrated(file_path):
     # due to https://github.com/openshift/release/pull/7178
     if file_path.endswith('periodics.yaml') and 'openshift/release/' in file_path:
         return False
+    if file_path.endswith('presubmits.yaml') and 'ci-operator/jobs/openshift-priv/' in file_path:
+        return True
     return False
 
 def ensure(job_dir, overwrite):
@@ -78,16 +100,6 @@ logging.basicConfig(
     format="%(asctime)s:%(levelname)s:%(message)s"
     )
 
-DEFAULT_CLUSTER = "default"
-BUILD01_CLUSTER = "ci/api-build01-ci-devcluster-openshift-com:6443"
-JOB_MAP = {
-    "pull-ci-openshift-release-master-build01-dry": DEFAULT_CLUSTER,
-    "pull-ci-openshift-release-master-core-dry": DEFAULT_CLUSTER,
-    "pull-ci-openshift-release-master-services-dry": DEFAULT_CLUSTER,
-    "periodic-acme-cert-issuer-for-build01": DEFAULT_CLUSTER,
-    "periodic-build01-upgrade": BUILD01_CLUSTER,
-}
-
 
 def main():
     """main function."""
@@ -97,6 +109,7 @@ def main():
                         help="the path to the job directory")
     parser.add_argument('-w', '--overwrite', default=False, help="overwrite jobs' cluster if True")
     args = parser.parse_args()
+    load_dup_jobs()
     ensure(args.job_dir, args.overwrite)
     if not args.overwrite:
         logging.info("every job is running on the expected cluster")

@@ -24,7 +24,7 @@ if [ "${CLUSTER_TYPE}" != "packet" ] ; then
 fi
 
 # Terraform setup and init for packet server
-terraform_home=${ARTIFACT_DIR}/terraform
+terraform_home=/tmp/terraform
 mkdir -p ${terraform_home}
 cd ${terraform_home}
 
@@ -36,7 +36,7 @@ resource "packet_device" "server" {
   count            = "1"
   project_id       = "$PACKET_PROJECT_ID"
   hostname         = "ipi-$CLUSTER_NAME"
-  plan             = "m2.xlarge.x86"
+  plan             = "c2.medium.x86"
   facilities       = ["sjc1", "ewr1"]
   operating_system = "centos_8"
   billing_cycle    = "hourly"

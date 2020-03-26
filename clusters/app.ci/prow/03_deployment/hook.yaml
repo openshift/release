@@ -63,7 +63,7 @@ items:
         serviceAccountName: hook
         containers:
         - name: hook
-          image: gcr.io/k8s-prow/hook:v20200317-190894183
+          image: gcr.io/k8s-prow/hook:v20200325-b114fe7f2
           args:
           - --config-path=/etc/config/config.yaml
           - --github-token-path=/etc/github/oauth
@@ -78,7 +78,7 @@ items:
           env:
           # Multiple configs can only be passed via the env var and not via the flag
           - name: KUBECONFIG
-            value: /etc/build-farm-credentials/build01.kubeconfig:/etc/build-farm-credentials/app.ci.kubeconfig
+            value: /etc/build-farm-credentials/api.ci.kubeconfig:/etc/build-farm-credentials/app.ci.kubeconfig:/etc/build-farm-credentials/build01.kubeconfig
           ports:
             - name: main
               containerPort: 8888
@@ -188,10 +188,12 @@ items:
         - name: build-farm-credentials
           secret:
             items:
-            - key: sa.hook.build01.config
-              path: build01.kubeconfig
+            - key: sa.hook.api.ci.config
+              path: api.ci.kubeconfig
             - key: sa.hook.app.ci.config
               path: app.ci.kubeconfig
+            - key: sa.hook.build01.config
+              path: build01.kubeconfig
             secretName: build-farm-credentials
         - name: tmp
           emptyDir: {}

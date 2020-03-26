@@ -1,5 +1,6 @@
 periodics:
 - agent: kubernetes
+  cluster: api.ci
   cron: '@yearly'
   decorate: true
   labels:
@@ -69,6 +70,89 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
+  cluster: api.ci
+  cron: '@yearly'
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: cpaas-cvp-optional-operator-common-tests
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --branch=cvp-ocp-$(OCP_VERSION)
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
+      - --org=redhat-operator-ecosystem
+      - --repo=playground
+      - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
+      - --secret-dir=/usr/local/cvp-common-$(CLUSTER_TYPE)-cluster-profile
+      - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+      - --target=cvp-common-$(CLUSTER_TYPE)
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(OCP_VERSION)
+      - --input-hash=$(CLUSTER_TYPE)
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/cvp-common-aws-cluster-profile
+        name: cluster-profile-aws
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/sentry-dsn
+        name: sentry-dsn
+        readOnly: true
+      - mountPath: /etc/registry
+        name: registry
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: cluster-profile-aws
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: sentry-dsn
+      secret:
+        secretName: sentry-dsn
+    - configMap:
+        name: step-registry
+      name: registry
+- agent: kubernetes
+  cluster: api.ci
   cron: '@yearly'
   decorate: true
   labels:
@@ -192,6 +276,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
+  cluster: api.ci
   cron: '@yearly'
   decorate: true
   labels:
@@ -317,6 +402,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
+  cluster: api.ci
   cron: '@yearly'
   decorate: true
   labels:
@@ -440,6 +526,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
+  cluster: api.ci
   cron: '@yearly'
   decorate: true
   labels:
@@ -551,6 +638,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
+  cluster: api.ci
   cron: '@yearly'
   decorate: true
   labels:
@@ -674,6 +762,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
+  cluster: api.ci
   cron: '@yearly'
   decorate: true
   labels:
@@ -784,6 +873,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
+  cluster: api.ci
   cron: '@yearly'
   decorate: true
   labels:
@@ -881,6 +971,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
+  cluster: api.ci
   cron: '@yearly'
   decorate: true
   labels:
