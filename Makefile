@@ -35,8 +35,8 @@ services:
 jobs:
 	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest
 	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/ci-operator:/ci-operator:z" registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest --from-dir /ci-operator/config --to-dir /ci-operator/jobs
-	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/determinize-prow-jobs:latest
-	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/ci-operator/jobs:/ci-operator/jobs:z" registry.svc.ci.openshift.org/ci/determinize-prow-jobs:latest --prow-jobs-dir /ci-operator/jobs
+	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/sanitize-prow-jobs:latest
+	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/ci-operator/jobs:/ci-operator/jobs:z" registry.svc.ci.openshift.org/ci/sanitize-prow-jobs:latest --prow-jobs-dir /ci-operator/jobs
 
 prow-config:
 	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/determinize-prow-config:latest

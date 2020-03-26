@@ -45,7 +45,7 @@ set -e
 cp \
     -t "${SHARED_DIR}" \
     "${dir}/auth/kubeconfig" \
-    "${dir}/metadata.json" \
-    "${dir}/terraform.tfstate"
+    "${dir}/metadata.json"
 cp "${dir}/.openshift_install.log" "${ARTIFACT_DIR}/"
+cp "${dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null || :
 exit "$ret"

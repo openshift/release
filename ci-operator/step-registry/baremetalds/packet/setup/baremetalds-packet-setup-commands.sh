@@ -24,7 +24,7 @@ if [ "${CLUSTER_TYPE}" != "packet" ] ; then
 fi
 
 # Terraform setup and init for packet server
-terraform_home=${ARTIFACT_DIR}/terraform
+terraform_home=/tmp/terraform
 mkdir -p ${terraform_home}
 cd ${terraform_home}
 
