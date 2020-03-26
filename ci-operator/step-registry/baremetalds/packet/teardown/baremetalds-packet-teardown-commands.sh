@@ -26,7 +26,7 @@ echo "-------[ $SHARED_DIR ]"
 ls -ll ${SHARED_DIR}
 
 # Shutdown packet server
-terraform_home=${ARTIFACT_DIR}/terraform
+terraform_home=/tmp/terraform
 mkdir -p ${terraform_home}
 cp ${SHARED_DIR}/terraform.* ${terraform_home}
 echo "Deprovisioning cluster..."
