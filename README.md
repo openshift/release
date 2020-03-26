@@ -6,6 +6,8 @@ OCP.
 
 ## CI Workflow Configuration
 
+To setup a CI workflow for a new repository, use `make new-repo`.
+
 Configuration files for CI workflows live under [`ci-operator/`](./ci-operator/)
 and are split into the following categories:
 
