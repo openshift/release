@@ -29,13 +29,29 @@ def load_dup_jobs():
 DUP_JOBS = load_dup_jobs()
 
 
+def load_grouped_jobs():
+    """load the grouped jobs."""
+    with open(os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                           "ensure_job_cluster_groups.yaml")) as file:
+        groups = yaml.safe_load(file)
+        jobs = []
+        for i, group in enumerate(groups):
+            if i <= 0:
+                jobs.extend(group)
+        return jobs
+
+
+GROUP_JOBS = load_grouped_jobs()
+
+
 def get_desired_cluster(file_path, job):
     """get the desired cluster for a given job defined in file_path."""
     if job.get("agent", "") != "kubernetes":
         return DEFAULT_CLUSTER
     if job["name"] in JOB_MAP:
         return JOB_MAP[job["name"]]
-    if job["name"].endswith("-build01") or migrated(file_path) or job["name"] in DUP_JOBS:
+    if job["name"].endswith("-build01") or migrated(file_path) or \
+        job["name"] in DUP_JOBS or job["name"] in GROUP_JOBS:
         return BUILD01_CLUSTER
     return DEFAULT_CLUSTER
 
@@ -87,8 +103,7 @@ def ensure(job_dir, overwrite):
                             data[job_type][repo] = get_updated_jobs(data[job_type][repo], name_map)
                     name_map = identify_jobs_to_update(file_path, data.get("periodics", []))
                     if name_map and not overwrite:
-                        raise Exception('those jobs in {} have to run on the cluster {}'\
-                            .format(file_path, name_map))
+                        raise Exception('the jobs in {} do not have the `cluster` property set correctly. Expected job<->cluster mapping: {}. If you are adding a new job, please run `make jobs` for setting the default value.'.format(file_path, name_map))
                     data["periodics"] = get_updated_jobs(data.get("periodics", []), name_map)
                 if overwrite:
                     with open(file_path, 'w') as file:
