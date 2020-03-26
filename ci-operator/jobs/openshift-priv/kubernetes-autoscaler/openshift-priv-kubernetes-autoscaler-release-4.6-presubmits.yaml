@@ -4,7 +4,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/e2e-aws-operator
     decorate: true
     decoration_config:
@@ -105,7 +105,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/e2e-azure-operator
     decorate: true
     decoration_config:
@@ -206,7 +206,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/e2e-gcp-operator
     decorate: true
     decoration_config:
@@ -309,7 +309,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/git-history
     decorate: true
     decoration_config:
@@ -375,73 +375,6 @@ presubmits:
     branches:
     - release-4.6
     cluster: ci/api-build01-ci-devcluster-openshift-com:6443
-    context: ci/prow/git-history-build01
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    hidden: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-kubernetes-autoscaler-release-4.6-git-history-build01
-    optional: true
-    path_alias: k8s.io/autoscaler
-    rerun_command: /test git-history-build01
-    skip_report: true
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=git-history
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )git-history-build01,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.6
-    cluster: api.ci
     context: ci/prow/goimports
     decorate: true
     decoration_config:
@@ -507,73 +440,6 @@ presubmits:
     branches:
     - release-4.6
     cluster: ci/api-build01-ci-devcluster-openshift-com:6443
-    context: ci/prow/goimports-build01
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    hidden: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-kubernetes-autoscaler-release-4.6-goimports-build01
-    optional: true
-    path_alias: k8s.io/autoscaler
-    rerun_command: /test goimports-build01
-    skip_report: true
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=goimports
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )goimports-build01,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.6
-    cluster: api.ci
     context: ci/prow/golint
     decorate: true
     decoration_config:
@@ -639,73 +505,6 @@ presubmits:
     branches:
     - release-4.6
     cluster: ci/api-build01-ci-devcluster-openshift-com:6443
-    context: ci/prow/golint-build01
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    hidden: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-kubernetes-autoscaler-release-4.6-golint-build01
-    optional: true
-    path_alias: k8s.io/autoscaler
-    rerun_command: /test golint-build01
-    skip_report: true
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=golint
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )golint-build01,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.6
-    cluster: api.ci
     context: ci/prow/govet
     decorate: true
     decoration_config:
@@ -771,73 +570,6 @@ presubmits:
     branches:
     - release-4.6
     cluster: ci/api-build01-ci-devcluster-openshift-com:6443
-    context: ci/prow/govet-build01
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    hidden: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-kubernetes-autoscaler-release-4.6-govet-build01
-    optional: true
-    path_alias: k8s.io/autoscaler
-    rerun_command: /test govet-build01
-    skip_report: true
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=govet
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )govet-build01,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.6
-    cluster: api.ci
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -903,73 +635,6 @@ presubmits:
     branches:
     - release-4.6
     cluster: ci/api-build01-ci-devcluster-openshift-com:6443
-    context: ci/prow/images-build01
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    hidden: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-kubernetes-autoscaler-release-4.6-images-build01
-    optional: true
-    path_alias: k8s.io/autoscaler
-    rerun_command: /test images-build01
-    skip_report: true
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=[images]
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )images-build01,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.6
-    cluster: api.ci
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -1030,70 +695,3 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )unit,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.6
-    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
-    context: ci/prow/unit-build01
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    hidden: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-kubernetes-autoscaler-release-4.6-unit-build01
-    optional: true
-    path_alias: k8s.io/autoscaler
-    rerun_command: /test unit-build01
-    skip_report: true
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=unit
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )unit-build01,?($|\s.*)

@@ -27,16 +27,8 @@ presubmits:
         - --secret-dir=/usr/local/e2e-aws-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=e2e-aws
-        - --template=/usr/local/e2e-aws
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: e2e-aws
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance/parallel run-tests
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -52,9 +44,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-aws-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-aws
-          name: job-definition
-          subPath: cluster-launch-installer-e2e.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -80,9 +69,6 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-e2e
-        name: job-definition
       - name: pull-secret
         secret:
           secretName: regcred
@@ -277,82 +263,6 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-aws-scaleup-rhel7,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.5
-    cluster: api.ci
-    context: ci/prow/e2e-aws-steps
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-release-4.5-e2e-aws-steps
-    rerun_command: /test e2e-aws-steps
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --lease-server-password-file=/etc/boskos/password
-        - --lease-server-username=ci
-        - --lease-server=https://boskos-ci.svc.ci.openshift.org
-        - --secret-dir=/usr/local/e2e-aws-steps-cluster-profile
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=e2e-aws-steps
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-aws-steps-cluster-profile
-          name: cluster-profile
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
-      - name: boskos
-        secret:
-          items:
-          - key: password
-            path: password
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )e2e-aws-steps,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -1296,7 +1206,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.5
-    cluster: api.ci
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/gofmt
     decorate: true
     decoration_config:
@@ -1353,64 +1263,6 @@ presubmits:
     branches:
     - release-4.5
     cluster: ci/api-build01-ci-devcluster-openshift-com:6443
-    context: ci/prow/gofmt-build01
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-release-4.5-gofmt-build01
-    optional: true
-    rerun_command: /test gofmt-build01
-    skip_report: true
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=gofmt
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )gofmt-build01,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.5
-    cluster: api.ci
     context: ci/prow/golint
     decorate: true
     decoration_config:
@@ -1467,64 +1319,6 @@ presubmits:
     branches:
     - release-4.5
     cluster: ci/api-build01-ci-devcluster-openshift-com:6443
-    context: ci/prow/golint-build01
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-release-4.5-golint-build01
-    optional: true
-    rerun_command: /test golint-build01
-    skip_report: true
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=golint
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )golint-build01,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.5
-    cluster: api.ci
     context: ci/prow/govet
     decorate: true
     decoration_config:
@@ -1581,64 +1375,6 @@ presubmits:
     branches:
     - release-4.5
     cluster: ci/api-build01-ci-devcluster-openshift-com:6443
-    context: ci/prow/govet-build01
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-release-4.5-govet-build01
-    optional: true
-    rerun_command: /test govet-build01
-    skip_report: true
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=govet
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )govet-build01,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.5
-    cluster: api.ci
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -1690,64 +1426,6 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )images,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.5
-    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
-    context: ci/prow/images-build01
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-release-4.5-images-build01
-    optional: true
-    rerun_command: /test images-build01
-    skip_report: true
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=[images]
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )images-build01,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -1834,7 +1512,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.5
-    cluster: api.ci
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -1891,64 +1569,6 @@ presubmits:
     branches:
     - release-4.5
     cluster: ci/api-build01-ci-devcluster-openshift-com:6443
-    context: ci/prow/unit-build01
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-release-4.5-unit-build01
-    optional: true
-    rerun_command: /test unit-build01
-    skip_report: true
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=unit
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )unit-build01,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.5
-    cluster: api.ci
     context: ci/prow/verify-vendor
     decorate: true
     decoration_config:
@@ -2000,64 +1620,6 @@ presubmits:
         secret:
           secretName: sentry-dsn
     trigger: (?m)^/test( | .* )verify-vendor,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.5
-    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
-    context: ci/prow/verify-vendor-build01
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-release-4.5-verify-vendor-build01
-    optional: true
-    rerun_command: /test verify-vendor-build01
-    skip_report: true
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=verify-vendor
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )verify-vendor-build01,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:

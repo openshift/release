@@ -51,6 +51,37 @@ postsubmits:
           secretName: app-ci-config-updater-kubeconfig
   - agent: kubernetes
     branches:
+    - ^master$
+    cluster: api.ci
+    decorate: true
+    labels:
+      ci.openshift.io/role: infra-canary
+    name: branch-ci-openshift-release-master-app-ci-apply-monitoring-canary
+    spec:
+      containers:
+      - args:
+        - prow-monitoring
+        command:
+        - make
+        env:
+        - name: KUBECONFIG
+          value: /etc/kubeconfig/kubeconfig
+        image: registry.svc.ci.openshift.org/ocp/cli-make:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/kubeconfig
+          name: kubeconfig
+          readOnly: true
+      volumes:
+      - name: kubeconfig
+        secret:
+          secretName: app-ci-config-updater-kubeconfig
+  - agent: kubernetes
+    branches:
     - master
     cluster: api.ci
     decorate: true
@@ -227,7 +258,7 @@ postsubmits:
         - --debug
         command:
         - /app/label_sync/app.binary
-        image: gcr.io/k8s-prow/label_sync:v20200323-ecb75feef
+        image: gcr.io/k8s-prow/label_sync:v20200325-b114fe7f2
         imagePullPolicy: Always
         name: ""
         resources:
