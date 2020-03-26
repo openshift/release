@@ -5,6 +5,8 @@ This document describes how to create CI jobs for Openshift components using
 ci-operator and is intended for component developers who want to add tests to
 their CI process.
 
+To begin setting up a CI jobs for a new repository, run `make new-repo`.
+
 After editing the files under this directory, make sure to run the generator to
 ensure that your changes are compliant to our conventions and pass the CI tests
 that will run when you submit your changes as a PR:
@@ -287,7 +289,6 @@ The outputs of a template test are:
 
 These are described in more detail in the
 [`ci-operator` documentation](https://github.com/openshift/ci-tools/blob/master/TEMPLATES.md#expected-output-from-templates).
-
 
 ### Adding a template
 
