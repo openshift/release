@@ -29,13 +29,29 @@ def load_dup_jobs():
 DUP_JOBS = load_dup_jobs()
 
 
+def load_grouped_jobs():
+    """load the grouped jobs."""
+    with open(os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                           "ensure_job_cluster_groups.yaml")) as file:
+        groups = yaml.safe_load(file)
+        jobs = []
+        for i, group in enumerate(groups):
+            if i <= 0:
+                jobs.extend(group)
+        return jobs
+
+
+GROUP_JOBS = load_grouped_jobs()
+
+
 def get_desired_cluster(file_path, job):
     """get the desired cluster for a given job defined in file_path."""
     if job.get("agent", "") != "kubernetes":
         return DEFAULT_CLUSTER
     if job["name"] in JOB_MAP:
         return JOB_MAP[job["name"]]
-    if job["name"].endswith("-build01") or migrated(file_path) or job["name"] in DUP_JOBS:
+    if job["name"].endswith("-build01") or migrated(file_path) or \
+        job["name"] in DUP_JOBS or job["name"] in GROUP_JOBS:
         return BUILD01_CLUSTER
     return DEFAULT_CLUSTER
 
