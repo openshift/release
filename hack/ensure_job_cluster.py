@@ -87,8 +87,7 @@ def ensure(job_dir, overwrite):
                             data[job_type][repo] = get_updated_jobs(data[job_type][repo], name_map)
                     name_map = identify_jobs_to_update(file_path, data.get("periodics", []))
                     if name_map and not overwrite:
-                        raise Exception('those jobs in {} have to run on the cluster {}'\
-                            .format(file_path, name_map))
+                        raise Exception('the jobs in {} do not have the `cluster` property set correctly. Expected job<->cluster mapping: {}. If you are adding a new job, please run `make jobs` for setting the default value.'.format(file_path, name_map))
                     data["periodics"] = get_updated_jobs(data.get("periodics", []), name_map)
                 if overwrite:
                     with open(file_path, 'w') as file:
