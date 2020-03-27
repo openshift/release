@@ -5,12 +5,15 @@ parameters:
   name: SESSION_SECRET
   generate: expression
   from: "[a-zA-Z0-9]{43}"
+- description: "The namespace. Must come from a var or it will get stripped off"
+  name: NAMESPACE
+  value: ci
 objects:
 - apiVersion: v1
   kind: Route
   metadata:
     name: deck
-    namespace: ci
+    namespace: ${NAMESPACE}
     annotations:
       haproxy.router.openshift.io/timeout: "90s"
   spec:
@@ -25,7 +28,7 @@ objects:
 - apiVersion: v1
   kind: Route
   metadata:
-    namespace: ci
+    namespace: ${NAMESPACE}
     name: prow
     annotations:
       haproxy.router.openshift.io/timeout: "90s"
@@ -41,7 +44,7 @@ objects:
 - apiVersion: v1
   kind: Service
   metadata:
-    namespace: ci
+    namespace: ${NAMESPACE}
     name: deck
     labels:
       app: prow
@@ -62,7 +65,7 @@ objects:
 - apiVersion: apps/v1
   kind: Deployment
   metadata:
-    namespace: ci
+    namespace: ${NAMESPACE}
     name: deck
     labels:
       app: prow
@@ -225,7 +228,7 @@ objects:
 - apiVersion: v1
   kind: Route
   metadata:
-    namespace: ci
+    namespace: ${NAMESPACE}
     name: deck-internal
     annotations:
       haproxy.router.openshift.io/timeout: "90s"
@@ -239,7 +242,7 @@ objects:
 - apiVersion: v1
   kind: Service
   metadata:
-    namespace: ci
+    namespace: ${NAMESPACE}
     name: deck-internal
     labels:
       app: prow
@@ -262,7 +265,7 @@ objects:
 - apiVersion: apps/v1
   kind: Deployment
   metadata:
-    namespace: ci
+    namespace: ${NAMESPACE}
     name: deck-internal
     labels:
       app: prow
@@ -443,7 +446,7 @@ objects:
 - apiVersion: v1
   kind: Secret
   metadata:
-    namespace: ci
+    namespace: ${NAMESPACE}
     name: deck-internal-session-secret
   stringData:
     session_secret: "${SESSION_SECRET}="
