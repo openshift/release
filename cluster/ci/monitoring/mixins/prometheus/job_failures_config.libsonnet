@@ -25,6 +25,9 @@
       'periodic-ci-redhat-developer-service-binding-operator-master-dev-release': {
         receiver: 'openshift-dev-services',
       },
+      'periodic-ci-operator-framework-operator-lifecycle-managment-master-rhoperator-metric-e2e-aws-olm-master-daily': {
+        receiver: 'OLM-rh-operators',
+      },
     },
   },
 }
