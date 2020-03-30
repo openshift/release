@@ -11,7 +11,6 @@ import yaml
 DEFAULT_CLUSTER = "api.ci"
 BUILD01_CLUSTER = "ci/api-build01-ci-devcluster-openshift-com:6443"
 JOB_MAP = {
-    "pull-ci-openshift-ci-tools-master-integration": DEFAULT_CLUSTER,
     "pull-ci-openshift-release-master-build01-dry": DEFAULT_CLUSTER,
     "pull-ci-openshift-release-master-core-dry": DEFAULT_CLUSTER,
     "pull-ci-openshift-release-master-services-dry": DEFAULT_CLUSTER,
