@@ -42,7 +42,7 @@ periodics:
         ci-operator --artifact-dir=$(ARTIFACTS) --secret-dir=/usr/local/pull-secret \
           --secret-dir=/usr/local/e2e-aws-cluster-profile --template=/usr/local/e2e-aws \
           --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME) \
-          --lease-server=http://boskos \
+          --lease-server=https://boskos-ci.svc.ci.openshift.org \
           --promote
 
         # also tag the image into the art-latest stream
@@ -64,6 +64,7 @@ periodics:
       - name: CONFIG_SPEC
         value: |
           tag_specification:
+            cluster: https://api.ci.openshift.org
             name: "$(BRANCH)"
             namespace: ocp
           promotion:
@@ -79,6 +80,7 @@ periodics:
               tag: golang-1.11
           base_images:
             $(TAG):
+              cluster: https://api.ci.openshift.org
               name: $(TAG)
               namespace: rhcos
               tag: "$(BRANCH)"
@@ -663,7 +665,7 @@ periodics:
         oc annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
 
         ci-operator --artifact-dir=$(ARTIFACTS) \
-          --lease-server=http://boskos \
+          --lease-server=https://boskos-ci.svc.ci.openshift.org \
           --secret-dir=/usr/local/pull-secret --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile \
           --target=e2e-$(CLUSTER_TYPE)-upgrade --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME)
       env:
@@ -674,6 +676,7 @@ periodics:
       - name: CONFIG_SPEC
         value: |
           tag_specification:
+            cluster: https://api.ci.openshift.org
             name: "$(BRANCH)"
             namespace: ocp
           resources:
@@ -775,7 +778,7 @@ periodics:
         oc annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
 
         ci-operator --artifact-dir=$(ARTIFACTS) \
-          --lease-server=http://boskos \
+          --lease-server=https://boskos-ci.svc.ci.openshift.org \
           --secret-dir=/usr/local/pull-secret --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile \
           --target=e2e-$(CLUSTER_TYPE)-upgrade --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME)
       env:
@@ -786,6 +789,7 @@ periodics:
       - name: CONFIG_SPEC
         value: |
           tag_specification:
+            cluster: https://api.ci.openshift.org
             name: "$(BRANCH)"
             namespace: ocp
           resources:
