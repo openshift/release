@@ -44,7 +44,7 @@ BLACKLIST = [
 
 
 def run_oc(args):
-    command = ['oc', '--loglevel', '10', '--namespace', 'ci'] + args
+    command = ['oc', '--loglevel', '3', '--namespace', 'ci'] + args
     try:
         process = subprocess.run(command, capture_output=True, check=True)
     except subprocess.CalledProcessError as exc:
@@ -83,6 +83,7 @@ def highlight(log_dir, dc):
     warn = '"level":"warning"'
     error = '"level":"error"'
     fatal = '"level":"fatal"'
+    query = '"query":"'
     log = '{}/{}.log'.format(log_dir, dc)
     while True:
         debug("deployment/{}: gathering info".format(dc))
@@ -102,6 +103,10 @@ def highlight(log_dir, dc):
                 for l in run_oc(cmd).splitlines():
                     if any(word in l for word in BLACKLIST):
                         continue
+                    if query in l:
+                        data = json.loads(l)
+                        data.pop("query")
+                        l = json.dumps(data)
                     if warn in l:
                         log_lines.append(YELLOW + l + RESET)
                     elif error in l or fatal in l:
