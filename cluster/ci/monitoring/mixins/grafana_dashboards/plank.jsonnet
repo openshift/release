@@ -2,6 +2,7 @@ local grafana = import 'grafonnet/grafana.libsonnet';
 local dashboard = grafana.dashboard;
 local graphPanel = grafana.graphPanel;
 local prometheus = grafana.prometheus;
+local template = grafana.template;
 
 local legendConfig = {
         legend+: {
@@ -18,17 +19,26 @@ dashboard.new(
         time_from='now-1h',
         schemaVersion=18,
       )
+.addTemplate(template.new(
+        'cluster',
+        'prometheus',
+        std.format('label_values(prowjobs{job="plank"}, %s)', 'cluster'),
+        label='cluster',
+        refresh='time',
+        allValues='.*',
+        includeAll=true,
+    ))
 .addPanel(
     (graphPanel.new(
-        'number of Prow jobs by type',
-        description='sum(prowjobs{job="plank"}) by (type)',
+        'number of Prow jobs by type with cluster=${cluster}',
+        description='sum(prowjobs{job="plank", cluster=~"${cluster}"}) by (type)',
         datasource='prometheus',
         legend_alignAsTable=true,
         legend_rightSide=true,
         
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(prowjobs{job="plank"}) by (type)',
+        'sum(prowjobs{job="plank", cluster=~"${cluster}"}) by (type)',
         legendFormat='{{type}}',
     )), gridPos={
     h: 9,
@@ -38,15 +48,15 @@ dashboard.new(
   })
 .addPanel(
     (graphPanel.new(
-        'number of Prow jobs by state',
-        description='sum(prowjobs{job="plank"}) by (state)',
+        'number of Prow jobs by state with cluster=${cluster}',
+        description='sum(prowjobs{job="plank", cluster=~"${cluster}"}) by (state)',
         datasource='prometheus',
         legend_alignAsTable=true,
         legend_rightSide=true,
         
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(prowjobs{job="plank"}) by (state)',
+        'sum(prowjobs{job="plank", cluster=~"${cluster}"}) by (state)',
         legendFormat='{{state}}',
     )), gridPos={
     h: 9,
