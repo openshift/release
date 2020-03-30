@@ -15,8 +15,7 @@ that will run when you submit your changes as a PR:
 make jobs
 ```
 
-Make sure to pull the latest image to ensure that you do not use a stale version
-of the generator. Pre-submit tests on this repository will ensure that a run of
+Pre-submit tests on this repository will ensure that a run of
 the latest generator does not error on proposed configuration changes and also
 does not generate any new configuration.
 
