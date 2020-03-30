@@ -116,16 +116,16 @@ presubmits:
     always_run: true
     branches:
     - release-next-playground
-    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
-    context: ci/prow/lint
+    cluster: api.ci
+    context: ci/prow/test
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-redhat-developer-helm-release-next-playground-lint
-    rerun_command: /test lint
+    name: pull-ci-redhat-developer-helm-release-next-playground-test
+    rerun_command: /test test
     spec:
       containers:
       - args:
@@ -134,7 +134,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=lint
+        - --target=test
         command:
         - ci-operator
         image: ci-operator:latest
@@ -167,60 +167,4 @@ presubmits:
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )lint,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-next-playground
-    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
-    context: ci/prow/unit
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-redhat-developer-helm-release-next-playground-unit
-    rerun_command: /test unit
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
-        - --target=unit
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )unit,?($|\s.*)
+    trigger: (?m)^/test( | .* )test,?($|\s.*)
