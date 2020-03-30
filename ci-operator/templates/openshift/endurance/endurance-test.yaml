@@ -14,6 +14,8 @@ parameters:
   required: true
 - name: RELEASE_IMAGE_LATEST
   required: true
+- name: BRANCH
+  required: true
 
 objects:
 # We want the cluster to be able to access these images
@@ -138,13 +140,15 @@ objects:
 
         function run-upgrade-tests() {
           current=$(oc get clusterversion/version -o jsonpath='{.status.history[0].version}')
-          new=$(oc adm release info -a /tmp/ci-credentials/pull-secret ${RELEASE_IMAGE_LATEST} | grep Version: | awk '{print $2}')
+          new=$(oc adm release info -a /tmp/ci-credentials/pull-secret ${RELEASE_IMAGE_LATEST} | grep Version: | awk '{print $2}')          
           if [ $new == $current ]; then
             echo "Skipping upgrade test because cluster is already at the latest version: $current (current) == $new (new)"
             return 0
           fi
+          newImage=$(curl -s https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/${BRANCH}.0-0.nightly/latest | jq --raw-output '.pullSpec')
 
-          openshift-tests run-upgrade "${TEST_SUITE}" --to-image "${IMAGE:-${RELEASE_IMAGE_LATEST}}" \
+          echo "Running upgrade test from $current to $new using new image $newImage"
+          openshift-tests run-upgrade "${TEST_SUITE}" --to-image "${IMAGE:-${newImage}}" \
             --options "${TEST_OPTIONS:-}" \
             --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
         }
