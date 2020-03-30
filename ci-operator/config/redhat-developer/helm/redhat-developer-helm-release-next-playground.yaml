@@ -4,13 +4,15 @@ base_images:
     name: "4.3"
     namespace: ocp
     tag: base
-binary_build_commands: make -f openshift-ci/Makefile build
+binary_build_commands: make build
 build_root:
-  project_image:
-    dockerfile_path: openshift-ci/Dockerfile.tests
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.13
 images:
-- dockerfile_path: openshift-ci/Dockerfile.tests
-  from: base
+- from: base
   to: helm
 resources:
   '*':
@@ -23,15 +25,11 @@ tag_specification:
   name: "4.3"
   namespace: ocp
 tests:
+- as: test
+  commands: make test
+  container:
+    from: src
 - as: acceptance
-  commands: make -f openshift-ci/Makefile build test-acceptance
-  container:
-    from: src
-- as: unit
-  commands: make -f openshift-ci/Makefile unit
-  container:
-    from: src
-- as: lint
-  commands: make -f openshift-ci/Makefile lint
+  commands: make test-acceptance
   container:
     from: src
