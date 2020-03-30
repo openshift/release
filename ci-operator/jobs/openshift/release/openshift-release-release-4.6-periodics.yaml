@@ -39,10 +39,14 @@ periodics:
         fi
 
         # verify the tests pass
-        ci-operator --artifact-dir=$(ARTIFACTS) --secret-dir=/usr/local/pull-secret \
-          --secret-dir=/usr/local/e2e-aws-cluster-profile --template=/usr/local/e2e-aws \
+        ci-operator \
+          --artifact-dir=$(ARTIFACTS) \
+          --kubeconfig=/etc/apici/kubeconfig \
+          --lease-server=https://boskos-ci.svc.ci.openshift.org \
+          --secret-dir=/usr/local/pull-secret \
+          --secret-dir=/usr/local/e2e-aws-cluster-profile \
+          --template=/usr/local/e2e-aws \
           --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME) \
-          --lease-server=http://boskos \
           --promote
 
         # also tag the image into the art-latest stream
@@ -64,6 +68,7 @@ periodics:
       - name: CONFIG_SPEC
         value: |
           tag_specification:
+            cluster: https://api.ci.openshift.org
             name: "$(BRANCH)"
             namespace: ocp
           promotion:
@@ -79,6 +84,7 @@ periodics:
               tag: golang-1.12
           base_images:
             $(TAG):
+              cluster: https://api.ci.openshift.org
               name: $(TAG)
               namespace: rhcos
               tag: "4.6"
@@ -111,6 +117,9 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-aws
@@ -143,7 +152,7 @@ periodics:
 - agent: kubernetes
   cluster: api.ci
   decorate: true
-  interval: 12h
+  interval: 24h
   labels:
     ci.openshift.io/release-type: informing
     job-release: "4.6"
@@ -199,6 +208,7 @@ periodics:
       - name: CONFIG_SPEC
         value: |
           tag_specification:
+            cluster: https://api.ci.openshift.org
             name: "$(BRANCH)"
             namespace: "ocp-$(ARCH)"
           promotion:
@@ -214,6 +224,7 @@ periodics:
               tag: golang-1.12
           base_images:
             $(TAG):
+              cluster: https://api.ci.openshift.org
               name: $(TAG)
               namespace: rhcos
               tag: "$(BRANCH)-$(ARCH)"
@@ -246,6 +257,9 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-aws
@@ -278,7 +292,7 @@ periodics:
 - agent: kubernetes
   cluster: api.ci
   decorate: true
-  interval: 12h
+  interval: 24h
   labels:
     ci.openshift.io/release-type: informing
     job-release: "4.6"
@@ -334,6 +348,7 @@ periodics:
       - name: CONFIG_SPEC
         value: |
           tag_specification:
+            cluster: https://api.ci.openshift.org
             name: "$(BRANCH)"
             namespace: "ocp-$(ARCH)"
           promotion:
@@ -349,6 +364,7 @@ periodics:
               tag: golang-1.12
           base_images:
             $(TAG):
+              cluster: https://api.ci.openshift.org
               name: $(TAG)
               namespace: rhcos
               tag: "$(BRANCH)-$(ARCH)"
@@ -381,6 +397,9 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-aws
@@ -607,6 +626,9 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-aws
@@ -678,7 +700,8 @@ periodics:
         # execute the test
         ci-operator \
           --artifact-dir=$(ARTIFACTS) \
-          --lease-server=http://boskos \
+          --kubeconfig=/etc/apici/kubeconfig \
+          --lease-server=https://boskos-ci.svc.ci.openshift.org \
           --namespace=${namespace} \
           --secret-dir=/usr/local/pull-secret \
           --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile \
@@ -693,6 +716,7 @@ periodics:
       - name: CONFIG_SPEC
         value: |
           tag_specification:
+            cluster: https://api.ci.openshift.org
             name: "none" # don't import anything to avoid a race between 4.5 latest and the chosen version
             namespace: ocp
           build_root:
@@ -726,6 +750,9 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/pull-secret
@@ -4631,6 +4658,9 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-vsphere-upi-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-vsphere-upi
@@ -4680,6 +4710,9 @@ periodics:
       - mountPath: /etc/apici
         name: apici-ci-operator-credentials
         readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-vsphere-upi-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-vsphere-upi
@@ -4698,6 +4731,12 @@ periodics:
         - key: sa.ci-operator.apici.config
           path: kubeconfig
         secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -4730,6 +4769,9 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-vsphere-upi-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-vsphere-upi-serial
@@ -4779,6 +4821,9 @@ periodics:
       - mountPath: /etc/apici
         name: apici-ci-operator-credentials
         readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-vsphere-upi-serial-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-vsphere-upi-serial
@@ -4797,6 +4842,12 @@ periodics:
         - key: sa.ci-operator.apici.config
           path: kubeconfig
         secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -4913,6 +4964,136 @@ periodics:
 - agent: kubernetes
   cluster: api.ci
   decorate: true
+  interval: 24h
+  labels:
+    ci.openshift.io/release-type: informing
+    job-env: aws
+    job-release: "4.6"
+    job-test: e2e
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    release.openshift.io/verify: "true"
+  name: release-openshift-origin-installer-e2e-aws-upgrade-4.3-to-4.4-to-4.5-to-4.6-ci
+  spec:
+    containers:
+    - command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -exuo pipefail
+
+        data=$(ARTIFACTS)/release.json
+
+        if ! curl --fail -X GET -G https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest --data-urlencode 'in=>4.3.0 <4.4.0-0' > ${data}; then
+          echo "error: Could not find an initial version"
+          exit 1
+        fi
+        export RELEASE_IMAGE_INITIAL=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${data}" )
+
+        if ! curl --fail -X GET -G https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest --data-urlencode 'in=>4.4.0 <4.5.0-0' > ${data}; then
+          echo "error: Could not find a middle version"
+          exit 1
+        fi
+        next_0=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${data}" )
+
+        if ! curl --fail -X GET -G https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.5.0-0.nightly/latest > ${data}; then
+          echo "error: Could not find newest version"
+          exit 1
+        fi
+        next_1=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${data}" )
+
+        if ! curl --fail -X GET -G https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.6.0-0.ci/latest > ${data}; then
+          echo "error: Could not find newest version"
+          exit 1
+        fi
+        next_2=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${data}" )
+
+        export RELEASE_IMAGE_LATEST=${next_2}
+        export CONFIG_SPEC="${CONFIG_SPEC/RELEASE_IMAGES/$next_0,$next_1,$next_2}"
+
+        ci-operator \
+          --artifact-dir=$(ARTIFACTS) \
+          --kubeconfig=/etc/apici/kubeconfig \
+          --lease-server=https://boskos-ci.svc.ci.openshift.org\
+          --secret-dir=/usr/local/pull-secret \
+          --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile \
+          --target=e2e-$(CLUSTER_TYPE)-upgrade \
+          --input-hash=$(BUILD_ID) \
+          --input-hash=$(JOB_NAME)
+      env:
+      - name: BRANCH
+        value: "4.3"
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: CONFIG_SPEC
+        value: |
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-serial
+            commands: TEST_SUITE=openshift/conformance/serial run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-upgrade
+            commands: |
+              TEST_SUITE=all IMAGE=RELEASE_IMAGES run-upgrade-tests
+              TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: launch-$(CLUSTER_TYPE)
+            commands: sleep 9000 & wait
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
+  cluster: api.ci
+  decorate: true
   interval: 48h
   labels:
     ci.openshift.io/release-type: informing
@@ -4956,9 +5137,15 @@ periodics:
         # annotate the information about this job so that the release controller adds it to the upgrade graph
         oc annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
 
-        ci-operator --artifact-dir=$(ARTIFACTS) --lease-server=http://boskos\
-          --secret-dir=/usr/local/pull-secret --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile \
-          --target=e2e-$(CLUSTER_TYPE)-upgrade --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME)
+        ci-operator \
+          --artifact-dir=$(ARTIFACTS) \
+          --kubeconfig=/etc/apici/kubeconfig \
+          --lease-server=https://boskos-ci.svc.ci.openshift.org \
+          --secret-dir=/usr/local/pull-secret \
+          --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile \
+          --target=e2e-$(CLUSTER_TYPE)-upgrade \
+          --input-hash=$(BUILD_ID) \
+          --input-hash=$(JOB_NAME)
       env:
       - name: BRANCH
         value: "4.5"
@@ -4967,6 +5154,7 @@ periodics:
       - name: CONFIG_SPEC
         value: |
           tag_specification:
+            cluster: https://api.ci.openshift.org
             name: "$(BRANCH)"
             namespace: ocp
           resources:
@@ -5001,6 +5189,9 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/pull-secret
@@ -5069,10 +5260,15 @@ periodics:
         # annotate the information about this job so that we can query for it
         oc annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
 
-        ci-operator --artifact-dir=$(ARTIFACTS) \
-          --lease-server=http://boskos \
-          --secret-dir=/usr/local/pull-secret --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile \
-          --target=e2e-$(CLUSTER_TYPE)-upgrade --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME)
+        ci-operator \
+          --artifact-dir=$(ARTIFACTS) \
+          --kubeconfig=/etc/apici/kubeconfig \
+          --lease-server=https://boskos-ci.svc.ci.openshift.org \
+          --secret-dir=/usr/local/pull-secret \
+          --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile \
+          --target=e2e-$(CLUSTER_TYPE)-upgrade \
+          --input-hash=$(BUILD_ID) \
+          --input-hash=$(JOB_NAME)
       env:
       - name: BRANCH
         value: "4.5"
@@ -5081,6 +5277,7 @@ periodics:
       - name: CONFIG_SPEC
         value: |
           tag_specification:
+            cluster: https://api.ci.openshift.org
             name: "$(BRANCH)"
             namespace: ocp
           resources:
@@ -5103,6 +5300,9 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/pull-secret
@@ -5171,10 +5371,15 @@ periodics:
         # annotate the information about this job so that we can query for it
         oc annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
 
-        ci-operator --artifact-dir=$(ARTIFACTS) \
-          --lease-server=http://boskos \
-          --secret-dir=/usr/local/pull-secret --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile \
-          --target=e2e-$(CLUSTER_TYPE)-upgrade --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME)
+        ci-operator \
+          --artifact-dir=$(ARTIFACTS) \
+          --kubeconfig=/etc/apici/kubeconfig \
+          --lease-server=https://boskos-ci.svc.ci.openshift.org \
+          --secret-dir=/usr/local/pull-secret \
+          --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile \
+          --target=e2e-$(CLUSTER_TYPE)-upgrade \
+          --input-hash=$(BUILD_ID) \
+          --input-hash=$(JOB_NAME)
       env:
       - name: BRANCH
         value: "4.6"
@@ -5183,6 +5388,7 @@ periodics:
       - name: CONFIG_SPEC
         value: |
           tag_specification:
+            cluster: https://api.ci.openshift.org
             name: "$(BRANCH)"
             namespace: ocp
           resources:
@@ -5205,6 +5411,9 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/pull-secret
@@ -5372,10 +5581,15 @@ periodics:
         # annotate the information about this job so that we can query for it
         oc annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
 
-        ci-operator --artifact-dir=$(ARTIFACTS) \
-          --lease-server=http://boskos \
-          --secret-dir=/usr/local/pull-secret --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile \
-          --target=e2e-$(CLUSTER_TYPE)-upgrade --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME)
+        ci-operator \
+          --artifact-dir=$(ARTIFACTS) \
+          --kubeconfig=/etc/apici/kubeconfig \
+          --lease-server=https://boskos-ci.svc.ci.openshift.org \
+          --secret-dir=/usr/local/pull-secret \
+          --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile \
+          --target=e2e-$(CLUSTER_TYPE)-upgrade \
+          --input-hash=$(BUILD_ID) \
+          --input-hash=$(JOB_NAME)
       env:
       - name: BRANCH
         value: "4.6"
@@ -5384,6 +5598,7 @@ periodics:
       - name: CONFIG_SPEC
         value: |
           tag_specification:
+            cluster: https://api.ci.openshift.org
             name: "$(BRANCH)"
             namespace: ocp
           resources:
@@ -5406,6 +5621,9 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-gcp-upgrade-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/pull-secret
@@ -5476,10 +5694,15 @@ periodics:
         # annotate the information about this job so that we can query for it
         oc annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
 
-        ci-operator --artifact-dir=$(ARTIFACTS) \
-          --lease-server=http://boskos \
-          --secret-dir=/usr/local/pull-secret --secret-dir=/usr/local/e2e-azure-upgrade-cluster-profile \
-          --target=e2e-azure-upgrade --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME)
+        ci-operator \
+          --artifact-dir=$(ARTIFACTS) \
+          --kubeconfig=/etc/apici/kubeconfig \
+          --lease-server=https://boskos-ci.svc.ci.openshift.org \
+          --secret-dir=/usr/local/pull-secret \
+          --secret-dir=/usr/local/e2e-azure-upgrade-cluster-profile \
+          --target=e2e-azure-upgrade \
+          --input-hash=$(BUILD_ID) \
+          --input-hash=$(JOB_NAME)
       env:
       - name: BRANCH
         value: "4.6"
@@ -5488,6 +5711,7 @@ periodics:
       - name: CONFIG_SPEC
         value: |
           tag_specification:
+            cluster: https://api.ci.openshift.org
             name: "$(BRANCH)"
             namespace: ocp
           resources:
@@ -5510,6 +5734,9 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-azure-upgrade-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/pull-secret
@@ -5554,6 +5781,9 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-openstack-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-openstack
@@ -5601,6 +5831,9 @@ periodics:
       - mountPath: /etc/apici
         name: apici-ci-operator-credentials
         readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-openstack-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-openstack
@@ -5619,6 +5852,12 @@ periodics:
         - key: sa.ci-operator.apici.config
           path: kubeconfig
         secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -5670,7 +5909,7 @@ periodics:
       - name: RPM_REPO_CRIO_DIR
         value: 4.6-rhel-7
       - name: RPM_REPO_OPENSHIFT_ORIGIN
-        value: https://rpms.svc.ci.openshift.org/openshift-origin-v4.6/
+        value: https://rpms.svc.ci.openshift.org/openshift-origin-v4.5/
       - name: TEST_COMMAND
         value: TEST_SUITE=openshift/conformance/parallel run-tests
       image: ci-operator:latest
@@ -5739,6 +5978,9 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-openstack-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-openstack-serial
@@ -5790,6 +6032,9 @@ periodics:
       - mountPath: /etc/apici
         name: apici-ci-operator-credentials
         readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-openstack-serial-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-openstack-serial
@@ -5808,6 +6053,12 @@ periodics:
         - key: sa.ci-operator.apici.config
           path: kubeconfig
         secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
