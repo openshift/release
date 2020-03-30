@@ -278,6 +278,81 @@ index 6567969..95cda8f 100644
      name: config-updater
 -    namespace: ci
 +    namespace: dedicated-admin
+diff --git a/./core-services/prow/03_deployment/boskos-redirect.yaml b/./core-services/prow/03_deployment/boskos-redirect.yaml
+deleted file mode 100644
+index b36de5b..0000000
+--- a/./core-services/prow/03_deployment/boskos-redirect.yaml
++++ /dev/null
+@@ -1,69 +0,0 @@
+-apiVersion: v1
+-kind: ConfigMap
+-metadata:
+-  name: boskos-redirect-config
+-  namespace: ci
+-data:
+-  "default.conf": |
+-    server {
+-      listen 8080;
+-      return 302 $scheme://boskos-ci.apps.ci.m4r3.p1.openshiftapps.com$request_uri;
+-    }
+----
+-apiVersion: apps/v1
+-kind: Deployment
+-metadata:
+-  labels:
+-    app: boskos-redirect
+-  name: boskos-redirect
+-  namespace: ci
+-spec:
+-  replicas: 1
+-  selector:
+-    matchLabels:
+-      component: boskos-redirect
+-  template:
+-    metadata:
+-      labels:
+-        app: prow
+-        component: boskos-redirect
+-    spec:
+-      affinity:
+-        podAntiAffinity:
+-          requiredDuringSchedulingIgnoredDuringExecution:
+-          - labelSelector:
+-              matchExpressions:
+-              - key: component
+-                operator: In
+-                values:
+-                - boskos-redirect
+-            topologyKey: "kubernetes.io/hostname"
+-      containers:
+-      - image: nginxinc/nginx-unprivileged:1.17
+-        name: nginx
+-        volumeMounts:
+-        - name: config
+-          mountPath: /etc/nginx/conf.d
+-      volumes:
+-      - name: config
+-        configMap:
+-          name: boskos-redirect-config
+----
+-apiVersion: v1
+-kind: Service
+-metadata:
+-  labels:
+-    app: prow
+-    component: boskos-redirect
+-  name: boskos-redirect
+-  namespace: ci
+-spec:
+-  ports:
+-  - name: main
+-    port: 80
+-    protocol: TCP
+-    targetPort: 8080
+-  selector:
+-    component: boskos-redirect
+-  sessionAffinity: None
+-  type: ClusterIP
 diff --git a/./core-services/prow/03_deployment/boskos.yaml b/./clusters/app.ci/prow/03_deployment/boskos.yaml
 index 9768c58..f16b6f0 100644
 --- a/./core-services/prow/03_deployment/boskos.yaml
