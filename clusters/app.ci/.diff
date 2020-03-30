@@ -523,6 +523,81 @@ index 9509980..03c7d56 100644
  - apiVersion: v1
    kind: Service
    metadata:
+diff --git a/./core-services/prow/03_deployment/hook-redirect.yaml b/./core-services/prow/03_deployment/hook-redirect.yaml
+deleted file mode 100644
+index e3f674a..0000000
+--- a/./core-services/prow/03_deployment/hook-redirect.yaml
++++ /dev/null
+@@ -1,69 +0,0 @@
+-apiVersion: v1
+-kind: ConfigMap
+-metadata:
+-  name: hook-redirect-config
+-  namespace: ci
+-data:
+-  "default.conf": |
+-    server {
+-      listen 8080;
+-      return 302 $scheme://hook-ci.apps.ci.m4r3.p1.openshiftapps.com$request_uri;
+-    }
+----
+-apiVersion: apps/v1
+-kind: Deployment
+-metadata:
+-  labels:
+-    app: hook-redirect
+-  name: hook-redirect
+-  namespace: ci
+-spec:
+-  replicas: 1
+-  selector:
+-    matchLabels:
+-      component: hook-redirect
+-  template:
+-    metadata:
+-      labels:
+-        app: prow
+-        component: hook-redirect
+-    spec:
+-      affinity:
+-        podAntiAffinity:
+-          requiredDuringSchedulingIgnoredDuringExecution:
+-          - labelSelector:
+-              matchExpressions:
+-              - key: component
+-                operator: In
+-                values:
+-                - hook-redirect
+-            topologyKey: "kubernetes.io/hostname"
+-      containers:
+-      - image: nginxinc/nginx-unprivileged:1.17
+-        name: nginx
+-        volumeMounts:
+-        - name: config
+-          mountPath: /etc/nginx/conf.d
+-      volumes:
+-      - name: config
+-        configMap:
+-          name: hook-redirect-config
+----
+-apiVersion: v1
+-kind: Service
+-metadata:
+-  labels:
+-    app: prow
+-    component: hook-redirect
+-  name: hook-redirect
+-  namespace: ci
+-spec:
+-  ports:
+-  - name: main
+-    port: 80
+-    protocol: TCP
+-    targetPort: 8080
+-  selector:
+-    component: hook-redirect
+-  sessionAffinity: None
+-  type: ClusterIP
 diff --git a/./core-services/prow/03_deployment/hook.yaml b/./clusters/app.ci/prow/03_deployment/hook.yaml
 index e869ff3..795f6c1 100644
 --- a/./core-services/prow/03_deployment/hook.yaml
