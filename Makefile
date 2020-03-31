@@ -130,7 +130,7 @@ prow-release-controller-deploy:
 prow-release-controller: prow-release-controller-definitions prow-release-controller-deploy
 .PHONY: prow-release-controller
 
-projects: ci-ns gcsweb origin-stable origin-release publishing-bot content-mirror azure metering coreos
+projects: ci-ns origin-stable origin-release publishing-bot content-mirror azure metering coreos
 .PHONY: projects
 
 content-mirror:
@@ -140,10 +140,6 @@ content-mirror:
 node-problem-detector:
 	$(MAKE) apply WHAT=projects/kubernetes/node-problem-detector.yaml
 .PHONY: node-problem-detector
-
-gcsweb:
-	$(MAKE) applyTemplate WHAT=projects/gcsweb/pipeline.yaml
-.PHONY: gcsweb
 
 kube-state-metrics:
 	$(MAKE) apply WHAT=projects/kube-state-metrics/pipeline.yaml
