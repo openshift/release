@@ -68,7 +68,7 @@ objects:
       contextDir: "${SOURCE_CONTEXT}"
       type: Git
       dockerfile: |
-        FROM openshift/origin-release:golang-1.8
+        FROM openshift/origin-release:golang-1.13
 
         ENV ARCH=amd64 VERSION=v1.0.4 PKG=k8s.io/test-infra/gcsweb
         COPY . /go/src/k8s.io/test-infra/gcsweb
@@ -80,7 +80,7 @@ objects:
       dockerStrategy:
         from:
           kind: DockerImage
-          name: openshift/origin-release:golang-1.8
+          name: openshift/origin-release:golang-1.13
         imageOptimizationPolicy: SkipLayers
     triggers:
     - type: ConfigChange
@@ -129,44 +129,36 @@ objects:
           kind: ImageStreamTag
           name: "${NAME}:binaries"
       type: ImageChange
-- apiVersion: v1
-  kind: DeploymentConfig
+- apiVersion: apps/v1
+  kind: Deployment
   metadata:
+    annotations:
+      image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"${NAME}:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"${NAME}\")].image"}]'
     labels:
-      app: "${NAME}"
-    name: "${NAME}"
+      app: gcsweb
+    name: gcsweb
     namespace: ${NAMESPACE}
   spec:
     replicas: 1
-    revisionHistoryLimit: 2
     selector:
-      app: "${NAME}"
-      deploymentconfig: "${NAME}"
+      matchLabels:
+        component: "${NAME}"
+    strategy: {}
     template:
       metadata:
+        creationTimestamp: null
         labels:
-          app: "${NAME}"
-          deploymentconfig: "${NAME}"
+          app: prow
+          component: "${NAME}"
       spec:
         containers:
-        - image: "${NAME}:latest"
-          name: "${NAME}"
+        - image: ${NAME}:latest
+          name: ${NAME}
           args:
           - "-b"
           - "origin-ci-test"
           - "-b"
           - "origin-federated-results"
-    test: false
-    triggers:
-    - type: ConfigChange
-    - imageChangeParams:
-        automatic: true
-        containerNames:
-        - "${NAME}"
-        from:
-          kind: ImageStreamTag
-          name: "${NAME}:latest"
-      type: ImageChange
 - kind: Service
   apiVersion: v1
   metadata:
@@ -184,7 +176,7 @@ objects:
       targetPort: 8080
       nodePort: 0
     selector:
-      app: "${SERVICE_NAME}"
+      component: "${SERVICE_NAME}"
     type: ClusterIP
     sessionAffinity: None
 - kind: Route
