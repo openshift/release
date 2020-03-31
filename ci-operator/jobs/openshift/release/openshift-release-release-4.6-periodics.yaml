@@ -9,7 +9,18 @@ periodics:
   name: promote-release-openshift-machine-os-content-e2e-aws-4.6
   spec:
     containers:
-    - command:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
+      - --secret-dir=/usr/local/pull-secret
+      - --secret-dir=/usr/local/e2e-aws-cluster-profile
+      - --template=/usr/local/e2e-aws
+      - --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME)
+      - --promote
+      command:
       - /bin/bash
       - -c
       - |
@@ -39,23 +50,14 @@ periodics:
         fi
 
         # verify the tests pass
-        ci-operator \
-          --artifact-dir=$(ARTIFACTS) \
-          --kubeconfig=/etc/apici/kubeconfig \
-          --lease-server-password-file=/etc/boskos/password \
-          --lease-server-username=ci \
-          --lease-server=https://boskos-ci.svc.ci.openshift.org \
-          --secret-dir=/usr/local/pull-secret \
-          --secret-dir=/usr/local/e2e-aws-cluster-profile \
-          --template=/usr/local/e2e-aws \
-          --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME) \
-          --promote
+        ci-operator $@
 
         # also tag the image into the art-latest stream
         oc tag "${to_quay}" "ocp/${BRANCH}-art-latest:${TAG}"
 
         # also tag the image into the ocp private stream
         oc tag "${to_quay}" "ocp-private/${BRANCH}-priv:${TAG}"
+      - ""
       env:
       - name: TAG_NS
         value: rhcos
@@ -707,7 +709,16 @@ periodics:
   name: release-openshift-origin-installer-old-rhcos-e2e-aws-4.6
   spec:
     containers:
-    - command:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
+      - --secret-dir=/usr/local/pull-secret
+      - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
+      - --target=e2e-$(CLUSTER_TYPE)-upgrade
+      command:
       - /bin/bash
       - -c
       - |
@@ -736,16 +747,8 @@ periodics:
           --exclude=machine-config-operator
 
         # execute the test
-        ci-operator \
-          --artifact-dir=$(ARTIFACTS) \
-          --kubeconfig=/etc/apici/kubeconfig \
-          --lease-server-password-file=/etc/boskos/password \
-          --lease-server-username=ci \
-          --lease-server=https://boskos-ci.svc.ci.openshift.org \
-          --namespace=${namespace} \
-          --secret-dir=/usr/local/pull-secret \
-          --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile \
-          --target=e2e-$(CLUSTER_TYPE)-upgrade
+        ci-operator $@ --namespace=${namespace}
+      - ""
       env:
       - name: FROM_BRANCH
         value: "4.5"
@@ -5060,7 +5063,18 @@ periodics:
   name: release-openshift-origin-installer-e2e-aws-upgrade-4.3-to-4.4-to-4.5-to-4.6-ci
   spec:
     containers:
-    - command:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
+      - --secret-dir=/usr/local/pull-secret
+      - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
+      - --target=e2e-$(CLUSTER_TYPE)-upgrade
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      command:
       - /bin/bash
       - -c
       - |
@@ -5096,17 +5110,8 @@ periodics:
         export RELEASE_IMAGE_LATEST=${next_2}
         export CONFIG_SPEC="${CONFIG_SPEC/RELEASE_IMAGES/$next_0,$next_1,$next_2}"
 
-        ci-operator \
-          --artifact-dir=$(ARTIFACTS) \
-          --kubeconfig=/etc/apici/kubeconfig \
-          --lease-server-password-file=/etc/boskos/password \
-          --lease-server-username=ci \
-          --lease-server=https://boskos-ci.svc.ci.openshift.org \
-          --secret-dir=/usr/local/pull-secret \
-          --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile \
-          --target=e2e-$(CLUSTER_TYPE)-upgrade \
-          --input-hash=$(BUILD_ID) \
-          --input-hash=$(JOB_NAME)
+        ci-operator $@
+      - ""
       env:
       - name: BRANCH
         value: "4.3"
@@ -5201,7 +5206,18 @@ periodics:
   name: release-openshift-origin-installer-e2e-aws-upgrade-4.5-stable-to-4.6-ci
   spec:
     containers:
-    - command:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
+      - --secret-dir=/usr/local/pull-secret
+      - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
+      - --target=e2e-$(CLUSTER_TYPE)-upgrade
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      command:
       - /bin/bash
       - -c
       - |
@@ -5233,17 +5249,8 @@ periodics:
         # annotate the information about this job so that the release controller adds it to the upgrade graph
         oc annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
 
-        ci-operator \
-          --artifact-dir=$(ARTIFACTS) \
-          --kubeconfig=/etc/apici/kubeconfig \
-          --lease-server-password-file=/etc/boskos/password \
-          --lease-server-username=ci \
-          --lease-server=https://boskos-ci.svc.ci.openshift.org \
-          --secret-dir=/usr/local/pull-secret \
-          --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile \
-          --target=e2e-$(CLUSTER_TYPE)-upgrade \
-          --input-hash=$(BUILD_ID) \
-          --input-hash=$(JOB_NAME)
+        ci-operator $@
+      - ""
       env:
       - name: BRANCH
         value: "4.5"
@@ -5335,7 +5342,18 @@ periodics:
   name: release-openshift-origin-installer-e2e-aws-upgrade-rollback-4.5-to-4.6
   spec:
     containers:
-    - command:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
+      - --secret-dir=/usr/local/pull-secret
+      - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
+      - --target=e2e-$(CLUSTER_TYPE)-upgrade
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      command:
       - /bin/bash
       - -c
       - |
@@ -5367,17 +5385,8 @@ periodics:
         # annotate the information about this job so that we can query for it
         oc annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
 
-        ci-operator \
-          --artifact-dir=$(ARTIFACTS) \
-          --kubeconfig=/etc/apici/kubeconfig \
-          --lease-server-password-file=/etc/boskos/password \
-          --lease-server-username=ci \
-          --lease-server=https://boskos-ci.svc.ci.openshift.org \
-          --secret-dir=/usr/local/pull-secret \
-          --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile \
-          --target=e2e-$(CLUSTER_TYPE)-upgrade \
-          --input-hash=$(BUILD_ID) \
-          --input-hash=$(JOB_NAME)
+        ci-operator $@
+      - ""
       env:
       - name: BRANCH
         value: "4.5"
@@ -5457,7 +5466,18 @@ periodics:
   name: release-openshift-origin-installer-e2e-aws-upgrade-rollback-4.6
   spec:
     containers:
-    - command:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
+      - --secret-dir=/usr/local/pull-secret
+      - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
+      - --target=e2e-$(CLUSTER_TYPE)-upgrade
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      command:
       - /bin/bash
       - -c
       - |
@@ -5489,17 +5509,8 @@ periodics:
         # annotate the information about this job so that we can query for it
         oc annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
 
-        ci-operator \
-          --artifact-dir=$(ARTIFACTS) \
-          --kubeconfig=/etc/apici/kubeconfig \
-          --lease-server-password-file=/etc/boskos/password \
-          --lease-server-username=ci \
-          --lease-server=https://boskos-ci.svc.ci.openshift.org \
-          --secret-dir=/usr/local/pull-secret \
-          --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile \
-          --target=e2e-$(CLUSTER_TYPE)-upgrade \
-          --input-hash=$(BUILD_ID) \
-          --input-hash=$(JOB_NAME)
+        ci-operator $@
+      - ""
       env:
       - name: BRANCH
         value: "4.6"
@@ -5687,7 +5698,18 @@ periodics:
   name: release-openshift-origin-installer-e2e-gcp-upgrade-4.6
   spec:
     containers:
-    - command:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
+      - --secret-dir=/usr/local/pull-secret
+      - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
+      - --target=e2e-$(CLUSTER_TYPE)-upgrade
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      command:
       - /bin/bash
       - -c
       - |
@@ -5719,17 +5741,8 @@ periodics:
         # annotate the information about this job so that we can query for it
         oc annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
 
-        ci-operator \
-          --artifact-dir=$(ARTIFACTS) \
-          --kubeconfig=/etc/apici/kubeconfig \
-          --lease-server-password-file=/etc/boskos/password \
-          --lease-server-username=ci \
-          --lease-server=https://boskos-ci.svc.ci.openshift.org \
-          --secret-dir=/usr/local/pull-secret \
-          --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile \
-          --target=e2e-$(CLUSTER_TYPE)-upgrade \
-          --input-hash=$(BUILD_ID) \
-          --input-hash=$(JOB_NAME)
+        ci-operator $@
+      - ""
       env:
       - name: BRANCH
         value: "4.6"
@@ -5811,7 +5824,18 @@ periodics:
   name: release-openshift-origin-installer-e2e-azure-upgrade-4.6
   spec:
     containers:
-    - command:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
+      - --secret-dir=/usr/local/pull-secret
+      - --secret-dir=/usr/local/e2e-azure-upgrade-cluster-profile
+      - --target=e2e-azure-upgrade
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      command:
       - /bin/bash
       - -c
       - |
@@ -5843,17 +5867,8 @@ periodics:
         # annotate the information about this job so that we can query for it
         oc annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
 
-        ci-operator \
-          --artifact-dir=$(ARTIFACTS) \
-          --kubeconfig=/etc/apici/kubeconfig \
-          --lease-server-password-file=/etc/boskos/password \
-          --lease-server-username=ci \
-          --lease-server=https://boskos-ci.svc.ci.openshift.org \
-          --secret-dir=/usr/local/pull-secret \
-          --secret-dir=/usr/local/e2e-azure-upgrade-cluster-profile \
-          --target=e2e-azure-upgrade \
-          --input-hash=$(BUILD_ID) \
-          --input-hash=$(JOB_NAME)
+        ci-operator $@
+      - ""
       env:
       - name: BRANCH
         value: "4.6"
