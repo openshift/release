@@ -89,6 +89,15 @@ items:
             items:
             - key: sa.release-controller.api.ci.config
               path: kubeconfig
+        - name: oauth
+          secret:
+            secretName: github-credentials-openshift-ci-robot
+        - name: bugzilla
+          secret:
+            secretName: bugzilla-credentials-openshift-bugzilla-robot
+        - name: plugins
+          configMap:
+            name: plugins
         containers:
         - name: controller
           image: release-controller:latest
@@ -126,6 +135,15 @@ items:
           - name: prowjob-kubeconfig
             mountPath: /etc/prowjob-kubeconfig
             readOnly: true
+          - name: oauth
+            mountPath: /etc/github
+            readOnly: true
+          - name: bugzilla
+            mountPath: /etc/bugzilla
+            readOnly: true
+          - name: plugins
+            mountPath: /etc/plugins
+            readOnly: true
           command:
           - /usr/bin/release-controller
           - --to=release
@@ -136,4 +154,11 @@ items:
           - --artifacts=openshift-release-artifacts.svc.ci.openshift.org
           - --prow-namespace=ci
           - --job-namespace=ci-release
+          - --github-token-path=/etc/github/oauth
+          # uncomment after release-controller#151 is merged
+          #- --github-endpoint=http://ghproxy
+          - --github-endpoint=https://api.github.com
+          - --github-graphql-endpoint=http://ghproxy/graphql
+          - --bugzilla-endpoint=https://bugzilla.redhat.com
+          - --bugzilla-api-key-path=/etc/bugzilla/api
           - -v=4
