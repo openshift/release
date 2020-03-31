@@ -22,10 +22,14 @@ parameters:
   value: "openshift.testing"
 - name: BUILD_ID
   required: false
-- name: BASTION_Z_SVC_IP
-  value: 172.30.211.152
+- name: BASTION_SVC_IP
+  required: true
+- name: BASTION_SVC
+  required: true
 - name: REMOTE_LIBVIRT_HOSTNAME
-  value: "ocponz"
+  required: true
+- name: MULTIARCH_RELEASE_IMAGE_LATEST
+  required: true
 
 objects:
 
@@ -227,7 +231,8 @@ objects:
         mkdir -p /tmp/output
         cd /tmp/output
 
-        # use s390x builds of e2e test images
+        # use s390x or ppc64le builds of e2e test images
+        # this is a multi-arch iamge
         cat << EOREGISTRY > /tmp/kube-test-repo-list
         e2eRegistry: quay.io/multiarch-k8s-e2e
         EOREGISTRY
@@ -269,7 +274,7 @@ objects:
       - name: PULL_SECRET_PATH
         value: /etc/openshift-installer/pull-secret
       - name: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
-        value: registry.svc.ci.openshift.org/ocp-s390x/release-s390x:4.2
+        value: ${MULTIARCH_RELEASE_IMAGE_LATEST}
       - name: OPENSHIFT_INSTALL_INVOKER
         value: openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID}
       - name: USER
@@ -288,8 +293,7 @@ objects:
         value: registry.svc.ci.openshift.org/${NAMESPACE}/release
       - name: REMOTE_LIBVIRT_URI
         value: "qemu+tcp://${REMOTE_LIBVIRT_HOSTNAME}/system"
-      - name: BASTION_Z_SVC
-        value: sshd.bastion-z.svc.cluster.local
+      - name: BASTION_SVC
       - name: INSTALL_INITIAL_RELEASE
       - name: RELEASE_IMAGE_INITIAL
       command:
@@ -321,7 +325,7 @@ objects:
         cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
 
         workers=2
-        if [[ "${ARCH}" = "s390x" ]]; then
+        if [[ "${ARCH}" = "s390x" || "${ARCH}" = "ppc64le" ]]; then
             master_type=null
             subnets="[]"
             cat > /tmp/artifacts/installer/install-config.yaml << EOF
@@ -330,7 +334,7 @@ objects:
         metadata:
           name: ${CLUSTER_NAME}
         controlPlane:
-          architecture: s390x
+          architecture: ${ARCH}
           hyperthreading: Enabled
           name: master
           replicas: 3
@@ -343,7 +347,7 @@ objects:
           serviceNetwork:
           - 172.30.0.0/16
         compute:
-        - architecture: s390x
+        - architecture: ${ARCH}
           hyperthreading: Enabled
           name: worker
           replicas: ${workers}
@@ -547,7 +551,7 @@ objects:
           sleep 60 & wait
         done
     hostAliases:
-    - ip: "${BASTION_Z_SVC_IP}"
+    - ip: "${BASTION_SVC_IP}"
       hostnames:
       - "${REMOTE_LIBVIRT_HOSTNAME}"
       - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${BASE_DOMAIN}"
