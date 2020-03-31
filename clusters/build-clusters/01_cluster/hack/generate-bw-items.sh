@@ -30,18 +30,13 @@ generate_kubeconfig() {
   sa=$1
   local config
   config="${WORKDIR}/sa.${sa}.${CLUSTER_NAME}.config"
-  local token
-  token=$(oc --kubeconfig "${KUBECONFIG_BUILD01}" sa get-token -n ci "${sa}")
-  oc login ${API_SERVER} --token ${token} --kubeconfig "${config}"
-  oc --kubeconfig "${config}" project ci
+  oc --kubeconfig "${KUBECONFIG_BUILD01}" sa create-kubeconfig -n ci "${sa}" > "${config}"
   #strange --kubeconfig does not work here
   #https://coreos.slack.com/archives/CEKNRGF25/p1578065888081000
-  oc --config "${config}" config rename-context "ci/api-build01-ci-devcluster-openshift-com:6443/system:serviceaccount:ci:${sa}" ci/api-build01-ci-devcluster-openshift-com:6443
-  #depending on how many projects the SA has access to, there could be another context  generated without namespace after oc-login
-  #we leave it there for simplicity
+  oc --config "${config}" config rename-context "${sa}" ci/api-build01-ci-devcluster-openshift-com:6443
 }
 
-declare -a SAArray=( "config-updater" "deck" "plank" "sinker" "hook" "ca-cert-issuer" )
+declare -a SAArray=( "config-updater" "deck" "plank" "sinker" "hook" "ca-cert-issuer" "crier" )
  
 # Iterate the string array using for loop
 for name in ${SAArray[@]}; do
