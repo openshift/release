@@ -1,0 +1,24 @@
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: ci-search
+  namespace: ci
+spec:
+  tags:
+  - name: latest
+    from:
+      kind: DockerImage
+      name: registry.svc.ci.openshift.org/ci/ci-search:latest
+---
+kind: Route
+apiVersion: route.openshift.io/v1
+metadata:
+  namespace: ci
+  name: search
+spec:
+  tls:
+    termination: Edge
+    insecureEdgeTerminationPolicy: Redirect
+  to:
+    kind: Service
+    name: search

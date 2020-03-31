@@ -1,5 +1,28 @@
 periodics:
 - agent: kubernetes
+  cluster: app.ci
+  decorate: true
+  interval: 1m
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  max_concurrency: 1
+  name: periodic-ci-image-import-to-app-ci
+  spec:
+    containers:
+    - args:
+      - -c
+      - |
+        set -o errexit
+        set -o nounset
+        oc import-image -n ci ci-search --all
+      command:
+      - /bin/bash
+      image: registry.svc.ci.openshift.org/ocp/4.5:cli
+      imagePullPolicy: Always
+      name: ""
+      resources: {}
+    serviceAccountName: image-importer
+- agent: kubernetes
   cluster: ci/api-build01-ci-devcluster-openshift-com:6443
   decorate: true
   interval: 1m
