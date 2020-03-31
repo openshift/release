@@ -36,6 +36,9 @@ parameters:
   displayName: GCS Web UI Service Name
   description: The name of the OpenShift Service exposed for the GCS Web UI container.
   value: gcsweb
+- description: "The namespace. Must come from a var or it will get stripped off"
+  name: NAMESPACE
+  value: ci
 objects:
 - kind: ImageStream
   apiVersion: v1
@@ -43,12 +46,14 @@ objects:
     labels:
       app: "${NAME}"
     name: "${NAME}"
+    namespace: ${NAMESPACE}
 - kind: BuildConfig
   apiVersion: v1
   metadata:
     labels:
       app: "${NAME}"
     name: "${NAME}-binary"
+    namespace: ${NAMESPACE}
   spec:
     successfulBuildsHistoryLimit: 1
     failedBuildsHistoryLimit: 2
@@ -85,6 +90,7 @@ objects:
     labels:
       app: "${NAME}"
     name: "${NAME}"
+    namespace: ${NAMESPACE}
   spec:
     successfulBuildsHistoryLimit: 1
     failedBuildsHistoryLimit: 2
@@ -129,6 +135,7 @@ objects:
     labels:
       app: "${NAME}"
     name: "${NAME}"
+    namespace: ${NAMESPACE}
   spec:
     replicas: 1
     revisionHistoryLimit: 2
@@ -164,6 +171,7 @@ objects:
   apiVersion: v1
   metadata:
     name: "${SERVICE_NAME}"
+    namespace: ${NAMESPACE}
     labels:
       app: "${NAME}"
     annotations:
@@ -183,6 +191,7 @@ objects:
   apiVersion: v1
   metadata:
     name: "${SERVICE_NAME}"
+    namespace: ${NAMESPACE}
     labels:
       app: "${NAME}"
   spec:
