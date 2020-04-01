@@ -17,6 +17,7 @@ JOB_MAP = {
     "pull-ci-openshift-release-master-services-dry": DEFAULT_CLUSTER,
     "periodic-acme-cert-issuer-for-build01": DEFAULT_CLUSTER,
     "periodic-build01-upgrade": BUILD01_CLUSTER,
+    "periodic-ci-image-import-to-build01": BUILD01_CLUSTER,
 }
 
 def load_dup_jobs():
@@ -50,8 +51,8 @@ def get_desired_cluster(file_path, job):
         return DEFAULT_CLUSTER
     if job["name"] in JOB_MAP:
         return JOB_MAP[job["name"]]
-    if job["name"].endswith("-build01") or migrated(file_path) or \
-        job["name"] in DUP_JOBS or job["name"] in GROUP_JOBS:
+    if migrated(file_path):
+    #job["name"] in DUP_JOBS or job["name"] in GROUP_JOBS:
         return BUILD01_CLUSTER
     return DEFAULT_CLUSTER
 
@@ -82,8 +83,8 @@ def migrated(file_path):
     # due to https://github.com/openshift/release/pull/7178
     if file_path.endswith('periodics.yaml') and 'openshift/release/' in file_path:
         return False
-    if file_path.endswith('presubmits.yaml') and 'ci-operator/jobs/openshift-priv/' in file_path:
-        return True
+    #if file_path.endswith('presubmits.yaml') and 'ci-operator/jobs/openshift-priv/' in file_path:
+    #    return True
     return False
 
 def ensure(job_dir, overwrite):
