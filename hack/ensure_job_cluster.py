@@ -8,8 +8,9 @@ import logging
 import os
 import yaml
 
-DEFAULT_CLUSTER = "api.ci"
+APP_CI_CLUSTER = "app.ci"
 BUILD01_CLUSTER = "ci/api-build01-ci-devcluster-openshift-com:6443"
+DEFAULT_CLUSTER = "api.ci"
 JOB_MAP = {
     "pull-ci-openshift-release-master-build01-dry": DEFAULT_CLUSTER,
     "pull-ci-openshift-release-master-core-dry": DEFAULT_CLUSTER,
@@ -17,6 +18,7 @@ JOB_MAP = {
     "periodic-acme-cert-issuer-for-build01": DEFAULT_CLUSTER,
     "periodic-build01-upgrade": BUILD01_CLUSTER,
     "periodic-ci-image-import-to-build01": BUILD01_CLUSTER,
+    "periodic-ci-image-import-to-app-ci": APP_CI_CLUSTER,
 }
 
 def load_dup_jobs():
