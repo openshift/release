@@ -35,6 +35,16 @@ cp "${SHARED_DIR}/install-config.yaml" "${dir}/"
 mkdir -p ~/.ssh
 cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
 
+
+TF_LOG=debug openshift-install --dir="${dir}" create manifests
+
+while IFS= read -r -d '' item
+do
+  manifest="$( basename "${item}" )"
+  cp "${item}" "${dir}/manifests/${manifest##manifest_}"
+done <   <( find "${SHARED_DIR}" -name "manifest_*.yml" -print0)
+
+
 TF_LOG=debug openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v password &
 
 set +e
