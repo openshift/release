@@ -22,9 +22,9 @@ generate_kubeconfig() {
   local config
   config="${WORKDIR}/sa.${sa}.${CLUSTER_NAME}.config"
   oc --kubeconfig "${KUBECONFIG_BUILD01}" sa create-kubeconfig -n ci "${sa}" > "${config}"
-  #strange --kubeconfig does not work here
-  #https://coreos.slack.com/archives/CEKNRGF25/p1578065888081000
-  oc --config "${config}" config rename-context "${sa}" ci/api-build01-ci-devcluster-openshift-com:6443
+  # oc config rename-context is not enough, as we then end up
+  # with multiple users with the same name when they get merged
+  sed -i "s/${sa}/${CLUSTER_NAME}/g" $config
 }
 
 declare -a SAArray=( "config-updater" "deck" "plank" "sinker" "hook" "ca-cert-issuer" "crier" )
