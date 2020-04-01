@@ -1,14 +1,24 @@
-kind: List
-apiVersion: v1
-items:
+kind: Template
+apiVersion: template.openshift.io/v1
+parameters:
+- description: "The namespace. Must come from a var or it will get stripped off"
+  name: NAMESPACE
+  value: ci
+- description: "The monitoring namespace. Must come from a var or it will get stripped off"
+  name: MONITORING_NAMESPACE
+  value: prow-monitoring
+- description: The host for the route
+  name: ROUTE_HOST
+  value: steps.svc.ci.openshift.org
+objects:
 - apiVersion: v1
   kind: Service
   metadata:
-    namespace: ci
     labels:
       app: prow
       component: ci-operator-configresolver
     name: ci-operator-configresolver
+    namespace: ${NAMESPACE}
   spec:
     ports:
     - name: main
@@ -33,9 +43,9 @@ items:
       app: prow
       component: ci-operator-configresolver
     name: ci-operator-configresolver-ui
-    namespace: ci
+    namespace: ${NAMESPACE}
   spec:
-    host: steps.svc.ci.openshift.org
+    host: ${ROUTE_HOST}
     tls:
       insecureEdgeTerminationPolicy: Redirect
       termination: edge
@@ -51,7 +61,7 @@ items:
       app: prow
       component: ci-operator-configresolver
     name: ci-operator-configresolver
-    namespace: ci
+    namespace: ${namespace}
   spec:
     port:
       targetPort: main
@@ -62,7 +72,7 @@ items:
   kind: ServiceMonitor
   metadata:
     name: ci-operator-configresolver
-    namespace: prow-monitoring
+    namespace: ${MONITORING_NAMESPACE}
     labels:
       app: prow
       component: ci-operator-configresolver
@@ -82,7 +92,7 @@ items:
 - apiVersion: apps/v1
   kind: Deployment
   metadata:
-    namespace: ci
+    namespace: ${NAMESPACE}
     name: ci-operator-configresolver
     annotations:
       image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"ci-operator-configresolver:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"ci-operator-configresolver\")].image"}]'
