@@ -37,7 +37,7 @@ def load_grouped_jobs():
         groups = yaml.safe_load(file)
         jobs = []
         for i, group in enumerate(groups):
-            if i <= 1:
+            if i <= 0:
                 jobs.extend(group)
         return jobs
 
@@ -51,8 +51,7 @@ def get_desired_cluster(file_path, job):
         return DEFAULT_CLUSTER
     if job["name"] in JOB_MAP:
         return JOB_MAP[job["name"]]
-    if migrated(file_path):
-    #job["name"] in DUP_JOBS or job["name"] in GROUP_JOBS:
+    if migrated(file_path) or job["name"] in DUP_JOBS or job["name"] in GROUP_JOBS:
         return BUILD01_CLUSTER
     return DEFAULT_CLUSTER
 
@@ -83,8 +82,8 @@ def migrated(file_path):
     # due to https://github.com/openshift/release/pull/7178
     if file_path.endswith('periodics.yaml') and 'openshift/release/' in file_path:
         return False
-    #if file_path.endswith('presubmits.yaml') and 'ci-operator/jobs/openshift-priv/' in file_path:
-    #    return True
+    if file_path.endswith('presubmits.yaml') and 'ci-operator/jobs/openshift-priv/' in file_path:
+        return True
     return False
 
 def ensure(job_dir, overwrite):
