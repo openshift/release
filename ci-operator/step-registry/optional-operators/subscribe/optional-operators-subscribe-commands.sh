@@ -28,6 +28,7 @@ OO_INSTALL_NAMESPACE="${OO_INSTALL_NAMESPACE:-}"
 OO_TARGET_NAMESPACES="${OO_TARGET_NAMESPACES:-}"
 
 if [[ -z "$OO_INSTALL_NAMESPACE" ]]; then
+    echo "OO_INSTALL_NAMESPACE not set: creating new namespace"
     OO_INSTALL_NAMESPACE=$(
         oc create -f - -o jsonpath='{.metadata.name}' <<EOF
 apiVersion: v1
@@ -37,35 +38,48 @@ metadata:
 EOF
     )
 else
+    echo "OO_INSTALL_NAMESPACE is set: testing whether it exists:'"
     oc get namespace "$OO_INSTALL_NAMESPACE"
 fi
 
-echo "installing \"$OO_PACKAGE\" in namespace \"$OO_INSTALL_NAMESPACE\""
+echo "Installing \"$OO_PACKAGE\" in namespace \"$OO_INSTALL_NAMESPACE\""
 
 if [[ "$OO_TARGET_NAMESPACES" == "!install" ]]; then
-    echo "targeting operator installation namespace"
+    echo "Targeting operator installation namespace ($OO_INSTALL_NAMESPACE)"
     OO_TARGET_NAMESPACES="$OO_INSTALL_NAMESPACE"
 fi
 
 OPERATORGROUP=$(oc -n "$OO_INSTALL_NAMESPACE" get operatorgroup -o jsonpath="{.items[*].metadata.name}" || true)
+
 if [[ $(echo "$OPERATORGROUP" | wc -w) -gt 1 ]]; then
-    echo "error: multiple operatorgroups in namespace \"$OO_INSTALL_NAMESPACE\": $OPERATORGROUP" 1>&2
+    echo "Error: multiple OperatorGroups in namespace \"$OO_INSTALL_NAMESPACE\": $OPERATORGROUP" 1>&2
+    oc -n "$OO_INSTALL_NAMESPACE" get operatorgroup -o yaml >"$ARTIFACT_DIR/operatorgroups-$OO_INSTALL_NAMESPACE.yaml"
     exit 1
+elif [[ -n "$OPERATORGROUP" ]]; then
+    echo "OperatorGroup \"$OPERATORGROUP\" exists: modifying it"
+    oc -n "$OO_INSTALL_NAMESPACE" get operatorgroup -o yaml >"$ARTIFACT_DIR/og-$OPERATORGROUP-orig.yaml"
+    OG_OPERATION=apply
+    OG_NAMESTANZA="name: $OPERATORGROUP"
+else
+    echo "OperatorGroup does not exist: creating it"
+    OG_OPERATION=create
+    OG_NAMESTANZA="generateName: oo-"
 fi
 
 OPERATORGROUP=$(
-    oc "$([[ -n "$OPERATORGROUP" ]] && printf apply || printf create)" -f - -o jsonpath='{.metadata.name}' <<EOF
+    oc $OG_OPERATION -f - -o jsonpath='{.metadata.name}' <<EOF
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
-  $([[ -n "$OPERATORGROUP" ]] && echo "name: $OPERATORGROUP" || echo "generateName: oo-")
+  $OG_NAMESTANZA
   namespace: $OO_INSTALL_NAMESPACE
 spec:
   targetNamespaces: [$OO_TARGET_NAMESPACES]
 EOF
 )
 
-echo "operator group name is \"$OPERATORGROUP\""
+echo "OperatorGroup name is \"$OPERATORGROUP\""
+echo "Creating CatalogSource"
 
 CATSRC=$(
     oc create -f - -o jsonpath='{.metadata.name}' <<EOF
@@ -80,7 +94,8 @@ spec:
 EOF
 )
 
-echo "catalog source name is \"$CATSRC\""
+echo "CatalogSource name is \"$CATSRC\""
+echo "Creating Subscription"
 
 SUB=$(
     oc create -f - -o jsonpath='{.metadata.name}' <<EOF
@@ -97,28 +112,65 @@ spec:
 EOF
 )
 
-echo "subscription name is \"$SUB\""
-echo "waiting for csv to become ready..."
+echo "Subscription name is \"$SUB\""
+echo "Waiting for ClusterServiceVersion to become ready..."
 
 for _ in $(seq 1 30); do
     CSV=$(oc -n "$OO_INSTALL_NAMESPACE" get subscription "$SUB" -o jsonpath='{.status.installedCSV}' || true)
     if [[ -n "$CSV" ]]; then
         if [[ "$(oc -n "$OO_INSTALL_NAMESPACE" get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
-            echo "csv \"$CSV\" ready"
+            echo "ClusterServiceVersion \"$CSV\" ready"
             exit 0
         fi
     fi
     sleep 10
 done
 
-echo "timed out waiting for csv to become ready" 1>&2
-oc get namespace "$OO_INSTALL_NAMESPACE" -o yaml 1>&2
-oc get -n "$OO_INSTALL_NAMESPACE" operatorgroup "$OPERATORGROUP" -o yaml 1>&2
-oc get -n "$OO_INSTALL_NAMESPACE" catalogsource "$CATSRC" -o yaml 1>&2
-oc get -n "$OO_INSTALL_NAMESPACE" subscription "$SUB" -o yaml 1>&2
+echo "Timed out waiting for csv to become ready" 1>&2
+
+NS_ART="$ARTIFACT_DIR/ns-$OO_INSTALL_NAMESPACE.yaml"
+echo "Dumping Namespace $OO_INSTALL_NAMESPACE as $NS_ART"
+oc get namespace "$OO_INSTALL_NAMESPACE" -o yaml >"$NS_ART"
+
+OG_ART="$ARTIFACT_DIR/og-$OPERATORGROUP.yaml"
+echo "Dumping OperatorGroup $OPERATORGROUP as $NS_ART"
+oc get -n "$OO_INSTALL_NAMESPACE" operatorgroup "$OPERATORGROUP" -o yaml >"$OG_ART"
+
+CS_ART="$ARTIFACT_DIR/cs-$CATSRC.yaml"
+echo "Dumping CatalogSource $CATSRC as $CS_ART"
+oc get -n "$OO_INSTALL_NAMESPACE" catalogsource "$CATSRC" -o yaml >"$CS_ART"
+for field in message reason; do
+    VALUE="$(oc get "$OO_INSTALL_NAMESPACE" catalogsource "$CATSRC" -o jsonpath="{.status.$field}" || true)"
+    if [[ -n "$VALUE" ]]; then
+        echo "  Subscription $SUB status $field: $VALUE"
+    fi
+done
+
+SUB_ART="$ARTIFACT_DIR/sub-$SUB.yaml"
+echo "Dumping Subscription $SUB as $SUB_ART"
+oc get -n "$OO_INSTALL_NAMESPACE" subscription "$SUB" -o yaml >"$SUB_ART"
+for field in state reason; do
+    VALUE="$(oc get "$OO_INSTALL_NAMESPACE" subscription "$SUB" -o jsonpath="{.status.$field}" || true)"
+    if [[ -n "$VALUE" ]]; then
+        echo "  Subscription $SUB status $field: $VALUE"
+    fi
+done
+
 if [[ -n "$CSV" ]]; then
-    oc get -n "$OO_INSTALL_NAMESPACE" csv "$CSV" -o yaml 1>&2
+    CSV_ART="$ARTIFACT_DIR/csv-$CSV.yaml"
+    echo "ClusterServiceVersion $CSV was created but never became ready"
+    echo "Dumping ClusterServiceVersion $CSV as $CSV_ART"
+    oc get -n "$OO_INSTALL_NAMESPACE" csv "$CSV" -o yaml >"$CSV_ART"
+    for field in phase message reason; do
+        VALUE="$(oc get "$OO_INSTALL_NAMESPACE" csv "$CSV" -o jsonpath="{.status.$field}" || true)"
+        if [[ -n "$VALUE" ]]; then
+            echo "  ClusterServiceVersion $CSV status $field: $VALUE"
+        fi
+    done
 else
-    oc get -n "$OO_INSTALL_NAMESPACE" csv -o yaml 1>&2
+    CSV_ART="$ARTIFACT_DIR/$OO_INSTALL_NAMESPACE-all-csvs.yaml"
+    echo "ClusterServiceVersion $CSV was never created"
+    echo "Dumping all ClusterServiceVersions in namespace $OO_INSTALL_NAMESPACE to $CSV_ART"
+    oc get -n "$OO_INSTALL_NAMESPACE" csv -o yaml >"$CSV_ART"
 fi
 exit 1
