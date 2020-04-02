@@ -18,7 +18,9 @@ generate_kubeconfig() {
   local config
   config="${WORKDIR}/sa.${sa}.${CLUSTER_NAME}.config"
   oc sa create-kubeconfig -n ci "${sa}" > "${config}"
-  KUBECONFIG=$config oc config rename-context "${sa}" $CLUSTER_NAME
+  # oc config rename-context is not enough, as we then end up
+  # with multiple users with the same name when they get merged
+  sed -i "s/${sa}/${CLUSTER_NAME}/g" $config
 }
 
 for name in ${SAArray[@]}; do
