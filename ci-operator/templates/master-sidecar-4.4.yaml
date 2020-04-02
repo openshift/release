@@ -8,7 +8,9 @@ parameters:
   required: true
 - name: IMAGE_CLI
   required: true
-- name: IMAGE_HYPERSHIFT
+- name: IMAGE_OPENSHIFT_APISERVER
+  required: true
+- name: IMAGE_OPENSHIFT_CONTROLLER_MANAGER
   required: true
 - name: IMAGE_HYPERKUBE
   required: true
@@ -86,14 +88,23 @@ objects:
       - /usr/bin/kube-apiserver
       - /usr/bin/kube-controller-manager
       - /tmp/shared/bin/
-    - name: bin-hypershift
-      image: ${IMAGE_HYPERSHIFT}
+    - name: bin-openshift-controller-manager
+      image: ${IMAGE_OPENSHIFT_CONTROLLER_MANAGER}
       volumeMounts:
       - name: shared-tmp
         mountPath: /tmp/shared
       command:
       - cp
-      - /usr/bin/hypershift
+      - /usr/bin/openshift-controller-manager
+      - /tmp/shared/bin/
+    - name: bin-openshift-apiserver
+      image: ${IMAGE_OPENSHIFT_APISERVER}
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      command:
+      - cp
+      - /usr/bin/openshift-apiserver
       - /tmp/shared/bin/
     - name: bin-etcd
       image: ${IMAGE_ETCD}
@@ -1340,7 +1351,7 @@ objects:
       -d \"${LOCALUP_CONFIG}/openshift-apiserver\" ]; then\n        mkdir -p ${LOCALUP_CONFIG}/openshift-apiserver\n
       \       cp ${base}/openshift-apiserver.yaml ${LOCALUP_CONFIG}/openshift-apiserver\n
       \       local::master::generate_openshiftapiserver_certs\n    fi\n\n    OPENSHIFT_APISERVER_LOG=${LOG_DIR}/openshift-apiserver.log\n
-      \   hypershift openshift-apiserver \\\n      --v=${LOG_LEVEL} \\\n      --vmodule=\"${LOG_SPEC}\"
+      \   openshift-apiserver \\\n      --v=${LOG_LEVEL} \\\n      --vmodule=\"${LOG_SPEC}\"
       \\\n      --config=${LOCALUP_CONFIG}/openshift-apiserver/openshift-apiserver.yaml
       >\"${OPENSHIFT_APISERVER_LOG}\" 2>&1 &\n    OPENSHIFT_APISERVER_PID=$!\n\n    #
       Wait for openshift-apiserver to come up before launching the rest of the components.\n
@@ -1352,7 +1363,7 @@ objects:
       {\n    mkdir -p ${LOCALUP_CONFIG}/openshift-controller-manager\n    cp ${base}/openshift-controller-manager.yaml
       ${LOCALUP_CONFIG}/openshift-controller-manager\n    local::master::generate_openshiftcontrollermanager_certs\n\n
       \   OPENSHIFT_CONTROLLER_MANAGER_LOG=${LOG_DIR}/openshift-controller-manager.log\n
-      \   hypershift openshift-controller-manager \\\n      --v=${LOG_LEVEL} \\\n      --vmodule=\"${LOG_SPEC}\"
+      \   openshift-controller-manager \\\n      --v=${LOG_LEVEL} \\\n      --vmodule=\"${LOG_SPEC}\"
       \\\n      --config=${LOCALUP_CONFIG}/openshift-controller-manager/openshift-controller-manager.yaml
       >\"${OPENSHIFT_CONTROLLER_MANAGER_LOG}\" 2>&1 &\n    OPENSHIFT_CONTROLLER_MANAGER_PID=$!\n\n
       \   local::master::log::info \"Waiting for openshift-controller-manager to come
