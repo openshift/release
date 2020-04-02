@@ -28,13 +28,14 @@ OO_INSTALL_NAMESPACE="${OO_INSTALL_NAMESPACE:-}"
 OO_TARGET_NAMESPACES="${OO_TARGET_NAMESPACES:-}"
 
 if [[ -z "$OO_INSTALL_NAMESPACE" ]]; then
-    OO_INSTALL_NAMESPACE=$(oc create -f - -o jsonpath='{.metadata.name}' << EOF
+    OO_INSTALL_NAMESPACE=$(
+        oc create -f - -o jsonpath='{.metadata.name}' <<EOF
 apiVersion: v1
 kind: Namespace
 metadata:
   generateName: oo-
 EOF
-)
+    )
 else
     oc get namespace "$OO_INSTALL_NAMESPACE"
 fi
@@ -52,7 +53,8 @@ if [[ $(echo "$OPERATORGROUP" | wc -w) -gt 1 ]]; then
     exit 1
 fi
 
-OPERATORGROUP=$(oc "$([[ -n "$OPERATORGROUP" ]] && printf apply || printf create)" -f - -o jsonpath='{.metadata.name}' << EOF
+OPERATORGROUP=$(
+    oc "$([[ -n "$OPERATORGROUP" ]] && printf apply || printf create)" -f - -o jsonpath='{.metadata.name}' <<EOF
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
@@ -65,7 +67,8 @@ EOF
 
 echo "operator group name is \"$OPERATORGROUP\""
 
-CATSRC=$(oc create -f - -o jsonpath='{.metadata.name}' << EOF
+CATSRC=$(
+    oc create -f - -o jsonpath='{.metadata.name}' <<EOF
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
@@ -79,7 +82,8 @@ EOF
 
 echo "catalog source name is \"$CATSRC\""
 
-SUB=$(oc create -f - -o jsonpath='{.metadata.name}' << EOF
+SUB=$(
+    oc create -f - -o jsonpath='{.metadata.name}' <<EOF
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
@@ -99,10 +103,10 @@ echo "waiting for csv to become ready..."
 for _ in $(seq 1 30); do
     CSV=$(oc -n "$OO_INSTALL_NAMESPACE" get subscription "$SUB" -o jsonpath='{.status.installedCSV}' || true)
     if [[ -n "$CSV" ]]; then
-	if [[ "$(oc -n "$OO_INSTALL_NAMESPACE" get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
-	    echo "csv \"$CSV\" ready"
-	    exit 0
-	fi
+        if [[ "$(oc -n "$OO_INSTALL_NAMESPACE" get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
+            echo "csv \"$CSV\" ready"
+            exit 0
+        fi
     fi
     sleep 10
 done
