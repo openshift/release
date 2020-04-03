@@ -1,0 +1,45 @@
+base_images:
+  os:
+    cluster: https://api.ci.openshift.org
+    name: ubi-minimal
+    namespace: ocp
+    tag: "7"
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+  - dockerfile_path: build/Dockerfile
+    from: os
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/wildfly/wildfly-operator/build
+    to: wildfly-operator
+promotion:
+  name: wildfly-operator
+  namespace: wildfly
+resources:
+  '*':
+    limits: {}
+    requests:
+      cpu: 100m
+      memory: 250Mi
+  unit:
+    limits: {}
+    requests:
+      cpu: 200m
+      memory: 2Gi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: "4.3"
+  namespace: ocp
+tests:
+- as: test-e2e-18
+  commands: make test-e2e-18
+  openshift_installer_src:
+    cluster_profile: aws
