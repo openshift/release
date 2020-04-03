@@ -16,16 +16,28 @@ parameters:
   required: true
 - name: ARCH
   required: true
+- name: CLUSTER_TYPE
+  value: remote-libvirt
 - name: TEST_COMMAND
   required: true
 - name: RELEASE_IMAGE_LATEST
   required: true
-- name: BASE_DOMAIN
-  value: "openshift.testing"
 - name: BUILD_ID
   required: false
 - name: BASTION_SVC_IP
   required: true
+- name: BASTION_SVC_1_IP
+  value: 127.0.0.1
+  required: false
+- name: BASTION_SVC_2_IP
+  value: 127.0.0.1
+  required: false
+- name: BASTION_SVC_3_IP
+  value: 127.0.0.1
+  required: false
+- name: BASTION_SVC_4_IP
+  value: 127.0.0.1
+  required: false
 - name: BASTION_SVC
   required: true
 - name: REMOTE_LIBVIRT_HOSTNAME
@@ -101,7 +113,7 @@ objects:
       # we want to gather the teardown logs no matter what
       ci-operator.openshift.io/wait-for-container-artifacts: teardown
       ci-operator.openshift.io/save-container-logs: "true"
-      ci-operator.openshift.io/container-sub-tests: "setup,test,teardown"
+      ci-operator.openshift.io/container-sub-tests: "lease,setup,test,teardown"
   spec:
     restartPolicy: Never
     activeDeadlineSeconds: 21600
@@ -116,6 +128,91 @@ objects:
         secretName: ${JOB_NAME_SAFE}-cluster-profile
 
     containers:
+
+    - name: lease
+      image: registry.svc.ci.openshift.org/ci/boskoscli:latest
+      terminationMessagePolicy: FallbackToLogsOnError
+      resources:
+        requests:
+          cpu: 10m
+          memory: 10Mi
+        limits:
+          memory: 200Mi
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      - name: cluster-profile
+        mountPath: /etc/openshift-installer
+      - name: artifacts
+        mountPath: /tmp/artifacts
+      env:
+      - name: ARCH
+      - name: CLUSTER_TYPE
+      - name: CLUSTER_NAME
+        value: ${NAMESPACE}-${JOB_NAME_HASH}
+      command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -euo pipefail
+
+        trap 'rc=$?; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi; if test "${rc}" -ne 0; then touch /tmp/shared/exit; fi; exit "${rc}"' EXIT
+
+        # hack for bazel
+        function boskosctl() {
+          /app/boskos/cmd/cli/app.binary "${@}"
+        }
+
+        function acquire_lease() {
+          if [[ "${ARCH}" != "s390x" ]]; then
+            resource_name="${CLUSTER_TYPE}-00"
+            return
+          fi
+
+          resource="$( boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" acquire --type "${CLUSTER_TYPE}-quota-slice" --state "free" --target-state "leased" --timeout 150m )"
+          resource_name="$(echo "${resource}"|jq .name --raw-output)"
+
+          echo "[INFO] Lease acquired! at $(date --utc)"
+          echo "[INFO] Leased resource: ${resource}"
+          echo "[INFO] Sending heartbeats to retain the lease ${resource_name}"
+          boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" heartbeat --resource "${resource}" &
+          heartbeats_pid=$!
+        }
+
+        echo "[INFO] Acquiring a lease ..."
+        acquire_lease
+
+        # Save name of the env to be used as the base domain
+        cat > /tmp/shared/libvirt-lease.conf <<EOF
+        BASE_DOMAIN="${resource_name}"
+        EOF
+
+        touch /tmp/shared/leased
+
+        function release() {
+            if [[ "${ARCH}" != "s390x" ]]; then
+              return
+            fi
+
+            echo "killing heartbeat process "${heartbeats_pid}" at $(date --utc)"
+            kill -9 "${heartbeats_pid}"
+            echo "[INFO] Releasing the lease on resouce ${resource_name}"
+            boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" release --name "${resource_name}" --target-state "free"
+        }
+
+        trap "release" EXIT
+        trap "release" TERM
+
+        while true; do
+          if [[ -f /tmp/shared/exit ]]; then
+            echo "Another process exited" 2>&1
+            exit 0
+          fi
+
+          sleep 15 & wait $!
+        done
+
     # Once the cluster is up, executes shared tests
     - name: test
       image: ${IMAGE_TESTS}
@@ -230,6 +327,17 @@ objects:
         cp /tmp/cluster/ssh-privatekey ~/.ssh/kube_libvirt_rsa || true
         export KUBE_SSH_USER=core
 
+        # ensure lease is acquired
+        if [[ ! -f /tmp/shared/libvirt-lease.conf ]]; then
+          exit 1
+        fi
+
+        # ensure BASE_DOMAIN is set
+        source /tmp/shared/libvirt-lease.conf
+        if [[ -z "$BASE_DOMAIN" ]]; then
+          exit 1
+        fi
+
         mkdir -p /tmp/output
         cd /tmp/output
 
@@ -259,7 +367,7 @@ objects:
       terminationMessagePolicy: FallbackToLogsOnError
       volumeMounts:
       - name: shared-tmp
-        mountPath: /tmp
+        mountPath: /tmp/shared
       - name: cluster-profile
         mountPath: /etc/openshift-installer
       - name: artifacts
@@ -267,8 +375,6 @@ objects:
       env:
       - name: CLUSTER_NAME
         value: ${NAMESPACE}-${JOB_NAME_HASH}
-      - name: BASE_DOMAIN
-        value: ${BASE_DOMAIN}
       - name: SSH_PRIV_KEY_PATH
         value: /etc/openshift-installer/ssh-privatekey
       - name: SSH_PUB_KEY_PATH
@@ -296,6 +402,7 @@ objects:
       - name: REMOTE_LIBVIRT_URI
         value: "qemu+tcp://${REMOTE_LIBVIRT_HOSTNAME}/system"
       - name: BASTION_SVC
+        value: sshd.bastion-z.svc.cluster.local
       - name: MASTER_REPLICAS
         value: "3"
       - name: WORKER_REPLICAS
@@ -309,8 +416,24 @@ objects:
         #!/bin/sh
         set -e
 
-        trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/setup-success; else touch /tmp/exit; fi; exit "${rc}"' EXIT
+        trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/shared/setup-success; else touch /tmp/shared/exit; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+        # Wait until lease is acquired
+        while true; do
+          if [[ -f /tmp/shared/exit ]]; then
+            echo "Another process exited" 2>&1
+            exit 1
+          fi
+          if [[ -f /tmp/shared/leased ]]; then
+            echo "Lease acquired, installing..."
+
+            # Retrieve lease variables
+            source /tmp/shared/libvirt-lease.conf
+            break
+          fi
+          sleep 15 & wait
+        done
+
         cp "$(command -v openshift-install)" /tmp
         mkdir /tmp/artifacts/installer
 
@@ -318,7 +441,7 @@ objects:
           echo "Installing from initial release ${RELEASE_IMAGE_INITIAL}"
           OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_INITIAL}"
         else
-          echo "Installing from release ${RELEASE_IMAGE_LATEST}"
+          echo "Installing from release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
         fi
 
         openshift-install version
@@ -329,6 +452,20 @@ objects:
         ## move private key to ~/.ssh/ so that installer can use it to gather logs on bootstrap failure
         mkdir -p ~/.ssh
         cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
+
+        # declare environments to extract subnet
+        declare -A SUBNETS
+        SUBNETS["${CLUSTER_TYPE}-00"]="126"
+        SUBNETS["${CLUSTER_TYPE}-01"]="1"
+        SUBNETS["${CLUSTER_TYPE}-02"]="2"
+        SUBNETS["${CLUSTER_TYPE}-03"]="3"
+        SUBNETS["${CLUSTER_TYPE}-04"]="4"
+
+        # get cluster subnet or default it to 126
+        cluster_subnet="${SUBNETS[$BASE_DOMAIN]}"
+        if [[ -z "$cluster_subnet" ]]; then
+           cluster_subnet=126
+        fi
 
         if [[ "${ARCH}" = "s390x" || "${ARCH}" = "ppc64le" ]]; then
             master_type=null
@@ -347,7 +484,7 @@ objects:
           clusterNetwork:
           - cidr: 10.128.0.0/14
             hostPrefix: 23
-          machineCIDR: 192.168.126.0/24
+          machineCIDR: 192.168.${cluster_subnet}.0/24
           networkType: OpenShiftSDN
           serviceNetwork:
           - 172.30.0.0/16
@@ -396,13 +533,13 @@ objects:
             libvirt_network=$(mock-nss.sh virsh --connect "${REMOTE_LIBVIRT_URI}" net-list --name | grep "${NAMESPACE}-${JOB_NAME_HASH}" || true)
             if [[ -n "${libvirt_network}" ]]; then
                 cat > /tmp/artifacts/installer/worker-hostrecords.xml << EOF
-        <host ip='192.168.126.51'>
-          <hostname>alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${BASE_DOMAIN}</hostname>
-          <hostname>console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${BASE_DOMAIN}</hostname>
-          <hostname>downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${BASE_DOMAIN}</hostname>
-          <hostname>grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${BASE_DOMAIN}</hostname>
-          <hostname>oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${BASE_DOMAIN}</hostname>
-          <hostname>prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${BASE_DOMAIN}</hostname>
+        <host ip='192.168.${cluster_subnet}.51'>
+          <hostname>alertmanager-main-openshift-monitoring.apps.${CLUSTER_NAME}.${BASE_DOMAIN}</hostname>
+          <hostname>console-openshift-console.apps.${CLUSTER_NAME}.${BASE_DOMAIN}</hostname>
+          <hostname>downloads-openshift-console.apps.${CLUSTER_NAME}.${BASE_DOMAIN}</hostname>
+          <hostname>grafana-openshift-monitoring.apps.${CLUSTER_NAME}.${BASE_DOMAIN}</hostname>
+          <hostname>oauth-openshift.apps.${CLUSTER_NAME}.${BASE_DOMAIN}</hostname>
+          <hostname>prometheus-k8s-openshift-monitoring.apps.${CLUSTER_NAME}.${BASE_DOMAIN}</hostname>
         </host>
         EOF
                 echo "Libvirt network found. Injecting worker DNS records."
@@ -567,10 +704,46 @@ objects:
     - ip: "${BASTION_SVC_IP}"
       hostnames:
       - "${REMOTE_LIBVIRT_HOSTNAME}"
-      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${BASE_DOMAIN}"
-      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${BASE_DOMAIN}"
-      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${BASE_DOMAIN}"
-      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${BASE_DOMAIN}"
-      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${BASE_DOMAIN}"
-      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${BASE_DOMAIN}"
-      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${BASE_DOMAIN}"
+      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-00"
+      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-00"
+      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-00"
+      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-00"
+      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-00"
+      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-00"
+      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-00"
+    - ip: "${BASTION_SVC_1_IP}"
+      hostnames:
+      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-01"
+      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-01"
+      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-01"
+      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-01"
+      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-01"
+      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-01"
+      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-01"
+    - ip: "${BASTION_SVC_2_IP}"
+      hostnames:
+      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-02"
+      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-02"
+      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-02"
+      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-02"
+      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-02"
+      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-02"
+      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-02"
+    - ip: "${BASTION_SVC_3_IP}"
+      hostnames:
+      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-03"
+      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-03"
+      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-03"
+      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-03"
+      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-03"
+      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-03"
+      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-03"
+    - ip: "${BASTION_SVC_4_IP}"
+      hostnames:
+      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-04"
+      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-04"
+      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-04"
+      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-04"
+      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-04"
+      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-04"
+      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-04"
