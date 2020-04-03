@@ -294,6 +294,10 @@ objects:
       - name: REMOTE_LIBVIRT_URI
         value: "qemu+tcp://${REMOTE_LIBVIRT_HOSTNAME}/system"
       - name: BASTION_SVC
+      - name: MASTER_REPLICAS
+        value: "3"
+      - name: WORKER_REPLICAS
+        value: "2"
       - name: INSTALL_INITIAL_RELEASE
       - name: RELEASE_IMAGE_INITIAL
       command:
@@ -324,7 +328,6 @@ objects:
         mkdir -p ~/.ssh
         cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
 
-        workers=2
         if [[ "${ARCH}" = "s390x" || "${ARCH}" = "ppc64le" ]]; then
             master_type=null
             subnets="[]"
@@ -337,7 +340,7 @@ objects:
           architecture: ${ARCH}
           hyperthreading: Enabled
           name: master
-          replicas: 3
+          replicas: ${MASTER_REPLICAS}
         networking:
           clusterNetwork:
           - cidr: 10.128.0.0/14
@@ -371,7 +374,15 @@ objects:
         export TF_LOG=DEBUG
         export TF_LOG_PATH=/tmp/artifacts/terraform.log
 
+        # Bump the libvirt masters memory to 16GB
         export TF_VAR_libvirt_master_memory=16384
+        mock-nss.sh openshift-install create manifests --dir=/tmp/artifacts/installer
+        ls /tmp/artifacts/installer/openshift
+        for ((i=0; i<$MASTER_REPLICAS; i++))
+        do
+            sed -i -e 's/7168/16384/g' /tmp/artifacts/installer/openshift/99_openshift-cluster-api_master-machines-${i}.yaml
+        done
+
         mock-nss.sh openshift-install create cluster --dir=/tmp/artifacts/installer --log-level=debug &
         openshift_install="$!"
 
