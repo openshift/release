@@ -36,14 +36,14 @@ local mytemplate(name, labelInQuery) = template.new(
 
 dashboard.new(
         'GitHub Cache',
-        time_from='now-7d',
+        time_from='now-1d',
         schemaVersion=18,
         refresh='1m',
       )
 .addTemplate(mytemplate('token', 'token_hash'))
 .addTemplate(mytemplate('path', 'path'))
 .addTemplate(mytemplate('status', 'status'))
-.addTemplate(mytemplate('user-agent', 'user_agent'))
+.addTemplate(mytemplate('user_agent', 'user_agent'))
 .addTemplate(
   {
         "allValue": null,
@@ -305,6 +305,94 @@ dashboard.new(
     .addTarget(histogramQuantileTarget('0.99'))
     .addTarget(histogramQuantileTarget('0.95'))
     .addTarget(histogramQuantileTarget('0.5')), gridPos={
+    h: 9,
+    w: 24,
+    x: 0,
+    y: 18,
+  })
+.addPanel(
+    (graphPanel.new(
+        'Token Consumption by User Agent',
+        description='sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED"}[1h])) by (user_agent)',
+        datasource='prometheus',
+        legend_alignAsTable=true,
+        legend_rightSide=true,
+        legend_values=true,
+        legend_current=true,
+        legend_avg=true,
+        legend_sort='avg',
+        legend_sortDesc=true,
+    ) + legendConfig)
+    .addTarget(prometheus.target(
+        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED"}[1h])) by (user_agent)',
+         legendFormat='{{user_agent}}',
+    )), gridPos={
+    h: 9,
+    w: 24,
+    x: 0,
+    y: 18,
+  })
+.addPanel(
+    (graphPanel.new(
+        'Token Consumption by Path',
+        description='sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED"}[1h])) by (path)',
+        datasource='prometheus',
+        legend_alignAsTable=true,
+        legend_rightSide=true,
+        legend_values=true,
+        legend_current=true,
+        legend_avg=true,
+        legend_sort='avg',
+        legend_sortDesc=true,
+    ) + legendConfig)
+    .addTarget(prometheus.target(
+        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED"}[1h])) by (path)',
+         legendFormat='{{path}}',
+    )), gridPos={
+    h: 9,
+    w: 24,
+    x: 0,
+    y: 18,
+  })
+.addPanel(
+    (graphPanel.new(
+        'Token Consumption For Path ${path} by User Agent',
+        description='sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED",path="${path}"}[1h])) by (user_agent)',
+        datasource='prometheus',
+        legend_alignAsTable=true,
+        legend_rightSide=true,
+        legend_values=true,
+        legend_current=true,
+        legend_avg=true,
+        legend_sort='avg',
+        legend_sortDesc=true,
+    ) + legendConfig)
+    .addTarget(prometheus.target(
+        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED",path="${path}"}[1h])) by (user_agent)',
+         legendFormat='{{user_agent}}',
+    )), gridPos={
+    h: 9,
+    w: 24,
+    x: 0,
+    y: 18,
+  })
+.addPanel(
+    (graphPanel.new(
+        'Token Consumption for User Agent ${user_agent} by Path',
+        description='sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED",user_agent="${user_agent}"}[1h])) by (path)',
+        datasource='prometheus',
+        legend_alignAsTable=true,
+        legend_rightSide=true,
+        legend_values=true,
+        legend_current=true,
+        legend_avg=true,
+        legend_sort='avg',
+        legend_sortDesc=true,
+    ) + legendConfig)
+    .addTarget(prometheus.target(
+        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED",user_agent="${user_agent}"}[1h])) by (path)',
+         legendFormat='{{path}}',
+    )), gridPos={
     h: 9,
     w: 24,
     x: 0,
