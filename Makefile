@@ -53,6 +53,10 @@ new-repo:
 	$(MAKE) jobs
 	$(MAKE) prow-config
 
+validate-step-registry:
+	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/ci-operator-configresolver:latest
+	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/core-services/prow/02_config:/prow:z" -v "$(CURDIR)/ci-operator/config:/config:z" -v "$(CURDIR)/ci-operator/step-registry:/step-registry:z" registry.svc.ci.openshift.org/ci/ci-operator-configresolver:latest --config /config --registry /step-registry --prow-config /prow/_config.yaml --validate-only
+
 # LEGACY TARGETS
 # You should not need to add new targets here.
 
