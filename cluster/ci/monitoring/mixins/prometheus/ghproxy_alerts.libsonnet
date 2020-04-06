@@ -38,7 +38,7 @@
               severity: 'critical',
             },
             annotations: {
-              message: 'token {{ $labels.token_hash }} may run out of API quota before the next reset. Check the <https://prometheus-prow-monitoring.svc.ci.openshift.org/graph?g0.range_input=1h&g0.expr=sum(github_token_usage)%20by%20(token_hash%2Capi_version)&g0.tab=0&g1.range_input=1h&g1.expr=sum(increase(ghcache_responses%7Bmode!%3D%22REVALIDATED%22%7D%5B1h%5D))%20by%20(user_agent)&g1.tab=0&g2.range_input=1h&g2.expr=sum(increase(ghcache_responses%7Bmode!%3D%22REVALIDATED%22%7D%5B1h%5D))%20by%20(path)&g2.tab=0&g3.range_input=1h&g3.expr=sum(increase(ghcache_responses%7Bpath%3D%22%2Frepositories%2F%3ArepoId%2Fcollaborators%22%2Cmode!%3D%22REVALIDATED%22%7D%5B1h%5D))%20by%20(user_agent)&g3.tab=0&g4.range_input=1h&g4.expr=sum(increase(ghcache_responses%7Bpath%3D~%22.*collaborators.*%22%2Cmode%3D~%22COALESCED%7CREVALIDATED%22%7D%5B1d%5D))%20by%20(path)%20%2F%20sum(increase(ghcache_responses%7Bpath%3D~%22.*collaborators.*%22%2Cmode%3D~%22COALESCED%7CREVALIDATED%7CMISS%7CCHANGED%22%7D%5B1d%5D))%20by%20(path)&g4.tab=0|dashboard>',
+              message: 'token {{ $labels.token_hash }} may run out of API quota before the next reset. Check the <https://grafana-prow-monitoring.svc.ci.openshift.org/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1|dashboard>',
             },
           }
         ],
