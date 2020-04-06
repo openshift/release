@@ -8,14 +8,14 @@ cluster_profile=/var/run/secrets/ci.openshift.io/cluster-profile
 
 export CLUSTER_NAME=${NAMESPACE}-${JOB_NAME_HASH}
 
+echo "************ baremetalds packet setup command ************"
+env | sort
+
 set +x
 export PACKET_PROJECT_ID=b3c1623c-ce0b-45cf-9757-c61a71e06eac
 PACKET_AUTH_TOKEN=$(cat ${cluster_profile}/.packetcred)
 export PACKET_AUTH_TOKEN
 set -x
-
-echo "************ baremetalds packet setup command ************"
-env | sort
 
 # Initial check
 if [ "${CLUSTER_TYPE}" != "packet" ] ; then
