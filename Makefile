@@ -256,7 +256,7 @@ kubeconfig_path ?= $(HOME)/.kube/config
 
 # these are useful for dptp-team
 # echo -n "bw_password" > /tmp/bw_password
-# make kerberos_id=<your_kerberos_id> dry_run=true force=false bw_password_path=/tmp/bw_password kubeconfig_path=${HOME}/.kube/config ci-secret-bootstrap
+# make kerberos_id=<your_kerberos_id> cluster=app.ci ci-secret-bootstrap
 ci-secret-bootstrap:
 	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/ci-secret-bootstrap:latest
 	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/core-services/ci-secret-bootstrap/_config.yaml:/_config.yaml:z" \
