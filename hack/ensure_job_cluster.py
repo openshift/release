@@ -17,6 +17,7 @@ JOB_MAP = {
     "periodic-acme-cert-issuer-for-build01": DEFAULT_CLUSTER,
     "periodic-build01-upgrade": BUILD01_CLUSTER,
     "periodic-ci-image-import-to-build01": BUILD01_CLUSTER,
+    "pull-ci-openshift-config-master-format": BUILD01_CLUSTER,
 }
 
 def load_dup_jobs():
