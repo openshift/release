@@ -2,6 +2,8 @@ kind: Template
 apiVersion: template.openshift.io/v1
 
 parameters:
+- name: JOB_NAME
+  required: true
 - name: JOB_NAME_SAFE
   required: true
 - name: JOB_NAME_HASH
@@ -256,7 +258,7 @@ objects:
         LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
           --zone "${GOOGLE_COMPUTE_ZONE}" \
           packer@"${INSTANCE_PREFIX}" \
-          --command 'export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_LATEST}" OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID} && timeout 4800 bash -ce "create-cluster installer"'
+          --command 'export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_LATEST}" OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME}/${BUILD_ID} && timeout 4800 bash -ce "create-cluster installer"'
 
    # Performs cleanup of all created resources and upload the artifacts
     - name: teardown
