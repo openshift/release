@@ -262,10 +262,13 @@ objects:
           --command 'sudo mv /home/packer/openshift-install /usr/local/bin/openshift-install'
         set +x
         echo 'Will now launch libvirt cluster in the gce instance with "${RELEASE_IMAGE_LATEST}"'
+        # Install allows up to 30min beyond than what installer allows by default. In the create-cluster script
+        # see the `wait-for install-complete` added here: https://github.com/ironcladlou/openshift4-libvirt-gcp/blob/rhel8/tools/create-cluster
+        # https://github.com/openshift/installer/issues/3043
         LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
           --zone "${GOOGLE_COMPUTE_ZONE}" \
           packer@"${INSTANCE_PREFIX}" \
-          --command 'export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_LATEST}" OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME}/${BUILD_ID} && timeout 4800 bash -ce "create-cluster installer"'
+          --command 'export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_LATEST}" OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME}/${BUILD_ID} && timeout 150m bash -ce "create-cluster installer"'
 
    # Performs cleanup of all created resources and upload the artifacts
     - name: teardown
