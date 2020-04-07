@@ -57,7 +57,7 @@ finished()
 }
 trap finished EXIT TERM
 
-# Prepare configuration and run dev-scripts 
+# Prepare configuration and run dev-scripts
 scp $SSHOPTS ${PULL_SECRET_PATH} root@$IP:pull-secret
 
 timeout -s 9 175m ssh $SSHOPTS root@$IP bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
@@ -77,7 +77,17 @@ yum install -y git
 mkdir -p /tmp/artifacts
 
 if [ ! -e dev-scripts ] ; then
-  git clone https://github.com/openshift-metal3/dev-scripts.git
+  # If OCP CI is testing a dev-scripts PR, we check it out here.
+  # FIXME: Maybe move to built images containing dev-scripts contents?
+  if [[ "$REPO_NAME" == "dev-scripts" && "$PULL_NUMBER" != "" ]]; then
+    git clone https://github.com/openshift-metal3/dev-scripts.git
+    pushd dev-scripts
+    git fetch origin pull/$PULL_NUMBER/head:pr
+    git merge pr
+    popd
+  else
+    git clone https://github.com/openshift-metal3/dev-scripts.git
+  fi
 fi
 cd dev-scripts
 
