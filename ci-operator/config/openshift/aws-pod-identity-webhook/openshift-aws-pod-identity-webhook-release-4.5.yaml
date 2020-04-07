@@ -4,36 +4,31 @@ base_images:
     name: "4.5"
     namespace: ocp
     tag: base
+binary_build_commands: make amazon-eks-pod-identity-webhook
 build_root:
   image_stream_tag:
     cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.13
+canonical_go_repository: github.com/aws/amazon-eks-pod-identity-webhook
 images:
-- dockerfile_path: Dockerfile
+- dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    root:
+    bin:
       as:
-      - "0"
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
       paths: null
-  to: local-storage-operator
-- dockerfile_path: Dockerfile.diskmaker
-  from: base
-  inputs:
-    root:
-      as:
-      - "0"
-      paths: null
-  to: local-storage-diskmaker
+  to: aws-pod-identity-webhook
 promotion:
   disabled: true
   name: "4.5"
   namespace: ocp
 resources:
   '*':
-    limits: {}
+    limits:
+      memory: 4Gi
     requests:
       cpu: 100m
       memory: 200Mi
@@ -42,11 +37,7 @@ tag_specification:
   name: "4.5"
   namespace: ocp
 tests:
-- as: unit
-  commands: make test
-  container:
-    from: src
-- as: e2e-operator
-  commands: make test_e2e
-  openshift_installer_src:
+- as: e2e-aws
+  steps:
     cluster_profile: aws
+    workflow: origin-e2e-aws

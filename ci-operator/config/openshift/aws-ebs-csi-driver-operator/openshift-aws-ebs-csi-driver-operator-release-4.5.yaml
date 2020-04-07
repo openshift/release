@@ -4,6 +4,7 @@ base_images:
     name: "4.5"
     namespace: ocp
     tag: base
+binary_build_commands: make build
 build_root:
   image_stream_tag:
     cluster: https://api.ci.openshift.org
@@ -11,29 +12,21 @@ build_root:
     namespace: openshift
     tag: golang-1.13
 images:
-- dockerfile_path: Dockerfile
+- dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    root:
+    bin:
       as:
-      - "0"
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
       paths: null
-  to: local-storage-operator
-- dockerfile_path: Dockerfile.diskmaker
-  from: base
-  inputs:
-    root:
-      as:
-      - "0"
-      paths: null
-  to: local-storage-diskmaker
+  to: aws-ebs-csi-driver-operator
 promotion:
   disabled: true
   name: "4.5"
   namespace: ocp
 resources:
   '*':
-    limits: {}
+    limits: null
     requests:
       cpu: 100m
       memory: 200Mi
@@ -42,11 +35,16 @@ tag_specification:
   name: "4.5"
   namespace: ocp
 tests:
-- as: unit
-  commands: make test
+- as: verify
+  commands: |
+    # Work around broken verify-codegen
+    make verify-bindata verify-deps verify-gofmt verify-golint verify-govet
   container:
     from: src
-- as: e2e-operator
-  commands: make test_e2e
-  openshift_installer_src:
-    cluster_profile: aws
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: |
+    mkdir -p /tmp/artifacts
+    make test-unit JUNITFILE=/tmp/artifacts/junit_report.xml
+  container:
+    from: src
