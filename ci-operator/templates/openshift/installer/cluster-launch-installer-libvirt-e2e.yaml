@@ -135,9 +135,12 @@ objects:
           --quiet --key-file /tmp/cluster/gce.json
         gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
         gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
-        set -x
-        SETUP_SUCCESS=
+        # wait for install
         while true; do
+          if [[ -f "${HOME}"/setup-failed ]]; then
+            echo "Setup reported a failure, do not report test failure" 2>&1
+            exit 0
+          fi
           if [[ -f "${HOME}"/exit ]]; then
             echo "Another process exited" 2>&1
             exit 1
@@ -145,12 +148,10 @@ objects:
           if [[ ! -f "${HOME}"/setup-success ]]; then
             sleep 15 & wait
             continue
-          elif [[ -z "${SETUP_SUCCESS}" ]]; then
-            echo "Setup success"
-            SETUP_SUCCESS=1
           fi
           break
         done
+        set -x
         LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
           --zone "${GOOGLE_COMPUTE_ZONE}" \
           packer@"${INSTANCE_PREFIX}" \
@@ -192,7 +193,7 @@ objects:
         #!/bin/bash
         set -euo pipefail
 
-        trap 'rc=$?; if test "${rc}" -eq 0; then touch "${HOME}"/setup-success; else touch "${HOME}"/exit; fi; exit "${rc}"' EXIT
+        trap 'rc=$?; if test "${rc}" -eq 0; then touch "${HOME}"/setup-success; else touch "${HOME}"/exit "${HOME}"/setup-failed; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
         cat  > "${HOME}"/run-tests.sh << 'EOF'
         #!/bin/bash
@@ -206,6 +207,7 @@ objects:
           return 0
         }
 
+        set -eu
         ${TEST_COMMAND}
         EOF
         chmod +x "${HOME}"/run-tests.sh
