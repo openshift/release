@@ -4,6 +4,11 @@ base_images:
     name: "4.6"
     namespace: ocp
     tag: base
+  elasticsearch-operator-src:
+    cluster: https://api.ci.openshift.org
+    name: "4.6"
+    namespace: ocp
+    tag: elasticsearch-operator-src
 build_root:
   image_stream_tag:
     cluster: https://api.ci.openshift.org
@@ -13,6 +18,12 @@ build_root:
 images:
 - from: base
   to: cluster-logging-operator
+- dockerfile_path: olm_deploy/operatorregistry/Dockerfile
+  from: base
+  to: cluster-logging-operator-registry
+- dockerfile_path: Dockerfile.e2e
+  from: elasticsearch-operator-src
+  to: cluster-logging-operator-e2e
 promotion:
   name: "4.6"
   namespace: ocp
@@ -31,7 +42,11 @@ tests:
   commands: make test-unit
   container:
     from: src
-- as: e2e-operator
-  commands: make test-e2e
-  openshift_installer_src:
+- artifact_dir: /tmp/artifacts
+  as: e2e-operator
+  commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=/tmp/artifacts/logs ARTIFACT_DIR=/tmp/artifacts/artifacts
+    make test-e2e-olm
+  openshift_installer_custom_test_image:
     cluster_profile: aws
+    from: stable:cluster-logging-operator-e2e
+    nested_virt_image: ""
