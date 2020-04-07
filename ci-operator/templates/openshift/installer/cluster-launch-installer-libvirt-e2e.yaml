@@ -1,6 +1,8 @@
 kind: Template
 apiVersion: template.openshift.io/v1
 
+# image-family openshift4-libvirt must exist in ${GOOGLE_PROJECT_ID} for this template
+# for more info see here: https://github.com/ironcladlou/openshift4-libvirt-gcp/blob/rhel8/IMAGES.md
 parameters:
 - name: JOB_NAME
   required: true
@@ -231,8 +233,8 @@ objects:
           --network "${INSTANCE_PREFIX}" \
           --allow tcp:22,icmp
 
-        # image-family openshift4-libvirt must exist in ${GOOGLE_COMPUTE_ZONE} for this template
-        # to create the image-family see here: https://github.com/ironcladlou/openshift4-libvirt-gcp#images
+        # image-family openshift4-libvirt must exist in ${GOOGLE_PROJECT_ID} for this template
+        # for more info see here: https://github.com/ironcladlou/openshift4-libvirt-gcp/blob/rhel8/IMAGES.md
         gcloud compute instances create "${INSTANCE_PREFIX}" \
           --image-family openshift4-libvirt \
           --zone "${GOOGLE_COMPUTE_ZONE}" \
@@ -240,9 +242,9 @@ objects:
           --min-cpu-platform "Intel Haswell" \
           --boot-disk-type pd-ssd \
           --boot-disk-size 256GB \
-          --metadata-from-file openshift-pull-secret=/tmp/cluster/pull-secret \
           --subnet "${INSTANCE_PREFIX}" \
           --network "${INSTANCE_PREFIX}"
+
         LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
           --quiet \
           --project "${GOOGLE_PROJECT_ID}" \
@@ -258,6 +260,11 @@ objects:
           --project "${GOOGLE_PROJECT_ID}" \
           --zone "${GOOGLE_COMPUTE_ZONE}" \
           --recurse /bin/openshift-install packer@"${INSTANCE_PREFIX}":/home/packer/openshift-install
+        LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+          --quiet \
+          --project "${GOOGLE_PROJECT_ID}" \
+          --zone "${GOOGLE_COMPUTE_ZONE}" \
+          /tmp/cluster/pull-secret packer@"${INSTANCE_PREFIX}":/home/packer/pull-secret
         LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
           --zone "${GOOGLE_COMPUTE_ZONE}" \
           packer@"${INSTANCE_PREFIX}" \
