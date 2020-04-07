@@ -15,7 +15,7 @@ cluster_profile=/var/run/secrets/ci.openshift.io/cluster-profile
 export SSH_PRIV_KEY_PATH=${cluster_profile}/ssh-privatekey
 export PULL_SECRET_PATH=${cluster_profile}/pull-secret
 export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST}
-export OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID}
+export OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME}/${BUILD_ID}
 export HOME=/tmp
 
 case "${CLUSTER_TYPE}" in
