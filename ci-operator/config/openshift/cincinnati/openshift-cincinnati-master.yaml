@@ -7,14 +7,22 @@ base_images:
     name: release
     namespace: openshift
     tag: golang-1.13
+  buildroot:
+    cluster: https://api.ci.openshift.org
+    name: cincinnati-build-root
+    namespace: cincinnati
+    tag: "latest"
 build_root:
-  project_image:
-    dockerfile_path: dist/openshift-release/Dockerfile.builder
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: cincinnati-build-root
+    namespace: cincinnati
+    tag: "latest"
 images:
 - dockerfile_path: dist/Dockerfile.deploy/Dockerfile
   from: centos
   inputs:
-    root:
+    buildroot:
       as:
       - quay.io/app-sre/cincinnati:builder
   to: deploy
@@ -24,7 +32,7 @@ images:
     openshift_release_golang-1.13:
       as:
       - registry.svc.ci.openshift.org/openshift/release:golang-1.13
-    root:
+    buildroot:
       as:
       - quay.io/app-sre/cincinnati:builder
   to: e2e-test
