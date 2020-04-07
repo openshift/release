@@ -441,6 +441,8 @@ objects:
               master_type=m5.8xlarge
             elif has_variant "large"; then
               master_type=m5.4xlarge
+            elif has_variant "compact"; then
+              master_type=m5.2xlarge
             fi
             case $((RANDOM % 4)) in
             0) AWS_REGION=us-east-1
@@ -559,6 +561,14 @@ objects:
           ${SSH_PUB_KEY}
         EOF
         elif [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
+            master_type=null
+            if has_variant "xlarge"; then
+              master_type=n1-standard-32
+            elif has_variant "large"; then
+              master_type=n1-standard-16
+            elif has_variant "compact"; then
+              master_type=n1-standard-8
+            fi
             # HACK: try to "poke" the token endpoint before the test starts
             for i in $(seq 1 30); do
               code="$( curl -s -o /dev/null -w "%{http_code}" https://oauth2.googleapis.com/token -X POST -d '' || echo "Failed to POST https://oauth2.googleapis.com/token with $?" 1>&2)"
@@ -588,6 +598,9 @@ objects:
         controlPlane:
           name: master
           replicas: 3
+          platform:
+            gcp:
+              type: ${master_type}
         compute:
         - name: worker
           replicas: ${workers}
