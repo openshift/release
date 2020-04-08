@@ -126,23 +126,23 @@ for _ in $(seq 1 30); do
     sleep 10
 done
 
-echo "Timed out waiting for csv to become ready" 1>&2
+echo "Timed out waiting for csv to become ready"
 
 NS_ART="$ARTIFACT_DIR/ns-$OO_INSTALL_NAMESPACE.yaml"
 echo "Dumping Namespace $OO_INSTALL_NAMESPACE as $NS_ART"
 oc get namespace "$OO_INSTALL_NAMESPACE" -o yaml >"$NS_ART"
 
 OG_ART="$ARTIFACT_DIR/og-$OPERATORGROUP.yaml"
-echo "Dumping OperatorGroup $OPERATORGROUP as $NS_ART"
+echo "Dumping OperatorGroup $OPERATORGROUP as $OG_ART"
 oc get -n "$OO_INSTALL_NAMESPACE" operatorgroup "$OPERATORGROUP" -o yaml >"$OG_ART"
 
 CS_ART="$ARTIFACT_DIR/cs-$CATSRC.yaml"
 echo "Dumping CatalogSource $CATSRC as $CS_ART"
 oc get -n "$OO_INSTALL_NAMESPACE" catalogsource "$CATSRC" -o yaml >"$CS_ART"
 for field in message reason; do
-    VALUE="$(oc get "$OO_INSTALL_NAMESPACE" catalogsource "$CATSRC" -o jsonpath="{.status.$field}" || true)"
+    VALUE="$(oc get -n "$OO_INSTALL_NAMESPACE" catalogsource "$CATSRC" -o jsonpath="{.status.$field}" || true)"
     if [[ -n "$VALUE" ]]; then
-        echo "  Subscription $SUB status $field: $VALUE"
+        echo "  CatalogSource $CATSRC status $field: $VALUE"
     fi
 done
 
@@ -150,7 +150,7 @@ SUB_ART="$ARTIFACT_DIR/sub-$SUB.yaml"
 echo "Dumping Subscription $SUB as $SUB_ART"
 oc get -n "$OO_INSTALL_NAMESPACE" subscription "$SUB" -o yaml >"$SUB_ART"
 for field in state reason; do
-    VALUE="$(oc get "$OO_INSTALL_NAMESPACE" subscription "$SUB" -o jsonpath="{.status.$field}" || true)"
+    VALUE="$(oc get -n "$OO_INSTALL_NAMESPACE" subscription "$SUB" -o jsonpath="{.status.$field}" || true)"
     if [[ -n "$VALUE" ]]; then
         echo "  Subscription $SUB status $field: $VALUE"
     fi
@@ -162,7 +162,7 @@ if [[ -n "$CSV" ]]; then
     echo "Dumping ClusterServiceVersion $CSV as $CSV_ART"
     oc get -n "$OO_INSTALL_NAMESPACE" csv "$CSV" -o yaml >"$CSV_ART"
     for field in phase message reason; do
-        VALUE="$(oc get "$OO_INSTALL_NAMESPACE" csv "$CSV" -o jsonpath="{.status.$field}" || true)"
+        VALUE="$(oc get -n "$OO_INSTALL_NAMESPACE" csv "$CSV" -o jsonpath="{.status.$field}" || true)"
         if [[ -n "$VALUE" ]]; then
             echo "  ClusterServiceVersion $CSV status $field: $VALUE"
         fi
