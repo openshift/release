@@ -587,92 +587,47 @@ index 123d15f..75a4563 100644
          - name: exporter
            image: gcr.io/k8s-prow/exporter:v20200408-5c9024e0c
 diff --git a/./core-services/prow/03_deployment/gcsweb.yaml b/./clusters/app.ci/prow/03_deployment/gcsweb.yaml
-index 990648c..de3cac3 100644
+index 342e600..691aeb5 100644
 --- a/./core-services/prow/03_deployment/gcsweb.yaml
 +++ b/./clusters/app.ci/prow/03_deployment/gcsweb.yaml
-@@ -68,7 +68,7 @@ objects:
-       contextDir: "${SOURCE_CONTEXT}"
-       type: Git
-       dockerfile: |
--        FROM openshift/origin-release:golang-1.8
-+        FROM openshift/origin-release:golang-1.13
- 
-         ENV ARCH=amd64 VERSION=v1.0.4 PKG=k8s.io/test-infra/gcsweb
-         COPY . /go/src/k8s.io/test-infra/gcsweb
-@@ -80,7 +80,7 @@ objects:
-       dockerStrategy:
-         from:
-           kind: DockerImage
--          name: openshift/origin-release:golang-1.8
-+          name: openshift/origin-release:golang-1.13
-         imageOptimizationPolicy: SkipLayers
-     triggers:
-     - type: ConfigChange
-@@ -129,44 +129,36 @@ objects:
-           kind: ImageStreamTag
-           name: "${NAME}:binaries"
-       type: ImageChange
+@@ -1,8 +1,8 @@
+ kind: List
+ apiVersion: v1
+ items:
 -- apiVersion: v1
 -  kind: DeploymentConfig
 +- apiVersion: apps/v1
 +  kind: Deployment
    metadata:
-+    annotations:
-+      image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"${NAME}:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"${NAME}\")].image"}]'
      labels:
--      app: "${NAME}"
--    name: "${NAME}"
-+      app: gcsweb
-+    name: gcsweb
-     namespace: ${NAMESPACE}
+       app: gcsweb
+@@ -10,15 +10,15 @@ items:
+     namespace: ci
    spec:
      replicas: 1
 -    revisionHistoryLimit: 2
      selector:
--      app: "${NAME}"
--      deploymentconfig: "${NAME}"
+-      app: gcsweb
+-      deploymentconfig: gcsweb
 +      matchLabels:
-+        component: "${NAME}"
-+    strategy: {}
++        component: gcsweb
      template:
        metadata:
 +        creationTimestamp: null
          labels:
--          app: "${NAME}"
--          deploymentconfig: "${NAME}"
+-          app: gcsweb
+-          deploymentconfig: gcsweb
 +          app: prow
-+          component: "${NAME}"
++          component: gcsweb
        spec:
          containers:
--        - image: "${NAME}:latest"
--          name: "${NAME}"
-+        - image: ${NAME}:latest
-+          name: ${NAME}
-           args:
-           - "-b"
-           - "origin-ci-test"
-           - "-b"
-           - "origin-federated-results"
--    test: false
--    triggers:
--    - type: ConfigChange
--    - imageChangeParams:
--        automatic: true
--        containerNames:
--        - "${NAME}"
--        from:
--          kind: ImageStreamTag
--          name: "${NAME}:latest"
--      type: ImageChange
- - kind: Service
-   apiVersion: v1
-   metadata:
-@@ -184,7 +176,7 @@ objects:
+         - image: gcr.io/k8s-prow/gcsweb:v20200408-dc0f81256
+@@ -45,7 +45,7 @@ items:
        targetPort: 8080
        nodePort: 0
      selector:
--      app: "${SERVICE_NAME}"
-+      component: "${SERVICE_NAME}"
+-      app: gcsweb
++      component: gcsweb
      type: ClusterIP
      sessionAffinity: None
  - kind: Route
