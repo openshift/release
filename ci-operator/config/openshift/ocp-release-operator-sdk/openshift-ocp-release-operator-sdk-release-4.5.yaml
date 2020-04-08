@@ -3,7 +3,7 @@ base_images:
     cluster: https://api.ci.openshift.org
     name: ubi
     namespace: ocp
-    tag: "7"
+    tag: "8"
   os-minimal:
     cluster: https://api.ci.openshift.org
     name: ubi-minimal
@@ -25,6 +25,18 @@ images:
 - dockerfile_path: release/helm/upstream.Dockerfile
   from: os-minimal
   to: helm-operator
+- dockerfile_path: ci/dockerfiles/ansible-e2e.Dockerfile
+  from: ansible-operator
+  inputs:
+    osdk-builder:
+      as:
+      - osdk-builder
+      paths: null
+  to: osdk-ansible-e2e
+- context_dir: test/ansible
+  dockerfile_path: build/Dockerfile
+  from: ansible-operator
+  to: osdk-ansible-full-e2e
 - dockerfile_path: ci/dockerfiles/ansible-e2e-hybrid.Dockerfile
   from: os
   inputs:
@@ -41,14 +53,6 @@ images:
       - osdk-builder
       paths: null
   to: osdk-helm-e2e-hybrid
-- dockerfile_path: ci/dockerfiles/ansible-e2e.Dockerfile
-  from: ansible-operator
-  inputs:
-    osdk-builder:
-      as:
-      - osdk-builder
-      paths: null
-  to: osdk-ansible-e2e
 - dockerfile_path: ci/dockerfiles/helm-e2e.Dockerfile
   from: helm-operator
   inputs:
@@ -62,6 +66,7 @@ promotion:
   excluded_images:
   - osdk-builder
   - osdk-ansible-e2e
+  - osdk-ansible-full-e2e
   - osdk-ansible-e2e-hybrid
   - osdk-helm-e2e
   - osdk-helm-e2e-hybrid
@@ -103,10 +108,10 @@ tests:
   container:
     from: src
 - as: e2e-aws-ansible
-  commands: make test/e2e/ansible2
+  commands: make -f ci/prow.Makefile test-e2e-ansible
   openshift_installer_src:
     cluster_profile: aws
 - as: e2e-aws-helm
-  commands: make test/e2e/helm2
+  commands: make -f ci/prow.Makefile test-e2e-helm
   openshift_installer_src:
     cluster_profile: aws
