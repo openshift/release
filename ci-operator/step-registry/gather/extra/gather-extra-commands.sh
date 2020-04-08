@@ -18,6 +18,12 @@ function queue() {
 
 export PATH=$PATH:/tmp/shared
 
+if test ! -f "${KUBECONFIG}"
+then
+	echo "No kubeconfig, so no point in gathering extra artifacts."
+	exit 0
+fi
+
 echo "Gathering artifacts ..."
 mkdir -p ${ARTIFACT_DIR}/pods ${ARTIFACT_DIR}/nodes ${ARTIFACT_DIR}/metrics ${ARTIFACT_DIR}/bootstrap ${ARTIFACT_DIR}/network
 
