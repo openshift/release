@@ -306,83 +306,11 @@ separate PR.
 
 ### Testing a template
 
-A job that uses a template can be tested in two different ways. The `mkpj` and
-`mkpod` tools can be used to create a pod that will reproduce the setup used in
-CI, although some customization is still possible by editing the job locally.
+A job that uses a template can be tested in two different ways. The easiest is
+to just create a pull request, which will then trigger a run of all added or
+changed jobs.
 For complete control of the execution, the more manual process of assembling
 the `ci-operator` call can be used.
-
-#### Testing with `mkpj` and `mkpod`
-
-Prow has a utility to generate a ProwJob from its configuration files and
-another to turn that into a Pod ready to be executed. These utilities are
-available in upstream container images (`gcr.io/k8s-prow/mkpj` and
-`gcr.io/k8s-prow/mkpod`) or can be compiled from the
-[upstream repository](https://github.com/kubernetes/test-infra/tree/master/prow/cmd#dev-tools).
-
-The [`mkpjpod.sh`](../hack/mkpjpod.sh) script can be used to streamline that
-process. This script outputs the yaml for a pod that runs the specified test job
-and reports the status back into the referenced pull request. You can pipe the
-output of the script to `oc create -f -` and launch the pod in a cluster
-somewhere. For Red Hat employees working on OpenShift, you can use the `ci-stg`
-namespace in the [CI cluster](https://api.ci.openshift.org) to run test jobs.
-
-For example, say that we want to test the
-`pull-ci-openshift-origin-master-e2e-aws` job against a pull request to
-`openshift/origin`. We'll specify the following pieces of information:
-
-* the repository: `openshift/origin`
-* the base branch of the repository to test: `master`
-* the pull request to merge onto the base branch: `21526`
-* the github user that should have access to the namespace where the tests are run: `yourgithubname`
-* the job to run: `pull-ci-openshift-origin-master-e2e-aws`
-
-```sh
-hack/pj_env.py \
-    openshift/origin \
-    master \
-    21526 \
-    'yourgithubname' \
-    hack/mkpjpod.sh pull-ci-openshift-origin-master-e2e-aws \
-    | oc -n ci-stg create -f -
-```
-
-The script produces a log like:
-
-```
-time="2019-01-18T14:53:08Z" level=warning msg="No BuildID found in ProwJob status or given with --build-id, GCS interaction will be poor."
-pod/c47e597f-1b30-11e9-8b3b-661cd79effa8 created
-```
-From which you can follow the job logs:
-
-`oc -n ci-stg logs  -c test -f c47e597f-1b30-11e9-8b3b-661cd79effa8`
-
-where you can determine the namespace where the `ci-operator` is running the job.  The logs have a line like:
-
-```2019/01/18 14:55:20 Using namespace ci-op-3167h4v3```
-
-This will allow to determine the installer logs:
-
-```
-oc logs -f e2e -c setup  -n ci-op-3167h4v3
-```
-
-Note, it is important to supply the name of your github account in order to be
-granted RBAC permission to view pods in the created test namespace.
-
-You'll be able to see the test logs in the pod where `ci-operator` runs the job:
-
-```
-oc logs -f e2e -c test -n ci-op-3167h4v3
-```
-
-You can also see the documentation in the script file and the following screencasts
-for details:
-
-- Basic usage of the script to reproduce container and template tests:
- [![asciicast](https://asciinema.org/a/231019.svg)](https://asciinema.org/a/231019)
-- Making changes to the job or ci-operator configuration file:
- [![asciicast](https://asciinema.org/a/231020.svg)](https://asciinema.org/a/231020)
 
 #### Testing manually
 
