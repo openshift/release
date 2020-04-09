@@ -710,14 +710,19 @@ periodics:
 - agent: kubernetes
   cluster: api.ci
   decorate: true
-  interval: 30m
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: config
+    workdir: true
+  interval: 12h
   labels:
     ci.openshift.io/role: infra
   name: periodic-org-sync
   spec:
     containers:
     - args:
-      - --config-path=/etc/config/config.yaml
+      - --config-path=./org/config.yaml
       - --confirm=true
       - --github-token-path=/etc/github/oauth
       - --github-endpoint=http://ghproxy
@@ -740,16 +745,10 @@ periodics:
       - mountPath: /etc/github
         name: token
         readOnly: true
-      - mountPath: /etc/config
-        name: config
-        readOnly: true
     volumes:
     - name: token
       secret:
         secretName: github-credentials-openshift-merge-robot
-    - configMap:
-        name: org-config
-      name: config
 - agent: kubernetes
   cluster: api.ci
   cron: '@daily'
