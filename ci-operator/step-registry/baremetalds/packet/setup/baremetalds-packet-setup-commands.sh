@@ -43,7 +43,7 @@ resource "packet_device" "server" {
 
   tags {
     "prow_job_id"  = "$PROW_JOB_ID"
-    "prow_job"     = "https://prow.svc.ci.openshift.org/view/gcs/origin-ci-test/pr-logs/pull/$REPO_OWNER_$REPO_NAME/$PULL_NUMBER/$JOB_NAME/$BUILD_ID"
+    "prow_job"     = "https://prow.svc.ci.openshift.org/view/gcs/origin-ci-test/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
   }
 }
 EOF
