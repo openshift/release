@@ -1893,6 +1893,9 @@ objects:
           # Copy sample UPI files
           cp -r /var/lib/openshift-install/upi/${CLUSTER_TYPE}/* /tmp/tf
 
+          # Copy Ignition to terraform directory
+          cp /tmp/artifacts/installer/*.ign /tmp/tf
+
           # Create terraform.tfvars
           export MASTER_IGN=$(cat /tmp/artifacts/installer/master.ign)
           export WORKER_IGN=$(cat /tmp/artifacts/installer/worker.ign)
@@ -1929,6 +1932,8 @@ objects:
           compute_ignition = <<END_OF_WORKER_IGNITION
           ${WORKER_IGN}
           END_OF_WORKER_IGNITION
+
+          ssh_public_key_path = "${SSH_PUB_KEY_PATH}"
         EOF
 
           # Copy secret tfvars
@@ -2160,6 +2165,12 @@ objects:
         echo "Completing UPI setup"
         openshift-install --dir=/tmp/artifacts/installer wait-for install-complete 2>&1 | grep --line-buffered -v password &
         wait "$!"
+        # The image registry in some instances the config object
+        # is not properly configured. Rerun patching
+        # after cluster complete
+        if [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
+          update_image_registry
+        fi
         touch /tmp/install-complete
 
     # Performs cleanup of all created resources
