@@ -1066,3 +1066,32 @@ periodics:
         requests:
           cpu: 500m
     serviceAccountName: group-auto-updater
+- agent: kubernetes
+  cluster: api.ci
+  cron: '@weekly'
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  labels:
+    ci.openshift.io/role: infra
+  max_concurrency: 1
+  name: periodic-imagestream-importer
+  spec:
+    containers:
+    - args:
+      - -c
+      - |
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+        for is in python; do
+          echo "importing ${is} ..."
+          oc import-image -n openshift "${is}" --all
+        done
+      command:
+      - /bin/bash
+      image: registry.svc.ci.openshift.org/ocp/4.5:cli
+      imagePullPolicy: Always
+      name: ""
+      resources: {}
+    serviceAccountName: imagestream-importer
