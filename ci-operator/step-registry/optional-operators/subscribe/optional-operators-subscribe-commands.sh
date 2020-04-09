@@ -57,7 +57,7 @@ if [[ $(echo "$OPERATORGROUP" | wc -w) -gt 1 ]]; then
     exit 1
 elif [[ -n "$OPERATORGROUP" ]]; then
     echo "OperatorGroup \"$OPERATORGROUP\" exists: modifying it"
-    oc -n "$OO_INSTALL_NAMESPACE" get operatorgroup -o yaml >"$ARTIFACT_DIR/og-$OPERATORGROUP-orig.yaml"
+    oc -n "$OO_INSTALL_NAMESPACE" get operatorgroup "$OPERATORGROUP" -o yaml >"$ARTIFACT_DIR/og-$OPERATORGROUP-orig.yaml"
     OG_OPERATION=apply
     OG_NAMESTANZA="name: $OPERATORGROUP"
 else
