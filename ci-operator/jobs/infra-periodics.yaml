@@ -146,6 +146,50 @@ periodics:
         secretName: github-credentials-openshift-bot
 - agent: kubernetes
   cluster: api.ci
+  cron: 0 1 * * *
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-daily-bugzilla-refresh
+  spec:
+    containers:
+    - args:
+      - |-
+        --query=is:pr
+        state:open
+        label:bugzilla/invalid-bug
+        label:lgtm
+        -label:bugzilla/valid-bug
+        -label:do-not-merge
+        -label:do-not-merge/work-in-progress
+        -label:do-not-merge/hold
+        -label:needs-rebase
+        -label:needs-ok-to-test
+      - --token=/etc/oauth/oauth
+      - --updated=0
+      - |-
+        --comment=/bugzilla refresh
+
+        Recalculating validity in case the underlying Bugzilla bug has changed.
+      - --ceiling=0
+      - --confirm
+      command:
+      - /app/robots/commenter/app.binary
+      image: gcr.io/k8s-prow/commenter:v20200409-55b94657f
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/oauth
+        name: token
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-bot
+- agent: kubernetes
+  cluster: api.ci
   decorate: true
   interval: 12m
   labels:
