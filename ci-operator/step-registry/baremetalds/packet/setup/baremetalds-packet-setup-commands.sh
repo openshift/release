@@ -40,6 +40,7 @@ resource "packet_device" "server" {
   facilities       = ["sjc1", "ewr1"]
   operating_system = "centos_8"
   billing_cycle    = "hourly"
+  tags             = ["$PROW_JOB_ID", "https://prow.svc.ci.openshift.org/view/gcs/origin-ci-test/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"]
 }
 EOF
 
