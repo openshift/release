@@ -118,6 +118,28 @@ items:
 - kind: Role
   apiVersion: authorization.openshift.io/v1
   metadata:
+    name: release-controller-modify-origin
+    namespace: origin
+  rules:
+  - apiGroups:
+    - image.openshift.io
+    resources:
+    - imagestreams
+    resourceNames:
+    - release
+    - "4.3"
+    - "4.4"
+    - "4.5"
+    - "4.6"
+    verbs:
+    - get
+    - list
+    - watch
+    - update
+    - patch
+- kind: Role
+  apiVersion: authorization.openshift.io/v1
+  metadata:
     name: release-controller-prowjob
     namespace: ci
   rules:
@@ -182,6 +204,18 @@ items:
   - kind: ServiceAccount
     namespace: ci
     name: release-controller
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: release-controller-modify-binding-origin
+    namespace: openshift
+  roleRef:
+    kind: Role
+    name: release-controller-modify-origin
+  subjects:
+  - kind: ServiceAccount
+    namespace: ci
+    name: release-controller
 
 # grant release-controller edit on its work namespace
 - kind: Namespace
@@ -235,3 +269,15 @@ items:
   metadata:
     name: release-controller
     namespace: ci
+
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: vrutkovs-view
+    namespace: ci-release
+  roleRef:
+    kind: ClusterRole
+    name: view
+  subjects:
+  - kind: User
+    name: vrutkovs
