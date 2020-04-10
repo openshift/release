@@ -28,6 +28,21 @@ terraform_home=/tmp/terraform
 mkdir -p ${terraform_home}
 cd ${terraform_home}
 
+case "${JOB_TYPE}" in 
+
+  presubmit)
+    prow_job_url="https://prow.svc.ci.openshift.org/view/gcs/origin-ci-test/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
+    ;;
+
+  periodic)
+    prow_job_url="https://prow.svc.ci.openshift.org/view/gcs/origin-ci-test/logs/${JOB_NAME}/${BUILD_ID}"
+    ;;
+
+  *)
+    prow_job_url="<none>"
+    ;;
+esac
+
 cat > ${terraform_home}/terraform.tf <<-EOF
 provider "packet" {
 }
@@ -40,7 +55,7 @@ resource "packet_device" "server" {
   facilities       = ["sjc1", "ewr1"]
   operating_system = "centos_8"
   billing_cycle    = "hourly"
-  tags             = ["prow_job_id=$PROW_JOB_ID", "leased_resource=$LEASED_RESOURCE", "prow_job_url=https://prow.svc.ci.openshift.org/view/gcs/origin-ci-test/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"]
+  tags             = ["prow_job_id=$PROW_JOB_ID", "leased_resource=$LEASED_RESOURCE", "prow_job_url=$prow_job_url"]
 }
 EOF
 
