@@ -133,6 +133,18 @@ items:
     - delete
     - update
     - patch
+- kind: Role
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: release-controller-import-origin
+    namespace: origin
+  rules:
+  - apiGroups:
+    - image.openshift.io
+    resources:
+    - imagestreamimports
+    verbs:
+    - create
 
 - kind: RoleBinding
   apiVersion: rbac.authorization.k8s.io/v1
@@ -198,6 +210,20 @@ items:
   roleRef:
     kind: ClusterRole
     name: system:image-builder
+  subjects:
+  - kind: ServiceAccount
+    namespace: ci-release
+    name: builder
+# builder should be able to modify imagestreams and create tags
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: release-controller-binding-origin
+    namespace: origin
+  roleRef:
+    kind: Role
+    namespace: origin
+    name: release-controller-import-origin
   subjects:
   - kind: ServiceAccount
     namespace: ci-release
