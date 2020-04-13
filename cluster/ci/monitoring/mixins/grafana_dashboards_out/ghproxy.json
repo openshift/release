@@ -454,7 +454,7 @@
          "dashLength": 10,
          "dashes": false,
          "datasource": "prometheus",
-         "description": "GitHub token usage by token identifier and API version.",
+         "description": "GitHub token usage by login and API version.",
          "fill": 1,
          "gridPos": {
             "h": 9,
@@ -490,10 +490,10 @@
          "steppedLine": false,
          "targets": [
             {
-               "expr": "label_replace(sum(github_token_usage) by (api_version, token_hash), \"token_hash_short\", \"$1\", \"token_hash\", \"([a-z0-9]{5})(.*)\")",
+               "expr": "sum(github_token_usage * on(token_hash) group_left(login) max(github_user_info{login=~\"openshift-.*\"}) by (token_hash, login)) by (api_version, login)",
                "format": "time_series",
                "intervalFactor": 2,
-               "legendFormat": "{{api_version}}:{{token_hash_short}}",
+               "legendFormat": "{{login}} : {{api_version}}",
                "refId": "A"
             }
          ],
@@ -575,7 +575,7 @@
          "steppedLine": false,
          "targets": [
             {
-               "expr": "sum(rate(github_request_duration_count{job=\"ghproxy\"}[${range}])) by (status)",
+               "expr": "sum(rate(github_request_duration_count[${range}])) by (status)",
                "format": "time_series",
                "intervalFactor": 2,
                "legendFormat": "{{status}}",
@@ -660,7 +660,7 @@
          "steppedLine": false,
          "targets": [
             {
-               "expr": "sum(rate(github_request_duration_count{status=\"${status}\",job=\"ghproxy\"}[${range}])) by (path)",
+               "expr": "sum(rate(github_request_duration_count{status=\"${status}\"}[${range}])) by (path)",
                "format": "time_series",
                "intervalFactor": 2,
                "legendFormat": "{{path}}",
@@ -709,7 +709,7 @@
          "dashLength": 10,
          "dashes": false,
          "datasource": "prometheus",
-         "description": "GitHub request rates by token identifier, path and status.",
+         "description": "GitHub request rates by login, path and status.",
          "fill": 1,
          "gridPos": {
             "h": 9,
@@ -747,17 +747,17 @@
          "steppedLine": false,
          "targets": [
             {
-               "expr": "label_replace(sum(rate(github_request_duration_count{job=\"ghproxy\", token_hash=\"${token}\", path=\"${path}\", status=\"${status}\"}[${range}])) by (token_hash, path, status), \"token_hash_short\", \"$1\", \"token_hash\", \"([a-z0-9]{5})(.*)\")",
+               "expr": "sum(rate(github_token_usage{path=\"${path}\", status=\"${status}\"}[${range}]) * on(token_hash) group_left(login) max(github_user_info{login=~\"${login}\"}) by (token_hash, login)) by (login, path, status)",
                "format": "time_series",
                "intervalFactor": 2,
-               "legendFormat": "{{status}}:{{token_hash_short}}:{{path}}",
+               "legendFormat": "{{status}}:{{login}}:{{path}}",
                "refId": "A"
             }
          ],
          "thresholds": [ ],
          "timeFrom": null,
          "timeShift": null,
-         "title": "Request Rates: ${token}, ${path}, and ${status} with ${range}",
+         "title": "Request Rates: ${login}, ${path}, and ${status} with ${range}",
          "tooltip": {
             "shared": true,
             "sort": 0,
@@ -796,7 +796,7 @@
          "dashLength": 10,
          "dashes": false,
          "datasource": "prometheus",
-         "description": "histogram_quantile(<phi>, sum(rate(github_request_duration_bucket{job=\"ghproxy\"}[${range}])) by (le))",
+         "description": "histogram_quantile(<phi>, sum(rate(github_request_duration_bucket[${range}])) by (le))",
          "fill": 1,
          "gridPos": {
             "h": 9,
@@ -834,21 +834,21 @@
          "steppedLine": false,
          "targets": [
             {
-               "expr": "histogram_quantile(0.99, sum(rate(github_request_duration_bucket{job=\"ghproxy\"}[5m])) by (le))",
+               "expr": "histogram_quantile(0.99, sum(rate(github_request_duration_bucket[5m])) by (le))",
                "format": "time_series",
                "intervalFactor": 2,
                "legendFormat": "phi=0.99",
                "refId": "A"
             },
             {
-               "expr": "histogram_quantile(0.95, sum(rate(github_request_duration_bucket{job=\"ghproxy\"}[5m])) by (le))",
+               "expr": "histogram_quantile(0.95, sum(rate(github_request_duration_bucket[5m])) by (le))",
                "format": "time_series",
                "intervalFactor": 2,
                "legendFormat": "phi=0.95",
                "refId": "B"
             },
             {
-               "expr": "histogram_quantile(0.5, sum(rate(github_request_duration_bucket{job=\"ghproxy\"}[5m])) by (le))",
+               "expr": "histogram_quantile(0.5, sum(rate(github_request_duration_bucket[5m])) by (le))",
                "format": "time_series",
                "intervalFactor": 2,
                "legendFormat": "phi=0.5",
@@ -897,7 +897,7 @@
          "dashLength": 10,
          "dashes": false,
          "datasource": "prometheus",
-         "description": "histogram_quantile(<phi>, sum(rate(github_request_duration_bucket{job=\"ghproxy\", token_hash=~\"${token}\", path=~\"${path}\", status=~\"${status}\"}[${range}])) by (le))",
+         "description": "histogram_quantile(<phi>, sum(rate(github_request_duration_bucket{path=~\"${path}\", status=~\"${status}\"}[${range}])) by (le))",
          "fill": 1,
          "gridPos": {
             "h": 9,
@@ -935,21 +935,21 @@
          "steppedLine": false,
          "targets": [
             {
-               "expr": "histogram_quantile(0.99, sum(rate(github_request_duration_bucket{job=\"ghproxy\", token_hash=\"${token}\", path=\"${path}\", status=\"${status}\"}[5m])) by (le))",
+               "expr": "histogram_quantile(0.99, sum(rate(github_request_duration_bucket{path=\"${path}\", status=\"${status}\"}[5m]) * on(token_hash) group_left(login) max(github_user_info{login=~\"${login}\"}) by (token_hash, login)) by (le))",
                "format": "time_series",
                "intervalFactor": 2,
                "legendFormat": "phi=0.99",
                "refId": "A"
             },
             {
-               "expr": "histogram_quantile(0.95, sum(rate(github_request_duration_bucket{job=\"ghproxy\", token_hash=\"${token}\", path=\"${path}\", status=\"${status}\"}[5m])) by (le))",
+               "expr": "histogram_quantile(0.95, sum(rate(github_request_duration_bucket{path=\"${path}\", status=\"${status}\"}[5m]) * on(token_hash) group_left(login) max(github_user_info{login=~\"${login}\"}) by (token_hash, login)) by (le))",
                "format": "time_series",
                "intervalFactor": 2,
                "legendFormat": "phi=0.95",
                "refId": "B"
             },
             {
-               "expr": "histogram_quantile(0.5, sum(rate(github_request_duration_bucket{job=\"ghproxy\", token_hash=\"${token}\", path=\"${path}\", status=\"${status}\"}[5m])) by (le))",
+               "expr": "histogram_quantile(0.5, sum(rate(github_request_duration_bucket{path=\"${path}\", status=\"${status}\"}[5m]) * on(token_hash) group_left(login) max(github_user_info{login=~\"${login}\"}) by (token_hash, login)) by (le))",
                "format": "time_series",
                "intervalFactor": 2,
                "legendFormat": "phi=0.5",
@@ -959,7 +959,7 @@
          "thresholds": [ ],
          "timeFrom": null,
          "timeShift": null,
-         "title": "Latency Distribution for ${token}, ${path}, and ${status} with ${range}",
+         "title": "Latency Distribution for ${login}, ${path}, and ${status} with ${range}",
          "tooltip": {
             "shared": true,
             "sort": 0,
@@ -1354,11 +1354,11 @@
             "datasource": "prometheus",
             "hide": 0,
             "includeAll": false,
-            "label": "token",
+            "label": "login",
             "multi": false,
-            "name": "token",
+            "name": "login",
             "options": [ ],
-            "query": "label_values(github_request_duration_count{job=\"ghproxy\"}, token_hash)",
+            "query": "label_values(github_user_info{login=~\"openshift-.*\"}, login)",
             "refresh": 2,
             "regex": "",
             "sort": 0,
@@ -1378,7 +1378,7 @@
             "multi": false,
             "name": "path",
             "options": [ ],
-            "query": "label_values(github_request_duration_count{job=\"ghproxy\"}, path)",
+            "query": "label_values(github_request_duration_count, path)",
             "refresh": 2,
             "regex": "",
             "sort": 0,
@@ -1398,7 +1398,7 @@
             "multi": false,
             "name": "status",
             "options": [ ],
-            "query": "label_values(github_request_duration_count{job=\"ghproxy\"}, status)",
+            "query": "label_values(github_request_duration_count, status)",
             "refresh": 2,
             "regex": "",
             "sort": 0,
@@ -1418,7 +1418,7 @@
             "multi": false,
             "name": "user_agent",
             "options": [ ],
-            "query": "label_values(github_request_duration_count{job=\"ghproxy\"}, user_agent)",
+            "query": "label_values(github_request_duration_count, user_agent)",
             "refresh": 2,
             "regex": "",
             "sort": 0,
