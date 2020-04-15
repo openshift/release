@@ -11,6 +11,11 @@ export AWS_SHARED_CREDENTIALS_FILE=$cluster_profile/.awscred
 export AZURE_AUTH_LOCATION=$cluster_profile/osServicePrincipal.json
 
 echo "Deprovisioning cluster ..."
+if [[ ! -s "${SHARED_DIR}/metadata.json" ]]; then
+  echo "Skipping: ${SHARED_DIR}/metadata.json not found."
+  exit
+fi
+
 cp -ar "${SHARED_DIR}" /tmp/installer
 openshift-install --dir /tmp/installer destroy cluster &
 
