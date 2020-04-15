@@ -66,7 +66,6 @@ presubmits:
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-windows-machine-config-operator-master-e2e-operator
     rerun_command: /test e2e-operator
@@ -80,11 +79,24 @@ presubmits:
         - --lease-server-password-file=/etc/boskos/password
         - --lease-server-username=ci
         - --lease-server=https://boskos-ci.svc.ci.openshift.org
+        - --repo=windows-machine-config-operator
         - --secret-dir=/usr/local/e2e-operator-cluster-profile
         - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=e2e-operator
+        - --template=/usr/local/e2e-operator
         command:
         - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: CLUSTER_VARIANT
+          value: ovn
+        - name: JOB_NAME_SAFE
+          value: e2e-operator
+        - name: TEST_COMMAND
+          value: make run-ci-e2e-test
+        - name: TEST_IMAGESTREAM_TAG
+          value: pipeline:windows-machine-config-operator-test
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -100,6 +112,9 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-operator-cluster-profile
           name: cluster-profile
+        - mountPath: /usr/local/e2e-operator
+          name: job-definition
+          subPath: cluster-launch-installer-custom-test-image.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -125,6 +140,9 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-custom-test-image
+        name: job-definition
       - name: pull-secret
         secret:
           secretName: regcred
