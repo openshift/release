@@ -6,6 +6,7 @@ e.g., python ./hack/ensure_job_cluster.py
 import argparse
 import logging
 import multiprocessing
+import sys
 import os
 import yaml
 
@@ -108,12 +109,12 @@ def process_file(args):
         for repo in data.get(job_type, {}):
             name_map = identify_jobs_to_update(file_path, data[job_type][repo])
             if name_map and not overwrite:
-                raise Exception('those jobs in {} have to run on the cluster {}'\
+                raise ValueError('those jobs in {} have to run on the cluster {}'\
                     .format(file_path, name_map))
             data[job_type][repo] = get_updated_jobs(data[job_type][repo], name_map)
     name_map = identify_jobs_to_update(file_path, data.get("periodics", []))
     if name_map and not overwrite:
-        raise Exception('the jobs in {} do not have the `cluster` property set correctly. Expected job<->cluster mapping: {}. If you are adding a new job, please run `make jobs` for setting the default value.'.format(file_path, name_map))
+        raise ValueError('the jobs in {} do not have the `cluster` property set correctly. Expected job<->cluster mapping: {}. If you are adding a new job, please run `make jobs` for setting the default value.'.format(file_path, name_map))
     data["periodics"] = get_updated_jobs(data.get("periodics", []), name_map)
     if overwrite:
         with open(file_path, 'w') as file:
@@ -142,4 +143,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except ValueError as error:
+        sys.exit(error)
