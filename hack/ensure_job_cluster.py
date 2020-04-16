@@ -39,7 +39,7 @@ def load_grouped_jobs():
         groups = yaml.safe_load(file)
         jobs = []
         for i, group in enumerate(groups):
-            if i <= 3:
+            if i <= 4:
                 jobs.extend(group)
         return jobs
 
