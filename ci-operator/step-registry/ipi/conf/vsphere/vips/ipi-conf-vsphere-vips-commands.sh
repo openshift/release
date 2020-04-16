@@ -11,11 +11,10 @@ ipam_token=$(grep -oP 'ipam_token="\K[^"]+' ${tfvars_path})
 # Array to hold virtual ips:
 # 0: API
 # 1: Ingress
-# 2: DNS
 declare -a vips
 
 echo "Reserving virtual ip addresses from the IPAM server..."
-for i in {0..2}
+for i in {0..1}
 do
   args=$(jq -n \
             --arg hostn "$cluster_name-$i" \

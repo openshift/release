@@ -16,7 +16,6 @@ export AWS_SHARED_CREDENTIALS_FILE=${cluster_profile}/.awscred
 # Load array created in setup-vips:
 # 0: API
 # 1: Ingress
-# 2: DNS
 declare -a vips
 mapfile -t vips < "${SHARED_DIR}"/vips.txt
 
@@ -46,14 +45,6 @@ cat > "${SHARED_DIR}"/dns-create.json <<EOF
       "TTL": 60,
       "ResourceRecords": [{"Value": "${vips[1]}"}]
       }
-    },{
-    "Action": "UPSERT",
-    "ResourceRecordSet": {
-      "Name": "$cluster_domain.",
-      "Type": "NS",
-      "TTL": 300,
-      "ResourceRecords": [{"Value": "${vips[2]}"}]
-      }
 }]}
 EOF
 
@@ -78,14 +69,6 @@ cat > "${SHARED_DIR}"/dns-delete.json <<EOF
       "Type": "A",
       "TTL": 60,
       "ResourceRecords": [{"Value": "${vips[1]}"}]
-      }
-    },{
-    "Action": "DELETE",
-    "ResourceRecordSet": {
-      "Name": "$cluster_domain.",
-      "Type": "NS",
-      "TTL": 300,
-      "ResourceRecords": [{"Value": "${vips[2]}"}]
       }
 }]}
 EOF

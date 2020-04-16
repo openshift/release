@@ -26,5 +26,4 @@ platform:
     vCenter: vcsa-ci.vmware.devcluster.openshift.com
     apiVIP: "${vips[0]}"
     ingressVIP: "${vips[1]}"
-    dnsVIP: "${vips[2]}"
 EOF
