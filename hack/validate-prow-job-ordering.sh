@@ -32,7 +32,7 @@ ERROR: automation in place that manipulates these configs and consistent formatt
 [ERORR] helps reviewing the changes the automation does.
 
 ERROR: Run the following command to re-format the Prow jobs:
-ERROR: $ docker run -it -v \$(pwd)/ci-operator/jobs:/jobs:z registry.svc.ci.openshift.org/ci/sanitize-prow-jobs:latest --prow-jobs-dir /jobs
+ERROR: $ make jobs
 
 ERROR: The following errors were found:
 
