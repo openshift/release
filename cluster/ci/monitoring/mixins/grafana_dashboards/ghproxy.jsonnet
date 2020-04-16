@@ -104,11 +104,11 @@ dashboard.new(
         legend_sortDesc=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(increase(ghcache_responses[1h])) by (mode)',
+        'sum(increase(ghcache_responses[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login)) by (mode)',
         legendFormat='{{mode}}',
     ))
     .addTarget(prometheus.target(
-        'sum(increase(ghcache_responses{mode=~"COALESCED|REVALIDATED"}[1h]))',
+        'sum(increase(ghcache_responses{mode=~"COALESCED|REVALIDATED"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login))',
         legendFormat='(No Cost)',
     )), gridPos={
     h: 6,
@@ -133,7 +133,7 @@ dashboard.new(
         #y_axis_label='% Cacheable Request Fulfilled for Free',
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(increase(ghcache_responses{mode=~"COALESCED|REVALIDATED"}[1h])) \n/ sum(increase(ghcache_responses{mode=~"COALESCED|REVALIDATED|MISS|CHANGED"}[1h]))',
+        'sum(increase(ghcache_responses{mode=~"COALESCED|REVALIDATED"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login)) \n/ sum(increase(ghcache_responses{mode=~"COALESCED|REVALIDATED|MISS|CHANGED"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login))',
         legendFormat='Efficiency',
     )), gridPos={
     h: 6,
@@ -173,7 +173,7 @@ dashboard.new(
         valueName='current',
     )
     .addTarget(prometheus.target(
-        'sum(increase(ghcache_responses{mode=~"COALESCED|REVALIDATED"}[1h]))',
+        'sum(increase(ghcache_responses{mode=~"COALESCED|REVALIDATED"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login))',
         instant=true,
     )), gridPos={
     h: 6,
@@ -190,7 +190,7 @@ dashboard.new(
         format='short',
     )
     .addTarget(prometheus.target(
-        'sum(increase(ghcache_responses{mode=~"COALESCED|REVALIDATED"}[7d]))',
+        'sum(increase(ghcache_responses{mode=~"COALESCED|REVALIDATED"}[7d]) * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login))',
         instant=true,
     )), gridPos={
     h: 6,
@@ -228,7 +228,7 @@ dashboard.new(
         legend_rightSide=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(rate(github_request_duration_count[${range}])) by (status)',
+        'sum(rate(github_request_duration_count[${range}]) * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login)) by (status)',
          legendFormat='{{status}}',
     )), gridPos={
     h: 9,
@@ -245,7 +245,7 @@ dashboard.new(
         legend_rightSide=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(rate(github_request_duration_count{status="${status}"}[${range}])) by (path)',
+        'sum(rate(github_request_duration_count{status="${status}"}[${range}]) * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login)) by (path)',
          legendFormat='{{path}}',
     )), gridPos={
     h: 9,
@@ -266,7 +266,7 @@ dashboard.new(
         legend_sortDesc=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(rate(github_token_usage{path="${path}", status="${status}"}[${range}]) * on(token_hash) group_left(login) max(github_user_info{login=~"${login}"}) by (token_hash, login)) by (login, path, status)',
+        'sum(rate(github_request_duration_count{path="${path}", status="${status}"}[${range}]) * on(token_hash) group_left(login) max(github_user_info{login=~"${login}"}) by (token_hash, login)) by (login, path, status)',
          legendFormat='{{status}}:{{login}}:{{path}}',
     )), gridPos={
     h: 9,
@@ -330,7 +330,7 @@ dashboard.new(
         legend_sortDesc=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED"}[1h])) by (user_agent)',
+        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login)) by (user_agent)',
          legendFormat='{{user_agent}}',
     )), gridPos={
     h: 9,
@@ -352,7 +352,7 @@ dashboard.new(
         legend_sortDesc=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED"}[1h])) by (path)',
+        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login)) by (path)',
          legendFormat='{{path}}',
     )), gridPos={
     h: 9,
@@ -374,7 +374,7 @@ dashboard.new(
         legend_sortDesc=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED",path="${path}"}[1h])) by (user_agent)',
+        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED",path="${path}"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login)) by (user_agent)',
          legendFormat='{{user_agent}}',
     )), gridPos={
     h: 9,
@@ -396,7 +396,7 @@ dashboard.new(
         legend_sortDesc=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED",user_agent="${user_agent}"}[1h])) by (path)',
+        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED",user_agent="${user_agent}"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login)) by (path)',
          legendFormat='{{path}}',
     )), gridPos={
     h: 9,
