@@ -6,6 +6,8 @@ set -o pipefail
 
 echo "************ baremetalds packet setup command ************"
 
+ansible-playbook --version
+
 # cluster_profile=/var/run/secrets/ci.openshift.io/cluster-profile
 
 # export CLUSTER_NAME=${NAMESPACE}-${JOB_NAME_HASH}
