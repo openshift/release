@@ -1226,43 +1226,43 @@ objects:
             esac
             echo "Azure region: ${AZURE_REGION}"
 
-            export BASE_DOMAIN_RESOURCE_GROUP="os4-common"	
+            export BASE_DOMAIN_RESOURCE_GROUP="os4-common"
             base_domain="${BASE_DOMAIN:-ci.azure.devcluster.openshift.com}"
-            echo "Base domain: ${base_domain}"	
+            echo "Base domain: ${base_domain}"
 
-            cat > /tmp/artifacts/installer/install-config.yaml << EOF	
-        apiVersion: v1	
-        baseDomain: ${base_domain}	
-        metadata:	
-          name: ${CLUSTER_NAME}	
-        controlPlane:	
-          name: master	
-          replicas: 3	
-        compute:	
-        - name: worker	
-          replicas: 0	
-        platform:	
-          azure:	
-            baseDomainResourceGroupName: ${BASE_DOMAIN_RESOURCE_GROUP}	
+            cat > /tmp/artifacts/installer/install-config.yaml << EOF
+        apiVersion: v1
+        baseDomain: ${base_domain}
+        metadata:
+          name: ${CLUSTER_NAME}
+        controlPlane:
+          name: master
+          replicas: 3
+        compute:
+        - name: worker
+          replicas: 0
+        platform:
+          azure:
+            baseDomainResourceGroupName: ${BASE_DOMAIN_RESOURCE_GROUP}
             region: ${AZURE_REGION}
-        pullSecret: >	
-          ${PULL_SECRET}	
-        sshKey: |	
-          ${SSH_PUB_KEY}	
+        pullSecret: >
+          ${PULL_SECRET}
+        sshKey: |
+          ${SSH_PUB_KEY}
         EOF
             export PATH=${HOME}/.local/bin:${PATH}
 
             echo "Creating manifests"
             openshift-install --dir=/tmp/artifacts/installer create manifests
-            
+
             pushd /tmp/artifacts/installer
 
             echo "Editing manifests"
-            rm -f openshift/99_openshift-cluster-api_master-machines-*.yaml	
-            rm -f openshift/99_openshift-cluster-api_worker-machineset-*.yaml	
+            rm -f openshift/99_openshift-cluster-api_master-machines-*.yaml
+            rm -f openshift/99_openshift-cluster-api_worker-machineset-*.yaml
             sed -i "s;mastersSchedulable: true;mastersSchedulable: false;g" manifests/cluster-scheduler-02-config.yml
-            sed -i "/publicZone/,+1d" manifests/cluster-dns-02-config.yml 
-            sed -i "/privateZone/,+1d" manifests/cluster-dns-02-config.yml 
+            sed -i "/publicZone/,+1d" manifests/cluster-dns-02-config.yml
+            sed -i "/privateZone/,+1d" manifests/cluster-dns-02-config.yml
 
             popd
         else
@@ -1893,6 +1893,9 @@ objects:
           # Copy sample UPI files
           cp -r /var/lib/openshift-install/upi/${CLUSTER_TYPE}/* /tmp/tf
 
+          # Copy Ignition to terraform directory
+          cp /tmp/artifacts/installer/*.ign /tmp/tf
+
           # Create terraform.tfvars
           export MASTER_IGN=$(cat /tmp/artifacts/installer/master.ign)
           export WORKER_IGN=$(cat /tmp/artifacts/installer/worker.ign)
@@ -1929,6 +1932,8 @@ objects:
           compute_ignition = <<END_OF_WORKER_IGNITION
           ${WORKER_IGN}
           END_OF_WORKER_IGNITION
+
+          ssh_public_key_path = "${SSH_PUB_KEY_PATH}"
         EOF
 
           # Copy secret tfvars
@@ -2000,9 +2005,9 @@ objects:
           fi
 
           echo "Uploading bootstrap.ign"
-          az storage container create --name files --account-name $ACCOUNT_NAME --public-access blob          
+          az storage container create --name files --account-name $ACCOUNT_NAME --public-access blob
           az storage blob upload --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY -c "files" -f "/tmp/artifacts/installer/bootstrap.ign" -n "bootstrap.ign"
-          
+
           echo "Creating private DNS zone"
           az network private-dns zone create -g $RESOURCE_GROUP -n ${CLUSTER_NAME}.${base_domain}
 
@@ -2017,7 +2022,7 @@ objects:
           az group deployment create -g $RESOURCE_GROUP \
             --template-file "01_vnet.json" \
             --parameters baseName="$INFRA_ID"
-        
+
           echo "Linking VNet to private DNS zone"
           az network private-dns link vnet create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${base_domain} -n ${INFRA_ID}-network-link -v "${INFRA_ID}-vnet" -e false
 
@@ -2027,7 +2032,7 @@ objects:
             --template-file "02_storage.json" \
             --parameters vhdBlobURL="${VHD_BLOB_URL}" \
             --parameters baseName="$INFRA_ID"
-          
+
           echo "Deploying 03_infra"
           az group deployment create -g $RESOURCE_GROUP \
             --template-file "03_infra.json" \
@@ -2049,7 +2054,7 @@ objects:
 
           BOOTSTRAP_PUBLIC_IP=$(az network public-ip list -g $RESOURCE_GROUP --query "[?name=='${INFRA_ID}-bootstrap-ssh-pip'] | [0].ipAddress" -o tsv)
           GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --bootstrap ${BOOTSTRAP_PUBLIC_IP}"
-          
+
           echo "Deploying 05_masters"
           MASTER_IGNITION=$(cat /tmp/artifacts/installer/master.ign | base64)
           az group deployment create -g $RESOURCE_GROUP \
@@ -2058,7 +2063,7 @@ objects:
             --parameters sshKeyData="$SSH_PUB_KEY" \
             --parameters privateDNSZoneName="${CLUSTER_NAME}.${base_domain}" \
             --parameters baseName="$INFRA_ID"
-                    
+
           MASTER0_IP=$(az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${INFRA_ID}-master-0-nic --name pipConfig --query "privateIpAddress" -o tsv)
           MASTER1_IP=$(az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${INFRA_ID}-master-1-nic --name pipConfig --query "privateIpAddress" -o tsv)
           MASTER2_IP=$(az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${INFRA_ID}-master-2-nic --name pipConfig --query "privateIpAddress" -o tsv)
@@ -2112,7 +2117,7 @@ objects:
 
         if [[ "${CLUSTER_TYPE}" == "azure4" ]]; then
           echo "Adding ingress DNS records"
-          
+
           export KUBECONFIG=/tmp/artifacts/installer/auth/kubeconfig
 
           public_ip_router="<pending>"
@@ -2121,9 +2126,9 @@ objects:
             public_ip_router=$(oc -n openshift-ingress get service router-default --no-headers | awk '{print $4}')
             echo $public_ip_router
           done
-          
+
           az network dns record-set a add-record -g $BASE_DOMAIN_RESOURCE_GROUP -z ${base_domain} -n *.apps.${CLUSTER_NAME} -a $public_ip_router --ttl 300
-          
+
           az network private-dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${base_domain} -n *.apps --ttl 300
           az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${base_domain} -n *.apps -a $public_ip_router
         fi
@@ -2160,6 +2165,12 @@ objects:
         echo "Completing UPI setup"
         openshift-install --dir=/tmp/artifacts/installer wait-for install-complete 2>&1 | grep --line-buffered -v password &
         wait "$!"
+        # The image registry in some instances the config object
+        # is not properly configured. Rerun patching
+        # after cluster complete
+        if [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
+          update_image_registry
+        fi
         touch /tmp/install-complete
 
     # Performs cleanup of all created resources
