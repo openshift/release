@@ -1,0 +1,25 @@
+kind: ConfigMap
+apiVersion: v1
+data:
+  vector.toml: |-
+    [sources.kube_apiserver_audit_logs]
+      type = "file"
+      include = ["/host/var/log/kube-apiserver/audit.log"]
+      ignore_older = 86400
+
+    [sources.openshift_apiserver_audit_logs]
+      type = "file"
+      include = ["/host/var/log/openshift-apiserver/audit.log"]
+      ignore_older = 86400
+
+    [sinks.aws_cloudwatch_logs]
+      type = "aws_cloudwatch_logs"
+      inputs = ["kube_apiserver_audit_logs", "openshift_apiserver_audit_logs"]
+      group_name = "ci-build01-audit-logs"
+      region = "us-east-1"
+      stream_name = "{{ host }}"
+      encoding = "json"
+metadata:
+  name: vector-audit-log-config
+  namespace: api-audit-log
+
