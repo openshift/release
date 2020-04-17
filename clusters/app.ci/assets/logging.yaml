@@ -1,0 +1,172 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  annotations:
+    openshift.io/description: Holds components to forward prow logs
+  name: prow-logging
+---
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: vector-log-shipper
+  namespace: prow-logging
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vector-config
+  namespace: prow-logging
+data:
+  # You must bump the revision on the DaemonSet after changing the config here
+  vector-agent-config: |-
+    # file: vector.toml
+    # Configuration for vector-agent
+    # Docs: https://vector.dev/docs/
+    # Set global options
+    data_dir = "/var/lib/vector"
+    # Ingest logs from Kubernetes
+    [sources.kubernetes]
+      type = "kubernetes"
+    # captures services in the ci namespace
+    [transforms.ci-services]
+      type = "filter"
+      inputs = ["kubernetes"]
+      condition.type = "check_fields"
+      condition."pod_namespace.eq" = "ci"
+      condition."container_name.neq" = "test"
+      condition."container_name.neq" = "namespace-ttl-controller" # generates enormous amounts of logs
+
+    # parse the json so we can filter
+    [transforms.json_parsed]
+      type = "json_parser"
+      inputs = ["ci-services"]
+      drop_invalid = true
+
+
+    [sinks.aws_cloudwatch_logs]
+      type = "aws_cloudwatch_logs"
+      inputs = ["json_parsed"]
+      group_name = "app-ci-pod-logs"
+      region = "us-east-1"
+      stream_name = "{{ host }}"
+      encoding = "json"
+      batch.max_size = 1000000
+    # Can be enabled for debugging purposes
+    # [sinks.console]
+    #   type = "console"
+    #   inputs = ["json_parsed"]
+    #   target = "stdout"
+    #   encoding.codec = "json" # required
+---
+# Vector agent on each node where it collects logs from pods.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: vector-agent
+  namespace: prow-logging
+spec:
+  minReadySeconds: 1
+  updateStrategy:
+    rollingUpdate:
+      maxUnavailable: "50%"
+  selector:
+    matchLabels:
+      name: vector-agent
+  template:
+    metadata:
+      labels:
+        name: vector-agent
+        rev: "13"
+    spec:
+      hostNetwork: true
+      serviceAccountName: vector-log-shipper
+      containers:
+      - name: vector
+        image: docker.io/timberio/vector:0.9.0-alpine
+        command: ["/usr/local/bin/vector", "-w"]
+        env:
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              key: AWS_ACCESS_KEY_ID
+              name: vector-agent-secret
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              key: AWS_SECRET_ACCESS_KEY
+              name: vector-agent-secret
+        resources:
+          requests:
+            cpu: 50m      # based on observation of pod usage on build01
+            memory: 300Mi
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: var-log
+          mountPath: /var/log/
+          readOnly: true
+        - name: var-lib
+          mountPath: /var/lib
+          readOnly: true
+        - name: var-lib-vector
+          mountPath: /var/lib/vector
+          readOnly: false
+        - name: config-dir
+          mountPath: /etc/vector
+          readOnly: true
+      volumes:
+      # Directory with logs
+      - name: var-log
+        hostPath:
+          path: /var/log/
+      # Docker and containerd log files in Kubernetes are symlinks to this folder.
+      - name: var-lib
+        hostPath:
+          path: /var/lib/
+      # Temporary files. Must persist accross pods so logs do not get permanently lost on misconfiguration
+      - name: var-lib-vector
+        hostPath:
+          path: /var/lib/vector
+      # Mount vector configuration from config map as a file vector.toml
+      - name: config-dir
+        configMap:
+         name: vector-config
+         items:
+           - key: vector-agent-config
+             path: vector.toml
+---
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  annotations:
+    kubernetes.io/description: SCC for the prow logging components
+  name: prow-logging
+allowHostDirVolumePlugin: true
+allowHostIPC: true
+allowHostNetwork: true
+allowHostPID: true
+allowHostPorts: true
+allowPrivilegeEscalation: true
+allowPrivilegedContainer: true
+allowedCapabilities:
+- '*'
+allowedUnsafeSysctls:
+- '*'
+defaultAddCapabilities: null
+fsGroup:
+  type: RunAsAny
+priority: null
+readOnlyRootFilesystem: false
+requiredDropCapabilities: null
+runAsUser:
+  type: RunAsAny
+seLinuxContext:
+  type: RunAsAny
+seccompProfiles:
+- '*'
+supplementalGroups:
+  type: RunAsAny
+users:
+- system:serviceaccount:prow-logging:vector-log-shipper
+volumes:
+- '*'
