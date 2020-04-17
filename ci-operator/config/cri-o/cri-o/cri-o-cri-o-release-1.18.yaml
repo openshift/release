@@ -1,0 +1,59 @@
+base_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: "4.5"
+    namespace: ocp
+    tag: base
+  base-machine:
+    cluster: https://api.ci.openshift.org
+    name: fedora
+    namespace: openshift
+    tag: "29"
+  machine-os-content-base:
+    cluster: https://api.ci.openshift.org
+    name: "4.5"
+    namespace: ocp
+    tag: machine-os-content
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- context_dir: images/os/
+  from: base
+  inputs:
+    base-machine-with-rpms:
+      as:
+      - fedora:29
+      paths: null
+    machine-os-content-base:
+      as:
+      - registry.svc.ci.openshift.org/openshift/origin-v4.0:machine-os-content
+      paths: null
+  to: machine-os-content
+raw_steps:
+- rpm_image_injection_step:
+    from: base-machine
+    to: base-machine-with-rpms
+resources:
+  '*':
+    limits: {}
+    requests:
+      cpu: 100m
+      memory: 4Gi
+rpm_build_commands: hack/build-rpms.sh
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: "4.5"
+  namespace: ocp
+tests:
+- as: e2e-aws
+  steps:
+    cluster_profile: aws
+    workflow: origin-e2e-aws
+- as: launch-aws
+  commands: sleep 7200 & wait
+  openshift_installer:
+    cluster_profile: aws
