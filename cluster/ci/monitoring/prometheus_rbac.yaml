@@ -19,10 +19,6 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  labels:
-    apps.kubernetes.io/component: controller
-    apps.kubernetes.io/name: prometheus-operator
-    apps.kubernetes.io/version: v0.29.0
   name: prow-prometheus-operator
 rules:
 - apiGroups:
@@ -35,11 +31,11 @@ rules:
   - monitoring.coreos.com
   resources:
   - alertmanagers
-  - alertmanagers/finalizers
   - prometheuses
   - prometheuses/finalizers
-  - prometheusrules
+  - alertmanagers/finalizers
   - servicemonitors
+  - prometheusrules
   verbs:
   - '*'
 - apiGroups:
@@ -60,18 +56,19 @@ rules:
   resources:
   - pods
   verbs:
-  - delete
   - list
+  - delete
 - apiGroups:
   - ""
-  attributeRestrictions: null
   resources:
-  - endpoints
   - services
+  - services/finalizers
+  - endpoints
   verbs:
-  - create
   - get
+  - create
   - update
+  - delete
 - apiGroups:
   - ""
   resources:
