@@ -725,9 +725,20 @@ objects:
             - fd02::/112
         EOF
         elif [[ -n "${network_type}" ]]; then
+          cidr_size=16
+          hostPrefix=23
+          if has_variant "xlarge" || has_variant "large"; then
+            cidr_size=12
+            host_prefix=22
+          fi
           cat >> /tmp/artifacts/installer/install-config.yaml << EOF
         networking:
           networkType: ${network_type}
+          machineNetwork:
+          - cidr: 10.0.0.0/16
+          clusterNetwork:
+          - cidr: 10.128.0.0/${cidr_size}
+            hostPrefix: ${host_prefix}
         EOF
         fi
 
