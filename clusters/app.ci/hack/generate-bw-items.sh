@@ -11,6 +11,7 @@ WORKDIR="$(mktemp -d /tmp/kubeconfigs-app-ci-$(date --iso-8601).XXXX)"
 readonly WORKDIR
 
 kubectl config use-context $CLUSTER_NAME
+kubectl config set-context $(kubectl config current-context) --namespace=ci
 
 generate_kubeconfig() {
   local sa
