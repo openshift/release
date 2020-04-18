@@ -119,3 +119,33 @@ items:
     name: system:unauthenticated
   - kind: SystemGroup
     name: system:authenticated
+
+- kind: Role
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: route-getter
+    namespace: openshift-console
+  rules:
+  - apiGroups:
+    - "route.openshift.io"
+    attributeRestrictions: null
+    resources:
+    - routes
+    resourceNames:
+    - console
+    verbs:
+    - get
+
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: route-getter
+    namespace: openshift-console
+  roleRef:
+    kind: Role
+    name: route-getter
+    namespace: openshift-console
+  subjects:
+  - kind: ServiceAccount
+    name: ci-operator
+    namespace: ci
