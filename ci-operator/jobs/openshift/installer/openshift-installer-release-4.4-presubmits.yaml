@@ -1869,6 +1869,9 @@ presubmits:
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
         - --repo=installer
         - --secret-dir=/usr/local/e2e-ovirt-cluster-profile
         - --target=e2e-ovirt
@@ -1893,6 +1896,9 @@ presubmits:
         volumeMounts:
         - mountPath: /etc/apici
           name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
           readOnly: true
         - mountPath: /usr/local/e2e-ovirt-cluster-profile
           name: cluster-profile
@@ -1919,6 +1925,12 @@ presubmits:
               name: ovirt-infra-secrets
           - configMap:
               name: cluster-profile-ovirt
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
       - configMap:
           name: prow-job-cluster-launch-installer-ovirt-e2e
         name: job-definition
