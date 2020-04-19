@@ -706,10 +706,13 @@ objects:
         EOF
         fi
 
+        cidr_size=16
+        host_prefix=23
         network_type="${CLUSTER_NETWORK_TYPE-}"
         if has_variant "ovn"; then
           network_type=OVNKubernetes
         fi
+
         if has_variant "ipv6"; then
           export OPENSHIFT_INSTALL_AZURE_EMULATE_SINGLESTACK_IPV6=true
           cat >> /tmp/artifacts/installer/install-config.yaml << EOF
@@ -725,8 +728,6 @@ objects:
             - fd02::/112
         EOF
         elif [[ -n "${network_type}" ]]; then
-          cidr_size=16
-          hostPrefix=23
           if has_variant "xlarge" || has_variant "large"; then
             cidr_size=12
             host_prefix=22
