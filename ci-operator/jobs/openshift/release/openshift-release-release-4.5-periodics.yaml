@@ -6515,6 +6515,25 @@ periodics:
           make test-e2e-olm
       - name: TEST_IMAGESTREAM_TAG
         value: stable:cluster-logging-operator-e2e
+      - name: CONFIG_SPEC
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
+          tests:
+          - as: e2e-operator
+            commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=/tmp/artifacts/logging-logs ARTIFACT_DIR=/tmp/artifacts/logging-artifacts make test-e2e-olm
+            openshift_installer_custom_test_image:
+              cluster_profile: aws
+              from: stable:cluster-logging-operator-e2e
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
