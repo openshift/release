@@ -1,0 +1,37 @@
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
+tests:
+- as: build
+  commands: |
+    true
+  container:
+    from: bin
+- as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: bin
+- as: verify-deps
+  commands: |
+    make verify-deps -k --warn-undefined-variables
+  container:
+    from: bin
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: |
+    make test-unit JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
+  container:
+    from: test-bin
