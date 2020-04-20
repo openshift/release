@@ -710,6 +710,16 @@ objects:
         if has_variant "ovn"; then
           network_type=OVNKubernetes
         fi
+        cidr_size=16
+        host_prefix=23
+        if has_variant "xlarge" || has_variant "large"; then
+          cidr_size=12
+          host_prefix=22
+          if [[ -z "${network_type}" ]]; then
+            network_type=OpenShiftSDN
+          fi
+        fi
+
         if has_variant "ipv6"; then
           export OPENSHIFT_INSTALL_AZURE_EMULATE_SINGLESTACK_IPV6=true
           cat >> /tmp/artifacts/installer/install-config.yaml << EOF
@@ -728,6 +738,11 @@ objects:
           cat >> /tmp/artifacts/installer/install-config.yaml << EOF
         networking:
           networkType: ${network_type}
+          machineNetwork:
+          - cidr: 10.0.0.0/16
+          clusterNetwork:
+          - cidr: 10.128.0.0/${cidr_size}
+            hostPrefix: ${host_prefix}
         EOF
         fi
 

@@ -28,7 +28,6 @@ presubmits:
         - --lease-server=https://boskos-ci.svc.ci.openshift.org
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --secret-dir=/usr/local/e2e-aws-cluster-profile
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=e2e-aws
         command:
         - ci-operator
@@ -52,9 +51,6 @@ presubmits:
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
-          readOnly: true
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
@@ -81,9 +77,6 @@ presubmits:
       - name: pull-secret
         secret:
           secretName: regcred
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-aws,?($|\s.*)
   - agent: kubernetes
     always_run: true
@@ -113,7 +106,6 @@ presubmits:
         - --lease-server=https://boskos-ci.svc.ci.openshift.org
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --secret-dir=/usr/local/e2e-aws-upgrade-cluster-profile
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=e2e-aws-upgrade
         command:
         - ci-operator
@@ -137,9 +129,6 @@ presubmits:
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
-          readOnly: true
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
@@ -166,9 +155,6 @@ presubmits:
       - name: pull-secret
         secret:
           secretName: regcred
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-aws-upgrade,?($|\s.*)
   - agent: kubernetes
     always_run: true
@@ -194,7 +180,6 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
         - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=[images]
         command:
         - ci-operator
@@ -214,9 +199,6 @@ presubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
       serviceAccountName: ci-operator
       volumes:
       - name: apici-ci-operator-credentials
@@ -231,9 +213,6 @@ presubmits:
       - name: pull-secret
         secret:
           secretName: regcred
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
     always_run: true
@@ -259,7 +238,6 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
         - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=unit
         command:
         - ci-operator
@@ -279,8 +257,63 @@ presubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
+      - name: pull-secret
+        secret:
+          secretName: regcred
+    trigger: (?m)^/test( | .* )unit,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-4.6
+    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
+    context: ci/prow/verify
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    hidden: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-router-release-4.6-verify
+    path_alias: github.com/openshift/router
+    rerun_command: /test verify
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --target=verify
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
@@ -296,7 +329,4 @@ presubmits:
       - name: pull-secret
         secret:
           secretName: regcred
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )unit,?($|\s.*)
+    trigger: (?m)^/test( | .* )verify,?($|\s.*)

@@ -55,14 +55,14 @@
          "steppedLine": false,
          "targets": [
             {
-               "expr": "sum(increase(ghcache_responses[1h])) by (mode)",
+               "expr": "sum(increase(ghcache_responses[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~\"openshift-.*\"}) by (token_hash, login)) by (mode)",
                "format": "time_series",
                "intervalFactor": 2,
                "legendFormat": "{{mode}}",
                "refId": "A"
             },
             {
-               "expr": "sum(increase(ghcache_responses{mode=~\"COALESCED|REVALIDATED\"}[1h]))",
+               "expr": "sum(increase(ghcache_responses{mode=~\"COALESCED|REVALIDATED\"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~\"openshift-.*\"}) by (token_hash, login))",
                "format": "time_series",
                "intervalFactor": 2,
                "legendFormat": "(No Cost)",
@@ -147,7 +147,7 @@
          "steppedLine": false,
          "targets": [
             {
-               "expr": "sum(increase(ghcache_responses{mode=~\"COALESCED|REVALIDATED\"}[1h])) \n/ sum(increase(ghcache_responses{mode=~\"COALESCED|REVALIDATED|MISS|CHANGED\"}[1h]))",
+               "expr": "sum(increase(ghcache_responses{mode=~\"COALESCED|REVALIDATED\"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~\"openshift-.*\"}) by (token_hash, login)) \n/ sum(increase(ghcache_responses{mode=~\"COALESCED|REVALIDATED|MISS|CHANGED\"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~\"openshift-.*\"}) by (token_hash, login))",
                "format": "time_series",
                "intervalFactor": 2,
                "legendFormat": "Efficiency",
@@ -344,7 +344,7 @@
          "tableColumn": "",
          "targets": [
             {
-               "expr": "sum(increase(ghcache_responses{mode=~\"COALESCED|REVALIDATED\"}[1h]))",
+               "expr": "sum(increase(ghcache_responses{mode=~\"COALESCED|REVALIDATED\"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~\"openshift-.*\"}) by (token_hash, login))",
                "format": "time_series",
                "instant": true,
                "intervalFactor": 2,
@@ -427,7 +427,7 @@
          "tableColumn": "",
          "targets": [
             {
-               "expr": "sum(increase(ghcache_responses{mode=~\"COALESCED|REVALIDATED\"}[7d]))",
+               "expr": "sum(increase(ghcache_responses{mode=~\"COALESCED|REVALIDATED\"}[7d]) * on(token_hash) group_left(login) max(github_user_info{login=~\"openshift-.*\"}) by (token_hash, login))",
                "format": "time_series",
                "instant": true,
                "intervalFactor": 2,
@@ -575,7 +575,7 @@
          "steppedLine": false,
          "targets": [
             {
-               "expr": "sum(rate(github_request_duration_count[${range}])) by (status)",
+               "expr": "sum(rate(github_request_duration_count[${range}]) * on(token_hash) group_left(login) max(github_user_info{login=~\"openshift-.*\"}) by (token_hash, login)) by (status)",
                "format": "time_series",
                "intervalFactor": 2,
                "legendFormat": "{{status}}",
@@ -660,7 +660,7 @@
          "steppedLine": false,
          "targets": [
             {
-               "expr": "sum(rate(github_request_duration_count{status=\"${status}\"}[${range}])) by (path)",
+               "expr": "sum(rate(github_request_duration_count{status=\"${status}\"}[${range}]) * on(token_hash) group_left(login) max(github_user_info{login=~\"openshift-.*\"}) by (token_hash, login)) by (path)",
                "format": "time_series",
                "intervalFactor": 2,
                "legendFormat": "{{path}}",
@@ -747,7 +747,7 @@
          "steppedLine": false,
          "targets": [
             {
-               "expr": "sum(rate(github_token_usage{path=\"${path}\", status=\"${status}\"}[${range}]) * on(token_hash) group_left(login) max(github_user_info{login=~\"${login}\"}) by (token_hash, login)) by (login, path, status)",
+               "expr": "sum(rate(github_request_duration_count{path=\"${path}\", status=\"${status}\"}[${range}]) * on(token_hash) group_left(login) max(github_user_info{login=~\"${login}\"}) by (token_hash, login)) by (login, path, status)",
                "format": "time_series",
                "intervalFactor": 2,
                "legendFormat": "{{status}}:{{login}}:{{path}}",
@@ -1036,7 +1036,7 @@
          "steppedLine": false,
          "targets": [
             {
-               "expr": "sum(increase(ghcache_responses{mode=~\"MISS|NO-STORE|CHANGED\"}[1h])) by (user_agent)",
+               "expr": "sum(increase(ghcache_responses{mode=~\"MISS|NO-STORE|CHANGED\"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~\"openshift-.*\"}) by (token_hash, login)) by (user_agent)",
                "format": "time_series",
                "intervalFactor": 2,
                "legendFormat": "{{user_agent}}",
@@ -1123,7 +1123,7 @@
          "steppedLine": false,
          "targets": [
             {
-               "expr": "sum(increase(ghcache_responses{mode=~\"MISS|NO-STORE|CHANGED\"}[1h])) by (path)",
+               "expr": "sum(increase(ghcache_responses{mode=~\"MISS|NO-STORE|CHANGED\"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~\"openshift-.*\"}) by (token_hash, login)) by (path)",
                "format": "time_series",
                "intervalFactor": 2,
                "legendFormat": "{{path}}",
@@ -1210,7 +1210,7 @@
          "steppedLine": false,
          "targets": [
             {
-               "expr": "sum(increase(ghcache_responses{mode=~\"MISS|NO-STORE|CHANGED\",path=\"${path}\"}[1h])) by (user_agent)",
+               "expr": "sum(increase(ghcache_responses{mode=~\"MISS|NO-STORE|CHANGED\",path=\"${path}\"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~\"openshift-.*\"}) by (token_hash, login)) by (user_agent)",
                "format": "time_series",
                "intervalFactor": 2,
                "legendFormat": "{{user_agent}}",
@@ -1297,7 +1297,7 @@
          "steppedLine": false,
          "targets": [
             {
-               "expr": "sum(increase(ghcache_responses{mode=~\"MISS|NO-STORE|CHANGED\",user_agent=\"${user_agent}\"}[1h])) by (path)",
+               "expr": "sum(increase(ghcache_responses{mode=~\"MISS|NO-STORE|CHANGED\",user_agent=\"${user_agent}\"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~\"openshift-.*\"}) by (token_hash, login)) by (path)",
                "format": "time_series",
                "intervalFactor": 2,
                "legendFormat": "{{path}}",

@@ -18,15 +18,16 @@ vet that interaction for correctness.
 ### Aggregate IaaS Secrets for use in Cluster Tests
 
 A set of secrets exists that contain aggregated information for ease of mounting
-into tests that are interacting with an IaaS hosted by a cloud. The following secrets
-currently exist:
+into tests that are interacting with an IaaS hosted by a cloud.
+
+The following secrets currently exist:
 
 #### `cluster-secrets-aws`
 
 |       Key        | Description |
 | ---------------- | ----------- |
 | `.awscred`       | Credentials for the AWS EC2 API. See the [upstream credentials doc](https://docs.aws.amazon.com/cli/latest/userguide/cli-multiple-profiles.html). |
-| `pull-secret`    | Credentials for pulling OpenShift images from Quay and for authenticating to telemetry. Retrieved from [try.openshift.com](https://try.openshift.com) under the ccoleman+openshift-ci-test@redhat.com account, and has the service account token from the `ocp` namespace added with `oc registry login --to=/tmp/pull-secret -z default -n ocp`.|
+| `pull-secret`    | [See below](#pull-secret-key). |
 | `ssh-privatekey` | Private half of the SSH key, for connecting to AWS EC2 VMs. |
 | `ssh-publickey`  | Public half of the SSH key, for connecting to AWS EC2 VMs. |
 
@@ -39,7 +40,7 @@ currently exist:
 | `ssh-privatekey`  | Private half of the SSH key, for connecting to GCE VMs. |
 | `ssh-publickey`   | Public half of the SSH key, for connecting to GCE VMs. |
 | `telemeter-token` | Token to push telemetry data on CI clusters. |
-| `pull-secret`    | Credentials for pulling OpenShift images from Quay and for authenticating to telemetry. Retrieved from [try.openshift.com](https://try.openshift.com) under the ccoleman+openshift-ci-test@redhat.com account, and has the service account token from the `ocp` namespace added with `oc registry login --to=/tmp/pull-secret -z default -n ocp`.|
+| `pull-secret`     | [See below](#pull-secret-key). |
 
 #### `cluster-secrets-azure`
 
@@ -60,7 +61,7 @@ currently exist:
 |       Key                         | Description |
 | ----------------------------------| ----------- |
 | `osServicePrincipal.json`     | Credentials for the Azure API. This is a json file that contains fields described in [upstream credentials doc](https://docs.microsoft.com/en-us/azure-stack/operator/azure-stack-create-service-principals#create-a-service-principal-using-a-client-secret). |
-| `pull-secret`    | Credentials for pulling OpenShift images from Quay and for authenticating to telemetry. Retrieved from [try.openshift.com](https://try.openshift.com) under the ccoleman+openshift-ci-test@redhat.com account, and has the service account token from the `ocp` namespace added with `oc registry login --to=/tmp/pull-secret -z default -n ocp`.|
+| `pull-secret`    | [See below](#pull-secret-key). |
 | `ssh-privatekey` | Private half of the SSH key, for connecting to Azure VMs. |
 | `ssh-publickey`  | Public half of the SSH key, for connecting to Azure VMs. |
 
@@ -70,7 +71,7 @@ currently exist:
 | ----------------------| ----------- |
 | `secret.auto.tfvars`  | Secret part of terraform vars. See the [example tfvars](https://github.com/openshift/installer/blob/master/upi/vsphere/terraform.tfvars.example). |
 | `.awscred`            | Credentials for the AWS EC2 API, used for Route53 access. See the [upstream credentials doc](https://docs.aws.amazon.com/cli/latest/userguide/cli-multiple-profiles.html). |
-| `pull-secret`         | Credentials for pulling OpenShift images from Quay and for authenticating to telemetry. Retrieved from [try.openshift.com](https://try.openshift.com) under the ccoleman+openshift-ci-test@redhat.com account, and has the service account token from the `ocp` namespace added with `oc registry login --to=/tmp/pull-secret -z default -n ocp`.|
+| `pull-secret`         | [See below](#pull-secret-key). |
 | `ssh-privatekey`      | Private half of the SSH key, for connecting to VSphere VMs. |
 | `ssh-publickey`       | Public half of the SSH key, for connecting to VSphere VMs. |
 
@@ -79,9 +80,9 @@ currently exist:
 |        Key        | Description |
 | ----------------- | ----------- |
 | `clouds.yaml`     | Credentials for the openstack cloud. See the [Openstack docs](https://docs.openstack.org/python-openstackclient/pike/configuration/index.html). |
-| `ssh-privatekey`   | Private half of the SSH key, for connecting to OpenStack Nova VMs. |
+| `ssh-privatekey`  | Private half of the SSH key, for connecting to OpenStack Nova VMs. |
 | `ssh-publickey`   | Public half of the SSH key, for connecting to OpenStack Nova VMs. |
-| `pull-secret`    | Credentials for pulling OpenShift images from Quay and for authenticating to telemetry. Retrieved from [try.openshift.com](https://try.openshift.com) under the ccoleman+openshift-ci-test@redhat.com account, and has the service account token from the `ocp` namespace added with `oc registry login --to=/tmp/pull-secret -z default -n ocp`.|
+| `pull-secret`     | [See below](#pull-secret-key). |
 
 #### `cluster-secrets-metal`
 
@@ -89,9 +90,21 @@ currently exist:
 | -----------------| ----------- |
 | `.awscred`       | Credentials for the AWS EC2 API, used for Route53 access. See the [upstream credentials doc](https://docs.aws.amazon.com/cli/latest/userguide/cli-multiple-profiles.html). |
 | `.packetcred`    | Credentials for the Packet.net API, used for creating bare-metal servers. See the [upstream credentials doc](https://www.packet.com/developers/api/). |
-| `pull-secret`    | Credentials for pulling OpenShift images from Quay and for authenticating to telemetry. Retrieved from [try.openshift.com](https://try.openshift.com) under the ccoleman+openshift-ci-test@redhat.com account, and has the service account token from the `ocp` namespace added with `oc registry login --to=/tmp/pull-secret -z default -n ocp`.|
+| `pull-secret`    | [See below](#pull-secret-key). |
 | `ssh-privatekey` | Private half of the SSH key, for connecting to VMs. |
 | `ssh-publickey`  | Public half of the SSH key, for connecting to VMs. |
+
+#### `pull-secret` key
+
+All secrets in this category have a `pull-secret` key containing:
+
+- credentials for pulling OpenShift images from Quay
+- credentials for authenticating to telemetry (retrieved from
+  [try.openshift.com](https://try.openshift.com) under the
+  ccoleman+openshift-ci-test@redhat.com account)
+- the service account token from the `ocp` namespace in each CI cluster, added
+  with `oc registry login --to=/tmp/pull-secret -z default -n ocp`, allowing
+  images to be pulled as `system:authenticated`
 
 ### GCE ServiceAccount Credentials
 

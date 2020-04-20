@@ -26,7 +26,6 @@ presubmits:
         - --lease-server-username=ci
         - --lease-server=https://boskos-ci.svc.ci.openshift.org
         - --secret-dir=/usr/local/e2e-aws-moderate-cluster-profile
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=e2e-aws-moderate
         - --template=/usr/local/e2e-aws-moderate
         command:
@@ -59,9 +58,6 @@ presubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
       serviceAccountName: ci-operator
       volumes:
       - name: apici-ci-operator-credentials
@@ -87,9 +83,6 @@ presubmits:
       - name: pull-secret
         secret:
           secretName: regcred
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-aws-moderate,?($|\s.*)
   - agent: kubernetes
     always_run: true
@@ -113,7 +106,6 @@ presubmits:
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
         - --target=[images]
         command:
         - ci-operator
@@ -130,8 +122,54 @@ presubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: pull-secret
+        secret:
+          secretName: regcred
+    trigger: (?m)^/test( | .* )images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: api.ci
+    context: ci/prow/unit
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-ComplianceAsCode-content-master-unit
+    rerun_command: /test unit
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --target=unit
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
@@ -144,7 +182,4 @@ presubmits:
       - name: pull-secret
         secret:
           secretName: regcred
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
+    trigger: (?m)^/test( | .* )unit,?($|\s.*)
