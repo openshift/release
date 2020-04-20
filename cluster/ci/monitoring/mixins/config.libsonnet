@@ -42,6 +42,11 @@
         channel: '#cnf-alerts',
         notify: 'cnf-cop',
       },
+      'openshift-logging': {
+        team: 'logging',
+        channel: '#forum-logging',
+        notify: 'aoslogging',
+      },
       'openshift-dev-services': {
         team: 'openshift-dev-services',
         channel: '#forum-os-dev-services',
