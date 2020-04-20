@@ -230,7 +230,6 @@ objects:
       - |
         #!/bin/bash
         set -euo pipefail
-        set -x
         
         trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/setup-success; else touch /tmp/exit /tmp/setup-failed; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
@@ -488,7 +487,6 @@ objects:
         approve_csrs &
         update_image_registry &
 
-        set +x
         echo "Completing UPI setup"
         openshift-install --dir=/tmp/artifacts/installer wait-for install-complete 2>&1 | grep --line-buffered -v password &
         wait "$!"
