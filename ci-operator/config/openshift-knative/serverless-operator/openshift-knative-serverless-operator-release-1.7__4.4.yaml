@@ -1,0 +1,40 @@
+base_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: "4.4"
+    namespace: ocp
+    tag: base
+build_root:
+  project_image:
+    dockerfile_path: openshift/ci-operator/build-image/Dockerfile
+images:
+- context_dir: serving/ingress
+  from: base
+  to: knative-openshift-ingress
+- context_dir: knative-operator
+  from: base
+  to: knative-operator
+resources:
+  '*':
+    limits: {}
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: "4.4"
+  namespace: ocp
+tests:
+- as: e2e-aws-ocp-44
+  commands: make test-e2e
+  openshift_installer_src:
+    cluster_profile: aws
+- as: e2e-aws-ocp-44-continuous
+  commands: make test-e2e
+  cron: 0 */6 * * *
+  openshift_installer_src:
+    cluster_profile: aws
+- as: upgrade-tests-aws-ocp-44
+  commands: make test-upgrade
+  openshift_installer_src:
+    cluster_profile: aws
