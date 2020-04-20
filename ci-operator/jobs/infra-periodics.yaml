@@ -1141,3 +1141,48 @@ periodics:
       name: ""
       resources: {}
     serviceAccountName: imagestream-importer
+- agent: kubernetes
+  cluster: api.ci
+  decorate: true
+  decoration_config:
+    oauth_token_secret:
+      key: oauth
+      name: github-credentials-openshift-ci-robot-private-git-cloner
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: config
+    workdir: true
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 12h
+  name: periodic-auto-private-org-peribolos-sync
+  spec:
+    containers:
+    - args:
+      - --github-token-path=/etc/github/oauth
+      - --github-endpoint=http://ghproxy
+      - --github-endpoint=https://api.github.com
+      - --github-graphql-endpoint=http://ghproxy/graphql
+      - --dry-run=false
+      - --git-name=openshift-bot
+      - --git-email=openshift-bot@redhat.com
+      - --peribolos-config=./org/config.yaml
+      - --release-repo-path=/home/prow/go/src/github.com/openshift/release
+      command:
+      - /usr/bin/autoperibolossync
+      image: registry.svc.ci.openshift.org/ci/auto-peribolos-sync:latest
+      imagePullPolicy: Always
+      name: auto-peribolos-sync
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: token
+        readOnly: true
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-bot
