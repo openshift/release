@@ -22,7 +22,7 @@
         ] + [
           {	
             alert: '%s-low' % job_name,	
-            expr: |||	
+            expr: |||
               sum(rate(prowjob_state_transitions{job="plank",job_name="%s",state="success"}[2d]))/sum(rate(prowjob_state_transitions{job="plank",job_name="%s",state=~"success|failure"}[2d])) * 100 < 95
             ||| % [job_name, job_name],	
             'for': '10m',	

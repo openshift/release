@@ -369,19 +369,30 @@ objects:
         GATHER_BOOTSTRAP_ARGS=
 
         function gather_bootstrap_and_fail() {
-          if test -n "${GATHER_BOOTSTRAP_ARGS}"; then
-            openshift-install --dir=/tmp/artifacts/installer gather bootstrap --key "${SSH_PRIVATE_KEY_PATH}" ${GATHER_BOOTSTRAP_ARGS}
-          fi
-
           if [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
+            set +e
             # list all the virtual machines in the folder/rp
             clustervms=$(govc ls "/${GOVC_DATACENTER}/vm/${CLUSTER_NAME}")
             for ipath in $clustervms; do
               # split on /
               IFS=/ read -a ipath_array <<< "$ipath";
+              hostname=${ipath_array[-1]}
+
               # create png of the current console to determine if a virtual machine has a problem
-              govc vm.console -vm.ipath=$ipath -capture /tmp/artifacts/installer/${ipath_array[-1]}.png
+              govc vm.console -vm.ipath=$ipath -capture /tmp/artifacts/installer/${hostname}.png
+
+              # based on the virtual machine name create variable for each
+              # with ip addresses as the value
+              declare "${hostname//-/_}_ip"=$(govc vm.ip -a -vm.ipath=$ipath | awk -F',' '{print $1}')
             done
+
+            GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --bootstrap ${bootstrap_0_ip}"
+            GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --master ${control_plane_0_ip} --master ${control_plane_1_ip} --master ${control_plane_2_ip}"
+
+            set -e
+          fi
+          if test -n "${GATHER_BOOTSTRAP_ARGS}"; then
+            openshift-install --dir=/tmp/artifacts/installer gather bootstrap --key "${SSH_PRIVATE_KEY_PATH}" ${GATHER_BOOTSTRAP_ARGS}
           fi
 
           return 1
@@ -1946,22 +1957,6 @@ objects:
 
           terraform apply -auto-approve -no-color &
           wait "$!"
-          # find bootstrap ip
-
-          # Temporary removal of vSphere gathering of
-          # ip addresses of guests until another method
-          # that will work with all terraform versions
-          # is available
-          #
-          #BOOTSTRAP_IP=$(terraform state show 'module.bootstrap.external.ip_address' | grep ip_address | awk '{print $3}')
-
-          #GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --bootstrap ${BOOTSTRAP_IP}"
-
-          #CONTROL_PLANE_0_IP=$(terraform state show 'module.control_plane.external.ip_address[0]' | grep ip_address | awk '{print $3}')
-          #CONTROL_PLANE_1_IP=$(terraform state show 'module.control_plane.external.ip_address[1]' | grep ip_address | awk '{print $3}')
-          #CONTROL_PLANE_2_IP=$(terraform state show 'module.control_plane.external.ip_address[2]' | grep ip_address | awk '{print $3}')
-
-          #GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --master ${CONTROL_PLANE_0_IP} --master ${CONTROL_PLANE_1_IP} --master ${CONTROL_PLANE_2_IP}"
 
         elif [[ "${CLUSTER_TYPE}" == "azure4" ]]; then
           mkdir -p /tmp/azure
