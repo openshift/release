@@ -3,7 +3,7 @@
 prow-monitoring-deploy: ci-secret-deploy
 	$(eval prometheus-k8s_token := $(shell oc get --as=system:serviceaccount:ci:config-updater secret -n openshift-monitoring grafana-datasources -o "jsonpath={.data.prometheus\.yaml}" | base64 --decode | jq '.datasources[] | select(.name = "prometheus-k8s") .basicAuthPassword'))
 	@echo "Deploying prow-monitoring stack ..."
-	oc process -n prow-monitoring -f ./prometheus_expose.yaml | oc apply -f -
+	oc process -n prow-monitoring -f ./prometheus_expose.yaml.tmpl | oc apply -f -
 	oc apply -f ./prometheus_operator_deploy.yaml
 	oc apply -f ./sinker_service_monitor.yaml
 	oc apply -f ./ghproxy_service_monitor.yaml
@@ -16,25 +16,34 @@ prow-monitoring-deploy: ci-secret-deploy
 	oc apply -f ./tide_service_monitor.yaml
 	oc apply -f ./prometheus_crd.yaml
 	oc apply -f ./mixins/prometheus_out/prometheus_rule_prow.yaml
-	oc process -n prow-monitoring -f ./alert_manager_expose.yaml | oc apply -f -
+	oc process -n prow-monitoring -f ./alert_manager_expose.yaml.tmpl | oc apply -f -
 	oc apply -f ./alert_manager_crd.yaml
 	oc apply -f ./prometheus_service_monitor.yaml
 	oc apply -f ./alert_manager_service_monitor.yaml
 	#grafana
-	oc process -n prow-monitoring -f ./grafana_expose.yaml | oc apply -f -
+	oc process -n prow-monitoring -f ./grafana_expose.yaml.tmpl | oc apply -f -
 	oc create -n prow-monitoring secret generic grafana-config --from-file=./grafana.ini --dry-run -o yaml | oc apply -f -
 
 	# Fill prometheus-k8s basicAuthPassword in datasources file.
 	@echo "replacing the token in ./datasources.yaml ..."
-	@sed -i -e "s|CHANGE_ME|$(prometheus-k8s_token)|g" ./datasources.yaml
-	oc create -n prow-monitoring configmap grafana-datasources --from-file=./datasources.yaml --dry-run -o yaml | oc apply -f -
+	@cat ./datasources.yaml|sed "s#CHANGE_ME#$(prometheus-k8s_token)#"|oc apply -f -
 
 	#Those config are deployed by config_uploader; we leave those here for manual debugging
-	#oc create -n prow-monitoring configmap grafana-dashboards --from-file=./dashboards.yaml --dry-run -o yaml | oc apply -f -
+	#oc create -n prow-monitoring configmap grafana-dashboards --from-file=./dashboards.yaml.nomanifest --dry-run -o yaml | oc apply -f -
 	#oc create -n prow-monitoring configmap grafana-dashboard-definitions-0 --from-file=./mixins/grafana_dashboards_out/ --dry-run -o yaml | oc apply -f -
 	oc apply -f ./grafana_deploy.yaml
 	oc apply -f ./grafana_service_monitor.yaml
 
+
+.PHONY: app-ci-deploy
+app-ci-deploy:
+	$(eval prometheus-k8s_token := $(shell oc get --as=system:serviceaccount:ci:config-updater secret -n openshift-monitoring grafana-datasources -o "jsonpath={.data.prometheus\.yaml}" | base64 --decode | jq '.datasources[] | select(.name = "prometheus-k8s") .basicAuthPassword'))
+	$(eval slack_api_url := $(shell oc get secret -n ci ci-slack-api-url -o json | jq -r .data.url | base64 -d))
+	@echo "Deploying prow-monitoring stack ..."
+	@# apply command contains the secret, do not make it visible by removing the leading `@`
+	@oc create -f ./ --dry-run=true -o yaml|sed -e "s#CHANGE_ME#$(prometheus-k8s_token)#g" -e '/node-role.kubernetes.io\/infra/d' -e '/storageClassName/d' -e '/nodeSelector/d'|kubectl apply --force -f -
+	oc apply -f ./mixins/prometheus_out/prometheus_rule_prow.yaml
+	cat ./mixins/prometheus_out/alertmanager.yaml|sed -e 's#ops-testplatform#ops-app-ci#g' -e "s#{{ api_url }}#$(slack_api_url)#g"|oc create -n prow-monitoring secret generic alertmanager-prow --from-literal=alertmanager.yaml="$$(cat)" --from-file=./msg.tmpl --dry-run -o yaml | oc apply -f -
 
 .PHONY : ci-secret-deploy
 ci-secret-deploy:
@@ -50,7 +59,6 @@ ci-secret-deploy:
 .PHONY : prow-monitoring-pre-steps
 prow-monitoring-pre-steps:
 	@echo "Running prow-monitoring-pre-steps ..."
-	oc apply -f ./ci_hook_rbac.yaml --as=system:admin
 	oc apply -f ./client_rbac.yaml --as=system:admin
 	oc apply -f ./prometheus_project.yaml --as=system:admin
 	oc apply -f ./prometheus_rbac.yaml --as=system:admin

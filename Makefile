@@ -232,6 +232,10 @@ prow-monitoring:
 	make -C cluster/ci/monitoring prow-monitoring-deploy
 .PHONY: prow-monitoring
 
+prow-monitoring-app-ci:
+	make -C cluster/ci/monitoring app-ci-deploy
+.PHONY: prow-monitoring-app-ci
+
 build-farm-consistency:
 	@echo "diffing ns-ttl-controller assets ..."
 	diff -Naup ./core-services/ci-ns-ttl-controller/ci-ns-ttl-controller_dc.yaml ./clusters/build-clusters/01_cluster/openshift/ci-ns-ttl-controller/ci-ns-ttl-controller_dc.yaml
