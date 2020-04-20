@@ -1,0 +1,493 @@
+presubmits:
+  openshift-knative/serverless-operator:
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-1.7
+    cluster: api.ci
+    context: ci/prow/4.3-e2e-aws-ocp-43
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: "4.3"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-serverless-operator-release-1.7-4.3-e2e-aws-ocp-43
+    rerun_command: /test 4.3-e2e-aws-ocp-43
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
+        - --secret-dir=/usr/local/e2e-aws-ocp-43-cluster-profile
+        - --target=e2e-aws-ocp-43
+        - --template=/usr/local/e2e-aws-ocp-43
+        - --variant=4.3
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: JOB_NAME_SAFE
+          value: e2e-aws-ocp-43
+        - name: TEST_COMMAND
+          value: make test-e2e
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-aws-ocp-43-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-aws-ocp-43
+          name: job-definition
+          subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-src
+        name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
+    trigger: (?m)^/test( | .* )4.3-e2e-aws-ocp-43,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-1.7
+    cluster: api.ci
+    context: ci/prow/4.3-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: "4.3"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-serverless-operator-release-1.7-4.3-images
+    rerun_command: /test 4.3-images
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --target=[images]
+        - --variant=4.3
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: pull-secret
+        secret:
+          secretName: regcred
+    trigger: (?m)^/test( | .* )4.3-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-1.7
+    cluster: api.ci
+    context: ci/prow/4.3-upgrade-tests-aws-ocp-43
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: "4.3"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-serverless-operator-release-1.7-4.3-upgrade-tests-aws-ocp-43
+    rerun_command: /test 4.3-upgrade-tests-aws-ocp-43
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
+        - --secret-dir=/usr/local/upgrade-tests-aws-ocp-43-cluster-profile
+        - --target=upgrade-tests-aws-ocp-43
+        - --template=/usr/local/upgrade-tests-aws-ocp-43
+        - --variant=4.3
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: JOB_NAME_SAFE
+          value: upgrade-tests-aws-ocp-43
+        - name: TEST_COMMAND
+          value: make test-upgrade
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/upgrade-tests-aws-ocp-43-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/upgrade-tests-aws-ocp-43
+          name: job-definition
+          subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-src
+        name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
+    trigger: (?m)^/test( | .* )4.3-upgrade-tests-aws-ocp-43,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-1.7
+    cluster: api.ci
+    context: ci/prow/4.4-e2e-aws-ocp-44
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: "4.4"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-serverless-operator-release-1.7-4.4-e2e-aws-ocp-44
+    rerun_command: /test 4.4-e2e-aws-ocp-44
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
+        - --secret-dir=/usr/local/e2e-aws-ocp-44-cluster-profile
+        - --target=e2e-aws-ocp-44
+        - --template=/usr/local/e2e-aws-ocp-44
+        - --variant=4.4
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: JOB_NAME_SAFE
+          value: e2e-aws-ocp-44
+        - name: TEST_COMMAND
+          value: make test-e2e
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-aws-ocp-44-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-aws-ocp-44
+          name: job-definition
+          subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-src
+        name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
+    trigger: (?m)^/test( | .* )4.4-e2e-aws-ocp-44,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-1.7
+    cluster: api.ci
+    context: ci/prow/4.4-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: "4.4"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-serverless-operator-release-1.7-4.4-images
+    rerun_command: /test 4.4-images
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --target=[images]
+        - --variant=4.4
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: pull-secret
+        secret:
+          secretName: regcred
+    trigger: (?m)^/test( | .* )4.4-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-1.7
+    cluster: api.ci
+    context: ci/prow/4.4-upgrade-tests-aws-ocp-44
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: "4.4"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-serverless-operator-release-1.7-4.4-upgrade-tests-aws-ocp-44
+    rerun_command: /test 4.4-upgrade-tests-aws-ocp-44
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
+        - --secret-dir=/usr/local/upgrade-tests-aws-ocp-44-cluster-profile
+        - --target=upgrade-tests-aws-ocp-44
+        - --template=/usr/local/upgrade-tests-aws-ocp-44
+        - --variant=4.4
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: JOB_NAME_SAFE
+          value: upgrade-tests-aws-ocp-44
+        - name: TEST_COMMAND
+          value: make test-upgrade
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/upgrade-tests-aws-ocp-44-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/upgrade-tests-aws-ocp-44
+          name: job-definition
+          subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-src
+        name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
+    trigger: (?m)^/test( | .* )4.4-upgrade-tests-aws-ocp-44,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-1.7
+    cluster: api.ci
+    context: ci/prow/unit-test
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-serverless-operator-release-1.7-unit-test
+    rerun_command: /test unit-test
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --target=unit-test
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: pull-secret
+        secret:
+          secretName: regcred
+    trigger: (?m)^/test( | .* )unit-test,?($|\s.*)
