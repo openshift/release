@@ -6498,7 +6498,7 @@ periodics:
       - name: RELEASE_IMAGE_LATEST
         value: registry.svc.ci.openshift.org/ocp/release:4.5
       - name: BRANCH
-        value: "4.6"
+        value: "4.5"
       - name: CLUSTER_TYPE
         value: aws
       - name: JOB_NAME_SAFE
@@ -6527,6 +6527,116 @@ periodics:
             openshift_installer_custom_test_image:
               cluster_profile: aws
               from: stable:cluster-logging-operator-e2e
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/e2e-operator-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/e2e-operator
+        name: job-definition
+        subPath: cluster-launch-installer-custom-test-image.yaml
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - configMap:
+        name: prow-job-cluster-launch-installer-custom-test-image
+      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
+  cluster: api.ci
+  decorate: true
+  interval: 24h
+  labels:
+    ci.openshift.io/release-type: broken
+    job-release: "4.5"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: release-openshift-ocp-installer-elasticsearch-operator-e2e-4.5
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
+      - --secret-dir=/usr/local/e2e-operator-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-operator
+      - --template=/usr/local/e2e-operator
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_LATEST
+        value: registry.svc.ci.openshift.org/ocp/release:4.5
+      - name: BRANCH
+        value: "4.5"
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: JOB_NAME_SAFE
+        value: e2e-operator
+      - name: TEST_COMMAND
+        value: make test-e2e-olm
+      - name: TEST_IMAGESTREAM_TAG
+        value: stable:elasticsearch-operator-src
+      - name: CONFIG_SPEC
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
+          tests:
+          - as: e2e-operator
+            commands: make test-e2e-olm
+            openshift_installer_custom_test_image:
+              cluster_profile: aws
+              from: stable:elasticsearch-operator-src
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
