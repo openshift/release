@@ -891,13 +891,41 @@ items:
   - kind: Group
     apiGroup: rbac.authorization.k8s.io
     name: ocm-admins
-  - kind: ServiceAccount
-    name: ci-operator
-    namespace: ci
   roleRef:
     kind: ClusterRole
     apiGroup: rbac.authorization.k8s.io
     name: admin
+- kind: Role
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: image-tagger
+    namespace: open-cluster-management
+  rules:
+  - apiGroups:
+    - ""
+    - image.openshift.io
+    attributeRestrictions: null
+    resources:
+    - imagestreamtags
+    - imagestreams
+    verbs:
+    - update
+    - patch
+    - get
+    - create
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: ocm-image-tagger
+    namespace: open-cluster-management
+  roleRef:
+    kind: Role
+    name: image-tagger
+    namespace: open-cluster-management
+  subjects:
+  - kind: ServiceAccount
+    name: ci-operator
+    namespace: ci
 - kind: RoleBinding
   apiVersion: rbac.authorization.k8s.io/v1beta1
   metadata:
