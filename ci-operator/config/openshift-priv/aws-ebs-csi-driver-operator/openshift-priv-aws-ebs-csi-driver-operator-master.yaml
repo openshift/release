@@ -21,6 +21,9 @@ images:
       - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
       paths: null
   to: aws-ebs-csi-driver-operator
+- dockerfile_path: Dockerfile.test
+  from: src
+  to: aws-ebs-csi-driver-operator-test
 promotion:
   name: 4.5-priv
   namespace: ocp-private
@@ -48,3 +51,10 @@ tests:
     make test-unit JUNITFILE=/tmp/artifacts/junit_report.xml
   container:
     from: src
+- as: e2e-operator
+  commands: |
+    make test-e2e ARTIFACT_DIR=/tmp/artifacts
+  openshift_installer_custom_test_image:
+    cluster_profile: aws
+    from: stable:aws-ebs-csi-driver-operator-test
+    nested_virt_image: ""
