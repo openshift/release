@@ -72,7 +72,9 @@ objects:
     - name: cloud-credentials
       secret:
         secretName: ${CLUSTER_TYPE}-openshift-llc-account-credentials
-       
+    - name: shared-tmp
+      emptyDir: {}
+
     containers:
     # Once the cluster is up, executes shared tests
     - name: test
@@ -93,6 +95,8 @@ objects:
         mountPath: /tmp/ci-credentials
       - name: cloud-credentials
         mountPath: /etc/cloud-credentials
+      - name: shared-tmp
+        mountPath: /tmp/shared
       env:
       - name: ARTIFACT_DIR
         value: /tmp/artifacts
@@ -111,7 +115,7 @@ objects:
 
         export PATH=/usr/libexec/origin:$PATH
 
-        trap 'touch /tmp/done' EXIT
+        trap 'touch /tmp/shared/exit' EXIT
         trap 'jobs -p | xargs -r kill || true; exit 0' TERM
 
         mkdir -p "${HOME}"
@@ -159,3 +163,175 @@ objects:
         }
 
         ${TEST_COMMAND}
+
+    # Perform must-gather, but do not really tear down the cluster
+    - name: teardown
+      image: ${IMAGE_TESTS}
+      terminationMessagePolicy: FallbackToLogsOnError
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      - name: cluster-profile
+        mountPath: /etc/openshift-installer
+      - name: artifacts
+        mountPath: /tmp/artifacts
+      env:
+      - name: INSTANCE_PREFIX
+        value: ${NAMESPACE}-${JOB_NAME_HASH}
+      - name: AWS_SHARED_CREDENTIALS_FILE
+        value: /etc/openshift-installer/.awscred
+      - name: AZURE_AUTH_LOCATION
+        value: /etc/openshift-installer/osServicePrincipal.json
+      - name: GOOGLE_CLOUD_KEYFILE_JSON
+        value: /etc/openshift-installer/gce.json
+      - name: KUBECONFIG
+        value: /tmp/artifacts/installer/auth/kubeconfig
+      - name: USER
+        value: test
+      - name: HOME
+        value: /tmp
+      - name: LC_ALL
+        value: en_US.UTF-8
+      command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -eo pipefail
+
+        function queue() {
+          local TARGET="${1}"
+          shift
+          local LIVE="$(jobs | wc -l)"
+          while [[ "${LIVE}" -ge 45 ]]; do
+            sleep 1
+            LIVE="$(jobs | wc -l)"
+          done
+          echo "${@}"
+          if [[ -n "${FILTER}" ]]; then
+            "${@}" | "${FILTER}" >"${TARGET}" &
+          else
+            "${@}" >"${TARGET}" &
+          fi
+        }
+
+        function teardown() {
+          set +e
+          touch /tmp/shared/exit
+          export PATH=$PATH:/tmp/shared
+
+          echo "Gathering artifacts ..."
+          mkdir -p /tmp/artifacts/pods /tmp/artifacts/nodes /tmp/artifacts/metrics /tmp/artifacts/bootstrap /tmp/artifacts/network
+
+          oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' > /tmp/nodes
+          oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.spec.providerID}{"\n"}{end}' | sed 's|.*/||' > /tmp/node-provider-IDs
+          oc --insecure-skip-tls-verify --request-timeout=5s -n openshift-machine-api get machines -o jsonpath --template '{range .items[*]}{.spec.providerID}{"\n"}{end}' | sed 's|.*/||' >> /tmp/node-provider-IDs
+          oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces --template '{{ range .items }}{{ $name := .metadata.name }}{{ $ns := .metadata.namespace }}{{ range .spec.containers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ range .spec.initContainers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ end }}' > /tmp/containers
+          oc --insecure-skip-tls-verify --request-timeout=5s get pods -l openshift.io/component=api --all-namespaces --template '{{ range .items }}-n {{ .metadata.namespace }} {{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/pods-api
+
+          queue /tmp/artifacts/config-resources.json oc --insecure-skip-tls-verify --request-timeout=5s get apiserver.config.openshift.io authentication.config.openshift.io build.config.openshift.io console.config.openshift.io dns.config.openshift.io featuregate.config.openshift.io image.config.openshift.io infrastructure.config.openshift.io ingress.config.openshift.io network.config.openshift.io oauth.config.openshift.io project.config.openshift.io scheduler.config.openshift.io -o json
+          queue /tmp/artifacts/apiservices.json oc --insecure-skip-tls-verify --request-timeout=5s get apiservices -o json
+          queue /tmp/artifacts/clusteroperators.json oc --insecure-skip-tls-verify --request-timeout=5s get clusteroperators -o json
+          queue /tmp/artifacts/clusterversion.json oc --insecure-skip-tls-verify --request-timeout=5s get clusterversion -o json
+          queue /tmp/artifacts/configmaps.json oc --insecure-skip-tls-verify --request-timeout=5s get configmaps --all-namespaces -o json
+          queue /tmp/artifacts/credentialsrequests.json oc --insecure-skip-tls-verify --request-timeout=5s get credentialsrequests --all-namespaces -o json
+          queue /tmp/artifacts/csr.json oc --insecure-skip-tls-verify --request-timeout=5s get csr -o json
+          queue /tmp/artifacts/endpoints.json oc --insecure-skip-tls-verify --request-timeout=5s get endpoints --all-namespaces -o json
+          FILTER=gzip queue /tmp/artifacts/deployments.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get deployments --all-namespaces -o json
+          FILTER=gzip queue /tmp/artifacts/daemonsets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get daemonsets --all-namespaces -o json
+          queue /tmp/artifacts/events.json oc --insecure-skip-tls-verify --request-timeout=5s get events --all-namespaces -o json
+          queue /tmp/artifacts/kubeapiserver.json oc --insecure-skip-tls-verify --request-timeout=5s get kubeapiserver -o json
+          queue /tmp/artifacts/kubecontrollermanager.json oc --insecure-skip-tls-verify --request-timeout=5s get kubecontrollermanager -o json
+          queue /tmp/artifacts/machineconfigpools.json oc --insecure-skip-tls-verify --request-timeout=5s get machineconfigpools -o json
+          queue /tmp/artifacts/machineconfigs.json oc --insecure-skip-tls-verify --request-timeout=5s get machineconfigs -o json
+          queue /tmp/artifacts/machinesets.json oc --insecure-skip-tls-verify --request-timeout=5s get machinesets -A -o json
+          queue /tmp/artifacts/machines.json oc --insecure-skip-tls-verify --request-timeout=5s get machines -A -o json
+          queue /tmp/artifacts/namespaces.json oc --insecure-skip-tls-verify --request-timeout=5s get namespaces -o json
+          queue /tmp/artifacts/nodes.json oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o json
+          queue /tmp/artifacts/openshiftapiserver.json oc --insecure-skip-tls-verify --request-timeout=5s get openshiftapiserver -o json
+          queue /tmp/artifacts/pods.json oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces -o json
+          queue /tmp/artifacts/persistentvolumes.json oc --insecure-skip-tls-verify --request-timeout=5s get persistentvolumes --all-namespaces -o json
+          queue /tmp/artifacts/persistentvolumeclaims.json oc --insecure-skip-tls-verify --request-timeout=5s get persistentvolumeclaims --all-namespaces -o json
+          FILTER=gzip queue /tmp/artifacts/replicasets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get replicasets --all-namespaces -o json
+          queue /tmp/artifacts/rolebindings.json oc --insecure-skip-tls-verify --request-timeout=5s get rolebindings --all-namespaces -o json
+          queue /tmp/artifacts/roles.json oc --insecure-skip-tls-verify --request-timeout=5s get roles --all-namespaces -o json
+          queue /tmp/artifacts/services.json oc --insecure-skip-tls-verify --request-timeout=5s get services --all-namespaces -o json
+          FILTER=gzip queue /tmp/artifacts/statefulsets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get statefulsets --all-namespaces -o json
+
+          FILTER=gzip queue /tmp/artifacts/openapi.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get --raw /openapi/v2
+
+          # gather nodes first in parallel since they may contain the most relevant debugging info
+          while IFS= read -r i; do
+            mkdir -p /tmp/artifacts/nodes/$i
+            queue /tmp/artifacts/nodes/$i/heap oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/debug/pprof/heap
+          done < /tmp/nodes
+
+          if [[ "${CLUSTER_TYPE}" = "aws" ]]; then
+            # FIXME: get epel-release or otherwise add awscli to our teardown image
+            export PATH="${HOME}/.local/bin:${PATH}"
+            easy_install --user pip  # our Python 2.7.5 is even too old for ensurepip
+            pip install --user awscli
+            export AWS_DEFAULT_REGION="$(python -c 'import json; data = json.load(open("/tmp/artifacts/installer/metadata.json")); print(data["aws"]["region"])')"
+            echo "gathering node console output from ${AWS_DEFAULT_REGION}"
+          fi
+
+          while IFS= read -r i; do
+            mkdir -p "/tmp/artifacts/nodes/${i}"
+            if [[ "${CLUSTER_TYPE}" = "aws" ]]; then
+              queue /tmp/artifacts/nodes/$i/console aws ec2 get-console-output --instance-id "${i}" --output text
+            fi
+          done < <(sort /tmp/node-provider-IDs | uniq)
+
+          FILTER=gzip queue /tmp/artifacts/nodes/masters-journal.gz oc --insecure-skip-tls-verify adm node-logs --role=master --unify=false
+          FILTER=gzip queue /tmp/artifacts/nodes/workers-journal.gz oc --insecure-skip-tls-verify adm node-logs --role=worker --unify=false
+
+          # Snapshot iptables-save on each node for debugging possible kube-proxy issues
+          oc --insecure-skip-tls-verify get --request-timeout=20s -n openshift-sdn -l app=sdn pods --template '{{ range .items }}{{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/sdn-pods
+          while IFS= read -r i; do
+            queue /tmp/artifacts/network/iptables-save-$i oc --insecure-skip-tls-verify rsh --timeout=20 -n openshift-sdn -c sdn $i iptables-save -c
+          done < /tmp/sdn-pods
+
+          while IFS= read -r i; do
+            file="$( echo "$i" | cut -d ' ' -f 3 | tr -s ' ' '_' )"
+            queue /tmp/artifacts/metrics/${file}-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig'
+            queue /tmp/artifacts/metrics/${file}-controllers-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig'
+          done < /tmp/pods-api
+
+          while IFS= read -r i; do
+            file="$( echo "$i" | cut -d ' ' -f 2,3,5 | tr -s ' ' '_' )"
+            FILTER=gzip queue /tmp/artifacts/pods/${file}.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s $i
+            FILTER=gzip queue /tmp/artifacts/pods/${file}_previous.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s -p $i
+          done < /tmp/containers
+
+          echo "Snapshotting prometheus (may take 15s) ..."
+          queue /tmp/artifacts/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring prometheus-k8s-0 -- tar cvzf - -C /prometheus .
+          FILTER=gzip queue /tmp/artifacts/metrics/prometheus-target-metadata.json.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring prometheus-k8s-0 -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets/metadata --data-urlencode 'match_target={instance!=\"\"}'"
+
+          echo "Running must-gather..."
+          mkdir -p /tmp/artifacts/must-gather
+          queue /tmp/artifacts/must-gather/must-gather.log oc --insecure-skip-tls-verify adm must-gather --dest-dir /tmp/artifacts/must-gather
+
+          echo "Waiting for logs ..."
+          wait
+
+          # This is an experimental wiring of autogenerated failure detection.
+          echo "Detect known failures from symptoms (experimental) ..."
+          curl -f https://gist.githubusercontent.com/smarterclayton/03b50c8f9b6351b2d9903d7fb35b342f/raw/symptom.sh 2>/dev/null | bash -s /tmp/artifacts > /tmp/artifacts/junit/junit_symptoms.xml
+
+          tar -czC /tmp/artifacts/must-gather -f /tmp/artifacts/must-gather.tar.gz . &&
+          rm -rf /tmp/artifacts/must-gather
+
+          # DO NOT TEAR DOWN THE CLUSTER! It's endurance test, testing the same cluster again and again.
+          # echo "Deprovisioning cluster ..."
+          # openshift-install --dir /tmp/artifacts/installer destroy cluster
+        }
+
+        trap 'teardown' EXIT
+        trap 'jobs -p | xargs -r kill || true; exit 0' TERM
+
+        for i in $(seq 1 220); do
+          if [[ -f /tmp/shared/exit ]]; then
+            exit 0
+          fi
+          sleep 60 & wait
+        done
