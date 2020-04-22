@@ -1,0 +1,49 @@
+base_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: "4.7"
+    namespace: ocp
+    tag: base
+binary_build_commands: make
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+canonical_go_repository: github.com/kubernetes-sigs/aws-ebs-csi-driver
+images:
+- dockerfile_path: Dockerfile.openshift
+  from: base
+  inputs:
+    bin:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
+      paths: null
+  to: aws-ebs-csi-driver
+promotion:
+  name: "4.7"
+  namespace: ocp
+resources:
+  '*':
+    limits: null
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: "4.7"
+  namespace: ocp
+tests:
+- as: verify
+  commands: |
+    # Set $HOME for golangci-lint cache
+    HOME=/tmp make verify
+  container:
+    from: src
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: |
+    make test
+  container:
+    from: src

@@ -1,102 +1,6 @@
 periodics:
 - agent: kubernetes
   cluster: api.ci
-  cron: 0 */12 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: osde2e
-  labels:
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-stage-aws-addon-integreatly-operator
-  spec:
-    containers:
-    - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/integr8ly-ci-secrets
-        addons;
-      command:
-      - /bin/bash
-      - -c
-      env:
-      - name: ADDON_IDS
-        value: rhmi
-      - name: ADDON_TEST_HARNESSES
-        value: quay.io/integreatly/integreatly-operator-test-harness:osde2e
-      - name: OSD_ENV
-        value: stage
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /usr/local/integr8ly-ci-secrets
-        name: integr8ly-ci-secrets
-        readOnly: true
-      - mountPath: /usr/local/osde2e-common
-        name: osde2e-common
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: integr8ly-ci-secrets
-      secret:
-        secretName: integr8ly-ci-secrets
-    - name: osde2e-common
-      secret:
-        secretName: osde2e-common
-- agent: kubernetes
-  cluster: api.ci
-  cron: 0 */12 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: osde2e
-  labels:
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-stage-aws-addon-prow-operator
-  spec:
-    containers:
-    - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
-        addons;
-      command:
-      - /bin/bash
-      - -c
-      env:
-      - name: ADDON_IDS
-        value: prow-operator
-      - name: ADDON_TEST_HARNESSES
-        value: quay.io/miwilson/prow-operator-test-harness
-      - name: OSD_ENV
-        value: stage
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /usr/local/osde2e-common
-        name: osde2e-common
-        readOnly: true
-      - mountPath: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: osde2e-common
-      secret:
-        secretName: osde2e-common
-    - name: osde2e-credentials
-      secret:
-        secretName: osde2e-credentials
-- agent: kubernetes
-  cluster: api.ci
   cron: 0 */4 * * *
   decorate: true
   extra_refs:
@@ -116,51 +20,6 @@ periodics:
       - -c
       env:
       - name: NEXT_RELEASE_AFTER_PROD_DEFAULT
-        value: "0"
-      - name: OSD_ENV
-        value: int
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /usr/local/osde2e-common
-        name: osde2e-common
-        readOnly: true
-      - mountPath: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: osde2e-common
-      secret:
-        secretName: osde2e-common
-    - name: osde2e-credentials
-      secret:
-        secretName: osde2e-credentials
-- agent: kubernetes
-  cluster: api.ci
-  cron: 0 */4 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: osde2e
-  labels:
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-int-aws-e2e-upgrade-to-osd-default-nightly
-  spec:
-    containers:
-    - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
-      command:
-      - /bin/bash
-      - -c
-      env:
-      - name: NEXT_RELEASE_AFTER_PROD_DEFAULT_FOR_UPGRADE
         value: "0"
       - name: OSD_ENV
         value: int
@@ -240,7 +99,7 @@ periodics:
     repo: osde2e
   labels:
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-int-aws-e2e-upgrade-to-osd-default-plus-one-nightly
+  name: osde2e-int-aws-e2e-osd-default-plus-two-nightly
   spec:
     containers:
     - args:
@@ -250,8 +109,8 @@ periodics:
       - /bin/bash
       - -c
       env:
-      - name: NEXT_RELEASE_AFTER_PROD_DEFAULT_FOR_UPGRADE
-        value: "1"
+      - name: NEXT_RELEASE_AFTER_PROD_DEFAULT
+        value: "2"
       - name: OSD_ENV
         value: int
       image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
@@ -285,7 +144,7 @@ periodics:
     repo: osde2e
   labels:
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-int-aws-e2e-osd-default-plus-two-nightly
+  name: osde2e-int-aws-e2e-upgrade-to-osd-default-nightly
   spec:
     containers:
     - args:
@@ -295,8 +154,53 @@ periodics:
       - /bin/bash
       - -c
       env:
-      - name: NEXT_RELEASE_AFTER_PROD_DEFAULT
-        value: "2"
+      - name: NEXT_RELEASE_AFTER_PROD_DEFAULT_FOR_UPGRADE
+        value: "0"
+      - name: OSD_ENV
+        value: int
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/osde2e-common
+        name: osde2e-common
+        readOnly: true
+      - mountPath: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: osde2e-common
+      secret:
+        secretName: osde2e-common
+    - name: osde2e-credentials
+      secret:
+        secretName: osde2e-credentials
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 */4 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: osde2e
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: osde2e-int-aws-e2e-upgrade-to-osd-default-plus-one-nightly
+  spec:
+    containers:
+    - args:
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      command:
+      - /bin/bash
+      - -c
+      env:
+      - name: NEXT_RELEASE_AFTER_PROD_DEFAULT_FOR_UPGRADE
+        value: "1"
       - name: OSD_ENV
         value: int
       image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
@@ -376,7 +280,7 @@ periodics:
     repo: osde2e
   labels:
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-prod-aws-e2e-default
+  name: osde2e-int-gcp-e2e-osd-default-nightly
   spec:
     containers:
     - args:
@@ -386,52 +290,14 @@ periodics:
       - /bin/bash
       - -c
       env:
+      - name: CLOUD_PROVIDER_ID
+        value: gcp
+      - name: CLOUD_PROVIDER_REGION
+        value: us-east1
+      - name: NEXT_RELEASE_AFTER_PROD_DEFAULT
+        value: "0"
       - name: OSD_ENV
-        value: prod
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /usr/local/osde2e-common
-        name: osde2e-common
-        readOnly: true
-      - mountPath: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: osde2e-common
-      secret:
-        secretName: osde2e-common
-    - name: osde2e-credentials
-      secret:
-        secretName: osde2e-credentials
-- agent: kubernetes
-  cluster: api.ci
-  cron: 0 6,14 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: osde2e
-  labels:
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-prod-aws-informing-default
-  spec:
-    containers:
-    - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
-        informing
-      command:
-      - /bin/bash
-      - -c
-      env:
-      - name: OSD_ENV
-        value: prod
+        value: int
       image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
       imagePullPolicy: Always
       name: ""
@@ -463,7 +329,253 @@ periodics:
     repo: osde2e
   labels:
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-prod-aws-e2e-upgrade-default-next
+  name: osde2e-int-gcp-e2e-osd-default-plus-one-nightly
+  spec:
+    containers:
+    - args:
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      command:
+      - /bin/bash
+      - -c
+      env:
+      - name: CLOUD_PROVIDER_ID
+        value: gcp
+      - name: CLOUD_PROVIDER_REGION
+        value: us-east1
+      - name: NEXT_RELEASE_AFTER_PROD_DEFAULT
+        value: "1"
+      - name: OSD_ENV
+        value: int
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/osde2e-common
+        name: osde2e-common
+        readOnly: true
+      - mountPath: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: osde2e-common
+      secret:
+        secretName: osde2e-common
+    - name: osde2e-credentials
+      secret:
+        secretName: osde2e-credentials
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 */4 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: osde2e
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: osde2e-int-gcp-e2e-osd-default-plus-two-nightly
+  spec:
+    containers:
+    - args:
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      command:
+      - /bin/bash
+      - -c
+      env:
+      - name: CLOUD_PROVIDER_ID
+        value: gcp
+      - name: CLOUD_PROVIDER_REGION
+        value: us-east1
+      - name: NEXT_RELEASE_AFTER_PROD_DEFAULT
+        value: "2"
+      - name: OSD_ENV
+        value: int
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/osde2e-common
+        name: osde2e-common
+        readOnly: true
+      - mountPath: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: osde2e-common
+      secret:
+        secretName: osde2e-common
+    - name: osde2e-credentials
+      secret:
+        secretName: osde2e-credentials
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 */4 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: osde2e
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: osde2e-int-gcp-e2e-upgrade-to-osd-default-nightly
+  spec:
+    containers:
+    - args:
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      command:
+      - /bin/bash
+      - -c
+      env:
+      - name: CLOUD_PROVIDER_ID
+        value: gcp
+      - name: CLOUD_PROVIDER_REGION
+        value: us-east1
+      - name: NEXT_RELEASE_AFTER_PROD_DEFAULT_FOR_UPGRADE
+        value: "0"
+      - name: OSD_ENV
+        value: int
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/osde2e-common
+        name: osde2e-common
+        readOnly: true
+      - mountPath: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: osde2e-common
+      secret:
+        secretName: osde2e-common
+    - name: osde2e-credentials
+      secret:
+        secretName: osde2e-credentials
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 */4 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: osde2e
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: osde2e-int-gcp-e2e-upgrade-to-osd-default-plus-one-nightly
+  spec:
+    containers:
+    - args:
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      command:
+      - /bin/bash
+      - -c
+      env:
+      - name: CLOUD_PROVIDER_ID
+        value: gcp
+      - name: CLOUD_PROVIDER_REGION
+        value: us-east1
+      - name: NEXT_RELEASE_AFTER_PROD_DEFAULT_FOR_UPGRADE
+        value: "1"
+      - name: OSD_ENV
+        value: int
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/osde2e-common
+        name: osde2e-common
+        readOnly: true
+      - mountPath: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: osde2e-common
+      secret:
+        secretName: osde2e-common
+    - name: osde2e-credentials
+      secret:
+        secretName: osde2e-credentials
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 8 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: osde2e
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: osde2e-int-gcp-scale-osd-default-nightly
+  spec:
+    containers:
+    - args:
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
+        scale
+      command:
+      - /bin/bash
+      - -c
+      env:
+      - name: CLOUD_PROVIDER_ID
+        value: gcp
+      - name: CLOUD_PROVIDER_REGION
+        value: us-east1
+      - name: NEXT_RELEASE_AFTER_PROD_DEFAULT
+        value: "0"
+      - name: OSD_ENV
+        value: int
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/osde2e-common
+        name: osde2e-common
+        readOnly: true
+      - mountPath: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: osde2e-common
+      secret:
+        secretName: osde2e-common
+    - name: osde2e-credentials
+      secret:
+        secretName: osde2e-credentials
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 */4 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: osde2e
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: osde2e-prod-aws-e2e-default
   spec:
     containers:
     - args:
@@ -475,8 +587,6 @@ periodics:
       env:
       - name: OSD_ENV
         value: prod
-      - name: UPGRADE_TO_CIS_IF_POSSIBLE
-        value: "true"
       image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
       imagePullPolicy: Always
       name: ""
@@ -589,7 +699,7 @@ periodics:
         secretName: osde2e-credentials
 - agent: kubernetes
   cluster: api.ci
-  cron: 0 10,18 * * *
+  cron: 0 12 * * *
   decorate: true
   extra_refs:
   - base_ref: master
@@ -597,20 +707,63 @@ periodics:
     repo: osde2e
   labels:
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-prod-aws-informing-next
+  name: osde2e-prod-aws-e2e-oldest-imageset
   spec:
     containers:
     - args:
       - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
         ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
-        informing
+        oldest-imageset
       command:
       - /bin/bash
       - -c
       env:
       - name: OSD_ENV
         value: prod
-      - name: USE_LATEST_VERSION_FOR_INSTALL
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/osde2e-common
+        name: osde2e-common
+        readOnly: true
+      - mountPath: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: osde2e-common
+      secret:
+        secretName: osde2e-common
+    - name: osde2e-credentials
+      secret:
+        secretName: osde2e-credentials
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 */4 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: osde2e
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: osde2e-prod-aws-e2e-upgrade-default-next
+  spec:
+    containers:
+    - args:
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      command:
+      - /bin/bash
+      - -c
+      env:
+      - name: OSD_ENV
+        value: prod
+      - name: UPGRADE_TO_CIS_IF_POSSIBLE
         value: "true"
       image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
       imagePullPolicy: Always
@@ -635,7 +788,7 @@ periodics:
         secretName: osde2e-credentials
 - agent: kubernetes
   cluster: api.ci
-  cron: 0 12 * * *
+  cron: 0 6,14 * * *
   decorate: true
   extra_refs:
   - base_ref: master
@@ -643,19 +796,65 @@ periodics:
     repo: osde2e
   labels:
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-prod-aws-e2e-oldest-imageset
+  name: osde2e-prod-aws-informing-default
   spec:
     containers:
     - args:
       - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
         ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
-        oldest-imageset
+        informing
       command:
       - /bin/bash
       - -c
       env:
       - name: OSD_ENV
         value: prod
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/osde2e-common
+        name: osde2e-common
+        readOnly: true
+      - mountPath: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: osde2e-common
+      secret:
+        secretName: osde2e-common
+    - name: osde2e-credentials
+      secret:
+        secretName: osde2e-credentials
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 10,18 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: osde2e
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: osde2e-prod-aws-informing-next
+  spec:
+    containers:
+    - args:
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
+        informing
+      command:
+      - /bin/bash
+      - -c
+      env:
+      - name: OSD_ENV
+        value: prod
+      - name: USE_LATEST_VERSION_FOR_INSTALL
+        value: "true"
       image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
       imagePullPolicy: Always
       name: ""
@@ -731,6 +930,433 @@ periodics:
     repo: osde2e
   labels:
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: osde2e-prod-gcp-e2e-default
+  spec:
+    containers:
+    - args:
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      command:
+      - /bin/bash
+      - -c
+      env:
+      - name: CLOUD_PROVIDER_ID
+        value: gcp
+      - name: CLOUD_PROVIDER_REGION
+        value: us-east1
+      - name: OSD_ENV
+        value: prod
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/osde2e-common
+        name: osde2e-common
+        readOnly: true
+      - mountPath: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: osde2e-common
+      secret:
+        secretName: osde2e-common
+    - name: osde2e-credentials
+      secret:
+        secretName: osde2e-credentials
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 */4 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: osde2e
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: osde2e-prod-gcp-e2e-next
+  spec:
+    containers:
+    - args:
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      command:
+      - /bin/bash
+      - -c
+      env:
+      - name: CLOUD_PROVIDER_ID
+        value: gcp
+      - name: CLOUD_PROVIDER_REGION
+        value: us-east1
+      - name: OSD_ENV
+        value: prod
+      - name: USE_LATEST_VERSION_FOR_INSTALL
+        value: "true"
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/osde2e-common
+        name: osde2e-common
+        readOnly: true
+      - mountPath: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: osde2e-common
+      secret:
+        secretName: osde2e-common
+    - name: osde2e-credentials
+      secret:
+        secretName: osde2e-credentials
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 */4 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: osde2e
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: osde2e-prod-gcp-e2e-upgrade-default-next
+  spec:
+    containers:
+    - args:
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      command:
+      - /bin/bash
+      - -c
+      env:
+      - name: CLOUD_PROVIDER_ID
+        value: gcp
+      - name: CLOUD_PROVIDER_REGION
+        value: us-east1
+      - name: OSD_ENV
+        value: prod
+      - name: UPGRADE_TO_CIS_IF_POSSIBLE
+        value: "true"
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/osde2e-common
+        name: osde2e-common
+        readOnly: true
+      - mountPath: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: osde2e-common
+      secret:
+        secretName: osde2e-common
+    - name: osde2e-credentials
+      secret:
+        secretName: osde2e-credentials
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 8 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: osde2e
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: osde2e-prod-gcp-scale-default
+  spec:
+    containers:
+    - args:
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
+        scale
+      command:
+      - /bin/bash
+      - -c
+      env:
+      - name: CLOUD_PROVIDER_ID
+        value: gcp
+      - name: CLOUD_PROVIDER_REGION
+        value: us-east1
+      - name: OSD_ENV
+        value: prod
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/osde2e-common
+        name: osde2e-common
+        readOnly: true
+      - mountPath: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: osde2e-common
+      secret:
+        secretName: osde2e-common
+    - name: osde2e-credentials
+      secret:
+        secretName: osde2e-credentials
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 23 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: osde2e
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: osde2e-stage-aws-addon-codeready-operator
+  spec:
+    containers:
+    - args:
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/crw-osd-token addons;
+      command:
+      - /bin/bash
+      - -c
+      env:
+      - name: ADDON_IDS
+        value: codeready-workspaces
+      - name: ADDON_TEST_HARNESSES
+        value: quay.io/crw/osd-e2e:latest
+      - name: OSD_ENV
+        value: stage
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/crw-osd-token
+        name: crw-osd-token
+        readOnly: true
+      - mountPath: /usr/local/osde2e-common
+        name: osde2e-common
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: crw-osd-token
+      secret:
+        secretName: crw-osd-token
+    - name: osde2e-common
+      secret:
+        secretName: osde2e-common
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 3 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: osde2e
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: osde2e-stage-aws-addon-codeready-qe-operator
+  spec:
+    containers:
+    - args:
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/crw-osd-token addons;
+      command:
+      - /bin/bash
+      - -c
+      env:
+      - name: ADDON_IDS
+        value: codeready-workspaces-qe
+      - name: ADDON_TEST_HARNESSES
+        value: quay.io/crw/osd-e2e:nightly
+      - name: OSD_ENV
+        value: stage
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/crw-osd-token
+        name: crw-osd-token
+        readOnly: true
+      - mountPath: /usr/local/osde2e-common
+        name: osde2e-common
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: crw-osd-token
+      secret:
+        secretName: crw-osd-token
+    - name: osde2e-common
+      secret:
+        secretName: osde2e-common
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 */12 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: osde2e
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: osde2e-stage-aws-addon-integreatly-operator
+  spec:
+    containers:
+    - args:
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/integr8ly-ci-secrets
+        addons;
+      command:
+      - /bin/bash
+      - -c
+      env:
+      - name: ADDON_IDS
+        value: rhmi
+      - name: ADDON_TEST_HARNESSES
+        value: quay.io/integreatly/integreatly-operator-test-harness:osde2e
+      - name: OSD_ENV
+        value: stage
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/integr8ly-ci-secrets
+        name: integr8ly-ci-secrets
+        readOnly: true
+      - mountPath: /usr/local/osde2e-common
+        name: osde2e-common
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: integr8ly-ci-secrets
+      secret:
+        secretName: integr8ly-ci-secrets
+    - name: osde2e-common
+      secret:
+        secretName: osde2e-common
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 */12 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: osde2e
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: osde2e-stage-aws-addon-prow-operator
+  spec:
+    containers:
+    - args:
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
+        addons;
+      command:
+      - /bin/bash
+      - -c
+      env:
+      - name: ADDON_IDS
+        value: prow-operator
+      - name: ADDON_TEST_HARNESSES
+        value: quay.io/miwilson/prow-operator-test-harness
+      - name: OSD_ENV
+        value: stage
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/osde2e-common
+        name: osde2e-common
+        readOnly: true
+      - mountPath: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: osde2e-common
+      secret:
+        secretName: osde2e-common
+    - name: osde2e-credentials
+      secret:
+        secretName: osde2e-credentials
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 8 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: osde2e
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: osde2e-stage-aws-conformance-default
+  spec:
+    containers:
+    - args:
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        export MULTI_AZ=true; ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
+        conformance
+      command:
+      - /bin/bash
+      - -c
+      env:
+      - name: OSD_ENV
+        value: stage
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/osde2e-common
+        name: osde2e-common
+        readOnly: true
+      - mountPath: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: osde2e-common
+      secret:
+        secretName: osde2e-common
+    - name: osde2e-credentials
+      secret:
+        secretName: osde2e-credentials
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 */4 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: osde2e
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: osde2e-stage-aws-e2e-default
   spec:
     containers:
@@ -743,98 +1369,6 @@ periodics:
       env:
       - name: OSD_ENV
         value: stage
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /usr/local/osde2e-common
-        name: osde2e-common
-        readOnly: true
-      - mountPath: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: osde2e-common
-      secret:
-        secretName: osde2e-common
-    - name: osde2e-credentials
-      secret:
-        secretName: osde2e-credentials
-- agent: kubernetes
-  cluster: api.ci
-  cron: 0 */4 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: osde2e
-  labels:
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-stage-aws-e2e-upgrade-default-next-z
-  spec:
-    containers:
-    - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
-      command:
-      - /bin/bash
-      - -c
-      env:
-      - name: OSD_ENV
-        value: stage
-      - name: UPGRADE_TO_CIS_IF_POSSIBLE
-        value: "true"
-      - name: ONLY_UPGRADE_TO_Z_RELEASES
-        value: "true"
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /usr/local/osde2e-common
-        name: osde2e-common
-        readOnly: true
-      - mountPath: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: osde2e-common
-      secret:
-        secretName: osde2e-common
-    - name: osde2e-credentials
-      secret:
-        secretName: osde2e-credentials
-- agent: kubernetes
-  cluster: api.ci
-  cron: 0 */4 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: osde2e
-  labels:
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-stage-aws-e2e-upgrade-default-next
-  spec:
-    containers:
-    - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
-      command:
-      - /bin/bash
-      - -c
-      env:
-      - name: OSD_ENV
-        value: stage
-      - name: UPGRADE_TO_CIS_IF_POSSIBLE
-        value: "true"
       image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
       imagePullPolicy: Always
       name: ""
@@ -991,7 +1525,7 @@ periodics:
         secretName: osde2e-credentials
 - agent: kubernetes
   cluster: api.ci
-  cron: 0 8 * * *
+  cron: 0 */4 * * *
   decorate: true
   extra_refs:
   - base_ref: master
@@ -999,19 +1533,20 @@ periodics:
     repo: osde2e
   labels:
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-stage-aws-scale-default
+  name: osde2e-stage-aws-e2e-upgrade-default-next
   spec:
     containers:
     - args:
       - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
         ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
-        scale
       command:
       - /bin/bash
       - -c
       env:
       - name: OSD_ENV
         value: stage
+      - name: UPGRADE_TO_CIS_IF_POSSIBLE
+        value: "true"
       image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
       imagePullPolicy: Always
       name: ""
@@ -1035,7 +1570,7 @@ periodics:
         secretName: osde2e-credentials
 - agent: kubernetes
   cluster: api.ci
-  cron: 0 8 * * *
+  cron: 0 */4 * * *
   decorate: true
   extra_refs:
   - base_ref: master
@@ -1043,358 +1578,22 @@ periodics:
     repo: osde2e
   labels:
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-stage-aws-conformance-default
+  name: osde2e-stage-aws-e2e-upgrade-default-next-z
   spec:
     containers:
     - args:
       - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        export MULTI_AZ=true; ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
-        conformance
+        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
       command:
       - /bin/bash
       - -c
       env:
+      - name: ONLY_UPGRADE_TO_Z_RELEASES
+        value: "true"
       - name: OSD_ENV
         value: stage
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /usr/local/osde2e-common
-        name: osde2e-common
-        readOnly: true
-      - mountPath: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: osde2e-common
-      secret:
-        secretName: osde2e-common
-    - name: osde2e-credentials
-      secret:
-        secretName: osde2e-credentials
-- agent: kubernetes
-  cluster: api.ci
-  cron: 0 23 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: osde2e
-  labels:
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-stage-aws-addon-codeready-operator
-  spec:
-    containers:
-    - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/crw-osd-token addons;
-      command:
-      - /bin/bash
-      - -c
-      env:
-      - name: ADDON_IDS
-        value: codeready-workspaces
-      - name: ADDON_TEST_HARNESSES
-        value: quay.io/crw/osd-e2e:latest
-      - name: OSD_ENV
-        value: stage
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /usr/local/osde2e-common
-        name: osde2e-common
-        readOnly: true
-      - mountPath: /usr/local/crw-osd-token
-        name: crw-osd-token
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: osde2e-common
-      secret:
-        secretName: osde2e-common
-    - name: crw-osd-token
-      secret:
-        secretName: crw-osd-token
-- agent: kubernetes
-  cluster: api.ci
-  cron: 0 3 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: osde2e
-  labels:
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-stage-aws-addon-codeready-qe-operator
-  spec:
-    containers:
-    - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/crw-osd-token addons;
-      command:
-      - /bin/bash
-      - -c
-      env:
-      - name: ADDON_IDS
-        value: codeready-workspaces-qe
-      - name: ADDON_TEST_HARNESSES
-        value: quay.io/crw/osd-e2e:nightly
-      - name: OSD_ENV
-        value: stage
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /usr/local/osde2e-common
-        name: osde2e-common
-        readOnly: true
-      - mountPath: /usr/local/crw-osd-token
-        name: crw-osd-token
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: osde2e-common
-      secret:
-        secretName: osde2e-common
-    - name: crw-osd-token
-      secret:
-        secretName: crw-osd-token
-- agent: kubernetes
-  cluster: api.ci
-  cron: 0 */4 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: osde2e
-  labels:
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-int-gcp-e2e-osd-default-nightly
-  spec:
-    containers:
-    - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
-      command:
-      - /bin/bash
-      - -c
-      env:
-      - name: CLOUD_PROVIDER_ID
-        value: gcp
-      - name: CLOUD_PROVIDER_REGION
-        value: us-east1
-      - name: NEXT_RELEASE_AFTER_PROD_DEFAULT
-        value: "0"
-      - name: OSD_ENV
-        value: int
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /usr/local/osde2e-common
-        name: osde2e-common
-        readOnly: true
-      - mountPath: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: osde2e-common
-      secret:
-        secretName: osde2e-common
-    - name: osde2e-credentials
-      secret:
-        secretName: osde2e-credentials
-- agent: kubernetes
-  cluster: api.ci
-  cron: 0 */4 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: osde2e
-  labels:
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-int-gcp-e2e-upgrade-to-osd-default-nightly
-  spec:
-    containers:
-    - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
-      command:
-      - /bin/bash
-      - -c
-      env:
-      - name: CLOUD_PROVIDER_ID
-        value: gcp
-      - name: CLOUD_PROVIDER_REGION
-        value: us-east1
-      - name: NEXT_RELEASE_AFTER_PROD_DEFAULT_FOR_UPGRADE
-        value: "0"
-      - name: OSD_ENV
-        value: int
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /usr/local/osde2e-common
-        name: osde2e-common
-        readOnly: true
-      - mountPath: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: osde2e-common
-      secret:
-        secretName: osde2e-common
-    - name: osde2e-credentials
-      secret:
-        secretName: osde2e-credentials
-- agent: kubernetes
-  cluster: api.ci
-  cron: 0 */4 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: osde2e
-  labels:
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-int-gcp-e2e-osd-default-plus-one-nightly
-  spec:
-    containers:
-    - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
-      command:
-      - /bin/bash
-      - -c
-      env:
-      - name: CLOUD_PROVIDER_ID
-        value: gcp
-      - name: CLOUD_PROVIDER_REGION
-        value: us-east1
-      - name: NEXT_RELEASE_AFTER_PROD_DEFAULT
-        value: "1"
-      - name: OSD_ENV
-        value: int
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /usr/local/osde2e-common
-        name: osde2e-common
-        readOnly: true
-      - mountPath: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: osde2e-common
-      secret:
-        secretName: osde2e-common
-    - name: osde2e-credentials
-      secret:
-        secretName: osde2e-credentials
-- agent: kubernetes
-  cluster: api.ci
-  cron: 0 */4 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: osde2e
-  labels:
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-int-gcp-e2e-upgrade-to-osd-default-plus-one-nightly
-  spec:
-    containers:
-    - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
-      command:
-      - /bin/bash
-      - -c
-      env:
-      - name: CLOUD_PROVIDER_ID
-        value: gcp
-      - name: CLOUD_PROVIDER_REGION
-        value: us-east1
-      - name: NEXT_RELEASE_AFTER_PROD_DEFAULT_FOR_UPGRADE
-        value: "1"
-      - name: OSD_ENV
-        value: int
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /usr/local/osde2e-common
-        name: osde2e-common
-        readOnly: true
-      - mountPath: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: osde2e-common
-      secret:
-        secretName: osde2e-common
-    - name: osde2e-credentials
-      secret:
-        secretName: osde2e-credentials
-- agent: kubernetes
-  cluster: api.ci
-  cron: 0 */4 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: osde2e
-  labels:
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-int-gcp-e2e-osd-default-plus-two-nightly
-  spec:
-    containers:
-    - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
-      command:
-      - /bin/bash
-      - -c
-      env:
-      - name: CLOUD_PROVIDER_ID
-        value: gcp
-      - name: CLOUD_PROVIDER_REGION
-        value: us-east1
-      - name: NEXT_RELEASE_AFTER_PROD_DEFAULT
-        value: "2"
-      - name: OSD_ENV
-        value: int
+      - name: UPGRADE_TO_CIS_IF_POSSIBLE
+        value: "true"
       image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
       imagePullPolicy: Always
       name: ""
@@ -1426,7 +1625,7 @@ periodics:
     repo: osde2e
   labels:
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-int-gcp-scale-osd-default-nightly
+  name: osde2e-stage-aws-scale-default
   spec:
     containers:
     - args:
@@ -1437,14 +1636,8 @@ periodics:
       - /bin/bash
       - -c
       env:
-      - name: CLOUD_PROVIDER_ID
-        value: gcp
-      - name: CLOUD_PROVIDER_REGION
-        value: us-east1
-      - name: NEXT_RELEASE_AFTER_PROD_DEFAULT
-        value: "0"
       - name: OSD_ENV
-        value: int
+        value: stage
       image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
       imagePullPolicy: Always
       name: ""
@@ -1523,7 +1716,7 @@ periodics:
     repo: osde2e
   labels:
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-stage-gcp-e2e-upgrade-default-next
+  name: osde2e-stage-gcp-e2e-next
   spec:
     containers:
     - args:
@@ -1539,7 +1732,7 @@ periodics:
         value: us-east1
       - name: OSD_ENV
         value: stage
-      - name: UPGRADE_TO_CIS_IF_POSSIBLE
+      - name: USE_LATEST_VERSION_FOR_INSTALL
         value: "true"
       image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
       imagePullPolicy: Always
@@ -1572,7 +1765,7 @@ periodics:
     repo: osde2e
   labels:
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-stage-gcp-e2e-next
+  name: osde2e-stage-gcp-e2e-upgrade-default-next
   spec:
     containers:
     - args:
@@ -1588,7 +1781,7 @@ periodics:
         value: us-east1
       - name: OSD_ENV
         value: stage
-      - name: USE_LATEST_VERSION_FOR_INSTALL
+      - name: UPGRADE_TO_CIS_IF_POSSIBLE
         value: "true"
       image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
       imagePullPolicy: Always
@@ -1638,199 +1831,6 @@ periodics:
         value: us-east1
       - name: OSD_ENV
         value: stage
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /usr/local/osde2e-common
-        name: osde2e-common
-        readOnly: true
-      - mountPath: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: osde2e-common
-      secret:
-        secretName: osde2e-common
-    - name: osde2e-credentials
-      secret:
-        secretName: osde2e-credentials
-- agent: kubernetes
-  cluster: api.ci
-  cron: 0 */4 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: osde2e
-  labels:
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-prod-gcp-e2e-default
-  spec:
-    containers:
-    - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
-      command:
-      - /bin/bash
-      - -c
-      env:
-      - name: CLOUD_PROVIDER_ID
-        value: gcp
-      - name: CLOUD_PROVIDER_REGION
-        value: us-east1
-      - name: OSD_ENV
-        value: prod
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /usr/local/osde2e-common
-        name: osde2e-common
-        readOnly: true
-      - mountPath: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: osde2e-common
-      secret:
-        secretName: osde2e-common
-    - name: osde2e-credentials
-      secret:
-        secretName: osde2e-credentials
-- agent: kubernetes
-  cluster: api.ci
-  cron: 0 */4 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: osde2e
-  labels:
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-prod-gcp-e2e-upgrade-default-next
-  spec:
-    containers:
-    - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
-      command:
-      - /bin/bash
-      - -c
-      env:
-      - name: CLOUD_PROVIDER_ID
-        value: gcp
-      - name: CLOUD_PROVIDER_REGION
-        value: us-east1
-      - name: OSD_ENV
-        value: prod
-      - name: UPGRADE_TO_CIS_IF_POSSIBLE
-        value: "true"
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /usr/local/osde2e-common
-        name: osde2e-common
-        readOnly: true
-      - mountPath: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: osde2e-common
-      secret:
-        secretName: osde2e-common
-    - name: osde2e-credentials
-      secret:
-        secretName: osde2e-credentials
-- agent: kubernetes
-  cluster: api.ci
-  cron: 0 */4 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: osde2e
-  labels:
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-prod-gcp-e2e-next
-  spec:
-    containers:
-    - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
-      command:
-      - /bin/bash
-      - -c
-      env:
-      - name: CLOUD_PROVIDER_ID
-        value: gcp
-      - name: CLOUD_PROVIDER_REGION
-        value: us-east1
-      - name: OSD_ENV
-        value: prod
-      - name: USE_LATEST_VERSION_FOR_INSTALL
-        value: "true"
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /usr/local/osde2e-common
-        name: osde2e-common
-        readOnly: true
-      - mountPath: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: osde2e-common
-      secret:
-        secretName: osde2e-common
-    - name: osde2e-credentials
-      secret:
-        secretName: osde2e-credentials
-- agent: kubernetes
-  cluster: api.ci
-  cron: 0 8 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: osde2e
-  labels:
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-prod-gcp-scale-default
-  spec:
-    containers:
-    - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
-        scale
-      command:
-      - /bin/bash
-      - -c
-      env:
-      - name: CLOUD_PROVIDER_ID
-        value: gcp
-      - name: CLOUD_PROVIDER_REGION
-        value: us-east1
-      - name: OSD_ENV
-        value: prod
       image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
       imagePullPolicy: Always
       name: ""
