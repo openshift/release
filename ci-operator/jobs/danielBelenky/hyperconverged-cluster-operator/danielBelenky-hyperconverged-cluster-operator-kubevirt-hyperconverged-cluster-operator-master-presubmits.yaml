@@ -1,0 +1,179 @@
+presubmits:
+  danielBelenky/hyperconverged-cluster-operator:
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - kubevirt-hyperconverged-cluster-operator-master
+    cluster: api.ci
+    context: ci/prow/hco-e2e-nightly-bundle
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-danielBelenky-hyperconverged-cluster-operator-kubevirt-hyperconverged-cluster-operator-master-hco-e2e-nightly-bundle
+    rerun_command: /test hco-e2e-nightly-bundle
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
+        - --secret-dir=/usr/local/hco-e2e-nightly-bundle-cluster-profile
+        - --secret-dir=/etc/quay-secret
+        - --target=hco-e2e-nightly-bundle
+        - --template=/usr/local/hco-e2e-nightly-bundle
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_ENABLE_NESTED_VIRT
+          value: "true"
+        - name: CLUSTER_NESTED_VIRT_IMAGE
+          value: rhcos43-nested-virt
+        - name: CLUSTER_TYPE
+          value: gcp
+        - name: JOB_NAME_SAFE
+          value: hco-e2e-nightly-bundle
+        - name: CUSTOM_SECRET_NAME
+          value: quay-secret
+        - name: TEST_COMMAND
+          value: |
+            echo "Test is starting"
+
+            username_secret_line="$(grep username /usr/share/custom-secret/secret.txt)"
+            username_secret="${username_secret_line#*:}"
+
+            password_secret_line="$(grep token /usr/share/custom-secret/secret.txt)"
+            password_secret="${password_secret_line#*:}"
+
+            /create_docker_config.sh quay.io/openshift-cnv "$username_secret" "$password_secret"
+            sleep 300
+
+            echo "Deploying test infra"
+            oc create ns openshift-cnv
+            oc create -f /kubevirt-testing-infra.yaml
+
+            echo "Deploying nightly bundle"
+            export HCO_REGISTRY_IMAGE=quay.io/openshift-cnv/container-native-virtualization-hco-bundle-registry:v2.3.0-184
+            export HCO_VERSION=2.3.0
+            export HCO_CHANNEL=2.3
+            export TARGET_NAMESPACE=openshift-cnv
+            /deploy.sh
+
+            set -x
+            operator_image="$(oc get pod -n openshift-cnv -l kubevirt.io=virt-operator --no-headers -o=jsonpath='{.items[0].spec.containers[0].image}')"
+            test_pod_override="$(sed -e "s|@OPERATOR_IMAGE_URL@|${operator_image}|g" /kubevirt-tests-pod-spec-override.json.in)"
+            oc -n openshift-cnv run -i tests-runner --image=dummy --overrides="$test_pod_override" --restart=Never
+
+            echo "Test is finished"
+        - name: TEST_IMAGESTREAM_TAG
+          value: pipeline:nightly-bundle-tests-runner
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/hco-e2e-nightly-bundle-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/hco-e2e-nightly-bundle
+          name: job-definition
+          subPath: cluster-launch-installer-custom-test-image.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/quay-secret
+          name: quay-secret
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - configMap:
+          name: prow-job-cluster-launch-installer-custom-test-image
+        name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: quay-secret
+        secret:
+          secretName: cluster-secrets-openshift-virtualization
+    trigger: (?m)^/test( | .* )hco-e2e-nightly-bundle,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - kubevirt-hyperconverged-cluster-operator-master
+    cluster: api.ci
+    context: ci/prow/images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-danielBelenky-hyperconverged-cluster-operator-kubevirt-hyperconverged-cluster-operator-master-images
+    rerun_command: /test images
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --target=[images]
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: pull-secret
+        secret:
+          secretName: regcred
+    trigger: (?m)^/test( | .* )images,?($|\s.*)

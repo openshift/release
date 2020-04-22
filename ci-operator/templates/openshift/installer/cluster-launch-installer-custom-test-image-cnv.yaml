@@ -137,16 +137,6 @@ objects:
       - /usr/bin/kubectl
       - /tmp/shared/
 
-    - name: cli-tests
-      image: ${IMAGE_TESTS}
-      volumeMounts:
-      - name: shared-tmp
-        mountPath: /tmp/shared
-      command:
-      - cp
-      - /usr/bin/openshift-tests
-      - /tmp/shared/
-
     containers:
     # Once the cluster is up, executes shared tests
     - name: test
@@ -660,13 +650,9 @@ objects:
         EOF
         fi
 
-        openshift-install --dir=/tmp/artifacts/installer/ create manifests &
-        wait "$!"
-
-        sed -i '/^  channel:/d' /tmp/artifacts/installer/manifests/cvo-overrides.yaml
-
         # TODO: Replace with a more concise manifest injection approach
         if [[ -n "${CLUSTER_NETWORK_MANIFEST}" ]]; then
+            openshift-install --dir=/tmp/artifacts/installer/ create manifests
             echo "${CLUSTER_NETWORK_MANIFEST}" > /tmp/artifacts/installer/manifests/cluster-network-03-config.yml
         fi
 
