@@ -19,4 +19,4 @@ ci_operator_dir="${base_dir}/ci-operator"
 cmd=sanitize-prow-jobs
 if ! type $cmd &>/dev/null; then cmd=determinize-prow-jobs; fi
 
-$cmd --prow-jobs-dir "${ci_operator_dir}/jobs"
+$cmd --prow-jobs-dir "${ci_operator_dir}/jobs" --config-path "${base_dir}/core-services/sanitize-prow-jobs/_config.yaml"
