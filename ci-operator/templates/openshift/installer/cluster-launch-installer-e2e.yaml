@@ -432,12 +432,14 @@ objects:
         cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
 
         workers=3
-        if has_variant "compact"; then
+        if has_variant "compact" || has_variant "multisocket"; then
           workers=0
         fi
         if [[ "${CLUSTER_TYPE}" = "aws" ]]; then
             master_type=null
-            if has_variant "xlarge"; then
+            if has_variant "multisocket"; then
+              master_type=c5n.metal
+            elif has_variant "xlarge"; then
               master_type=m5.8xlarge
             elif has_variant "large"; then
               master_type=m5.4xlarge
