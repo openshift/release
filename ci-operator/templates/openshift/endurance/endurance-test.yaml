@@ -164,26 +164,20 @@ objects:
 
         ${TEST_COMMAND}
 
-    # Perform must-gather, but do not really tear down the cluster
-    - name: teardown
+    # Perform must-gather, but do not really tear down the cluster.
+    # Copied from "teardown" conainer from cluster-launch-installer-e2e.yaml with some little tailoring
+    # (cut unused env. variables, don't destroy the cluster at the end).
+    - name: log-gather
       image: ${IMAGE_TESTS}
       terminationMessagePolicy: FallbackToLogsOnError
       volumeMounts:
       - name: shared-tmp
         mountPath: /tmp/shared
-      - name: cluster-profile
-        mountPath: /etc/openshift-installer
       - name: artifacts
         mountPath: /tmp/artifacts
       env:
       - name: INSTANCE_PREFIX
         value: ${NAMESPACE}-${JOB_NAME_HASH}
-      - name: AWS_SHARED_CREDENTIALS_FILE
-        value: /etc/openshift-installer/.awscred
-      - name: AZURE_AUTH_LOCATION
-        value: /etc/openshift-installer/osServicePrincipal.json
-      - name: GOOGLE_CLOUD_KEYFILE_JSON
-        value: /etc/openshift-installer/gce.json
       - name: KUBECONFIG
         value: /tmp/artifacts/installer/auth/kubeconfig
       - name: USER
