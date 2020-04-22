@@ -41,9 +41,24 @@ app-ci-deploy:
 	$(eval slack_api_url := $(shell oc get secret -n ci ci-slack-api-url -o json | jq -r .data.url | base64 -d))
 	@echo "Deploying prow-monitoring stack ..."
 	@# apply command contains the secret, do not make it visible by removing the leading `@`
-	@oc create -f ./ --dry-run=true -o yaml|sed -e "s#CHANGE_ME#$(prometheus-k8s_token)#g" -e '/node-role.kubernetes.io\/infra/d' -e '/storageClassName/d' -e '/nodeSelector/d'|kubectl apply --force -f -
-	oc apply -f ./mixins/prometheus_out/prometheus_rule_prow.yaml
-	cat ./mixins/prometheus_out/alertmanager.yaml|sed -e 's#ops-testplatform#ops-app-ci#g' -e "s#{{ api_url }}#$(slack_api_url)#g"|oc create -n prow-monitoring secret generic alertmanager-prow --from-literal=alertmanager.yaml="$$(cat)" --from-file=./msg.tmpl --dry-run -o yaml | oc apply -f -
+	@oc create -f ./ --dry-run=true -o yaml \
+		|sed -e "s#CHANGE_ME#$(prometheus-k8s_token)#g" \
+			-e '/node-role.kubernetes.io\/infra/d' \
+			-e '/storageClassName/d' \
+			-e '/nodeSelector/d' \
+			-e 's#alertmanager-prow-monitoring.svc.ci.openshift.org#alertmanager-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com#g' \
+			-e 's#prometheus-prow-monitoring.svc.ci.openshift.org#prometheus-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com#g' \
+			-e 's#api.ci.openshift.org#app.ci.openshift.org#g' \
+		|kubectl apply --force -f -
+	cat ./mixins/prometheus_out/prometheus_rule_prow.yaml \
+		|sed  's#grafana-prow-monitoring.svc.ci.openshift.org#grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com#g' \
+		|oc create --dry-run=true -o yaml -f - \
+		|oc apply -f -
+	@cat ./mixins/prometheus_out/alertmanager.yaml \
+		| sed -e 's#ops-testplatform#ops-app-ci#g'  \
+			-e "s#{{ api_url }}#$(slack_api_url)#g" \
+		|oc create -n prow-monitoring secret generic alertmanager-prow --from-literal=alertmanager.yaml="$$(cat)" --from-file=./msg.tmpl --dry-run -o yaml \
+		|oc apply -f -
 
 .PHONY : ci-secret-deploy
 ci-secret-deploy:
