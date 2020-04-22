@@ -76,7 +76,7 @@ fi
 cp ${terraform_home}/terraform.* ${SHARED_DIR}
 
 # Sharing artifacts required by other steps
-jq -r '.modules[0].resources["packet_device.server"].primary.attributes.access_public_ipv4' terraform.tfstate > /tmp/server-ip
+jq -r '.resources[0].instances[0].attributes.access_public_ipv4' terraform.tfstate > /tmp/server-ip
 cp /tmp/server-ip ${SHARED_DIR}
 
 
