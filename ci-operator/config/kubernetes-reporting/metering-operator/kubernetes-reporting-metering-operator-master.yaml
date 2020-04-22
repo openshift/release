@@ -1,27 +1,27 @@
 base_images:
+  ansible-operator:
+    cluster: https://api.ci.openshift.org
+    name: "4.5"
+    namespace: ocp
+    tag: ansible-operator
   base:
     cluster: https://api.ci.openshift.org
-    name: origin-v3.11
-    namespace: openshift
-    tag: base
-  metering-helm:
-    cluster: https://api.ci.openshift.org
-    name: "4.1"
+    name: "4.5"
     namespace: ocp
-    tag: metering-helm
+    tag: base
 build_root:
   project_image:
     context_dir: .
     dockerfile_path: Dockerfile.src
 images:
-- dockerfile_path: Dockerfile.reporting-operator
+- dockerfile_path: Dockerfile.reporting-operator.okd
   from: base
   to: metering-reporting-operator
-- dockerfile_path: Dockerfile.metering-operator
-  from: metering-helm
-  to: metering-helm-operator
+- dockerfile_path: Dockerfile.metering-ansible-operator
+  from: ansible-operator
+  to: metering-ansible-operator
 promotion:
-  name: "4.1"
+  name: "4.5"
   namespace: ocp
 resources:
   '*':
@@ -31,7 +31,7 @@ resources:
       memory: 200Mi
 tag_specification:
   cluster: https://api.ci.openshift.org
-  name: "4.1"
+  name: "4.5"
   namespace: ocp
 tests:
 - artifact_dir: /tmp/artifacts
@@ -49,9 +49,9 @@ tests:
 
     # create a copy of the source so we can modify the files.
     export GOPATH=/tmp/go
-    mkdir -p $GOPATH/src/github.com/operator-framework/
-    cp -r /go/src/github.com/operator-framework/operator-metering/ $GOPATH/src/github.com/operator-framework/operator-metering
-    cd $GOPATH/src/github.com/operator-framework/operator-metering
+    mkdir -p $GOPATH/src/github.com/kubernetes-reporting/
+    cp -r /go/src/github.com/kubernetes-reporting/metering-operator/ $GOPATH/src/github.com/kubernetes-reporting/metering-operator
+    cd $GOPATH/src/github.com/kubernetes-reporting/metering-operator
 
     # Run the actual tests that nothing in the changes after re-generating
     # files. This ensures generated files aren't modified directly.
@@ -64,7 +64,15 @@ tests:
     # Increase the size of the machines so that there are machines large enough
     # to run Presto, and the full metering stack.
     kubectl -n openshift-machine-api get machinesets -o name | grep worker | cut -d/ -f2 | xargs -I{} kubectl -n openshift-machine-api scale machineset {} --replicas 3
-    TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/integration make integration
-    TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/e2e make e2e
+    TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/e2e EXTRA_TEST_FLAGS="-run TestManualMeteringInstall" make e2e
+  openshift_installer_src:
+    cluster_profile: aws
+- as: metering-upgrade-aws
+  commands: |
+    set -x
+    # Increase the size of the machines so that there are machines large enough
+    # to run Presto, and the full metering stack.
+    kubectl -n openshift-machine-api get machinesets -o name | grep worker | cut -d/ -f2 | xargs -I{} kubectl -n openshift-machine-api scale machineset {} --replicas 3
+    TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/upgrade make e2e-upgrade
   openshift_installer_src:
     cluster_profile: aws

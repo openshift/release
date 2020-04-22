@@ -1,10 +1,10 @@
 presubmits:
-  operator-framework/operator-metering:
+  kubernetes-reporting/metering-operator:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.5
-    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
+    - release-4.1
+    cluster: api.ci
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -12,7 +12,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-operator-framework-operator-metering-release-4.5-images
+    name: pull-ci-kubernetes-reporting-metering-operator-release-4.1-images
     rerun_command: /test images
     spec:
       containers:
@@ -22,6 +22,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
         - --target=[images]
+        - --target=[release:latest]
         command:
         - ci-operator
         image: ci-operator:latest
@@ -52,7 +53,7 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.5
+    - release-4.1
     cluster: api.ci
     context: ci/prow/metering-e2e-aws
     decorate: true
@@ -61,7 +62,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-operator-framework-operator-metering-release-4.5-metering-e2e-aws
+    name: pull-ci-kubernetes-reporting-metering-operator-release-4.1-metering-e2e-aws
     rerun_command: /test metering-e2e-aws
     spec:
       containers:
@@ -89,7 +90,8 @@ presubmits:
             # Increase the size of the machines so that there are machines large enough
             # to run Presto, and the full metering stack.
             kubectl -n openshift-machine-api get machinesets -o name | grep worker | cut -d/ -f2 | xargs -I{} kubectl -n openshift-machine-api scale machineset {} --replicas 3
-            TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/e2e EXTRA_TEST_FLAGS="-run TestManualMeteringInstall" make e2e
+            TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/integration make integration
+            TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/e2e make e2e
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -140,96 +142,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.5
+    - release-4.1
     cluster: api.ci
-    context: ci/prow/metering-upgrade-aws
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-operator-framework-operator-metering-release-4.5-metering-upgrade-aws
-    rerun_command: /test metering-upgrade-aws
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --lease-server-password-file=/etc/boskos/password
-        - --lease-server-username=ci
-        - --lease-server=https://boskos-ci.svc.ci.openshift.org
-        - --secret-dir=/usr/local/metering-upgrade-aws-cluster-profile
-        - --target=metering-upgrade-aws
-        - --template=/usr/local/metering-upgrade-aws
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: metering-upgrade-aws
-        - name: TEST_COMMAND
-          value: |
-            set -x
-            # Increase the size of the machines so that there are machines large enough
-            # to run Presto, and the full metering stack.
-            kubectl -n openshift-machine-api get machinesets -o name | grep worker | cut -d/ -f2 | xargs -I{} kubectl -n openshift-machine-api scale machineset {} --replicas 3
-            TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/upgrade make e2e-upgrade
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/metering-upgrade-aws-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/metering-upgrade-aws
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
-      - name: boskos
-        secret:
-          items:
-          - key: password
-            path: password
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
-      - name: pull-secret
-        secret:
-          secretName: regcred
-    trigger: (?m)^/test( | .* )metering-upgrade-aws,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.5
-    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -237,7 +151,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-operator-framework-operator-metering-release-4.5-unit
+    name: pull-ci-kubernetes-reporting-metering-operator-release-4.1-unit
     rerun_command: /test unit
     spec:
       containers:
@@ -277,8 +191,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.5
-    cluster: ci/api-build01-ci-devcluster-openshift-com:6443
+    - release-4.1
+    cluster: api.ci
     context: ci/prow/verify
     decorate: true
     decoration_config:
@@ -286,7 +200,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-operator-framework-operator-metering-release-4.5-verify
+    name: pull-ci-kubernetes-reporting-metering-operator-release-4.1-verify
     rerun_command: /test verify
     spec:
       containers:
