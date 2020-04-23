@@ -1,0 +1,43 @@
+base_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: 4.7-priv
+    namespace: ocp-private
+    tag: base
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.12
+canonical_go_repository: github.com/openshift/mdns-publisher
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  to: mdns-publisher
+promotion:
+  name: 4.7-priv
+  namespace: ocp-private
+resources:
+  '*':
+    limits: {}
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: 4.7-priv
+  namespace: ocp-private
+tests:
+- as: gofmt
+  commands: make fmt
+  container:
+    from: src
+- as: govet
+  commands: make vet
+  container:
+    from: src
+- as: unit
+  commands: make test
+  container:
+    from: src
