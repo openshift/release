@@ -75,8 +75,13 @@ fi
 # Sharing terraform artifacts required by teardown
 cp ${terraform_home}/terraform.* ${SHARED_DIR}
 
-# Sharing artifacts required by other steps
-jq -r '.resources[0].instances[0].attributes.access_public_ipv4' terraform.tfstate > /tmp/server-ip
+# Sharing artifacts required by other steps, works with terraform 0.11
+jq -r '.modules[0].resources["packet_device.server"].primary.attributes.access_public_ipv4' terraform.tfstate > /tmp/server-ip
+
+#temporary workaround for terraform 0.12
+if [[ $(< /tmp/server-ip) == "null" ]] ; then
+  jq -r '.resources[0].instances[0].attributes.access_public_ipv4' terraform.tfstate > /tmp/server-ip
+fi
 cp /tmp/server-ip ${SHARED_DIR}
 
 
