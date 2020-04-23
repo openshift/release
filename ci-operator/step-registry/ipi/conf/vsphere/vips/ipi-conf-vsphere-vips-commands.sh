@@ -22,7 +22,7 @@ do
             --arg token "$ipam_token" \
             '{network: "139.178.87.128", hostname: $hostn, ipam: "139.178.89.254", ipam_token: $token}')
 
-  vip_json=$(echo "$args" | bash <(curl -s https://raw.githubusercontent.com/openshift/installer/master/upi/vsphere/machine/cidr_to_ip.sh))
+  vip_json=$(echo "$args" | bash <(curl -s https://raw.githubusercontent.com/openshift/installer/master/upi/vsphere/ipam/cidr_to_ip.sh))
   vips[$i]=$(echo "$vip_json" | jq -r .ip_address )
   if [[ -z ${vips[$i]} ]]; then
     echo "error: Unable to reserve virtual IP address, exiting" 1>&2
