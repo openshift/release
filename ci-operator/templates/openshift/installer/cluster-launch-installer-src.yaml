@@ -251,10 +251,18 @@ objects:
         cp "$(command -v openshift-install)" /tmp
         mkdir /tmp/artifacts/installer
 
+        function has_variant() {
+          regex="(^|,)$1($|,)"
+          if [[ $CLUSTER_VARIANT =~ $regex ]]; then
+            return 0
+          fi
+          return 1
+        }
+
         if [[ -n "${INSTALL_INITIAL_RELEASE}" && -n "${RELEASE_IMAGE_INITIAL}" ]]; then
           echo "Installing from initial release ${RELEASE_IMAGE_INITIAL}"
           OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_INITIAL}"
-        elif [[ "${CLUSTER_VARIANT}" =~ "mirror" ]]; then
+        elif has_variant "mirror"; then
           export PATH=$PATH:/tmp  # gain access to oc
           while [ ! command -V oc ]; do sleep 1; done # poll to make sure that the test container has dropped oc into the shared volume
 
@@ -282,15 +290,19 @@ objects:
         cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
 
         workers=3
-        if [[ "${CLUSTER_VARIANT}" =~ "compact" ]]; then
+        if has_variant "compact" || has_variant "multisocket"; then
           workers=0
         fi
         if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
             master_type=null
-            if [[ "${CLUSTER_VARIANT}" =~ "xlarge" ]]; then
+            if has_variant "multisocket"; then
+              master_type=c5n.metal
+            elif has_variant "xlarge"; then
               master_type=m5.8xlarge
-            elif [[ "${CLUSTER_VARIANT}" =~ "large" ]]; then
+            elif has_variant "large"; then
               master_type=m5.4xlarge
+            elif has_variant "compact"; then
+              master_type=m5.2xlarge
             fi
             case $((RANDOM % 4)) in
             0) AWS_REGION=us-east-1
@@ -303,7 +315,7 @@ objects:
             esac
             echo "AWS region: ${AWS_REGION} (zones: ${ZONE_1:-${AWS_REGION}a} ${ZONE_2:-${AWS_REGION}b})"
             subnets="[]"
-            if [[ "${CLUSTER_VARIANT}" =~ "shared-vpc" ]]; then
+            if has_variant "shared-vpc"; then
               case "${AWS_REGION}_$((RANDOM % 4))" in
               us-east-1_0) subnets="['subnet-030a88e6e97101ab2','subnet-0e07763243186cac5','subnet-02c5fea7482f804fb','subnet-0291499fd1718ee01','subnet-01c4667ad446c8337','subnet-025e9043c44114baa']";;
               us-east-1_1) subnets="['subnet-0170ee5ccdd7e7823','subnet-0d50cac95bebb5a6e','subnet-0094864467fc2e737','subnet-0daa3919d85296eb6','subnet-0ab1e11d3ed63cc97','subnet-07681ad7ce2b6c281']";;
@@ -378,7 +390,7 @@ objects:
             vnetname=""
             ctrlsubnet=""
             computesubnet=""
-            if [[ "${CLUSTER_VARIANT}" =~ "shared-vpc" ]]; then
+            if has_variant "shared-vpc"; then
               vnetrg="os4-common"
               vnetname="do-not-delete-shared-vnet-${AZURE_REGION}"
               ctrlsubnet="subnet-1"
@@ -395,6 +407,7 @@ objects:
         compute:
         - name: worker
           replicas: ${workers}
+          type: Standard_D3_v2
         platform:
           azure:
             baseDomainResourceGroupName: os4-common
@@ -409,10 +422,31 @@ objects:
           ${SSH_PUB_KEY}
         EOF
         elif [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
+            master_type=null
+            if has_variant "xlarge"; then
+              master_type=n1-standard-32
+            elif has_variant "large"; then
+              master_type=n1-standard-16
+            elif has_variant "compact"; then
+              master_type=n1-standard-8
+            fi
+            # HACK: try to "poke" the token endpoint before the test starts
+            for i in $(seq 1 30); do
+              code="$( curl -s -o /dev/null -w "%{http_code}" https://oauth2.googleapis.com/token -X POST -d '' || echo "Failed to POST https://oauth2.googleapis.com/token with $?" 1>&2)"
+              if [[ "${code}" == "400" ]]; then
+                break
+              fi
+              echo "error: Unable to resolve https://oauth2.googleapis.com/token: $code" 1>&2
+              if [[ "${i}" == "30" ]]; then
+                echo "error: Unable to resolve https://oauth2.googleapis.com/token within timeout, exiting" 1>&2
+                exit 1
+              fi
+              sleep 1
+            done
             network=""
             ctrlsubnet=""
             computesubnet=""
-            if [[ "${CLUSTER_VARIANT}" =~ "shared-vpc" ]]; then
+            if has_variant "shared-vpc"; then
               network="do-not-delete-shared-network"
               ctrlsubnet="do-not-delete-shared-master-subnet"
               computesubnet="do-not-delete-shared-worker-subnet"
@@ -425,6 +459,9 @@ objects:
         controlPlane:
           name: master
           replicas: 3
+          platform:
+            gcp:
+              type: ${master_type}
         compute:
         - name: worker
           replicas: ${workers}
@@ -447,7 +484,7 @@ objects:
 
         # as a current stop gap -- this is pointing to a proxy hosted in
         # the namespace "ci-test-ewolinet" on the ci cluster
-        if [[ "${CLUSTER_VARIANT}" =~ "proxy" ]]; then
+        if has_variant "proxy"; then
 
         # FIXME: due to https://bugzilla.redhat.com/show_bug.cgi?id=1750650 we need to
         # use a http endpoint for the httpsProxy value
@@ -531,17 +568,46 @@ objects:
         fi
 
         network_type="${CLUSTER_NETWORK_TYPE-}"
-        if [[ "${CLUSTER_VARIANT}" =~ "ovn" ]]; then
+        if has_variant "ovn"; then
           network_type=OVNKubernetes
         fi
-        if [[ -n "${network_type}" ]]; then
+        cidr_size=16
+        host_prefix=23
+        if has_variant "xlarge" || has_variant "large"; then
+          cidr_size=12
+          host_prefix=22
+          if [[ -z "${network_type}" ]]; then
+            network_type=OpenShiftSDN
+          fi
+        fi
+
+        if has_variant "ipv6"; then
+          export OPENSHIFT_INSTALL_AZURE_EMULATE_SINGLESTACK_IPV6=true
+          cat >> /tmp/artifacts/installer/install-config.yaml << EOF
+        networking:
+          networkType: OVNKubernetes
+          machineNetwork:
+            - cidr: 10.0.0.0/16
+            - cidr: fd00::/48
+          clusterNetwork:
+            - cidr: fd01::/48
+              hostPrefix: 64
+          serviceNetwork:
+            - fd02::/112
+        EOF
+        elif [[ -n "${network_type}" ]]; then
           cat >> /tmp/artifacts/installer/install-config.yaml << EOF
         networking:
           networkType: ${network_type}
+          machineNetwork:
+          - cidr: 10.0.0.0/16
+          clusterNetwork:
+          - cidr: 10.128.0.0/${cidr_size}
+            hostPrefix: ${host_prefix}
         EOF
         fi
 
-        if [[ "${CLUSTER_VARIANT}" =~ "mirror" ]]; then
+        if has_variant "mirror"; then
           cat >> /tmp/artifacts/installer/install-config.yaml << EOF
         imageContentSources:
         - source: "${MIRROR_BASE}-scratch"
@@ -550,10 +616,38 @@ objects:
         EOF
         fi
 
+        if has_variant "fips"; then
+          cat >> /tmp/artifacts/installer/install-config.yaml << EOF
+        fips: true
+        EOF
+        fi
+
+        if has_variant "preserve_bootstrap"; then
+          export OPENSHIFT_INSTALL_PRESERVE_BOOTSTRAP=true
+        fi
+
         # TODO: Replace with a more concise manifest injection approach
         if [[ -n "${CLUSTER_NETWORK_MANIFEST:-}" ]]; then
             openshift-install --dir=/tmp/artifacts/installer/ create manifests
             echo "${CLUSTER_NETWORK_MANIFEST}" > /tmp/artifacts/installer/manifests/cluster-network-03-config.yml
+        fi
+
+        if has_variant "rt"; then
+          if [[ -n "${CLUSTER_NETWORK_MANIFEST:-}" ]]; then
+            echo 'error: CLUSTER_NETWORK_MANIFEST is incompatible with the "rt" variant'
+            exit 1
+          fi
+          openshift-install --dir=/tmp/artifacts/installer/ create manifests
+          cat > /tmp/artifacts/installer/manifests/realtime-worker-machine-config.yml << EOF
+        apiVersion: machineconfiguration.openshift.io/v1
+        kind: MachineConfig
+        metadata:
+          labels:
+            machineconfiguration.openshift.io/role: worker
+          name: realtime-worker
+        spec:
+          kernelType: realtime
+        EOF
         fi
 
         TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create cluster 2>&1 | grep --line-buffered -v password &
@@ -615,6 +709,8 @@ objects:
           mkdir -p /tmp/artifacts/pods /tmp/artifacts/nodes /tmp/artifacts/metrics /tmp/artifacts/bootstrap /tmp/artifacts/network
 
           oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' > /tmp/nodes
+          oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.spec.providerID}{"\n"}{end}' | sed 's|.*/||' > /tmp/node-provider-IDs
+          oc --insecure-skip-tls-verify --request-timeout=5s -n openshift-machine-api get machines -o jsonpath --template '{range .items[*]}{.spec.providerID}{"\n"}{end}' | sed 's|.*/||' >> /tmp/node-provider-IDs
           oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces --template '{{ range .items }}{{ $name := .metadata.name }}{{ $ns := .metadata.namespace }}{{ range .spec.containers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ range .spec.initContainers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ end }}' > /tmp/containers
           oc --insecure-skip-tls-verify --request-timeout=5s get pods -l openshift.io/component=api --all-namespaces --template '{{ range .items }}-n {{ .metadata.namespace }} {{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/pods-api
 
@@ -655,6 +751,22 @@ objects:
             queue /tmp/artifacts/nodes/$i/heap oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/debug/pprof/heap
           done < /tmp/nodes
 
+          if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
+            # FIXME: get epel-release or otherwise add awscli to our teardown image
+            export PATH="${HOME}/.local/bin:${PATH}"
+            easy_install --user pip  # our Python 2.7.5 is even too old for ensurepip
+            pip install --user awscli
+            export AWS_DEFAULT_REGION="$(python -c 'import json; data = json.load(open("/tmp/artifacts/installer/metadata.json")); print(data["aws"]["region"])')"
+            echo "gathering node console output from ${AWS_DEFAULT_REGION}"
+          fi
+
+          while IFS= read -r i; do
+            mkdir -p "/tmp/artifacts/nodes/${i}"
+            if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
+              queue /tmp/artifacts/nodes/$i/console aws ec2 get-console-output --instance-id "${i}" --output text
+            fi
+          done < <(sort /tmp/node-provider-IDs | uniq)
+
           FILTER=gzip queue /tmp/artifacts/nodes/masters-journal.gz oc --insecure-skip-tls-verify adm node-logs --role=master --unify=false
           FILTER=gzip queue /tmp/artifacts/nodes/workers-journal.gz oc --insecure-skip-tls-verify adm node-logs --role=worker --unify=false
 
@@ -678,6 +790,7 @@ objects:
 
           echo "Snapshotting prometheus (may take 15s) ..."
           queue /tmp/artifacts/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring prometheus-k8s-0 -- tar cvzf - -C /prometheus .
+          FILTER=gzip queue /tmp/artifacts/metrics/prometheus-target-metadata.json.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring prometheus-k8s-0 -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets/metadata --data-urlencode 'match_target={instance!=\"\"}'"
 
           echo "Running must-gather..."
           mkdir -p /tmp/artifacts/must-gather
@@ -685,6 +798,10 @@ objects:
 
           echo "Waiting for logs ..."
           wait
+
+          # This is an experimental wiring of autogenerated failure detection.
+          echo "Detect known failures from symptoms (experimental) ..."
+          curl -f https://gist.githubusercontent.com/smarterclayton/03b50c8f9b6351b2d9903d7fb35b342f/raw/symptom.sh 2>/dev/null | bash -s /tmp/artifacts > /tmp/artifacts/junit/junit_symptoms.xml
 
           tar -czC /tmp/artifacts/must-gather -f /tmp/artifacts/must-gather.tar.gz . &&
           rm -rf /tmp/artifacts/must-gather
@@ -696,7 +813,7 @@ objects:
         trap 'teardown' EXIT
         trap 'jobs -p | xargs -r kill || true; exit 0' TERM
 
-        for i in `seq 1 180`; do
+        for i in $(seq 1 220); do
           if [[ -f /tmp/shared/exit ]]; then
             exit 0
           fi
