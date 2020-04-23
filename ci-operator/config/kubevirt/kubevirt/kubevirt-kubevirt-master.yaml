@@ -4,22 +4,35 @@ base_images:
     name: "4.4"
     namespace: ocp
     tag: base
+  kubevirt-builder:
+    cluster: https://api.ci.openshift.org
+    name: kubevirt-builder
+    namespace: ci
+    tag: 30-5.8.1
 build_root:
   image_stream_tag:
     cluster: https://api.ci.openshift.org
-    name: release
-    namespace: openshift
-    tag: golang-1.12
+    name: kubevirt-builder
+    namespace: ci
+    tag: 30-5.8.1
 canonical_go_repository: kubevirt.io/kubevirt
 images:
 - dockerfile_path: hack/ci/Dockerfile.ci
-  from: base
+  from: kubevirt-builder
   inputs:
     root:
       as:
       - builder
       paths: null
   to: kubevirt-test
+- dockerfile_path: hack/ci/Dockerfile.ci-pr
+  from: kubevirt-builder
+  inputs:
+    root:
+      as:
+      - builder
+      paths: null
+  to: kubevirt-test-pr
 resources:
   '*':
     limits:
@@ -33,7 +46,7 @@ tag_specification:
   namespace: ocp
 tests:
 - artifact_dir: /go/src/kubevirt.io/kubevirt/_out/exported-artifacts
-  as: e2e
+  as: e2e-periodic-gcp-nested-virt
   commands: |
     cd /go/src/kubevirt.io/kubevirt
     #./hack/ci/test.sh
@@ -68,5 +81,15 @@ tests:
   openshift_installer_custom_test_image:
     cluster_profile: gcp
     from: pipeline:kubevirt-test
+    enable_nested_virt: true
+    nested_virt_image: rhcos43-nested-virt
+- artifact_dir: /go/src/kubevirt.io/kubevirt/_out/exported-artifacts
+  as: e2e-gcp-nested-virt
+  commands: |
+    cd /go/src/kubevirt.io/kubevirt
+    bash -x ./hack/ci/test.sh
+  openshift_installer_custom_test_image:
+    cluster_profile: gcp
+    from: pipeline:kubevirt-test-pr
     enable_nested_virt: true
     nested_virt_image: rhcos43-nested-virt
