@@ -1,0 +1,53 @@
+base_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: 4.7-priv
+    namespace: ocp-private
+    tag: base
+  elasticsearch-operator-src:
+    cluster: https://api.ci.openshift.org
+    name: 4.7-priv
+    namespace: ocp-private
+    tag: elasticsearch-operator-src
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.12
+canonical_go_repository: github.com/openshift/cluster-logging-operator
+images:
+- from: base
+  to: cluster-logging-operator
+- dockerfile_path: olm_deploy/operatorregistry/Dockerfile
+  from: base
+  to: cluster-logging-operator-registry
+- dockerfile_path: Dockerfile.e2e
+  from: elasticsearch-operator-src
+  to: cluster-logging-operator-e2e
+promotion:
+  name: 4.7-priv
+  namespace: ocp-private
+resources:
+  '*':
+    limits: {}
+    requests:
+      cpu: 200m
+      memory: 200Mi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: 4.7-priv
+  namespace: ocp-private
+tests:
+- as: unit
+  commands: make test-unit
+  container:
+    from: src
+- artifact_dir: /tmp/artifacts
+  as: e2e-operator
+  commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=/tmp/artifacts/logging-logs ARTIFACT_DIR=/tmp/artifacts/logging-artifacts
+    make test-e2e-olm
+  openshift_installer_custom_test_image:
+    cluster_profile: aws
+    from: stable:cluster-logging-operator-e2e
+    nested_virt_image: ""

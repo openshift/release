@@ -1,0 +1,42 @@
+base_images:
+  os:
+    cluster: https://api.ci.openshift.org
+    name: ubi
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.12
+images:
+- dockerfile_path: Dockerfile.ocp
+  from: base-os
+  to: ironic-hardware-inventory-recorder
+promotion:
+  name: "4.7"
+  namespace: ocp
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      rm -rf /etc/yum.repos.d/*
+      curl http://base-4-5-rhel8.ocp.svc > /etc/yum.repos.d/base-4-5-rhel8.repo
+      curl http://base-openstack-4-5.ocp.svc > /etc/yum.repos.d/base-openstack-4-5.repo
+    from: os
+    to: base-os
+resources:
+  '*':
+    limits: {}
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: "4.7"
+  namespace: ocp
+tests:
+- as: e2e-metal-ipi
+  steps:
+    cluster_profile: packet
+    workflow: baremetalds-e2e
