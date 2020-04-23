@@ -16,29 +16,38 @@ readonly CLUSTER_NAME
 
 kubectl config use-context $CLUSTER_NAME
 
+SED_COMMAND="sed"
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  SED_COMMAND="gsed"
+fi
+
 generate_kubeconfig() {
   local sa
   sa=$1
   local config
   config="${WORKDIR}/sa.${sa}.${CLUSTER_NAME}.config"
-  oc --kubeconfig "${KUBECONFIG_BUILD01}" sa create-kubeconfig -n ci "${sa}" > "${config}"
-  # oc config rename-context is not enough, as we then end up
-  # with multiple users with the same name when they get merged
-  sed -i "s/${sa}/${CLUSTER_NAME}/g" $config
+  oc sa create-kubeconfig -n ci "${sa}" > "${config}"
+  "${SED_COMMAND}" -i "s/${sa}/${CLUSTER_NAME}/g" "${config}"
+  if [[ "$(oc --kubeconfig ${config} --context ${CLUSTER_NAME} whoami)" != "system:serviceaccount:ci:${sa}" ]]; then
+    echo "not good kubeconfig ${config} for the expected SA ${sa}"
+    return 1
+  fi
 }
 
 declare -a SAArray=( "config-updater" "deck" "plank" "sinker" "hook" "ca-cert-issuer" "crier" )
 
 # Iterate the string array using for loop
 for name in ${SAArray[@]}; do
-   generate_kubeconfig ${name}
+  if ! generate_kubeconfig "${name}"; then
+     exit 1
+  fi
 done
 
 generate_reg_auth_value() {
   local cluster
   cluster=$1
   local registry
-  registry=$3
+  registry=$2
   oc -n ci get secret $( oc get secret -n ci -o "jsonpath={.items[?(@.metadata.annotations.kubernetes\.io/service-account\.name==\"build01\")].metadata.name}" ) -o "jsonpath={.items[?(@.type==\"kubernetes.io/dockercfg\")].data.\.dockercfg}" | base64 --decode | jq --arg reg "${registry}" -r '.[$reg].auth' | tr -d '\n' > "${WORKDIR}/build01_${cluster}_reg_auth_value.txt"
 }
 
