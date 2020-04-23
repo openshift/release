@@ -549,6 +549,7 @@ objects:
         compute:
         - name: worker
           replicas: ${workers}
+          type: Standard_D3_v2
         platform:
           azure:
             baseDomainResourceGroupName: os4-common
@@ -896,7 +897,7 @@ objects:
             queue /tmp/artifacts/nodes/$i/heap oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/debug/pprof/heap
           done < /tmp/nodes
 
-          if [[ "${CLUSTER_TYPE}" = "aws" ]]; then
+          if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
             # FIXME: get epel-release or otherwise add awscli to our teardown image
             export PATH="${HOME}/.local/bin:${PATH}"
             easy_install --user pip  # our Python 2.7.5 is even too old for ensurepip
@@ -907,7 +908,7 @@ objects:
 
           while IFS= read -r i; do
             mkdir -p "/tmp/artifacts/nodes/${i}"
-            if [[ "${CLUSTER_TYPE}" = "aws" ]]; then
+            if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
               queue /tmp/artifacts/nodes/$i/console aws ec2 get-console-output --instance-id "${i}" --output text
             fi
           done < <(sort /tmp/node-provider-IDs | uniq)
