@@ -128,13 +128,25 @@ periodics:
         value: e2e-storage-csi-gcp-pd
       - name: TEST_COMMAND
         value: |
+          set -x
+          pwd
           # E2E_GOOGLE_APPLICATION_CREDENTIALS is used by pd.csi.storage.gke.io tests to run the driver.
           export E2E_GOOGLE_APPLICATION_CREDENTIALS=$GCP_SHARED_CREDENTIALS_FILE
 
           # Filter pd.csi.storage.gke.io tests and run them.
-          openshift-tests run openshift/conformance-excluded --dry-run | grep pd.csi.storage.gke.io > tests
-          openshift-tests run openshift/conformance-excluded -f tests \
-                --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
+          echo "Running dry-run"
+          openshift-tests run openshift/conformance-excluded --dry-run | grep pd.csi.storage.gke.io > /tmp/tests
+          echo "Running tests:"
+          cat /tmp/tests
+          echo "Dry run with cloud provider"
+          openshift-tests run openshift/conformance-excluded --dry-run \
+                --provider "${TEST_PROVIDER:-}"
+          echo "Running"
+          openshift-tests run openshift/conformance-excluded -f /tmp/tests \
+                --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit || :
+          set
+          echo Sleeping
+          sleep 3600
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
