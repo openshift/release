@@ -71,7 +71,9 @@ while IFS= read -r i; do
 done < /tmp/nodes
 
 FILTER=gzip queue ${ARTIFACT_DIR}/nodes/masters-journal.gz oc --insecure-skip-tls-verify adm node-logs --role=master --unify=false
+FILTER=gzip queue ${ARTIFACT_DIR}/nodes/masters-journal-previous.gz oc --insecure-skip-tls-verify adm node-logs --boot=-1 --role=master --unify=false
 FILTER=gzip queue ${ARTIFACT_DIR}/nodes/workers-journal.gz oc --insecure-skip-tls-verify adm node-logs --role=worker --unify=false
+FILTER=gzip queue ${ARTIFACT_DIR}/nodes/workers-journal-previous.gz oc --insecure-skip-tls-verify adm node-logs --boot=-1 --role=worker --unify=false
 
 # Snapshot iptables-save on each node for debugging possible kube-proxy issues
 oc --insecure-skip-tls-verify get --request-timeout=20s -n openshift-sdn -l app=sdn pods --template '{{ range .items }}{{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/sdn-pods
