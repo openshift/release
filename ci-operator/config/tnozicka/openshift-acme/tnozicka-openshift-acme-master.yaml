@@ -19,7 +19,7 @@ images:
       as:
       - openshift/origin-release:golang-1.13
       paths: null
-  to: openshift-acme-controller
+  to: controller
 - dockerfile_path: images/openshift-acme-exposer/Dockerfile
   from: base
   inputs:
@@ -27,10 +27,10 @@ images:
       as:
       - openshift/origin-release:golang-1.13
       paths: null
-  to: openshift-acme-exposer
+  to: exposer
 promotion:
-  name: openshift-acme
-  namespace: ci
+  name: "0.9"
+  namespace: "openshift-acme"
 resources:
   '*':
     requests:
@@ -60,6 +60,9 @@ tests:
 - artifact_dir: /tmp/artifacts
   as: e2e-cluster-wide
   commands: |
+    CONTROLLER_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:controller}
+    EXPOSER_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:exposer}
+    export CONTROLLER_IMAGE EXPOSER_IMAGE
     ./hack/ci-deploy.sh cluster-wide
     make ci-test-e2e-cluster-wide E2E_JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
   openshift_installer_src:
@@ -67,6 +70,9 @@ tests:
 - artifact_dir: /tmp/artifacts
   as: e2e-single-namespace
   commands: |
+    CONTROLLER_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:controller}
+    EXPOSER_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:exposer}
+    export CONTROLLER_IMAGE EXPOSER_IMAGE
     ./hack/ci-deploy.sh single-namespace
     make ci-test-e2e-single-namespace E2E_JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
   openshift_installer_src:
@@ -74,6 +80,9 @@ tests:
 - artifact_dir: /tmp/artifacts
   as: e2e-specific-namespaces
   commands: |
+    CONTROLLER_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:controller}
+    EXPOSER_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:exposer}
+    export CONTROLLER_IMAGE EXPOSER_IMAGE
     ./hack/ci-deploy.sh specific-namespaces
     make ci-test-e2e-specific-namespaces E2E_JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
   openshift_installer_src:
