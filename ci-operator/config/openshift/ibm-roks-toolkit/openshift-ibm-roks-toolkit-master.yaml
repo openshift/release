@@ -1,0 +1,37 @@
+base_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: "4.5"
+    namespace: ocp
+    tag: base
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- from: base
+  to: ibm-roks-toolkit
+- dockerfile_path: Dockerfile.cpoperator
+  from: base
+  to: control-plane-operator
+promotion:
+  name: ibm-roks-4.4
+  namespace: hypershift-toolkit
+resources:
+  '*':
+    limits: {}
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: "4.5"
+  namespace: ocp
+tests:
+- as: verify
+  commands: make verify
+  container:
+    from: src
