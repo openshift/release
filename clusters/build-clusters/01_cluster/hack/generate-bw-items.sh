@@ -2,7 +2,7 @@
 
 ### prerequisites
 ### 1. (latest version of) /usr/bin/oc, otherwise download https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/
-### 2. jq is installed
+### 2. jq/yq are installed
 
 set -o errexit
 set -o nounset
@@ -28,6 +28,17 @@ generate_kubeconfig() {
   config="${WORKDIR}/sa.${sa}.${CLUSTER_NAME}.config"
   oc sa create-kubeconfig -n ci "${sa}" > "${config}"
   "${SED_COMMAND}" -i "s/${sa}/${CLUSTER_NAME}/g" "${config}"
+  for context_name in ${ADDITIONAL_CONTEXTS[@]}; do
+    new_context="$(yq '.contexts[0]' ${config} | yq -c --arg cn "${context_name}" '.name = $cn')"
+    #(hongkliu): no idea why redirection does not work
+    #yq -y --arg nc "${new_context}" '.contexts +=  [$nc | fromjson] ' "${config}" > "${config}"
+    yq -y --arg nc "${new_context}" '.contexts +=  [$nc | fromjson] ' "${config}" > "${WORKDIR}/tmp.config"
+    mv -f "${WORKDIR}/tmp.config" "${config}"
+    if [[ "$(oc --kubeconfig ${config} --context ${context_name} whoami)" != "system:serviceaccount:ci:${sa}" ]]; then
+      echo "not good kubeconfig ${config} for the expected context ${context_name}"
+      return 1
+    fi
+  done
   if [[ "$(oc --kubeconfig ${config} --context ${CLUSTER_NAME} whoami)" != "system:serviceaccount:ci:${sa}" ]]; then
     echo "not good kubeconfig ${config} for the expected SA ${sa}"
     return 1
@@ -35,6 +46,7 @@ generate_kubeconfig() {
 }
 
 declare -a SAArray=( "config-updater" "deck" "plank" "sinker" "hook" "ca-cert-issuer" "crier" )
+declare -a ADDITIONAL_CONTEXTS=( "ci/api-build01-ci-devcluster-openshift-com:6443" )
 
 # Iterate the string array using for loop
 for name in ${SAArray[@]}; do
