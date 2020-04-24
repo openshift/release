@@ -39,36 +39,7 @@ periodics:
       - name: JOB_NAME_SAFE
         value: e2e-periodic-gcp-nested-virt
       - name: TEST_COMMAND
-        value: |
-          cd /go/src/kubevirt.io/kubevirt
-          #./hack/ci/test.sh
-
-          # TODO: this needs to be moved into kubevirt 'hack/ci/test.sh' again after the template has been merged,
-          # putting it back in here for now to avoid fiddling with two repos in order to get it
-          # working
-
-          export PATH=$PATH:/usr/local/go/bin/
-
-          export GIMME_GO_VERSION=1.12.8
-          export GOPATH="/go"
-          export GOBIN="/usr/bin"
-          source /etc/profile.d/gimme.sh
-
-          export DOCKER_PREFIX='kubevirtnightlybuilds'
-          export DOCKER_TAG="latest"
-          export KUBEVIRT_PROVIDER=external
-
-          echo "calling cluster-up to prepare config and check whether cluster is reachable"
-          bash -x ./cluster-up/up.sh
-
-          echo "deploying"
-          bash -x ./hack/cluster-deploy.sh
-
-          echo "testing"
-          mkdir -p "$ARTIFACT_DIR"
-          TESTS_TO_FOCUS=$(grep -E -o '\[crit\:high\]' tests/*_test.go | sort | uniq | sed -E 's/tests\/([a-z_]+)\.go\:.*/\1/' | tr '\n' '|' | sed 's/|$//')
-          FUNC_TEST_ARGS='--ginkgo.noColor --ginkgo.focus='"$TESTS_TO_FOCUS"' --ginkgo.regexScansFilePath=true --junit-output='"$ARTIFACT_DIR"'/junit.functest.xml' \
-              bash -x ./hack/functests.sh
+        value: ./hack/ci/test.sh
       - name: TEST_IMAGESTREAM_TAG
         value: pipeline:kubevirt-test
       image: ci-operator:latest
