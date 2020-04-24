@@ -226,18 +226,62 @@ objects:
           mkdir -p "${HOME}"
         }
 
-        function upload_rhcos_image() {
+        # Fetches the target RHCOS version from the branch of
+        # github.com/openshift/installer corresponding to the target release.
+        #
+        # Uploads a new version if necessary.
+        upload_rhcos_image() {
+          declare \
+            glance_image_version \
+            glance_image_id \
+            rhcos_versions_file \
+            rhcos_image_file \
+            image_sha \
+            image_version \
+            image_url \
+            image_id
+
+          rhcos_versions_file="${TMP_SHARED}/rhcos.json"
+          curl --silent -o "$rhcos_versions_file" "https://raw.githubusercontent.com/openshift/installer/${RHCOS_RELEASE}/data/data/rhcos.json"
+
+          image_sha="$(jq --raw-output '.images.openstack."uncompressed-sha256"' "$rhcos_versions_file")"
+          image_url="$(jq --raw-output '.baseURI + .images.openstack.path' "$rhcos_versions_file")"
+          image_version="$(jq --raw-output '."ostree-version"' "$rhcos_versions_file")"
+
           export RHCOS_GLANCE_IMAGE_NAME=${INFRA_ID}-rhcos-${RHCOS_RELEASE}
-          rm -rf ${TMP_SHARED}/rhcos.json
-          local IMAGE_SOURCE=https://raw.githubusercontent.com/openshift/installer/${RHCOS_RELEASE}/data/data/rhcos.json
-          wget -q -O ${TMP_SHARED}/rhcos.json $IMAGE_SOURCE
-          local GZ_IMAGE_FILENAME=$(grep path ${TMP_SHARED}/rhcos.json | grep openstack |awk '{print $2}' | awk -F\" '{print $2}')
-          local BASEURI=$(grep base ${TMP_SHARED}/rhcos.json | awk '{print $2}' |awk -F\" '{print $2}')
-          wget  -q -O ${TMP_SHARED}/$GZ_IMAGE_FILENAME $BASEURI$GZ_IMAGE_FILENAME
-          gunzip ${TMP_SHARED}/$GZ_IMAGE_FILENAME
-          local IMAGE_FILENAME=${GZ_IMAGE_FILENAME%.gz}
-          IMAGE_ID=$(openstack image create --container-format=bare --disk-format=qcow2 --file ${TMP_SHARED}/$IMAGE_FILENAME $RHCOS_GLANCE_IMAGE_NAME -f value -c id)
-          echo $IMAGE_ID > ${TMP_SHARED}/RHCOS_GLANCE_IMAGE_ID
+
+
+          glance_image_id="$(openstack image show -f value -c id -c properties "$RHCOS_GLANCE_IMAGE_NAME")"
+          glance_image_version="$(openstack image show -f json -c properties "$RHCOS_GLANCE_IMAGE_NAME" \
+                                  | jq --raw-output '.properties.version')"
+
+          if [[ $glance_image_version == $image_version ]]; then
+            >&2 echo "RHCOS image '${RHCOS_GLANCE_IMAGE_NAME}' already at the latest version '$image_version'"
+            echo "$glance_image_id" > "${TMP_SHARED}/RHCOS_GLANCE_IMAGE_ID"
+            return 0
+          fi
+
+          declare local_image_file="$(mktemp)"
+          >&2 echo "Downloading RHCOS image from:"
+          >&2 echo "$image_url"
+
+          if [[ "$image_url" == *.gz ]]; then
+              curl --insecure --compressed -L -o "${local_image_file}.gz" "$image_url"
+              gunzip -f "${local_image_file}.gz"
+          else
+              curl --insecure --compressed -L -o "$local_image_file" "$image_url"
+          fi
+
+          echo "Verifying image..."
+          if ! sha256sum --quiet -c <(echo -n "${image_sha}  ${local_image_file}"); then
+            >&2 echo 'Image is corrupted. Exiting...'
+            return 1
+          fi
+
+          echo "Uploading image to Glance as '${RHCOS_GLANCE_IMAGE_NAME}-new'"
+          glance_image_id="$(openstack image create --container-format bare --disk-format qcow2 --file "$local_image_file" "${RHCOS_GLANCE_IMAGE_NAME}-new" --private --property version="$image_version" -f value -c id)"
+
+          echo "$glance_image_id" > "${TMP_SHARED}/RHCOS_GLANCE_IMAGE_ID"
         }
 
         function wait_for_teardown_container(){
