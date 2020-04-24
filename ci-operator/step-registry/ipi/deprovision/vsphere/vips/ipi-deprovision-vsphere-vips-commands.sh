@@ -13,7 +13,7 @@ export AWS_SHARED_CREDENTIALS_FILE="${cluster_profile}/.awscred"
 
 # FIXME: should this be using ${SHARED_DIR}/vips.txt ?
 echo "Releasing IP addresses from IPAM server..."
-for i in {0..2}
+for i in {0..1}
 do
     curl "http://139.178.89.254/api/removeHost.php?apiapp=address&apitoken=${ipam_token}&host=${cluster_name}-$i"
 done
