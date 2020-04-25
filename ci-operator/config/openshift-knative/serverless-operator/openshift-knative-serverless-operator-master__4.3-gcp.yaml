@@ -1,29 +1,12 @@
-tag_specification:
-  cluster: https://api.ci.openshift.org
-  name: '4.3'
-  namespace: ocp
 base_images:
   base:
     cluster: https://api.ci.openshift.org
-    name: '4.3'
+    name: "4.3"
     namespace: ocp
     tag: base
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
-tests:
-- as: e2e-gcp-ocp-43-continuous
-  commands: "make test-e2e"
-  cron: "0 0 * * 0" # every Sunday
-  openshift_installer_src:
-    cluster_profile: gcp
-resources:
-  '*':
-    limits:
-      memory: 4Gi
-    requests:
-      cpu: 100m
-      memory: 200Mi
 images:
 - context_dir: serving/ingress
   from: base
@@ -31,3 +14,20 @@ images:
 - context_dir: knative-operator
   from: base
   to: knative-operator
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: "4.3"
+  namespace: ocp
+tests:
+- as: e2e-gcp-ocp-43-continuous
+  commands: make test-e2e
+  cron: 0 0 * * 0
+  openshift_installer_src:
+    cluster_profile: gcp
