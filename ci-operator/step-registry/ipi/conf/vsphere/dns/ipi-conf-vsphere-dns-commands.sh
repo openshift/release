@@ -57,9 +57,8 @@ cat > "${SHARED_DIR}"/dns-create.json <<EOF
 }]}
 EOF
 
-aws route53 change-resource-record-sets --hosted-zone-id "$hosted_zone_id" --change-batch file:///"${SHARED_DIR}"/dns-create.json
-
 echo "Creating batch file to destroy DNS records"
+
 cat > "${SHARED_DIR}"/dns-delete.json <<EOF
 {
 "Comment": "Delete public OpenShift DNS records for VSphere IPI CI install",
@@ -90,3 +89,10 @@ cat > "${SHARED_DIR}"/dns-delete.json <<EOF
 }]}
 EOF
 
+id=$(aws route53 change-resource-record-sets --hosted-zone-id "$hosted_zone_id" --change-batch file:///"${SHARED_DIR}"/dns-create.json --query '"ChangeInfo"."Id"' --output text)
+
+echo "Waiting for DNS records to sync..."
+
+aws route53 wait resource-record-sets-changed --id "$id"
+
+echo "DNS records created."
