@@ -44,6 +44,7 @@ aws)
     export KUBE_SSH_USER=core
     ;;
 azure4) export TEST_PROVIDER=azure;;
+vsphere) export TEST_PROVIDER=vsphere;;
 *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
 esac
 
