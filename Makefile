@@ -267,7 +267,7 @@ ci-secret-bootstrap:
 		-v "$(kubeconfig_path):/_kubeconfig:z" \
 		-v "$(bw_password_path):/_bw_password:z" \
 		registry.svc.ci.openshift.org/ci/ci-secret-bootstrap:latest \
-		--bw-password-path=/_bw_password --bw-user $(kerberos_id)@redhat.com --config=/_config.yaml --kubeconfig=/_kubeconfig --dry-run=$(dry_run) --force=$(force) --cluster=$(cluster)
+		--bw-password-path=/_bw_password --bw-user $(kerberos_id)@redhat.com --config=/_config.yaml --kubeconfig=/_kubeconfig --dry-run=$(dry_run) --force=$(force) --cluster=$(cluster) --as=system:admin
 .PHONY: ci-secret-bootstrap
 
 verify-app-ci:
