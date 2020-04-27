@@ -1011,3 +1011,72 @@ presubmits:
         secret:
           secretName: regcred
     trigger: (?m)^/test( | .* )verify,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: api.ci
+    context: ci/prow/windows-e2e-networking
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-network-operator-master-windows-e2e-networking
+    rerun_command: /test windows-e2e-networking
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
+        - --secret-dir=/usr/local/windows-e2e-networking-cluster-profile
+        - --target=windows-e2e-networking
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/windows-e2e-networking-cluster-profile
+          name: cluster-profile
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - name: pull-secret
+        secret:
+          secretName: regcred
+    trigger: (?m)^/test( | .* )windows-e2e-networking,?($|\s.*)
