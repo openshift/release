@@ -1,0 +1,1313 @@
+kind: Template
+apiVersion: template.openshift.io/v1
+
+parameters:
+- name: JOB_NAME
+  required: true
+- name: JOB_NAME_SAFE
+  required: true
+- name: JOB_NAME_HASH
+  required: true
+- name: NAMESPACE
+  required: true
+- name: IMAGE_TESTS
+  required: true
+- name: IMAGE_OPENSTACK_INSTALLER
+  required: true
+- name: CLUSTER_TYPE
+  value: "openstack"
+- name: TEST_COMMAND
+  required: true
+- name: RELEASE_IMAGE_LATEST
+  required: true
+- name: OS_CLOUD
+  value: openstack-cloud
+- name: OPENSTACK_EXTERNAL_NETWORK
+  value: external
+- name: RHCOS_RELEASE
+  value: master
+- name: OPENSTACK_FLAVOR
+  value: m1.s2.xlarge
+- name: BASE_DOMAIN
+  value: shiftstack.devcluster.openshift.com
+  required: true
+- name: KURYR_ENABLED
+  value: "false"
+- name: BUILD_ID
+  required: false
+- name: NETWORK_TYPE
+  value: OpenShiftSDN
+- name: USE_LEASE_CLIENT
+- name: TMP_SHARED
+  value: /tmp/shared
+- name: TMP_ARTIFACTS
+  value: /tmp/artifacts
+- name: TMP_CLUSTER_PROFILE
+  value: /tmp/cluster-profile
+- name: DO_NOT_CREATE_DNS_RECORD
+- name: NUMBER_OF_MASTERS
+  value: "3"
+- name: NUMBER_OF_WORKERS
+  value: "3"
+
+
+objects:
+
+# We want the cluster to be able to access the images
+- kind: RoleBinding
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: ${JOB_NAME_SAFE}-image-puller
+    namespace: ${NAMESPACE}
+  roleRef:
+    name: system:image-puller
+  subjects:
+  - kind: SystemGroup
+    name: system:unauthenticated
+  - kind: SystemGroup
+    name: system:authenticated
+
+# Give admin access to a known bot
+- kind: RoleBinding
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: ${JOB_NAME_SAFE}-namespace-admins
+    namespace: ${NAMESPACE}
+  roleRef:
+    name: admin
+  subjects:
+  - kind: ServiceAccount
+    namespace: ci
+    name: ci-chat-bot
+
+# Define the pod consisting of three containers: setup, test, teardown
+- kind: Pod
+  apiVersion: v1
+  metadata:
+    name: ${JOB_NAME_SAFE}
+    namespace: ${NAMESPACE}
+    annotations:
+      # we want to gather the teardown logs no matter what
+      ci-operator.openshift.io/wait-for-container-artifacts: teardown
+      ci-operator.openshift.io/save-container-logs: "true"
+      ci-operator.openshift.io/container-sub-tests: "setup,test,teardown"
+  spec:
+    restartPolicy: Never
+    activeDeadlineSeconds: 21600
+    terminationGracePeriodSeconds: 900
+    volumes:
+    - name: artifacts
+      emptyDir: {}
+    - name: shared-tmp
+      emptyDir: {}
+    - name: cluster-profile
+      secret:
+        secretName: ${JOB_NAME_SAFE}-cluster-profile
+    initContainers:
+    - name: cp-shared
+      image: ${IMAGE_TESTS}
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      command:
+      - cp
+      - /usr/bin/openshift-tests
+      - /usr/bin/oc
+      - /usr/bin/kubectl
+      - /tmp/shared/
+
+    containers:
+
+    # setup container runs a upi install
+    - name: setup
+      image: ${IMAGE_OPENSTACK_INSTALLER}
+      terminationMessagePolicy: FallbackToLogsOnError
+      volumeMounts:
+      - name: artifacts
+        mountPath: ${TMP_ARTIFACTS}
+      - name: shared-tmp
+        mountPath: ${TMP_SHARED}
+      - name: cluster-profile
+        mountPath: ${TMP_CLUSTER_PROFILE}
+
+      env:
+      - name: CLUSTER_TYPE
+        value: ${CLUSTER_TYPE}
+      - name: CLUSTER_NAME
+        value: ${NAMESPACE}-${JOB_NAME_HASH}
+      - name: AWS_SHARED_CREDENTIALS_FILE
+        value: ${TMP_CLUSTER_PROFILE}/.awscred
+      - name: AWS_DEFAULT_REGION
+        value: us-east-1
+      - name: AWS_DEFAULT_OUTPUT
+        value: json
+      - name: AWS_PROFILE
+        value: openshift-ci-infra
+      - name: BASE_DOMAIN
+        value: ${BASE_DOMAIN}
+      - name: SSH_PUB_KEY_PATH
+        value: ${TMP_CLUSTER_PROFILE}/ssh-publickey
+      - name: SSH_PRIVATE_KEY_PATH
+        value: ${TMP_CLUSTER_PROFILE}/ssh-privatekey
+      - name: PULL_SECRET_PATH
+        value: ${TMP_CLUSTER_PROFILE}/pull-secret
+      - name: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+        value: ${RELEASE_IMAGE_LATEST}
+      - name: OPENSHIFT_INSTALL_INVOKER
+        value: openshift-internal-ci/${JOB_NAME}/${BUILD_ID}
+      - name: OPENSTACK_FLAVOR
+        value: ${OPENSTACK_FLAVOR}
+      - name: OPENSTACK_EXTERNAL_NETWORK
+        value: ${OPENSTACK_EXTERNAL_NETWORK}
+      - name: OS_CLOUD
+        value: ${OS_CLOUD}
+      - name: OS_CLIENT_CONFIG_FILE
+        value: ${TMP_CLUSTER_PROFILE}/clouds.yaml
+      - name: DO_NOT_CREATE_DNS_RECORD
+        value: ${DO_NOT_CREATE_DNS_RECORD}
+      - name: TMP_SHARED
+        value: ${TMP_SHARED}
+      - name: TMP_ARTIFACTS
+        value: ${TMP_ARTIFACTS}
+      - name: TMP_CLUSTER_PROFILE
+        value: ${TMP_CLUSTER_PROFILE}
+      - name: ASSETS_DIR
+        value: ${TMP_ARTIFACTS}/installer
+      - name: OS_UPI_DIR
+        value: /var/lib/openshift-install/upi/openstack
+      - name: NETWORK_TYPE
+        value: OpenShiftSDN
+      - name: OS_SUBNET_RANGE
+        value: 10.0.128.0/17
+      - name: INSTALL_INITIAL_RELEASE
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+        value: ${RELEASE_IMAGE_LATEST}
+      - name: IMAGE_OPENSTACK_INSTALLER
+        value: ${IMAGE_OPENSTACK_INSTALLER}
+      - name: USER
+        value: test
+      - name: HOME
+        value: /tmp/home
+      - name: NUMBER_OF_MASTERS
+        value: ${NUMBER_OF_MASTERS}
+      - name: NUMBER_OF_WORKERS
+        value: ${NUMBER_OF_WORKERS}
+      - name: RHCOS_RELEASE
+        value: ${RHCOS_RELEASE}
+
+      command:
+      - /bin/sh
+      - -c
+      - |
+        #!/bin/sh
+        echo "OpenStack: setup for cluster ${CLUSTER_NAME}"
+        # configure pipefail to return value from last non-zero exiting process or children
+        set -euo pipefail
+
+        #Before we can do anything on the container we need to make sure our user has the approriate permissions.
+        function allow_user_access() {
+          if ! whoami &> /dev/null; then
+            if [ -w /etc/passwd ]; then
+              echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+            fi
+          fi
+          mkdir -p "${HOME}"
+        }
+
+        function upload_rhcos_image() {
+          export RHCOS_GLANCE_IMAGE_NAME=${INFRA_ID}-rhcos-${RHCOS_RELEASE}
+          rm -rf ${TMP_SHARED}/rhcos.json
+          local IMAGE_SOURCE=https://raw.githubusercontent.com/openshift/installer/${RHCOS_RELEASE}/data/data/rhcos.json
+          wget -q -O ${TMP_SHARED}/rhcos.json $IMAGE_SOURCE
+          local GZ_IMAGE_FILENAME=$(grep path ${TMP_SHARED}/rhcos.json | grep openstack |awk '{print $2}' | awk -F\" '{print $2}')
+          local BASEURI=$(grep base ${TMP_SHARED}/rhcos.json | awk '{print $2}' |awk -F\" '{print $2}')
+          wget  -q -O ${TMP_SHARED}/$GZ_IMAGE_FILENAME $BASEURI$GZ_IMAGE_FILENAME
+          gunzip ${TMP_SHARED}/$GZ_IMAGE_FILENAME
+          local IMAGE_FILENAME=${GZ_IMAGE_FILENAME%.gz}
+          IMAGE_ID=$(openstack image create --container-format=bare --disk-format=qcow2 --file ${TMP_SHARED}/$IMAGE_FILENAME $RHCOS_GLANCE_IMAGE_NAME -f value -c id)
+          echo $IMAGE_ID > ${TMP_SHARED}/RHCOS_GLANCE_IMAGE_ID
+        }
+
+        function wait_for_teardown_container(){
+          filename=${TMP_SHARED}/teardown_running
+          echo "Waiting for teardown container to start"
+          for i in $(seq 1 150); do
+            echo looking for $filename
+            if [[ -f $filename ]]; then
+              return 0
+            fi
+            sleep 2
+          done
+          echo "Teardown container is not running after 5 minutes. Test can't start"
+          exit 1
+        }
+
+        function signal_early_failure() {
+          touch ${TMP_SHARED}/setup_early_failure
+        }
+
+        function check_early_failures() {
+          # if the installer does not have the upi openstack directory no need to continue
+          if [[ ! -d "${OS_UPI_DIR}" ]]; then
+              echo "FAILURE: ${OS_UPI_DIR} does not exists on the installer image"
+              signal_early_failure
+              exit 1
+          fi
+        }
+
+        function signal_oc_bootstrap_started() {
+          touch ${TMP_SHARED}/oc-bootstrap-started
+        }
+
+        function clean_exit()
+        {
+          rc=$?
+          echo setup exit
+          echo date
+          if test "${rc}" -eq 0; then
+            echo setup PASS rc = ${rc}
+            touch ${TMP_SHARED}/setup-success
+            ls ${TMP_SHARED}
+          else
+            echo setup FAIL rc=${rc}
+            touch ${TMP_SHARED}/exit ${TMP_SHARED}/setup-failed
+            ls ${TMP_SHARED}
+          fi
+          exit "${rc}"
+        }
+
+        function clean_term() {
+          CHILDREN=$(jobs -p)
+          if test -n "${CHILDREN}"; then
+              kill ${CHILDREN} && wait
+          fi
+        }
+
+        function signal_setup_complete() {
+          touch ${TMP_SHARED}/setup-complete
+        }
+
+        function setup_test_bed() {
+          # We have to truncate cluster name to 14 chars, because there is a limitation in the install-config
+          # Now it looks like "ci-op-rl6z646h-65230".
+          # We will remove "ci-op-" prefix from there to keep just last 14 characters. and it cannot start with a "-"
+          UNSAFE_CLUSTER_NAME=${CLUSTER_NAME:${#CLUSTER_NAME}<14?0:-14}
+          export CLUSTER_NAME=${UNSAFE_CLUSTER_NAME#"-"}
+
+          # copy active openshift-install binary to ${TMP_SHARED}
+          cp "$(command -v openshift-install)" ${TMP_SHARED}
+          mkdir "${ASSETS_DIR}"
+
+          #Pick release image to use
+          if [[ -n "${INSTALL_INITIAL_RELEASE}" && -n "${RELEASE_IMAGE_INITIAL}" ]]; then
+          echo "Installing from initial release ${RELEASE_IMAGE_INITIAL}"
+          OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_INITIAL}"
+          else
+          echo "Installing from release ${RELEASE_IMAGE_LATEST}"
+          fi
+
+          # set expiration date, ssh pub key and openshift secret
+          export EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
+          export SSH_PUB_KEY=$(cat "${SSH_PUB_KEY_PATH}")
+          export PULL_SECRET=$(cat "${PULL_SECRET_PATH}")
+
+          # move private key to ~/.ssh/ so that installer can use it to gather logs on bootstrap failure
+          mkdir -p ~/.ssh
+          cp "${SSH_PRIVATE_KEY_PATH}" ~/.ssh/id_rsa
+          chmod 0600 ~/.ssh/id_rsa
+
+          echo "OPENSTACK platform installer is using: ${IMAGE_OPENSTACK_INSTALLER} for testing"
+        }
+
+        function get_bootstrap_fip() {
+          export BOOTSTRAP_HOSTNAME=${INFRA_ID}-bootstrap
+          export BOOTSTRAP_FIP=$(openstack server list --name $BOOTSTRAP_HOSTNAME -f value -c Networks | awk '{print $2}')
+          echo $BOOTSTRAP_FIP
+        }
+
+
+
+
+        function create_api_fip () {
+          #(TODO) adduarte: all openstack resources should be written toa file which can be used to delete later.
+          LB_FIP_AND_ID=$(openstack floating ip create --description api.$CLUSTER_NAME.$BASE_DOMAIN $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address' -c 'id')
+          LB_FIP_IP=$(echo $LB_FIP_AND_ID |awk '{print $1}')
+          LB_FIP_UID=$(echo $LB_FIP_AND_ID |awk '{print $2}')
+          echo $LB_FIP_UID > ${TMP_SHARED}/LB_FIP_UID
+        }
+
+        function create_ingress_fip() {
+          INGRESS_FIP_AND_ID=$(openstack floating ip create --description ingress.$CLUSTER_NAME.$BASE_DOMAIN $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address' -c 'id')
+          INGRESS_FIP_IP=$(echo $INGRESS_FIP_AND_ID |awk '{print $1}')
+          INGRESS_FIP_UID=$(echo $INGRESS_FIP_AND_ID |awk '{print $2}')
+          echo $INGRESS_FIP_UID > ${TMP_SHARED}/INGRESS_FIP_UID
+        }
+
+        function create_dns_records() {
+          if [ -z "$DO_NOT_CREATE_DNS_RECORD" ]; then
+            echo "Creating DNS record for api.$CLUSTER_NAME.$BASE_DOMAIN. -> $LB_FIP_IP (${LB_FIP_UID})"
+            cat > ${ASSETS_DIR}/api-record.json <<EOF
+        {
+        "Comment": "Create the public OpenShift API record",
+        "Changes": [{
+              "Action": "UPSERT",
+              "ResourceRecordSet": {
+                "Name": "api.$CLUSTER_NAME.$BASE_DOMAIN.",
+                "Type": "A",
+                "TTL": 300,
+                "ResourceRecords": [{"Value": "$LB_FIP_IP"}]
+              }
+        }]}
+        EOF
+            export HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "shiftstack.devcluster.openshift.com" | python -c 'import json,sys;print json.load(sys.stdin)["HostedZones"][0]["Id"].split("/")[-1]')
+            aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file://${ASSETS_DIR}/api-record.json
+
+            echo "Creating DNS record for *.apps.$CLUSTER_NAME.$BASE_DOMAIN. -> $INGRESS_FIP_IP"
+            cat > /tmp/artifacts/installer/ingress-record.json <<EOF
+        {
+        "Comment": "Create the public OpenShift Ingress record",
+        "Changes": [{
+          "Action": "UPSERT",
+          "ResourceRecordSet": {
+            "Name": "*.apps.$CLUSTER_NAME.$BASE_DOMAIN.",
+            "Type": "A",
+            "TTL": 300,
+            "ResourceRecords": [{"Value": "$INGRESS_FIP_IP"}]
+            }
+        }]}
+        EOF
+            aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file:///tmp/artifacts/installer/ingress-record.json
+          else
+            ssh ${DNSUSER}@${DNSSERVER} -o StrictHostKeyChecking=no -i ${SSH_PRIVATE_KEY_PATH} "rm -rf ~/cluster.conf"
+            ssh ${DNSUSER}@${DNSSERVER} -o StrictHostKeyChecking=no -i ${SSH_PRIVATE_KEY_PATH} "echo address=/${BASE_DOMAIN}/${LB_FIP_IP} >> ~/cluster.conf"
+            ssh ${DNSUSER}@${DNSSERVER} -o StrictHostKeyChecking=no -i ${SSH_PRIVATE_KEY_PATH} "echo address=/apps.${BASE_DOMAIN}/${INGRESS_FIP_IP} >> ~/cluster.conf"
+            ssh ${DNSUSER}@${DNSSERVER} -o StrictHostKeyChecking=no -i ${SSH_PRIVATE_KEY_PATH} "sudo cp ~/cluster.conf /etc/dnsmasq.d/"
+            ssh ${DNSUSER}@${DNSSERVER} -o StrictHostKeyChecking=no -i ${SSH_PRIVATE_KEY_PATH} "sudo systemctl restart dnsmasq"
+          fi
+        }
+
+        function create_install_config() {
+          echo "Creating install_config.yaml"
+          # Create install-config.yaml.bkk to use as install-config.yaml because
+          # some of the next steps will delete the install-config.yaml thus we create a permanent one.
+          echo ${ASSETS_DIR}
+          cat > ${ASSETS_DIR}/install-config.yaml << EOF
+        apiVersion: v1
+        baseDomain: ${BASE_DOMAIN}
+        compute:
+        - hyperthreading: Enabled
+          name: worker
+          platform: {}
+          replicas: 0
+        controlPlane:
+          hyperthreading: Enabled
+          name: master
+          platform: {}
+          replicas: ${NUMBER_OF_MASTERS}
+        metadata:
+          name: ${CLUSTER_NAME}
+        networking:
+          clusterNetwork:
+          - cidr: 10.128.0.0/14
+            hostPrefix: 23
+          machineCIDR: ${OS_SUBNET_RANGE}
+          networkType: ${NETWORK_TYPE}
+          serviceNetwork:
+          - 172.30.0.0/16
+        platform:
+          openstack:
+            cloud: ${OS_CLOUD}
+            computeFlavor: ${OPENSTACK_FLAVOR}
+            externalNetwork: ${OPENSTACK_EXTERNAL_NETWORK}
+            lbFloatingIP: ${LB_FIP_IP}
+
+        pullSecret: >
+          ${PULL_SECRET}
+        sshKey: |
+          ${SSH_PUB_KEY}
+        EOF
+        }
+
+        function backup_install_config() {
+          cp ${ASSETS_DIR}/install-config.yaml ${ASSETS_DIR}/install-config.yaml.bkk
+        }
+
+        function create_manifest_files() {
+          echo "Creating manifest files"
+          TF_LOG=debug openshift-install --dir=${ASSETS_DIR} create manifests  --log-level=debug 2>&1 | grep --line-buffered -v password
+
+          #Remove Machines from manifests
+          rm -f ${ASSETS_DIR}/openshift/99_openshift-cluster-api_master-machines-*.yaml
+
+          #Remove MachineSets
+          rm -f ${ASSETS_DIR}/openshift/99_openshift-cluster-api_worker-machineset-*.yaml
+
+          #Make control-plane nodes unscheduable
+          sed -i "s;mastersSchedulable: true;mastersSchedulable: false;g" ${ASSETS_DIR}/manifests/cluster-scheduler-02-config.yml
+        }
+
+        function create_ignition_configs_and_jsons() {
+          echo "Creating ignition-configs"
+          TF_LOG=debug openshift-install --dir=${ASSETS_DIR} create ignition-configs --log-level=debug 2>&1 | grep --line-buffered -v password &
+          wait "$!"
+          export INFRA_ID=$(sed -n 's|.*"infraID":"\([^"]*\)".*|\1|p' ${ASSETS_DIR}/metadata.json )
+
+          # Create a ramdisk for the etcd storage. This helps with disk latency
+          # unpredictability in the OpenStack cloud used by the CI
+          python -c \
+              'import json, sys; j = json.load(sys.stdin); j[u"systemd"][u"units"] = [{u"contents": "[Unit]\nDescription=Mount etcd as a ramdisk\nBefore=local-fs.target\n[Mount]\n What=none\nWhere=/var/lib/etcd\nType=tmpfs\nOptions=size=2G\n[Install]\nWantedBy=local-fs.target", u"enabled": True, u"name":u"var-lib-etcd.mount"}]; json.dump(j, sys.stdout)' \
+              < "${ASSETS_DIR}/master.ign" \
+              > "${ASSETS_DIR}/master.ign.out"
+          mv "${ASSETS_DIR}/master.ign.out" "${ASSETS_DIR}/master.ign"
+
+          python -c "import base64
+        import json
+        import os
+        assets_dir = os.environ.get('ASSETS_DIR')
+        bootstrap_ign = assets_dir + '/bootstrap.ign'
+
+        with open(bootstrap_ign, 'r') as f:
+            ignition = json.load(f)
+
+        files = ignition['storage'].get('files', [])
+
+        infra_id = os.environ.get('INFRA_ID', 'openshift').encode()
+        hostname_b64 = base64.standard_b64encode(infra_id + b'-bootstrap\n').decode().strip()
+        files.append(
+        {
+            'path': '/etc/hostname',
+            'mode': 420,
+            'contents': {
+                'source': 'data:text/plain;charset=utf-8;base64,' + hostname_b64,
+                'verification': {}
+            },
+            'filesystem': 'root',
+        })
+
+        ca_cert_path = os.environ.get('OS_CACERT', '')
+        if ca_cert_path:
+            with open(ca_cert_path, 'r') as f:
+                ca_cert = f.read().encode()
+                ca_cert_b64 = base64.standard_b64encode(ca_cert).decode().strip()
+
+            files.append(
+            {
+                'path': '/opt/openshift/tls/cloud-ca-cert.pem',
+                'mode': 420,
+                'contents': {
+                    'source': 'data:text/plain;charset=utf-8;base64,' + ca_cert_b64,
+                    'verification': {}
+                },
+                'filesystem': 'root',
+            })
+
+        ignition['storage']['files'] = files;
+
+        with open(bootstrap_ign, 'w') as f:
+            json.dump(ignition, f)
+        "
+
+          # upload bootstrap.ign to glance
+          BOOTSTRAP_IGN_PATH=${ASSETS_DIR}/bootstrap.ign
+          GLANCE_SHIM_IMAGE_ID=$(openstack image create --disk-format raw --container-format bare --file ${BOOTSTRAP_IGN_PATH} ${INFRA_ID}-bootstrap-ignition -f value -c id)
+          echo $GLANCE_SHIM_IMAGE_ID > ${TMP_SHARED}/GLANCE_SHIM_IMAGE_ID
+          FILE_LOCATION=$(openstack image show ${GLANCE_SHIM_IMAGE_ID} | grep -oh "\/.*file")
+          GLANCE_ADDRESS=$(openstack catalog show glance -f table -c endpoints  | grep public | awk '{print $4}')
+          export GLANCE_IMAGE_URL="$GLANCE_ADDRESS$FILE_LOCATION"
+
+          # Create Hostname Config Ignition File
+          DATA=$(echo "$INFRA_ID-bootstrap" | base64)
+          export HOSTNAME_CONFIG_DATA_URL="data:text/plain;base64,$DATA"
+
+          #create Bootstrap Ignition Shim
+          export OPENSTACK_TOKEN=$(openstack token issue --format value -c id)
+          cat > ${ASSETS_DIR}/$INFRA_ID-bootstrap-ignition.json << EOF
+        {
+        "ignition": {
+            "config": {
+                "append": [
+                  {
+                    "source": "$GLANCE_IMAGE_URL",
+                    "verification": {},
+                    "httpHeaders": [
+                      {
+                         "name": "X-Auth-Token",
+                         "value": "$OPENSTACK_TOKEN"
+                      }
+                    ]
+                  }
+                ]
+            },
+            "security": {},
+            "timeouts": {},
+            "version": "2.4.0"
+        },
+        "networkd": {},
+        "passwd": {},
+        "storage": {
+                  "files": [{
+                      "filesystem": "root",
+                      "path": "/etc/hostname",
+                      "mode": 420,
+                      "contents": { "source": "$HOSTNAME_CONFIG_DATA_URL" }
+                  }]
+        },
+        "systemd": {}
+        }
+        EOF
+
+
+          echo "$INFRA_ID-bootstrap-ignition.json"
+          cat ${ASSETS_DIR}/$INFRA_ID-bootstrap-ignition.json
+          #create master.ign for each master
+          MASTER_IGN_PATH=${ASSETS_DIR}/master.ign
+          for index in $(seq 0 2); do
+              MASTER_HOSTNAME="$INFRA_ID-master-$index\n"
+              python -c "import base64, json, sys;
+        ignition = json.load(sys.stdin);
+        files = ignition['storage'].get('files', []);
+        files.append({'path': '/etc/hostname', 'mode': 420, 'contents': {'source': 'data:text/plain;charset=utf-8;base64,' + base64.standard_b64encode(b'$MASTER_HOSTNAME').decode().strip(), 'verification': {}}, 'filesystem': 'root'});
+        ignition['storage']['files'] = files;
+        json.dump(ignition, sys.stdout)
+        " <$MASTER_IGN_PATH >"${ASSETS_DIR}/$INFRA_ID-master-$index-ignition.json"
+          done
+        }
+
+        function check_ip_resolves() {
+          correct_ip=$1
+          lookup=$(nslookup $2)
+          if [[ $? -eq 0 ]]; then
+            if [[ ${lookup} =~ "$1" ]]; then
+               echo $2 resolves to $1
+               return 0
+            fi
+          fi
+          echo $2 does not resolv to $1
+          return 1
+        }
+
+
+        function verify_dns_resolvs() {
+          echo Verifying we can resolv api.$CLUSTER_NAME.$BASE_DOMAIN
+          check_ip_resolves "${LB_FIP_IP}" "api.$CLUSTER_NAME.$BASE_DOMAIN"
+          if [[ "$?" -ne "0" ]] ; then
+                echo dns verification failed!
+                exit 1
+          fi
+        }
+
+        function get_clouds_param() {
+          awk '/^\s+'$1':/ { print $2 }' "$OS_CLIENT_CONFIG_FILE" | sed -e 's/^"//' -e 's/"$//'
+        }
+
+        function prepair_ansible_playbooks_workspace() {
+          OPENSTACK_REGION="$(get_clouds_param 'region_name')"
+          echo "OpenStack UPI directory: ${OS_UPI_DIR}"
+          #prepair inventory.yaml
+          cp ${OS_UPI_DIR}/inventory.yaml ${OS_UPI_DIR}/inventory.yaml.bkk
+          sed -i "s~os_subnet_range.*~os_subnet_range: \'${OS_SUBNET_RANGE}\'~g" ${OS_UPI_DIR}/inventory.yaml
+          sed -i "s/os_flavor_master.*/os_flavor_master: \'${OPENSTACK_FLAVOR}\'/g" ${OS_UPI_DIR}/inventory.yaml
+          sed -i "s/os_flavor_worker.*/os_flavor_worker: \'${OPENSTACK_FLAVOR}\'/g" ${OS_UPI_DIR}/inventory.yaml
+          sed -i "s/os_image_rhcos.*/os_image_rhcos: \'${RHCOS_GLANCE_IMAGE_NAME}\'/g" ${OS_UPI_DIR}/inventory.yaml
+          sed -i "s/os_external_network.*/os_external_network: \'${OPENSTACK_EXTERNAL_NETWORK}\'/g" ${OS_UPI_DIR}/inventory.yaml
+          sed -i "s/os_api_fip.*/os_api_fip: \'${LB_FIP_IP}\'/g" ${OS_UPI_DIR}/inventory.yaml
+          sed -i "s/os_ingress_fip.*/os_ingress_fip: \'${INGRESS_FIP_IP}\'/g" ${OS_UPI_DIR}/inventory.yaml
+          sed -i "s/os_region_name.*/os_region_name: \'${OPENSTACK_REGION}\'/g" ${OS_UPI_DIR}/inventory.yaml
+          sed -i "s/os_cp_nodes_number.*/os_cp_nodes_number: ${NUMBER_OF_MASTERS}/g" ${OS_UPI_DIR}/inventory.yaml
+          sed -i "s/os_compute_nodes_number.*/os_compute_nodes_number: ${NUMBER_OF_WORKERS}/g" ${OS_UPI_DIR}/inventory.yaml
+
+          # The metadata.json  and ignition json files needs to be in the same directory as playbooks
+          cp ${ASSETS_DIR}/*.json ${OS_UPI_DIR}/
+          cp ${ASSETS_DIR}/*.ign ${OS_UPI_DIR}/
+        }
+
+        function verify_playbooks_status() {
+          # We first do a dry run with --list-tasks to catch any configuration errors right up front
+          # before we start the full run.
+          ansible-playbook -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/security-groups.yaml" --list-tasks
+          ansible-playbook -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/network.yaml" --list-tasks
+          ansible-playbook -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/bootstrap.yaml" --list-tasks
+          ansible-playbook -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/control-plane.yaml" --list-tasks
+          ansible-playbook -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/compute-nodes.yaml" --list-tasks
+          echo "SUCCEFULLY verified all playbooks with --list-tasks flag"
+        }
+
+
+        function wait_for_bootstrap_at_port () {
+          for i in {1..10};
+          do
+           sleep 30
+           result=$(curl -m 2 -skL -w "%{http_code}" "https://${BOOTSTRAP_FIP}:${1}" -o /dev/null) || true
+           if [ "$result" -gt "0" ] ; then
+            echo bootstrap responded to https://${BOOTSTRAP_FIP}:${1} with $result
+            break
+           else
+            echo bootstrap did not respond to  https://${BOOTSTRAP_FIP}:${1}
+            echo trying again
+           fi
+          done
+        }
+
+        function run_bootstrap_playbooks() {
+          #Security Groups
+          ansible-playbook -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/security-groups.yaml"
+
+          #Network and Subnet
+          ansible-playbook -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/network.yaml"
+
+          #Bootstrap
+          ansible-playbook  -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/bootstrap.yaml"
+          get_bootstrap_fip > ${TMP_SHARED}/BOOTSTRAP_FIP
+          export BOOTSTRAP_FIP=$(cat ${TMP_SHARED}/BOOTSTRAP_FIP)
+          wait_for_bootstrap_at_port 6443
+        }
+
+
+        function run_control_plane_playbooks() {
+          #Control plane
+          ansible-playbook -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/control-plane.yaml"
+        }
+
+        function wait_for_control_plane() {
+          sleep 60
+        }
+
+
+        function wait_for_bootstrap_complete() {
+          signal_oc_bootstrap_started
+          echo "Waiting for bootstrap to complete"
+          date
+          TF_LOG=debug openshift-install --dir=${ASSETS_DIR} wait-for bootstrap-complete --log-level=debug 2>&1 | grep --line-buffered -v password &
+          wait "$!"
+        }
+
+
+        function access_the_openshiftapi() {
+          export KUBECONFIG="${ASSETS_DIR}/auth/kubeconfig"
+          echo oc get nodes
+          oc get nodes || true
+          echo oc pods -A
+          oc get pods -A || true
+        }
+
+
+        function gather_bootstrap_logs() {
+            if [ -f "${TMP_SHARED}/BOOTSTRAP_FIP" ] ; then
+                echo Gathering bootstrap logs
+                B_FIP=$(cat ${TMP_SHARED}/BOOTSTRAP_FIP)
+                ssh -i ${SSH_PRIVATE_KEY_PATH} -o "StrictHostKeyChecking no" core@${B_FIP} 'journalctl -b  -u release-image.service -u bootkube.service > bootstrap.log; tar -czf bootstrap.log.tgz bootstrap.log' || true
+                scp -i ${SSH_PRIVATE_KEY_PATH} -o "StrictHostKeyChecking no" core@${B_FIP}:~/bootstrap.log.tgz ${TMP_ARTIFACTS}/bootstrap/bootstrap.log.tgz || true
+            else
+              echo Bootstrap fip no longer available. Unable to collect bootstrap logs
+            fi
+        }
+
+
+
+        function delete_bootstrap_resources() {
+          #we need to look for the message: INFO It is now safe to remove the bootstrap resources" from opesnhift-install wait-for boostrap-complete
+          echo "destroying bootstrap resources"
+          gather_bootstrap_logs
+          mv ${TMP_SHARED}/BOOTSTRAP_FIP ${TMP_SHARED}/BOOTSTRAP_FIP_logs_collected
+          ansible-playbook -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-bootstrap.yaml"
+          openstack image delete $GLANCE_SHIM_IMAGE_ID
+        }
+
+        function deploy_compute_nodes() {
+          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/compute-nodes.yaml"
+        }
+
+        function wait_for_compute_nodes() {
+            sleep 60
+        }
+
+
+        function approve_csrs() {
+          while true; do
+            if [[ ! -f ${TMP_SHARED}/setup-complete ]]; then
+              oc get csr -o name | xargs oc adm certificate approve
+              sleep 15 & wait
+              continue
+            else
+              break
+            fi
+          done
+        }
+
+        function approve_csrs_in_background() {
+          echo "Approving pending CSRs"
+          export KUBECONFIG=${ASSETS_DIR}/auth/kubeconfig
+          approve_csrs &
+        }
+
+
+        function wait_for_install_complete() {
+          echo "Completing UPI setup"
+          TF_LOG=debug openshift-install --dir=${ASSETS_DIR} wait-for install-complete --log-level=debug 2>&1 | grep --line-buffered -v password &
+          wait "$!"
+        }
+
+
+        # Test setup
+        trap  clean_exit EXIT
+        trap clean_term  TERM
+        wait_for_teardown_container
+        allow_user_access
+        setup_test_bed
+        check_early_failures
+        create_api_fip
+        create_ingress_fip
+        create_dns_records
+        create_install_config
+        backup_install_config
+        create_manifest_files
+        create_ignition_configs_and_jsons
+        upload_rhcos_image
+        prepair_ansible_playbooks_workspace
+        verify_playbooks_status
+        run_bootstrap_playbooks
+        run_control_plane_playbooks
+        wait_for_control_plane
+        verify_dns_resolvs
+        wait_for_bootstrap_complete
+        access_the_openshiftapi
+        delete_bootstrap_resources
+        deploy_compute_nodes
+        wait_for_compute_nodes
+        approve_csrs_in_background
+        wait_for_install_complete
+        signal_setup_complete
+
+
+
+
+
+    # Once the cluster is up, executes shared tests
+    - name: test
+      image: ${IMAGE_TESTS}
+      terminationMessagePolicy: FallbackToLogsOnError
+      resources:
+        requests:
+          cpu: 3
+          memory: 600Mi
+        limits:
+          memory: 4Gi
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: ${TMP_SHARED}
+      - name: cluster-profile
+        mountPath: ${TMP_CLUSTER_PROFILE}
+      - name: artifacts
+        mountPath: ${TMP_ARTIFACTS}
+      env:
+      - name: OS_CLOUD
+        value: ${OS_CLOUD}
+      - name: OS_CLIENT_CONFIG_FILE
+        value: ${TMP_CLUSTER_PROFILE}/clouds.yaml
+      - name: KUBECONFIG
+        value: ${TMP_ARTIFACTS}/installer/auth/kubeconfig
+      - name: TMP_SHARED
+        value: ${TMP_SHARED}
+      - name: TMP_ARTIFACTS
+        value: ${TMP_ARTIFACTS}
+      - name: TMP_CLUSTER_PROFILE
+        value: ${TMP_CLUSTER_PROFILE}
+      - name: USER
+        value: test
+      - name: HOME
+        value: /tmp/home
+      - name: NUMBER_OF_MASTERS
+        value: ${NUMBER_OF_MASTERS}
+      - name: NUMBER_OF_WORKERS
+        value: ${NUMBER_OF_WORKERS}
+      command:
+      - /bin/sh
+      - -c
+      - |
+        #!/bin/bash
+        set -euo pipefail
+
+        export PATH=${TMP_SHARED}:/usr/libexec/origin:$PATH
+
+        trap 'touch ${TMP_SHARED}/exit' EXIT ERR
+        trap 'jobs -p | xargs -r kill || true; exit 0' TERM
+
+        function allow_user_access() {
+          if ! whoami &> /dev/null; then
+            if [ -w /etc/passwd ]; then
+              echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+            fi
+          fi
+          mkdir -p "${HOME}"
+        }
+
+        function wait_for_other_containers() {
+          # Wait for setup container to finish or an exit
+          while true; do
+            echo "waiting for setup container to finish"
+            if [[ -f ${TMP_SHARED}/setup-failed ]]; then
+              echo "Setup reported a failure." 2>&1
+              exit 0
+            fi
+            if [[ -f ${TMP_SHARED}/exit ]]; then
+              echo "Another process exited" 2>&1
+              exit 1
+            fi
+            if [[ ! -f ${TMP_SHARED}/setup-complete ]]; then
+              sleep 15 & wait
+              continue
+            fi
+            # don't let clients impact the global kubeconfig
+            cp "${KUBECONFIG}" /tmp/admin.kubeconfig
+            export KUBECONFIG=/tmp/admin.kubeconfig
+            break
+          done
+        }
+
+
+
+
+
+        function install_secret_on_cluster() {
+          # if the cluster profile included an insights secret, install it to the cluster to
+          # report support data from the support-operator
+          if [[ -f ${TMP_CLUSTER_PROFILE}/insights-live.yaml ]]; then
+            oc create -f ${TMP_CLUSTER_PROFILE}/insights-live.yaml || true
+          fi
+        }
+
+        function setup_env_vars() {
+          # set up env vars
+          export KUBE_SSH_BASTION="$( oc --insecure-skip-tls-verify get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
+          export KUBE_SSH_KEY_PATH=${TMP_CLUSTER_PROFILE}/ssh-privatekey
+          export KUBE_SSH_USER=core
+          mkdir -p ~/.ssh
+          cp ${TMP_CLUSTER_PROFILE}/ssh-privatekey ~/.ssh/kube_openstack_rsa || true
+          export TEST_PROVIDER='{"type":"openstack"}'
+        }
+
+        function configure_xtrace() {
+          XTRACE_ENABLED=0
+          if set -o | grep xtrace.*on &>/dev/null; then
+            XTRACE_ENABLED=1
+            set -x
+          fi
+        }
+
+        function setup_test_bed() {
+          mkdir -p "${HOME}"
+          mkdir -p /tmp/output
+          cd /tmp/output
+        }
+
+
+        # Test execution
+        allow_user_access
+        wait_for_other_containers
+        setup_test_bed
+
+        echo Tests requested: ${TEST_COMMAND}
+        case ${TEST_COMMAND} in
+          run-no-tests)
+             echo "WARNING: No tests were run against the installed cluster"
+             exit 0
+             ;;
+          run-minial-tests)
+             echo Running minimal tests - NOT IMPLEMENTED
+             #install_secret_on_cluster
+             #setup_env_vars
+             #configure_xtrace
+             exit 1
+             ;;
+          run-tests)
+             echo Running full tests - NOT IMPLEMENTED
+             #openshift-tests run "${TEST_SUITE}" \
+             #    --provider "${TEST_PROVIDER:-}" -o ${TMP_ARTIFACTS}/e2e.log --junit-dir ${TMP_ARTIFACTS}/junit
+             exit 1
+             ;;
+          run-upgrade-tests)
+             echo Running upgrade tests - NOT IMPLEMENTED
+             #openshift-tests run-upgrade "${TEST_SUITE}" --to-image "${RELEASE_IMAGE_LATEST}" \
+             #    --options "${TEST_OPTIONS:-}" \
+             #    --provider "${TEST_PROVIDER:-}" -o ${TMP_ARTIFACTS}/e2e.log --junit-dir ${TMP_ARTIFACTS}/ju
+             exit 1
+             ;;
+        esac
+
+        echo ${TEST_COMMAND} - NOT IMPLEMENTED
+        exit 1
+    # teardown container performs cleanup of all created resources
+    - name: teardown
+      image: ${IMAGE_OPENSTACK_INSTALLER}
+      terminationMessagePolicy: FallbackToLogsOnError
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: ${TMP_SHARED}
+      - name: cluster-profile
+        mountPath: ${TMP_CLUSTER_PROFILE}
+      - name: artifacts
+        mountPath: ${TMP_ARTIFACTS}
+      env:
+      - name: CLUSTER_TYPE
+        value: ${CLUSTER_TYPE}
+      - name: CLUSTER_NAME
+        value: ${NAMESPACE}-${JOB_NAME_HASH}
+      - name: AWS_SHARED_CREDENTIALS_FILE
+        value: ${TMP_CLUSTER_PROFILE}/.awscred
+      - name: AWS_DEFAULT_REGION
+        value: us-east-1
+      - name: AWS_DEFAULT_OUTPUT
+        value: json
+      - name: AWS_PROFILE
+        value: openshift-ci-infra
+      - name: KUBECONFIG
+        value: ${TMP_ARTIFACTS}/installer/auth/kubeconfig
+      - name: SSH_PRIVATE_KEY_PATH
+        value: ${TMP_CLUSTER_PROFILE}/ssh-privatekey
+      - name: OS_CLOUD
+        value: ${OS_CLOUD}
+      - name: OS_CLIENT_CONFIG_FILE
+        value: ${TMP_CLUSTER_PROFILE}/clouds.yaml
+      - name: DO_NOT_CREATE_DNS_RECORD
+        value: ${DO_NOT_CREATE_DNS_RECORD}
+      - name: TMP_SHARED
+        value: ${TMP_SHARED}
+      - name: TMP_ARTIFACTS
+        value: ${TMP_ARTIFACTS}
+      - name: TMP_CLUSTER_PROFILE
+        value: ${TMP_CLUSTER_PROFILE}
+      - name: ASSETS_DIR
+        value: ${TMP_ARTIFACTS}/installer
+      - name: OS_UPI_DIR
+        value: /var/lib/openshift-install/upi/openstack
+      - name: USER
+        value: test
+      - name: HOME
+        value: /tmp/home
+      - name: NUMBER_OF_MASTERS
+        value: ${NUMBER_OF_MASTERS}
+      - name: NUMBER_OF_WORKERS
+        value: ${NUMBER_OF_WORKERS}
+
+      command:
+      - /bin/sh
+      - -c
+      - |
+        #!/bin/bash
+        set -eo pipefail
+
+        mkdir -p "${HOME}"
+
+        function queue() {
+          local TARGET="${1}"
+          echo target: $TARGET
+          shift
+          local LIVE="$(jobs | wc -l)"
+          echo live $LIVE
+          while [[ "${LIVE}" -ge 45 ]]; do
+            sleep 1
+            LIVE="$(jobs | wc -l)"
+          done
+          echo "${@}"
+          if [[ -n "${FILTER:-}" ]]; then
+            "${@}" | "${FILTER}" >"${TARGET}" &
+          else
+            "${@}" >"${TARGET}" &
+          fi
+        }
+
+        function exit_on_setup_early_failure() {
+            if [[ -f ${TMP_SHARED}/setup_early_failure ]]; then
+              echo Setup container reported Early Failure. No teardown will be executed for ${CLUSTER_NAME}
+              exit 0
+            fi
+        }
+        function collect_logs_from_proxy() {
+          # collect logs from the proxy
+          if [ -f "${ASSETS_DIR}/proxyip" ]
+          then
+            proxy_ip="$(cat ${ASSETS_DIR}/proxyip)"
+            mkdir -p ${TMP_ARTIFACTS}/proxy
+            eval $(ssh-agent)
+            ssh-add /etc/openshift-installer/ssh-privatekey
+            ssh -A -o PreferredAuthentications=publickey -o StrictHostKeyChecking=false -o UserKnownHostsFile=/dev/null core@${proxy_ip} 'journalctl -u squid' > ${TMP_ARTIFACTS}/proxy/squid.service
+
+          fi
+        }
+
+        function start_teardown() {
+          #start of teardown
+          # We have to truncate cluster name to 14 chars, because there is a limitation in the install-config
+          # Now it looks like "ci-op-rl6z646h-65230".
+          # We will remove "ci-op-" prefix from there to keep just last 14 characters.
+          UNSAFE_CLUSTER_NAME=${CLUSTER_NAME:${#CLUSTER_NAME}<14?0:-14}
+          export CLUSTER_NAME=${UNSAFE_CLUSTER_NAME#"-"}
+          echo "Teardown for ${CLUSTER_NAME}"
+          touch ${TMP_SHARED}/exit
+          export PATH=$PATH:${TMP_SHARED}
+          mkdir -p ${TMP_ARTIFACTS}/pods ${TMP_ARTIFACTS}/nodes ${TMP_ARTIFACTS}/metrics ${TMP_ARTIFACTS}/bootstrap ${TMP_ARTIFACTS}/network
+        }
+
+        function prepair_ansible_playbooks_workspace() {
+          # The metadata.json  and ignition json files needs to be in the same directory as playbooks
+          cp ${ASSETS_DIR}/*.json ${OS_UPI_DIR}/
+          cp ${ASSETS_DIR}/*.ign ${OS_UPI_DIR}/
+        }
+
+
+        function gather_openstack_information() {
+          echo "Gathering openstack server list"
+          openstack server list | grep -e $CLUSTER_NAME >${TMP_ARTIFACTS}/openstack_nodes.log
+
+          echo "Gathering openstack server details"
+          for server in $(openstack server list -c Name -f value | grep -e $CLUSTER_NAME | sort); do
+              echo -e "\n$ openstack server show $server" >>${TMP_ARTIFACTS}/openstack_nodes.log
+              openstack server show $server >>${TMP_ARTIFACTS}/openstack_nodes.log
+          done
+
+          echo "Gathering openstack server logs"
+          local BOOTSTRAP_NAME=$(openstack server list --format value --column Name | grep -e "${CLUSTER_NAME}-.*-bootstrap")
+          if [ -n "$BOOTSTRAP_NAME" ]; then
+             openstack console log show "$BOOTSTRAP_NAME" &>${TMP_ARTIFACTS}/bootstrap/nova.log
+          fi
+
+          echo "Gathering openstack securitygroups"
+          export INFRA_ID=$(sed -n 's|.*"infraID":"\([^"]*\)".*|\1|p' ${ASSETS_DIR}/metadata.json )
+
+          os_sg_master="${INFRA_ID}-master"
+          os_sg_worker="${INFRA_ID}-worker"
+
+          openstack security group rule list $os_sg_master &>${TMP_ARTIFACTS}/${INFRA_ID}-master-security-group
+          openstack security group rule list $os_sg_worker &>${TMP_ARTIFACTS}/${INFRA_ID}-worker-security-group
+
+        }
+
+        function gather_bootstrap_logs() {
+           echo gathering bootstrap logs
+            if [ -f "${TMP_SHARED}/BOOTSTRAP_FIP" ] ; then
+                echo we do know the bootstrap fip
+                B_FIP=$(cat ${TMP_SHARED}/BOOTSTRAP_FIP)
+                ssh -i ${SSH_PRIVATE_KEY_PATH} -o "StrictHostKeyChecking no" core@${B_FIP} 'journalctl -b  -u release-image.service -u bootkube.service > bootstrap.log; tar -czf bootstrap.log.tgz bootstrap.log'
+                scp -i ${SSH_PRIVATE_KEY_PATH} -o "StrictHostKeyChecking no" core@${B_FIP}:~/bootstrap.log.tgz ${TMP_ARTIFACTS}/bootstrap/
+            fi
+           echo finished gathering bootstrap logs
+        }
+
+        function gather_master_logs() {
+            echo "NO MASTER LOGS WERE COLLECTED
+            # this still needs to be implementd.
+        }
+
+        function gather_compute_logs() {
+           echo "NO COMPUTE LOGS WERE COLLECTED
+           # this still needs to be implemented
+        }
+
+        function gather_openshift_information() {
+
+          if [[ ! -f ${TMP_SHARED}/oc-bootstrap-started ]]; then
+            echo openshift-install wait-for bootstrap-complete was not executed. No OC information collected.
+            return 1
+          fi
+          echo "Gathering openshift nodes"
+          oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' > /tmp/nodes
+          echo "Gathering openshift pods"
+          oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces --template '{{ range .items }}{{ $name := .metadata.name }}{{ $ns := .metadata.namespace }}{{ range .spec.containers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ range .spec.initContainers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ end }}' > /tmp/containers
+          oc --insecure-skip-tls-verify --request-timeout=5s get pods -l openshift.io/component=api --all-namespaces --template '{{ range .items }}-n {{ .metadata.namespace }} {{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/pods-api
+
+          queue ${TMP_ARTIFACTS}/config-resources.json oc --insecure-skip-tls-verify --request-timeout=5s get apiserver.config.openshift.io authentication.config.openshift.io build.config.openshift.io console.config.openshift.io dns.config.openshift.io featuregate.config.openshift.io image.config.openshift.io infrastructure.config.openshift.io ingress.config.openshift.io network.config.openshift.io oauth.config.openshift.io project.config.openshift.io scheduler.config.openshift.io -o json
+          queue ${TMP_ARTIFACTS}/apiservices.json oc --insecure-skip-tls-verify --request-timeout=5s get apiservices -o json
+          queue ${TMP_ARTIFACTS}/clusteroperators.json oc --insecure-skip-tls-verify --request-timeout=5s get clusteroperators -o json
+          queue ${TMP_ARTIFACTS}/clusterversion.json oc --insecure-skip-tls-verify --request-timeout=5s get clusterversion -o json
+          queue ${TMP_ARTIFACTS}/configmaps.json oc --insecure-skip-tls-verify --request-timeout=5s get configmaps --all-namespaces -o json
+          queue ${TMP_ARTIFACTS}/credentialsrequests.json oc --insecure-skip-tls-verify --request-timeout=5s get credentialsrequests --all-namespaces -o json
+          queue ${TMP_ARTIFACTS}/csr.json oc --insecure-skip-tls-verify --request-timeout=5s get csr -o json
+          queue ${TMP_ARTIFACTS}/endpoints.json oc --insecure-skip-tls-verify --request-timeout=5s get endpoints --all-namespaces -o json
+          FILTER=gzip queue ${TMP_ARTIFACTS}/deployments.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get deployments --all-namespaces -o json
+          FILTER=gzip queue ${TMP_ARTIFACTS}/daemonsets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get daemonsets --all-namespaces -o json
+          queue ${TMP_ARTIFACTS}/events.json oc --insecure-skip-tls-verify --request-timeout=5s get events --all-namespaces -o json
+          queue ${TMP_ARTIFACTS}/kubeapiserver.json oc --insecure-skip-tls-verify --request-timeout=5s get kubeapiserver -o json
+          queue ${TMP_ARTIFACTS}/kubecontrollermanager.json oc --insecure-skip-tls-verify --request-timeout=5s get kubecontrollermanager -o json
+          queue ${TMP_ARTIFACTS}/machineconfigpools.json oc --insecure-skip-tls-verify --request-timeout=5s get machineconfigpools -o json
+          queue ${TMP_ARTIFACTS}/machineconfigs.json oc --insecure-skip-tls-verify --request-timeout=5s get machineconfigs -o json
+          queue ${TMP_ARTIFACTS}/machinesets.json oc --insecure-skip-tls-verify --request-timeout=5s get machinesets -A -o json
+          queue ${TMP_ARTIFACTS}/machines.json oc --insecure-skip-tls-verify --request-timeout=5s get machines -A -o json
+          queue ${TMP_ARTIFACTS}/namespaces.json oc --insecure-skip-tls-verify --request-timeout=5s get namespaces -o json
+          queue ${TMP_ARTIFACTS}/nodes.json oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o json
+          queue ${TMP_ARTIFACTS}/openshiftapiserver.json oc --insecure-skip-tls-verify --request-timeout=5s get openshiftapiserver -o json
+          queue ${TMP_ARTIFACTS}/pods.json oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces -o json
+          queue ${TMP_ARTIFACTS}/persistentvolumes.json oc --insecure-skip-tls-verify --request-timeout=5s get persistentvolumes --all-namespaces -o json
+          queue ${TMP_ARTIFACTS}/persistentvolumeclaims.json oc --insecure-skip-tls-verify --request-timeout=5s get persistentvolumeclaims --all-namespaces -o json
+          FILTER=gzip queue ${TMP_ARTIFACTS}/replicasets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get replicasets --all-namespaces -o json
+          queue ${TMP_ARTIFACTS}/rolebindings.json oc --insecure-skip-tls-verify --request-timeout=5s get rolebindings --all-namespaces -o json
+          queue ${TMP_ARTIFACTS}/roles.json oc --insecure-skip-tls-verify --request-timeout=5s get roles --all-namespaces -o json
+          queue ${TMP_ARTIFACTS}/services.json oc --insecure-skip-tls-verify --request-timeout=5s get services --all-namespaces -o json
+          FILTER=gzip queue ${TMP_ARTIFACTS}/statefulsets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get statefulsets --all-namespaces -o json
+
+          FILTER=gzip queue ${TMP_ARTIFACTS}/openapi.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get --raw /openapi/v2
+
+          # gather nodes first in parallel since they may contain the most relevant debugging info
+          while IFS= read -r i; do
+            mkdir -p ${TMP_ARTIFACTS}/nodes/$i
+            queue ${TMP_ARTIFACTS}/nodes/$i/nova.log openstack console log show $i
+            queue ${TMP_ARTIFACTS}/nodes/$i/heap oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/debug/pprof/heap
+          done < /tmp/nodes
+
+          FILTER=gzip queue ${TMP_ARTIFACTS}/nodes/masters-journal.gz oc --insecure-skip-tls-verify adm node-logs --role=master --unify=false
+          FILTER=gzip queue ${TMP_ARTIFACTS}/nodes/workers-journal.gz oc --insecure-skip-tls-verify adm node-logs --role=worker --unify=false
+
+          # Snapshot iptables-save on each node for debugging possible kube-proxy issues
+          oc --insecure-skip-tls-verify get --request-timeout=20s -n openshift-sdn -l app=sdn pods --template '{{ range .items }}{{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/sdn-pods
+          while IFS= read -r i; do
+            queue ${TMP_ARTIFACTS}/network/iptables-save-$i oc --insecure-skip-tls-verify rsh --timeout=20 -n openshift-sdn -c sdn $i iptables-save -c
+          done < /tmp/sdn-pods
+
+          while IFS= read -r i; do
+            file="$( echo "$i" | cut -d ' ' -f 3 | tr -s ' ' '_' )"
+            queue ${TMP_ARTIFACTS}/metrics/${file}-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig'
+            queue ${TMP_ARTIFACTS}/metrics/${file}-controllers-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig'
+          done < /tmp/pods-api
+
+          while IFS= read -r i; do
+            file="$( echo "$i" | cut -d ' ' -f 2,3,5 | tr -s ' ' '_' )"
+            FILTER=gzip queue ${TMP_ARTIFACTS}/pods/${file}.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s $i
+            FILTER=gzip queue ${TMP_ARTIFACTS}/pods/${file}_previous.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s -p $i
+          done < /tmp/containers
+
+          echo "Snapshotting prometheus (may take 15s) ..."
+          queue ${TMP_ARTIFACTS}/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring prometheus-k8s-0 -- tar cvzf - -C /prometheus .
+
+          # move private key to ~/.ssh/ so that installer can use it to gather logs
+          mkdir -p ~/.ssh
+          cp "${SSH_PRIVATE_KEY_PATH}" ~/.ssh/id_rsa
+          chmod 0600 ~/.ssh/id_rsa
+
+          echo "Running must-gather..."
+          mkdir -p ${TMP_ARTIFACTS}/must-gather
+          queue ${TMP_ARTIFACTS}/must-gather/must-gather.log oc --insecure-skip-tls-verify adm must-gather --dest-dir ${TMP_ARTIFACTS}/must-gather
+
+          echo "Waiting for logs ..."
+          wait
+        }
+
+
+        function remove_dns_entries() {
+          if [ -z "$DO_NOT_CREATE_DNS_RECORD" ]; then
+            echo "Removing entries from DNS ..."
+            export HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "shiftstack.devcluster.openshift.com" | python -c 'import json,sys;print json.load(sys.stdin)["HostedZones"][0]["Id"].split("/")[-1]')
+            sed -e's/UPSERT/DELETE/g' ${ASSETS_DIR}/api-record.json > ${ASSETS_DIR}/delete-api-record.json
+            sed -e's/Create/Delete/g' ${ASSETS_DIR}/api-record.json > ${ASSETS_DIR}/delete-api-record.json
+            aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file://${ASSETS_DIR}/delete-api-record.json
+            sed -e's/UPSERT/DELETE/g' ${ASSETS_DIR}/ingress-record.json > ${ASSETS_DIR}/delete-ingress-record.json
+            sed -e's/Create/Delete/g' ${ASSETS_DIR}/ingress-record.json > ${ASSETS_DIR}/delete-ingress-record.json
+            aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file://${ASSETS_DIR}/delete-ingress-record.json
+          else
+            echo "There are no DNS entries to remove"
+          fi
+        }
+
+        function delete_api_fip() {
+          LB_FIP_UID=`cat ${TMP_SHARED}/LB_FIP_UID`
+          echo "Deleting api FIP ... for ${CLUSTER_NAME} with UID: ${LB_FIP_UID}"
+          openstack floating ip delete $LB_FIP_UID
+        }
+
+        function delete_ingress_fip() {
+          INGRESS_FIP_UID=`cat ${TMP_SHARED}/INGRESS_FIP_UID`
+          echo "Deleting ingress FIP using UID: ${INGRESS_FIP_UID}"
+          openstack floating ip delete $INGRESS_FIP_UID
+        }
+
+        function delete_glance_shim_image() {
+          GLANCE_SHIM_IMAGE_ID=`cat ${TMP_SHARED}/GLANCE_SHIM_IMAGE_ID`
+          echo "Deleting glance image $GLANCE_SHIM_IMAGE_ID"
+          openstack image delete $GLANCE_SHIM_IMAGE_ID
+        }
+
+        function delete_glance_rhcos_image() {
+          RHCOS_GLANCE_IMAGE_ID=`cat ${TMP_SHARED}/RHCOS_GLANCE_IMAGE_ID`
+          echo "Deleting rhcos glance image ${RHCOS_GLANCE_IMAGE_ID}"
+          openstack image delete ${RHCOS_GLANCE_IMAGE_ID}
+        }
+
+        function verify_teardown_playbooks() {
+          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-load-balancers.yaml" --list-tasks
+          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-compute-nodes.yaml" --list-tasks
+          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-control-plane.yaml" --list-tasks
+          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-bootstrap.yaml" --list-tasks
+          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-network.yaml" --list-tasks
+          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-security-groups.yaml" --list-tasks
+        }
+
+        function run_teardown_playbooks() {
+          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-load-balancers.yaml"
+          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-compute-nodes.yaml"
+          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-control-plane.yaml"
+          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-bootstrap.yaml"
+          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-network.yaml"
+          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-security-groups.yaml"
+        }
+
+        function destroy_cluster() {
+          # This is UPI setup so we don't destroy the cluster using "destroy cluster"
+          #TF_LOG=debug openshift-install  --dir ${ASSETS_DIR} destroy cluster --log-level=debug 2>&1 | grep --line-buffered -v password
+          echo openshift-install destroy cluster NOT used
+        }
+
+        function allow_user_access() {
+          if ! whoami &> /dev/null; then
+            if [ -w /etc/passwd ]; then
+              echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+            fi
+          fi
+          mkdir -p "${HOME}"
+        }
+
+        function wait_for_other_containers_to_exit() {
+        # we wait for one of the containers to flag a ${TMP_SHARED}/exit, then exit (triggering teardown)
+          echo Waiting for ${TMP_SHARED}/exit
+          for i in $(seq 1 2200); do
+            if [[ -f ${TMP_SHARED}/exit ]]; then
+              exit 0
+            fi
+            sleep 6 & wait
+          done
+        }
+
+        function signal_teardown_container_is_running(){
+          touch ${TMP_SHARED}/teardown_running
+        }
+
+        function teardown() {
+          set +e
+          start_teardown
+          gather_bootstrap_logs
+          exit_on_setup_early_failure
+          collect_logs_from_proxy
+          prepair_ansible_playbooks_workspace
+          gather_openstack_information
+          gather_openshift_information
+          remove_dns_entries
+          delete_api_fip
+          delete_ingress_fip
+          delete_glance_shim_image
+          delete_glance_rhcos_image
+          verify_teardown_playbooks
+          destroy_cluster
+          run_teardown_playbooks
+          echo "Teardown completed succesfully"
+        }
+
+
+
+
+
+        #Teardown execution
+        trap 'teardown' EXIT
+        trap 'jobs -p | xargs -r kill || true; exit 0' TERM
+
+        signal_teardown_container_is_running
+        allow_user_access
+        wait_for_other_containers_to_exit
+
