@@ -127,7 +127,7 @@ It is automated by config-updater:
 Upgrade channel configuration, e.g., from OCP 4.3 to 4.4:
 
 ```
-oc --as system:admin --context build01 patch clusterversion version -p '{"spec":{"channel":"stable-4.4"}}'
+oc --as system:admin --context build01 patch clusterversion version --type json -p '[{"op": "add", "path": "/spec/channel", "value": "candidate-4.4"}]'
 ```
 
 ### Run the upgrade command
