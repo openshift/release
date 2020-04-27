@@ -120,6 +120,39 @@ It is automated by config-updater:
 * alertmanager secret for sending notification to slack
 * PVCs for monitoring stack
 
+## Upgrade the cluster
+
+### Updating between minor versions
+
+Upgrade channel configuration, e.g., from OCP 4.3 to 4.4:
+
+```
+oc --as system:admin --context build01 patch clusterversion version -p '{"spec":{"channel":"stable-4.4"}}'
+```
+
+### Run the upgrade command
+
+Choose on the [release page](https://openshift-release.svc.ci.openshift.org/) the version to upgrade to, for example
+[4.4.0-rc.12](https://openshift-release.svc.ci.openshift.org/releasestream/4-stable/release/4.4.0-rc.12):
+
+```
+$ bash clusters/build-clusters/01_cluster/hack/upgrade-cluster.sh quay.io/openshift-release-dev/ocp-release:4.4.0-rc.12-x86_64
+--as system:admin --context build01 adm upgrade --allow-explicit-upgrade --to-image quay.io/openshift-release-dev/ocp-release@sha256:674200aaa1cc940782aa4b109ebfeaf7206bb57c3e01d62ec8e0b3d5ca910e8f
+```
+
+Double-check the SHA with:
+
+```
+$ curl -s https://mirror.openshift.com/pub/openshift-v4/clients/ocp/4.4.0-rc.12/release.txt | grep Pull
+Pull From: quay.io/openshift-release-dev/ocp-release@sha256:674200aaa1cc940782aa4b109ebfeaf7206bb57c3e01d62ec8e0b3d5ca910e8f
+```
+
+Then, run the script with `DRY_RUN=false`:
+
+```
+DRY_RUN=false bash clusters/build-clusters/01_cluster/hack/upgrade-cluster.sh quay.io/openshift-release-dev/ocp-release:4.4.0-rc.12-x86_64
+```
+
 ## Destroy the cluster
 
 _Note_: [Remove the build01 config from plank](https://github.com/openshift/release/pull/6922). It would cause plank to crash otherwise.
