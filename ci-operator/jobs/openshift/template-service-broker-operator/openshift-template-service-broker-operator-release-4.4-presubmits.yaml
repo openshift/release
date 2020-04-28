@@ -135,7 +135,16 @@ presubmits:
           value: operator-molecule-e2e
         - name: TEST_COMMAND
           value: |
-            echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
+            NSS_WRAPPER_PASSWD=/tmp/passwd.nss_wrapper
+            NSS_WRAPPER_GROUP=/etc/group
+            cp /etc/passwd $NSS_WRAPPER_PASSWD
+            echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> $NSS_WRAPPER_PASSWD
+            export NSS_WRAPPER_PASSWD
+            export NSS_WRAPPER_GROUP
+            LD_PRELOAD=/usr/lib64/libnss_wrapper.so
+            export LD_PRELOAD
+            export LC_ALL=en_US.utf8
+            export LANG=en_US.utf8
             molecule test -s cluster
         image: ci-operator:latest
         imagePullPolicy: Always
@@ -220,7 +229,16 @@ presubmits:
           value: operator-molecule-olm-e2e
         - name: TEST_COMMAND
           value: |
-            echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
+            NSS_WRAPPER_PASSWD=/tmp/passwd.nss_wrapper
+            NSS_WRAPPER_GROUP=/etc/group
+            cp /etc/passwd $NSS_WRAPPER_PASSWD
+            echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> $NSS_WRAPPER_PASSWD
+            export NSS_WRAPPER_PASSWD
+            export NSS_WRAPPER_GROUP
+            LD_PRELOAD=/usr/lib64/libnss_wrapper.so
+            export LD_PRELOAD
+            export LC_ALL=en_US.utf8
+            export LANG=en_US.utf8
             molecule test -s cluster-olm
         image: ci-operator:latest
         imagePullPolicy: Always
