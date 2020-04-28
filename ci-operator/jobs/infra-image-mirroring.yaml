@@ -15,11 +15,15 @@ periodics:
         set -o errexit
         failures=0
         for mapping in /etc/imagemirror/mapping_knative*; do
-          echo "Running: oc image mirror -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror -f="$mapping" --skip-multiple-scopes; then
-            echo "ERROR: Failed to mirror images from $mapping"
-            failures=$((failures+1))
-          fi
+          for count in {1..3}; do
+            echo "Running: oc image mirror -f=$mapping --skip-multiple-scopes"
+            if ! oc image mirror --continue-on-error -f="$mapping" --skip-multiple-scopes; then
+              echo "ERROR: Failed to mirror images from $mapping"
+              failures=$((failures+1))
+            else
+              break
+            fi
+          done
         done
         exit $failures
       command:
@@ -27,7 +31,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: quay.io/openshift/origin-cli:4.3
+      image: registry.svc.ci.openshift.org/ocp/4.5:cli
       imagePullPolicy: Always
       name: ""
       resources:
