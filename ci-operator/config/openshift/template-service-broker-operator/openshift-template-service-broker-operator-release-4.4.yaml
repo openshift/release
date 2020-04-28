@@ -31,13 +31,31 @@ tests:
     from: test-bin
 - as: operator-molecule-e2e
   commands: |
-    echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
+    NSS_WRAPPER_PASSWD=/tmp/passwd.nss_wrapper
+    NSS_WRAPPER_GROUP=/etc/group
+    cp /etc/passwd $NSS_WRAPPER_PASSWD
+    echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> $NSS_WRAPPER_PASSWD
+    export NSS_WRAPPER_PASSWD
+    export NSS_WRAPPER_GROUP
+    LD_PRELOAD=/usr/lib64/libnss_wrapper.so
+    export LD_PRELOAD
+    export LC_ALL=en_US.utf8
+    export LANG=en_US.utf8
     molecule test -s cluster
   openshift_installer_src:
     cluster_profile: aws
 - as: operator-molecule-olm-e2e
   commands: |
-    echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
+    NSS_WRAPPER_PASSWD=/tmp/passwd.nss_wrapper
+    NSS_WRAPPER_GROUP=/etc/group
+    cp /etc/passwd $NSS_WRAPPER_PASSWD
+    echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> $NSS_WRAPPER_PASSWD
+    export NSS_WRAPPER_PASSWD
+    export NSS_WRAPPER_GROUP
+    LD_PRELOAD=/usr/lib64/libnss_wrapper.so
+    export LD_PRELOAD
+    export LC_ALL=en_US.utf8
+    export LANG=en_US.utf8
     molecule test -s cluster-olm
   openshift_installer_src:
     cluster_profile: aws
