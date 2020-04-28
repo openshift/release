@@ -9,7 +9,6 @@
             expr: |||
               rate(prowjob_state_transitions{job_name="%s",state="failure"}[5m]) > 0
             ||| % job_name,
-            'for': '1m',
             labels: {
               severity: 'critical',
               team: '%s' % $._config.alertManagerReceivers[$._job_failures_config.alerts[job_name].receiver].team,
