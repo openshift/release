@@ -170,6 +170,30 @@ presubmits:
     branches:
     - master
     cluster: api.ci
+    context: ci/prow/ci-operator-config
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-ci-operator-generated-config
+    rerun_command: /test ci-operator-config
+    spec:
+      containers:
+      - args:
+        - ./
+        command:
+        - hack/validate-ci-operator-config.sh
+        image: determinize-ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: ((?m)^/test ci-operator-config,?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: api.ci
     context: ci/prow/ci-operator-registry
     decorate: true
     labels:

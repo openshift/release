@@ -32,11 +32,20 @@ services:
 	applyconfig --config-dir services --confirm=true
 
 # these are useful for devs
+update:
+	$(MAKE) jobs
+	$(MAKE) ci-operator-config
+	$(MAKE) prow-config
+
 jobs:
 	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest
 	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/ci-operator:/ci-operator:z" registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest --from-dir /ci-operator/config --to-dir /ci-operator/jobs
 	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/sanitize-prow-jobs:latest
 	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/ci-operator/jobs:/ci-operator/jobs:z" -v "$(CURDIR)/core-services/sanitize-prow-jobs:/core-services/sanitize-prow-jobs:z" registry.svc.ci.openshift.org/ci/sanitize-prow-jobs:latest --prow-jobs-dir /ci-operator/jobs --config-path /core-services/sanitize-prow-jobs/_config.yaml
+
+ci-operator-config:
+	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/determinize-ci-operator:latest
+	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/ci-operator/config:/ci-operator/config:z" registry.svc.ci.openshift.org/ci/determinize-ci-operator:latest --config-dir /ci-operator/config --confirm	
 
 prow-config:
 	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/determinize-prow-config:latest
@@ -45,13 +54,12 @@ prow-config:
 branch-cut:
 	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/config-brancher:latest
 	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/ci-operator:/ci-operator:z" registry.svc.ci.openshift.org/ci/config-brancher:latest --config-dir /ci-operator/config --org=$(ORG) --repo=$(REPO) --current-release=4.3 --future-release=4.4 --bump-release=4.4 --confirm
-		$(MAKE) jobs
+	$(MAKE) update
 
 new-repo:
 	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/repo-init:latest
 	$(CONTAINER_ENGINE) run --rm -it -v "$(CURDIR):/release:z" registry.svc.ci.openshift.org/ci/repo-init:latest --release-repo /release
-	$(MAKE) jobs
-	$(MAKE) prow-config
+	$(MAKE) update
 
 validate-step-registry:
 	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/ci-operator-configresolver:latest
