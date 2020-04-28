@@ -172,13 +172,14 @@ periodics:
       - --lease-server-username=ci
       - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --namespace=$(NAMESPACE)
-      - --secret-dir=/usr/local/launch-$(CLUSTER_TYPE)-cluster-profile
+      - --secret-dir=/usr/local/launch-cluster-profile
       - --secret-dir=/usr/local/pull-secret
-      - --target=launch-aws
-      - --template=/usr/local/launch-$(CLUSTER_TYPE)
+      - --target=launch
+      - --template=/usr/local/launch
       command:
       - ci-operator
       env:
+      - name: RELEASE_IMAGE_INITIAL
       - name: RELEASE_IMAGE_LATEST
       - name: CLUSTER_VARIANT
       - name: CLUSTER_DURATION
@@ -201,25 +202,68 @@ periodics:
             name: "$(BRANCH)"
             namespace: ocp
           tests:
-          - as: e2e-$(CLUSTER_TYPE)
+          - as: e2e
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-$(CLUSTER_TYPE)-serial
+          - as: e2e-builds
+            commands: TEST_SUITE=openshift/build run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-disruptive
+            commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-disruptive-all
+            commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-all
+            commands: TEST_SUITE=openshift/conformance run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-image-ecosystem
+            commands: TEST_SUITE=openshift/image-ecosystem run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-image-registry
+            commands: TEST_SUITE=openshift/image-registry run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-network-stress
+            commands: TEST_SUITE=openshift/network/stress run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-serial
             commands: TEST_SUITE=openshift/conformance/serial run-tests
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-$(CLUSTER_TYPE)-upgrade
+          - as: e2e-upgrade
             commands: TEST_SUITE=all run-upgrade-tests
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
               upgrade: true
-          - as: launch-$(CLUSTER_TYPE)
+          - as: e2e-upgrade-all
+            commands: TEST_SUITE=all run-upgrade-tests; TEST_SUITE=openshift/conformance run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: e2e-upgrade-partial
+            commands: TEST_SUITE=all TEST_OPTIONS=abort-at=random run-upgrade-tests; TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: e2e-upgrade-rollback
+            commands: TEST_SUITE=all TEST_OPTIONS=abort-at=100 run-upgrade-tests; TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: launch
             commands: sleep $(CLUSTER_DURATION) & wait
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
       - name: JOB_NAME_SAFE
-        value: launch-aws
+        value: launch
       - name: TEST_COMMAND
         value: sleep $(CLUSTER_DURATION) & wait
       - name: NAMESPACE
@@ -236,9 +280,9 @@ periodics:
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
-      - mountPath: /usr/local/launch-aws-cluster-profile
+      - mountPath: /usr/local/launch-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/launch-aws
+      - mountPath: /usr/local/launch
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
       - mountPath: /etc/pull-secret
@@ -296,13 +340,14 @@ periodics:
       - --lease-server-username=ci
       - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --namespace=$(NAMESPACE)
-      - --secret-dir=/usr/local/launch-$(CLOUD_TYPE)-cluster-profile
+      - --secret-dir=/usr/local/launch-cluster-profile
       - --secret-dir=/usr/local/pull-secret
-      - --target=launch-azure
-      - --template=/usr/local/launch-$(CLOUD_TYPE)
+      - --target=launch
+      - --template=/usr/local/launch
       command:
       - ci-operator
       env:
+      - name: RELEASE_IMAGE_INITIAL
       - name: RELEASE_IMAGE_LATEST
       - name: CLUSTER_VARIANT
       - name: CLUSTER_DURATION
@@ -327,25 +372,68 @@ periodics:
             name: "$(BRANCH)"
             namespace: ocp
           tests:
-          - as: e2e-$(CLOUD_TYPE)
+          - as: e2e
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-$(CLOUD_TYPE)-serial
+          - as: e2e-builds
+            commands: TEST_SUITE=openshift/build run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-disruptive
+            commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-disruptive-all
+            commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-all
+            commands: TEST_SUITE=openshift/conformance run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-image-ecosystem
+            commands: TEST_SUITE=openshift/image-ecosystem run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-image-registry
+            commands: TEST_SUITE=openshift/image-registry run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-network-stress
+            commands: TEST_SUITE=openshift/network/stress run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-serial
             commands: TEST_SUITE=openshift/conformance/serial run-tests
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-$(CLOUD_TYPE)-upgrade
+          - as: e2e-upgrade
             commands: TEST_SUITE=all run-upgrade-tests
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
               upgrade: true
-          - as: launch-$(CLOUD_TYPE)
+          - as: e2e-upgrade-all
+            commands: TEST_SUITE=all run-upgrade-tests; TEST_SUITE=openshift/conformance run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: e2e-upgrade-partial
+            commands: TEST_SUITE=all TEST_OPTIONS=abort-at=random run-upgrade-tests; TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: e2e-upgrade-rollback
+            commands: TEST_SUITE=all TEST_OPTIONS=abort-at=100 run-upgrade-tests; TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: launch
             commands: sleep $(CLUSTER_DURATION) & wait
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
       - name: JOB_NAME_SAFE
-        value: launch-azure
+        value: launch
       - name: TEST_COMMAND
         value: sleep $(CLUSTER_DURATION) & wait
       - name: NAMESPACE
@@ -362,9 +450,9 @@ periodics:
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
-      - mountPath: /usr/local/launch-azure-cluster-profile
+      - mountPath: /usr/local/launch-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/launch-azure
+      - mountPath: /usr/local/launch
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
       - mountPath: /etc/pull-secret
@@ -422,13 +510,14 @@ periodics:
       - --lease-server-username=ci
       - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --namespace=$(NAMESPACE)
-      - --secret-dir=/usr/local/launch-$(CLUSTER_TYPE)-cluster-profile
+      - --secret-dir=/usr/local/launch-cluster-profile
       - --secret-dir=/usr/local/pull-secret
-      - --target=launch-gcp
-      - --template=/usr/local/launch-$(CLUSTER_TYPE)
+      - --target=launch
+      - --template=/usr/local/launch
       command:
       - ci-operator
       env:
+      - name: RELEASE_IMAGE_INITIAL
       - name: RELEASE_IMAGE_LATEST
       - name: CLUSTER_VARIANT
       - name: CLUSTER_DURATION
@@ -451,25 +540,68 @@ periodics:
             name: "$(BRANCH)"
             namespace: ocp
           tests:
-          - as: e2e-$(CLUSTER_TYPE)
+          - as: e2e
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-$(CLUSTER_TYPE)-serial
+          - as: e2e-builds
+            commands: TEST_SUITE=openshift/build run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-disruptive
+            commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-disruptive-all
+            commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-all
+            commands: TEST_SUITE=openshift/conformance run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-image-ecosystem
+            commands: TEST_SUITE=openshift/image-ecosystem run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-image-registry
+            commands: TEST_SUITE=openshift/image-registry run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-network-stress
+            commands: TEST_SUITE=openshift/network/stress run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-serial
             commands: TEST_SUITE=openshift/conformance/serial run-tests
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-$(CLUSTER_TYPE)-upgrade
+          - as: e2e-upgrade
             commands: TEST_SUITE=all run-upgrade-tests
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
               upgrade: true
-          - as: launch-$(CLUSTER_TYPE)
+          - as: e2e-upgrade-all
+            commands: TEST_SUITE=all run-upgrade-tests; TEST_SUITE=openshift/conformance run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: e2e-upgrade-partial
+            commands: TEST_SUITE=all TEST_OPTIONS=abort-at=random run-upgrade-tests; TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: e2e-upgrade-rollback
+            commands: TEST_SUITE=all TEST_OPTIONS=abort-at=100 run-upgrade-tests; TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: launch
             commands: sleep $(CLUSTER_DURATION) & wait
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
       - name: JOB_NAME_SAFE
-        value: launch-gcp
+        value: launch
       - name: TEST_COMMAND
         value: sleep $(CLUSTER_DURATION) & wait
       - name: NAMESPACE
@@ -486,9 +618,9 @@ periodics:
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
-      - mountPath: /usr/local/launch-gcp-cluster-profile
+      - mountPath: /usr/local/launch-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/launch-gcp
+      - mountPath: /usr/local/launch
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
       - mountPath: /etc/pull-secret
@@ -543,13 +675,14 @@ periodics:
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
       - --namespace=$(NAMESPACE)
-      - --secret-dir=/usr/local/launch-$(CLUSTER_TYPE)-cluster-profile
+      - --secret-dir=/usr/local/launch-cluster-profile
       - --secret-dir=/usr/local/pull-secret
-      - --target=launch-metal
-      - --template=/usr/local/launch-$(CLUSTER_TYPE)
+      - --target=launch
+      - --template=/usr/local/launch
       command:
       - ci-operator
       env:
+      - name: RELEASE_IMAGE_INITIAL
       - name: RELEASE_IMAGE_LATEST
       - name: CLUSTER_VARIANT
       - name: CLUSTER_DURATION
@@ -572,25 +705,68 @@ periodics:
             name: "$(BRANCH)"
             namespace: ocp
           tests:
-          - as: e2e-$(CLUSTER_TYPE)
+          - as: e2e
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
             openshift_installer:
-              cluster_profile: aws
-          - as: e2e-$(CLUSTER_TYPE)-serial
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-builds
+            commands: TEST_SUITE=openshift/build run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-disruptive
+            commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-disruptive-all
+            commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-all
+            commands: TEST_SUITE=openshift/conformance run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-image-ecosystem
+            commands: TEST_SUITE=openshift/image-ecosystem run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-image-registry
+            commands: TEST_SUITE=openshift/image-registry run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-network-stress
+            commands: TEST_SUITE=openshift/network/stress run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-serial
             commands: TEST_SUITE=openshift/conformance/serial run-tests
             openshift_installer:
-              cluster_profile: aws
-          - as: e2e-$(CLUSTER_TYPE)-upgrade
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-upgrade
             commands: TEST_SUITE=all run-upgrade-tests
             openshift_installer:
-              cluster_profile: aws
+              cluster_profile: "$(CLUSTER_TYPE)"
               upgrade: true
-          - as: launch-$(CLUSTER_TYPE)
+          - as: e2e-upgrade-all
+            commands: TEST_SUITE=all run-upgrade-tests; TEST_SUITE=openshift/conformance run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: e2e-upgrade-partial
+            commands: TEST_SUITE=all TEST_OPTIONS=abort-at=random run-upgrade-tests; TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: e2e-upgrade-rollback
+            commands: TEST_SUITE=all TEST_OPTIONS=abort-at=100 run-upgrade-tests; TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: launch
             commands: sleep $(CLUSTER_DURATION) & wait
             openshift_installer:
-              cluster_profile: aws
+              cluster_profile: "$(CLUSTER_TYPE)"
       - name: JOB_NAME_SAFE
-        value: launch-metal
+        value: launch
       - name: TEST_COMMAND
         value: sleep $(CLUSTER_DURATION) & wait
       - name: NAMESPACE
@@ -607,9 +783,9 @@ periodics:
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
-      - mountPath: /usr/local/launch-metal-cluster-profile
+      - mountPath: /usr/local/launch-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/launch-metal
+      - mountPath: /usr/local/launch
         name: job-definition
         subPath: cluster-launch-installer-metal-e2e.yaml
       - mountPath: /etc/pull-secret
@@ -667,13 +843,14 @@ periodics:
       - --lease-server-username=ci
       - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --namespace=$(NAMESPACE)
-      - --secret-dir=/usr/local/launch-$(CLUSTER_TYPE)-cluster-profile
+      - --secret-dir=/usr/local/launch-cluster-profile
       - --secret-dir=/usr/local/pull-secret
-      - --target=launch-vsphere
-      - --template=/usr/local/launch-$(CLUSTER_TYPE)
+      - --target=launch
+      - --template=/usr/local/launch
       command:
       - ci-operator
       env:
+      - name: RELEASE_IMAGE_INITIAL
       - name: RELEASE_IMAGE_LATEST
       - name: CLUSTER_VARIANT
       - name: CLUSTER_DURATION
@@ -696,25 +873,64 @@ periodics:
             name: "$(BRANCH)"
             namespace: ocp
           tests:
-          - as: e2e-$(CLUSTER_TYPE)
+          - as: e2e
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-$(CLUSTER_TYPE)-serial
+          - as: e2e-builds
+            commands: TEST_SUITE=openshift/build run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-disruptive
+            commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-disruptive-all
+            commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-image-ecosystem
+            commands: TEST_SUITE=openshift/image-ecosystem run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-image-registry
+            commands: TEST_SUITE=openshift/image-registry run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-network-stress
+            commands: TEST_SUITE=openshift/network/stress run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-serial
             commands: TEST_SUITE=openshift/conformance/serial run-tests
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-$(CLUSTER_TYPE)-upgrade
+          - as: e2e-upgrade
             commands: TEST_SUITE=all run-upgrade-tests
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
               upgrade: true
-          - as: launch-$(CLUSTER_TYPE)
+          - as: e2e-upgrade-all
+            commands: TEST_SUITE=all run-upgrade-tests; TEST_SUITE=openshift/conformance run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: e2e-upgrade-partial
+            commands: TEST_SUITE=all TEST_OPTIONS=abort-at=random run-upgrade-tests; TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: e2e-upgrade-rollback
+            commands: TEST_SUITE=all TEST_OPTIONS=abort-at=100 run-upgrade-tests; TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: launch
             commands: sleep $(CLUSTER_DURATION) & wait
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
       - name: JOB_NAME_SAFE
-        value: launch-vsphere
+        value: launch
       - name: TEST_COMMAND
         value: sleep $(CLUSTER_DURATION) & wait
       - name: NAMESPACE
@@ -731,9 +947,9 @@ periodics:
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
-      - mountPath: /usr/local/launch-vsphere-cluster-profile
+      - mountPath: /usr/local/launch-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/launch-vsphere
+      - mountPath: /usr/local/launch
         name: job-definition
         subPath: cluster-launch-installer-upi-e2e.yaml
       - mountPath: /etc/pull-secret
