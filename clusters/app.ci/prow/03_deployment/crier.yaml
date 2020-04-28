@@ -56,6 +56,8 @@ items:
           - --gcs-workers=10
           - --gcs-credentials-file=/etc/service-account/service-account.json
           - --kubernetes-gcs-workers=10
+          - --slack-workers=5
+          - --slack-token-file=/etc/slack/oauth
           env:
           # Multiple configs can only be passed via the env var and not via the flag
           - name: KUBECONFIG
@@ -63,6 +65,9 @@ items:
           volumeMounts:
           - name: oauth
             mountPath: /etc/github
+            readOnly: true
+          - name: slack
+            mountPath: /etc/slack
             readOnly: true
           - name: config
             mountPath: /etc/config
@@ -111,6 +116,9 @@ items:
         - name: oauth
           secret:
             secretName: github-credentials-openshift-ci-robot
+        - name: slack
+          secret:
+            secretName: slack-credentials-prow
         - name: config
           configMap:
             name: config
