@@ -4,36 +4,35 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-cluster_profile=/var/run/secrets/ci.openshift.io/cluster-profile
-
 echo "************ baremetalds packet teardown command ************"
-env | sort
 
-set +x
-export SSH_PRIV_KEY_PATH=${cluster_profile}/ssh-privatekey
-export SSHOPTS="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90 -i ${SSH_PRIV_KEY_PATH}"
-PACKET_AUTH_TOKEN=$(cat ${cluster_profile}/.packetcred)
-export PACKET_AUTH_TOKEN
-set -x
+# TODO: Remove once OpenShift CI will be upgraded to 4.2 (see https://access.redhat.com/articles/4859371)
+${HOME}/fix_uid.sh
 
-# Initial check
-if [ "${CLUSTER_TYPE}" != "packet" ] ; then
-    echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"
-    exit 1
-fi
+# Run Ansible playbook
+cd ${HOME}
+cat > packet-teardown.yaml <<-EOF
+- name: teardown Packet host
+  hosts: localhost
+  gather_facts: no
+  vars:
+    - cluster_type: "{{ lookup('env', 'CLUSTER_TYPE') }}"
+  vars_files:
+    - "{{ lookup('env', 'CLUSTER_PROFILE_DIR') }}/.packet-kni-vars"
+  tasks:
 
-echo "-------[ $SHARED_DIR ]"
-ls -ll ${SHARED_DIR}
+  - name: check cluster type
+    fail:
+      msg: "Unsupported CLUSTER_TYPE '{{ cluster_type }}'"
+    when: cluster_type != "packet"
 
-# Shutdown packet server
-terraform_home=/tmp/terraform
-mkdir -p ${terraform_home}
-cp ${SHARED_DIR}/terraform.* ${terraform_home}
-echo "Deprovisioning cluster..."
-cd ${terraform_home}
-terraform init
-# shellcheck disable=SC2034
-for r in {1..5}; do terraform destroy -auto-approve && break ; done
+  - name: remove Packet host {{ packet_hostname }}
+    packet_device:
+      auth_token: "{{ packet_auth_token }}"
+      project_id: "{{ packet_project_id }}"
+      hostnames: "{{ packet_hostname }}" 
+      state: absent
+    no_log: true    
+EOF
 
-
-
+ansible-playbook packet-teardown.yaml -e "packet_hostname=ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}"
