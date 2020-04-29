@@ -72,7 +72,7 @@ echo "export MIRROR_IMAGES=true" >> /root/dev-scripts/config_root.sh
 
 echo 'export KUBECONFIG=/root/dev-scripts/ocp/ostest/auth/kubeconfig' >> /root/.bashrc
 
-#timeout -s 9 105m make > output.log
+timeout -s 9 105m make > output.log
 
 EOF
 
