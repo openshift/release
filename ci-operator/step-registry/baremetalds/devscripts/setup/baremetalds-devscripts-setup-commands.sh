@@ -4,25 +4,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-cluster_profile=/var/run/secrets/ci.openshift.io/cluster-profile
-
-export SSH_PRIV_KEY_PATH=${cluster_profile}/ssh-privatekey
-export PULL_SECRET_PATH=${cluster_profile}/pull-secret
-export SSHOPTS="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90 -i ${SSH_PRIV_KEY_PATH}"
-
 echo "************ baremetalds devscripts setup command ************"
-env | sort
 
-# Ensure our UID, which is randomly generated, is in /etc/passwd. This is required
-# to be able to SSH.
-if ! whoami &> /dev/null; then
-    if [[ -w /etc/passwd ]]; then
-        echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
-    else
-        echo "/etc/passwd is not writeable, and user matching this uid is not found."
-        exit 1
-    fi
-fi
+# TODO: Remove once OpenShift CI will be upgraded to 4.2 (see https://access.redhat.com/articles/4859371)
+${HOME}/fix_uid.sh
 
 # Initial check
 if [ "${CLUSTER_TYPE}" != "packet" ] ; then
@@ -30,13 +15,10 @@ if [ "${CLUSTER_TYPE}" != "packet" ] ; then
     exit 1
 fi
 
-echo "-------[ $SHARED_DIR ]"
-ls -ll ${SHARED_DIR}
-
 # Fetch packet server IP
 IP=$(cat ${SHARED_DIR}/server-ip)
-export IP
-echo "Packet server IP is ${IP}"
+
+SSHOPTS="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90 -i ${CLUSTER_PROFILE_DIR}/.packet-kni-ssh-privatekey"
 
 # Checkout dev-scripts and make
 for x in $(seq 10) ; do
@@ -57,28 +39,24 @@ finished()
 }
 trap finished EXIT TERM
 
-# Prepare configuration and run dev-scripts 
-scp $SSHOPTS ${PULL_SECRET_PATH} root@$IP:pull-secret
+# Copy dev-scripts source from current directory to the remote server
+tar -czf - . | ssh $SSHOPTS root@$IP "cat > /root/dev-scripts.tar.gz"
+
+# Prepare configuration and run dev-scripts
+scp $SSHOPTS ${CLUSTER_PROFILE_DIR}/pull-secret root@$IP:pull-secret
 
 timeout -s 9 175m ssh $SSHOPTS root@$IP bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 
 set -ex
 
-#### For debug only, to be removed ####################################
-curl https://github.com/derekhiggins.keys >> /root/.ssh/authorized_keys
-curl https://github.com/andfasano.keys >> /root/.ssh/authorized_keys
-curl https://github.com/russellb.keys >> /root/.ssh/authorized_keys
-curl https://github.com/stbenjam.keys >> /root/.ssh/authorized_keys
-curl https://github.com/honza.keys >> /root/.ssh/authorized_keys
-#######################################################################
-
 yum install -y git
 
 mkdir -p /tmp/artifacts
 
-if [ ! -e dev-scripts ] ; then
-  git clone https://github.com/openshift-metal3/dev-scripts.git
-fi
+mkdir dev-scripts
+tar -xzvf dev-scripts.tar.gz -C /root/dev-scripts
+chown -R root:root dev-scripts
+
 cd dev-scripts
 
 set +x
@@ -94,7 +72,7 @@ echo "export MIRROR_IMAGES=true" >> /root/dev-scripts/config_root.sh
 
 echo 'export KUBECONFIG=/root/dev-scripts/ocp/ostest/auth/kubeconfig' >> /root/.bashrc
 
-timeout -s 9 105m make
+#timeout -s 9 105m make > output.log
 
 EOF
 
