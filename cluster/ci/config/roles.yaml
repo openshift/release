@@ -942,3 +942,45 @@ items:
     kind: ClusterRole
     apiGroup: rbac.authorization.k8s.io
     name: system:image-puller
+
+- kind: Namespace
+  apiVersion: v1
+  metadata:
+    name: redhat-integration
+- kind: Group
+  apiVersion: v1
+  metadata:
+    name: redhat-integration-dev
+  users:
+  - akoserwal
+  - jeremyary
+  - akieling
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: admin
+    namespace: redhat-integration
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: redhat-integration-dev
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: admin
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: image-puller
+    namespace: redhat-integration
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:unauthenticated
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:authenticated
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: system:image-puller
