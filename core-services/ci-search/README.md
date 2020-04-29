@@ -1,5 +1,3 @@
-ci-search
-===========
+# ci-search
 
-This is a configuration for the service running on https://search.svc.ci.openshift.org/.
-The source code for ci-search itself can be found in https://github.com/openshift/ci-search.
+Redirects users to the ci-search service hosted in [build01](../../clusters/build-clusters/01_cluster/ci-search).
