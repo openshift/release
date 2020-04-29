@@ -22,6 +22,25 @@ dashboard.new(
       )
 .addPanel(
     (graphPanel.new(
+        'CI Operator Failure Rates by Reason',
+        description='sum(rate(ci_operator_error_rate{state="failed"}[30m])) by (reason)',
+        datasource='prometheus',
+        legend_alignAsTable=true,
+        legend_rightSide=true,
+        legend_values=true,
+        legend_current=true,
+    ) + legendConfig)
+    .addTarget(prometheus.target(
+        'sum(rate(ci_operator_error_rate{state="failed"}[30m])) by (reason)',
+        legendFormat='{{reason}}',
+    )), gridPos={
+    h: 9,
+    w: 24,
+    x: 0,
+    y: 0,
+  })
+.addPanel(
+    (graphPanel.new(
         'IPI-Deprovision Failures',
         description='rate(prowjob_state_transitions{job_name="periodic-ipi-deprovision",state="failure"}[30m])',
         datasource='prometheus',
