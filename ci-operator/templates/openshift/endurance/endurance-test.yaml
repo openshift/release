@@ -149,7 +149,9 @@ objects:
             echo "Skipping upgrade test because cluster is already at the latest version: $current (current) == $new (new)"
             return 0
           fi
-          newImage=$(curl -s https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/${BRANCH}.0-0.nightly/latest | jq --raw-output '.pullSpec')
+          (cd /tmp/shared && curl -L -o jq https://github.com/stedolan/jq/releases/download/jq-1.5/jq-linux64 && chmod +x jq)
+
+          newImage=$(curl -s https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/${BRANCH}.0-0.nightly/latest | /tmp/shared/jq --raw-output '.pullSpec')
 
           echo "Running upgrade test from $current to $new using new image $newImage"
           openshift-tests run-upgrade "${TEST_SUITE}" --to-image "${IMAGE:-${newImage}}" \
