@@ -38,6 +38,8 @@ cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
 openshift-install --dir="${dir}" create manifests &
 wait "$!"
 
+sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
+
 while IFS= read -r -d '' item
 do
   manifest="$( basename "${item}" )"

@@ -436,7 +436,11 @@ objects:
         mv /tmp/artifacts/installer/master.ign.out /tmp/artifacts/installer/master.ign
 
         # What we're doing here is we generate manifests first and force that OpenShift SDN is configured.
-        TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create manifests --log-level=debug
+        TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create manifests --log-level=debug &
+        wait "$!"
+
+        sed -i '/^  channel:/d' /tmp/artifacts/installer/manifests/cvo-overrides.yaml
+
         # This is for debugging purposes, allows us to map a job to a VM
         cat /tmp/artifacts/installer/manifests/cluster-infrastructure-02-config.yml
 
