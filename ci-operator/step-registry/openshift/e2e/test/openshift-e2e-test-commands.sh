@@ -15,12 +15,6 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 mkdir -p "${HOME}"
 
-# if the cluster profile included an insights secret, install it to the cluster to
-# report support data from the support-operator
-if [[ -f "${cluster_profile}/insights-live.yaml" ]]; then
-    oc create -f "${cluster_profile}/insights-live.yaml" || true
-fi
-
 # set up cloud-provider-specific env vars
 case "${CLUSTER_TYPE}" in
 gcp)
