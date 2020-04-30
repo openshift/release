@@ -22,9 +22,6 @@ if [[ -f "${cluster_profile}/insights-live.yaml" ]]; then
 fi
 
 # set up cloud-provider-specific env vars
-KUBE_SSH_BASTION="$( oc --insecure-skip-tls-verify get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
-KUBE_SSH_KEY_PATH=${cluster_profile}/ssh-privatekey
-export KUBE_SSH_BASTION KUBE_SSH_KEY_PATH
 case "${CLUSTER_TYPE}" in
 gcp)
     export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
