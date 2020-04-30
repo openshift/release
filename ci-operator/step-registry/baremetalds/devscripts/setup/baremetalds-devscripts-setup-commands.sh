@@ -45,6 +45,11 @@ tar -czf - . | ssh $SSHOPTS root@$IP "cat > /root/dev-scripts.tar.gz"
 # Prepare configuration and run dev-scripts
 scp $SSHOPTS ${CLUSTER_PROFILE_DIR}/pull-secret root@$IP:pull-secret
 
+if [[ -e ${SHARED_DIR}/dev-scripts-additional-config ]]
+then
+  scp $SSHOPTS ${SHARED_DIR}/dev-scripts-additional-config root@$IP:dev-scripts-additional-config
+fi
+
 timeout -s 9 175m ssh $SSHOPTS root@$IP bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 
 set -ex
@@ -69,6 +74,11 @@ echo "export OPENSHIFT_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}" >> /root/dev-scrip
 echo "export ADDN_DNS=\$(awk '/nameserver/ { print \$2;exit; }' /etc/resolv.conf)" >> /root/dev-scripts/config_root.sh
 echo "export OPENSHIFT_CI=true" >> /root/dev-scripts/config_root.sh
 echo "export MIRROR_IMAGES=true" >> /root/dev-scripts/config_root.sh
+
+if [[ -e /root/dev-scripts-additional-config ]]
+then
+  cat /root/dev-scripts-additional-config >> /root/dev-scripts/config_root.sh
+fi
 
 echo 'export KUBECONFIG=/root/dev-scripts/ocp/ostest/auth/kubeconfig' >> /root/.bashrc
 
