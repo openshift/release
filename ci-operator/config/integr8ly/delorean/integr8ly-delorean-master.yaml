@@ -1,9 +1,28 @@
+base_images:
+  os:
+    cluster: https://api.ci.openshift.org
+    name: ubi
+    namespace: ocp
+    tag: "8"
+binary_build_commands: make build/cli
 build_root:
   image_stream_tag:
     cluster: https://api.ci.openshift.org
     name: delorean-base-image
     namespace: integr8ly
     tag: latest
+images:
+- dockerfile_path: Dockerfile
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/integr8ly/delorean
+  to: delorean
+promotion:
+  name: delorean
+  namespace: integr8ly
 resources:
   '*':
     requests:
