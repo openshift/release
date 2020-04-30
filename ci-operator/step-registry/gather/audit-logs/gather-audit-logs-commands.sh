@@ -6,7 +6,4 @@ then
 	exit 0
 fi
 
-dest_dir=$(mktemp --dir --tmpdir="$ARTIFACT_DIR")
-oc adm must-gather --dest-dir="$dest_dir" --image=quay.io/openshift/origin-must-gather -- /usr/bin/gather_audit_logs
-mv "$dest_dir"/*/audit_logs "$ARTIFACT_DIR/audit-logs"
-rm -Rf "$dest_dir"
+oc adm must-gather --dest-dir="$ARTIFACT_DIR" -- /usr/bin/gather_audit_logs
