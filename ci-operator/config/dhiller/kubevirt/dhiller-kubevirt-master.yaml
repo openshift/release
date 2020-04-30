@@ -1,0 +1,64 @@
+base_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: "4.4"
+    namespace: ocp
+    tag: base
+  kubevirt-builder:
+    cluster: https://api.ci.openshift.org
+    name: kubevirt-builder
+    namespace: ci
+    tag: 30-5.8.1
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: kubevirt-builder
+    namespace: ci
+    tag: 30-5.8.1
+canonical_go_repository: kubevirt.io/kubevirt
+images:
+- dockerfile_path: hack/ci/Dockerfile.ci
+  from: kubevirt-builder
+  inputs:
+    root:
+      as:
+      - builder
+      paths: null
+  to: kubevirt-test
+- dockerfile_path: hack/ci/Dockerfile.ci-pr
+  from: kubevirt-builder
+  inputs:
+    root:
+      as:
+      - builder
+      paths: null
+  to: kubevirt-test-pr
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: "4.4"
+  namespace: ocp
+tests:
+- artifact_dir: /go/src/kubevirt.io/kubevirt/_out/exported-artifacts
+  as: e2e-dhiller-periodic-gcp-nested-virt
+  commands: ./hack/ci/test.sh
+  cron: 2 3 * * *
+  openshift_installer_custom_test_image:
+    cluster_profile: gcp
+    enable_nested_virt: true
+    from: pipeline:kubevirt-test
+    nested_virt_image: rhcos43-nested-virt
+- artifact_dir: /go/src/kubevirt.io/kubevirt/_out/exported-artifacts
+  as: e2e-dhiller-pull-gcp-nested-virt
+  commands: ./hack/ci/test.sh
+  openshift_installer_custom_test_image:
+    cluster_profile: gcp
+    enable_nested_virt: true
+    from: pipeline:kubevirt-test-pr
+    nested_virt_image: rhcos43-nested-virt
