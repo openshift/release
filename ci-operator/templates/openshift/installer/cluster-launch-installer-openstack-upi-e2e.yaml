@@ -317,6 +317,8 @@ objects:
           cp "${SSH_PRIVATE_KEY_PATH}" ~/.ssh/id_rsa
           chmod 0600 ~/.ssh/id_rsa
 
+          prepare_ansible_playbooks
+
           echo "OPENSTACK platform installer is using: ${IMAGE_OPENSTACK_INSTALLER} for testing"
         }
 
@@ -601,10 +603,29 @@ objects:
           awk '/^\s+'$1':/ { print $2 }' "$OS_CLIENT_CONFIG_FILE" | sed -e 's/^"//' -e 's/"$//'
         }
 
-        function prepair_ansible_playbooks_workspace() {
+        function prepare_ansible_playbooks() {
+          # The name of the playbooks changed between release 4.4 and 4.5
+          # we need to normalize the playbook names
+          if [ -f "${OS_UPI_DIR}/01_security-groups.yaml" ]; then
+              cp ${OS_UPI_DIR}/01_security-groups.yaml ${OS_UPI_DIR}/security-groups.yaml
+              cp ${OS_UPI_DIR}/02_network.yaml ${OS_UPI_DIR}/network.yaml
+              cp ${OS_UPI_DIR}/03_bootstrap.yaml ${OS_UPI_DIR}/bootstrap.yaml
+              cp ${OS_UPI_DIR}/04_control-plane.yaml ${OS_UPI_DIR}/control-plane.yaml
+              cp ${OS_UPI_DIR}/05_compute-nodes.yaml ${OS_UPI_DIR}/compute-nodes.yaml
+
+              cp ${OS_UPI_DIR}/down-01_security-groups.yaml ${OS_UPI_DIR}/down-01_security-groups.yaml
+              cp ${OS_UPI_DIR}/down-02_network.yaml ${OS_UPI_DIR}/down-network.yaml
+              cp ${OS_UPI_DIR}/down-03_bootstrap.yaml ${OS_UPI_DIR}/down-bootstrap.yaml
+              cp ${OS_UPI_DIR}/down-04_control-plane.yaml ${OS_UPI_DIR}/down-control-plane.yaml
+              cp ${OS_UPI_DIR}/down-05_compute-nodes.yaml ${OS_UPI_DIR}/down-compute-nodes.yaml
+              cp ${OS_UPI_DIR}/down-06_load-balancers.yaml ${OS_UPI_DIR}/down-load-balancers.yaml
+          fi
+        }
+
+        function prepare_ansible_playbooks_workspace() {
           OPENSTACK_REGION="$(get_clouds_param 'region_name')"
           echo "OpenStack UPI directory: ${OS_UPI_DIR}"
-          #prepair inventory.yaml
+          #prepare inventory.yaml
           cp ${OS_UPI_DIR}/inventory.yaml ${OS_UPI_DIR}/inventory.yaml.bkk
           sed -i "s~os_subnet_range.*~os_subnet_range: \'${OS_SUBNET_RANGE}\'~g" ${OS_UPI_DIR}/inventory.yaml
           sed -i "s/os_flavor_master.*/os_flavor_master: \'${OPENSTACK_FLAVOR}\'/g" ${OS_UPI_DIR}/inventory.yaml
@@ -764,7 +785,7 @@ objects:
         create_manifest_files
         create_ignition_configs_and_jsons
         upload_rhcos_image
-        prepair_ansible_playbooks_workspace
+        prepare_ansible_playbooks_workspace
         verify_playbooks_status
         run_bootstrap_playbooks
         run_control_plane_playbooks
@@ -1049,7 +1070,7 @@ objects:
           mkdir -p ${TMP_ARTIFACTS}/pods ${TMP_ARTIFACTS}/nodes ${TMP_ARTIFACTS}/metrics ${TMP_ARTIFACTS}/bootstrap ${TMP_ARTIFACTS}/network
         }
 
-        function prepair_ansible_playbooks_workspace() {
+        function prepare_ansible_playbooks_workspace() {
           # The metadata.json  and ignition json files needs to be in the same directory as playbooks
           cp ${ASSETS_DIR}/*.json ${OS_UPI_DIR}/
           cp ${ASSETS_DIR}/*.ign ${OS_UPI_DIR}/
@@ -1285,7 +1306,7 @@ objects:
           gather_bootstrap_logs
           exit_on_setup_early_failure
           collect_logs_from_proxy
-          prepair_ansible_playbooks_workspace
+          prepare_ansible_playbooks_workspace
           gather_openstack_information
           gather_openshift_information
           remove_dns_entries
