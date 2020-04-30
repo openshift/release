@@ -60,6 +60,6 @@ if [[ -e "${SHARED_DIR}/test-suite.txt" ]]; then
 fi
 
 openshift-tests run "${test_suite}" \
-    --provider "${TEST_PROVIDER}" \
+    ${TEST_PROVIDER+--provider "${TEST_PROVIDER}"} \
     -o /tmp/artifacts/e2e.log \
     --junit-dir /tmp/artifacts/junit
