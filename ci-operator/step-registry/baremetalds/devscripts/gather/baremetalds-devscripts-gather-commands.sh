@@ -31,7 +31,7 @@ echo "### Gathering logs..."
 timeout -s 9 15m ssh $SSHOPTS root@$IP bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 export MUST_GATHER_PATH=/tmp/artifacts/must-gather
 cd dev-scripts
-make gather > gather.log
+make gather
 EOF
 
 echo "### Downloading logs..."
