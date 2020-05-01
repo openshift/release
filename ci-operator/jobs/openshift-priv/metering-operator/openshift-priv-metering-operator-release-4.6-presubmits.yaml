@@ -101,6 +101,8 @@ presubmits:
             # Increase the size of the machines so that there are machines large enough
             # to run Presto, and the full metering stack.
             kubectl -n openshift-machine-api get machinesets -o name | grep worker | cut -d/ -f2 | xargs -I{} kubectl -n openshift-machine-api scale machineset {} --replicas 3
+
+            # TODO: revert when https://bugzilla.redhat.com/show_bug.cgi?id=1825330 has been resolved
             TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/e2e EXTRA_TEST_FLAGS="-run TestManualMeteringInstall" make e2e
         image: ci-operator:latest
         imagePullPolicy: Always
@@ -155,103 +157,6 @@ presubmits:
         secret:
           secretName: regcred
     trigger: (?m)^/test( | .* )metering-e2e-aws,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.6
-    cluster: build01
-    context: ci/prow/metering-upgrade-aws
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    hidden: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-metering-operator-release-4.6-metering-upgrade-aws
-    path_alias: github.com/kube-reporting/metering-operator
-    rerun_command: /test metering-upgrade-aws
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --lease-server-password-file=/etc/boskos/password
-        - --lease-server-username=ci
-        - --lease-server=https://boskos-ci.svc.ci.openshift.org
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --secret-dir=/usr/local/metering-upgrade-aws-cluster-profile
-        - --target=metering-upgrade-aws
-        - --template=/usr/local/metering-upgrade-aws
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: metering-upgrade-aws
-        - name: TEST_COMMAND
-          value: |
-            set -x
-            # Increase the size of the machines so that there are machines large enough
-            # to run Presto, and the full metering stack.
-            kubectl -n openshift-machine-api get machinesets -o name | grep worker | cut -d/ -f2 | xargs -I{} kubectl -n openshift-machine-api scale machineset {} --replicas 3
-            TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/upgrade make e2e-upgrade
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/metering-upgrade-aws-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
-        - mountPath: /usr/local/metering-upgrade-aws
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
-      - name: boskos
-        secret:
-          items:
-          - key: password
-            path: password
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
-      - name: pull-secret
-        secret:
-          secretName: regcred
-    trigger: (?m)^/test( | .* )metering-upgrade-aws,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
