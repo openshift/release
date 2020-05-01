@@ -382,7 +382,11 @@ objects:
 
         # What we're doing here is we generate manifests first and force that OpenShift SDN is configured. Kuryr is only
         # allowed when KURYR_ENABLED variable is set to "true".
-        TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create manifests --log-level=debug
+        TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create manifests --log-level=debug &
+        wait "$!"
+
+        sed -i '/^  channel:/d' /tmp/artifacts/installer/manifests/cvo-overrides.yaml
+
         if [[ "${KURYR_ENABLED:-false}" != "true" ]]; then
           echo "Forcing OpenShiftSDN by modifying manifests"
           sed -i -e 's/networkType: .*$/networkType: OpenShiftSDN/g' /tmp/artifacts/installer/manifests/cluster-network-02-config.yml

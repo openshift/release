@@ -398,7 +398,10 @@ objects:
         EOF
         fi
 
-        openshift-install --dir=/tmp/artifacts/installer/ create manifests
+        openshift-install --dir=/tmp/artifacts/installer/ create manifests &
+        wait "$!"
+
+        sed -i '/^  channel:/d' /tmp/artifacts/installer/manifests/cvo-overrides.yaml
 
         # TODO: Replace with a more concise manifest injection approach
         if [[ -n "${CLUSTER_NETWORK_MANIFEST}" ]]; then

@@ -770,9 +770,13 @@ objects:
           export OPENSHIFT_INSTALL_PRESERVE_BOOTSTRAP=true
         fi
 
+        openshift-install --dir=/tmp/artifacts/installer/ create manifests &
+        wait "$!"
+
+        sed -i '/^  channel:/d' /tmp/artifacts/installer/manifests/cvo-overrides.yaml
+
         # TODO: Replace with a more concise manifest injection approach
         if [[ -n "${CLUSTER_NETWORK_MANIFEST:-}" ]]; then
-            openshift-install --dir=/tmp/artifacts/installer/ create manifests
             echo "${CLUSTER_NETWORK_MANIFEST}" > /tmp/artifacts/installer/manifests/cluster-network-03-config.yml
         fi
 
@@ -781,7 +785,6 @@ objects:
             echo 'error: CLUSTER_NETWORK_MANIFEST is incompatible with the "rt" variant'
             exit 1
           fi
-          openshift-install --dir=/tmp/artifacts/installer/ create manifests
           cat > /tmp/artifacts/installer/manifests/realtime-worker-machine-config.yml << EOF
         apiVersion: machineconfiguration.openshift.io/v1
         kind: MachineConfig
