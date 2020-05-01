@@ -1,15 +1,19 @@
 default: api.ci
 nonKubernetes: api.ci
 groups:
+  "app.ci":
+    jobs:
+    - periodic-ci-secret-bootstrap
   "build01":
     paths:
     - ".*openshift-priv/.*-presubmits.yaml$"
     jobs:
-    #name: build01-jobs
     - periodic-build01-upgrade
     - periodic-ci-image-import-to-build01
     - pull-ci-openshift-config-master-format
-    #name: duplicated
+    #those are non-e2e jobs and we have been running them on build01 since OCP 4.3
+    #This group and the other groups with volume, are only useful in the migration process because we do not want to migrate all jobs together
+    #Once the migration is done, those jobs could be running on any cluster
     - pull-ci-openshift-psap-special-resource-operator-release-4.6-images
     - pull-ci-openshift-psap-special-resource-operator-release-4.6-unit
     - pull-ci-openshift-psap-special-resource-operator-release-4.6-verify
@@ -5900,12 +5904,11 @@ groups:
     - ".*openshift/release/.*-periodics.yaml$"
     - ".*-periodics.yaml$"
     jobs:
-    #name: api.ci-jobs
     - pull-ci-openshift-release-master-build01-dry
     - pull-ci-openshift-release-master-core-dry
     - pull-ci-openshift-release-master-services-dry
     - periodic-acme-cert-issuer-for-build01
-    #name: volume0
+    #volume0
     - pull-ci-cri-o-cri-o-release-1.14-e2e-aws
     - pull-ci-integr8ly-cloud-resource-operator-master-e2e
     - pull-ci-openshift-ansible-service-broker-release-4.2-operator-molecule-e2e
@@ -6043,7 +6046,7 @@ groups:
     - pull-ci-redhat-developer-helm-release-next-playground-images
     - pull-ci-redhat-developer-helm-release-next-playground-lint
     - pull-ci-redhat-developer-helm-release-next-playground-unit
-    #name: volume1
+    #volume1
     - pull-ci-openshift-origin-release-4.3-e2e-gcp-builds
     - pull-ci-openshift-cluster-svcat-controller-manager-operator-release-4.4-e2e-aws
     - pull-ci-openshift-cluster-svcat-controller-manager-operator-release-4.4-e2e-aws-operator
@@ -6378,7 +6381,7 @@ groups:
     - pull-ci-openshift-cluster-api-provider-aws-master-e2e-aws
     - pull-ci-openshift-origin-master-e2e-gcp-image-ecosystem
     - pull-ci-openshift-cluster-kube-scheduler-operator-master-e2e-aws
-    #name: volume2
+    #volume2
     - pull-ci-openshift-compliance-operator-master-e2e-aws
     - pull-ci-openshift-insights-operator-master-insights-operator-e2e-tests
     - pull-ci-openshift-sriov-network-operator-master-e2e-aws
@@ -6416,7 +6419,7 @@ groups:
     - pull-ci-openshift-knative-serverless-operator-master-4.3-upgrade-tests-aws-ocp-43
     - pull-ci-openshift-knative-serverless-operator-master-4.4-e2e-aws-ocp-44
     - pull-ci-operator-framework-operator-lifecycle-manager-master-e2e-aws-console-olm
-    #name: volume3
+    #volume3
     - pull-ci-openshift-ci-tools-master-integration-build01
     - pull-ci-openshift-knative-serverless-operator-master-4.3-e2e-aws-ocp-43
     - pull-ci-openshift-installer-master-e2e-aws-upgrade
@@ -6437,12 +6440,12 @@ groups:
     - pull-ci-openshift-origin-master-e2e-gcp-upgrade
     - pull-ci-openshift-origin-master-e2e-gcp
     - pull-ci-integr8ly-integreatly-operator-master-e2e
-    #name: volume4
+    #volume4
     - pull-ci-openshift-installer-master-e2e-aws-steps
     - pull-ci-kubevirt-kubevirt-master-e2e
     - pull-ci-openshift-origin-master-e2e-aws-csi
     - pull-ci-openshift-console-master-e2e-gcp-console
     - pull-ci-openshift-priv-library-go-master-unit-build01
-    #name: volume5
+    #volume5
     - pull-ci-openshift-priv-library-go-master-verify-deps-build01
     - pull-ci-openshift-priv-library-go-master-verify-build01
