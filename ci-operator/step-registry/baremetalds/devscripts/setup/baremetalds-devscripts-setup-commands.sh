@@ -74,6 +74,7 @@ echo "export OPENSHIFT_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}" >> /root/dev-scrip
 echo "export ADDN_DNS=\$(awk '/nameserver/ { print \$2;exit; }' /etc/resolv.conf)" >> /root/dev-scripts/config_root.sh
 echo "export OPENSHIFT_CI=true" >> /root/dev-scripts/config_root.sh
 echo "export MIRROR_IMAGES=true" >> /root/dev-scripts/config_root.sh
+echo "export NUM_WORKERS=2" >> /root/dev-scripts/config_root.sh
 
 if [[ -e /root/dev-scripts-additional-config ]]
 then
