@@ -47,6 +47,33 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: app.ci
+    context: ci/build-farm/app-ci-config-dry
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-app-ci-config-dry
+    rerun_command: /test app-ci-config-dry
+    spec:
+      containers:
+      - args:
+        - --config-dir=clusters/app.ci
+        - --confirm=false
+        - --as=
+        command:
+        - applyconfig
+        image: registry.svc.ci.openshift.org/ci/applyconfig:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+      serviceAccountName: config-updater
+    trigger: (?m)^/test( | .* )app-ci-config-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
     cluster: api.ci
     context: ci/prow/build-farm-consistency
     decorate: true
