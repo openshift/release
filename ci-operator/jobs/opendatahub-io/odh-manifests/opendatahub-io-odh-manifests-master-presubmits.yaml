@@ -21,6 +21,9 @@ presubmits:
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --lease-server=https://boskos-ci.svc.ci.openshift.org
         - --secret-dir=/usr/local/my-test-cluster-profile
         - --target=my-test
         command:
@@ -35,6 +38,9 @@ presubmits:
         - mountPath: /etc/apici
           name: apici-ci-operator-credentials
           readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /usr/local/my-test-cluster-profile
           name: cluster-profile
         - mountPath: /etc/pull-secret
@@ -48,13 +54,17 @@ presubmits:
           - key: sa.ci-operator.apici.config
             path: kubeconfig
           secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
       - name: cluster-profile
         projected:
           sources:
           - secret:
-              name: cluster-secrets-
-          - configMap:
-              name: cluster-profile-
+              name: cluster-secrets-aws
       - name: pull-secret
         secret:
           secretName: regcred
