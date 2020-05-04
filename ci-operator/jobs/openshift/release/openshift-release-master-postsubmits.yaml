@@ -3,81 +3,47 @@ postsubmits:
   - agent: kubernetes
     branches:
     - ^master$
-    cluster: api.ci
+    cluster: app.ci
     decorate: true
     labels:
-      ci.openshift.io/role: infra-canary
-    name: branch-ci-openshift-release-master-app-ci-apply-canary
+      ci.openshift.io/role: infra
+    name: branch-ci-openshift-release-master-app-ci-apply
     spec:
       containers:
       - args:
         - --config-dir=clusters/app.ci
         - --confirm=true
-        - --kubeconfig=/etc/kubeconfig/kubeconfig
         - --as=
         command:
         - applyconfig
-        env:
-        - name: build01_build01_reg_auth_value
-          valueFrom:
-            secretKeyRef:
-              key: build01_build01_reg_auth_value.txt
-              name: build-farm-credentials
-        - name: build01_ci_reg_auth_value
-          valueFrom:
-            secretKeyRef:
-              key: build01_ci_reg_auth_value.txt
-              name: build-farm-credentials
-        - name: slack_api_url
-          valueFrom:
-            secretKeyRef:
-              key: url
-              name: ci-slack-api-url
         image: registry.svc.ci.openshift.org/ci/applyconfig:latest
         imagePullPolicy: Always
         name: ""
         resources:
           requests:
             cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/kubeconfig
-          name: kubeconfig
-          readOnly: true
-      volumes:
-      - name: kubeconfig
-        secret:
-          secretName: app-ci-config-updater-kubeconfig
+      serviceAccountName: config-updater
   - agent: kubernetes
     branches:
     - ^master$
-    cluster: api.ci
+    cluster: app.ci
     decorate: true
     labels:
-      ci.openshift.io/role: infra-canary
-    name: branch-ci-openshift-release-master-app-ci-apply-monitoring-canary
+      ci.openshift.io/role: infra
+    name: branch-ci-openshift-release-master-app-ci-apply-monitoring
     spec:
       containers:
       - args:
         - prow-monitoring-app-ci
         command:
         - make
-        env:
-        - name: KUBECONFIG
-          value: /etc/kubeconfig/kubeconfig
         image: registry.svc.ci.openshift.org/ocp/cli-make:latest
         imagePullPolicy: Always
         name: ""
         resources:
           requests:
             cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/kubeconfig
-          name: kubeconfig
-          readOnly: true
-      volumes:
-      - name: kubeconfig
-        secret:
-          secretName: app-ci-config-updater-kubeconfig
+      serviceAccountName: config-updater
   - agent: kubernetes
     branches:
     - master
