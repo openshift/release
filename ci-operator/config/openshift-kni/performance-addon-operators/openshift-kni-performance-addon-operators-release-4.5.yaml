@@ -1,0 +1,61 @@
+base_images:
+  operator-registry:
+    cluster: https://api.ci.openshift.org
+    name: "4.5"
+    namespace: ocp
+    tag: operator-registry
+  os:
+    cluster: https://api.ci.openshift.org
+    name: ubi
+    namespace: ocp
+    tag: "7"
+binary_build_commands: make build
+build_root:
+  project_image:
+    dockerfile_path: openshift-ci/Dockerfile.tools
+images:
+- dockerfile_path: openshift-ci/Dockerfile.deploy
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift-kni/performance-addon-operators/build/_output/bin/performance-addon-operators
+  to: performance-addon-operator
+- dockerfile_path: openshift-ci/Dockerfile.registry.intermediate
+  from: operator-registry
+  to: operator-registry-base
+- dockerfile_path: openshift-ci/Dockerfile.registry.build
+  from: operator-registry-base
+  to: performance-addon-operator-registry
+- dockerfile_path: openshift-ci/Dockerfile.registry.upstream.dev
+  from: operator-registry-base
+  to: performance-addon-operator-registry-upstream
+promotion:
+  excluded_images:
+  - operator-registry-base
+  - performance-addon-operator-registry
+  name: performance-addon-operator-4.5
+  namespace: openshift-kni
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: "4.5"
+  namespace: ocp
+tests:
+- as: ci
+  commands: make ci-job
+  container:
+    from: src
+- as: e2e-gcp
+  commands: make deploy && make functests
+  openshift_installer_src:
+    cluster_profile: gcp
+zz_generated_metadata:
+  branch: release-4.5
+  org: openshift-kni
+  repo: performance-addon-operators
