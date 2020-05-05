@@ -1231,10 +1231,10 @@ index addd77b..41009fb 100644
    metadata:
 diff --git a/./core-services/prow/03_deployment/hook-redirect.yaml b/./core-services/prow/03_deployment/hook-redirect.yaml
 deleted file mode 100644
-index 505b204..0000000
+index 6ef3037..0000000
 --- a/./core-services/prow/03_deployment/hook-redirect.yaml
 +++ /dev/null
-@@ -1,69 +0,0 @@
+@@ -1,90 +0,0 @@
 -apiVersion: v1
 -kind: ConfigMap
 -metadata:
@@ -1243,8 +1243,10 @@ index 505b204..0000000
 -data:
 -  "default.conf": |
 -    server {
--      listen 8080;
--      return 302 $scheme://hook-ci.apps.ci.l2s4.p1.openshiftapps.com$request_uri;
+-      listen 8888;
+-      location / {
+-        proxy_pass https://hook-ci.apps.ci.l2s4.p1.openshiftapps.com;
+-      }
 -    }
 ----
 -apiVersion: apps/v1
@@ -1297,13 +1299,32 @@ index 505b204..0000000
 -spec:
 -  ports:
 -  - name: main
--    port: 80
+-    port: 8888
 -    protocol: TCP
--    targetPort: 8080
+-    targetPort: 8888
 -  selector:
 -    component: hook-redirect
 -  sessionAffinity: None
 -  type: ClusterIP
+----
+-apiVersion: route.openshift.io/v1
+-kind: Route
+-metadata:
+-  name: hook-red
+-  namespace: ci
+-spec:
+-  host: hook-red-ci.svc.ci.openshift.org
+-  path: /hook
+-  port:
+-    targetPort: 8888
+-  tls:
+-    insecureEdgeTerminationPolicy: Redirect
+-    termination: edge
+-  to:
+-    kind: Service
+-    name: hook-redirect
+-    weight: 100
+-  wildcardPolicy: None
 diff --git a/./core-services/prow/03_deployment/hook.yaml b/./clusters/app.ci/prow/03_deployment/hook.yaml
 index 1ada879..76de0ef 100644
 --- a/./core-services/prow/03_deployment/hook.yaml
