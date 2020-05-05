@@ -6,8 +6,10 @@ metadata:
 data:
   "default.conf": |
     server {
-      listen 8080;
-      return 302 $scheme://hook-ci.apps.ci.l2s4.p1.openshiftapps.com$request_uri;
+      listen 8888;
+      location / {
+        proxy_pass https://hook-ci.apps.ci.l2s4.p1.openshiftapps.com;
+      }
     }
 ---
 apiVersion: apps/v1
@@ -60,10 +62,29 @@ metadata:
 spec:
   ports:
   - name: main
-    port: 80
+    port: 8888
     protocol: TCP
-    targetPort: 8080
+    targetPort: 8888
   selector:
     component: hook-redirect
   sessionAffinity: None
   type: ClusterIP
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: hook-red
+  namespace: ci
+spec:
+  host: hook-red-ci.svc.ci.openshift.org
+  path: /hook
+  port:
+    targetPort: 8888
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: edge
+  to:
+    kind: Service
+    name: hook-redirect
+    weight: 100
+  wildcardPolicy: None
