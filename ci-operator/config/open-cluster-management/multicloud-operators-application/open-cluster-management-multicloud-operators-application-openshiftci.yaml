@@ -1,0 +1,30 @@
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+promotion:
+  name: "4.5"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: "4.5"
+  namespace: ocp
+tests:
+- as: unit
+  commands: USE_VENDORIZED_BUILD_HARNESS=true TESTARGS="-count 1" make test
+  container:
+    from: src
+zz_generated_metadata:
+  branch: openshiftci
+  org: open-cluster-management
+  repo: multicloud-operators-application
