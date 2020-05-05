@@ -989,7 +989,7 @@ index e428337..5cd4ab3 100644
            image: gcr.io/k8s-prow/crier:v20200504-df0aa60dd
 diff --git a/./core-services/prow/03_deployment/deck-redirect.yaml b/./core-services/prow/03_deployment/deck-redirect.yaml
 deleted file mode 100644
-index 9efe3ad..0000000
+index 7d196b7..0000000
 --- a/./core-services/prow/03_deployment/deck-redirect.yaml
 +++ /dev/null
 @@ -1,139 +0,0 @@
@@ -1055,7 +1055,7 @@ index 9efe3ad..0000000
 -spec:
 -  ports:
 -  - name: main
--    port: 8080
+-    port: 80
 -    protocol: TCP
 -    targetPort: 8080
 -  selector:
@@ -1125,7 +1125,7 @@ index 9efe3ad..0000000
 -spec:
 -  ports:
 -  - name: main
--    port: 443
+-    port: 80
 -    protocol: TCP
 -    targetPort: 8080
 -  selector:
@@ -1133,19 +1133,10 @@ index 9efe3ad..0000000
 -  sessionAffinity: None
 -  type: ClusterIP
 diff --git a/./core-services/prow/03_deployment/deck.yaml b/./clusters/app.ci/prow/03_deployment/deck.yaml
-index 19bac24..e82c2ae 100644
+index ee55e01..e82c2ae 100644
 --- a/./core-services/prow/03_deployment/deck.yaml
 +++ b/./clusters/app.ci/prow/03_deployment/deck.yaml
-@@ -24,7 +24,7 @@ objects:
-       termination: edge
-     to:
-       kind: Service
--      name: deck-redirect
-+      name: deck
- - apiVersion: v1
-   kind: Route
-   metadata:
-@@ -35,13 +35,12 @@ objects:
+@@ -35,7 +35,6 @@ objects:
    spec:
      port:
        targetPort: 8080
@@ -1153,13 +1144,6 @@ index 19bac24..e82c2ae 100644
      tls:
        insecureEdgeTerminationPolicy: Redirect
        termination: edge
-     to:
-       kind: Service
--      name: deck-redirect
-+      name: deck
- - apiVersion: v1
-   kind: Service
-   metadata:
 @@ -85,7 +84,6 @@ objects:
            component: deck
        spec:
@@ -1176,15 +1160,6 @@ index 19bac24..e82c2ae 100644
            env:
            # Multiple configs can only be passed via the env var and not via the flag
            - name: KUBECONFIG
-@@ -247,7 +246,7 @@ objects:
-       termination: Reencrypt
-     to:
-       kind: Service
--      name: deck-internal-redirect
-+      name: deck-internal
- - apiVersion: v1
-   kind: Service
-   metadata:
 diff --git a/./core-services/prow/03_deployment/exporter.yaml b/./clusters/app.ci/prow/03_deployment/exporter.yaml
 index bb1a0e1..62fe328 100644
 --- a/./core-services/prow/03_deployment/exporter.yaml
@@ -1256,7 +1231,7 @@ index f9250c6..83f16a3 100644
    metadata:
 diff --git a/./core-services/prow/03_deployment/hook-redirect.yaml b/./core-services/prow/03_deployment/hook-redirect.yaml
 deleted file mode 100644
-index ec67bcc..0000000
+index 505b204..0000000
 --- a/./core-services/prow/03_deployment/hook-redirect.yaml
 +++ /dev/null
 @@ -1,69 +0,0 @@
@@ -1322,7 +1297,7 @@ index ec67bcc..0000000
 -spec:
 -  ports:
 -  - name: main
--    port: 8888
+-    port: 80
 -    protocol: TCP
 -    targetPort: 8080
 -  selector:
@@ -1330,18 +1305,9 @@ index ec67bcc..0000000
 -  sessionAffinity: None
 -  type: ClusterIP
 diff --git a/./core-services/prow/03_deployment/hook.yaml b/./clusters/app.ci/prow/03_deployment/hook.yaml
-index 3c611d7..5f12776 100644
+index 25a37d7..5f12776 100644
 --- a/./core-services/prow/03_deployment/hook.yaml
 +++ b/./clusters/app.ci/prow/03_deployment/hook.yaml
-@@ -15,7 +15,7 @@ items:
-       termination: edge
-     to:
-       kind: Service
--      name: hook-redirect
-+      name: hook
- - apiVersion: v1
-   kind: Service
-   metadata:
 @@ -61,7 +61,6 @@ items:
            component: hook
        spec:
@@ -1351,9 +1317,18 @@ index 3c611d7..5f12776 100644
          - name: hook
            image: gcr.io/k8s-prow/hook:v20200504-df0aa60dd
 diff --git a/./core-services/prow/03_deployment/horologium.yaml b/./clusters/app.ci/prow/03_deployment/horologium.yaml
-index 4dabdb1..e820610 100644
+index 3134af7..e820610 100644
 --- a/./core-services/prow/03_deployment/horologium.yaml
 +++ b/./clusters/app.ci/prow/03_deployment/horologium.yaml
+@@ -10,7 +10,7 @@ items:
+       app: prow
+       component: horologium
+   spec:
+-    replicas: 1
++    replicas: 0
+     revisionHistoryLimit: 2
+     selector:
+       matchLabels:
 @@ -23,7 +23,6 @@ items:
            component: horologium
        spec:
