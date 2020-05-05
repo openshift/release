@@ -45,7 +45,7 @@ jobs:
 
 ci-operator-config:
 	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/determinize-ci-operator:latest
-	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/ci-operator/config:/ci-operator/config:z" registry.svc.ci.openshift.org/ci/determinize-ci-operator:latest --config-dir /ci-operator/config --confirm	
+	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/ci-operator/config:/ci-operator/config:z" registry.svc.ci.openshift.org/ci/determinize-ci-operator:latest --config-dir /ci-operator/config --confirm
 
 prow-config:
 	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/determinize-prow-config:latest
@@ -242,6 +242,7 @@ prow-monitoring:
 
 prow-monitoring-app-ci:
 	make -C cluster/ci/monitoring app-ci-deploy
+	oc apply -f core-services/monitoring/prometheus-cache.yaml
 .PHONY: prow-monitoring-app-ci
 
 build-farm-consistency:
