@@ -6,6 +6,8 @@ set -o pipefail
 
 echo "************ baremetalds devscripts setup command ************"
 
+echo "foo message"
+
 # TODO: Remove once OpenShift CI will be upgraded to 4.2 (see https://access.redhat.com/articles/4859371)
 ${HOME}/fix_uid.sh
 
