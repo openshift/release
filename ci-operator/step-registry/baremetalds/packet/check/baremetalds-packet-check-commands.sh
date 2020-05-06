@@ -4,10 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-
-echo "************ baremetalds env setup ************"
-env | sort
-
 set +x
 
 PACKET_PROJECT_ID=$(cat ${CLUSTER_PROFILE_DIR}/.packet-kni-vars|grep packet_project_id|awk '{print $2}')
@@ -31,25 +27,25 @@ leaks="$(echo "$servers" | jq -r '.devices[]|select((now-(.created_at|fromdate))
 leaks_report="$(echo "$leaks" | jq --tab  '.hostname,.id,.created_at,.tags'|sed 's/\"/ /g')"
 leak_ids="$(echo "$leaks" | jq -c '.id'|sed 's/\"//g')"
 leak_num="$(echo "$leak_ids" | wc -w)"
-
 set -x
 
-echo "************ delete e2e-metal-ipi leaked servers and send slack notification ************"
+echo "New Packet.net server leaks total: $leak_num."
 
 if [[ -n "$leaks" ]]
 then
-    echo "$leaks_report"
+    echo "************ delete e2e-metal-ipi leaked servers and send slack notification ************"
+    echo -e "Discovered leaks info:\n $leaks_report"
     set +x
     curl -X POST --data-urlencode\
      "payload={\"text\":\"New Packet.net server leaks total: $leak_num. Deleting the following:\n\",\"attachments\":[{\"color\":\"warning\",\"text\":\"$leaks_report\"}]}"\
       https://hooks.slack.com/services/T027F3GAJ/B011TAG710V/${SLACK_AUTH_TOKEN}
     
     #delete leaks
-     for leak in $leak_ids
-     do
-         echo $leak    
-         curl -X DELETE --header 'Accept: application/json' --header "X-Auth-Token: ${PACKET_AUTH_TOKEN}"\
-          "https://api.packet.net/devices/$leak"
-     done
+    for leak in $leak_ids
+    do
+        echo $leak    
+        curl -X DELETE --header 'Accept: application/json' --header "X-Auth-Token: ${PACKET_AUTH_TOKEN}"\
+         "https://api.packet.net/devices/$leak"
+    done
     set -x
 fi
