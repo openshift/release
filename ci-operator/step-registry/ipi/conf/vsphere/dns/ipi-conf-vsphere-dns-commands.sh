@@ -6,12 +6,11 @@ set -o pipefail
 
 echo "origin-ci-int-aws.dev.rhcloud.com" > "${SHARED_DIR}"/basedomain.txt
 
-cluster_profile=/var/run/secrets/ci.openshift.io/cluster-profile
 cluster_name=${NAMESPACE}-${JOB_NAME_HASH}
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 cluster_domain="${cluster_name}.${base_domain}"
 
-export AWS_SHARED_CREDENTIALS_FILE=${cluster_profile}/.awscred 
+export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred 
 
 # Load array created in setup-vips:
 # 0: API
