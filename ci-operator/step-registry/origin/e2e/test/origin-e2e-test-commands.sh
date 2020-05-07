@@ -21,7 +21,7 @@ if [[ -f "${CLUSTER_PROFILE_DIR}/insights-live.yaml" ]]; then
 fi
 
 # set up cloud-provider-specific env vars
-KUBE_SSH_BASTION="$( oc --insecure-skip-tls-verify get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
+KUBE_SSH_BASTION="$( oc get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
 KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 export KUBE_SSH_BASTION KUBE_SSH_KEY_PATH
 case "${CLUSTER_TYPE}" in
