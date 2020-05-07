@@ -4,8 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-cluster_profile=/var/run/secrets/ci.openshift.io/cluster-profile
-export AWS_SHARED_CREDENTIALS_FILE=${cluster_profile}/.awscred 
+export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred 
 
 HOSTED_ZONE_ID="$(cat "${SHARED_DIR}/hosted-zone.txt")"
 

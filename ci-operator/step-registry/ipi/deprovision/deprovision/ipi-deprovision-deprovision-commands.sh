@@ -6,10 +6,9 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-cluster_profile=/var/run/secrets/ci.openshift.io/cluster-profile
-export AWS_SHARED_CREDENTIALS_FILE=$cluster_profile/.awscred
-export AZURE_AUTH_LOCATION=$cluster_profile/osServicePrincipal.json
-export GOOGLE_CLOUD_KEYFILE_JSON=$cluster_profile/gce.json
+export AWS_SHARED_CREDENTIALS_FILE=$CLUSTER_PROFILE_DIR/.awscred
+export AZURE_AUTH_LOCATION=$CLUSTER_PROFILE_DIR/osServicePrincipal.json
+export GOOGLE_CLOUD_KEYFILE_JSON=$CLUSTER_PROFILE_DIR/gce.json
 
 echo "Deprovisioning cluster ..."
 if [[ ! -s "${SHARED_DIR}/metadata.json" ]]; then

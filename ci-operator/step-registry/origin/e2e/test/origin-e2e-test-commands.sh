@@ -4,10 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-cluster_profile=/var/run/secrets/ci.openshift.io/cluster-profile
-export AWS_SHARED_CREDENTIALS_FILE=${cluster_profile}/.awscred
-export AZURE_AUTH_LOCATION=${cluster_profile}/osServicePrincipal.json
-export GCP_SHARED_CREDENTIALS_FILE=${cluster_profile}/gce.json
+export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
+export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
+export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
 export HOME=/tmp/home
 export PATH=/usr/libexec/origin:$PATH
 
@@ -17,25 +16,25 @@ mkdir -p "${HOME}"
 
 # if the cluster profile included an insights secret, install it to the cluster to
 # report support data from the support-operator
-if [[ -f "${cluster_profile}/insights-live.yaml" ]]; then
-    oc create -f "${cluster_profile}/insights-live.yaml" || true
+if [[ -f "${CLUSTER_PROFILE_DIR}/insights-live.yaml" ]]; then
+    oc create -f "${CLUSTER_PROFILE_DIR}/insights-live.yaml" || true
 fi
 
 # set up cloud-provider-specific env vars
 KUBE_SSH_BASTION="$( oc --insecure-skip-tls-verify get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
-KUBE_SSH_KEY_PATH=${cluster_profile}/ssh-privatekey
+KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 export KUBE_SSH_BASTION KUBE_SSH_KEY_PATH
 case "${CLUSTER_TYPE}" in
 gcp)
     export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
     export KUBE_SSH_USER=core
     mkdir -p ~/.ssh
-    cp "${cluster_profile}/ssh-privatekey" ~/.ssh/google_compute_engine || true
+    cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/google_compute_engine || true
     export TEST_PROVIDER='{"type":"gce","region":"us-east1","multizone": true,"multimaster":true,"projectid":"openshift-gce-devel-ci"}'
     ;;
 aws)
     mkdir -p ~/.ssh
-    cp "${cluster_profile}/ssh-privatekey" ~/.ssh/kube_aws_rsa || true
+    cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/kube_aws_rsa || true
     export PROVIDER_ARGS="-provider=aws -gce-zone=us-east-1"
     # TODO: make openshift-tests auto-discover this from cluster config
     REGION="$(oc get -o jsonpath='{.status.platformStatus.aws.region}' infrastructure cluster)"
