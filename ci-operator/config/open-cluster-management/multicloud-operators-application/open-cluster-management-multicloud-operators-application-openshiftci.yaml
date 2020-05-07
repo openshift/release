@@ -1,10 +1,26 @@
-binary_build_commands: make build
+base_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+binary_build_commands: USE_VENDORIZED_BUILD_HARNESS=true GOPROXY="proxy.golang.org,direct"
+  make build
 build_root:
   image_stream_tag:
     cluster: https://api.ci.openshift.org
     name: builder
     namespace: open-cluster-management
     tag: go1.14-linux-amd64
+images:
+- dockerfile_path: build/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/open-cluster-management/multicloud-operators-application/multicluster-operators-application
+  to: latest
 promotion:
   name: multicluster-operators-application
   namespace: open-cluster-management
@@ -15,10 +31,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  cluster: https://api.ci.openshift.org
-  name: multicluster-operators-application
-  namespace: open-cluster-management
 tests:
 - as: unit
   commands: USE_VENDORIZED_BUILD_HARNESS=true GOPROXY="proxy.golang.org,direct" make
