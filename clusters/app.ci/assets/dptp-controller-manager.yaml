@@ -1,0 +1,299 @@
+kind: ImageStream
+apiVersion: image.openshift.io/v1
+metadata:
+  name: dptp-controller-manager
+  namespace: ci
+spec:
+  lookupPolicy:
+    local: true
+  tags:
+  - name: latest
+    importPolicy:
+      scheduled: true
+    from:
+      kind: DockerImage
+      name: registry.svc.ci.openshift.org/ci/dptp-controller-manager:latest
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dptp-controller-manager
+  namespace: ci
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dptp-controller-manager
+rules:
+- apiGroups:
+  - prow.k8s.io
+  resources:
+  - prowjobs
+  verbs:
+  - '*'
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  resourceNames:
+  - dptp-controller-manager
+  verbs:
+  - get
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - events
+  verbs:
+  - create
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: dptp-controller-manager
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: dptp-controller-manager
+subjects:
+- kind: ServiceAccount
+  name: dptp-controller-manager
+  namespace: ci
+---
+# We can just use this and get rid of the services once we have prom operator 0.31+
+# https://github.com/coreos/prometheus-operator/blob/master/CHANGELOG.md#0310--2019-06-20
+#apiVersion: monitoring.coreos.com/v1
+#kind: PodMonitor
+#metadata:
+#  labels:
+#    app: dptp-controller-manager
+#  name: dptp-controller-manager
+#  namespace: prow-monitoring
+#spec:
+#  selector:
+#    matchLabels:
+#      app: dptp-controller-manager
+#  podMetricsEndpoints:
+#  - port: metrics
+#    interval: 15s
+#    scheme: http
+#  namespaceSelector:
+#    matchNames:
+#    - ci
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: ci
+  labels:
+    app: dptp-controller-manager
+  name: dptp-controller-manager
+spec:
+  ports:
+  - name: metrics
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app: dptp-controller-manager
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    prow-app: really-why-can-it-not-just-select-on-the-ns
+  name: dptp-controller-manager
+  namespace: prow-monitoring
+spec:
+  endpoints:
+  - interval: 30s
+    port: metrics
+    scheme: http
+  namespaceSelector:
+    matchNames:
+    - ci
+  selector:
+    matchLabels:
+      app: dptp-controller-manager
+---
+spec:
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"dptp-controller-manager:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"dptp-controller-manager\")].image"}]'
+  labels:
+    app: dptp-controller-manager
+  name: dptp-controller-manager
+spec:
+  # TODO: Scale up when the cluster is migrated. Right now we would exhaust github
+  # tokens
+  replicas: 0
+  selector:
+    matchLabels:
+      app: dptp-controller-manager
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: dptp-controller-manager
+    spec:
+      containers:
+      - image: dptp-controller-manager
+        name: dptp-controller-manager
+        args:
+        - --leader-election-namespace=ci
+        - --imagestreamtagreconciler.ignored-github-organization=openshift-priv
+        - --config-path=/etc/config/config.yaml
+        - --job-config-path=/etc/job-config
+        - --ci-operator-config-path=/etc/configs
+        - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --registry-cluster-kubeconfig=/var/kubeconfigs/api-ci-kubeconfig
+        # TODO: Change to etc/github/oauth after migration
+        - --github-token-path=/dev/null
+        ports:
+        - name: metrics
+          containerPort: 8080
+        volumeMounts:
+        - name: oauth
+          mountPath: /etc/github
+          readOnly: true
+        - name: kubeconfigs
+          mountPath: /var/kubeconfigs
+        - name: config
+          mountPath: /etc/config
+          readOnly: true
+        - name: master
+          mountPath: /etc/configs/master
+          readOnly: true
+        - name: misc
+          mountPath: /etc/configs/misc
+          readOnly: true
+        - name: release-3x
+          mountPath: /etc/configs/release-3.x
+          readOnly: true
+        - name: release-41
+          mountPath: /etc/configs/release-4.1
+          readOnly: true
+        - name: release-42
+          mountPath: /etc/configs/release-4.2
+          readOnly: true
+        - name: release-43
+          mountPath: /etc/configs/release-4.3
+          readOnly: true
+        - name: release-44
+          mountPath: /etc/configs/release-4.4
+          readOnly: true
+        - name: release-45
+          mountPath: /etc/configs/release-4.5
+          readOnly: true
+        - name: release-46
+          mountPath: /etc/configs/release-4.6
+          readOnly: true
+        - name: release-47
+          mountPath: /etc/configs/release-4.7
+          readOnly: true
+        - name: job-config-misc
+          mountPath: /etc/job-config/misc
+          readOnly: true
+        - name: job-config-master
+          mountPath: /etc/job-config/master
+          readOnly: true
+        - name: job-config-3x
+          mountPath: /etc/job-config/3.x
+          readOnly: true
+        - name: job-config-41
+          mountPath: /etc/job-config/4.1
+          readOnly: true
+        - name: job-config-42
+          mountPath: /etc/job-config/4.2
+          readOnly: true
+        - name: job-config-43
+          mountPath: /etc/job-config/4.3
+          readOnly: true
+        - name: job-config-44
+          mountPath: /etc/job-config/4.4
+          readOnly: true
+        - name: job-config-45
+          mountPath: /etc/job-config/4.5
+          readOnly: true
+        - name: job-config-46
+          mountPath: /etc/job-config/4.6
+          readOnly: true
+        - name: job-config-47
+          mountPath: /etc/job-config/4.7
+          readOnly: true
+      serviceAccountName: dptp-controller-manager
+      volumes:
+      - name: oauth
+        secret:
+          secretName: github-credentials-openshift-ci-robot
+      - name: kubeconfigs
+        secret:
+          secretName: dptp-controller-manager
+      - name: master
+        configMap:
+          name: ci-operator-master-configs
+      - name: misc
+        configMap:
+          name: ci-operator-misc-configs
+      - name: release-3x
+        configMap:
+          name: ci-operator-3.x-configs
+      - name: release-41
+        configMap:
+          name: ci-operator-4.1-configs
+      - name: release-42
+        configMap:
+          name: ci-operator-4.2-configs
+      - name: release-43
+        configMap:
+          name: ci-operator-4.3-configs
+      - name: release-44
+        configMap:
+          name: ci-operator-4.4-configs
+      - name: release-45
+        configMap:
+          name: ci-operator-4.5-configs
+      - name: release-46
+        configMap:
+          name: ci-operator-4.6-configs
+      - name: release-47
+        configMap:
+          name: ci-operator-4.7-configs
+      - name: config
+        configMap:
+          name: config
+      - name: job-config-misc
+        configMap:
+          name: job-config-misc
+      - name: job-config-master
+        configMap:
+          name: job-config-master
+      - name: job-config-3x
+        configMap:
+          name: job-config-3.x
+      - name: job-config-41
+        configMap:
+          name: job-config-4.1
+      - name: job-config-42
+        configMap:
+          name: job-config-4.2
+      - name: job-config-43
+        configMap:
+          name: job-config-4.3
+      - name: job-config-44
+        configMap:
+          name: job-config-4.4
+      - name: job-config-45
+        configMap:
+          name: job-config-4.5
+      - name: job-config-46
+        configMap:
+          name: job-config-4.6
+      - name: job-config-47
+        configMap:
+          name: job-config-4.7
+
