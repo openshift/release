@@ -71,8 +71,6 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
         - --lease-server-password-file=/etc/boskos/password
-        - --lease-server-username=ci
-        - --lease-server=https://boskos-ci.svc.ci.openshift.org
         - --secret-dir=/usr/local/e2e-gcp-cluster-profile
         - --target=e2e-gcp
         - --template=/usr/local/e2e-gcp
@@ -84,8 +82,7 @@ presubmits:
         - name: JOB_NAME_SAFE
           value: e2e-gcp
         - name: TEST_COMMAND
-          value: export component=sctptester; SCTPTEST_IMAGE=$(echo $IMAGE_FORMAT
-            | envsubst) make functests-on-ci
+          value: make functests-on-ci
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -158,8 +155,6 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
         - --lease-server-password-file=/etc/boskos/password
-        - --lease-server-username=ci
-        - --lease-server=https://boskos-ci.svc.ci.openshift.org
         - --secret-dir=/usr/local/e2e-gcp-origin-cluster-profile
         - --target=e2e-gcp-origin
         - --template=/usr/local/e2e-gcp-origin
@@ -171,8 +166,7 @@ presubmits:
         - name: JOB_NAME_SAFE
           value: e2e-gcp-origin
         - name: TEST_COMMAND
-          value: export component=sctptester; SCTPTEST_IMAGE=$(echo $IMAGE_FORMAT
-            | envsubst) RUN_ORIGIN_TESTS=true make functests-on-ci
+          value: RUN_ORIGIN_TESTS=true make functests-on-ci
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -246,7 +240,6 @@ presubmits:
         - --lease-server-password-file=/etc/boskos/password
         - --lease-server-username=ci
         - --lease-server=https://boskos-ci.svc.ci.openshift.org
-        - --repo=cnf-features-deploy
         - --secret-dir=/usr/local/e2e-gcp-ovn-cluster-profile
         - --target=e2e-gcp-ovn
         - --template=/usr/local/e2e-gcp-ovn
@@ -260,8 +253,7 @@ presubmits:
         - name: JOB_NAME_SAFE
           value: e2e-gcp-ovn
         - name: TEST_COMMAND
-          value: export component=sctptester; SCTPTEST_IMAGE=$(echo $IMAGE_FORMAT
-            | envsubst) make functests-on-ci
+          value: make functests-on-ci
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -282,9 +274,6 @@ presubmits:
           subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
-          readOnly: true
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
@@ -313,9 +302,6 @@ presubmits:
       - name: pull-secret
         secret:
           secretName: regcred
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
     trigger: (?m)^/test( | .* )e2e-gcp-ovn,?($|\s.*)
   - agent: kubernetes
     always_run: true
