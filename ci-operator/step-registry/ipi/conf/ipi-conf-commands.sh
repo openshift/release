@@ -4,7 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-cluster_profile=/var/run/secrets/ci.openshift.io/cluster-profile
 cluster_name=${NAMESPACE}-${JOB_NAME_HASH}
 
 out=${SHARED_DIR}/install-config.yaml
@@ -16,8 +15,8 @@ fi
 
 echo "Installing from release ${RELEASE_IMAGE_LATEST}"
 
-ssh_pub_key=$(<"${cluster_profile}/ssh-publickey")
-pull_secret=$(<"${cluster_profile}/pull-secret")
+ssh_pub_key=$(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
+pull_secret=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
 
 cat > "${out}" << EOF
 apiVersion: v1
