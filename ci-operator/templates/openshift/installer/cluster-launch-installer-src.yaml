@@ -572,7 +572,10 @@ objects:
         network_type="${CLUSTER_NETWORK_TYPE-}"
         if has_variant "ovn"; then
           network_type=OVNKubernetes
+        elif has_variant "calico"; then
+          network_type=Calico
         fi
+
         cidr_size=16
         host_prefix=23
         if has_variant "xlarge" || has_variant "large"; then
@@ -608,7 +611,6 @@ objects:
             hostPrefix: ${host_prefix}
         EOF
         fi
-
         if has_variant "mirror"; then
           cat >> /tmp/artifacts/installer/install-config.yaml << EOF
         imageContentSources:
@@ -631,18 +633,50 @@ objects:
         openshift-install --dir=/tmp/artifacts/installer/ create manifests &
         wait "$!"
 
-        sed -i '/^  channel:/d' /tmp/artifacts/installer/manifests/cvo-overrides.yaml
-        # TODO: Replace with a more concise manifest injection approach
+        manifests=/tmp/artifacts/installer/manifests/
+
+        sed -i '/^  channel:/d' ${manifests}/cvo-overrides.yaml
+
         if [[ -n "${CLUSTER_NETWORK_MANIFEST:-}" ]]; then
-            echo "${CLUSTER_NETWORK_MANIFEST}" > /tmp/artifacts/installer/manifests/cluster-network-03-config.yml
+            echo "${CLUSTER_NETWORK_MANIFEST}" > ${manifests}/cluster-network-03-config.yml
+        fi
+
+        if [[ "${network_type}" == "Calico" ]]; then
+          pushd ${manifests}/..
+
+          # Copied exactly from https://docs.projectcalico.org/getting-started/openshift/installation
+          curl https://docs.projectcalico.org/manifests/ocp/crds/01-crd-installation.yaml -o manifests/01-crd-installation.yaml
+          curl https://docs.projectcalico.org/manifests/ocp/crds/01-crd-tigerastatus.yaml -o manifests/01-crd-tigerastatus.yaml
+          curl https://docs.projectcalico.org/manifests/ocp/crds/calico/kdd/02-crd-bgpconfiguration.yaml -o manifests/02-crd-bgpconfiguration.yaml
+          curl https://docs.projectcalico.org/manifests/ocp/crds/calico/kdd/02-crd-bgppeer.yaml -o manifests/02-crd-bgppeer.yaml
+          curl https://docs.projectcalico.org/manifests/ocp/crds/calico/kdd/02-crd-blockaffinity.yaml -o manifests/02-crd-blockaffinity.yaml
+          curl https://docs.projectcalico.org/manifests/ocp/crds/calico/kdd/02-crd-clusterinformation.yaml -o manifests/02-crd-clusterinformation.yaml
+          curl https://docs.projectcalico.org/manifests/ocp/crds/calico/kdd/02-crd-felixconfiguration.yaml -o manifests/02-crd-felixconfiguration.yaml
+          curl https://docs.projectcalico.org/manifests/ocp/crds/calico/kdd/02-crd-globalnetworkpolicy.yaml -o manifests/02-crd-globalnetworkpolicy.yaml
+          curl https://docs.projectcalico.org/manifests/ocp/crds/calico/kdd/02-crd-globalnetworkset.yaml -o manifests/02-crd-globalnetworkset.yaml
+          curl https://docs.projectcalico.org/manifests/ocp/crds/calico/kdd/02-crd-hostendpoint.yaml -o manifests/02-crd-hostendpoint.yaml
+          curl https://docs.projectcalico.org/manifests/ocp/crds/calico/kdd/02-crd-ipamblock.yaml -o manifests/02-crd-ipamblock.yaml
+          curl https://docs.projectcalico.org/manifests/ocp/crds/calico/kdd/02-crd-ipamconfig.yaml -o manifests/02-crd-ipamconfig.yaml
+          curl https://docs.projectcalico.org/manifests/ocp/crds/calico/kdd/02-crd-ipamhandle.yaml -o manifests/02-crd-ipamhandle.yaml
+          curl https://docs.projectcalico.org/manifests/ocp/crds/calico/kdd/02-crd-ippool.yaml -o manifests/02-crd-ippool.yaml
+          curl https://docs.projectcalico.org/manifests/ocp/crds/calico/kdd/02-crd-kubecontrollersconfiguration.yaml -o manifests/02-crd-kubecontrollersconfiguration.yaml
+          curl https://docs.projectcalico.org/manifests/ocp/crds/calico/kdd/02-crd-networkpolicy.yaml -o manifests/02-crd-networkpolicy.yaml
+          curl https://docs.projectcalico.org/manifests/ocp/crds/calico/kdd/02-crd-networkset.yaml -o manifests/02-crd-networkset.yaml
+          curl https://docs.projectcalico.org/manifests/ocp/tigera-operator/00-namespace-tigera-operator.yaml -o manifests/00-namespace-tigera-operator.yaml
+          curl https://docs.projectcalico.org/manifests/ocp/tigera-operator/02-rolebinding-tigera-operator.yaml -o manifests/02-rolebinding-tigera-operator.yaml
+          curl https://docs.projectcalico.org/manifests/ocp/tigera-operator/02-role-tigera-operator.yaml -o manifests/02-role-tigera-operator.yaml
+          curl https://docs.projectcalico.org/manifests/ocp/tigera-operator/02-serviceaccount-tigera-operator.yaml -o manifests/02-serviceaccount-tigera-operator.yaml
+          curl https://docs.projectcalico.org/manifests/ocp/tigera-operator/02-configmap-calico-resources.yaml -o manifests/02-configmap-calico-resources.yaml
+          curl https://docs.projectcalico.org/manifests/ocp/tigera-operator/02-configmap-tigera-install-script.yaml -o manifests/02-configmap-tigera-install-script.yaml
+          curl https://docs.projectcalico.org/manifests/ocp/tigera-operator/02-tigera-operator.yaml -o manifests/02-tigera-operator.yaml
+          curl https://docs.projectcalico.org/manifests/ocp/01-cr-installation.yaml -o manifests/01-cr-installation.yaml
+          # end copied
+
+          popd
         fi
 
         if has_variant "rt"; then
-          if [[ -n "${CLUSTER_NETWORK_MANIFEST:-}" ]]; then
-            echo 'error: CLUSTER_NETWORK_MANIFEST is incompatible with the "rt" variant'
-            exit 1
-          fi
-          cat > /tmp/artifacts/installer/manifests/realtime-worker-machine-config.yml << EOF
+          cat > ${manifests}/realtime-worker-machine-config.yml << EOF
         apiVersion: machineconfiguration.openshift.io/v1
         kind: MachineConfig
         metadata:
@@ -651,6 +685,33 @@ objects:
           name: realtime-worker
         spec:
           kernelType: realtime
+        EOF
+        fi
+
+        if has_variant "multisocket"; then
+          # TODO: waiting for https://issues.redhat.com/browse/GRPA-1895
+          cat > ${manifests}/multisocket-machine-config.yml << EOF
+        ---
+        apiVersion: machineconfiguration.openshift.io/v1
+        kind: MachineConfigPool
+        metadata:
+          labels:
+            topology-manager: enabled
+          name: master
+        ---
+        apiVersion: machineconfiguration.openshift.io/v1
+        kind: KubeletConfig
+        metadata:
+          name: enable-topology-manager
+        spec:
+          machineConfigPoolSelector:
+            matchLabels:
+              topology-manager: enabled
+          kubeletConfig:
+            cpuManagerPolicy: "static"
+            cpuManagerReconcilePeriod: "10s"
+            topologyManagerPolicy: "single-numa-node"
+            reservedSystemCPUs: 1,3,5,7
         EOF
         fi
 
