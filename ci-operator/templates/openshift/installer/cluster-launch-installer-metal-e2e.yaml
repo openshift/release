@@ -408,6 +408,32 @@ objects:
             echo "${CLUSTER_NETWORK_MANIFEST}" > /tmp/artifacts/installer/manifests/cluster-network-03-config.yml
         fi
 
+        if [[ "${CLUSTER_VARIANT}" =~ "numa" ]]; then
+          cat >> /tmp/artifacts/installer/openshift/90_topology_manager_single_numa_node_policy.yaml << EOF
+        ---
+        apiVersion: machineconfiguration.openshift.io/v1
+        kind: MachineConfigPool
+        metadata:
+          labels:
+            topology-manager: enabled
+          name: worker
+        ---
+        apiVersion: machineconfiguration.openshift.io/v1
+        kind: KubeletConfig
+        metadata:
+          name: enable-topology-manager
+        spec:
+          machineConfigPoolSelector:
+            matchLabels:
+              topology-manager: enabled
+          kubeletConfig:
+            cpuManagerPolicy: "static"
+            cpuManagerReconcilePeriod: "10s"
+            topologyManagerPolicy: "single-numa-node"
+            reservedSystemCPUs: 1,3
+        EOF
+        fi
+
         cat >> /tmp/artifacts/installer/openshift/99_kernelargs_e2e_metal.yaml << EOF
         apiVersion: machineconfiguration.openshift.io/v1
         kind: MachineConfig
