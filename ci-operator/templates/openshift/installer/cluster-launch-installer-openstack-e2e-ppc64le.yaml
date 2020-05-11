@@ -30,6 +30,8 @@ parameters:
   value: "ci-op-ppc64le"
 - name: MULTIARCH_RELEASE_IMAGE_LATEST
   required: true
+- name: SSHD_BASTION_IP
+  required: true
 
 objects:
 
@@ -720,8 +722,13 @@ objects:
         done
 
     # both ports (lb_fip and apps_fip) go through a single reverse ssh tunnel bastion
+    # NOTE: I cannot do something like the following in openshift-release-release-4.3-periodics.yaml
+    # $(nslookup sshd-43.bastion-ppc64le | grep 172 | awk '{print $2}')
+    # or
+    # $(nslookup sshd-43.bastion-ppc64le | awk -F': ' 'NF==2 { print $2 }')
+    # because it is part of the pod spec
     hostAliases:
-    - ip: 172.30.128.152 # sshd.bastion-ppc64le ip address
+    - ip: ${SSHD_BASTION_IP}
       hostnames:
       - "api.${CLUSTER_NAME}.${BASE_DOMAIN}"
       - "alertmanager-main-openshift-monitoring.apps.${CLUSTER_NAME}.${BASE_DOMAIN}"
