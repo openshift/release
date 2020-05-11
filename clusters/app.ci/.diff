@@ -1133,10 +1133,10 @@ index 7d196b7..0000000
 -  sessionAffinity: None
 -  type: ClusterIP
 diff --git a/./core-services/prow/03_deployment/deck.yaml b/./clusters/app.ci/prow/03_deployment/deck.yaml
-index 782de53..cf7dd07 100644
+index 2df1754..cf7dd07 100644
 --- a/./core-services/prow/03_deployment/deck.yaml
 +++ b/./clusters/app.ci/prow/03_deployment/deck.yaml
-@@ -35,7 +35,6 @@ objects:
+@@ -35,13 +35,12 @@ objects:
    spec:
      port:
        targetPort: 8080
@@ -1144,6 +1144,13 @@ index 782de53..cf7dd07 100644
      tls:
        insecureEdgeTerminationPolicy: Redirect
        termination: edge
+     to:
+       kind: Service
+-      name: deck-redirect
++      name: deck
+ - apiVersion: v1
+   kind: Service
+   metadata:
 @@ -85,7 +84,6 @@ objects:
            component: deck
        spec:
@@ -1160,6 +1167,15 @@ index 782de53..cf7dd07 100644
            env:
            # Multiple configs can only be passed via the env var and not via the flag
            - name: KUBECONFIG
+@@ -247,7 +246,7 @@ objects:
+       termination: Reencrypt
+     to:
+       kind: Service
+-      name: deck-internal-redirect
++      name: deck-internal
+ - apiVersion: v1
+   kind: Service
+   metadata:
 diff --git a/./core-services/prow/03_deployment/exporter.yaml b/./clusters/app.ci/prow/03_deployment/exporter.yaml
 index 5fc8db0..61e3f4d 100644
 --- a/./core-services/prow/03_deployment/exporter.yaml
@@ -1328,9 +1344,18 @@ index 6ef3037..0000000
 -    weight: 100
 -  wildcardPolicy: None
 diff --git a/./core-services/prow/03_deployment/hook.yaml b/./clusters/app.ci/prow/03_deployment/hook.yaml
-index 388b2b1..7ce24c1 100644
+index 316ce84..7ce24c1 100644
 --- a/./core-services/prow/03_deployment/hook.yaml
 +++ b/./clusters/app.ci/prow/03_deployment/hook.yaml
+@@ -15,7 +15,7 @@ items:
+       termination: edge
+     to:
+       kind: Service
+-      name: hook-redirect
++      name: hook
+ - apiVersion: v1
+   kind: Service
+   metadata:
 @@ -61,7 +61,6 @@ items:
            component: hook
        spec:
@@ -1340,18 +1365,9 @@ index 388b2b1..7ce24c1 100644
          - name: hook
            image: gcr.io/k8s-prow/hook:v20200508-fc2946b9d
 diff --git a/./core-services/prow/03_deployment/horologium.yaml b/./clusters/app.ci/prow/03_deployment/horologium.yaml
-index cc73798..28bbcc9 100644
+index b0df55f..28bbcc9 100644
 --- a/./core-services/prow/03_deployment/horologium.yaml
 +++ b/./clusters/app.ci/prow/03_deployment/horologium.yaml
-@@ -10,7 +10,7 @@ items:
-       app: prow
-       component: horologium
-   spec:
--    replicas: 1
-+    replicas: 0
-     revisionHistoryLimit: 2
-     selector:
-       matchLabels:
 @@ -23,7 +23,6 @@ items:
            component: horologium
        spec:
@@ -1360,19 +1376,23 @@ index cc73798..28bbcc9 100644
          containers:
          - name: horologium
            args:
-diff --git a/./core-services/prow/03_deployment/plank.yaml b/./clusters/app.ci/prow/03_deployment/plank.yaml
-index 484e5ab..7eb7079 100644
---- a/./core-services/prow/03_deployment/plank.yaml
-+++ b/./clusters/app.ci/prow/03_deployment/plank.yaml
-@@ -28,7 +28,7 @@ items:
-       component: plank
+diff --git a/./core-services/prow/03_deployment/jenkins_operator.yaml b/./clusters/app.ci/prow/03_deployment/jenkins_operator.yaml
+index c8dc2db..99ae990 100644
+--- a/./core-services/prow/03_deployment/jenkins_operator.yaml
++++ b/./clusters/app.ci/prow/03_deployment/jenkins_operator.yaml
+@@ -34,7 +34,7 @@ items:
+       component: jenkins-operator
    spec:
      # Do not scale up.
--    replicas: 1
-+    replicas: 0
+-    replicas: 0
++    replicas: 1
      revisionHistoryLimit: 2
      strategy:
        type: Recreate
+diff --git a/./core-services/prow/03_deployment/plank.yaml b/./clusters/app.ci/prow/03_deployment/plank.yaml
+index 0f118ad..7eb7079 100644
+--- a/./core-services/prow/03_deployment/plank.yaml
++++ b/./clusters/app.ci/prow/03_deployment/plank.yaml
 @@ -43,7 +43,6 @@ items:
            component: plank
        spec:
@@ -1395,18 +1415,9 @@ index c1a595a..0000000
 -  name: prow-critical
 -value: 1000000000
 diff --git a/./core-services/prow/03_deployment/sinker.yaml b/./clusters/app.ci/prow/03_deployment/sinker.yaml
-index b8dd858..b7b7039 100644
+index ba0aa21..b7b7039 100644
 --- a/./core-services/prow/03_deployment/sinker.yaml
 +++ b/./clusters/app.ci/prow/03_deployment/sinker.yaml
-@@ -10,7 +10,7 @@ items:
-       app: prow
-       component: sinker
-   spec:
--    replicas: 1
-+    replicas: 0
-     revisionHistoryLimit: 2
-     selector:
-       matchLabels:
 @@ -23,7 +23,6 @@ items:
            component: sinker
        spec:
@@ -1415,32 +1426,10 @@ index b8dd858..b7b7039 100644
          containers:
          - name: sinker
            image: gcr.io/k8s-prow/sinker:v20200508-fc2946b9d
-diff --git a/./core-services/prow/03_deployment/statusreconciler.yaml b/./clusters/app.ci/prow/03_deployment/statusreconciler.yaml
-index 83d2392..f1975ca 100644
---- a/./core-services/prow/03_deployment/statusreconciler.yaml
-+++ b/./clusters/app.ci/prow/03_deployment/statusreconciler.yaml
-@@ -7,7 +7,7 @@ metadata:
-     app: prow
-     component: statusreconciler
- spec:
--  replicas: 1
-+  replicas: 0
-   selector:
-     matchLabels:
-       app: prow
 diff --git a/./core-services/prow/03_deployment/tide.yaml b/./clusters/app.ci/prow/03_deployment/tide.yaml
-index ac3d146..6597a69 100644
+index a9176f6..6597a69 100644
 --- a/./core-services/prow/03_deployment/tide.yaml
 +++ b/./clusters/app.ci/prow/03_deployment/tide.yaml
-@@ -32,7 +32,7 @@ items:
-       component: tide
-   spec:
-     # Do not scale up.
--    replicas: 1
-+    replicas: 0
-     strategy:
-       type: Recreate
-     selector:
 @@ -46,7 +46,6 @@ items:
            component: tide
        spec:
