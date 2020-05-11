@@ -153,6 +153,62 @@ presubmits:
     branches:
     - master
     cluster: build01
+    context: ci/prow/images-debug
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/semantics-ignored: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ci-tools-master-images-debug
+    rerun_command: /test images-debug
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --target=[images]
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+      nodeSelector:
+        node-role.kubernetes.io/debug: ""
+      serviceAccountName: ci-operator
+      tolerations:
+      - effect: NoSchedule
+        key: dptp-debug
+        operator: Equal
+        value: "true"
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: pull-secret
+        secret:
+          secretName: regcred
+    trigger: (?m)^/test( | .* )images-debug,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build01
     context: ci/prow/integration
     decorate: true
     decoration_config:
