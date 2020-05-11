@@ -32,6 +32,8 @@ parameters:
   required: true
 - name: SSHD_BASTION_IP
   required: true
+- name: CUSTOM_IMAGE_OPENSTACK_INSTALLER
+  required: true
 
 objects:
 
@@ -105,7 +107,7 @@ objects:
     #
     # Once the cluster is up, executes shared tests
     - name: test
-      image: registry.svc.ci.openshift.org/ppc64le-openstack-installer-43/ppc64le-ci:latest
+      image: ${CUSTOM_IMAGE_OPENSTACK_INSTALLER}
       terminationMessagePolicy: FallbackToLogsOnError
       resources:
         requests:
@@ -235,7 +237,7 @@ objects:
 
     # Runs an install
     - name: setup
-      image: registry.svc.ci.openshift.org/ppc64le-openstack-installer-43/ppc64le-ci:latest
+      image: ${CUSTOM_IMAGE_OPENSTACK_INSTALLER}
       terminationMessagePolicy: FallbackToLogsOnError
       volumeMounts:
       - name: shared-tmp
@@ -343,13 +345,15 @@ objects:
         echo "-----------------------------------------------------------"
 
         # Display the version of openshift-install and make sure we are using the special sauce version
-        PATH=/ppc64le-openstack-installer-43/:${PATH}
+        echo "CUSTOM_IMAGE_OPENSTACK_INSTALLER=${CUSTOM_IMAGE_OPENSTACK_INSTALLER}"
+        ls -l / || true
+        PATH=/ppc64le-openstack-installer/:${PATH}
         LOCATION=$(which openshift-install)
         echo ${LOCATION}
         openshift-install version
-        if [ "${LOCATION}" != "/ppc64le-openstack-installer-43/openshift-install" ]
+        if [ "${LOCATION}" != "/ppc64le-openstack-installer/openshift-install" ]
         then
-                echo "Error: expecting ${LOCATION} to be /ppc64le-openstack-installer-43/openshift-install"
+                echo "Error: expecting ${LOCATION} to be /ppc64le-openstack-installer/openshift-install"
                 exit 1
         fi
         echo "-----------------------------------------------------------"
@@ -491,7 +495,7 @@ objects:
 
     # Performs cleanup of all created resources
     - name: teardown
-      image: registry.svc.ci.openshift.org/ppc64le-openstack-installer-43/ppc64le-ci:latest
+      image: ${CUSTOM_IMAGE_OPENSTACK_INSTALLER}
       terminationMessagePolicy: FallbackToLogsOnError
       volumeMounts:
       - name: shared-tmp
