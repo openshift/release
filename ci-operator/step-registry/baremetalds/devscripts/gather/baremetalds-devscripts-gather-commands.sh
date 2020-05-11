@@ -23,9 +23,16 @@ fi
 
 # Fetch packet server IP
 IP=$(cat ${SHARED_DIR}/server-ip)
-
 SSHOPTS="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90 -i ${CLUSTER_PROFILE_DIR}/.packet-kni-ssh-privatekey"
 
+function getlogs() {
+  echo "### Downloading logs..."
+  ssh $SSHOPTS root@$IP tar -czC "/tmp/artifacts/must-gather" -f "/tmp/artifacts/must-gather.tar.gz" .
+  scp $SSHOPTS root@$IP:/tmp/artifacts/must-gather.tar.gz ${ARTIFACT_DIR}
+}
+
+# Gather logs regardless of what happens after this
+trap getlogs EXIT
 
 echo "### Gathering logs..."
 timeout -s 9 15m ssh $SSHOPTS root@$IP bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
@@ -33,7 +40,3 @@ export MUST_GATHER_PATH=/tmp/artifacts/must-gather
 cd dev-scripts
 make gather
 EOF
-
-echo "### Downloading logs..."
-ssh $SSHOPTS root@$IP tar -czC "/tmp/artifacts/must-gather" -f "/tmp/artifacts/must-gather.tar.gz" .
-scp $SSHOPTS root@$IP:/tmp/artifacts/must-gather.tar.gz ${ARTIFACT_DIR}
