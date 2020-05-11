@@ -141,12 +141,14 @@ objects:
             boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" heartbeat --resource "${conformance_resource}" &
             conformance_heartbeats_pid=$!
             echo "[INFO] Sending heartbeats to retain the lease ${conformance_resource_name}"
+            # remove all _mem and _cpu declerations once installer supports ovirt machine pool - see https://bugzilla.redhat.com/1820300
             worker_cpu=8
             worker_mem=16384
             master_cpu=8
             master_mem=16384
           else
             ovirt_engine_template_name="${ovirt_engine_template_name}-8G"
+            # remove all _mem and _cpu declerations once installer supports ovirt machine pool - see https://bugzilla.redhat.com/1820300
             worker_cpu=4
             worker_mem=8192
             master_cpu=4
@@ -162,6 +164,7 @@ objects:
         OVIRT_APIVIP="$(extract_leases_info ovirt_apivip ${lease_path})"
         OVIRT_DNSVIP="$(extract_leases_info ovirt_dnsvip ${lease_path})"
         OVIRT_INGRESSVIP="$(extract_leases_info ovirt_ingressvip ${lease_path})"
+        # remove all _CPU and _MEM declerations once installer supports ovirt machine pool - see https://bugzilla.redhat.com/1820300
         WORKER_CPU="${worker_cpu}"
         WORKER_MEM="${worker_mem}"
         MASTER_CPU="${master_cpu}"
@@ -369,6 +372,7 @@ objects:
         export EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
         export SSH_PUB_KEY=$(cat "${SSH_PUB_KEY_PATH}")
         export PULL_SECRET=$(cat "${PULL_SECRET_PATH}")
+        # remove all TF_VAR customization once installer supports ovirt machine pool - see https://bugzilla.redhat.com/1820300
         export TF_VAR_ovirt_template_mem=${WORKER_MEM}
         export TF_VAR_ovirt_template_cpu=${WORKER_CPU}
         export TF_VAR_ovirt_master_mem=${MASTER_MEM}
@@ -399,12 +403,32 @@ objects:
         compute:
         - hyperthreading: Enabled
           name: worker
-          platform: {}
+          platform:
+            ovirt:
+              cpu:
+                cores: ${WORKER_CPU}
+                sockets: 1
+              memoryMB: ${WORKER_MEM}
+              osDisk:
+                # 31 is used to trigger the instance customization (the disk size is 16 Gi)
+                sizeGB: 31
+              vmType: server
+              instanceTypeID: 
           replicas: 2
         controlPlane:
           hyperthreading: Enabled
           name: master
-          platform: {}
+          platform:
+            ovirt:
+              cpu:
+                cores: ${MASTER_CPU}
+                sockets: 1
+              memoryMB: ${MASTER_MEM}
+              osDisk:
+                # 31 is used to trigger the instance customization (the disk size is 16 Gi)
+                sizeGB: 31
+              vmType: server
+              instanceTypeID:
           replicas: 3
         platform:
           ovirt:
