@@ -45,6 +45,36 @@ subjects:
   namespace: ci
   name: ci-chat-bot
 ---
+kind: Role
+apiVersion: authorization.openshift.io/v1
+metadata:
+  name: ci-chat-bot-read
+  namespace: ocp
+rules:
+- apiGroups:
+  - image.openshift.io
+  resources:
+  - imagestreams
+  - imagestreamtags
+  verbs:
+  - get
+  - list
+  - watch
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ci-chat-bot-binding
+  namespace: ocp
+roleRef:
+  kind: Role
+  apiGroup: rbac.authorization.k8s.io
+  name: ci-chat-bot-read
+subjects:
+- kind: ServiceAccount
+  namespace: ci
+  name: ci-chat-bot
+---
 kind: ServiceAccount
 apiVersion: v1
 metadata:
