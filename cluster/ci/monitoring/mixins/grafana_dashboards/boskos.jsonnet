@@ -87,4 +87,5 @@ dashboard.new(
 .addPanel(statePanel(iaas="vsphere", displayName="vSphere"), gridPos={h: 9, w: 24, x: 0, y: 0})
 .addPanel(statePanel(iaas="packet", displayName="Packet.net"), gridPos={h: 9, w: 24, x: 0, y: 0})
 .addPanel(statePanel(iaas="openstack", displayName="OpenStack"), gridPos={h: 9, w: 24, x: 0, y: 0})
+.addPanel(statePanel(iaas="openstack-vexxhost", displayName="OpenStack Vexxhost"), gridPos={h: 9, w: 24, x: 0, y: 0})
 + dashboardConfig
