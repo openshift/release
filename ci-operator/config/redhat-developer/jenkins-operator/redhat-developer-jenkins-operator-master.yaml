@@ -6,9 +6,9 @@ base_images:
     tag: "8"
 build_root:
   project_image:
-    dockerfile_path: Dockerfile
+    dockerfile_path: openshift-ci/Dockerfile.build_root
 images:
-- dockerfile_path: Dockerfile
+- dockerfile_path: openshift-ci/Dockerfile
   from: base
   inputs:
     src:
@@ -19,8 +19,8 @@ images:
 resources:
   '*':
     requests:
-      cpu: 200m
-      memory: 200Mi
+      cpu: 1000m
+      memory: 400Mi
 tag_specification:
   cluster: https://api.ci.openshift.org
   name: "4.3"
@@ -31,7 +31,10 @@ tests:
   container:
     from: src
 - as: unit
-  commands: make test
+  commands: |
+    echo $PWD
+    ls -la *
+    cd /tmp
   container:
     from: src
 zz_generated_metadata:
