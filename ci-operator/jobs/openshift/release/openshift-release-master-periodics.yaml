@@ -22,6 +22,8 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
       - --secret-dir=/usr/local/e2e-metal-ipi-cluster-profile
       - --target=e2e-metal-ipi
       - --variant=ocp-4.4
@@ -45,6 +47,9 @@ periodics:
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -69,6 +74,9 @@ periodics:
     - name: pull-secret
       secret:
         secretName: regcred
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
 - agent: kubernetes
   cluster: api.ci
   cron: '* */4 * * *'
@@ -92,6 +100,8 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
       - --secret-dir=/usr/local/e2e-metal-ipi-cluster-profile
       - --target=e2e-metal-ipi
       - --variant=ocp-4.5
@@ -114,6 +124,9 @@ periodics:
         name: cluster-profile
       - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -139,3 +152,6 @@ periodics:
     - name: pull-secret
       secret:
         secretName: regcred
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
