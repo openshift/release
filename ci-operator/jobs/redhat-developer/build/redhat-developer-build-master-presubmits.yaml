@@ -22,6 +22,8 @@ presubmits:
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
         - --target=unit
         - --variant=4.4
         command:
@@ -39,6 +41,9 @@ presubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
       - name: apici-ci-operator-credentials
@@ -50,4 +55,7 @@ presubmits:
       - name: pull-secret
         secret:
           secretName: regcred
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
     trigger: (?m)^/test( | .* )4.4-unit,?($|\s.*)
