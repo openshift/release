@@ -44,7 +44,7 @@ BLACKLIST = [
 
 
 def run_oc(args):
-    command = ['oc', '--loglevel', '3', '--namespace', 'ci'] + args
+    command = ['oc', '--context', 'app.ci', '--as', 'system:admin', '--loglevel', '3', '--namespace', 'ci'] + args
     try:
         process = subprocess.run(command, capture_output=True, check=True)
     except subprocess.CalledProcessError as exc:
