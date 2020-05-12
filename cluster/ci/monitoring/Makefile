@@ -5,15 +5,6 @@ prow-monitoring-deploy: ci-secret-deploy
 	@echo "Deploying prow-monitoring stack ..."
 	oc process -n prow-monitoring -f ./prometheus_expose.yaml.tmpl | oc apply -f -
 	oc apply -f ./prometheus_operator_deploy.yaml
-	oc apply -f ./sinker_service_monitor.yaml
-	oc apply -f ./ghproxy_service_monitor.yaml
-	oc apply -f ./hook_service_monitor.yaml
-	oc apply -f ./deck_service_monitor.yaml
-	oc apply -f ./deck-internal_service_monitor.yaml
-	oc apply -f ./jenkins-operator_service_monitor.yaml
-	oc apply -f ./plank_service_monitor.yaml
-	oc apply -f ./exporter_service_monitor.yaml
-	oc apply -f ./tide_service_monitor.yaml
 	oc apply -f ./prometheus_crd.yaml
 	oc apply -f ./mixins/prometheus_out/prometheus_rule_prow.yaml
 	oc process -n prow-monitoring -f ./alert_manager_expose.yaml.tmpl | oc apply -f -
@@ -55,7 +46,6 @@ app-ci-deploy:
 		|oc create --dry-run=true -o yaml -f - \
 		|oc apply -f -
 	@cat ./mixins/prometheus_out/alertmanager.yaml \
-		| sed -e 's#ops-testplatform#ops-app-ci#g'  \
 			-e "s#{{ api_url }}#$(slack_api_url)#g" \
 		|oc create -n prow-monitoring secret generic alertmanager-prow --from-literal=alertmanager.yaml="$$(cat)" --from-file=./msg.tmpl --dry-run -o yaml \
 		|oc apply -f -
