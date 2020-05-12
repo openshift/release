@@ -80,7 +80,7 @@ applyTemplate:
 	oc process -f $(WHAT) | oc apply -f -
 .PHONY: applyTemplate
 
-postsubmit-update: origin-release prow-monitoring cincinnati prow-release-controller-definitions
+postsubmit-update: origin-release cincinnati prow-release-controller-definitions
 .PHONY: postsubmit-update
 
 all: roles prow projects
@@ -235,10 +235,6 @@ coreos:
 cincinnati:
 	$(MAKE) apply WHAT=projects/cincinnati/cincinnati.yaml
 .PHONY: cincinnati
-
-prow-monitoring:
-	make -C cluster/ci/monitoring prow-monitoring-deploy
-.PHONY: prow-monitoring
 
 prow-monitoring-app-ci:
 	make -C cluster/ci/monitoring app-ci-deploy
