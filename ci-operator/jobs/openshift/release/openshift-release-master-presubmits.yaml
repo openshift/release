@@ -515,6 +515,7 @@ presubmits:
         - $(ARTIFACTS)/debug-log.txt
         - --dry-run=false
         - --rehearsal-limit=45
+        - --prowjob-kubeconfig=/var/prowjob-kubeconfig/kubeconfig
         command:
         - ./hack/pj-rehearse.sh
         image: pj-rehearse:latest
@@ -523,7 +524,17 @@ presubmits:
         resources:
           requests:
             cpu: 500m
+        volumeMounts:
+        - mountPath: /var/prowjob-kubeconfig
+          name: prowjob-kubeconfig
       serviceAccountName: ci-operator
+      volumes:
+      - name: prowjob-kubeconfig
+        secret:
+          items:
+          - key: sa.pj-rehearse.app.ci.config
+            path: kubeconfig
+          secretName: pj-rehearse
     trigger: (?m)^/test( | .* )pj-rehearse,?($|\s.*)
   - agent: kubernetes
     always_run: true
