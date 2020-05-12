@@ -45,36 +45,6 @@ subjects:
   namespace: ci
   name: ci-chat-bot
 ---
-kind: Role
-apiVersion: authorization.openshift.io/v1
-metadata:
-  name: ci-chat-bot-read
-  namespace: ocp
-rules:
-- apiGroups:
-  - image.openshift.io
-  resources:
-  - imagestreams
-  - imagestreamtags
-  verbs:
-  - get
-  - list
-  - watch
----
-kind: RoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: ci-chat-bot-binding
-  namespace: ocp
-roleRef:
-  kind: Role
-  apiGroup: rbac.authorization.k8s.io
-  name: ci-chat-bot-read
-subjects:
-- kind: ServiceAccount
-  namespace: ci
-  name: ci-chat-bot
----
 kind: ServiceAccount
 apiVersion: v1
 metadata:
@@ -141,6 +111,12 @@ spec:
       - name: job-config-47
         configMap:
           name: job-config-4.7
+      - name: build-cluster-kubeconfig
+        secret:
+          secretName: ci-chatbot-kubeconfig
+          items:
+            - key: sa.ci-chatbot.api.ci.config
+              path: kubeconfig
       containers:
       - name: bot
         image: ci-chat-bot:latest
@@ -178,6 +154,9 @@ spec:
         - name: job-config-47
           mountPath: /etc/job-config/4.7
           readOnly: true
+        - name: ci-chatbot-kubeconfig
+          mountPath: /var/build-cluster-kubeconfig
+          readOnly: true
         env:
         - name: BOT_TOKEN
           valueFrom:
@@ -191,3 +170,4 @@ spec:
         - --github-endpoint=http://ghproxy
         - --github-endpoint=https://api.github.com
         - --force-pr-owner=system:serviceaccount:ci:ci-chat-bot
+        - --build-cluster-kubeconfig=/var/build-cluster-kubeconfig/kubeconfig
