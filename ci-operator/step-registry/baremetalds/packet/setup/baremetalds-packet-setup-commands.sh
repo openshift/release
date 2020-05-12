@@ -17,8 +17,10 @@ cat > packet-setup.yaml <<-EOF
   gather_facts: no
   vars:
     - cluster_type: "{{ lookup('env', 'CLUSTER_TYPE') }}"
+    - slackhook_path: "{{ lookup('env', 'CLUSTER_PROFILE_DIR') }}"
   vars_files:
     - "{{ lookup('env', 'CLUSTER_PROFILE_DIR') }}/.packet-kni-vars"
+
   tasks:
 
   - name: check cluster type
@@ -39,6 +41,15 @@ cat > packet-setup.yaml <<-EOF
     register: hosts
     no_log: true
 
+  - name: Send notification message via Slack in case of failure
+    slack:
+      token: "{{ 'T027F3GAJ/B011TAG710V/' + lookup('file', slackhook_path + '/.slackhook') }}"
+      msg: 'Packet setup failed: {{ hosts }}'
+      color: warning
+      icon_emoji: ":failed:"
+    when: hosts.failed == "true"
+    no_log: true
+
   - name: wait for ssh
     wait_for:
       delay: 5
@@ -52,3 +63,4 @@ cat > packet-setup.yaml <<-EOF
 EOF
 
 ansible-playbook packet-setup.yaml -e "packet_hostname=ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}"
+
