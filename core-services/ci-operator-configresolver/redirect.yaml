@@ -1,0 +1,139 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ci-operator-configresolver-ui-redirect-config
+  namespace: ci
+data:
+  "default.conf": |
+    server {
+      listen 8080;
+      return 302 $scheme://ci-operator-configresolver-ui-ci.apps.ci.l2s4.p1.openshiftapps.com$request_uri;
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: ci-operator-configresolver-ui-redirect
+  name: ci-operator-configresolver-ui-redirect
+  namespace: ci
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      component: ci-operator-configresolver-ui-redirect
+  template:
+    metadata:
+      labels:
+        app: prow
+        component: ci-operator-configresolver-ui-redirect
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: component
+                operator: In
+                values:
+                - ci-operator-configresolver-ui-redirect
+            topologyKey: "kubernetes.io/hostname"
+      containers:
+      - image: nginxinc/nginx-unprivileged:1.17
+        name: nginx
+        volumeMounts:
+        - name: config
+          mountPath: /etc/nginx/conf.d
+      volumes:
+      - name: config
+        configMap:
+          name: ci-operator-configresolver-ui-redirect-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: prow
+    component: ci-operator-configresolver-ui-redirect
+  name: ci-operator-configresolver-ui-redirect
+  namespace: ci
+spec:
+  ports:
+  - name: ui
+    port: 80
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    component: ci-operator-configresolver-ui-redirect
+  sessionAffinity: None
+  type: ClusterIP
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ci-operator-configresolver-redirect-config
+  namespace: ci
+data:
+  "default.conf": |
+    server {
+      listen 8080;
+      return 302 $scheme://ci-operator-configresolver-ci.apps.ci.l2s4.p1.openshiftapps.com$request_uri;
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: ci-operator-configresolver-redirect
+  name: ci-operator-configresolver-redirect
+  namespace: ci
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      component: ci-operator-configresolver-redirect
+  template:
+    metadata:
+      labels:
+        app: prow
+        component: ci-operator-configresolver-redirect
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: component
+                operator: In
+                values:
+                - ci-operator-configresolver-redirect
+            topologyKey: "kubernetes.io/hostname"
+      containers:
+      - image: nginxinc/nginx-unprivileged:1.17
+        name: nginx
+        volumeMounts:
+        - name: config
+          mountPath: /etc/nginx/conf.d
+      volumes:
+      - name: config
+        configMap:
+          name: ci-operator-configresolver-redirect-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: prow
+    component: ci-operator-configresolver-redirect
+  name: ci-operator-configresolver-redirect
+  namespace: ci
+spec:
+  ports:
+  - name: main
+    port: 80
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    component: ci-operator-configresolver-redirect
+  sessionAffinity: None
+  type: ClusterIP
