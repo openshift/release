@@ -28,3 +28,74 @@ items:
   - apiGroup: rbac.authorization.k8s.io
     kind: Group
     name: ci-admins
+
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRoleBinding
+  metadata:
+    name: ci-admins-cluster-reader
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: cluster-reader
+  subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: ci-admins
+
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRoleBinding
+  metadata:
+    name: ci-admins-aggregated
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: ci-admins-aggregated
+  subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: ci-admins
+
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    name: ci-admins-aggregated
+  aggregationRule:
+    clusterRoleSelectors:
+    - matchLabels:
+        dptp.openshift.io/ci-admins-aggregated: "true"
+  rules: []
+
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    annotations:
+      openshift.io/description: This cluster role extends the build-in cluster-reader
+    labels:
+      dptp.openshift.io/ci-admins-aggregated: "true"
+    name: cluster-reader-extended
+  rules:
+  - apiGroups:
+    - '*'
+    resources:
+    - '*'
+    verbs:
+    - get
+    - list
+    - watch
+
+- kind: ClusterRole
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    labels:
+      dptp.openshift.io/ci-admins-aggregated: "true"
+    name: ci-admins-secret
+  rules:
+    - apiGroups:
+        - ""
+      resources:
+        - secrets
+      verbs:
+        - create
+        - update
+        - patch
+
