@@ -500,7 +500,7 @@ periodics:
         secretName: osde2e-credentials
 - agent: kubernetes
   cluster: api.ci
-  cron: 0 */4 * * *
+  cron: 0 2 * * *
   decorate: true
   extra_refs:
   - base_ref: master
@@ -508,7 +508,7 @@ periodics:
     repo: osde2e
   labels:
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-prod-aws-e2e-upgrade-4.3.0-next
+  name: osde2e-prod-aws-e2e-upgrade-prod-minus-one-to-next
   spec:
     containers:
     - args:
@@ -522,8 +522,149 @@ periodics:
         value: prod
       - name: UPGRADE_TO_CIS_IF_POSSIBLE
         value: "true"
-      - name: CLUSTER_VERSION
-        value: openshift-v4.3.0
+      - name: PREVIOUS_RELEASE_FROM_DEFAULT
+        value: "1"
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/osde2e-common
+        name: osde2e-common
+        readOnly: true
+      - mountPath: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: osde2e-common
+      secret:
+        secretName: osde2e-common
+    - name: osde2e-credentials
+      secret:
+        secretName: osde2e-credentials
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 6 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: osde2e
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: osde2e-prod-aws-e2e-upgrade-prod-minus-two-to-next
+  spec:
+    containers:
+    - args:
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      command:
+      - /bin/bash
+      - -c
+      env:
+      - name: OSD_ENV
+        value: prod
+      - name: UPGRADE_TO_CIS_IF_POSSIBLE
+        value: "true"
+      - name: PREVIOUS_RELEASE_FROM_DEFAULT
+        value: "2"
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/osde2e-common
+        name: osde2e-common
+        readOnly: true
+      - mountPath: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: osde2e-common
+      secret:
+        secretName: osde2e-common
+    - name: osde2e-credentials
+      secret:
+        secretName: osde2e-credentials
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 10 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: osde2e
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: osde2e-prod-aws-e2e-upgrade-prod-minus-three-to-next
+  spec:
+    containers:
+    - args:
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      command:
+      - /bin/bash
+      - -c
+      env:
+      - name: OSD_ENV
+        value: prod
+      - name: UPGRADE_TO_CIS_IF_POSSIBLE
+        value: "true"
+      - name: PREVIOUS_RELEASE_FROM_DEFAULT
+        value: "3"
+      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/osde2e-common
+        name: osde2e-common
+        readOnly: true
+      - mountPath: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: osde2e-common
+      secret:
+        secretName: osde2e-common
+    - name: osde2e-credentials
+      secret:
+        secretName: osde2e-credentials
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 14 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: osde2e
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: osde2e-prod-aws-e2e-upgrade-prod-minus-four-to-next
+  spec:
+    containers:
+    - args:
+      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
+        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      command:
+      - /bin/bash
+      - -c
+      env:
+      - name: OSD_ENV
+        value: prod
+      - name: UPGRADE_TO_CIS_IF_POSSIBLE
+        value: "true"
+      - name: PREVIOUS_RELEASE_FROM_DEFAULT
+        value: "4"
       image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
       imagePullPolicy: Always
       name: ""
