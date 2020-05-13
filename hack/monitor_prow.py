@@ -60,7 +60,7 @@ def debug(msg):
 
 
 def main():
-    dcs = run_oc(['get', 'deployment', '--selector', 'app=prow', '--output', 'jsonpath={.items[*].metadata.name}']).split()
+    dcs = run_oc(['get', 'deployment', '--output', 'go-template={{ range .items }}{{ $notfirst := false}}{{ range $k, $v := .spec.template.metadata.labels}}{{ if $notfirst}},{{end}}{{$k}}={{$v}}{{$notfirst = true}}{{end}} {{end}}']).split()
     with tempfile.TemporaryDirectory() as log_dir:
         fs = [(display, log_dir), *((highlight, log_dir, x) for x in dcs)]
         with multiprocessing.Pool(len(fs)) as pool:
@@ -90,13 +90,13 @@ def highlight(log_dir, dc):
         header = renderHeader(dc)
         lines = []
         log_lines = []
-        for pod in run_oc(['get', 'pods', '--selector', 'component={}'.format(dc), '--output', 'jsonpath={.items[*].metadata.name}']).split():
+        for pod in run_oc(['get', 'pods', '--selector', dc, '--output', 'jsonpath={.items[*].metadata.name}']).split():
             debug("deployment/{}: pod/{}: gathering info".format(dc, pod))
             lines.extend(renderFlavor(pod, dc))
             cmd = ['logs', '--since', '20m', 'pod/{}'.format(pod)]
-            if dc == 'deck-internal':
+            if "deck-internal" in dc:
                 cmd += ['--container', 'deck']
-            if dc == 'boskos':
+            if "component=boskos" in dc and not "-" in dc:
                 cmd += ['--container', 'boskos']
             debug("deployment/{}: pod/{}: getting logs".format(dc, pod))
             try:
@@ -123,7 +123,17 @@ def highlight(log_dir, dc):
 
 def renderHeader(dc):
     debug("deployment/{}: rendering header".format(dc))
-    rawdc = json.loads(run_oc(['get', 'deployment/{}'.format(dc), '--output', 'json']))
+    name = run_oc(["get", "deployment", "-l", dc, "-o", "name"]).strip()
+    if name == "":
+        # Surprise: Deployments may not match their .spec.labelSelector
+        replicaset = run_oc(["get", "replicaset", "-l", dc, "-o", 'go-template={{ $wtfWhyNoBreakInTemplate := ""}}{{ range .items }}{{ $wtfWhyNoBreakInTemplate = .metadata.name}}{{end}}{{$wtfWhyNoBreakInTemplate}}'.strip()])
+        if replicaset != "":
+            name = json.loads(run_oc(["get", "replicaset", replicaset, "-o", "json"])).get("metadata", {}).get("ownerReferences", [])[0].get("name", "")
+            name = "deployment/" + name
+    if name != "":
+        rawdc = json.loads(run_oc(['get', name.rstrip(), '--output', 'json']))
+    else:
+        rawdc = {}
     spec = rawdc.get("spec", {})
     status = rawdc.get("status", {})
     desired = spec.get("replicas", 0)
@@ -133,10 +143,12 @@ def renderHeader(dc):
     version = "<unknown-version>"
     containers = spec.get("template", {}).get("spec", {}).get("containers", [])
     for container in containers:
-        if dc == "jenkins-dev-operator":
+        if  "jenkins-dev-operator" in name:
             container_name = "jenkins-operator"
-        elif dc == "deck-internal":
+        elif "deck-internal" in name:
             container_name = "deck"
+        elif len(containers) == 1:
+            container_name = container.get("name", "")
         else:
             container_name = dc
         if container.get("name") == container_name:
