@@ -1,6 +1,21 @@
 kind: List
 apiVersion: v1
 items:
+- kind: ImageStream
+  apiVersion: image.openshift.io/v1
+  metadata:
+    name: result-aggregator
+    namespace: ci
+  spec:
+    lookupPolicy:
+      local: true
+    tags:
+    - name: latest
+      importPolicy:
+        scheduled: true
+      from:
+        kind: DockerImage
+        name: registry.svc.ci.openshift.org/ci/result-aggregator
 - apiVersion: v1
   kind: Service
   metadata:
@@ -21,7 +36,7 @@ items:
       targetPort: metrics
     selector:
       app: prow
-      component: result-aggregator  
+      component: result-aggregator
 - apiVersion: route.openshift.io/v1
   kind: Route
   metadata:
