@@ -85,6 +85,57 @@ periodics:
           path: kubeconfig
         secretName: build-farm-credentials
 - agent: kubernetes
+  cluster: app.ci
+  cron: 30 7 * * 1
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-acme-cert-issuer-for-appci
+  spec:
+    containers:
+    - args:
+      - -c
+      - |
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+        oc whoami
+        oc project
+        export CLOUDSDK_CONFIG=/tmp/gcloudconfig
+        mkdir -p "${CLOUDSDK_CONFIG}"
+        gcloud auth activate-service-account --key-file="${GOOGLE_APPLICATION_CREDENTIALS}"
+        /acme/acme.sh --version
+        /acme/acme.sh --issue --dns dns_gcloud -d 'prow.ci.openshift.com' --home /data --dnssleep 60 --fullchain-file /data/prow.fullchain.cer --key-file /data/prow.key --force
+        ls -al /data
+        oc -n ci create secret tls prow-cert --cert=/data/prow.fullchain.cer --key=/data/prow.key --dry-run -o yaml | oc -n ci apply -f -
+      command:
+      - /bin/bash
+      env:
+      - name: GOOGLE_APPLICATION_CREDENTIALS
+        value: /gcp/service-account.json
+      image: registry.svc.ci.openshift.org/ci/ca-cert-issuer:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /data
+        name: data
+      - mountPath: /gcp
+        name: cluster-secrets-gcp
+    serviceAccountName: cert-issuer
+    automountServiceAccountToken: true
+    volumes:
+    - emptyDir: {}
+      name: data
+    - name: cluster-secrets-gcp
+      secret:
+        items:
+        - key: service-account.json
+          path: service-account.json
+        secretName: gce-sa-credentials-gcs-publisher
+- agent: kubernetes
   cluster: build01
   cron: 30 7 * * *
   decorate: true
