@@ -33,10 +33,16 @@ resources:
       memory: 200Mi
 tests:
 - as: unit
-  commands: USE_VENDORIZED_BUILD_HARNESS=true GOPROXY="proxy.golang.org,direct" make
-    test
+  commands: GOPROXY="proxy.golang.org,direct" make test
   container:
     from: src
+- as: sonar
+  commands: make sonar/go
+  container:
+    from: src
+  secrets:
+  - mount_path: '/etc/sonarcloud/'
+    name: 'acm-sonarcloud-token'
 zz_generated_metadata:
   branch: openshiftci
   org: open-cluster-management
