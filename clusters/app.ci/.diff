@@ -1210,8 +1210,83 @@ index 5fc8db0..61e3f4d 100644
          containers:
          - name: exporter
            image: gcr.io/k8s-prow/exporter:v20200508-fc2946b9d
+diff --git a/./core-services/prow/03_deployment/gcsweb-redirect.yaml b/./core-services/prow/03_deployment/gcsweb-redirect.yaml
+deleted file mode 100644
+index 413c528..0000000
+--- a/./core-services/prow/03_deployment/gcsweb-redirect.yaml
++++ /dev/null
+@@ -1,69 +0,0 @@
+-apiVersion: v1
+-kind: ConfigMap
+-metadata:
+-  name: gcsweb-redirect-config
+-  namespace: ci
+-data:
+-  "default.conf": |
+-    server {
+-      listen 8080;
+-      return 302 $scheme://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com$request_uri;
+-    }
+----
+-apiVersion: apps/v1
+-kind: Deployment
+-metadata:
+-  labels:
+-    app: gcsweb-redirect
+-  name: gcsweb-redirect
+-  namespace: ci
+-spec:
+-  replicas: 2
+-  selector:
+-    matchLabels:
+-      component: gcsweb-redirect
+-  template:
+-    metadata:
+-      labels:
+-        app: prow
+-        component: gcsweb-redirect
+-    spec:
+-      affinity:
+-        podAntiAffinity:
+-          requiredDuringSchedulingIgnoredDuringExecution:
+-          - labelSelector:
+-              matchExpressions:
+-              - key: component
+-                operator: In
+-                values:
+-                - gcsweb-redirect
+-            topologyKey: "kubernetes.io/hostname"
+-      containers:
+-      - image: nginxinc/nginx-unprivileged:1.17
+-        name: nginx
+-        volumeMounts:
+-        - name: config
+-          mountPath: /etc/nginx/conf.d
+-      volumes:
+-      - name: config
+-        configMap:
+-          name: gcsweb-redirect-config
+----
+-apiVersion: v1
+-kind: Service
+-metadata:
+-  labels:
+-    app: prow
+-    component: gcsweb-redirect
+-  name: gcsweb-redirect
+-  namespace: ci
+-spec:
+-  ports:
+-  - name: main
+-    port: 80
+-    protocol: TCP
+-    targetPort: 8080
+-  selector:
+-    component: gcsweb-redirect
+-  sessionAffinity: None
+-  type: ClusterIP
 diff --git a/./core-services/prow/03_deployment/gcsweb.yaml b/./clusters/app.ci/prow/03_deployment/gcsweb.yaml
-index e77435d..42e71e6 100644
+index ce7ceca..42e71e6 100644
 --- a/./core-services/prow/03_deployment/gcsweb.yaml
 +++ b/./clusters/app.ci/prow/03_deployment/gcsweb.yaml
 @@ -1,8 +1,8 @@
@@ -1255,6 +1330,15 @@ index e77435d..42e71e6 100644
      type: ClusterIP
      sessionAffinity: None
  - kind: Route
+@@ -58,7 +58,7 @@ items:
+   spec:
+     to:
+       kind: Service
+-      name: gcsweb-redirect
++      name: gcsweb
+     tls:
+       termination: edge
+       insecureEdgeTerminationPolicy: Redirect
 diff --git a/./core-services/prow/03_deployment/ghproxy.yaml b/./clusters/app.ci/prow/03_deployment/ghproxy.yaml
 index c782815..eaccdd8 100644
 --- a/./core-services/prow/03_deployment/ghproxy.yaml
