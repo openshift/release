@@ -34,6 +34,8 @@ parameters:
   required: true
 - name: CUSTOM_IMAGE_OPENSTACK_INSTALLER
   required: true
+- name: OPENSHIFT_VERSION
+  required: true
 
 objects:
 
@@ -387,9 +389,12 @@ objects:
         /tmp/openstack_cmd.py /tmp/artifacts/openstack_cmd.out openstack floating ip create --description $CLUSTER_NAME $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address'
         LB_FIP=$(cat /tmp/artifacts/openstack_cmd.out)
 
+        echo "OPENSHIFT_VERSION=${OPENSHIFT_VERSION}"
+        [ -z "${OPENSHIFT_VERSION}" ] && exit 1
+
         echo "Creating DNS record for api.${CLUSTER_NAME}.${BASE_DOMAIN} -> ${LB_FIP}"
         # create A record for the api
-        curl -v https://sshd.bastion-ppc64le:13053/add -d '{"cluster_name": "'${CLUSTER_NAME}.${BASE_DOMAIN}'", "lb43_fip": "'$LB_FIP'"}'
+        curl -v https://sshd.bastion-ppc64le:13053/add -d '{"cluster_name": "'${CLUSTER_NAME}.${BASE_DOMAIN}'", "lb'${OPENSHIFT_VERSION}'_fip": "'$LB_FIP'"}'
 
         cat > /tmp/artifacts/installer/install-config.yaml << EOF
         apiVersion: v1beta4
@@ -485,7 +490,7 @@ objects:
 
                 echo "Creating DNS record for *.apps.${CLUSTER_NAME}.${BASE_DOMAIN} -> $APPS_FIP"
                 # create A record for *.apps
-                curl -v https://sshd.bastion-ppc64le:13053/add -d '{"cluster_name": "'${CLUSTER_NAME}.${BASE_DOMAIN}'", "apps43_fip": "'$APPS_FIP'"}'
+                curl -v https://sshd.bastion-ppc64le:13053/add -d '{"cluster_name": "'${CLUSTER_NAME}.${BASE_DOMAIN}'", "apps'${OPENSHIFT_VERSION}'_fip": "'$APPS_FIP'"}'
         else
                 echo "Failed to discover one ingress port"
                 exit 1
@@ -668,9 +673,12 @@ objects:
           echo "Waiting for logs ..."
           wait
 
+          echo "OPENSHIFT_VERSION=${OPENSHIFT_VERSION}"
+          [ -z "${OPENSHIFT_VERSION}" ] && exit 1
+
           echo "Removing entries from DNS ..."
-          curl -v https://sshd.bastion-ppc64le:13053/remove -d '{"cluster_name": "'${CLUSTER_NAME}.${BASE_DOMAIN}'", "lb43_fip": ""}'
-          curl -v https://sshd.bastion-ppc64le:13053/remove -d '{"cluster_name": "'${CLUSTER_NAME}.${BASE_DOMAIN}'", "apps43_fip": ""}'
+          curl -v https://sshd.bastion-ppc64le:13053/remove -d '{"cluster_name": "'${CLUSTER_NAME}.${BASE_DOMAIN}'", "lb'${OPENSHIFT_VERSION}'_fip": ""}'
+          curl -v https://sshd.bastion-ppc64le:13053/remove -d '{"cluster_name": "'${CLUSTER_NAME}.${BASE_DOMAIN}'", "apps'${OPENSHIFT_VERSION}'_fip": ""}'
 
           echo "Deleting service VM FIP ..."
           openstack floating ip list --long -f csv -c Description -c "Floating IP Address" | grep $CLUSTER_NAME | cut -f1 -d "," | xargs openstack floating ip delete
