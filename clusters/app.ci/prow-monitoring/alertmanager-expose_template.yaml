@@ -1,5 +1,7 @@
 apiVersion: template.openshift.io/v1
 kind: Template
+metadata:
+  name: alertmanager-expose
 parameters:
 - description: The session secret for the component.
   name: SESSION_SECRET
@@ -13,37 +15,35 @@ objects:
   kind: Service
   metadata:
     annotations:
-      service.alpha.openshift.io/serving-cert-secret-name: prometheus-tls
+      service.alpha.openshift.io/serving-cert-secret-name: alertmanager-tls
     labels:
-      app: prometheus
-    name: prometheus
+      app: alertmanager
+    name: alertmanager
     namespace: ${PROW_MONITORING_NAMESPACE}
   spec:
     ports:
-    - name: http
-      port: 9090
+    - name: web
+      port: 9093
       protocol: TCP
-      targetPort: 9090
+      targetPort: 9093
     - name: https
-      port: 9091
+      port: 9094
       protocol: TCP
-      targetPort: 9091
+      targetPort: 9094
     selector:
-      app: prometheus
-    sessionAffinity: ClientIP
-    type: ClusterIP
+      alertmanager: prow
+      app: alertmanager
 - apiVersion: v1
   kind: Route
   metadata:
-    name: prometheus
+    name: alertmanager
     namespace: ${PROW_MONITORING_NAMESPACE}
   spec:
     port:
-      targetPort: 9091
+      targetPort: https
     to:
       kind: Service
-      name: prometheus
-    wildcardPolicy: None
+      name: alertmanager
     tls:
       insecureEdgeTerminationPolicy: Redirect
       termination: Reencrypt
@@ -51,8 +51,8 @@ objects:
   kind: Secret
   metadata:
     labels:
-      k8s-app: prometheus
-    name: prometheus-proxy
+      k8s-app: alertmanager
+    name: alertmanager-proxy
     namespace: ${PROW_MONITORING_NAMESPACE}
   stringData:
     session_secret: "${SESSION_SECRET}="

@@ -3,19 +3,23 @@ SHELL=/usr/bin/env bash -o pipefail
 
 dashboards = build_cop boskos boskos_http canary configresolver deck e2e_template_jobs dptp ghproxy hook jenkins_operator osde2e plank prow sinker tide
 
-all: $(dashboards) prometheus_rule_prow.yaml alertmanager.yaml
+all: $(dashboards) prometheus-prow-rules_prometheusrule.yaml alertmanager-prow-secret_template.yaml
 
 $(dashboards):
 	@echo "Generating $@.json ..."
-	jsonnet -J vendor/ grafana_dashboards/$@.jsonnet > ./grafana_dashboards_out/$@.json
+	jsonnet -J vendor/ _grafana_dashboards/$@.jsonnet > ./_grafana_dashboards_out/$@.json
 
-prometheus_rule_prow.yaml:
-	@echo "Generating prometheus_rule_prow.yaml ..."
-	jsonnet  ./prometheus/prometheus_rule_prow.jsonnet | gojsontoyaml > ./prometheus_out/$@
+prometheus-prow-rules_prometheusrule.yaml:
+	@echo "Generating prometheus-prow-rules_prometheusrule.yaml ..."
+	jsonnet  ./_prometheus/prometheus_rule_prow.jsonnet | gojsontoyaml > ./prometheus_out/$@
 
 alertmanager.yaml:
 	@echo "Generating alertmanager.yaml ..."
-	jsonnet  ./prometheus/alertmanager.jsonnet | gojsontoyaml > ./prometheus_out/$@
+	jsonnet  ./_prometheus/alertmanager.jsonnet | gojsontoyaml > ./prometheus_out/_$@
+
+alertmanager-prow-secret_template.yaml: alertmanager.yaml
+	@echo "Generating alertmanager-prow-secret_template.yaml ..."
+	jsonnet  ./_prometheus/alertmanager-prow_secret.jsonnet | gojsontoyaml > ./prometheus_out/$@
 
 clean:
 	rm -rfv ./vendor
