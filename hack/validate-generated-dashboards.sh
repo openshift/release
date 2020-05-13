@@ -11,6 +11,6 @@ if [[ ! -d "${base_dir}" ]]; then
   exit 1
 fi
 
-mixins_dir="${base_dir}/cluster/ci/monitoring/mixins"
+mixins_dir="${base_dir}/clusters/app.ci/prow-monitoring/mixins"
 
 make -C "${mixins_dir}" validate-latest
