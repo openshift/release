@@ -127,9 +127,7 @@ metadata:
     app: dptp-controller-manager
   name: dptp-controller-manager
 spec:
-  # TODO: Scale up when the cluster is migrated. Right now we would exhaust github
-  # tokens
-  replicas: 0
+  replicas: 1
   selector:
     matchLabels:
       app: dptp-controller-manager
@@ -144,15 +142,15 @@ spec:
         name: dptp-controller-manager
         args:
         - --leader-election-namespace=ci
-        - --imagestreamtagreconciler.ignored-github-organization=openshift-priv
+        - --promotionreconcilerOptions.ignored-github-organization=openshift-priv
         - --config-path=/etc/config/config.yaml
         - --job-config-path=/etc/job-config
         - --ci-operator-config-path=/etc/configs
         - --github-endpoint=http://ghproxy
         - --github-endpoint=https://api.github.com
         - --registry-cluster-kubeconfig=/var/kubeconfigs/api-ci-kubeconfig
-        # TODO: Change to etc/github/oauth after migration
-        - --github-token-path=/dev/null
+        - --github-token-path=/etc/github/oauth
+        - --dry-run=false
         ports:
         - name: metrics
           containerPort: 8080
@@ -296,4 +294,3 @@ spec:
       - name: job-config-47
         configMap:
           name: job-config-4.7
-
