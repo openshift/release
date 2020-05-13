@@ -4,6 +4,16 @@ base_images:
     name: "4.3"
     namespace: ocp
     tag: base
+  knative-serving-src:
+    cluster: https://api.ci.openshift.org
+    name: pipeline
+    namespace: ci-op-r4wps7hl
+    tag: knative-serving-src
+  cli:
+    cluster: https://api.ci.openshift.org
+    name: "4.3"
+    namespace: ocp
+    tag: cli
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
@@ -28,9 +38,20 @@ tag_specification:
   namespace: ocp
 tests:
 - as: e2e-aws-ocp-43
-  commands: make test-e2e
-  openshift_installer_src:
-    cluster_profile: aws
+  steps:
+    pre:
+    - ref: ipi-conf-aws
+    - chain: ipi-install
+    test:
+    - ref:
+        as: serverless-operator-e2e-test
+        from: serverless-operator-src
+        commands: make test-e2e
+        documentation: |-
+          The Serverless Operator E2E tests.
+    - ref: knative-serving-e2e-test
+    post:
+    - chain: ipi-deprovision
 - as: e2e-aws-ocp-43-continuous
   commands: make test-e2e
   cron: 0 */6 * * *
