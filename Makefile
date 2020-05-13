@@ -276,12 +276,7 @@ ci-secret-bootstrap:
 .PHONY: ci-secret-bootstrap
 
 verify-app-ci:
-	@./hack/verify-app-ci.sh
-.PHONY: verify-app-ci
-
-update-app-ci:
-	@update=true ./hack/verify-app-ci.sh
-.PHONY: update-app-ci
+	true
 
 mixins:
 	$(CONTAINER_ENGINE) run --user=$(UID) --rm -v "$(CURDIR):/release:z" registry.svc.ci.openshift.org/ci/dashboards-validation:latest make -C /release/cluster/ci/monitoring/mixins install all
