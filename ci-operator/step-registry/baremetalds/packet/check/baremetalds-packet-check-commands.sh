@@ -24,28 +24,33 @@ servers="$(curl -X GET --header 'Accept: application/json' --header "X-Auth-Toke
 #Assuming all servers created more than 4 hours = 14400 sec ago are leaks
 leaks="$(echo "$servers" | jq -r '.devices[]|select((now-(.created_at|fromdate))>14400)')"
 
-leaks_report="$(echo "$leaks" | jq --tab  '.hostname,.id,.created_at,.tags'|sed 's/\"/ /g')"
+leak_report="$(echo "$leaks" | jq --tab  '.hostname,.id,.created_at,.tags'|sed 's/\"/ /g')"
 leak_ids="$(echo "$leaks" | jq -c '.id'|sed 's/\"//g')"
+leak_servers="$(echo "$leaks" | jq -c '.hostname'|sed 's/\"//g')"
 leak_num="$(echo "$leak_ids" | wc -w)"
+
+leak_report="${leak_report}\nProw job references per leaked server:" 
+for server in $leak_servers
+do
+  leak_report="${leak_report}\n<https://search.apps.build01.ci.devcluster.openshift.com/?search=$server&maxAge=48h&context=-1&type=build-log|$server>"
+done
 set -x
 
 echo "New Packet.net server leaks total: $leak_num."
-
+set +x
 if [[ -n "$leaks" ]]
 then
-    echo "************ delete e2e-metal-ipi leaked servers and send slack notification ************"
-    echo -e "Discovered leaks info:\n $leaks_report"
-    set +x
+    #send slack notification and delete e2e-metal-ipi leaked servers 
     curl -X POST --data-urlencode\
-     "payload={\"text\":\"New Packet.net server leaks total: $leak_num. Deleting the following:\n\",\"attachments\":[{\"color\":\"warning\",\"text\":\"$leaks_report\"}]}"\
+     "payload={\"text\":\"New Packet.net server leaks total: $leak_num. Deleting the following:\n\",\"attachments\":[{\"color\":\"warning\",\"text\":\"$leak_report\"}]}"\
       https://hooks.slack.com/services/T027F3GAJ/B011TAG710V/${SLACK_AUTH_TOKEN}
     
     #delete leaks
     for leak in $leak_ids
     do
-        echo $leak    
+        #echo $leak    
         curl -X DELETE --header 'Accept: application/json' --header "X-Auth-Token: ${PACKET_AUTH_TOKEN}"\
          "https://api.packet.net/devices/$leak"
     done
-    set -x
 fi
+set -x
