@@ -17,6 +17,7 @@ cat > packet-teardown.yaml <<-EOF
   gather_facts: no
   vars:
     - cluster_type: "{{ lookup('env', 'CLUSTER_TYPE') }}"
+    - slackhook_path: "{{ lookup('env', 'CLUSTER_PROFILE_DIR') }}"
   vars_files:
     - "{{ lookup('env', 'CLUSTER_PROFILE_DIR') }}/.packet-kni-vars"
   tasks:
@@ -32,7 +33,17 @@ cat > packet-teardown.yaml <<-EOF
       project_id: "{{ packet_project_id }}"
       hostnames: "{{ packet_hostname }}" 
       state: absent
+    register: hosts
     no_log: true    
+
+  - name: Send notification message via Slack in case of failure
+    slack:
+      token: "{{ 'T027F3GAJ/B011TAG710V/' + lookup('file', slackhook_path + '/.slackhook') }}"
+      msg: 'Packet teardown failed: {{ hosts }}'
+      color: warning
+      icon_emoji: ":failed:"
+    when: hosts.failed == "true"
+    no_log: true
 EOF
 
 ansible-playbook packet-teardown.yaml -e "packet_hostname=ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}"
