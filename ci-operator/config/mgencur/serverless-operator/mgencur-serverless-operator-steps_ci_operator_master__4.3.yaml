@@ -7,7 +7,7 @@ base_images:
   knative-serving-src:
     cluster: https://api.ci.openshift.org
     name: pipeline
-    namespace: ci-op-14kn8xyc
+    namespace: ci-op-vkdxs923
     tag: knative-serving-src
   cli:
     cluster: https://api.ci.openshift.org
@@ -63,7 +63,17 @@ tests:
           memory: 4Gi
       documentation: |-
         The Serverless Operator E2E tests.
-    - ref: knative-serving-e2e-test
+    - as: knative-serving-e2e-test
+      from: knative-serving-src
+      commands: make TEST_IMAGE_TEMPLATE=registry.svc.ci.openshift.org/openshift/knative-v0.13.2:knative-serving-test-{{.Name}} test-e2e-no-install
+      resources:
+        requests:
+          cpu: 500m
+          memory: 500Mi
+        limits:
+          memory: 4Gi
+      documentation: |-
+        The Knative Serving E2E and Conformance tests.
     post:
     - chain: ipi-aws-post
 - as: e2e-aws-ocp-43-continuous
