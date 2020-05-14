@@ -1,0 +1,115 @@
+periodics:
+- agent: kubernetes
+  cluster: api.ci
+  cron: 2 3 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: release-4.5
+    org: kubevirt
+    repo: hyperconverged-cluster-operator
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-kubevirt-hyperconverged-cluster-operator-release-4.5-hco-e2e-nightly-bundle-release-4-5-azure4
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/usr/local/hco-e2e-nightly-bundle-release-4-5-azure4-cluster-profile
+      - --target=hco-e2e-nightly-bundle-release-4-5-azure4
+      - --template=/usr/local/hco-e2e-nightly-bundle-release-4-5-azure4
+      command:
+      - ci-operator
+      env:
+      - name: CLUSTER_TYPE
+        value: azure4
+      - name: JOB_NAME_SAFE
+        value: hco-e2e-nightly-bundle-release-4-5-azure4
+      - name: TEST_COMMAND
+        value: |
+          set -e
+
+          ARTIFACTS_DIR=/tmp/artifacts
+          echo "Fetching quay secret"
+          auth_file=/tmp/openshift-cnv-auth.json
+          oc get secret/pull-secret -n openshift-config -o=jsonpath='{.data.\.dockerconfigjson}' | \
+              base64 -w0 -d |
+              jq 'map({"auths":{"quay.io/openshift-cnv"}})| .[]' -cM > "$auth_file"
+
+          echo "Generating debug info"
+          bundle_floating=quay.io/openshift-cnv/container-native-virtualization-hco-bundle-registry:2.4-latest
+          bundle_under_test="$(skopeo inspect --authfile "$auth_file" "docker://${bundle_floating}" | jq -r '.Name + "@" + .Digest')"
+          echo "$bundle_under_test" > "${ARTIFACTS_DIR}/bundle_under_test.txt"
+
+          set -x
+          echo "Deploying test infra"
+          oc create ns openshift-cnv
+          oc create -f /kubevirt-testing-infra.yaml
+
+          echo "Deploying nightly bundle"
+          export HCO_REGISTRY_IMAGE="${bundle_under_test}"
+          export HCO_VERSION=2.4.0
+          export HCO_CHANNEL=2.4
+          export TARGET_NAMESPACE=openshift-cnv
+          /deploy.sh
+
+          tests_filter="(Slirp Networking)|(with CPU spec)|(with TX offload disabled)|(with cni flannel and ptp plugin interface)|(with ovs-cni plugin)|(test_id:1752)|(SRIOV)|(with EFI)|(Operator)|(GPU)|(DataVolume Integration)|(test_id:3468)|(test_id:3466)|(test_id:1015)|(rfe_id:393)"
+          operator_image="$(oc get pod -n openshift-cnv -l kubevirt.io=virt-operator --no-headers -o=jsonpath='{.items[0].spec.containers[0].image}')"
+          test_pod_override="$(sed -e "s|@OPERATOR_IMAGE_URL@|${operator_image}|g" -e "s/@GINKGO_TESTS_TO_SKIP@/${tests_filter}/g" -e "s/@NAMESPACE@/${TARGET_NAMESPACE}/g" /kubevirt-tests-pod-spec-override.json.in)"
+          oc -n openshift-cnv run -i tests-runner --image=dummy --overrides="$test_pod_override" --restart=Never
+          echo "Test is finished"
+
+          echo "Tagging tested bundle"
+          TARGET_BUNDLE_REGISTRY=quay.io/openshift-cnv/container-native-virtualization-hco-bundle-registry-tested
+          skopeo copy --authfile "$auth_file" "docker://${bundle_under_test}" "docker://${TARGET_BUNDLE_REGISTRY}:4.5-tested"
+          echo "Nightly bundle test is finished."
+      - name: TEST_IMAGESTREAM_TAG
+        value: pipeline:nightly-bundle-tests-runner
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/hco-e2e-nightly-bundle-release-4-5-azure4-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/hco-e2e-nightly-bundle-release-4-5-azure4
+        name: job-definition
+        subPath: cluster-launch-installer-custom-test-image.yaml
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-azure4
+    - configMap:
+        name: prow-job-cluster-launch-installer-custom-test-image
+      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
