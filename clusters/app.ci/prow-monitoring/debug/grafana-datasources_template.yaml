@@ -1,0 +1,40 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: grafana-datasources
+parameters:
+- description: OPENSHIFT Prometheus Password
+  name: OPENSHIFT_PROMETHEUS_PASSWORD
+  required: true
+- description: prow monitoring stage namespace
+  name: PROW_MONITORING_STAGE_NAMESPACE
+  value: prow-monitoring-stage
+objects:
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: grafana-datasources
+    namespace: ${PROW_MONITORING_STAGE_NAMESPACE}
+  data:
+    'datasources.yaml': |-
+      apiVersion: 1
+      datasources:
+      - name: prometheus
+        type: prometheus
+        access: proxy
+        url: http://querier-cache.prow-monitoring.svc:9090
+        version: 1
+        orgId: 1
+        editable: false
+      - name: prometheus-k8s
+        access: proxy
+        basicAuth: true
+        basicAuthPassword: ${OPENSHIFT_PROMETHEUS_PASSWORD}
+        basicAuthUser: internal
+        editable: false
+        jsonData:
+          tlsSkipVerify: true
+        orgId: 1
+        type: prometheus
+        url: https://prometheus-k8s.openshift-monitoring.svc:9091
+        version: 1
