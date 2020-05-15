@@ -26,7 +26,6 @@ def main():
         validate_job_repo,
         validate_names,
         validate_sharding,
-        validate_ci_op_args,
         validate_pod_name,
         validate_resources,
     )
@@ -230,41 +229,6 @@ def validate_pod_name(path, data):
                     print("ERROR: {}: ci-operator job {} should not set a pod name".format(path, job["name"]))
                     out = False
                     continue
-
-    return out
-
-def validate_ci_op_args(path, data):
-    out = True
-    for job_type in data:
-        if job_type == "periodics":
-            continue
-
-        for repo in data[job_type]:
-            for job in data[job_type][repo]:
-                if job["agent"] != "kubernetes":
-                    continue
-
-                if not "command" in job["spec"]["containers"][0].keys():
-                    continue
-
-                if job["spec"]["containers"][0]["command"][0] != "ci-operator":
-                    continue
-
-                for needed_arg in ["--give-pr-author-access-to-namespace=true", "--artifact-dir=$(ARTIFACTS)"]:
-                    found = False
-                    if "args" in job["spec"]["containers"][0]:
-                        for arg in job["spec"]["containers"][0]["args"]:
-                            if arg == needed_arg:
-                                found = True
-
-                    else:
-                        for arg in job["spec"]["containers"][0]["command"][1:]:
-                            if arg == needed_arg:
-                                found = True
-
-                    if not found:
-                        print("ERROR: {}: job {} needs to set the {} flag for ci-operator".format(path, job["name"], needed_arg))
-                        out = False
 
     return out
 
