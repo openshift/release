@@ -1,0 +1,104 @@
+base_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: "4.3"
+    namespace: ocp
+    tag: base
+  knative-serving-src:
+    cluster: https://api.ci.openshift.org
+    name: pipeline # TODO: change this when knative-serving-src is published
+    namespace: ci-op-gvcn0b8j # TODO: change this when knative-serving-src is published
+    tag: knative-serving-src
+  cli:
+    cluster: https://api.ci.openshift.org
+    name: "4.3"
+    namespace: ocp
+    tag: cli
+build_root:
+  project_image:
+    dockerfile_path: openshift/ci-operator/build-image/Dockerfile
+canonical_go_repository: github.com/openshift-knative/serverless-operator
+images:
+- context_dir: openshift/ci-operator/source-image
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+    knative-serving-src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/knative.dev/serving
+  to: serverless-operator-src
+- context_dir: serving/ingress
+  from: base
+  to: knative-openshift-ingress
+- context_dir: knative-operator
+  from: base
+  to: knative-operator
+promotion:
+  name: openshift-serverless-nightly
+  namespace: openshift
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: "4.3"
+  namespace: ocp
+tests:
+- as: e2e-aws-ocp-43
+  steps:
+    cluster_profile: aws
+    workflow: origin-e2e-aws
+    pre:
+    - chain: ipi-aws-pre
+    test:
+    - as: serverless-e2e
+      from: serverless-operator-src
+      commands: make test-e2e
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    post:
+    - chain: ipi-aws-post
+- as: e2e-aws-ocp-43-continuous
+  steps:
+    cluster_profile: aws
+    pre:
+    - chain: ipi-aws-pre
+    test:
+    - as: serverless-e2e
+      from: serverless-operator-src
+      commands: make test-e2e
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    post:
+    - chain: ipi-aws-post
+  cron: 0 */6 * * *
+- as: upgrade-tests-aws-ocp-43
+  steps:
+    cluster_profile: aws
+    pre:
+    - chain: ipi-aws-pre
+    test:
+    - as: serverless-e2e
+      from: serverless-operator-src
+      commands: make test-upgrade
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    post:
+    - chain: ipi-aws-post
+zz_generated_metadata:
+  branch: reuse_knative_serving_src_sourcing
+  org: mgencur
+  repo: serverless-operator
+  variant: "4.3"
