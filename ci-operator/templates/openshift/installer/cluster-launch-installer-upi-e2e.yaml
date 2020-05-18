@@ -1202,7 +1202,6 @@ objects:
             password: "${VSPHERE_PASSWORD}"
             datacenter: dc1
             defaultDatastore: nvme-ds1
-            folder: "/dc1/vm/${CLUSTER_NAME}"
         pullSecret: >
           ${PULL_SECRET}
         sshKey: |
@@ -1916,6 +1915,9 @@ objects:
           export MASTER_IGN=$(cat /tmp/artifacts/installer/master.ign)
           export WORKER_IGN=$(cat /tmp/artifacts/installer/worker.ign)
 
+          # Read infra id from metadata.json
+          VSPHERE_INFRA_ID="$(jq -r .infraID /tmp/artifacts/installer/metadata.json)"
+
           cat > /tmp/tf/terraform.tfvars <<-EOF
           machine_cidr = "139.178.87.128/25"
 
@@ -1931,7 +1933,7 @@ objects:
 
           ipam = "139.178.89.254"
 
-          cluster_id = "${CLUSTER_NAME}"
+          cluster_id = "${VSPHERE_INFRA_ID}"
 
           base_domain = "${base_domain}"
 
