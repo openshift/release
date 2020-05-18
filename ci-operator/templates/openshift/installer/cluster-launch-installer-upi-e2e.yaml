@@ -2395,6 +2395,14 @@ objects:
               INFRA_ID="$(jq -r .infraID /tmp/artifacts/installer/metadata.json)"
               az group delete --name ${INFRA_ID}-rg --yes
             fi
+          elif [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
+            cd /tmp/shared/tf
+            rm -rf .terraform
+            terraform init -input=false -no-color
+            # In some instances either the IPAM records or AWS DNS records
+            # are removed before teardown is executed causing terraform destroy
+            # to fail - this is causing resource leaks. Do not refresh the state.
+            terraform destroy -refresh=false -auto-approve -no-color
           else
             cd /tmp/shared/tf
             rm -rf .terraform
