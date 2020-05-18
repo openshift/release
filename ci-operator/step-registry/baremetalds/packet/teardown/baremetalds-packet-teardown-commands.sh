@@ -27,23 +27,28 @@ cat > packet-teardown.yaml <<-EOF
       msg: "Unsupported CLUSTER_TYPE '{{ cluster_type }}'"
     when: cluster_type != "packet"
 
-  - name: remove Packet host {{ packet_hostname }}
-    packet_device:
-      auth_token: "{{ packet_auth_token }}"
-      project_id: "{{ packet_project_id }}"
-      hostnames: "{{ packet_hostname }}" 
-      state: absent
-    register: hosts
-    no_log: true    
-
-  - name: Send notification message via Slack in case of failure
-    slack:
-      token: "{{ 'T027F3GAJ/B011TAG710V/' + lookup('file', slackhook_path + '/.slackhook') }}"
-      msg: 'Packet teardown failed: {{ hosts }}'
-      color: warning
-      icon_emoji: ":failed:"
-    when: hosts.failed == "true"
-    no_log: true
+  - name: remove Packet host with error handling
+    block:
+    - name: remove Packet host {{ packet_hostname }}
+      packet_device:
+        auth_token: "{{ packet_auth_token }}"
+        project_id: "{{ packet_project_id }}"
+        hostnames: "{{ packet_hostname }}" 
+        state: absent
+      register: hosts
+      no_log: true
+    rescue:
+    - name: Send notification message via Slack in case of failure
+      slack:
+        token: "{{ 'T027F3GAJ/B011TAG710V/' + lookup('file', slackhook_path + '/.slackhook') }}"
+        msg: 'Packet teardown failed: {{ ansible_failed_result }}'
+        username: 'Ansible on {{ inventory_hostname }}'
+        channel: "#team-edge-installer"
+        color: warning
+        icon_emoji: ":failed:"
+    - name: fail the play
+      fail:
+        msg: "Packet teardown failed."
 EOF
 
 ansible-playbook packet-teardown.yaml -e "packet_hostname=ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}"

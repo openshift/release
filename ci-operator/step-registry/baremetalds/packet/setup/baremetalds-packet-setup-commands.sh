@@ -28,35 +28,39 @@ cat > packet-setup.yaml <<-EOF
       msg: "Unsupported CLUSTER_TYPE '{{ cluster_type }}'"
     when: cluster_type != "packet"
 
-  - name: create Packet host {{ packet_hostname }}
-    packet_device:
-      auth_token: "{{ packet_auth_token }}"
-      project_id: "{{ packet_project_id }}"
-      hostnames: "{{ packet_hostname }}"
-      operating_system: centos_8
-      plan: c3.medium.x86
-      facility: sjc1
-      wait_for_public_IPv: 4
-      state: active
-    register: hosts
-    no_log: true
-
-  - name: Send notification message via Slack in case of failure
-    slack:
-      token: "{{ 'T027F3GAJ/B011TAG710V/' + lookup('file', slackhook_path + '/.slackhook') }}"
-      msg: 'Packet setup failed: {{ hosts }}'
-      color: warning
-      icon_emoji: ":failed:"
-    when: hosts.failed == "true"
-    no_log: true
-
-  - name: wait for ssh
-    wait_for:
-      delay: 5
-      host: "{{ hosts.devices[0].public_ipv4 }}"
-      port: 22
-      state: started
-      timeout: 500
+  - name: create Packet host with error handling
+    block:
+    - name: create Packet host {{ packet_hostname }}
+      packet_device:
+        auth_token: "{{ packet_auth_token }}"
+        project_id: "{{ packet_project_id }}"
+        hostnames: "{{ packet_hostname }}"
+        operating_system: centos_8
+        plan: c3.medium.x86
+        facility: sjc1
+        wait_for_public_IPv: 4
+        state: active
+      register: hosts
+      no_log: true
+    - name: wait for ssh
+      wait_for:
+        delay: 5
+        host: "{{ hosts.devices[0].public_ipv4 }}"
+        port: 22
+        state: started
+        timeout: 500
+    rescue:
+    - name: Send notification message via Slack in case of failure
+      slack:
+        token: "{{ 'T027F3GAJ/B011TAG710V/' + lookup('file', slackhook_path + '/.slackhook') }}"
+        msg: "Packet setup failed: {{ ansible_failed_result }}"
+        username: "Ansible on {{ inventory_hostname }}"
+        channel: "#team-edge-installer"
+        color: warning
+        icon_emoji: ":failed:"
+    - name: fail the play
+      fail:
+        msg: "Packet setup failed."
 
   - name: save Packet IP
     local_action: copy content="{{ hosts.devices[0].public_ipv4 }}" dest="{{ lookup('env', 'SHARED_DIR') }}/server-ip"
