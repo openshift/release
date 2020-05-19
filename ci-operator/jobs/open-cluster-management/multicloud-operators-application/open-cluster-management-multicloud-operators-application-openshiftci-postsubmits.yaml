@@ -53,3 +53,46 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+  - agent: kubernetes
+    branches:
+    - ^openshiftci$
+    cluster: api.ci
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    max_concurrency: 1
+    name: branch-ci-open-cluster-management-multicloud-operators-application-openshiftci-manifest
+    spec:
+      containers:
+      - command:
+        - ls -lR /build-harness
+        image: open-cluster-management/builder:go1.14-linux-amd64
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
