@@ -58,14 +58,15 @@ postsubmits:
     - ^openshiftci$
     cluster: api.ci
     decorate: true
-    decoration_config:
-      skip_cloning: true
-    max_concurrency: 1
-    name: branch-ci-open-cluster-management-multicloud-operators-application-openshiftci-manifest
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: branch-ci-open-cluster-management-multicloud-operators-application-openshiftci-sonar
     spec:
       containers:
-      - command:
-        - ls -lR /build-harness
+      - args:
+        - sonar/go/openshiftci
+        command:
+        - make
         image: open-cluster-management/builder:go1.14-linux-amd64
         imagePullPolicy: Always
         name: ""
@@ -73,26 +74,11 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
+        - mountPath: /etc/sonarcloud
+          name: acm-sonarcloud-token
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: apici-ci-operator-credentials
+      - name: acm-sonarcloud-token
         secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
+          secretName: acm-sonarcloud-token
