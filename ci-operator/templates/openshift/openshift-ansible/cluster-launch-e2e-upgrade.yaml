@@ -142,7 +142,11 @@ objects:
 
         function run-tests() {
           if which openshift-tests && [[ -n "${TEST_SUITE-}" ]]; then
+            openshift-tests run-resourcewatch &
+            rw_pid=$!
             openshift-tests run "${TEST_SUITE}" --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
+            kill $rw_pid
+            tar -cf ${ARTIFACT_DIR}/rw.tar /repository
             return 0
           fi
           # TODO: remove everything after this point once we fork templates by release - starting with 4.0
