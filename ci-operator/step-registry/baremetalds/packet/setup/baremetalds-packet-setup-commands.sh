@@ -36,7 +36,7 @@ cat > packet-setup.yaml <<-EOF
         project_id: "{{ packet_project_id }}"
         hostnames: "{{ packet_hostname }}"
         operating_system: centos_8
-        plan: c3.medium.x86
+        plan: m2.xlarge.x86
         facility: sjc1
         wait_for_public_IPv: 4
         state: active
@@ -48,7 +48,7 @@ cat > packet-setup.yaml <<-EOF
         host: "{{ hosts.devices[0].public_ipv4 }}"
         port: 22
         state: started
-        timeout: 500
+        timeout: 900
     rescue:
     - name: Send notification message via Slack in case of failure
       slack:
