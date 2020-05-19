@@ -13,6 +13,9 @@
       'periodic-ci-openshift-kni-cnf-features-deploy-master-cnf-e2e-gcp-periodic': {
         receiver: 'kni-cnf',
       },
+      'periodic-ci-openshift-kni-cnf-features-deploy-release-4.5-cnf-e2e-gcp-periodic': {
+        receiver: 'kni-cnf',
+      },
       'periodic-ci-openshift-kni-cnf-features-deploy-release-4.4-cnf-e2e-gcp-periodic': {
         receiver: 'kni-cnf',
       },
