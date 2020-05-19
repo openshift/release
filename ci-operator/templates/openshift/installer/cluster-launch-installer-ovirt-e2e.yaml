@@ -137,15 +137,23 @@ objects:
         boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" heartbeat --resource "${resource}" &
         heartbeats_pid=$!
 
+        resource1="$( boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" acquire --type "${lease_type}" --state "free" --target-state "leased" --timeout 150m )"
+        resource_name1="$(echo "${resource1}"|jq .name --raw-output)"
+        lease_path1="/etc/openshift-installer/${resource_name1}.json"
+        echo "[INFO] Lease acquired! at $(date --utc) Leased resource: ${resource1}"
+        echo "[INFO] Sending heartbeats to retain the lease ${resource_name1}"
+        boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" heartbeat --resource "${resource1}" &
+        heartbeats_pid1=$!
+
         #Saving parameters for the env
         cat > /tmp/shared/ovirt-lease.conf <<EOF
         OVIRT_APIVIP="$(extract_leases_info ovirt_apivip ${lease_path})"
         OVIRT_DNSVIP="$(extract_leases_info ovirt_dnsvip ${lease_path})"
         OVIRT_INGRESSVIP="$(extract_leases_info ovirt_ingressvip ${lease_path})"
-        WORKER_CPU="$(extract_leases_info worker_cpu ${lease_path})"
-        WORKER_MEM="$(extract_leases_info worker_mem ${lease_path})"
-        MASTER_CPU="$(extract_leases_info master_cpu ${lease_path})"
-        MASTER_MEM="$(extract_leases_info master_mem ${lease_path})"
+        WORKER_CPU="8"
+        WORKER_MEM="16384"
+        MASTER_CPU="8"
+        MASTER_MEM="16384"
         OCP_CLUSTER="$(extract_leases_info cluster_name ${lease_path})"
         OVIRT_ENGINE_CLUSTER_ID="$(extract_leases_info ovirt_engine_cluster_id ${lease_path})"
         OVIRT_ENGINE_TEMPLATE_NAME="$(extract_leases_info ovirt_engine_template_name ${lease_path})"
@@ -158,6 +166,11 @@ objects:
             kill -9 "${heartbeats_pid}"
             echo "[INFO] Releasing the lease on resouce ${resource_name}"
             boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" release --name "${resource_name}" --target-state "free"
+
+            echo "killing heartbeat process "${heartbeats_pid1}" at $(date --utc)"
+            kill -9 "${heartbeats_pid1}"
+            echo "[INFO] Releasing the lease on resouce ${resource_name1}"
+            boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" release --name "${resource_name1}" --target-state "free"
         }
 
         trap "release" EXIT
@@ -268,8 +281,10 @@ objects:
           # This can be used if we just want to check the installer exits 0
           echo "WARNING: No tests were run against the installed cluster"
         }
-
-        ${TEST_COMMAND}
+        # Debuging
+        oc get infrastructures.config.openshift.io -o yaml
+        openshift-tests run openshift/conformance/parallel --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
+        sleep 100m
 
     # Runs an install
     - name: setup
@@ -570,7 +585,7 @@ objects:
 
           #We set OVIRT_CONFIG and insert he path to the engine ca to the config file
           export OVIRT_CONFIG=/tmp/artifacts/installer/ovirt-config.yaml
-          curl -k -o "/tmp/artifacts/installer/ovirt-engine.ca" ${OVIRT_ENGINE_URL::-4}/services/pki-resource?resource=ca-certificate
+          curl -4 -k -o "/tmp/artifacts/installer/ovirt-engine.ca" ${OVIRT_ENGINE_URL::-4}/services/pki-resource?resource=ca-certificate
           sed 's|ovirt_cafile: ""|ovirt_cafile: /tmp/artifacts/installer/ovirt-engine.ca|' -i /tmp/artifacts/installer/ovirt-config.yaml
           echo "Destroy bootstrap ..."
           openshift-install --dir /tmp/artifacts/installer destroy bootstrap
