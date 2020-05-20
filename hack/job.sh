@@ -19,4 +19,4 @@ docker run \
     ${BASE_REF:+"--base-ref" "${BASE_REF}"} \
     ${arg:-} \
     --job "${1}" |
-    oc apply -f -
+    oc --context app.ci --namespace ci --as system:admin apply -f -
