@@ -37,7 +37,7 @@ cat > packet-setup.yaml <<-EOF
         hostnames: "{{ packet_hostname }}"
         operating_system: centos_8
         plan: m2.xlarge.x86
-        facility: sjc1
+        facility: any
         wait_for_public_IPv: 4
         state: active
       register: hosts
