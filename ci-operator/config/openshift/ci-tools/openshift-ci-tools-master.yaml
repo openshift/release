@@ -334,11 +334,20 @@ tests:
   commands: ARTIFACT_DIR=/tmp/artifacts make integration
   container:
     from: bin
-- artifact_dir: /tmp/artifacts
-  as: e2e
-  commands: ARTIFACT_DIR=/tmp/artifacts make e2e
-  container:
-    from: bin
+- as: e2e
+  steps:
+    test:
+    - as: e2e
+      commands: KUBECONFIG=/auth/kubeconfig make e2e
+      credentials:
+      - MountPath: /auth
+        Name: ci-operator
+        Namespace: test-credentials
+      from: bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - artifact_dir: /tmp/artifacts
   as: breaking-changes
   commands: ARTIFACT_DIR=/tmp/artifacts make check-breaking-changes
