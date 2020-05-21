@@ -33,7 +33,7 @@ cat > packet-teardown.yaml <<-EOF
       packet_device:
         auth_token: "{{ packet_auth_token }}"
         project_id: "{{ packet_project_id }}"
-        hostnames: "{{ packet_hostname }}" 
+        hostnames: "{{ packet_hostname }}"
         state: absent
       register: hosts
       no_log: true
