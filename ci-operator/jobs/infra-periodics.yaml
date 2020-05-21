@@ -660,6 +660,11 @@ periodics:
 - agent: kubernetes
   cluster: api.ci
   decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+    workdir: true
   interval: 24h
   labels:
     ci.openshift.io/role: infra
@@ -667,8 +672,8 @@ periodics:
   spec:
     containers:
     - args:
-      - --config-path=/etc/config/config.yaml
-      - --job-config-path=/etc/job-config
+      - --config-path=./core-services/prow/02_config/_config.yaml
+      - --job-config-path=./ci-operator/jobs
       - --confirm=true
       - --github-token-path=/etc/github/oauth
       - --github-endpoint=http://ghproxy
@@ -686,82 +691,10 @@ periodics:
       - mountPath: /etc/github
         name: token
         readOnly: true
-      - mountPath: /etc/config
-        name: config
-        readOnly: true
-      - mountPath: /etc/job-config/misc
-        name: job-config-misc
-        readOnly: true
-      - mountPath: /etc/job-config/master
-        name: job-config-master
-        readOnly: true
-      - mountPath: /etc/job-config/3.x
-        name: job-config-3x
-        readOnly: true
-      - mountPath: /etc/job-config/4.0
-        name: job-config-40
-        readOnly: true
-      - mountPath: /etc/job-config/4.1
-        name: job-config-41
-        readOnly: true
-      - mountPath: /etc/job-config/4.2
-        name: job-config-42
-        readOnly: true
-      - mountPath: /etc/job-config/4.3
-        name: job-config-43
-        readOnly: true
-      - mountPath: /etc/job-config/4.4
-        name: job-config-44
-        readOnly: true
-      - mountPath: /etc/job-config/4.5
-        name: job-config-45
-        readOnly: true
-      - mountPath: /etc/job-config/4.6
-        name: job-config-46
-        readOnly: true
-      - mountPath: /etc/job-config/4.7
-        name: job-config-47
-        readOnly: true
     volumes:
     - name: token
       secret:
         secretName: github-credentials-openshift-merge-robot
-    - configMap:
-        name: config
-      name: config
-    - configMap:
-        name: job-config-misc
-      name: job-config-misc
-    - configMap:
-        name: job-config-master
-      name: job-config-master
-    - configMap:
-        name: job-config-3.x
-      name: job-config-3x
-    - configMap:
-        name: job-config-4.0
-      name: job-config-40
-    - configMap:
-        name: job-config-4.1
-      name: job-config-41
-    - configMap:
-        name: job-config-4.2
-      name: job-config-42
-    - configMap:
-        name: job-config-4.3
-      name: job-config-43
-    - configMap:
-        name: job-config-4.4
-      name: job-config-44
-    - configMap:
-        name: job-config-4.5
-      name: job-config-45
-    - configMap:
-        name: job-config-4.6
-      name: job-config-46
-    - configMap:
-        name: job-config-4.7
-      name: job-config-47
 - agent: kubernetes
   cluster: api.ci
   decorate: true
