@@ -11,6 +11,8 @@ if [[ ! -d "${base_dir}" ]]; then
   exit 1
 fi
 
+jb --version
+
 mixins_dir="${base_dir}/clusters/app.ci/prow-monitoring/mixins"
 
 make -C "${mixins_dir}" validate-latest
