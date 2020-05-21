@@ -279,5 +279,6 @@ verify-app-ci:
 	true
 
 mixins:
+	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/dashboards-validation:latest
 	$(CONTAINER_ENGINE) run --user=$(UID) --rm -v "$(CURDIR):/release:z" registry.svc.ci.openshift.org/ci/dashboards-validation:latest make -C /release/clusters/app.ci/prow-monitoring/mixins install all
 .PHONY: mixins
