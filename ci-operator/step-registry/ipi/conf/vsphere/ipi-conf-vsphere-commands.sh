@@ -15,6 +15,20 @@ mapfile -t vips < "${SHARED_DIR}/vips.txt"
 
 cat >> "${CONFIG}" << EOF
 baseDomain: $base_domain
+controlPlane:
+  name: "master"
+  replicas: 3
+  platform:
+    vsphere:
+      osDisk:
+        diskSizeGB: 60
+compute:
+- name: "worker"
+  replicas: 3
+  platform:
+    vsphere:
+      osDisk:
+        diskSizeGB: 60
 platform:
   vsphere:
     cluster: devel
