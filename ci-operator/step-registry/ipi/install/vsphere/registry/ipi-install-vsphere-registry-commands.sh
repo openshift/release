@@ -21,9 +21,10 @@ export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
 oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'
 
-echo "Sleep 30..."
-sleep 30
+#echo "Sleep 30..."
+#sleep 30
 
+oc get clusteroperators.config.openshift.io
 
 echo "wait for image-registry"
 operator_progress image-registry || true
