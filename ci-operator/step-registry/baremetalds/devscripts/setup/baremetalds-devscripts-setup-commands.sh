@@ -54,7 +54,8 @@ timeout -s 9 175m ssh $SSHOPTS root@$IP bash - << EOF |& sed -e 's/.*auths.*/***
 
 set -ex
 
-yum install -y git
+yum install -y git sysstat sos
+systemctl start sysstat
 
 mkdir -p /tmp/artifacts
 
