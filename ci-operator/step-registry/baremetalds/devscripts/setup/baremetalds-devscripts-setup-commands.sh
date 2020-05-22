@@ -95,11 +95,6 @@ echo 'export KUBECONFIG=/root/dev-scripts/ocp/ostest/auth/kubeconfig' >> /root/.
 
 timeout -s 9 105m make
 
+sleep 10000
 EOF
-
-
-
-
-
-
 
