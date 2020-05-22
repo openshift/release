@@ -43,5 +43,5 @@ cd dev-scripts
 make gather
 
 # Get sosreport including sar data
-sosreport --ticket-number "$HOSTNAME" --batch -o sar,filesys,networkmanager,virsh,libvirt,kvm
+sosreport --ticket-number "\$HOSTNAME" --batch -o sar,filesys,networkmanager,virsh,libvirt,kvm
 EOF
