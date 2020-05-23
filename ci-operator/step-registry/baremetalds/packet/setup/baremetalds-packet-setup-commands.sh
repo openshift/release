@@ -60,7 +60,7 @@ cat > packet-setup.yaml <<-EOF
         icon_emoji: ":failed:"
     - name: fail the play
       fail:
-        msg: "Packet setup failed."
+        msg: "ERROR: Packet setup failed."
 
   - name: save Packet IP
     local_action: copy content="{{ hosts.devices[0].public_ipv4 }}" dest="{{ lookup('env', 'SHARED_DIR') }}/server-ip"
