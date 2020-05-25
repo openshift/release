@@ -18,9 +18,6 @@ parameters:
   required: true
 - name: RELEASE_IMAGE_LATEST
   required: true
-- name: BASE_DOMAIN
-  value: openshift.testing
-  required: true
 - name: KURYR_ENABLED
   value: "false"
 - name: BUILD_ID
@@ -30,12 +27,9 @@ parameters:
   value: "ci-op-ppc64le"
 - name: MULTIARCH_RELEASE_IMAGE_LATEST
   required: true
-- name: SSHD_BASTION_IP
-  required: true
 - name: CUSTOM_IMAGE_OPENSTACK_INSTALLER
   required: true
-- name: OPENSHIFT_VERSION
-  required: true
+- name: LEASED_RESOURCE
 
 objects:
 
@@ -253,8 +247,8 @@ objects:
         value: ${CLUSTER_TYPE}
       - name: CLUSTER_NAME
         value: ${CLUSTER_NAME}
-      - name: BASE_DOMAIN
-        value: ${BASE_DOMAIN}
+      - name: JOB_NAME_HASH
+        value: ${JOB_NAME_HASH}
       - name: SSH_PUB_KEY_PATH
         value: /etc/openshift-installer/ssh-publickey
       - name: SSH_PRIV_KEY_PATH
@@ -346,6 +340,42 @@ objects:
         oc adm release info --registry-config=${PULL_SECRET_PATH} ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} | egrep '(Name: |Pull From: )'
         echo "-----------------------------------------------------------"
 
+        echo "LEASED_RESOURCE=${LEASED_RESOURCE}"
+        if [ -z "${LEASED_RESOURCE}" ]
+        then 
+          echo "Error: Missing the LEASED_RESOURCE environment variable!"
+          exit 1
+        fi
+
+        export BASTION="sshd.bastion-ppc64le"
+        case ${LEASED_RESOURCE} in
+        "openstack-ppc64le-00")
+          export BASE_DOMAIN="sshd-1.openshift.testing"
+          export HAPROXY="1"
+          ;;
+        "openstack-ppc64le-01")
+          export BASE_DOMAIN="sshd-2.openshift.testing"
+          export HAPROXY="2"
+          ;;
+        "openstack-ppc64le-02")
+          export BASE_DOMAIN="sshd-3.openshift.testing"
+          export HAPROXY="3"
+          ;;
+        "openstack-ppc64le-03")
+          export BASE_DOMAIN="sshd-4.openshift.testing"
+          export HAPROXY="4"
+          ;;
+        "*")
+          echo "Error: Unknown LEASED_RESOURCE"
+          exit 1
+          ;;  
+        esac
+        echo "CLUSTER_NAME=${CLUSTER_NAME}"
+        echo "JOB_NAME_HASH=${JOB_NAME_HASH}"
+        echo "BASE_DOMAIN=${BASE_DOMAIN}"
+        echo "BASTION=${BASTION}"
+        echo "HAPROXY=${HAPROXY}"
+
         # Display the version of openshift-install and make sure we are using the special sauce version
         echo "CUSTOM_IMAGE_OPENSTACK_INSTALLER=${CUSTOM_IMAGE_OPENSTACK_INSTALLER}"
         ls -l / || true
@@ -370,7 +400,7 @@ objects:
         echo "-----------------------------------------------------------"
 
         # Run simple tests to see if the bastion is up!
-        curl -v https://sshd.bastion-ppc64le:13000; echo
+        curl -v https://${BASTION}:13000; echo
         echo "-----------------------------------------------------------"
 
         /tmp/openstack_cmd.py /tmp/artifacts/openstack_cmd.out openstack server list -f value; echo $?
@@ -389,12 +419,9 @@ objects:
         /tmp/openstack_cmd.py /tmp/artifacts/openstack_cmd.out openstack floating ip create --description $CLUSTER_NAME $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address'
         LB_FIP=$(cat /tmp/artifacts/openstack_cmd.out)
 
-        echo "OPENSHIFT_VERSION=${OPENSHIFT_VERSION}"
-        [ -z "${OPENSHIFT_VERSION}" ] && exit 1
-
         echo "Creating DNS record for api.${CLUSTER_NAME}.${BASE_DOMAIN} -> ${LB_FIP}"
         # create A record for the api
-        curl -v https://sshd.bastion-ppc64le:13053/add -d '{"cluster_name": "'${CLUSTER_NAME}.${BASE_DOMAIN}'", "lb'${OPENSHIFT_VERSION}'_fip": "'$LB_FIP'"}'
+        curl -v https://${BASTION}:13053/add -d '{"cluster_name": "'${CLUSTER_NAME}.${BASE_DOMAIN}'", "lb'${HAPROXY}'-fip": "'$LB_FIP'"}'
 
         cat > /tmp/artifacts/installer/install-config.yaml << EOF
         apiVersion: v1beta4
@@ -470,31 +497,21 @@ objects:
                 OS_DEBUG=1 TF_LOG=trace openshift-install --dir=/tmp/artifacts/installer wait-for install-complete --log-level=debug
         fi
 
-        # @TODO - search for specific ingress port
-        echo "NAMESPACE=${NAMESPACE}"
-        echo "JOB_NAME_HASH=${JOB_NAME_HASH}"
-        echo "Searching for one ingress port (${CLUSTER_NAME})"
-        /tmp/openstack_cmd.py /tmp/artifacts/openstack_cmd.out openstack port list --format value -c Name
-        INGRESS_PORT=$(cat /tmp/artifacts/openstack_cmd.out | tr ' ' '\n' | awk "/${CLUSTER_NAME}.*-ingress-port/ {print}")
+        # NOTE: ${JOB_NAME_HASH} is different than .cluster_id !
+        CID=$(jq --raw-output .cluster_id /tmp/artifacts/installer/terraform.tfvars.json)
+        INGRESS_PORT="${CID}-ingress-port"
+        echo "CID=${CID}"
         echo "INGRESS_PORT=${INGRESS_PORT}"
+        [ -z "${CID}" ] && exit 1
 
-        if [ $(echo "${INGRESS_PORT}" | wc -l) -gt 1 ]; then
-                echo "Found more than one port!"
-                exit 1
-        fi
-        if [ -n "$INGRESS_PORT" ]; then
-                # Assign a FIP to ingress port to allow getting to apps
-                # create a new floating ip tagged with CLUSTER_NAME so it can be deleted later
-                /tmp/openstack_cmd.py /tmp/artifacts/openstack_cmd.out openstack floating ip create --description $CLUSTER_NAME $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address' --port $INGRESS_PORT
-                APPS_FIP=$(cat /tmp/artifacts/openstack_cmd.out)
+        # Assign a FIP to ingress port to allow getting to apps
+        # create a new floating ip tagged with CLUSTER_NAME so it can be deleted later
+        /tmp/openstack_cmd.py /tmp/artifacts/openstack_cmd.out openstack floating ip create --description $CLUSTER_NAME $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address' --port $INGRESS_PORT
+        APPS_FIP=$(cat /tmp/artifacts/openstack_cmd.out)
 
-                echo "Creating DNS record for *.apps.${CLUSTER_NAME}.${BASE_DOMAIN} -> $APPS_FIP"
-                # create A record for *.apps
-                curl -v https://sshd.bastion-ppc64le:13053/add -d '{"cluster_name": "'${CLUSTER_NAME}.${BASE_DOMAIN}'", "apps'${OPENSHIFT_VERSION}'_fip": "'$APPS_FIP'"}'
-        else
-                echo "Failed to discover one ingress port"
-                exit 1
-        fi
+        echo "Creating DNS record for *.apps.${CLUSTER_NAME}.${BASE_DOMAIN} -> $APPS_FIP"
+        # create A record for *.apps
+        curl -v https://${BASTION}:13053/add -d '{"cluster_name": "'${CLUSTER_NAME}.${BASE_DOMAIN}'", "apps'${HAPROXY}'-fip": "'$APPS_FIP'"}'
 
         echo "********** FINISHED SETUP CONTAINER **********"
 
@@ -673,12 +690,44 @@ objects:
           echo "Waiting for logs ..."
           wait
 
-          echo "OPENSHIFT_VERSION=${OPENSHIFT_VERSION}"
-          [ -z "${OPENSHIFT_VERSION}" ] && exit 1
+          echo "LEASED_RESOURCE=${LEASED_RESOURCE}"
+          if [ -z "${LEASED_RESOURCE}" ]
+          then 
+            echo "Error: Missing the LEASED_RESOURCE environment variable!"
+            exit 1
+          fi
+
+          export BASTION="sshd.bastion-ppc64le"
+          case ${LEASED_RESOURCE} in
+          "openstack-ppc64le-00")
+            export BASE_DOMAIN="sshd-1.openshift.testing"
+            export HAPROXY="1"
+            ;;
+          "openstack-ppc64le-01")
+            export BASE_DOMAIN="sshd-2.openshift.testing"
+            export HAPROXY="2"
+            ;;
+          "openstack-ppc64le-02")
+            export BASE_DOMAIN="sshd-3.openshift.testing"
+            export HAPROXY="3"
+            ;;
+          "openstack-ppc64le-03")
+            export BASE_DOMAIN="sshd-4.openshift.testing"
+            export HAPROXY="4"
+            ;;
+          "*")
+            echo "Error: Unknown LEASED_RESOURCE"
+            exit 1
+            ;;  
+          esac
+          echo "CLUSTER_NAME=${CLUSTER_NAME}"
+          echo "BASE_DOMAIN=${BASE_DOMAIN}"
+          echo "BASTION=${BASTION}"
+          echo "HAPROXY=${HAPROXY}"
 
           echo "Removing entries from DNS ..."
-          curl -v https://sshd.bastion-ppc64le:13053/remove -d '{"cluster_name": "'${CLUSTER_NAME}.${BASE_DOMAIN}'", "lb'${OPENSHIFT_VERSION}'_fip": ""}'
-          curl -v https://sshd.bastion-ppc64le:13053/remove -d '{"cluster_name": "'${CLUSTER_NAME}.${BASE_DOMAIN}'", "apps'${OPENSHIFT_VERSION}'_fip": ""}'
+          curl -v https://${BASTION}:13053/remove -d '{"cluster_name": "'${CLUSTER_NAME}.${BASE_DOMAIN}'", "lb'${HAPROXY}'-fip": ""}'
+          curl -v https://${BASTION}:13053/remove -d '{"cluster_name": "'${CLUSTER_NAME}.${BASE_DOMAIN}'", "apps'${HAPROXY}'-fip": ""}'
 
           echo "Deleting service VM FIP ..."
           openstack floating ip list --long -f csv -c Description -c "Floating IP Address" | grep $CLUSTER_NAME | cut -f1 -d "," | xargs openstack floating ip delete
@@ -733,19 +782,43 @@ objects:
           sleep 60 & wait
         done
 
-    # both ports (lb_fip and apps_fip) go through a single reverse ssh tunnel bastion
-    # NOTE: I cannot do something like the following in openshift-release-release-4.3-periodics.yaml
-    # $(nslookup sshd-43.bastion-ppc64le | grep 172 | awk '{print $2}')
-    # or
-    # $(nslookup sshd-43.bastion-ppc64le | awk -F': ' 'NF==2 { print $2 }')
-    # because it is part of the pod spec
+    # To find out the IP addresses associated with the bastion:
+    # oc project bastion-ppc64le
+    # oc status
     hostAliases:
-    - ip: ${SSHD_BASTION_IP}
+    - ip: 172.30.121.137
       hostnames:
-      - "api.${CLUSTER_NAME}.${BASE_DOMAIN}"
-      - "alertmanager-main-openshift-monitoring.apps.${CLUSTER_NAME}.${BASE_DOMAIN}"
-      - "console-openshift-console.apps.${CLUSTER_NAME}.${BASE_DOMAIN}"
-      - "downloads-openshift-console.apps.${CLUSTER_NAME}.${BASE_DOMAIN}"
-      - "grafana-openshift-monitoring.apps.${CLUSTER_NAME}.${BASE_DOMAIN}"
-      - "oauth-openshift.apps.${CLUSTER_NAME}.${BASE_DOMAIN}"
-      - "prometheus-k8s-openshift-monitoring.apps.${CLUSTER_NAME}.${BASE_DOMAIN}"
+      - "api.${CLUSTER_NAME}.sshd-1.openshift.testing"
+      - "alertmanager-main-openshift-monitoring.apps.${CLUSTER_NAME}.sshd-1.openshift.testing"
+      - "console-openshift-console.apps.${CLUSTER_NAME}.sshd-1.openshift.testing"
+      - "downloads-openshift-console.apps.${CLUSTER_NAME}.sshd-1.openshift.testing"
+      - "grafana-openshift-monitoring.apps.${CLUSTER_NAME}.sshd-1.openshift.testing"
+      - "oauth-openshift.apps.${CLUSTER_NAME}.sshd-1.openshift.testing"
+      - "prometheus-k8s-openshift-monitoring.apps.${CLUSTER_NAME}.sshd-1.openshift.testing"
+    - ip: 172.30.57.118
+      hostnames:
+      - "api.${CLUSTER_NAME}.sshd-2.openshift.testing"
+      - "alertmanager-main-openshift-monitoring.apps.${CLUSTER_NAME}.sshd-2.openshift.testing"
+      - "console-openshift-console.apps.${CLUSTER_NAME}.sshd-2.openshift.testing"
+      - "downloads-openshift-console.apps.${CLUSTER_NAME}.sshd-2.openshift.testing"
+      - "grafana-openshift-monitoring.apps.${CLUSTER_NAME}.sshd-2.openshift.testing"
+      - "oauth-openshift.apps.${CLUSTER_NAME}.sshd-2.openshift.testing"
+      - "prometheus-k8s-openshift-monitoring.apps.${CLUSTER_NAME}.sshd-2.openshift.testing"
+    - ip: 172.30.75.64
+      hostnames:
+      - "api.${CLUSTER_NAME}.sshd-3.openshift.testing"
+      - "alertmanager-main-openshift-monitoring.apps.${CLUSTER_NAME}.sshd-3.openshift.testing"
+      - "console-openshift-console.apps.${CLUSTER_NAME}.sshd-3.openshift.testing"
+      - "downloads-openshift-console.apps.${CLUSTER_NAME}.sshd-3.openshift.testing"
+      - "grafana-openshift-monitoring.apps.${CLUSTER_NAME}.sshd-3.openshift.testing"
+      - "oauth-openshift.apps.${CLUSTER_NAME}.sshd-3.openshift.testing"
+      - "prometheus-k8s-openshift-monitoring.apps.${CLUSTER_NAME}.sshd-3.openshift.testing"
+    - ip: 172.30.161.61
+      hostnames:
+      - "api.${CLUSTER_NAME}.sshd-4.openshift.testing"
+      - "alertmanager-main-openshift-monitoring.apps.${CLUSTER_NAME}.sshd-4.openshift.testing"
+      - "console-openshift-console.apps.${CLUSTER_NAME}.sshd-4.openshift.testing"
+      - "downloads-openshift-console.apps.${CLUSTER_NAME}.sshd-4.openshift.testing"
+      - "grafana-openshift-monitoring.apps.${CLUSTER_NAME}.sshd-4.openshift.testing"
+      - "oauth-openshift.apps.${CLUSTER_NAME}.sshd-4.openshift.testing"
+      - "prometheus-k8s-openshift-monitoring.apps.${CLUSTER_NAME}.sshd-4.openshift.testing"
