@@ -3,7 +3,8 @@
 This folder includes the resources for installation and configuration of [CI-cluster](URL_TBD).
 
 * [build-clusters](./build-clusters)
-    * [01_cluster](./build-clusters/01_cluster): build cluster managed by DPTP-team.
+    * [01_cluster](./build-clusters/01_cluster): build cluster hosted on AWS managed by DPTP-team.
+    * [02_cluster](./build-clusters/02_cluster): build cluster hosted on GCP managed by DPTP-team.
 
 ## Best practice for applyConfig
 
