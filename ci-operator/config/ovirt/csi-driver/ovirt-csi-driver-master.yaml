@@ -1,0 +1,41 @@
+base_images:
+  fedora:
+    cluster: https://api.ci.openshift.org
+    name: fedora
+    namespace: openshift
+    tag: "31"
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- dockerfile_path: Dockerfile
+  from: fedora
+  to: ovirt-csi-driver
+promotion:
+  name: csi-driver
+  namespace: ovirt
+resources:
+  '*':
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+tests:
+- as: fmt
+  commands: make fmt
+  container:
+    from: src
+- as: vet
+  commands: make vet
+  container:
+    from: src
+- as: sanity
+  commands: make test
+  container:
+    from: src
+zz_generated_metadata:
+  branch: master
+  org: ovirt
+  repo: csi-driver
