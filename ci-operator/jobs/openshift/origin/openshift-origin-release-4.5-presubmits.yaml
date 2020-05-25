@@ -108,7 +108,9 @@ presubmits:
         - name: JOB_NAME_SAFE
           value: e2e-aws-csi
         - name: TEST_COMMAND
-          value: TEST_INSTALL_CSI_DRIVERS=aws-ebs TEST_SUITE=openshift/csi run-tests
+          value: make test-e2e ARTIFACT_DIR=/tmp/artifacts
+        - name: TEST_IMAGESTREAM_TAG
+          value: stable:aws-ebs-csi-driver-operator-test
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -126,7 +128,7 @@ presubmits:
           name: cluster-profile
         - mountPath: /usr/local/e2e-aws-csi
           name: job-definition
-          subPath: cluster-launch-installer-e2e.yaml
+          subPath: cluster-launch-installer-custom-test-image.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -153,7 +155,7 @@ presubmits:
           - secret:
               name: cluster-secrets-aws
       - configMap:
-          name: prow-job-cluster-launch-installer-e2e
+          name: prow-job-cluster-launch-installer-custom-test-image
         name: job-definition
       - name: pull-secret
         secret:
