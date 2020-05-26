@@ -13,7 +13,7 @@
               severity: 'warning',
             },
             annotations: {
-              message: '{{ $value | humanize }}%% of all requests for {{ $labels.path }} through the GitHub proxy are errorring with code {{ $labels.status }}. Check <https://grafana-prow-monitoring.svc.ci.openshift.org/d/%s/github-cache?orgId=1&refresh=1m&fullscreen&panelId=9|grafana>' % $._config.grafanaDashboardIDs['ghproxy.json'],
+              message: '{{ $value | humanize }}%% of all requests for {{ $labels.path }} through the GitHub proxy are errorring with code {{ $labels.status }}. Check <https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/%s/github-cache?orgId=1&refresh=1m&fullscreen&panelId=9|grafana>' % $._config.grafanaDashboardIDs['ghproxy.json'],
             },
           },
           {
@@ -25,7 +25,7 @@
               severity: 'warning',
             },
             annotations: {
-              message: '{{ $value | humanize }}%% of all API requests through the GitHub proxy are errorring with code {{ $labels.status }}. Check <https://grafana-prow-monitoring.svc.ci.openshift.org/d/%s/github-cache?orgId=1&fullscreen&panelId=8|grafana>' % $._config.grafanaDashboardIDs['ghproxy.json'],
+              message: '{{ $value | humanize }}%% of all API requests through the GitHub proxy are errorring with code {{ $labels.status }}. Check <https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/%s/github-cache?orgId=1&fullscreen&panelId=8|grafana>' % $._config.grafanaDashboardIDs['ghproxy.json'],
             },
           },
           {
@@ -38,7 +38,7 @@
               severity: 'critical',
             },
             annotations: {
-              message: '{{ $labels.login }} may run out of API quota before the next reset. Check the <https://grafana-prow-monitoring.svc.ci.openshift.org/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1|dashboard>',
+              message: '{{ $labels.login }} may run out of API quota before the next reset. Check the <https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1|dashboard>',
             },
           }
         ],
