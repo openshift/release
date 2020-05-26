@@ -4,11 +4,6 @@ base_images:
     name: origin-v3.11
     namespace: openshift
     tag: cli
-  cluster-tests:
-    cluster: https://api.ci.openshift.org
-    name: origin-v3.11
-    namespace: openshift
-    tag: tests
 build_root:
   image_stream_tag:
     cluster: https://api.ci.openshift.org
@@ -16,13 +11,6 @@ build_root:
     namespace: openshift
     tag: golang-1.9
 images:
-- from: cluster-tests
-  inputs:
-    src:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/jenkins/test-e2e/.
-  to: tests
 - dockerfile_path: Dockerfile
   from: base
   inputs:
@@ -38,7 +26,6 @@ images:
       paths:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/jenkins/slave-base/.
-  optional: true
   to: slave-base-centos
 - dockerfile_path: Dockerfile
   from: slave-base-centos
@@ -56,6 +43,9 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/jenkins/agent-nodejs-8/.
   to: nodejs-agent
+promotion:
+  name: "3.11"
+  namespace: openshift
 resources:
   '*':
     requests:
@@ -65,6 +55,15 @@ tag_specification:
   cluster: https://api.ci.openshift.org
   name: origin-v3.11
   namespace: openshift
+tests:
+- as: e2e-aws
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-aws-jenkins
+  commands: TEST_SUITE=openshift/jenkins-e2e run-tests
+  openshift_installer:
+    cluster_profile: aws
 zz_generated_metadata:
   branch: openshift-3.11
   org: openshift
