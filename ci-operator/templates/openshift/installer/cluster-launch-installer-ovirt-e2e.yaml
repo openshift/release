@@ -122,6 +122,9 @@ objects:
           echo "$( jq ."${1}" --raw-output "${2}" )"
         }
 
+        LEASE_TYPE="conformance"
+        export LEASE_TYPE="conformance"
+
         lease_type="${CLUSTER_TYPE}-quota-slice"
 
         echo "[INFO] Acquiring a lease ..."
@@ -133,28 +136,18 @@ objects:
         boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" heartbeat --resource "${resource}" &
         heartbeats_pid=$!
 
-        #For conformance runs we require double resources
-        if [ "${LEASE_TYPE}" == "conformance" ]; then
-          resource_conformance="$( boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" acquire --type "${lease_type}" --state "free" --target-state "leased" --timeout 150m )"
-          resource_conformance_name="$(echo "${resource_conformance}"|jq .name --raw-output)"
-          echo "[INFO] Lease acquired! at $(date --utc) Leased resource: ${resource_conformance}"
-          boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" heartbeat --resource "${resource_conformance}" &
-          heartbeats_conformance_pid=$!
-        fi
+        resource_conformance="$( boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" acquire --type "${lease_type}" --state "free" --target-state "leased" --timeout 150m )"
+        resource_conformance_name="$(echo "${resource_conformance}"|jq .name --raw-output)"
+        echo "[INFO] Lease acquired! at $(date --utc) Leased resource: ${resource_conformance}"
+        boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" heartbeat --resource "${resource_conformance}" &
+        heartbeats_conformance_pid=$!
+
 
         ovirt_engine_template_name="$(extract_leases_info ovirt_engine_template_name ${lease_path})"
-        if [ "${LEASE_TYPE}" == "conformance" ]; then
-          worker_cpu="8"
-          worker_mem="16384"
-          master_cpu="8"
-          master_mem="16384"
-        else
-          worker_cpu="4"
-          worker_mem="8192"
-          master_cpu="4"
-          master_mem="8192"
-          ovirt_engine_template_name="${ovirt_engine_template_name}-8G"
-        fi
+        worker_cpu="8"
+        worker_mem="16384"
+        master_cpu="8"
+        master_mem="16384"
 
         #Saving parameters for the env
         cat > /tmp/shared/ovirt-lease.conf <<EOF
@@ -177,12 +170,11 @@ objects:
             kill -9 "${heartbeats_pid}"
             echo "[INFO] Releasing the lease on resouce ${resource_name}"
             boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" release --name "${resource_name}" --target-state "free"
-            if [ "${LEASE_TYPE}" == "conformance" ]; then
-              echo "killing heartbeat process "${heartbeats_conformance_pid}" at $(date --utc)"
-              kill -9 "${heartbeats_conformance_pid}"
-              echo "[INFO] Releasing the lease on resouce ${resource_conformance}"
-              boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" release --name "${resource_conformance_name}" --target-state "free"
-            fi
+            echo "killing heartbeat process "${heartbeats_conformance_pid}" at $(date --utc)"
+            kill -9 "${heartbeats_conformance_pid}"
+            echo "[INFO] Releasing the lease on resouce ${resource_conformance}"
+            boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" release --name "${resource_conformance_name}" --target-state "free"
+
         }
 
         trap "release" EXIT
@@ -296,6 +288,7 @@ objects:
         source /tmp/shared/ovirt-lease.conf
         # https://bugzilla.redhat.com/show_bug.cgi?id=1839463
         curl -k --connect-timeout 2 --retry 30 --retry-delay 30 https://api.${OCP_CLUSTER}.gcp.devcluster.openshift.com:6443/apis/config.openshift.io/v1/infrastructures/cluster
+        sleep 60m
         ${TEST_COMMAND}
 
     # Runs an install
@@ -411,7 +404,7 @@ objects:
                 # 31 is used to trigger the instance customization (the disk size is 16 Gi)
                 sizeGB: 31
               vmType: server
-              instanceTypeID: 
+              instanceTypeID:
           replicas: 2
         controlPlane:
           hyperthreading: Enabled
