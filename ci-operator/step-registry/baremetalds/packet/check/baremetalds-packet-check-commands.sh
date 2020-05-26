@@ -22,7 +22,7 @@ servers="$(curl -X GET --header 'Accept: application/json' --header "X-Auth-Toke
 ,ip_addresses,plan,meta,operating_system,facility,network_ports&per_page=1000")"
 
 #Assuming all servers created more than 4 hours = 14400 sec ago are leaks
-leaks="$(echo "$servers" | jq -r '.devices[]|select((now-(.created_at|fromdate))>14400)')"
+leaks="$(echo "$servers" | jq -r '.devices[]|select((now-(.created_at|fromdate))>14400 and any(.hostname; startswith("ipi-")))')"
 
 leak_report="$(echo "$leaks" | jq --tab  '.hostname,.id,.created_at,.tags'|sed 's/\"/ /g')"
 leak_ids="$(echo "$leaks" | jq -c '.id'|sed 's/\"//g')"
