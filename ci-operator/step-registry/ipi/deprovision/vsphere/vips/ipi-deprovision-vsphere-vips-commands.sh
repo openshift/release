@@ -6,7 +6,7 @@ set -o pipefail
 
 tfvars_path="${CLUSTER_PROFILE_DIR}/secret.auto.tfvars"
 cluster_name="${NAMESPACE}-${JOB_NAME_HASH}"
-ipam_token=$(grep -oP 'ipam_token="\K[^"]+' "${tfvars_path}")
+ipam_token=$(grep -oP 'ipam_token\s*=\s*"\K[^"]+' "${tfvars_path}")
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 

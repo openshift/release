@@ -6,8 +6,8 @@ set -o pipefail
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 TFVARS_PATH=/var/run/secrets/ci.openshift.io/cluster-profile/secret.auto.tfvars
-vsphere_user=$(grep -oP 'vsphere_user="\K[^"]+' ${TFVARS_PATH})
-vsphere_password=$(grep -oP 'vsphere_password="\K[^"]+' ${TFVARS_PATH})
+vsphere_user=$(grep -oP 'vsphere_user\s*=\s*"\K[^"]+' ${TFVARS_PATH})
+vsphere_password=$(grep -oP 'vsphere_password\s*=\s*"\K[^"]+' ${TFVARS_PATH})
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 
 declare -a vips
@@ -33,7 +33,7 @@ platform:
   vsphere:
     cluster: devel
     datacenter: dc1
-    defaultDatastore: nvme-ds1
+    defaultDatastore: vsanDatastore
     network: VM Network
     password: ${vsphere_password}
     username: ${vsphere_user}
