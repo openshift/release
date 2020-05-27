@@ -360,3 +360,14 @@ spec:
       for: 10m
       labels:
         severity: critical
+  - name: prow
+    rules:
+    - alert: prow-pod-crashlooping
+      annotations:
+        message: Pod {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container}})
+          is restarting {{ printf "%.2f" $value }} times / 5 minutes.
+      expr: rate(kube_pod_container_status_restarts_total{namespace=~"ci|prow-monitoring",job="kube-state-metrics"}[15m])
+        * 60 * 5 > 0
+      for: 1m
+      labels:
+        severity: critical
