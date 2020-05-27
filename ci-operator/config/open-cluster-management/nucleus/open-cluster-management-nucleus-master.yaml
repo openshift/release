@@ -4,6 +4,11 @@ base_images:
     name: "4.5"
     namespace: ocp
     tag: base
+  registration:
+    cluster: https://api.ci.openshift.org
+    name: "4.5"
+    namespace: open-cluster-management
+    tag: registration
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
@@ -25,6 +30,10 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: "4.4"
+  namespace: ocp
 test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
 tests:
 - as: build
@@ -48,6 +57,33 @@ tests:
     make test-unit JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
   container:
     from: test-bin
+- as: e2e
+  steps:
+    cluster_profile: aws
+    test:
+    - as: deploy
+      commands: |
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar xvzf - oc
+        KUBECTL=oc
+        OLM_NAMESPACE=openshift-operator-lifecycle-manager
+        PATH=.:$PATH
+        export KUBECTL OLM_NAMESPACE PATH
+        make deploy-hub e2e-bootstrap-secret
+      from: src
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-test
+      commands: /e2e.test -test.v -ginkgo.v
+      from: registration
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: master
   org: open-cluster-management
