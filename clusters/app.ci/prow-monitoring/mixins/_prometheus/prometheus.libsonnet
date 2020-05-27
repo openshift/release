@@ -8,4 +8,5 @@
 (import 'dptp_alerts.libsonnet') +
 (import 'ghproxy_alerts.libsonnet') +
 (import 'sinker_alerts.libsonnet') +
-(import 'job_failures_alerts.libsonnet')
+(import 'job_failures_alerts.libsonnet') +
+(import 'prow_alerts.libsonnet')
