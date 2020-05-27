@@ -342,8 +342,12 @@ objects:
         }
 
         function run-tests() {
+          openshift-tests run-resourcewatch &
+          rw_pid=$!
           openshift-tests run "${TEST_SUITE}" \
             --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
+          kill $rw_pid
+          tar -cf ${ARTIFACT_DIR}/resourcewatch.tar /repository
         }
 
         if [[ "${CLUSTER_TYPE}" == "gcp" ]]; then
