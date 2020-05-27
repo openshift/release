@@ -3,12 +3,12 @@
 
 .PHONY : no-op
 no-op:
-	
-	
+
+
 .PHONY : generate-mixins
 generate-mixins:
 	@echo "generating mixins ..."
-	make -C mixins all
+	make -C $(CURDIR)/../../.. mixins
 
 uname_s := $(shell uname -s)
 
