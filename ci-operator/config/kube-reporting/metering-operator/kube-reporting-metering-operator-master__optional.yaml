@@ -45,16 +45,16 @@ tests:
   steps:
     cluster_profile: aws
     test:
-      ref:
-        from: bin
-        commands: |
-          set -x
-          kubectl -n openshift-machine-api get machinesets -o name | grep worker | cut -d/ -f2 | xargs -I{} kubectl -n openshift-machine-api scale machineset {} --replicas 3
-          TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/e2e EXTRA_TEST_FLAGS="-run TestCIOperatorInstallation" make e2e
-        resources:
-          requests:
-            cpu: 1000m
-            memory: 100Mi
+    - as: this-needs-a-name
+      from: bin
+      commands: |
+        set -x
+        kubectl -n openshift-machine-api get machinesets -o name | grep worker | cut -d/ -f2 | xargs -I{} kubectl -n openshift-machine-api scale machineset {} --replicas 3
+        TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/e2e EXTRA_TEST_FLAGS="-run TestCIOperatorInstallation" make e2e
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 100Mi
     workflow: optional-operators-aws
   env:
     OO_PACKAGE: metering-ocp
