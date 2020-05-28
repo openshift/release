@@ -41,6 +41,24 @@ tests:
   commands: make unit TEST_OUTPUT_DIR=/tmp/artifacts
   container:
     from: src
+- as: e2e
+  steps:
+    cluster_profile: aws
+    test:
+      ref:
+        from: bin
+        commands: |
+          set -x
+          kubectl -n openshift-machine-api get machinesets -o name | grep worker | cut -d/ -f2 | xargs -I{} kubectl -n openshift-machine-api scale machineset {} --replicas 3
+          TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/e2e EXTRA_TEST_FLAGS="-run TestCIOperatorInstallation" make e2e
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 100Mi
+    workflow: optional-operators-aws
+  env:
+    OO_PACKAGE: metering-ocp
+    OO_CHANNEL: "4.5"
 zz_generated_metadata:
   branch: master
   org: kube-reporting
