@@ -35,7 +35,10 @@ cat > packet-teardown.yaml <<-EOF
         project_id: "{{ packet_project_id }}"
         hostnames: "{{ packet_hostname }}"
         state: absent
+      retries: 3
+      delay: 120
       register: hosts
+      until: hosts.failed == false
       no_log: true
     rescue:
     - name: Send notification message via Slack in case of failure
