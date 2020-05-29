@@ -162,6 +162,7 @@ spec:
         - --github-endpoint=https://api.github.com
         - --github-token-path=/etc/github/oauth
         - --enable-controller=promotionreconciler
+        - --testImagesDistributorOptions.imagePullSecretPath=/etc/regcred/.dockerconfigjson
         - --enable-controller=test_images_distributor
         - --dry-run=false
         env:
@@ -173,6 +174,9 @@ spec:
         volumeMounts:
         - name: oauth
           mountPath: /etc/github
+          readOnly: true
+        - name: regcred
+          mountPath: /etc/regcred
           readOnly: true
         - name: kubeconfigs
           mountPath: /var/kubeconfigs
@@ -247,6 +251,9 @@ spec:
       - name: kubeconfigs
         secret:
           secretName: dptp-controller-manager
+      - name: regcred
+        secret:
+          secretName: registry-cluster-pull-secret
       - name: master
         configMap:
           name: ci-operator-master-configs
