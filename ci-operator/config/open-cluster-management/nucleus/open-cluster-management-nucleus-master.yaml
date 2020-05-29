@@ -9,6 +9,11 @@ base_images:
     name: "4.5"
     namespace: open-cluster-management
     tag: registration
+  work:
+    cluster: https://api.ci.openshift.org
+    name: "4.5"
+    namespace: open-cluster-management
+    tag: work
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
@@ -66,8 +71,11 @@ tests:
         curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar xvzf - oc
         KUBECTL=oc
         OLM_NAMESPACE=openshift-operator-lifecycle-manager
+        IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:nucleus}
+        REGISTRATION_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:registration}
+        WORK_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:work}
         PATH=.:$PATH
-        export KUBECTL OLM_NAMESPACE PATH
+        export KUBECTL OLM_NAMESPACE PATH IMAGE_NAME REGISTRATION_IMAGE WORK_IMAGE
         make deploy-hub e2e-bootstrap-secret
       from: src
       resources:
@@ -77,7 +85,9 @@ tests:
           cpu: 100m
           memory: 200Mi
     - as: e2e-test
-      commands: /e2e.test -test.v -ginkgo.v
+      commands: |
+        export IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:registration}
+        /e2e.test -test.v -ginkgo.v
       from: registration
       resources:
         requests:
