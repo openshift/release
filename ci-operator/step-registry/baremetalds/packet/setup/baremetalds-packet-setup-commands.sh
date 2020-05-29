@@ -36,7 +36,7 @@ cat > packet-setup.yaml <<-EOF
         project_id: "{{ packet_project_id }}"
         hostnames: "{{ packet_hostname }}"
         operating_system: centos_8
-        plan: m2.xlarge.x86
+        plan: c1.xlarge.x86
         facility: any
         wait_for_public_IPv: 4
         state: active
