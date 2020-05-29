@@ -38,7 +38,7 @@ timeout -s 9 15m ssh $SSHOPTS root@$IP bash - << EOF |& sed -e 's/.*auths.*/*** 
 cd dev-scripts
 
 # Get install-gather, if there is one
-cp log-bundle\* /tmp/artifacts || true
+cp /root/dev-scripts/ocp/ostest/log-bundle\* /tmp/artifacts || true
 
 # Get must-gather
 export MUST_GATHER_PATH=/tmp/artifacts/must-gather
