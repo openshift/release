@@ -47,6 +47,19 @@ rules:
   - events
   verbs:
   - create
+- apiGroups:
+  - image.openshift.io
+  resources:
+  - '*'
+  verbs:
+  - "*"
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  - namespaces
+  verbs:
+  - "*"
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1beta1
@@ -142,15 +155,18 @@ spec:
         name: dptp-controller-manager
         args:
         - --leader-election-namespace=ci
-        - --promotionreconcilerOptions.ignored-github-organization=openshift-priv
         - --config-path=/etc/config/config.yaml
         - --job-config-path=/etc/job-config
         - --ci-operator-config-path=/etc/configs
         - --github-endpoint=http://ghproxy
         - --github-endpoint=https://api.github.com
-        - --kubeconfig=/var/kubeconfigs/api-ci-kubeconfig
         - --github-token-path=/etc/github/oauth
+        - --enable-controller=promotionreconciler
+        - --enable-controller=test_images_distributor
         - --dry-run=false
+        env:
+        - name: KUBECONFIG
+          value: /var/kubeconfigs/api-ci-kubeconfig:sa.dptp-controller-manager.build01.config:sa.dptp-controller-manager.build02.config
         ports:
         - name: metrics
           containerPort: 8080
