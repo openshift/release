@@ -1,48 +1,48 @@
 base_images:
   base:
     cluster: https://api.ci.openshift.org
-    name: "4.6"
+    name: "4.7"
     namespace: ocp
     tag: base
-binary_build_commands: go build -o ./bin/nfsplugin ./cmd/nfsplugin
 build_root:
   image_stream_tag:
     cluster: https://api.ci.openshift.org
     name: release
     namespace: openshift
     tag: golang-1.13
-canonical_go_repository: github.com/kubernetes-csi/csi-driver-nfs
 images:
-- dockerfile_path: images/Dockerfile
+- dockerfile_path: build/Dockerfile
   from: base
-  to: csi-driver-nfs
+  to: cincinnati-operator
+- dockerfile_path: dev/Dockerfile
+  from: base
+  to: cincinnati-graph-data-container
 promotion:
-  disabled: true
-  name: "4.6"
+  excluded_images:
+  - cincinnati-operator
+  name: "4.7"
   namespace: ocp
 resources:
   '*':
+    limits:
+      memory: 4Gi
     requests:
       cpu: 100m
       memory: 200Mi
 tag_specification:
   cluster: https://api.ci.openshift.org
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 tests:
-- as: go-fmt
-  commands: make test-fmt
+- as: unit
+  commands: make unit-test
   container:
     from: src
-- as: go-vet
-  commands: make test-vet
-  container:
-    from: src
-- as: vendor
-  commands: make test-vendor
-  container:
-    from: src
+- as: cincinnati-operator-e2e-aws
+  commands: make func-test
+  openshift_installer_src:
+    cluster_profile: aws
 zz_generated_metadata:
-  branch: release-4.6
+  branch: release-4.7
   org: openshift
-  repo: csi-driver-nfs
+  repo: cincinnati-operator
