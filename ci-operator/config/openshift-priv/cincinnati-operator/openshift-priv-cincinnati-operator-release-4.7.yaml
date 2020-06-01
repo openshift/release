@@ -1,0 +1,49 @@
+base_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: 4.7-priv
+    namespace: ocp-private
+    tag: base
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+canonical_go_repository: github.com/openshift/cincinnati-operator
+images:
+- dockerfile_path: build/Dockerfile
+  from: base
+  to: cincinnati-operator
+- dockerfile_path: dev/Dockerfile
+  from: base
+  to: cincinnati-graph-data-container
+promotion:
+  excluded_images:
+  - cincinnati-operator
+  name: 4.7-priv
+  namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: 4.7-priv
+  namespace: ocp-private
+tests:
+- as: unit
+  commands: make unit-test
+  container:
+    from: src
+- as: cincinnati-operator-e2e-aws
+  commands: make func-test
+  openshift_installer_src:
+    cluster_profile: aws
+zz_generated_metadata:
+  branch: release-4.7
+  org: openshift-priv
+  repo: cincinnati-operator
