@@ -4,6 +4,11 @@ base_images:
     name: 4.7-priv
     namespace: ocp-private
     tag: base
+  dev-scripts:
+    cluster: https://api.ci.openshift.org
+    name: test
+    namespace: openshift-kni
+    tag: dev-scripts
 build_root:
   image_stream_tag:
     cluster: https://api.ci.openshift.org
@@ -32,6 +37,29 @@ tests:
   steps:
     cluster_profile: packet
     workflow: baremetalds-e2e
+- as: e2e-metal-ipi-dualstack
+  steps:
+    cluster_profile: packet
+    pre:
+    - ref: baremetalds-packet-setup
+    - ref: ipi-install-rbac
+    - ref: baremetalds-devscripts-conf-dualstack
+    - ref: baremetalds-devscripts-setup
+    workflow: baremetalds-e2e
+- as: e2e-ovn-hybrid-step-registry
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-ovn-hybrid
+- as: e2e-windows-hybrid-network
+  steps:
+    cluster_profile: aws
+    test:
+    - ref: windows-e2e-playbook-test
+    workflow: ipi-aws-ovn-hybrid
+- as: e2e-vsphere
+  steps:
+    cluster_profile: vsphere
+    workflow: openshift-e2e-vsphere-ovn
 zz_generated_metadata:
   branch: release-4.7
   org: openshift-priv
