@@ -1,10 +1,95 @@
 presubmits:
-  openshift/cluster-capacity:
+  openshift/cincinnati-operator:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.6
-    cluster: build01
+    - release-4.7
+    context: ci/prow/cincinnati-operator-e2e-aws
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cincinnati-operator-release-4.7-cincinnati-operator-e2e-aws
+    rerun_command: /test cincinnati-operator-e2e-aws
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/usr/local/cincinnati-operator-e2e-aws-cluster-profile
+        - --target=cincinnati-operator-e2e-aws
+        - --template=/usr/local/cincinnati-operator-e2e-aws
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: JOB_NAME_SAFE
+          value: cincinnati-operator-e2e-aws
+        - name: TEST_COMMAND
+          value: make func-test
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/cincinnati-operator-e2e-aws-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/cincinnati-operator-e2e-aws
+          name: job-definition
+          subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-src
+        name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )cincinnati-operator-e2e-aws,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-4.7
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -12,8 +97,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-capacity-release-4.6-images
-    path_alias: sigs.k8s.io/cluster-capacity
+    name: pull-ci-openshift-cincinnati-operator-release-4.7-images
     rerun_command: /test images
     spec:
       containers:
@@ -23,6 +107,7 @@ presubmits:
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --target=[images]
+        - --target=[release:latest]
         command:
         - ci-operator
         image: ci-operator:latest
@@ -59,8 +144,7 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.6
-    cluster: build01
+    - release-4.7
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -68,8 +152,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-capacity-release-4.6-unit
-    path_alias: sigs.k8s.io/cluster-capacity
+    name: pull-ci-openshift-cincinnati-operator-release-4.7-unit
     rerun_command: /test unit
     spec:
       containers:
