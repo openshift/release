@@ -1,24 +1,22 @@
-presubmits:
-  openshift/cluster-api-provider-ovirt:
+postsubmits:
+  openshift/cincinnati-operator:
   - agent: kubernetes
-    always_run: true
     branches:
-    - release-4.6
-    cluster: build01
-    context: ci/prow/images
+    - ^release-4\.7$
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/is-promotion: "true"
       ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-api-provider-ovirt-release-4.6-images
-    rerun_command: /test images
+    max_concurrency: 1
+    name: branch-ci-openshift-cincinnati-operator-release-4.7-images
     spec:
       containers:
       - args:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
+        - --promote
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --target=[images]
@@ -54,4 +52,3 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
