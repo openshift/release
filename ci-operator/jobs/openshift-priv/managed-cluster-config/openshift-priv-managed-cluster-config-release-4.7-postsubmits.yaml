@@ -1,27 +1,25 @@
-presubmits:
-  openshift-priv/template-service-broker-operator:
+postsubmits:
+  openshift-priv/managed-cluster-config:
   - agent: kubernetes
-    always_run: true
     branches:
-    - release-4.7
-    cluster: build01
-    context: ci/prow/images
+    - ^release-4\.7$
     decorate: true
     decoration_config:
       skip_cloning: true
     hidden: true
     labels:
+      ci-operator.openshift.io/is-promotion: "true"
       ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-template-service-broker-operator-release-4.7-images
-    path_alias: github.com/openshift/template-service-broker-operator
-    rerun_command: /test images
+    max_concurrency: 1
+    name: branch-ci-openshift-priv-managed-cluster-config-release-4.7-images
+    path_alias: github.com/openshift/managed-cluster-config
     spec:
       containers:
       - args:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
         - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --promote
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --target=[images]
@@ -63,4 +61,3 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
