@@ -1,0 +1,35 @@
+base_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: "4.4"
+    namespace: ocp
+    tag: base
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- dockerfile_path: build/Dockerfile
+  from: base
+  to: aws-efs-operator
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  secret:
+    mount_path: /tmp/secret
+    name: aws-efs-operator-codecov-token
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: aws-efs-operator
