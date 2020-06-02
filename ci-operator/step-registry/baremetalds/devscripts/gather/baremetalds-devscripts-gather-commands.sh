@@ -38,13 +38,16 @@ timeout -s 9 15m ssh $SSHOPTS root@$IP bash - << EOF |& sed -e 's/.*auths.*/*** 
 cd dev-scripts
 
 # Get install-gather, if there is one
-cp /root/dev-scripts/ocp/ostest/log-bundle* /tmp/artifacts || true
+cp /root/dev-scripts/ocp/ostest/log-bundle*.tar.gz /tmp/artifacts/log-bundle-\$HOSTNAME.tar.gz || true
 
 # Get must-gather
 export MUST_GATHER_PATH=/tmp/artifacts/must-gather
 make gather
-tar -czC "/tmp/artifacts/must-gather" -f "/tmp/artifacts/must-gather.tar.gz" .
+tar -czC "/tmp/artifacts/must-gather" -f "/tmp/artifacts/must-gather-\$HOSTNAME.tar.gz" .
 
 # Get sosreport including sar data
 sosreport --ticket-number "\$HOSTNAME" --batch -o sar,filesys,networkmanager,virsh,libvirt,kvm --tmp-dir /tmp/artifacts
+
+# Get libvirt logs
+tar -czC "/var/log/libvirt/qemu" -f "/tmp/artifacts/libvirt-logs-\$HOSTNAME.tar.gz" --transform "s?^\.?libvirt-logs-\$HOSTNAME?" .
 EOF
