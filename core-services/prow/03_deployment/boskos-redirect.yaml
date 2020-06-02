@@ -7,7 +7,9 @@ data:
   "default.conf": |
     server {
       listen 8080;
-      return 302 $scheme://boskos-ci.apps.ci.l2s4.p1.openshiftapps.com$request_uri;
+      location / {
+        proxy_pass https://boskos-ci.apps.ci.l2s4.p1.openshiftapps.com;
+      }
     }
 ---
 apiVersion: apps/v1
@@ -60,9 +62,8 @@ metadata:
 spec:
   ports:
   - name: main
-    port: 80
+    port: 8080
     protocol: TCP
-    targetPort: 8080
   selector:
     component: boskos-redirect
   sessionAffinity: None

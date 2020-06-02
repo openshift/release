@@ -27,8 +27,7 @@ SSHOPTS="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/
 
 function getlogs() {
   echo "### Downloading logs..."
-  ssh $SSHOPTS root@$IP tar -czC "/tmp/artifacts/must-gather" -f "/tmp/artifacts/must-gather.tar.gz" .
-  scp $SSHOPTS root@$IP:/tmp/artifacts/must-gather.tar.gz ${ARTIFACT_DIR}
+  scp $SSHOPTS root@$IP:/tmp/artifacts/\*.tar\* ${ARTIFACT_DIR}
 }
 
 # Gather logs regardless of what happens after this
@@ -36,7 +35,16 @@ trap getlogs EXIT
 
 echo "### Gathering logs..."
 timeout -s 9 15m ssh $SSHOPTS root@$IP bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
-export MUST_GATHER_PATH=/tmp/artifacts/must-gather
 cd dev-scripts
+
+# Get install-gather, if there is one
+cp /root/dev-scripts/ocp/ostest/log-bundle* /tmp/artifacts || true
+
+# Get must-gather
+export MUST_GATHER_PATH=/tmp/artifacts/must-gather
 make gather
+tar -czC "/tmp/artifacts/must-gather" -f "/tmp/artifacts/must-gather.tar.gz" .
+
+# Get sosreport including sar data
+sosreport --ticket-number "\$HOSTNAME" --batch -o sar,filesys,networkmanager,virsh,libvirt,kvm --tmp-dir /tmp/artifacts
 EOF

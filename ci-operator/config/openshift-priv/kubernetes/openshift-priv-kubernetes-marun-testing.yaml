@@ -1,0 +1,256 @@
+base_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: 4.5-priv
+    namespace: ocp-private
+    tag: base
+  base-machine:
+    cluster: https://api.ci.openshift.org
+    name: fedora
+    namespace: openshift
+    tag: "29"
+  cli:
+    cluster: https://api.ci.openshift.org
+    name: 4.5-priv
+    namespace: ocp-private
+    tag: cli
+  cli-jq:
+    cluster: https://api.ci.openshift.org
+    name: cli-jq
+    namespace: ocp
+    tag: latest
+  machine-os-content-base:
+    cluster: https://api.ci.openshift.org
+    name: 4.5-priv
+    namespace: ocp-private
+    tag: machine-os-content
+  oc-rpms:
+    cluster: https://api.ci.openshift.org
+    name: 4.5-priv
+    namespace: ocp-private
+    tag: oc-rpms
+  tools:
+    cluster: https://api.ci.openshift.org
+    name: 4.5-priv
+    namespace: ocp-private
+    tag: tools
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+canonical_go_repository: github.com/openshift/kubernetes
+images:
+- dockerfile_path: images/hyperkube/Dockerfile.rhel
+  from: base
+  inputs:
+    bin:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
+      paths: null
+  to: hyperkube
+- dockerfile_path: images/tests/Dockerfile.rhel
+  from: tools
+  inputs:
+    bin:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
+      paths: null
+  to: tests
+- context_dir: images/os/
+  from: base
+  inputs:
+    base-machine-with-rpms:
+      as:
+      - fedora:29
+      paths: null
+    machine-os-content-base:
+      as:
+      - registry.svc.ci.openshift.org/openshift/origin-v4.0:machine-os-content
+      paths: null
+  to: machine-os-content
+promotion:
+  additional_images:
+    artifacts: artifacts
+  disabled: true
+  excluded_images:
+  - machine-os-content
+  name: 4.5-priv
+  namespace: ocp-private
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      mkdir -p _output/local/releases; touch _output/local/releases/CHECKSUM; echo $'FROM bin AS bin\nFROM rpms AS rpms\nFROM centos:7 \nCOPY --from=bin /go/src/github.com/openshift/kubernetes/_output/local/releases /srv/zips/ \nCOPY --from=oc-rpms /go/src/github.com/openshift/oc/_rpmbuild/SOURCES/* /srv/zips/ \nCOPY --from=rpms /go/src/github.com/openshift/kubernetes/_output/local/releases/rpms/* /srv/repo/ \nCOPY --from=oc-rpms /go/src/github.com/openshift/oc/_rpmbuild/RPMS/x86_64/* /srv/repo/ ' > _output/local/releases/Dockerfile; make build-cross;
+    from: bin
+    to: bin-cross
+- project_directory_image_build_step:
+    from: base
+    inputs:
+      bin-cross:
+        as:
+        - bin
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift/kubernetes/_output/local/releases/Dockerfile
+      oc-rpms:
+        as:
+        - oc-rpms
+        paths: null
+      rpms:
+        as:
+        - rpms
+        paths: null
+      src:
+        paths: null
+    optional: true
+    to: artifacts
+- output_image_tag_step:
+    from: artifacts
+    optional: true
+    to:
+      name: stable
+      namespace: ""
+      tag: artifacts
+- rpm_image_injection_step:
+    from: base
+    to: base-with-rpms
+- rpm_image_injection_step:
+    from: base-machine
+    to: base-machine-with-rpms
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 4Gi
+  artifacts:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  bin:
+    requests:
+      cpu: "3"
+      memory: 7Gi
+  bin-cross:
+    requests:
+      cpu: "3"
+      memory: 8Gi
+  cmd:
+    requests:
+      cpu: "4"
+      memory: 8Gi
+  e2e-conformance-k8s:
+    requests:
+      cpu: "1"
+      memory: 300Mi
+  hyperkube:
+    requests:
+      cpu: "3"
+      memory: 7Gi
+  hypershift:
+    requests:
+      cpu: "3"
+      memory: 7Gi
+  integration:
+    requests:
+      cpu: "6"
+      memory: 14Gi
+  rpms:
+    requests:
+      cpu: "4"
+      memory: 8Gi
+  tests:
+    requests:
+      cpu: "3"
+      memory: 7Gi
+  unit:
+    requests:
+      cpu: "6"
+      memory: 8Gi
+  verify:
+    requests:
+      cpu: "3"
+      memory: 8Gi
+rpm_build_commands: make build-rpms
+tag_specification:
+  cluster: https://api.ci.openshift.org
+  name: 4.5-priv
+  namespace: ocp-private
+tests:
+- as: unit
+  commands: make test GOFLAGS=-v
+  container:
+    from: src
+    memory_backed_volume:
+      size: 4Gi
+- as: verify
+  commands: make verify
+  container:
+    from: src
+- as: e2e-gcp
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer:
+    cluster_profile: gcp
+- as: e2e-aws-ovn
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-ovn
+- as: e2e-azure
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer:
+    cluster_profile: azure4
+- as: e2e-cmd
+  commands: TEST_SUITE=openshift/test-cmd run-tests
+  openshift_installer:
+    cluster_profile: gcp
+- as: e2e-gcp-builds
+  commands: TEST_SUITE=openshift/build run-tests
+  openshift_installer:
+    cluster_profile: gcp
+- as: e2e-aws-disruptive
+  commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance/parallel
+    run-tests
+  openshift_installer:
+    cluster_profile: aws
+- as: e2e-aws-jenkins
+  commands: TEST_SUITE=openshift/jenkins-e2e run-tests
+  openshift_installer:
+    cluster_profile: aws
+- as: e2e-gcp-image-ecosystem
+  commands: TEST_SUITE=openshift/image-ecosystem run-tests
+  openshift_installer:
+    cluster_profile: gcp
+- as: e2e-aws-image-registry
+  commands: TEST_SUITE=openshift/image-registry run-tests
+  openshift_installer:
+    cluster_profile: aws
+- as: e2e-gcp-upgrade
+  commands: TEST_SUITE=all run-upgrade-tests
+  openshift_installer:
+    cluster_profile: gcp
+    upgrade: true
+- as: e2e-aws-serial
+  commands: TEST_SUITE=openshift/conformance/serial run-tests
+  openshift_installer:
+    cluster_profile: aws
+- as: e2e-aws-csi
+  commands: TEST_INSTALL_CSI_DRIVERS=aws-ebs TEST_SUITE=openshift/csi run-tests
+  openshift_installer:
+    cluster_profile: aws
+- as: e2e-vsphere
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer_upi:
+    cluster_profile: vsphere
+- as: launch-vsphere
+  commands: sleep 7200 & wait
+  openshift_installer_upi:
+    cluster_profile: vsphere
+- as: e2e-conformance-k8s
+  commands: test/extended/conformance-k8s.sh
+  openshift_installer_src:
+    cluster_profile: aws
+zz_generated_metadata:
+  branch: marun-testing
+  org: openshift-priv
+  repo: kubernetes

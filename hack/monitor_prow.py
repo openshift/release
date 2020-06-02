@@ -83,7 +83,6 @@ def highlight(log_dir, dc):
     warn = '"level":"warning"'
     error = '"level":"error"'
     fatal = '"level":"fatal"'
-    query = '"query":"'
     log = '{}/{}.log'.format(log_dir, dc)
     while True:
         debug("deployment/{}: gathering info".format(dc))
@@ -103,10 +102,14 @@ def highlight(log_dir, dc):
                 for l in run_oc(cmd).splitlines():
                     if any(word in l for word in BLACKLIST):
                         continue
-                    if query in l:
-                        data = json.loads(l)
-                        data.pop("query")
-                        l = json.dumps(data)
+                    for marker, key in {
+                            '"query":"': "query",
+                            '"error":"query ': "error"
+                        }.items():
+                        if marker in l:
+                            data = json.loads(l)
+                            data.pop(key)
+                            l = json.dumps(data)
                     if warn in l:
                         log_lines.append(YELLOW + l + RESET)
                     elif error in l or fatal in l:

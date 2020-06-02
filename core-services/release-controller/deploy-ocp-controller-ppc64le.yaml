@@ -1,6 +1,54 @@
 kind: List
 apiVersion: v1
 items:
+# Bootstrap the environment for the amd64 tests image.  The caches require an amd64 "tests" image to execute on
+# the cluster.  This imagestream is used as a commandline parameter to the release-controller...
+#      --tools-image-stream-tag=release-controller-bootstrap:tests
+- kind: ImageStream
+  apiVersion: image.openshift.io/v1
+  metadata:
+    name: release-controller-bootstrap
+    namespace: ocp-ppc64le
+    annotations:
+  spec:
+    lookupPolicy:
+      local: false
+    tags:
+      - name: tests
+        from:
+          kind: DockerImage
+          name: registry.svc.ci.openshift.org/ocp/4.5:tests
+        importPolicy:
+          scheduled: true
+        referencePolicy:
+          type: Source
+
+# expose the files cache to the outside world
+- kind: Service
+  apiVersion: v1
+  metadata:
+    name: files-cache
+    namespace: ci-release-ppc64le
+  spec:
+    selector:
+      app: files-cache
+    ports:
+    - port: 80
+      targetPort: 8080
+- kind: Route
+  apiVersion: v1
+  metadata:
+    name: files-cache
+    namespace: ci-release-ppc64le
+  spec:
+    host: openshift-release-artifacts-ppc64le.svc.ci.openshift.org
+    tls:
+      termination: Edge
+      insecureEdgeTerminationPolicy: Redirect
+    to:
+      kind: Service
+      name: files-cache
+
 # deploy the controller
 - kind: Service
   apiVersion: v1
@@ -42,7 +90,7 @@ items:
         labels:
           app: release-controller-ocp-ppc64le
       spec:
-        serviceAccountName: release-controller-ocp
+        serviceAccountName: release-controller-ocp-ppc64le
         volumes:
         - configMap:
             defaultMode: 420
@@ -156,14 +204,16 @@ items:
           - --release-namespace=ocp-ppc64le
           - --prow-config=/etc/config/config.yaml
           - --job-config=/etc/job-config
-          - --artifacts=openshift-release-artifacts.svc.ci.openshift.org
+          - --artifacts=openshift-release-artifacts-ppc64le.svc.ci.openshift.org
           - --prow-namespace=ci
           - --prow-job-kubeconfig=/etc/prowjob-kubeconfig/kubeconfig
-          - --job-namespace=ci-release
+          - --job-namespace=ci-release-ppc64le
+          - --tools-image-stream-tag=release-controller-bootstrap:tests
           - -v=4
           - --github-token-path=/etc/github/oauth
           - --github-endpoint=http://ghproxy
           - --github-graphql-endpoint=http://ghproxy/graphql
           - --bugzilla-endpoint=https://bugzilla.redhat.com
           - --bugzilla-api-key-path=/etc/bugzilla/api
-          - --plugin-config=/etc/plugins/plugins
+          - --plugin-config=/etc/plugins/plugins.yaml
+          - --verify-bugzilla

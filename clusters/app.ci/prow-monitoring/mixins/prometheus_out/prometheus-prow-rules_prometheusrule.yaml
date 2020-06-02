@@ -104,6 +104,14 @@ spec:
       for: 5m
       labels:
         severity: critical
+    - alert: dptp-controller-managerDown
+      annotations:
+        message: The service dptp-controller-manager has been down for 5 minutes.
+      expr: |
+        absent(up{job="dptp-controller-manager"} == 1)
+      for: 5m
+      labels:
+        severity: critical
   - name: prow-monitoring-absent
     rules:
     - alert: ServiceLostHA
@@ -176,7 +184,7 @@ spec:
     - alert: plank-job-with-infra-role-failures
       annotations:
         message: plank jobs {{ $labels.job_name }} with infra role has failures. Check
-          on <https://grafana-prow-monitoring.svc.ci.openshift.org/d/8ce131e226b7fd2901c2fce45d4e21c1/dptp-dashboard?orgId=1&fullscreen&panelId=3|grafana>
+          on <https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/8ce131e226b7fd2901c2fce45d4e21c1/dptp-dashboard?orgId=1&fullscreen&panelId=3|grafana>
           and <https://prow.svc.ci.openshift.org/?job={{ $labels.job_name }}|deck>
       expr: |
         sum(rate(prowjob_state_transitions{job="plank",job_name!~"rehearse.*",state="failure"}[5m])) by (job_name) * on (job_name) group_left prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_role="infra"} > 0
@@ -189,7 +197,7 @@ spec:
       annotations:
         message: '{{ $value | humanize }}% of all requests for {{ $labels.path }}
           through the GitHub proxy are errorring with code {{ $labels.status }}. Check
-          <https://grafana-prow-monitoring.svc.ci.openshift.org/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1&refresh=1m&fullscreen&panelId=9|grafana>'
+          <https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1&refresh=1m&fullscreen&panelId=9|grafana>'
       expr: |
         sum(rate(github_request_duration_count{status=~"[45]..",status!="404",status!="410"}[5m])) by (status,path) / ignoring(status) group_left sum(rate(github_request_duration_count[5m])) by (path) * 100 > 10
       labels:
@@ -197,7 +205,7 @@ spec:
     - alert: ghproxy-global-status-code-abnormal
       annotations:
         message: '{{ $value | humanize }}% of all API requests through the GitHub
-          proxy are errorring with code {{ $labels.status }}. Check <https://grafana-prow-monitoring.svc.ci.openshift.org/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1&fullscreen&panelId=8|grafana>'
+          proxy are errorring with code {{ $labels.status }}. Check <https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1&fullscreen&panelId=8|grafana>'
       expr: |
         sum(rate(github_request_duration_count{status=~"[45]..",status!="404",status!="410"}[5m])) by (status) / ignoring(status) group_left sum(rate(github_request_duration_count[5m])) * 100 > 3
       labels:
@@ -205,7 +213,7 @@ spec:
     - alert: ghproxy-running-out-github-tokens-in-a-hour
       annotations:
         message: '{{ $labels.login }} may run out of API quota before the next reset.
-          Check the <https://grafana-prow-monitoring.svc.ci.openshift.org/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1|dashboard>'
+          Check the <https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1|dashboard>'
       expr: |
         github_token_usage * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login) + deriv(github_token_usage[20m]) * github_token_reset * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login) / 1e9 < 100
       for: 5m
@@ -350,5 +358,16 @@ spec:
       expr: |
         sum(rate(prowjob_state_transitions{job="plank",job_name="periodic-ci-image-import-to-build01",state="success"}[2d]))/sum(rate(prowjob_state_transitions{job="plank",job_name="periodic-ci-image-import-to-build01",state=~"success|failure"}[2d])) * 100 < 95
       for: 10m
+      labels:
+        severity: critical
+  - name: prow
+    rules:
+    - alert: prow-pod-crashlooping
+      annotations:
+        message: Pod {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container}})
+          is restarting {{ printf "%.2f" $value }} times / 5 minutes.
+      expr: rate(kube_pod_container_status_restarts_total{namespace=~"ci|prow-monitoring",job="kube-state-metrics"}[15m])
+        * 60 * 5 > 0
+      for: 1m
       labels:
         severity: critical

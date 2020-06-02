@@ -53,3 +53,35 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+  - agent: kubernetes
+    branches:
+    - ^openshiftci$
+    cluster: api.ci
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: branch-ci-open-cluster-management-multicloud-operators-application-openshiftci-sonar
+    spec:
+      containers:
+      - args:
+        - sonar/go/openshiftci-post
+        command:
+        - make
+        env:
+        - name: GOPROXY
+          value: proxy.golang.org,direct
+        image: registry.svc.ci.openshift.org/open-cluster-management/builder:go1.14-linux-amd64
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/sonarcloud
+          name: acm-sonarcloud-token
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: acm-sonarcloud-token
+        secret:
+          secretName: acm-sonarcloud-token

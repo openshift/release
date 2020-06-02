@@ -5,10 +5,6 @@ items:
   apiVersion: v1
   metadata:
     name: ocp-s390x
-- kind: Namespace
-  apiVersion: v1
-  metadata:
-    name: ci-release-s390x
 # pull access to authenticated users
 - kind: RoleBinding
   apiVersion: rbac.authorization.k8s.io/v1beta1
@@ -88,6 +84,25 @@ items:
     - imagestreamimports
     verbs:
     - create
+- kind: Role
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: release-controller-s390x-prowjob
+    namespace: ci
+  rules:
+  - apiGroups:
+    - prow.k8s.io
+    resources:
+    - prowjobs
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - delete
+    - update
+    - patch
+
 - kind: RoleBinding
   apiVersion: rbac.authorization.k8s.io/v1
   metadata:
@@ -99,7 +114,7 @@ items:
   subjects:
   - kind: ServiceAccount
     namespace: ci
-    name: release-controller-ocp
+    name: release-controller-ocp-s390x
 - kind: RoleBinding
   apiVersion: rbac.authorization.k8s.io/v1
   metadata:
@@ -111,7 +126,37 @@ items:
   subjects:
   - kind: ServiceAccount
     namespace: ci
-    name: release-controller-ocp
+    name: release-controller-ocp-s390x
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: release-controller-binding-prowjob-ocp-s390x
+    namespace: ci
+  roleRef:
+    kind: Role
+    name: release-controller-s390x-prowjob
+  subjects:
+  - kind: ServiceAccount
+    namespace: ci
+    name: release-controller-ocp-s390x
+
+# grant release-controller-ocp-s390x edit on its work namespace
+- kind: Namespace
+  apiVersion: v1
+  metadata:
+    name: ci-release-s390x
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: release-controller-binding-ocp
+    namespace: ci-release-s390x
+  roleRef:
+    kind: ClusterRole
+    name: edit
+  subjects:
+  - kind: ServiceAccount
+    namespace: ci
+    name: release-controller-ocp-s390x
 
 # give jobs in the work namespace authority to push to the
 # release namespace
@@ -125,7 +170,7 @@ items:
     name: system:image-builder
   subjects:
   - kind: ServiceAccount
-    namespace: ci-release
+    namespace: ci-release-s390x
     name: builder
 - kind: RoleBinding
   apiVersion: rbac.authorization.k8s.io/v1
@@ -138,7 +183,7 @@ items:
     name: release-controller-import-ocp
   subjects:
   - kind: ServiceAccount
-    namespace: ci-release
+    namespace: ci-release-s390x
     name: builder
 
 # create the secret that holds the upgrade graph state
@@ -147,3 +192,10 @@ items:
   metadata:
     name: release-upgrade-graph
     namespace: ocp-s390x
+
+# deploy the controller
+- kind: ServiceAccount
+  apiVersion: v1
+  metadata:
+    name: release-controller-ocp-s390x
+    namespace: ci
