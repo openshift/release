@@ -11,18 +11,21 @@ tag_specification:
   name: "4.5"
   namespace: ocp
 tests:
-- as: integration-e2e
-  commands: scripts/openshiftci-presubmit-all-tests.sh
-  openshift_installer_src:
-    cluster_profile: aws
+- as: integration-e2e-steps
   secret:
     mount_path: /tmp/secret
     name: odo-secret
-- as: integration-e2e-periodic
-  commands: scripts/openshiftci-periodic-tests.sh
-  cron: 0 */6 * * *
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: integration-e2e
+      commands: scripts/openshiftci-presubmit-all-tests.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: openshift
