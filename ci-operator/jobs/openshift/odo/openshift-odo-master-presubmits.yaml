@@ -58,8 +58,8 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       ci-operator.openshift.io/variant: v4.5
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-odo-master-v4.5-integration-e2e
-    rerun_command: /test v4.5-integration-e2e
+    name: pull-ci-openshift-odo-master-v4.5-integration-e2e-steps
+    rerun_command: /test v4.5-integration-e2e-steps
     spec:
       containers:
       - args:
@@ -67,20 +67,11 @@ presubmits:
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/secrets/odo-secret
-        - --secret-dir=/usr/local/integration-e2e-cluster-profile
-        - --target=integration-e2e
-        - --template=/usr/local/integration-e2e
+        - --secret-dir=/usr/local/integration-e2e-steps-cluster-profile
+        - --target=integration-e2e-steps
         - --variant=v4.5
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: integration-e2e
-        - name: TEST_COMMAND
-          value: scripts/openshiftci-presubmit-all-tests.sh
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -91,14 +82,8 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/integration-e2e-cluster-profile
+        - mountPath: /usr/local/integration-e2e-steps-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/integration-e2e
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
-        - mountPath: /secrets/odo-secret
-          name: odo-secret
-          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -118,16 +103,10 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
-      - name: odo-secret
-        secret:
-          secretName: odo-secret
       - name: pull-secret
         secret:
           secretName: regcred
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )v4.5-integration-e2e,?($|\s.*)
+    trigger: (?m)^/test( | .* )v4.5-integration-e2e-steps,?($|\s.*)
