@@ -3,11 +3,18 @@
 This document overviews the secrets that are available and the means by which
 they should be deployed to the cluster.
 
-## Access to secrets
+There are currently two ways to manager secrets:
 
-We store secrets in a private secret storage system. To add new secrets to this storage
-please reach out to `#forum-testplatform` on Slack and be prepared to encrypt your data
-with our GPG keys.
+* DPTP-managed Secrets: We store secrets in a private secret storage system: [Bitwarden](https://bitwarden.com/).
+To add new secrets to this storage please reach out to `#forum-testplatform` on Slack
+and be prepared to encrypt your data with our GPG keys. DPTP uses [ci-secret-bootstrap](../core-services/ci-secret-bootstrap)
+to populate secrets from Bitwarden to the clusters in CI-infrastructure.
+
+* Self-Managed Secrets: In order to provide custom secrets to jobs without putting the secret management
+into the hands of the Developer Productivity (Test Platform) team, it is possible
+to create the secrets in the cluster and have them automatically mirrored to be
+available for jobs. See [secret-mirroring](../core-services/secret-mirroring/README.md#self-managed-secrets)
+for details and instructions.
 
 ## Secrets Listing
 
@@ -199,19 +206,7 @@ This token is granted access to talk to the Slack API for automation purposes.
 
 ## Secret Regeneration
 
-In order to regenerate the secrets in the case of an emergency, a CI admin can
-recreate all of the above secrets by running:
-
-```
-$ BW_SESSION="$( bw login username@company.com password --raw )" ci-operator/populate-secrets-from-bitwarden.sh
-```
-
-This requires the appropriate access in BitWarden and will create a new session
-that can be closed with:
-
-```
-$ bw logout
-```
+`make job JOB=periodic-ci-secret-bootstrap` or wait for the [periodic-ci-secret-bootstrap](https://github.com/openshift/release/blob/f266979b7e0cfe8d7bf25a013a96a9086e7e8731/ci-operator/jobs/infra-periodics.yaml#L1187) job to be triggered the next time.
 
 ## Secret Drift Detection
 
@@ -227,11 +222,3 @@ $ oc get secrets --selector=ci.openshift.io/managed=true --export -o yaml -n ci 
 $ oc get secrets --selector=ci.openshift.io/managed=true --export -o yaml -n $TEST_NS > proposed.yaml
 $ diff prod.yaml proposed.yaml
 ```
-
-# Self-Managed Secrets
-
-In order to provide custom secrets to jobs without putting the secret management
-into the hands of the Developer Productivity (Test Platform) team, it is possible
-to create the secrets in the cluster and have them automatically mirrored to be
-available for jobs. See the [doc](../core-services/secret-mirroring/README.md#self-managed-secrets)
-for details and instructions.
