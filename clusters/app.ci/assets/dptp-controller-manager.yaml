@@ -164,6 +164,7 @@ spec:
         - --enable-controller=promotionreconciler
         - --testImagesDistributorOptions.imagePullSecretPath=/etc/regcred/.dockerconfigjson
         - --enable-controller=test_images_distributor
+        - --step-config-path=/etc/registry
         - --dry-run=false
         env:
         - name: KUBECONFIG
@@ -180,6 +181,9 @@ spec:
           readOnly: true
         - name: kubeconfigs
           mountPath: /var/kubeconfigs
+        - name: registry
+          mountPath: /etc/registry
+          readOnly: true
         - name: config
           mountPath: /etc/config
           readOnly: true
@@ -254,6 +258,9 @@ spec:
       - name: regcred
         secret:
           secretName: registry-cluster-pull-secret
+      - name: registry
+        configMap:
+          name: step-registry
       - name: master
         configMap:
           name: ci-operator-master-configs
