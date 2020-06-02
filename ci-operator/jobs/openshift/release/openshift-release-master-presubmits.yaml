@@ -104,8 +104,6 @@ presubmits:
         - clusters/build-clusters/01_cluster
         - --kubeconfig
         - /etc/build-farm-credentials/kubeconfig
-        - --context
-        - build01
         - --as=
         command:
         - applyconfig
@@ -154,6 +152,62 @@ presubmits:
             path: kubeconfig
           secretName: build-farm-credentials
     trigger: (?m)^/test( | .* )build01-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: app.ci
+    context: ci/build-farm/build02-dry
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-build02-dry
+    rerun_command: /test build02-dry
+    spec:
+      containers:
+      - args:
+        - --config-dir
+        - clusters/build-clusters/02_cluster
+        - --kubeconfig
+        - /etc/build-farm-credentials/kubeconfig
+        - --as=
+        command:
+        - applyconfig
+        env:
+        - name: github_client_id
+          valueFrom:
+            secretKeyRef:
+              key: build02_github_client_id
+              name: build-farm-credentials
+        - name: github_client_secret
+          valueFrom:
+            secretKeyRef:
+              key: build02_github_client_secret
+              name: build-farm-credentials
+        - name: slack_api_url
+          valueFrom:
+            secretKeyRef:
+              key: url
+              name: ci-slack-api-url
+        image: registry.svc.ci.openshift.org/ci/applyconfig:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.build02.config
+            path: kubeconfig
+          secretName: build-farm-credentials
+    trigger: (?m)^/test( | .* )build02-dry,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -260,7 +314,7 @@ presubmits:
         - mismatched-tide-lenient
         command:
         - /checkconfig
-        image: gcr.io/k8s-prow/checkconfig:v20200517-088d21b2a
+        image: gcr.io/k8s-prow/checkconfig:v20200531-9c20170569
         imagePullPolicy: Always
         name: ""
         resources:

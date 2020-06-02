@@ -33,16 +33,19 @@ cat > packet-teardown.yaml <<-EOF
       packet_device:
         auth_token: "{{ packet_auth_token }}"
         project_id: "{{ packet_project_id }}"
-        hostnames: "{{ packet_hostname }}" 
+        hostnames: "{{ packet_hostname }}"
         state: absent
+      retries: 3
+      delay: 120
       register: hosts
+      until: hosts.failed == false
       no_log: true
     rescue:
     - name: Send notification message via Slack in case of failure
       slack:
         token: "{{ 'T027F3GAJ/B011TAG710V/' + lookup('file', slackhook_path + '/.slackhook') }}"
         msg: 'Packet teardown failed: {{ ansible_failed_result }}'
-        username: 'Ansible on {{ inventory_hostname }}'
+        username: 'Ansible on {{ packet_hostname }}'
         channel: "#team-edge-installer"
         color: warning
         icon_emoji: ":failed:"

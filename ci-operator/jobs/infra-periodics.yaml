@@ -27,6 +27,33 @@ periodics:
       resources: {}
     serviceAccountName: image-importer
 - agent: kubernetes
+  cluster: build02
+  decorate: true
+  interval: 1m
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  max_concurrency: 1
+  name: periodic-ci-image-import-to-build02
+  spec:
+    containers:
+    - args:
+      - -c
+      - |
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+        for is in $(oc get is -n ci -o=jsonpath='{.items[*].metadata.name}'); do
+          echo "importing ${is} ..."
+          oc import-image -n ci "${is}" --all
+        done
+      command:
+      - /bin/bash
+      image: registry.svc.ci.openshift.org/ocp/4.5:cli
+      imagePullPolicy: Always
+      name: ""
+      resources: {}
+    serviceAccountName: image-importer
+- agent: kubernetes
   cluster: api.ci
   cron: 30 7 * * 1
   decorate: true
@@ -131,7 +158,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20200517-088d21b2a
+      image: gcr.io/k8s-prow/commenter:v20200531-9c20170569
       imagePullPolicy: Always
       name: ""
       resources:
@@ -175,7 +202,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20200517-088d21b2a
+      image: gcr.io/k8s-prow/commenter:v20200531-9c20170569
       imagePullPolicy: Always
       name: ""
       resources:
@@ -228,7 +255,7 @@ periodics:
       - --random
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20200517-088d21b2a
+      image: gcr.io/k8s-prow/commenter:v20200531-9c20170569
       imagePullPolicy: Always
       name: ""
       resources:
@@ -277,7 +304,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20200517-088d21b2a
+      image: gcr.io/k8s-prow/commenter:v20200531-9c20170569
       imagePullPolicy: Always
       name: ""
       resources:
@@ -330,7 +357,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20200517-088d21b2a
+      image: gcr.io/k8s-prow/commenter:v20200531-9c20170569
       imagePullPolicy: Always
       name: ""
       resources:
@@ -382,7 +409,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20200517-088d21b2a
+      image: gcr.io/k8s-prow/commenter:v20200531-9c20170569
       imagePullPolicy: Always
       name: ""
       resources:
@@ -416,7 +443,7 @@ periodics:
       - --debug
       command:
       - /app/label_sync/app.binary
-      image: gcr.io/k8s-prow/label_sync:v20200517-088d21b2a
+      image: gcr.io/k8s-prow/label_sync:v20200531-9c20170569
       imagePullPolicy: Always
       name: ""
       resources:
@@ -560,8 +587,8 @@ periodics:
       - --git-email=openshift-bot@redhat.com
       - --target-dir=.
       - --config-dir=./ci-operator/config
-      - --current-release=4.5
-      - --future-release=4.6
+      - --current-release=4.6
+      - --future-release=4.7
       - --self-approve=true
       - --assign=ghost
       - --whitelist-file=./core-services/openshift-priv/_whitelist.yaml
@@ -660,6 +687,11 @@ periodics:
 - agent: kubernetes
   cluster: api.ci
   decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+    workdir: true
   interval: 24h
   labels:
     ci.openshift.io/role: infra
@@ -667,8 +699,8 @@ periodics:
   spec:
     containers:
     - args:
-      - --config-path=/etc/config/config.yaml
-      - --job-config-path=/etc/job-config
+      - --config-path=./core-services/prow/02_config/_config.yaml
+      - --job-config-path=./ci-operator/jobs
       - --confirm=true
       - --github-token-path=/etc/github/oauth
       - --github-endpoint=http://ghproxy
@@ -676,7 +708,7 @@ periodics:
       - --github-graphql-endpoint=http://ghproxy/graphql
       command:
       - /app/prow/cmd/branchprotector/app.binary
-      image: gcr.io/k8s-prow/branchprotector:v20200517-088d21b2a
+      image: gcr.io/k8s-prow/branchprotector:v20200531-9c20170569
       imagePullPolicy: Always
       name: ""
       resources:
@@ -686,82 +718,10 @@ periodics:
       - mountPath: /etc/github
         name: token
         readOnly: true
-      - mountPath: /etc/config
-        name: config
-        readOnly: true
-      - mountPath: /etc/job-config/misc
-        name: job-config-misc
-        readOnly: true
-      - mountPath: /etc/job-config/master
-        name: job-config-master
-        readOnly: true
-      - mountPath: /etc/job-config/3.x
-        name: job-config-3x
-        readOnly: true
-      - mountPath: /etc/job-config/4.0
-        name: job-config-40
-        readOnly: true
-      - mountPath: /etc/job-config/4.1
-        name: job-config-41
-        readOnly: true
-      - mountPath: /etc/job-config/4.2
-        name: job-config-42
-        readOnly: true
-      - mountPath: /etc/job-config/4.3
-        name: job-config-43
-        readOnly: true
-      - mountPath: /etc/job-config/4.4
-        name: job-config-44
-        readOnly: true
-      - mountPath: /etc/job-config/4.5
-        name: job-config-45
-        readOnly: true
-      - mountPath: /etc/job-config/4.6
-        name: job-config-46
-        readOnly: true
-      - mountPath: /etc/job-config/4.7
-        name: job-config-47
-        readOnly: true
     volumes:
     - name: token
       secret:
         secretName: github-credentials-openshift-merge-robot
-    - configMap:
-        name: config
-      name: config
-    - configMap:
-        name: job-config-misc
-      name: job-config-misc
-    - configMap:
-        name: job-config-master
-      name: job-config-master
-    - configMap:
-        name: job-config-3.x
-      name: job-config-3x
-    - configMap:
-        name: job-config-4.0
-      name: job-config-40
-    - configMap:
-        name: job-config-4.1
-      name: job-config-41
-    - configMap:
-        name: job-config-4.2
-      name: job-config-42
-    - configMap:
-        name: job-config-4.3
-      name: job-config-43
-    - configMap:
-        name: job-config-4.4
-      name: job-config-44
-    - configMap:
-        name: job-config-4.5
-      name: job-config-45
-    - configMap:
-        name: job-config-4.6
-      name: job-config-46
-    - configMap:
-        name: job-config-4.7
-      name: job-config-47
 - agent: kubernetes
   cluster: api.ci
   decorate: true
@@ -795,7 +755,7 @@ periodics:
       - --fix-repos
       command:
       - /app/prow/cmd/peribolos/app.binary
-      image: gcr.io/k8s-prow/peribolos:v20200517-088d21b2a
+      image: gcr.io/k8s-prow/peribolos:v20200531-9c20170569
       imagePullPolicy: Always
       name: ""
       resources:
@@ -956,8 +916,8 @@ periodics:
       - /app/prow/cmd/config-bootstrapper/app.binary
       env:
       - name: KUBECONFIG
-        value: /etc/build-farm-credentials/api.ci.kubeconfig:/etc/build-farm-credentials/build01.kubeconfig:/etc/app-ci-config-updater-kubeconfig/kubeconfig
-      image: gcr.io/k8s-prow/config-bootstrapper:v20200517-088d21b2a
+        value: /etc/build-farm-credentials/api.ci.kubeconfig:/etc/build-farm-credentials/build01.kubeconfig:/etc/app-ci-config-updater-kubeconfig/kubeconfig:/etc/build-farm-credentials/build02.kubeconfig
+      image: gcr.io/k8s-prow/config-bootstrapper:v20200531-9c20170569
       imagePullPolicy: Always
       name: ""
       resources:
@@ -979,6 +939,8 @@ periodics:
           path: api.ci.kubeconfig
         - key: sa.hook.build01.config
           path: build01.kubeconfig
+        - key: sa.hook.build02.config
+          path: build02.kubeconfig
         secretName: build-farm-credentials
     - name: app-ci-config-updater-kubeconfig
       secret:
@@ -998,8 +960,8 @@ periodics:
     containers:
     - args:
       - --config-dir=./ci-operator/config/
-      - --current-release=4.5
-      - --future-release=4.6
+      - --current-release=4.6
+      - --future-release=4.7
       - --future-release=4.7
       - --fast-forward
       - --confirm
@@ -1042,6 +1004,8 @@ periodics:
       - --only-org=openshift
       - --confirm
       - --whitelist-file=./core-services/openshift-priv/_whitelist.yaml
+      - --git-name=openshift-merge-robot
+      - --git-email=openshift-merge-robot@redhat.com
       command:
       - private-org-sync
       image: private-org-sync:latest
@@ -1073,8 +1037,8 @@ periodics:
     containers:
     - args:
       - --config-dir=./ci-operator/config/
-      - --current-release=4.5
-      - --future-release=4.6
+      - --current-release=4.6
+      - --future-release=4.7
       - --confirm
       - --username=openshift-merge-robot
       - --token-path=/etc/github/oauth
@@ -1233,7 +1197,7 @@ periodics:
       - /usr/bin/ci-secret-bootstrap
       env:
       - name: KUBECONFIG
-        value: /etc/build-farm-credentials/sa.config-updater.api.ci.config:/etc/build-farm-credentials/sa.config-updater.app.ci.config:/etc/build-farm-credentials/sa.config-updater.build01.config
+        value: /etc/build-farm-credentials/sa.config-updater.api.ci.config:/etc/build-farm-credentials/sa.config-updater.app.ci.config:/etc/build-farm-credentials/sa.config-updater.build01.config:/etc/build-farm-credentials/sa.config-updater.build02.config
       image: registry.svc.ci.openshift.org/ci/ci-secret-bootstrap:latest
       imagePullPolicy: Always
       name: ci-secret-bootstrap
@@ -1262,6 +1226,8 @@ periodics:
           path: sa.config-updater.app.ci.config
         - key: sa.config-updater.build01.config
           path: sa.config-updater.build01.config
+        - key: sa.config-updater.build02.config
+          path: sa.config-updater.build02.config
         secretName: build-farm-credentials
     - emptyDir: {}
       name: config-volume

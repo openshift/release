@@ -13,6 +13,9 @@
     - cluster: build01
       namespace: ocp
       name: mirror.openshift.com
+    - cluster: build02
+      namespace: ocp
+      name: mirror.openshift.com
 # Host keys for the SSHD bastions
 - from:
     authorized_keys:
@@ -128,7 +131,7 @@
       namespace: ci
       name: bugzilla-credentials-openshift-bugzilla-robot
     - cluster: api.ci
-      namespace: bugizlla-operator
+      namespace: bugzilla-operator
       name: bugzilla-credentials-openshift-bugzilla-robot
     - cluster: app.ci
       namespace: ci
@@ -250,6 +253,9 @@
       namespace: ci
       name: github-credentials-openshift-ci-robot-private-git-cloner
     - cluster: build01
+      namespace: ci
+      name: github-credentials-openshift-ci-robot-private-git-cloner
+    - cluster: build02
       namespace: ci
       name: github-credentials-openshift-ci-robot-private-git-cloner
 # openshift-publish-robot also has a token that grants read-only
@@ -405,6 +411,9 @@
     - cluster: app.ci
       namespace: ci
       name: gce-sa-credentials-gcs-publisher
+    - cluster: build02
+      namespace: ci
+      name: gce-sa-credentials-gcs-publisher
 - from:
     service-account.json:
       bw_item: gcs-tide-publisher
@@ -428,6 +437,9 @@
       namespace: ci
       name: gce-sa-credentials-gcs-private
     - cluster: build01
+      namespace: ci
+      name: gce-sa-credentials-gcs-private
+    - cluster: build02
       namespace: ci
       name: gce-sa-credentials-gcs-private
 - from:
@@ -571,6 +583,22 @@
       namespace: ci
       name: ci-pull-credentials
       type: kubernetes.io/dockerconfigjson
+    - cluster: api.ci
+      namespace: test-credentials
+      name: ci-pull-credentials
+      type: kubernetes.io/dockerconfigjson
+    - cluster: app.ci
+      namespace: test-credentials
+      name: ci-pull-credentials
+      type: kubernetes.io/dockerconfigjson
+    - cluster: build01
+      namespace: test-credentials
+      name: ci-pull-credentials
+      type: kubernetes.io/dockerconfigjson
+    - cluster: build02
+      namespace: test-credentials
+      name: ci-pull-credentials
+      type: kubernetes.io/dockerconfigjson
 - from:
     test.env.yaml:
       bw_item: operator-manifests
@@ -611,6 +639,9 @@
     - cluster: build01
       namespace: ci
       name: cluster-secrets-aws
+    - cluster: build02
+      namespace: ci
+      name: cluster-secrets-aws
 # gcp
 - from:
     pull-secret:
@@ -641,6 +672,9 @@
     - cluster: build01
       namespace: ci
       name: cluster-secrets-gcp
+    - cluster: build02
+      namespace: ci
+      name: cluster-secrets-gcp
 # openstack
 - from:
     pull-secret:
@@ -668,7 +702,7 @@
 # openstack-ppc64le
 - from:
     pull-secret:
-      bw_item: openstack-ppc64le
+      bw_item: quay.io
       attachment: pull-secret
     clouds.yaml:
       bw_item: openstack-ppc64le
@@ -713,6 +747,9 @@
     - cluster: build01
       namespace: ci
       name: cluster-secrets-vsphere
+    - cluster: build02
+      namespace: ci
+      name: cluster-secrets-vsphere
 # metal
 - from:
     pull-secret:
@@ -747,6 +784,9 @@
       namespace: ci
       name: cluster-secrets-metal
     - cluster: build01
+      namespace: ci
+      name: cluster-secrets-metal
+    - cluster: build02
       namespace: ci
       name: cluster-secrets-metal
 # packet
@@ -794,6 +834,9 @@
     - cluster: build01
       namespace: ci
       name: cluster-secrets-packet
+    - cluster: build02
+      namespace: ci
+      name: cluster-secrets-packet
 #azure4
 - from:
     pull-secret:
@@ -815,6 +858,9 @@
     - cluster: build01
       namespace: ci
       name: cluster-secrets-azure4
+    - cluster: build02
+      namespace: ci
+      name: cluster-secrets-azure4
 # cluster-secrets-azure is not synced. Email sent to Jim about this.
 # azure:
 # codecov.io tokens we store for teams
@@ -829,6 +875,9 @@
     - cluster: build01
       namespace: ci
       name: redhat-developer-service-binding-operator-codecov-token
+    - cluster: build02
+      namespace: ci
+      name: redhat-developer-service-binding-operator-codecov-token
 # collects all the secrets for build farm
 - from:
     build01_github_client_secret:
@@ -836,6 +885,12 @@
       field: github_client_secret
     build01_github_client_id:
       bw_item: build_farm_01_cluster
+      field: github_client_id
+    build02_github_client_secret:
+      bw_item: build_farm_02_cluster
+      field: github_client_secret
+    build02_github_client_id:
+      bw_item: build_farm_02_cluster
       field: github_client_id
     build01_ci_reg_auth_value.txt:
       bw_item: build_farm
@@ -906,6 +961,24 @@
     sa.config-updater.api.ci.config:
       bw_item: build_farm
       attachment: sa.config-updater.api.ci.config
+    sa.config-updater.build02.config:
+      bw_item: build_farm
+      attachment: sa.config-updater.build02.config
+    sa.crier.build02.config:
+      bw_item: build_farm
+      attachment: sa.crier.build02.config
+    sa.deck.build02.config:
+      bw_item: build_farm
+      attachment: sa.deck.build02.config
+    sa.hook.build02.config:
+      bw_item: build_farm
+      attachment: sa.hook.build02.config
+    sa.plank.build02.config:
+      bw_item: build_farm
+      attachment: sa.plank.build02.config
+    sa.sinker.build02.config:
+      bw_item: build_farm
+      attachment: sa.sinker.build02.config
   to:
     - cluster: api.ci
       namespace: ci
@@ -913,6 +986,30 @@
     - cluster: app.ci
       namespace: ci
       name: build-farm-credentials
+- from:
+    kubeconfig:
+      bw_item: build_farm
+      attachment: sa.ci-operator.api.ci.config
+  to:
+    - cluster: api.ci
+      namespace: test-credentials
+      name: ci-operator
+- from:
+    kubeconfig:
+      bw_item: build_farm
+      attachment: sa.ci-operator.build01.config
+  to:
+    - cluster: build01
+      namespace: test-credentials
+      name: ci-operator
+- from:
+    kubeconfig:
+      bw_item: build_farm
+      attachment: sa.ci-operator.build02.config
+  to:
+    - cluster: build02
+      namespace: test-credentials
+      name: ci-operator
 # config updater for app.ci cluster
 - from:
     kubeconfig:
@@ -938,6 +1035,9 @@
     - cluster: build01
       namespace: ci
       name: apici-ci-operator-credentials
+    - cluster: build02
+      namespace: ci
+      name: apici-ci-operator-credentials
 # collects all the secrets for boskos
 - from:
     username:
@@ -957,6 +1057,9 @@
       namespace: ci
       name: boskos-credentials
     - cluster: app.ci
+      namespace: ci
+      name: boskos-credentials
+    - cluster: build02
       namespace: ci
       name: boskos-credentials
 # collects all the secrets for aws iamuser openshift-ci-robot iamuser under account ci-infra
@@ -983,6 +1086,9 @@
       field: AWS_SECRET_ACCESS_KEY
   to:
     - cluster: build01
+      namespace: ci
+      name: aws-ci-infra-ci-build01-audit-logs-uploader-credentials
+    - cluster: build02
       namespace: ci
       name: aws-ci-infra-ci-build01-audit-logs-uploader-credentials
 #https://jira.coreos.com/browse/DPP-2164
@@ -1042,6 +1148,12 @@
     api-ci-kubeconfig:
       bw_item: dptp-controller-manager
       attachment: api.ci.kubeconfig
+    build01-kubeconfig:
+      bw_item: dptp-controller-manager
+      attachment: sa.dptp-controller-manager.build01.config
+    build02-kubeconfig:
+      bw_item: dptp-controller-manager
+      attachment: sa.dptp-controller-manager.build02.config
   to:
     - cluster: app.ci
       namespace: ci
@@ -1068,6 +1180,9 @@
     - cluster: build01
       namespace: ci
       name: result-aggregator
+    - cluster: build02
+      namespace: ci
+      name: result-aggregator
 - from:
     sa.pj-rehearse.app.ci.config:
       bw_item: pj-rehearse
@@ -1092,3 +1207,42 @@
     - cluster: app.ci
       namespace: ci
       name: app-ci-openshift-monitoring-credentials
+- from:
+    token:
+      bw_item: acm-cicd
+      field: acm-sonarcloud-token
+  to:
+    - cluster: api.ci
+      namespace: ci
+      name: acm-sonarcloud-token
+    - cluster: build01
+      namespace: ci
+      name: acm-sonarcloud-token
+    - cluster: build02
+      namespace: ci
+      name: acm-sonarcloud-token
+- from:
+    token:
+      bw_item: acm-cicd
+      field: acm-cicd-github-token
+  to:
+    - cluster: api.ci
+      namespace: ci
+      name: acm-cicd-github
+    - cluster: build01
+      namespace: ci
+      name: acm-cicd-github
+    - cluster: build02
+      namespace: ci
+      name: acm-cicd-github
+- from:
+    key.json:
+      bw_item: cert-issuer
+      attachment: service-account.json
+    openshift-ci-build-farm-cert-issuer.json:
+      bw_item: openshift-ci-build-farm-cert-issuer
+      attachment: service-account.json
+  to:
+    - cluster: build02
+      namespace: cert-manager
+      name: cert-issuer

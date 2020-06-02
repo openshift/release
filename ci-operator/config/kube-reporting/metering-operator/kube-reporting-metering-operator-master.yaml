@@ -1,12 +1,12 @@
 base_images:
   ansible-operator:
     cluster: https://api.ci.openshift.org
-    name: "4.5"
+    name: "4.6"
     namespace: ocp
     tag: ansible-operator
   base:
     cluster: https://api.ci.openshift.org
-    name: "4.5"
+    name: "4.6"
     namespace: ocp
     tag: base
 build_root:
@@ -21,7 +21,7 @@ images:
   from: ansible-operator
   to: metering-ansible-operator
 promotion:
-  name: "4.5"
+  name: "4.6"
   namespace: ocp
 resources:
   '*':
@@ -30,7 +30,7 @@ resources:
       memory: 200Mi
 tag_specification:
   cluster: https://api.ci.openshift.org
-  name: "4.5"
+  name: "4.6"
   namespace: ocp
 tests:
 - artifact_dir: /tmp/artifacts
@@ -64,7 +64,17 @@ tests:
     # to run Presto, and the full metering stack.
     kubectl -n openshift-machine-api get machinesets -o name | grep worker | cut -d/ -f2 | xargs -I{} kubectl -n openshift-machine-api scale machineset {} --replicas 3
 
-    TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/e2e make e2e
+    TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/e2e EXTRA_TEST_FLAGS="-run TestManualMeteringInstall" make e2e
+  openshift_installer_src:
+    cluster_profile: aws
+- as: metering-upgrade-aws
+  commands: |
+    set -x
+    # Increase the size of the machines so that there are machines large enough
+    # to run Presto, and the full metering stack.
+    kubectl -n openshift-machine-api get machinesets -o name | grep worker | cut -d/ -f2 | xargs -I{} kubectl -n openshift-machine-api scale machineset {} --replicas 3
+
+    TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/upgrade EXTRA_TEST_FLAGS="-run TestMeteringUpgrades" make e2e
   openshift_installer_src:
     cluster_profile: aws
 zz_generated_metadata:

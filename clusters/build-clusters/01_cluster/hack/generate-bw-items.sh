@@ -34,7 +34,7 @@ generate_kubeconfig() {
   fi
 }
 
-declare -a SAArray=( "config-updater" "deck" "plank" "sinker" "hook" "ca-cert-issuer" "crier" )
+declare -a SAArray=( "config-updater" "deck" "plank" "sinker" "hook" "ca-cert-issuer" "crier" "dptp-controller-manager")
 
 # Iterate the string array using for loop
 for name in ${SAArray[@]}; do

@@ -598,12 +598,14 @@ periodics:
                   curl -L "${tar_url}" | tar xf - -C /srv/repo/ && \\
                   rm -rf /etc/yum.repos.d && \\
                   ostree --repo=/srv/repo checkout "${ostree_ref}" --subpath /usr/etc/yum.repos.d --user-mode /etc/yum.repos.d && \\
+                  ostree --repo=/srv/repo cat "${ostree_ref}" /usr/lib/os-release > /tmp/os-release && \\
+                  source /tmp/os-release && \\
                   sed -i 's/enabled=0/enabled=1/g' /etc/yum.repos.d/fedora-updates-testing-modular.repo && \\
                   rpm-ostree db list --repo /srv/repo "${ostree_ref}" > /tmp/packages && \\
-                  dnf module enable -y cri-o:1.17 && \\
-                  if ! grep -q cri-o /tmp/packages; then yumdownloader -y --archlist=x86_64 --disablerepo=* --enablerepo=updates-testing-modular --destdir=/tmp/rpms cri-o cri-tools; fi && \\
-                  if ! grep -q glusterfs-fuse /tmp/packages; then yumdownloader -y --archlist=x86_64 --disablerepo=* --enablerepo=fedora --enablerepo=updates --destdir=/tmp/rpms  glusterfs glusterfs-client-xlators glusterfs-fuse glusterfs-libs psmisc; fi && \\
-                  if ! grep -q open-vm-tools /tmp/packages; then yumdownloader -y --archlist=x86_64 --disablerepo=* --enablerepo=fedora --enablerepo=updates --destdir=/tmp/rpms  open-vm-tools; fi && \\
+                  dnf --setopt=releasever="\${VERSION_ID}" module enable -y cri-o:1.17 && \\
+                  if ! grep -q cri-o /tmp/packages; then yumdownloader -y --setopt=releasever="\${VERSION_ID}" --archlist=x86_64 --disablerepo=* --enablerepo=updates-testing-modular --destdir=/tmp/rpms cri-o cri-tools; fi && \\
+                  if ! grep -q glusterfs-fuse /tmp/packages; then yumdownloader --setopt=releasever="\${VERSION_ID}" -y --archlist=x86_64 --disablerepo=* --enablerepo=fedora --enablerepo=updates --destdir=/tmp/rpms  glusterfs glusterfs-client-xlators glusterfs-fuse glusterfs-libs psmisc; fi && \\
+                  if ! grep -q open-vm-tools /tmp/packages; then yumdownloader --setopt=releasever="\${VERSION_ID}" -y --archlist=x86_64 --disablerepo=* --enablerepo=fedora --enablerepo=updates --destdir=/tmp/rpms  open-vm-tools xmlsec1 xmlsec1-openssl libxslt libtool-ltdl; fi && \\
                   cd /tmp/working && \\
                   for i in \$(find /tmp/rpms/ -name *.rpm); do echo "Extracting \$i ..."; rpm2cpio \$i | cpio -div; done && \\
                   mv etc usr/ && mv sbin/* usr/sbin/ && rm -rf sbin/ && \\
@@ -1595,7 +1597,7 @@ periodics:
 - agent: kubernetes
   cluster: api.ci
   decorate: true
-  interval: 48h
+  interval: 12h
   labels:
     ci.openshift.io/release-type: informing
     job-release: "4.5"
@@ -2045,7 +2047,7 @@ periodics:
 - agent: kubernetes
   cluster: api.ci
   decorate: true
-  interval: 48h
+  interval: 12h
   labels:
     ci.openshift.io/release-type: informing
     job-release: "4.5"
@@ -2149,7 +2151,7 @@ periodics:
 - agent: kubernetes
   cluster: api.ci
   decorate: true
-  interval: 48h
+  interval: 24h
   labels:
     ci.openshift.io/release-type: informing
     job-release: "4.5"
@@ -2253,7 +2255,7 @@ periodics:
 - agent: kubernetes
   cluster: api.ci
   decorate: true
-  interval: 48h
+  interval: 24h
   labels:
     ci.openshift.io/release-type: informing
     job-release: "4.5"
@@ -2477,7 +2479,7 @@ periodics:
 - agent: kubernetes
   cluster: api.ci
   decorate: true
-  interval: 48h
+  interval: 12h
   labels:
     ci.openshift.io/release-type: informing
     job-release: "4.5"
@@ -2931,7 +2933,7 @@ periodics:
 - agent: kubernetes
   cluster: api.ci
   decorate: true
-  interval: 48h
+  interval: 24h
   labels:
     ci.openshift.io/release-type: informing
     job-release: "4.5"
@@ -3147,6 +3149,252 @@ periodics:
             name: cluster-secrets-gcp
         - configMap:
             name: cluster-profile-gcp
+    - configMap:
+        name: prow-job-cluster-launch-installer-e2e
+      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
+  cluster: api.ci
+  decorate: true
+  interval: 8h
+  labels:
+    ci.openshift.io/release-type: informing
+    job-env: aws
+    job-release: "4.5"
+    job-test: e2e-network-stress
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: release-openshift-origin-installer-e2e-aws-sdn-network-stress-4.5
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
+      - --secret-dir=/usr/local/e2e-aws-sdn-network-stress-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-aws-sdn-network-stress
+      - --template=/usr/local/e2e-aws-sdn-network-stress
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_LATEST
+        value: registry.svc.ci.openshift.org/ocp/release:4.5-ci
+      - name: BRANCH
+        value: "4.5"
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: CONFIG_SPEC
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-sdn-network-stress
+            commands: TEST_SUITE=openshift/network/stress run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-upgrade
+            commands: TEST_SUITE=all run-upgrade-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: launch-$(CLUSTER_TYPE)
+            commands: sleep 9000 & wait
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+      - name: JOB_NAME_SAFE
+        value: e2e-aws-sdn-network-stress
+      - name: TEST_COMMAND
+        value: TEST_SUITE=openshift/network/stress run-tests
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-sdn-network-stress-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/e2e-aws-sdn-network-stress
+        name: job-definition
+        subPath: cluster-launch-installer-e2e.yaml
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - configMap:
+        name: prow-job-cluster-launch-installer-e2e
+      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
+  cluster: api.ci
+  decorate: true
+  interval: 8h
+  labels:
+    ci.openshift.io/release-type: informing
+    job-env: aws
+    job-release: "4.5"
+    job-test: e2e-network-stress
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: release-openshift-origin-installer-e2e-aws-ovn-network-stress-4.5
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
+      - --secret-dir=/usr/local/e2e-aws-ovn-network-stress-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-aws-ovn-network-stress
+      - --template=/usr/local/e2e-aws-ovn-network-stress
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_LATEST
+        value: registry.svc.ci.openshift.org/ocp/release:4.5-ci
+      - name: BRANCH
+        value: "4.5"
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: CLUSTER_VARIANT
+        value: ovn
+      - name: CONFIG_SPEC
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-ovn-network-stress
+            commands: TEST_SUITE=openshift/network/stress run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-upgrade
+            commands: TEST_SUITE=all run-upgrade-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: launch-$(CLUSTER_TYPE)
+            commands: sleep 9000 & wait
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+      - name: JOB_NAME_SAFE
+        value: e2e-aws-ovn-network-stress
+      - name: TEST_COMMAND
+        value: TEST_SUITE=openshift/network/stress run-tests
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-ovn-network-stress-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/e2e-aws-ovn-network-stress
+        name: job-definition
+        subPath: cluster-launch-installer-e2e.yaml
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
     - configMap:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
@@ -3527,7 +3775,7 @@ periodics:
 - agent: kubernetes
   cluster: api.ci
   decorate: true
-  interval: 48h
+  interval: 24h
   labels:
     ci.openshift.io/release-type: informing
     job-env: aws
@@ -3651,7 +3899,7 @@ periodics:
 - agent: kubernetes
   cluster: api.ci
   decorate: true
-  interval: 48h
+  interval: 24h
   labels:
     ci.openshift.io/release-type: informing
     job-release: "4.5"
@@ -3775,7 +4023,7 @@ periodics:
 - agent: kubernetes
   cluster: api.ci
   decorate: true
-  interval: 48h
+  interval: 24h
   labels:
     ci.openshift.io/release-type: informing
     job-release: "4.5"
@@ -4581,7 +4829,7 @@ periodics:
 - agent: kubernetes
   cluster: api.ci
   decorate: true
-  interval: 48h
+  interval: 12h
   labels:
     ci.openshift.io/release-type: informing
     job-release: "4.5"
@@ -4701,7 +4949,7 @@ periodics:
 - agent: kubernetes
   cluster: api.ci
   decorate: true
-  interval: 48h
+  interval: 24h
   labels:
     ci.openshift.io/release-type: informing
     job-release: "4.5"
@@ -4821,7 +5069,7 @@ periodics:
 - agent: kubernetes
   cluster: api.ci
   decorate: true
-  interval: 48h
+  interval: 24h
   labels:
     ci.openshift.io/release-type: informing
     job-release: "4.5"
@@ -4932,7 +5180,7 @@ periodics:
 - agent: kubernetes
   cluster: api.ci
   decorate: true
-  interval: 48h
+  interval: 24h
   labels:
     ci.openshift.io/release-type: informing
     job-release: "4.5"
@@ -5043,7 +5291,7 @@ periodics:
 - agent: kubernetes
   cluster: api.ci
   decorate: true
-  interval: 48h
+  interval: 24h
   labels:
     ci.openshift.io/release-type: informing
     job-release: "4.5"
@@ -5297,7 +5545,7 @@ periodics:
 - agent: kubernetes
   cluster: api.ci
   decorate: true
-  interval: 6h
+  interval: 48h
   labels:
     ci.openshift.io/release-type: informing
     job-env: aws
@@ -5372,23 +5620,11 @@ periodics:
                 cpu: 100m
                 memory: 200Mi
           tests:
-          - as: e2e-$(CLUSTER_TYPE)
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-$(CLUSTER_TYPE)-serial
-            commands: TEST_SUITE=openshift/conformance/serial run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
           - as: e2e-$(CLUSTER_TYPE)-upgrade
             commands: TEST_SUITE=all run-upgrade-tests
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
               upgrade: true
-          - as: launch-$(CLUSTER_TYPE)
-            commands: sleep 9000 & wait
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -5820,7 +6056,7 @@ periodics:
 - agent: kubernetes
   cluster: api.ci
   decorate: true
-  interval: 6h
+  interval: 48h
   labels:
     ci.openshift.io/release-type: informing
     job-env: gcp
@@ -6090,7 +6326,7 @@ periodics:
   decorate: true
   decoration_config:
     skip_cloning: true
-  interval: 24h
+  interval: 6h
   labels:
     ci.openshift.io/release-type: informing
     job-env: openstack
@@ -6205,7 +6441,7 @@ periodics:
     org: openshift
     repo: openshift-ansible
     workdir: true
-  interval: 48h
+  interval: 6h
   labels:
     ci.openshift.io/release-type: informing
     job-release: "4.5"
@@ -6298,7 +6534,7 @@ periodics:
   decorate: true
   decoration_config:
     skip_cloning: true
-  interval: 24h
+  interval: 6h
   labels:
     ci.openshift.io/release-type: informing
     job-env: openstack
@@ -6523,7 +6759,7 @@ periodics:
 - agent: kubernetes
   cluster: api.ci
   decorate: true
-  interval: 4h
+  interval: 12h
   labels:
     ci.openshift.io/release-type: informing
     job-release: "4.5"
@@ -6856,7 +7092,7 @@ periodics:
   decorate: true
   decoration_config:
     skip_cloning: true
-  interval: 6h
+  interval: 4h
   labels:
     ci.openshift.io/release-type: informing
     job-env: ovirt
@@ -7039,23 +7275,11 @@ periodics:
                 cpu: 100m
                 memory: 200Mi
           tests:
-          - as: e2e-$(CLUSTER_TYPE)
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-$(CLUSTER_TYPE)-serial
-            commands: TEST_SUITE=openshift/conformance/serial run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
           - as: e2e-$(CLUSTER_TYPE)-upgrade
             commands: TEST_SUITE=all run-upgrade-tests
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
               upgrade: true
-          - as: launch-$(CLUSTER_TYPE)
-            commands: sleep 9000 & wait
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -7182,23 +7406,11 @@ periodics:
                 cpu: 100m
                 memory: 200Mi
           tests:
-          - as: e2e-$(CLUSTER_TYPE)
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-$(CLUSTER_TYPE)-serial
-            commands: TEST_SUITE=openshift/conformance/serial run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-$(CLUSTER_TYPE)-upgrade
+          - as: e2e-azure-upgrade
             commands: TEST_SUITE=all run-upgrade-tests
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
               upgrade: true
-          - as: launch-$(CLUSTER_TYPE)
-            commands: sleep 9000 & wait
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -7248,3 +7460,113 @@ periodics:
         - key: sa.release-bot.app.ci.config
           path: sa.release-bot.app.ci.config
         secretName: build-farm-credentials
+- agent: kubernetes
+  cluster: api.ci
+  decorate: true
+  interval: 24h
+  labels:
+    ci.openshift.io/release-type: informing
+    job-release: "4.5"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: release-openshift-ocp-installer-e2e-aws-csi-4.5
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
+      - --secret-dir=/usr/local/e2e-aws-csi-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-aws-csi
+      - --template=/usr/local/e2e-aws-csi
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_LATEST
+        value: registry.svc.ci.openshift.org/ocp/release:4.5
+      - name: BRANCH
+        value: "4.5"
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: JOB_NAME_SAFE
+        value: e2e-aws-csi
+      - name: TEST_COMMAND
+        value: make test-e2e ARTIFACT_DIR=/tmp/artifacts
+      - name: TEST_IMAGESTREAM_TAG
+        value: stable:aws-ebs-csi-driver-operator-test
+      - name: CONFIG_SPEC
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tag_specification:
+            cluster: https://api.ci.openshift.org
+            name: "$(BRANCH)"
+            namespace: ocp
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)-csi
+            commands: make test-e2e ARTIFACT_DIR=/tmp/artifacts
+            openshift_installer_custom_test_image:
+              cluster_profile: aws
+              from: stable:aws-ebs-csi-driver-operator-test
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-csi-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/e2e-aws-csi
+        name: job-definition
+        subPath: cluster-launch-installer-custom-test-image.yaml
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - configMap:
+        name: prow-job-cluster-launch-installer-custom-test-image
+      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials

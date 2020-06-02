@@ -54,13 +54,22 @@ timeout -s 9 175m ssh $SSHOPTS root@$IP bash - << EOF |& sed -e 's/.*auths.*/***
 
 set -ex
 
-yum install -y git
+yum install -y git sysstat sos
+systemctl start sysstat
 
 mkdir -p /tmp/artifacts
 
 mkdir dev-scripts
 tar -xzvf dev-scripts.tar.gz -C /root/dev-scripts
 chown -R root:root dev-scripts
+
+NVME_DEVICE="/dev/nvme0n1"
+if [ -e "\$NVME_DEVICE" ];
+then
+  mkfs.xfs -f "\${NVME_DEVICE}"
+  mkdir /opt/dev-scripts
+  mount "\${NVME_DEVICE}" /opt/dev-scripts
+fi
 
 cd dev-scripts
 
@@ -74,7 +83,7 @@ echo "export OPENSHIFT_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}" >> /root/dev-scrip
 echo "export ADDN_DNS=\$(awk '/nameserver/ { print \$2;exit; }' /etc/resolv.conf)" >> /root/dev-scripts/config_root.sh
 echo "export OPENSHIFT_CI=true" >> /root/dev-scripts/config_root.sh
 echo "export MIRROR_IMAGES=true" >> /root/dev-scripts/config_root.sh
-echo "export NUM_WORKERS=2" >> /root/dev-scripts/config_root.sh
+echo "export WORKER_MEMORY=16384" >> /root/dev-scripts/config_root.sh
 
 if [[ -e /root/dev-scripts-additional-config ]]
 then

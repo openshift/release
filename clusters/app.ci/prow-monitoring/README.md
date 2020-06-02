@@ -50,7 +50,7 @@ This is done via `servicemonitors.monitoring.coreos.com`. See sinker as example:
 $ oc get servicemonitors.monitoring.coreos.com -n prow-monitoring sinker -o yaml
 ```
 
-The `svc` should be available on the UI `https://prometheus-prow-monitoring.svc.ci.openshift.org/targets` after the new `servicemonitor` is created.
+The `svc` should be available on the UI `https://grafana-prow-monitoring.https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/targets` after the new `servicemonitor` is created.
 
 _Note_ that the serviemonitor has to have label `prow-app` as key (value could be an arbitrary string).
 
@@ -63,11 +63,11 @@ $ make grafana-debug-deploy
 ### username and password will be displayed in the output.
 ```
 
-Play with [the grafana instance for debugging](https://grafana-prow-monitoring-stage.svc.ci.openshift.org) which already connects to the prometheus service in prow-monitoring.
+Play with [the grafana instance for debugging](https://grafana-prow-monitoring-stage.apps.ci.l2s4.p1.openshiftapps.com) which already connects to the prometheus service in prow-monitoring.
 
 * Create the `jsonnet` file in [`mixins/grafana_dashboards`](mixins/grafana_dashboards) folder.
 * Update [Makefile](./Makefile) to include the new target to generate the `json` file.
-* Login [grafana-staging](https://grafana-prow-monitoring-stage.svc.ci.openshift.org) and import manually the generated `json` file until it looks satisfying.
+* Login [grafana-staging](https://grafana-prow-monitoring-stage.apps.ci.l2s4.p1.openshiftapps.com) and import manually the generated `json` file until it looks satisfying.
 * Push the rest of changes.
 
 Clean up:

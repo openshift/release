@@ -36,8 +36,8 @@ cat > packet-setup.yaml <<-EOF
         project_id: "{{ packet_project_id }}"
         hostnames: "{{ packet_hostname }}"
         operating_system: centos_8
-        plan: c3.medium.x86
-        facility: sjc1
+        plan: m2.xlarge.x86
+        facility: any
         wait_for_public_IPv: 4
         state: active
       register: hosts
@@ -48,19 +48,19 @@ cat > packet-setup.yaml <<-EOF
         host: "{{ hosts.devices[0].public_ipv4 }}"
         port: 22
         state: started
-        timeout: 500
+        timeout: 900
     rescue:
     - name: Send notification message via Slack in case of failure
       slack:
         token: "{{ 'T027F3GAJ/B011TAG710V/' + lookup('file', slackhook_path + '/.slackhook') }}"
         msg: "Packet setup failed: {{ ansible_failed_result }}"
-        username: "Ansible on {{ inventory_hostname }}"
+        username: "Ansible on {{ packet_hostname }}"
         channel: "#team-edge-installer"
         color: warning
         icon_emoji: ":failed:"
     - name: fail the play
       fail:
-        msg: "Packet setup failed."
+        msg: "ERROR: Packet setup failed."
 
   - name: save Packet IP
     local_action: copy content="{{ hosts.devices[0].public_ipv4 }}" dest="{{ lookup('env', 'SHARED_DIR') }}/server-ip"
