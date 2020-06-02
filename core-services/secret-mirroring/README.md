@@ -6,6 +6,11 @@ This tool mirrors secrets from one location in the cluster to another, allowing
 users to provide secrets without requiring RBAC privileges on secrets in a central
 namespace.
 
+Note that the tool can mirror secrets from a source to the target on the same cluster and 
+is deployed on all the clusters in the CI-infrastructure.
+Please ensure that the source secrets are available on all the clusters, in
+order to mirror them to the targets on all the clusters.
+
 # Self-managed secrets
 
 In order to provide custom secrets to jobs without putting the secret management
