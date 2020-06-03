@@ -19,6 +19,24 @@
           }
         ],
       },
+      {
+        name: 'ci-operator-error',
+        rules: [
+          {
+            alert: 'high-ci-operator-error-rate',
+            expr: |||
+              sum(rate(ci_operator_error_rate{state="failed"}[30m])) by (reason) > 0.02
+            |||,
+            'for': '1m',
+            labels: {
+              severity: 'critical',
+            },
+            annotations: {
+              message: 'An excessive amount of CI Operator executions are failing with {{ $labels.reason }}',
+            },
+          }
+        ],
+      },
     ],
   },
 }
