@@ -50,6 +50,17 @@ spec:
     name: search
 
 ---
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  name: ci-search
+  namespace: ci-search
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: search
+---
 kind: StatefulSet
 apiVersion: apps/v1
 metadata:
@@ -58,9 +69,11 @@ metadata:
   annotations:
     image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"ci-search:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"web\")].image"}]'
 spec:
+  replicas: 2
   selector:
     matchLabels:
       app: search
+  serviceName: ""
   template:
     metadata:
       labels:
