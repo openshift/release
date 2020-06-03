@@ -62,12 +62,23 @@ if [[ "${CLUSTER_TYPE}" == gcp ]]; then
     popd
 fi
 
-test_suite=openshift/conformance/parallel
-if [[ -e "${SHARED_DIR}/test-suite.txt" ]]; then
-    test_suite=$(<"${SHARED_DIR}/test-suite.txt")
-fi
-
-openshift-tests run "${test_suite}" \
-    --provider "${TEST_PROVIDER}" \
+if [[ "${OPENSHIFT_UPGRADE:-false}" == "false" ]]; then
+    test_suite=openshift/conformance/parallel
+    if [[ -e "${SHARED_DIR}/test-suite.txt" ]]; then
+        test_suite=$(<"${SHARED_DIR}/test-suite.txt")
+    fi
+    openshift-tests run "${test_suite}" \
+        --provider "${TEST_PROVIDER}" \
+        -o /tmp/artifacts/e2e.log \
+        --junit-dir /tmp/artifacts/junit
+else
+    test_suite=all
+    if [[ -e "${SHARED_DIR}/test-suite.txt" ]]; then
+        test_suite=$(<"${SHARED_DIR}/test-suite.txt")
+    fi
+    openshift-tests run-upgrade "${test_suite}" \
+    --to-image "${IMAGE:-${RELEASE_IMAGE_LATEST}}" \
+    --provider "${TEST_PROVIDER:-}" \
     -o /tmp/artifacts/e2e.log \
     --junit-dir /tmp/artifacts/junit
+fi

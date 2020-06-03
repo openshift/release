@@ -13,8 +13,6 @@ if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
   exit 1
 fi
 
-echo "Installing from release ${RELEASE_IMAGE_LATEST}"
-
 ssh_pub_key=$(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
 pull_secret=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
 
