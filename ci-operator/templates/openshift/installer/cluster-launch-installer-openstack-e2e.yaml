@@ -98,11 +98,18 @@ objects:
       - name: shared-tmp
         mountPath: /tmp/shared
       command:
-      - cp
-      - /usr/bin/openshift-tests
-      - /usr/bin/oc
-      - /usr/bin/kubectl
-      - /tmp/shared/
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -euo pipefail
+
+        mkdir /tmp/shared/bin
+        cp /usr/bin/openshift-tests* /usr/bin/oc /tmp/shared/bin
+        for cmd in kubectl openshift-deploy openshift-docker-build openshift-extract-image-content openshift-git-clone openshift-manage-dockerfile openshift-recycle openshift-sti-build; do
+          ln -s /tmp/shared/bin/oc /tmp/shared/bin/$cmd
+        done
+
     containers:
     # NOTE openshift-tests requires access to openstackclient/cinder
     # so we re-use the install image here which already contains
@@ -140,7 +147,7 @@ objects:
         #!/bin/bash
         set -euo pipefail
 
-        export PATH=/tmp/shared:/usr/libexec/origin:$PATH
+        export PATH=/tmp/shared/bin:/usr/libexec/origin:$PATH
 
         trap 'touch /tmp/shared/exit' EXIT
         trap 'jobs -p | xargs -r kill || true; exit 0' TERM
