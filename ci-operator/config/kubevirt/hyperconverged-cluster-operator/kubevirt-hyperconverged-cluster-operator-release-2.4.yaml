@@ -1,0 +1,65 @@
+base_images:
+  base:
+    name: "4.5"
+    namespace: ocp
+    tag: base
+  operator-registry:
+    name: "4.5"
+    namespace: ocp
+    tag: operator-registry
+binary_build_commands: make install
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- dockerfile_path: build/Dockerfile.okd
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/hyperconverged-cluster-operator
+  to: hyperconverged-cluster-operator
+- dockerfile_path: deploy/Dockerfile.registry.intermediate
+  from: operator-registry
+  to: operator-registry-base
+- dockerfile_path: deploy/Dockerfile.registry.ci
+  from: operator-registry-base
+  to: hco-registry
+- dockerfile_path: deploy/Dockerfile.registry.upgrade
+  from: operator-registry-base
+  to: hco-registry-upgrade
+promotion:
+  additional_images:
+    hyperconverged-cluster-operator-tests: src
+  excluded_images:
+  - operator-registry-base
+  - hco-registry
+  - hco-registry-upgrade
+  name: hco2.4_4.5
+  namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.5"
+  namespace: ocp
+tests:
+- as: hco-e2e-aws
+  commands: |
+    make start && make functest
+  openshift_installer_src:
+    cluster_profile: aws
+- as: hco-e2e-upgrade-aws
+  commands: |
+    make upgrade-test
+  openshift_installer_src:
+    cluster_profile: aws
+zz_generated_metadata:
+  branch: release-2.4
+  org: kubevirt
+  repo: hyperconverged-cluster-operator
