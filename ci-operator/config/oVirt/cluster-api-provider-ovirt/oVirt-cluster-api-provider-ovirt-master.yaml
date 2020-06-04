@@ -1,0 +1,41 @@
+base_images:
+  ubi-minimal:
+    cluster: https://api.ci.openshift.org
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    cluster: https://api.ci.openshift.org
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- dockerfile_path: Dockerfile
+  from: ubi-minimal
+  to: cluster-api-provider-ovirt
+promotion:
+  name: cluster-api-provider-ovirt
+  namespace: ovirt
+resources:
+  '*':
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+tests:
+- as: fmt
+  commands: make fmt
+  container:
+    from: src
+- as: vet
+  commands: make vet
+  container:
+    from: src
+- as: sanity
+  commands: make test
+  container:
+    from: src
+zz_generated_metadata:
+  branch: master
+  org: oVirt
+  repo: cluster-api-provider-ovirt
