@@ -33,7 +33,7 @@ local myPanel(title, description) = (graphPanel.new(
     ) + legendConfig);
 
 local myPrometheusTarget(regex) = prometheus.target(
-        std.format('sum(rate(prowjob_state_transitions{job="plank",job_name=~"%s",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"}[${range}]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~"%s",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"}[${range}]))', [regex, regex]),
+        std.format('sum(rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~"%s",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state="success"}[${range}]))/sum(rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~"%s",job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"${base_ref}",state=~"success|failure"}[${range}]))', [regex, regex]),
         legendFormat=regex,
     );
 
@@ -53,7 +53,7 @@ dashboard.new(
   template.new(
     'org',
     'prometheus',
-    'label_values(prowjob_state_transitions{job="plank"}, org)',
+    'label_values(prowjob_state_transitions{job="prow-controller-manager"}, org)',
     label='org',
     allValues='.*',
     includeAll=true,
@@ -64,7 +64,7 @@ dashboard.new(
   template.new(
     'repo',
     'prometheus',
-    'label_values(prowjob_state_transitions{job="plank", org=~"${org}"}, repo)',
+    'label_values(prowjob_state_transitions{job="prow-controller-manager", org=~"${org}"}, repo)',
     label='repo',
     allValues='.*',
     includeAll=true,
@@ -75,7 +75,7 @@ dashboard.new(
   template.new(
     'base_ref',
     'prometheus',
-    'label_values(prowjob_state_transitions{job="plank", org=~"${org}", repo=~"${repo}"}, base_ref)',
+    'label_values(prowjob_state_transitions{job="prow-controller-manager", org=~"${org}", repo=~"${repo}"}, base_ref)',
     label='base_ref',
     allValues='.*',
     includeAll=true,
@@ -146,7 +146,7 @@ dashboard.new(
         description='Job success rate for all branches and the org/repo selected in the templates.',
         )
     .addTarget(prometheus.target(
-        'sum(rate(prowjob_state_transitions{job="plank", job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"^(master|release-4.[0-9]+|openshift-4.[0-9]+)$", state="success"}[${range}])) by (base_ref)/sum(rate(prowjob_state_transitions{job="plank", job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"^(master|release-4.[0-9]+|openshift-4.[0-9]+)$", state=~"success|failure"}[${range}]))  by (base_ref)',
+        'sum(rate(prowjob_state_transitions{job="prow-controller-manager", job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"^(master|release-4.[0-9]+|openshift-4.[0-9]+)$", state="success"}[${range}])) by (base_ref)/sum(rate(prowjob_state_transitions{job="prow-controller-manager", job_name!~"rehearse.*",org=~"${org}",repo=~"${repo}",base_ref=~"^(master|release-4.[0-9]+|openshift-4.[0-9]+)$", state=~"success|failure"}[${range}]))  by (base_ref)',
         legendFormat='{{base_ref}}',
     )), defaultGridPos)
 .addPanel(

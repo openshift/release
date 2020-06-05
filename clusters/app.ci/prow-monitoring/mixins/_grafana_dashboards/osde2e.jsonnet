@@ -33,7 +33,7 @@ local myPanel(title, description) = (graphPanel.new(
     ) + legendConfig);
 
 local myPrometheusTarget(regex) = prometheus.target(
-        std.format('sum(rate(prowjob_state_transitions{job="plank",job_name=~"%s",job_name!~"rehearse.*",org=~"openshift",repo=~"osde2e",base_ref=~"master",state="success"}[${range}]) or up * 0)/sum(rate(prowjob_state_transitions{job="plank",job_name=~"%s",job_name!~"rehearse.*",org=~"openshift",repo=~"osde2e",base_ref=~"master",state=~"success|failure"}[${range}]))', [regex, regex]),
+        std.format('sum(rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~"%s",job_name!~"rehearse.*",org=~"openshift",repo=~"osde2e",base_ref=~"master",state="success"}[${range}]) or up * 0)/sum(rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~"%s",job_name!~"rehearse.*",org=~"openshift",repo=~"osde2e",base_ref=~"master",state=~"success|failure"}[${range}]))', [regex, regex]),
         legendFormat=regex,
     );
 
