@@ -7,8 +7,8 @@ items:
     namespace: ci
     labels:
       app: prow
-      component: plank
-    name: plank
+      component: prow-controller-manager
+    name: prow-controller-manager
   spec:
     ports:
     - name: metrics
@@ -22,41 +22,37 @@ items:
   kind: Deployment
   metadata:
     namespace: ci
-    name: plank
+    name: prow-controller-manager
     labels:
       app: prow
-      component: plank
+      component: prow-controller-manager
   spec:
-    # Do not scale up.
-    # Mutually exclusive with the prow-controller-manager. If this is scaled up, the prow controller-manager must be scaled down or they will race.
-    replicas: 0
+    replicas: 1
     revisionHistoryLimit: 2
-    strategy:
-      type: Recreate
     selector:
       matchLabels:
         app: prow
-        component: plank
+        component: prow-controller-manager
     template:
       metadata:
         labels:
           app: prow
-          component: plank
+          component: prow-controller-manager
       spec:
-        serviceAccountName: plank
+        serviceAccountName: prow-controller-manager
         containers:
-        - name: plank
-          image: gcr.io/k8s-prow/plank:v20200604-d7c8ec5bfb
+        - name: prow-controller-manager
+          image: gcr.io/k8s-prow/prow-controller-manager:v20200604-4ec4b01fe4
           args:
           - --config-path=/etc/config/config.yaml
           - --tot-url=http://tot
           - --dry-run=false
           - --job-config-path=/etc/job-config
+          - --enabled-controller=plank
           - --github-token-path=/etc/github/oauth
           - --github-endpoint=http://ghproxy
           - --github-endpoint=https://api.github.com
           - --github-graphql-endpoint=http://ghproxy/graphql
-          - --skip-report=true
           env:
           # Multiple configs can only be passed via the env var and not via the flag
           - name: KUBECONFIG
@@ -148,12 +144,12 @@ items:
         - name: build-farm-credentials
           secret:
             items:
-            - key: sa.plank.api.ci.config
+            - key: sa.prow-controller-manager.api.ci.config
               path: api.ci.kubeconfig
-            - key: sa.plank.build01.config
+            - key: sa.prow-controller-manager.build01.config
               path: build01.kubeconfig
-            - key: sa.plank.app.ci.config
+            - key: sa.prow-controller-manager.app.ci.config
               path: app.ci.kubeconfig
-            - key: sa.plank.build02.config
+            - key: sa.prow-controller-manager.build02.config
               path: build02.kubeconfig
             secretName: build-farm-credentials
