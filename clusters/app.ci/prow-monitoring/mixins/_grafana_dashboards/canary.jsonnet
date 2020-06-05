@@ -15,7 +15,7 @@ local dashboardConfig = {
         uid: config._config.grafanaDashboardIDs['canary.json'],
     };
 
-local jobRate(regex, state) = std.format('sum(rate(prowjob_state_transitions{job="plank",job_name=~"canary-openshift-ocp-installer-e2e-%s",job_name!~"rehearse.*",state=~"%s"}[48h]))', [regex, state]);
+local jobRate(regex, state) = std.format('sum(rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~"canary-openshift-ocp-installer-e2e-%s",job_name!~"rehearse.*",state=~"%s"}[48h]))', [regex, state]);
 local targetFor(regex, format) = prometheus.target(
     std.format("%s/%s", [jobRate(regex, "success"), jobRate(regex, "success|failure")]),
     legendFormat=format,
@@ -29,7 +29,7 @@ dashboard.new(
 .addPanel(
     (graphPanel.new(
         'Canary Release Informer States',
-        description='sum(rate(prowjob_state_transitions{job="plank",job_name=~"canary-openshift-ocp-installer-e2e-.*-4.2",job_name!~"rehearse.*",state="success"}[48h]))/sum(rate(prowjob_state_transitions{job="plank",job_name=~"canary-openshift-ocp-installer-e2e-.*-4.2",job_name!~"rehearse.*",state=~"success|failure"}[48h]))',
+        description='sum(rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~"canary-openshift-ocp-installer-e2e-.*-4.2",job_name!~"rehearse.*",state="success"}[48h]))/sum(rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~"canary-openshift-ocp-installer-e2e-.*-4.2",job_name!~"rehearse.*",state=~"success|failure"}[48h]))',
         datasource='prometheus',
         legend_alignAsTable=true,
         legend_rightSide=true,
