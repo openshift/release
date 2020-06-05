@@ -22,7 +22,7 @@ dashboard.new(
 .addTemplate(template.new(
         'cluster',
         'prometheus',
-        std.format('label_values(prowjobs{job="plank"}, %s)', 'cluster'),
+        std.format('label_values(prowjobs{job="prow-controller-manager"}, %s)', 'cluster'),
         label='cluster',
         refresh='time',
         allValues='.*',
@@ -31,14 +31,14 @@ dashboard.new(
 .addPanel(
     (graphPanel.new(
         'number of Prow jobs by type with cluster=${cluster}',
-        description='sum(prowjobs{job="plank", cluster=~"${cluster}"}) by (type)',
+        description='sum(prowjobs{job="prow-controller-manager", cluster=~"${cluster}"}) by (type)',
         datasource='prometheus',
         legend_alignAsTable=true,
         legend_rightSide=true,
         
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(prowjobs{job="plank", cluster=~"${cluster}"}) by (type)',
+        'sum(prowjobs{job="prow-controller-manager", cluster=~"${cluster}"}) by (type)',
         legendFormat='{{type}}',
     )), gridPos={
     h: 9,
@@ -49,14 +49,14 @@ dashboard.new(
 .addPanel(
     (graphPanel.new(
         'number of Prow jobs by state with cluster=${cluster}',
-        description='sum(prowjobs{job="plank", cluster=~"${cluster}"}) by (state)',
+        description='sum(prowjobs{job="prow-controller-manager", cluster=~"${cluster}"}) by (state)',
         datasource='prometheus',
         legend_alignAsTable=true,
         legend_rightSide=true,
         
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(prowjobs{job="plank", cluster=~"${cluster}"}) by (state)',
+        'sum(prowjobs{job="prow-controller-manager", cluster=~"${cluster}"}) by (state)',
         legendFormat='{{state}}',
     )), gridPos={
     h: 9,
