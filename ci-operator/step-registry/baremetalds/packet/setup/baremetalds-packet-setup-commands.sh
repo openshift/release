@@ -53,7 +53,7 @@ cat > packet-setup.yaml <<-EOF
     - name: Send notification message via Slack in case of failure
       slack:
         token: "{{ 'T027F3GAJ/B011TAG710V/' + lookup('file', slackhook_path + '/.slackhook') }}"
-        msg: "Packet setup failed: {{ ansible_failed_result }}"
+        msg: "Packet setup failed. Error msg: {{ ansible_failed_result.msg }}"
         username: "Ansible on {{ packet_hostname }}"
         channel: "#team-edge-installer"
         color: warning
