@@ -204,7 +204,7 @@ objects:
       terminationMessagePolicy: FallbackToLogsOnError
       resources:
         requests:
-          cpu: 3
+          cpu: 4
           memory: 600Mi
         limits:
           memory: 4Gi
@@ -264,6 +264,7 @@ objects:
         # set up env vars
         export KUBE_SSH_BASTION="$( oc --insecure-skip-tls-verify get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
         export KUBE_SSH_KEY_PATH=/tmp/cluster/ssh-privatekey
+        export TEST_PROVIDER='{"type":"ovirt"}'
         mkdir -p ~/.ssh
         cp /tmp/cluster/ssh-privatekey ~/.ssh/kube_ovirt_rsa || true
 
@@ -289,12 +290,8 @@ objects:
             --junit-dir /tmp/artifacts/junit -f -
         }
 
-        function run-no-tests() {
-          # This can be used if we just want to check the installer exits 0
-          echo "WARNING: No tests were run against the installed cluster"
-        }
-        source /tmp/shared/ovirt-lease.conf
         # https://bugzilla.redhat.com/show_bug.cgi?id=1839463
+        source /tmp/shared/ovirt-lease.conf
         curl -k --connect-timeout 2 --retry 30 --retry-delay 30 https://api.${OCP_CLUSTER}.gcp.devcluster.openshift.com:6443/apis/config.openshift.io/v1/infrastructures/cluster
         ${TEST_COMMAND}
 
