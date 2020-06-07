@@ -2,6 +2,100 @@ periodics:
 - agent: kubernetes
   cluster: api.ci
   decorate: true
+  interval: 48h
+  labels:
+    ci.openshift.io/release-type: informing
+    job-release: "4.7"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: release-openshift-origin-installer-cert-recovery-4.7
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --secret-dir=/usr/local/libvirt-31-day-cluster-profile
+      - --secret-dir=/etc/pull-secret
+      - --target=libvirt-31-day
+      - --template=/usr/local/libvirt-31-day
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_LATEST
+        value: registry.svc.ci.openshift.org/ocp/release:4.7-ci
+      - name: BRANCH
+        value: "4.7"
+      - name: CLUSTER_TYPE
+        value: gcp
+      - name: JOB_NAME_SAFE
+        value: libvirt-31-day
+      - name: CONFIG_SPEC
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+          tests: # this is only here to satisfy config spec validation, it doesn't run
+          - as: e2e-gcp
+            commands: "test"
+            openshift_installer:
+              cluster_profile: gcp
+      - name: TEST_COMMAND
+        value: "set -x\nsudo systemctl stop chronyd\nfuture=\\$(date -d \"+90 days\" +%Y-%m-%d)\ngetIPs=\\$(oc get nodes -o wide | awk '{print \\$6}')\nipList=( \\$getIPs )\ngetDomains=\\$(sudo virsh list | awk '{ print \\$2 }' | tail -n +3 | head -n -1)\ndomainList=( \\$getDomains )\necho Stopping chronyd, crio, and kubelet in nodes\nfor i in {1..5}; do\n  ip=\"\\${ipList[i]}\"\n  ssh-keyscan -H \\$ip >> ~/.ssh/known_hosts\n  ssh -t core@\\$ip \"sudo systemctl disable chronyd && sudo systemctl stop chronyd && sudo systemctl stop crio && sudo systemctl stop kubelet\"\ndone\necho \"Setting date to \\${future} in nodes\"\nfor i in {1..5}; do\n  ip=\"\\${ipList[i]}\"\n  ssh-keyscan -H \\$ip >> ~/.ssh/known_hosts\n  ssh -t core@\\$ip \"sudo date --set \\$future\"\ndone\necho Setting date on host\n# now set date for host\nsudo date --set \\$future\necho Starting kubelet, crio in nodes\nfor i in {1..5}; do\n  ip=\"\\${ipList[i]}\"\n  ssh-keyscan -H \\$ip >> ~/.ssh/known_hosts\n  ssh -t core@\\$ip \"sudo systemctl start crio && sudo systemctl start kubelet\"\ndone\necho Waiting 4 minutes for csr creation\nsleep 240\nnodesReady=0\nretries=0\necho Checking for pending CSRs\nset +euo pipefail\nwhile [[ \\$nodesReady -ne 5 ]] && [[ \\$retries -lt 30 ]]; do\n  pendingCSRs=\\$(oc get csr | grep Pending | wc -l)\n  if [[ \\$pendingCSRs -ne 0 ]]; then\n    echo Approving pending csrs\n    oc get csr -o name | xargs oc adm certificate approve\n  fi\n  sleep 10\n  getNodes=\\$(oc get nodes | grep Ready | grep -v NotReady | grep -v SchedulingDisabled | awk '{ print \\$1 }')\n  nodesList=( \\$getNodes )\n  nodesReady=\\${#nodesList[@]}\n  if [[ \\$nodesReady -eq 5 ]]; then\n    echo All nodes Ready\n  fi\n  (( retries++ ))\ndone\nif [[ \\$nodesReady -ne 5 ]]; then\n  echo Some nodes NotReady\n  oc get nodes\n  exit 1\nfi\npendingPods=1\nretries=0\necho Waiting for all pods running/completed and no pending pods\nwhile [[ \\$pendingPods -ne 0 ]] && [[ \\$retries -lt 120 ]]; do\n  pendingCSRs=\\$(oc get csr | grep Pending | wc -l)\n  if [[ \\$pendingCSRs -ne 0 ]]; then\n    echo Approving pending csrs\n    oc get csr -o name | xargs oc adm certificate approve\n  fi\n  sleep 10\n  pendingPods=\\$(oc get pods -A --no-headers | grep -v -e Running -e Completed -e Terminating | wc -l)\n  if [[ \\$pendingPods -eq 0 ]]; then\n    echo All nodes Ready and no pending pods\n  fi\n  (( retries++ ))\ndone\nif [[ \\$pendingPods -ne 0 ]]; then\n  echo The following pods are Pending\n  oc get pods -A | grep -v -e Running -e Completed -e Terminating\n  exit 1\nfi\necho Checking that all ClusterOperators are Degraded=False\ndegradedCOs=1\nretries=0\nwhile [[ \\$degradedCOs -ne 0 ]] && [[ \\$retries -lt 120 ]]; do\n  sleep 10\n  degradedCOs=\\$(oc get co --no-headers | awk '{ print \\$5 }' | grep \"True\" | wc -l) \n  if [[ \\$degradedCOs -eq 0 ]]; then\n    echo All ClusterOperators Degraded=False\n  fi\n  (( retries++ ))\ndone\nif [[ \\$degradedCOs -ne 0 ]]; then\n  echo Some ClusterOperators are Degraded=True\n  oc get co\n  exit 1\nfi\necho Checking that all ClusterOperators are Available=True\nunavailableCOs=1\nretries=0\nwhile [[ \\$unavailableCOs -ne 0 ]] && [[ \\$retries -lt 120 ]]; do\n  sleep 10\n  unavailableCOs=\\$(oc get co --no-headers | awk '{ print \\$3 }' | grep \"False\" | wc -l) \n  if [[ \\$unavailableCOs -eq 0 ]]; then\n    echo All ClusterOperators Available=True\n  fi\n  (( retries++ ))\ndone\nif [[ \\$unavailableCOs -ne 0 ]]; then\n  echo Some ClusterOperators are Available=False\n  oc get co\n  exit 1\nfi\necho Checking all ClusterOperators are Progressing=False\nprogressingCOs=1\nretries=0\nwhile [[ \\$progressingCOs -ne 0 ]] && [[ \\$retries -lt 120 ]]; do\n  sleep 10\n  progressingCOs=\\$(oc get co --no-headers | awk '{ print \\$4 }' | grep \"True\" | wc -l) \n  if [[ \\$progressingCOs -eq 0 ]]; then\n    echo All ClusterOperators Progressing=False\n  fi\n  (( retries++ ))\ndone\nif [[ \\$progressingCOs -ne 0 ]]; then\n  echo Some ClusterOperators are Progressing=True\n  oc get co\n  exit 1\nfi\nexit 0\n"
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /usr/local/libvirt-31-day-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/libvirt-31-day
+        name: job-definition
+        subPath: cluster-launch-installer-libvirt-e2e.yaml
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-gcp
+    - configMap:
+        name: prow-job-cluster-launch-installer-libvirt-e2e
+      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
+  cluster: api.ci
+  decorate: true
   interval: 4h
   labels:
     job-release: "4.7"
