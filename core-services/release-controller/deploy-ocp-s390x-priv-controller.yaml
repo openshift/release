@@ -1,0 +1,383 @@
+kind: List
+apiVersion: v1
+items:
+# Bootstrap the environment for the amd64 tests image.  The caches require an amd64 "tests" image to execute on
+# the cluster.  This imagestream is used as a commandline parameter to the release-controller...
+#      --tools-image-stream-tag=release-controller-bootstrap:tests
+- kind: ImageStream
+  apiVersion: image.openshift.io/v1
+  metadata:
+    name: release-controller-bootstrap
+    namespace: ocp-s390x-priv
+  spec:
+    lookupPolicy:
+      local: false
+    tags:
+      - name: tests
+        from:
+          kind: DockerImage
+          name: registry.svc.ci.openshift.org/ocp/4.5:tests
+        importPolicy:
+          scheduled: true
+        referencePolicy:
+          type: Source
+
+- kind: Service
+  apiVersion: v1
+  metadata:
+    name: files-cache
+    namespace: ci-release-s390x-priv
+  spec:
+    selector:
+      app: files-cache
+    ports:
+    - port: 80
+      targetPort: 8080
+
+- kind: Service
+  apiVersion: v1
+  metadata:
+    name: files-cache-oauth-proxy
+    namespace: ci-release-s390x-priv
+    annotations:
+      service.alpha.openshift.io/serving-cert-secret-name: files-cache-oauth-proxy-tls
+  spec:
+    selector:
+      app: files-cache-oauth-proxy
+    ports:
+      - port: 443
+        targetPort: 8443
+
+- kind: Route
+  apiVersion: v1
+  metadata:
+    name: files-cache-oauth-proxy
+    namespace: ci-release-s390x-priv
+  spec:
+    host: openshift-release-artifacts-s390x-priv.svc.ci.openshift.org
+    tls:
+      termination: Reencrypt
+      insecureEdgeTerminationPolicy: Redirect
+    to:
+      kind: Service
+      name: files-cache-oauth-proxy
+
+# deploy the controller
+- kind: Service
+  apiVersion: v1
+  metadata:
+    name: release-controller-ocp-s390x-priv
+    namespace: ci
+  spec:
+    selector:
+      app: release-controller-ocp-s390x-priv
+    ports:
+    - port: 80
+      targetPort: 8080
+- kind: Route
+  apiVersion: v1
+  metadata:
+    name: release-controller-ocp-s390x-priv
+    namespace: ci
+  spec:
+    host: openshift-release-s390x-priv.svc.ci.openshift.org
+    tls:
+      termination: Edge
+      insecureEdgeTerminationPolicy: Redirect
+    to:
+      kind: Service
+      name: release-controller-ocp-s390x-priv-redirect
+- kind: Deployment
+  apiVersion: apps/v1
+  metadata:
+    name: release-controller-ocp-s390x-priv
+    namespace: ci
+    annotations:
+      image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"release-controller:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"controller\")].image"}]'
+  spec:
+    replicas: 0
+    selector:
+      matchLabels:
+        app: release-controller-ocp-s390x-priv
+    template:
+      metadata:
+        labels:
+          app: release-controller-ocp-s390x-priv
+      spec:
+        serviceAccountName: release-controller-ocp-s390x-priv
+        volumes:
+        - name: session-secret
+          secret:
+            secretName: release-controller-session-secret
+        - name: internal-tls
+          secret:
+            secretName: release-controller-s390x-priv-tls
+        - configMap:
+            defaultMode: 420
+            name: config
+          name: config
+        - configMap:
+            defaultMode: 420
+            name: job-config-misc
+          name: job-config-misc
+        - configMap:
+            defaultMode: 420
+            name: job-config-master
+          name: job-config-master
+        - configMap:
+            defaultMode: 420
+            name: job-config-3.x
+          name: job-config-3x
+        - configMap:
+            defaultMode: 420
+            name: job-config-4.1
+          name: job-config-41
+        - configMap:
+            defaultMode: 420
+            name: job-config-4.2
+          name: job-config-42
+        - configMap:
+            defaultMode: 420
+            name: job-config-4.3
+          name: job-config-43
+        - configMap:
+            defaultMode: 420
+            name: job-config-4.4
+          name: job-config-44
+        - configMap:
+            defaultMode: 420
+            name: job-config-4.5
+          name: job-config-45
+        - name: job-config-46
+          configMap:
+            name: job-config-4.6
+        - name: job-config-47
+          configMap:
+            name: job-config-4.7
+        - name: prowjob-kubeconfig
+          secret:
+            secretName: release-controller-prowjob-kubeconfig
+            items:
+            - key: sa.release-controller.app.ci.config
+              path: kubeconfig
+        - name: oauth
+          secret:
+            secretName: github-credentials-openshift-ci-robot
+        - name: bugzilla
+          secret:
+            secretName: bugzilla-credentials-openshift-bugzilla-robot
+        - name: plugins
+          configMap:
+            name: plugins
+        containers:
+        - name: oauth-proxy
+          image: openshift/oauth-proxy:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8443
+              name: web
+          args:
+            - -provider=openshift
+            - -https-address=:8443
+            - -http-address=
+            - -email-domain=*
+            - -upstream=http://localhost:8080
+            - -client-id=system:serviceaccount:ci:release-controller-ocp-s390x-priv
+            - -openshift-ca=/etc/pki/tls/cert.pem
+            - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+            - '-openshift-sar={"verb": "get", "resource": "imagestreams", "namespace": "ocp-s390x-priv"}'
+            - '-openshift-delegate-urls={"/": {"verb": "get", "imagestreams": "secrets", "namespace": "ocp-s390x-priv"}}'
+            - -client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
+            - -cookie-secret-file=/etc/proxy/secrets/session_secret
+            - -tls-cert=/etc/tls/private/tls.crt
+            - -tls-key=/etc/tls/private/tls.key
+          volumeMounts:
+            - mountPath: /etc/tls/private
+              name: internal-tls
+            - mountPath: /etc/proxy/secrets
+              name: session-secret
+        - name: controller
+          image: release-controller:latest
+          volumeMounts:
+          - mountPath: /etc/config
+            name: config
+            readOnly: true
+          - mountPath: /etc/job-config/misc
+            name: job-config-misc
+            readOnly: true
+          - mountPath: /etc/job-config/master
+            name: job-config-master
+            readOnly: true
+          - mountPath: /etc/job-config/3.x
+            name: job-config-3x
+            readOnly: true
+          - mountPath: /etc/job-config/4.1
+            name: job-config-41
+            readOnly: true
+          - mountPath: /etc/job-config/4.2
+            name: job-config-42
+            readOnly: true
+          - mountPath: /etc/job-config/4.3
+            name: job-config-43
+            readOnly: true
+          - name: job-config-44
+            mountPath: /etc/job-config/4.4
+            readOnly: true
+          - name: job-config-45
+            mountPath: /etc/job-config/4.5
+            readOnly: true
+          - name: job-config-46
+            mountPath: /etc/job-config/4.6
+            readOnly: true
+          - name: job-config-47
+            mountPath: /etc/job-config/4.7
+            readOnly: true
+          - name: prowjob-kubeconfig
+            mountPath: /etc/prowjob-kubeconfig
+            readOnly: true
+          - name: oauth
+            mountPath: /etc/github
+            readOnly: true
+          - name: bugzilla
+            mountPath: /etc/bugzilla
+            readOnly: true
+          - name: plugins
+            mountPath: /etc/plugins
+            readOnly: true
+          command:
+          - /usr/bin/release-controller
+          - --to=release
+          - --release-namespace=ocp-s390x-priv
+          - --prow-config=/etc/config/config.yaml
+          - --job-config=/etc/job-config
+          - --artifacts=openshift-release-artifacts-s390x-priv.svc.ci.openshift.org
+          - --listen=127.0.0.1:8080
+          - --prow-namespace=ci
+          - --prow-job-kubeconfig=/etc/prowjob-kubeconfig/kubeconfig
+          - --job-namespace=ci-release-s390x-priv
+          - --tools-image-stream-tag=release-controller-bootstrap:tests
+          - -v=4
+          - --github-token-path=/etc/github/oauth
+          - --github-endpoint=http://ghproxy
+          - --github-graphql-endpoint=http://ghproxy/graphql
+          - --bugzilla-endpoint=https://bugzilla.redhat.com
+          - --bugzilla-api-key-path=/etc/bugzilla/api
+          - --plugin-config=/etc/plugins/plugins.yaml
+          - --verify-bugzilla
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: release-controller-ocp-s390x-priv-redirect-config
+    namespace: ci
+  data:
+    "default.conf": |
+      server {
+        listen 8080;
+        return 302 $scheme://openshift-release-s390x-priv.apps.ci.l2s4.p1.openshiftapps.com$request_uri;
+      }
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    labels:
+      app: release-controller-ocp-s390x-priv-redirect
+    name: release-controller-ocp-s390x-priv-redirect
+    namespace: ci
+  spec:
+    replicas: 2
+    selector:
+      matchLabels:
+        component: release-controller-ocp-s390x-priv-redirect
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: release-controller-ocp-s390x-priv-redirect
+      spec:
+        affinity:
+          podAntiAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                - key: component
+                  operator: In
+                  values:
+                  - release-controller-ocp-s390x-priv-redirect
+              topologyKey: "kubernetes.io/hostname"
+        containers:
+        - image: nginxinc/nginx-unprivileged:1.17
+          name: nginx
+          volumeMounts:
+          - name: config
+            mountPath: /etc/nginx/conf.d
+        volumes:
+        - name: config
+          configMap:
+            name: release-controller-ocp-s390x-priv-redirect-config
+- apiVersion: v1
+  kind: Service
+  metadata:
+    labels:
+      app: prow
+      component: release-controller-ocp-s390x-priv-redirect
+    name: release-controller-ocp-s390x-priv-redirect
+    namespace: ci
+  spec:
+    ports:
+    - name: main
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+    selector:
+      component: release-controller-ocp-s390x-priv-redirect
+    sessionAffinity: None
+    type: ClusterIP
+
+- kind: Deployment
+  apiVersion: apps/v1
+  metadata:
+    name: files-cache-oauth-proxy
+    namespace: ci-release-s390x-priv
+  spec:
+    selector:
+      matchLabels:
+        app: files-cache-oauth-proxy
+    template:
+      metadata:
+        labels:
+          app: files-cache-oauth-proxy
+      spec:
+        serviceAccountName: files-cache-oauth
+        volumes:
+          - name: session-secret
+            secret:
+              secretName: files-cache-session-secret
+          - name: internal-tls
+            secret:
+              secretName: files-cache-oauth-proxy-tls
+        containers:
+          - name: oauth-proxy
+            image: openshift/oauth-proxy:latest
+            imagePullPolicy: IfNotPresent
+            ports:
+              - containerPort: 8443
+                name: web
+            args:
+              - -provider=openshift
+              - -https-address=:8443
+              - -http-address=
+              - -email-domain=*
+              - -upstream=http://files-cache.ci-release-s390x-priv:80
+              - -client-id=system:serviceaccount:ci-release-s390x-priv:files-cache-oauth
+              - -openshift-ca=/etc/pki/tls/cert.pem
+              - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+              - '-openshift-sar={"verb": "get", "resource": "imagestreams", "namespace": "ocp-s390x-priv"}'
+              - '-openshift-delegate-urls={"/": {"verb": "get", "resource": "imagestreams", "namespace": "ocp-s390x-priv"}}'
+              - -client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
+              - -cookie-secret-file=/etc/proxy/secrets/session_secret
+              - -tls-cert=/etc/tls/private/tls.crt
+              - -tls-key=/etc/tls/private/tls.key
+            volumeMounts:
+              - mountPath: /etc/tls/private
+                name: internal-tls
+              - mountPath: /etc/proxy/secrets
+                name: session-secret

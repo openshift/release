@@ -1,0 +1,263 @@
+kind: List
+apiVersion: v1
+items:
+- kind: Namespace
+  apiVersion: v1
+  metadata:
+    name: ocp-ppc64le-priv
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: image-puller
+    namespace: ocp-ppc64le-priv
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: openshift-priv-admins
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: qe
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: system:image-puller
+
+# Restrict observability to QE & other need-to-knows
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: user-viewer
+    namespace: ocp-priv
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: openshift-priv-admins
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: qe
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: view
+
+# grant release-controller image modification in the
+# release namespace
+- kind: Role
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: release-controller-modify-ppc64le-priv
+    namespace: ocp-ppc64le-priv
+  rules:
+  - apiGroups:
+    - ""
+    resources:
+    - secrets
+    resourceNames:
+    - release-upgrade-graph
+    verbs:
+    - get
+    - update
+    - patch
+  - apiGroups:
+    - image.openshift.io
+    resources:
+    - imagestreams
+    - imagestreamtags
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - delete
+    - update
+    - patch
+  - apiGroups:
+    - ""
+    resources:
+    - events
+    verbs:
+    - create
+    - patch
+    - update
+- kind: Role
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: release-controller-import-ocp-ppc64le-priv
+    namespace: ocp-ppc64le-priv
+  rules:
+  - apiGroups:
+    - image.openshift.io
+    resources:
+    - imagestreamimports
+    verbs:
+    - create
+- kind: Role
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: release-controller-prowjob-ppc64le-priv
+    namespace: ci
+  rules:
+  - apiGroups:
+    - prow.k8s.io
+    resources:
+    - prowjobs
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - delete
+    - update
+    - patch
+
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: release-controller-binding
+    namespace: ocp-ppc64le-priv
+  roleRef:
+    kind: Role
+    name: release-controller-modify-ppc64le-priv
+  subjects:
+  - kind: ServiceAccount
+    namespace: ci
+    name: release-controller-ocp-ppc64le-priv
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: release-controller-binding-view
+    namespace: ocp-ppc64le-priv
+  roleRef:
+    kind: ClusterRole
+    name: view
+  subjects:
+  - kind: ServiceAccount
+    namespace: ci
+    name: release-controller-ocp-ppc64le-priv
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: release-controller-binding-prowjob-ocp-ppc64le-priv
+    namespace: ci
+  roleRef:
+    kind: Role
+    name: release-controller-prowjob-ppc64le-priv
+  subjects:
+  - kind: ServiceAccount
+    namespace: ci
+    name: release-controller-ocp-ppc64le-priv
+
+# grant release-controller-ocp-ppc64le-priv edit on its work namespace
+- kind: Namespace
+  apiVersion: v1
+  metadata:
+    name: ci-release-ppc64le-priv
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: release-controller-binding-ocp-ppc64le-priv
+    namespace: ci-release-ppc64le-priv
+  roleRef:
+    kind: ClusterRole
+    name: edit
+  subjects:
+  - kind: ServiceAccount
+    namespace: ci
+    name: release-controller-ocp-ppc64le-priv
+
+# give jobs in the work namespace authority to push to the
+# release namespace
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: release-controller-binding-promote
+    namespace: ocp-ppc64le-priv
+  roleRef:
+    kind: ClusterRole
+    name: system:image-builder
+  subjects:
+  - kind: ServiceAccount
+    namespace: ci-release-ppc64le-priv
+    name: builder
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: release-controller-binding-import
+    namespace: ocp-ppc64le-priv
+  roleRef:
+    kind: Role
+    namespace: ocp-ppc64le-priv
+    name: release-controller-import-ocp-ppc64le-priv
+  subjects:
+  - kind: ServiceAccount
+    namespace: ci-release-ppc64le-priv
+    name: builder
+
+# create the secret that holds the upgrade graph state
+- kind: Secret
+  apiVersion: v1
+  metadata:
+    name: release-upgrade-graph
+    namespace: ocp-ppc64le-priv
+
+# deploy the controller
+- kind: ServiceAccount
+  apiVersion: v1
+  metadata:
+    name: release-controller-ocp-ppc64le-priv
+    namespace: ci
+    annotations:
+      serviceaccounts.openshift.io/oauth-redirectreference.release-controller-ocp-ppc64le-priv: '{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"release-controller-ocp-ppc64le-priv"}}'
+
+
+  # oauth proxy permissions
+- kind: ClusterRole
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: release-controller-ocp-ppc64le-priv-oauth
+  rules:
+    - apiGroups:
+        - authentication.k8s.io
+      resources:
+        - tokenreviews
+      verbs:
+        - create
+    - apiGroups:
+        - authorization.k8s.io
+      resources:
+        - subjectaccessreviews
+      verbs:
+        - create
+- kind: ClusterRoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: release-controller-ocp-ppc64le-priv-oauth
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: release-controller-ocp-ppc64le-priv-oauth
+  subjects:
+    - kind: ServiceAccount
+      name: release-controller-ocp-ppc64le-priv
+      namespace: ci
+
+- kind: ServiceAccount
+  apiVersion: v1
+  metadata:
+    name: files-cache-oauth
+    namespace: ci-release-ppc64le-priv
+    annotations:
+      serviceaccounts.openshift.io/oauth-redirectreference.files-cache-oauth-proxy: '{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"files-cache-oauth-proxy"}}'
+
+- kind: ClusterRoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: files-cache-oauth-ppc64le-priv
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: files-cache-oauth-priv
+  subjects:
+    - kind: ServiceAccount
+      name: files-cache-oauth
+      namespace: ci-release-ppc64le-priv
