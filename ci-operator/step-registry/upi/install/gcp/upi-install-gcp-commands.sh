@@ -335,10 +335,22 @@ EOF
 
 gcloud deployment-manager deployments create ${INFRA_ID}-control-plane --config 05_control_plane.yaml
 
+## Determine name of master nodes
+# https://github.com/openshift/installer/pull/3713
+set +e
+fgrep -e '-master-0' 05_control_plane.py
+ret="$?"
+set -e
+if [[ "$ret" == 0 ]]; then
+  MASTER='master'
+else
+  MASTER='m'
+fi
+
 ## Configure control plane variables
-MASTER0_IP=$(gcloud compute instances describe ${INFRA_ID}-m-0 --zone ${ZONE_0} --format json | jq -r .networkInterfaces[0].networkIP)
-MASTER1_IP=$(gcloud compute instances describe ${INFRA_ID}-m-1 --zone ${ZONE_1} --format json | jq -r .networkInterfaces[0].networkIP)
-MASTER2_IP=$(gcloud compute instances describe ${INFRA_ID}-m-2 --zone ${ZONE_2} --format json | jq -r .networkInterfaces[0].networkIP)
+MASTER0_IP=$(gcloud compute instances describe ${INFRA_ID}-${MASTER}-0 --zone ${ZONE_0} --format json | jq -r .networkInterfaces[0].networkIP)
+MASTER1_IP=$(gcloud compute instances describe ${INFRA_ID}-${MASTER}-1 --zone ${ZONE_1} --format json | jq -r .networkInterfaces[0].networkIP)
+MASTER2_IP=$(gcloud compute instances describe ${INFRA_ID}-${MASTER}-2 --zone ${ZONE_2} --format json | jq -r .networkInterfaces[0].networkIP)
 
 GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --master ${MASTER0_IP} --master ${MASTER1_IP} --master ${MASTER2_IP}"
 
@@ -359,19 +371,19 @@ gcloud dns record-sets transaction execute --zone ${INFRA_ID}-private-zone
 ## Add control plane instances to load balancers
 echo "$(date -u --rfc-3339=seconds) - Adding control plane instances to load balancers..."
 if [ -f 02_lb_int.py ]; then # for workflow using internal load balancers
-  gcloud compute instance-groups unmanaged add-instances ${INFRA_ID}-master-${ZONE_0}-instance-group --zone=${ZONE_0} --instances=${INFRA_ID}-m-0
-  gcloud compute instance-groups unmanaged add-instances ${INFRA_ID}-master-${ZONE_1}-instance-group --zone=${ZONE_1} --instances=${INFRA_ID}-m-1
-  gcloud compute instance-groups unmanaged add-instances ${INFRA_ID}-master-${ZONE_2}-instance-group --zone=${ZONE_2} --instances=${INFRA_ID}-m-2
+  gcloud compute instance-groups unmanaged add-instances ${INFRA_ID}-master-${ZONE_0}-instance-group --zone=${ZONE_0} --instances=${INFRA_ID}-${MASTER}-0
+  gcloud compute instance-groups unmanaged add-instances ${INFRA_ID}-master-${ZONE_1}-instance-group --zone=${ZONE_1} --instances=${INFRA_ID}-${MASTER}-1
+  gcloud compute instance-groups unmanaged add-instances ${INFRA_ID}-master-${ZONE_2}-instance-group --zone=${ZONE_2} --instances=${INFRA_ID}-${MASTER}-2
 else # for workflow before internal load balancers
-  gcloud compute target-pools add-instances ${INFRA_ID}-ign-target-pool --instances-zone="${ZONE_0}" --instances=${INFRA_ID}-m-0
-  gcloud compute target-pools add-instances ${INFRA_ID}-ign-target-pool --instances-zone="${ZONE_1}" --instances=${INFRA_ID}-m-1
-  gcloud compute target-pools add-instances ${INFRA_ID}-ign-target-pool --instances-zone="${ZONE_2}" --instances=${INFRA_ID}-m-2
+  gcloud compute target-pools add-instances ${INFRA_ID}-ign-target-pool --instances-zone="${ZONE_0}" --instances=${INFRA_ID}-${MASTER}-0
+  gcloud compute target-pools add-instances ${INFRA_ID}-ign-target-pool --instances-zone="${ZONE_1}" --instances=${INFRA_ID}-${MASTER}-1
+  gcloud compute target-pools add-instances ${INFRA_ID}-ign-target-pool --instances-zone="${ZONE_2}" --instances=${INFRA_ID}-${MASTER}-2
 fi
 
 ### Add control plane instances to external load balancer target pools (optional)
-gcloud compute target-pools add-instances ${INFRA_ID}-api-target-pool --instances-zone="${ZONE_0}" --instances=${INFRA_ID}-m-0
-gcloud compute target-pools add-instances ${INFRA_ID}-api-target-pool --instances-zone="${ZONE_1}" --instances=${INFRA_ID}-m-1
-gcloud compute target-pools add-instances ${INFRA_ID}-api-target-pool --instances-zone="${ZONE_2}" --instances=${INFRA_ID}-m-2
+gcloud compute target-pools add-instances ${INFRA_ID}-api-target-pool --instances-zone="${ZONE_0}" --instances=${INFRA_ID}-${MASTER}-0
+gcloud compute target-pools add-instances ${INFRA_ID}-api-target-pool --instances-zone="${ZONE_1}" --instances=${INFRA_ID}-${MASTER}-1
+gcloud compute target-pools add-instances ${INFRA_ID}-api-target-pool --instances-zone="${ZONE_2}" --instances=${INFRA_ID}-${MASTER}-2
 
 ## Launch additional compute nodes
 echo "$(date -u --rfc-3339=seconds) - Launching additional compute nodes..."
