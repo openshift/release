@@ -47,36 +47,7 @@ tag_specification:
 tests:
 - artifact_dir: /go/src/kubevirt.io/kubevirt/_out/exported-artifacts
   as: e2e-periodic-gcp-nested-virt
-  commands: |
-    cd /go/src/kubevirt.io/kubevirt
-    #./hack/ci/test.sh
-
-    # TODO: this needs to be moved into kubevirt 'hack/ci/test.sh' again after the template has been merged,
-    # putting it back in here for now to avoid fiddling with two repos in order to get it
-    # working
-
-    export PATH=$PATH:/usr/local/go/bin/
-
-    export GIMME_GO_VERSION=1.12.8
-    export GOPATH="/go"
-    export GOBIN="/usr/bin"
-    source /etc/profile.d/gimme.sh
-
-    export DOCKER_PREFIX='kubevirtnightlybuilds'
-    export DOCKER_TAG="latest"
-    export KUBEVIRT_PROVIDER=external
-
-    echo "calling cluster-up to prepare config and check whether cluster is reachable"
-    bash -x ./cluster-up/up.sh
-
-    echo "deploying"
-    bash -x ./hack/cluster-deploy.sh
-
-    echo "testing"
-    mkdir -p "$ARTIFACT_DIR"
-    TESTS_TO_FOCUS=$(grep -E -o '\[crit\:high\]' tests/*_test.go | sort | uniq | sed -E 's/tests\/([a-z_]+)\.go\:.*/\1/' | tr '\n' '|' | sed 's/|$//')
-    FUNC_TEST_ARGS='--ginkgo.noColor --ginkgo.focus='"$TESTS_TO_FOCUS"' --ginkgo.regexScansFilePath=true --junit-output='"$ARTIFACT_DIR"'/junit.functest.xml' \
-        bash -x ./hack/functests.sh
+  commands: ./hack/ci/test.sh
   cron: 2 3 * * *
   openshift_installer_custom_test_image:
     cluster_profile: gcp
@@ -85,9 +56,7 @@ tests:
     nested_virt_image: rhcos43-nested-virt
 - artifact_dir: /go/src/kubevirt.io/kubevirt/_out/exported-artifacts
   as: e2e-gcp-nested-virt
-  commands: |
-    cd /go/src/kubevirt.io/kubevirt
-    bash -x ./hack/ci/test.sh
+  commands: ./hack/ci/test-pr.sh
   openshift_installer_custom_test_image:
     cluster_profile: gcp
     enable_nested_virt: true
