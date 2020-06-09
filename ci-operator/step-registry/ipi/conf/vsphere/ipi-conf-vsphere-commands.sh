@@ -27,6 +27,9 @@ compute:
   replicas: 3
   platform:
     vsphere:
+      cpus: 4
+      coresPerSocket: 1
+      memoryMB: 16384
       osDisk:
         diskSizeGB: 60
 platform:
