@@ -343,8 +343,10 @@ ret="$?"
 set -e
 if [[ "$ret" == 0 ]]; then
   MASTER='master'
+  WORKER='worker'
 else
   MASTER='m'
+  WORKER='w'
 fi
 
 ## Configure control plane variables
@@ -396,7 +398,7 @@ EOF
 
 for compute in {0..2}; do
   cat <<EOF >> 06_worker.yaml
-- name: 'w-${compute}'
+- name: '${WORKER}-${compute}'
   type: 06_worker.py
   properties:
     infra_id: '${INFRA_ID}'
