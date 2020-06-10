@@ -631,9 +631,47 @@ periodics:
       - name: BRANCH
         value: "4.7"
       - name: TAG_SOURCE
-        value: $(BRANCH):$(TAG)
+        value: machine-os-content:$(BRANCH)
       - name: CLUSTER_TYPE
         value: aws
+      - name: CONFIG_SPEC
+        value: |
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: origin
+          promotion:
+            name: "$(BRANCH)"
+            namespace: origin
+            additional_images:
+              $(TAG): $(TAG)
+          build_root:
+            image_stream_tag:
+              name: release
+              namespace: openshift
+              tag: golang-1.13
+          base_images:
+            $(TAG):
+              name: $(TAG)
+              namespace: fcos
+              tag: "4.7"
+          raw_steps:
+          - output_image_tag_step:
+              from: $(TAG)
+              to:
+                name: stable
+                tag: $(TAG)
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-aws
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: aws
       - name: JOB_NAME_SAFE
         value: e2e-aws
       - name: TEST_COMMAND
