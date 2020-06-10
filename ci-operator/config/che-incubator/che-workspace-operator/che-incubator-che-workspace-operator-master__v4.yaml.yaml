@@ -24,9 +24,18 @@ tests:
 - as: openshift-web-terminal-e2e
   commands: |
     ls -lrtha
-    export KUBEADMIN_PASSWORD=$(cat /tmp/artifacts/installer/auth/kubeadmin-password)
-    oc login -u kubeadmin -p $KUBEADMIN_PASSWORD --insecure-skip-tls-verify
     oc create namespace poc-flavius
+    make update_devworkspace_crds
+    go mod tidy
+    go mod vendor
+    # Output of e2e binary
+    export OUT_FILE=bin/workspace-controller-e2e
+
+    # Compile e2e binary tests
+    CGO_ENABLED=0 go test -v -c -o ${OUT_FILE} ./test/e2e/cmd/workspaces_test.go
+
+    # Launch tests
+    ./bin/workspace-controller-e2e
   openshift_installer_src:
     cluster_profile: aws
 zz_generated_metadata:
