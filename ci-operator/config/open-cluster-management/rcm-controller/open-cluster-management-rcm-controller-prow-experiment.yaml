@@ -1,8 +1,8 @@
 base_images:
   base:
-    name: "4.5"
+    name: ubi-minimal
     namespace: ocp
-    tag: base
+    tag: "8"
   registration:
     name: "4.5"
     namespace: open-cluster-management
@@ -14,7 +14,7 @@ base_images:
   registration-operator-src:
     name: "4.5"
     namespace: open-cluster-management
-    tag: registration-operator
+    tag: registration-operator-src
   work:
     name: "4.5"
     namespace: open-cluster-management
@@ -27,7 +27,12 @@ build_root:
 images:
 - dockerfile_path: build/Dockerfile
   from: base
-  to: rcm-controller
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/open-cluster-management/rcm-controller
+  to: latest
 promotion:
   name: "4.5"
   namespace: open-cluster-management
@@ -39,19 +44,15 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.4"
-  namespace: ocp
+  name: "4.5"
+  namespace: open-cluster-management
 tests:
-- as: build
-  commands: |
-    true
-  container:
-    from: bin
 - as: unit
-  commands: make test
+  commands: |
+    GOFLAGS="-mod=vendor" go build ./cmd/manager
   container:
     from: bin
 zz_generated_metadata:
-  branch: master
+  branch: prow-experiment
   org: open-cluster-management
   repo: rcm-controller
