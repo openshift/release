@@ -44,6 +44,7 @@ are currently targeted by existing mirroring jobs:
  - [integreatly](./integr8ly): `quay.io/integreatly`
  - [openshift-kni](./openshift-kni): `quay.io/openshift-kni`
  - [openshift-psap](./openshift-psap/): `quay.io/openshift-psap`
+ - [ovirt](./ovirt/): `quay.io/ovirt`
 
 ## Configuring mirroring for new sets of images
 
