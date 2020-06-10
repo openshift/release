@@ -1,7 +1,21 @@
+base_images:
+  cli:
+    name: "4.3"
+    namespace: ocp
+    tag: cli
 binary_build_commands: make bin
 build_root:
   project_image:
     dockerfile_path: openshift-ci/build-root/Dockerfile
+images:
+- dockerfile_path: openshift-ci/build-root/Dockerfile
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: oc-bin-image
 resources:
   '*':
     requests:
@@ -19,11 +33,11 @@ tests:
     test:
     - as: integration-e2e
       commands: scripts/openshiftci-presubmit-all-tests.sh
-      from: src
+      from: oc-bin-image
       resources:
         requests:
-          cpu: 100m
-          memory: 200Mi
+          cpu: "2"
+          memory: 4Gi
     workflow: ipi-aws
 zz_generated_metadata:
   branch: master
