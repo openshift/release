@@ -37,10 +37,15 @@ presubmits:
         - name: TEST_COMMAND
           value: |
             ls -lrtha
-            pwd
-            ls -lrtha /tmp/artifacts
-            ls -lrtha /tmp/artifacts/installer/auth
-            oc version
+            export KUBEADMIN_PASSWORD=$(cat /tmp/artifacts/installer/auth/kubeadmin-password)
+            oc login -u kubeadmin -p $KUBEADMIN_PASSWORD --insecure-skip-tls-verify
+            export OUT_FILE=bin/workspace-controller-e2e
+            # Compile e2e binary tests
+            CGO_ENABLED=0 go test -v -c -o ${OUT_FILE} ./test/e2e/cmd/workspaces_test.go
+            # Update CRDs
+            make update_devworkspace_crds
+            # Launch tests
+            ./bin/workspace-controller-e2e
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -129,7 +134,8 @@ presubmits:
         - name: JOB_NAME_SAFE
           value: openshift-web-terminal-e2e
         - name: TEST_COMMAND
-          value: .cico/cico_openshift_e2e.sh
+          value: |
+            oc version
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
