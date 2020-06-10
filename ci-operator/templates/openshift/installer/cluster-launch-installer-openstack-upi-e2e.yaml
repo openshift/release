@@ -197,10 +197,10 @@ objects:
         value: ${RHCOS_RELEASE}
 
       command:
-      - /bin/sh
+      - /bin/bash
       - -c
       - |
-        #!/bin/sh
+        #!/bin/bash
         echo "OpenStack: setup for cluster ${CLUSTER_NAME}"
         # configure pipefail to return value from last non-zero exiting process or children
         set -euo pipefail
@@ -847,7 +847,7 @@ objects:
       - name: NUMBER_OF_WORKERS
         value: ${NUMBER_OF_WORKERS}
       command:
-      - /bin/sh
+      - /bin/bash
       - -c
       - |
         #!/bin/bash
@@ -890,10 +890,6 @@ objects:
           done
         }
 
-
-
-
-
         function install_secret_on_cluster() {
           # if the cluster profile included an insights secret, install it to the cluster to
           # report support data from the support-operator
@@ -926,42 +922,40 @@ objects:
           cd /tmp/output
         }
 
+        function run-upgrade-tests() {
+          openshift-tests run-upgrade "${TEST_SUITE}" --to-image "${IMAGE:-${RELEASE_IMAGE_LATEST}}" \
+            --options "${TEST_OPTIONS:-}" \
+            --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
+        }
+
+        function run-tests() {
+          openshift-tests run "${TEST_SUITE}" \
+            --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
+        }
+
+        function run-minimal-tests() {
+          # Only execute Smoke (<4.4) or Early (>= 4.4) tests while the test
+          # infrastructure is getting prepared to run the actual suite
+          # reliably.
+          openshift-tests run openshift/conformance/parallel --dry-run |
+            grep 'Smoke\|Early' |
+          openshift-tests run -o /tmp/artifacts/e2e.log \
+            --junit-dir /tmp/artifacts/junit -f -
+          return 0
+        }
+
+        function run-no-tests() {
+          # This can be used if we just want to check the installer exits 0
+          echo "WARNING: No tests were run against the installed cluster"
+          return 0
+        }
 
         # Test execution
         allow_user_access
         wait_for_other_containers
         setup_test_bed
+        ${TEST_COMMAND}
 
-        echo Tests requested: ${TEST_COMMAND}
-        case ${TEST_COMMAND} in
-          run-no-tests)
-             echo "WARNING: No tests were run against the installed cluster"
-             exit 0
-             ;;
-          run-minial-tests)
-             echo Running minimal tests - NOT IMPLEMENTED
-             #install_secret_on_cluster
-             #setup_env_vars
-             #configure_xtrace
-             exit 1
-             ;;
-          run-tests)
-             echo Running full tests - NOT IMPLEMENTED
-             #openshift-tests run "${TEST_SUITE}" \
-             #    --provider "${TEST_PROVIDER:-}" -o ${TMP_ARTIFACTS}/e2e.log --junit-dir ${TMP_ARTIFACTS}/junit
-             exit 1
-             ;;
-          run-upgrade-tests)
-             echo Running upgrade tests - NOT IMPLEMENTED
-             #openshift-tests run-upgrade "${TEST_SUITE}" --to-image "${RELEASE_IMAGE_LATEST}" \
-             #    --options "${TEST_OPTIONS:-}" \
-             #    --provider "${TEST_PROVIDER:-}" -o ${TMP_ARTIFACTS}/e2e.log --junit-dir ${TMP_ARTIFACTS}/ju
-             exit 1
-             ;;
-        esac
-
-        echo ${TEST_COMMAND} - NOT IMPLEMENTED
-        exit 1
     # teardown container performs cleanup of all created resources
     - name: teardown
       image: ${IMAGE_OPENSTACK_INSTALLER}
@@ -1016,7 +1010,7 @@ objects:
         value: ${NUMBER_OF_WORKERS}
 
       command:
-      - /bin/sh
+      - /bin/bash
       - -c
       - |
         #!/bin/bash
