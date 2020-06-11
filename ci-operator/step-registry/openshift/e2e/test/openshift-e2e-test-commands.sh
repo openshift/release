@@ -7,12 +7,11 @@ set -o pipefail
 export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
 export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
 export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
-export HOME=/tmp/home
-export PATH=/usr/libexec/origin:$PATH
+export HOME=/tmp
+export WORKSPACE=${WORKSPACE:-/tmp}
+export PATH=/usr/libexec/origin:${WORKSPACE}:$PATH
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-
-mkdir -p "${HOME}"
 
 # if the cluster profile included an insights secret, install it to the cluster to
 # report support data from the support-operator
@@ -47,16 +46,16 @@ vsphere) export TEST_PROVIDER=vsphere;;
 *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
 esac
 
-mkdir -p /tmp/output
-cd /tmp/output
+mkdir -p ${WORKSPACE}/output
+cd ${WORKSPACE}/output
 
 if [[ "${CLUSTER_TYPE}" == gcp ]]; then
-    pushd /tmp
+    pushd ${WORKSPACE}
     curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
     tar -xzf google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
-    export PATH=$PATH:/tmp/google-cloud-sdk/bin
+    export PATH=$PATH:${WORKSPACE}/google-cloud-sdk/bin
     mkdir gcloudconfig
-    export CLOUDSDK_CONFIG=/tmp/gcloudconfig
+    export CLOUDSDK_CONFIG=${WORKSPACE}/gcloudconfig
     gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}"
     gcloud config set project openshift-gce-devel-ci
     popd
@@ -69,5 +68,5 @@ fi
 
 openshift-tests run "${test_suite}" \
     --provider "${TEST_PROVIDER}" \
-    -o /tmp/artifacts/e2e.log \
-    --junit-dir /tmp/artifacts/junit
+    -o ${ARTIFACT_DIR}/e2e.log \
+    --junit-dir ${ARTIFACT_DIR}/junit

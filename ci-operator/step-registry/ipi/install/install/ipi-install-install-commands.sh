@@ -16,6 +16,8 @@ export PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
 export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST}
 export OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME}/${BUILD_ID}
 export HOME=/tmp
+export WORKSPACE=${WORKSPACE:-/tmp}
+export PATH="${PATH}:${WORKSPACE}"
 
 case "${CLUSTER_TYPE}" in
 aws) export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred;;
@@ -25,8 +27,8 @@ vsphere) ;;
 *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"
 esac
 
-dir=/tmp/installer
-mkdir "${dir}/"
+dir=${WORKSPACE}/installer
+mkdir -p "${dir}/"
 cp "${SHARED_DIR}/install-config.yaml" "${dir}/"
 
 # move private key to ~/.ssh/ so that installer can use it to gather logs on

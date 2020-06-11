@@ -4,6 +4,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+export HOME=/tmp
+export WORKSPACE=${WORKSPACE:-/tmp}
+export PATH="${PATH}:${WORKSPACE}"
+
 if test ! -f "${KUBECONFIG}"
 then
 	echo "No kubeconfig, so no point in calling must-gather."
