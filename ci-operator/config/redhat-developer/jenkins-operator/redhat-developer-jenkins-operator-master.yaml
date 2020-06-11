@@ -7,7 +7,7 @@ build_root:
   project_image:
     dockerfile_path: openshift-ci/Dockerfile.build_root
 images:
-- dockerfile_path: openshift-ci/Dockerfile
+- dockerfile_path: openshift-ci/Dockerfile.build_image
   from: base
   inputs:
     src:
@@ -26,8 +26,13 @@ tag_specification:
 tests:
 - as: lint
   commands: |
-    curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.21.0
-    GOLANGCI_LINT_CACHE=$(go env GOCACHE) make lint
+    export GOLANGCI_LINT_VERSION=$(cat .golangciversion 2&> /dev/null || echo "1.26.0")
+    export GOLANGCI_LINT_CACHE=/tmp/.golangcicache
+    export XDG_CACHE_HOME=/tmp/.xdgcache
+    export GOCACHE=/tmp/gocache
+    mkdir -p $(go env GOPATH)/bin
+    curl -sfL "https://github.com/golangci/golangci-lint/releases/download/v${GOLANGCI_LINT_VERSION:?'golangci-lint version is unset'}/golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64.tar.gz" | tar -C $(go env GOPATH)/bin -zx --strip-components=1 "golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64/golangci-lint"
+    make lint
   container:
     from: src
 - as: unit
