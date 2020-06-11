@@ -52,7 +52,7 @@ fi
 
 timeout -s 9 175m ssh $SSHOPTS root@$IP bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 
-set -ex
+set -xeuo pipefail
 
 yum install -y git sysstat sos
 systemctl start sysstat
