@@ -5,15 +5,15 @@ presubmits:
     branches:
     - master
     cluster: api.ci
-    context: ci/prow/e2e-aws-e8
+    context: ci/prow/e2e-aws-ocp4-moderate
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-ComplianceAsCode-content-master-e2e-aws-e8
-    rerun_command: /test e2e-aws-e8
+    name: pull-ci-ComplianceAsCode-content-master-e2e-aws-ocp4-moderate
+    rerun_command: /test e2e-aws-ocp4-moderate
     spec:
       containers:
       - args:
@@ -22,18 +22,19 @@ presubmits:
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/e2e-aws-e8-cluster-profile
-        - --target=e2e-aws-e8
-        - --template=/usr/local/e2e-aws-e8
+        - --secret-dir=/usr/local/e2e-aws-ocp4-moderate-cluster-profile
+        - --target=e2e-aws-ocp4-moderate
+        - --template=/usr/local/e2e-aws-ocp4-moderate
         command:
         - ci-operator
         env:
         - name: CLUSTER_TYPE
           value: aws
         - name: JOB_NAME_SAFE
-          value: e2e-aws-e8
+          value: e2e-aws-ocp4-moderate
         - name: TEST_COMMAND
-          value: content=ocp4-content-ds make -f tests/ocp4e2e/Makefile e2e PROFILE=e8
+          value: content=ocp4-content-ds make -f tests/ocp4e2e/Makefile e2e PROFILE=moderate
+            PRODUCT=ocp4
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -47,9 +48,9 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-e8-cluster-profile
+        - mountPath: /usr/local/e2e-aws-ocp4-moderate-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-aws-e8
+        - mountPath: /usr/local/e2e-aws-ocp4-moderate
           name: job-definition
           subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
@@ -86,21 +87,21 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-e8,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-ocp4-moderate,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - master
     cluster: api.ci
-    context: ci/prow/e2e-aws-moderate
+    context: ci/prow/e2e-aws-rhcos4-e8
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-ComplianceAsCode-content-master-e2e-aws-moderate
-    optional: true
-    rerun_command: /test e2e-aws-moderate
+    name: pull-ci-ComplianceAsCode-content-master-e2e-aws-rhcos4-e8
+    rerun_command: /test e2e-aws-rhcos4-e8
     spec:
       containers:
       - args:
@@ -109,9 +110,96 @@ presubmits:
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/e2e-aws-moderate-cluster-profile
-        - --target=e2e-aws-moderate
-        - --template=/usr/local/e2e-aws-moderate
+        - --secret-dir=/usr/local/e2e-aws-rhcos4-e8-cluster-profile
+        - --target=e2e-aws-rhcos4-e8
+        - --template=/usr/local/e2e-aws-rhcos4-e8
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: JOB_NAME_SAFE
+          value: e2e-aws-rhcos4-e8
+        - name: TEST_COMMAND
+          value: content=ocp4-content-ds make -f tests/ocp4e2e/Makefile e2e PROFILE=e8
+            PRODUCT=rhcos4
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-aws-rhcos4-e8-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-aws-rhcos4-e8
+          name: job-definition
+          subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-src
+        name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-rhcos4-e8,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: api.ci
+    context: ci/prow/e2e-aws-rhcos4-moderate
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-ComplianceAsCode-content-master-e2e-aws-rhcos4-moderate
+    rerun_command: /test e2e-aws-rhcos4-moderate
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/usr/local/e2e-aws-rhcos4-moderate-cluster-profile
+        - --target=e2e-aws-rhcos4-moderate
+        - --template=/usr/local/e2e-aws-rhcos4-moderate
         command:
         - ci-operator
         env:
@@ -120,9 +208,10 @@ presubmits:
         - name: CLUSTER_VARIANT
           value: fips
         - name: JOB_NAME_SAFE
-          value: e2e-aws-moderate
+          value: e2e-aws-rhcos4-moderate
         - name: TEST_COMMAND
           value: content=ocp4-content-ds make -f tests/ocp4e2e/Makefile e2e PROFILE=moderate
+            PRODUCT=rhcos4
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -136,9 +225,9 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-moderate-cluster-profile
+        - mountPath: /usr/local/e2e-aws-rhcos4-moderate-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-aws-moderate
+        - mountPath: /usr/local/e2e-aws-rhcos4-moderate
           name: job-definition
           subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
@@ -175,7 +264,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-moderate,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-rhcos4-moderate,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
