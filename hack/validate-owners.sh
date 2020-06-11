@@ -11,12 +11,12 @@ if [[ ! -d "${base_dir}" ]]; then
   exit 1
 fi
 
-whitelist_file="${2:-}"
+allowlist_file="${2:-}"
 WHITELIST=""
-if [[ -f "$whitelist_file" ]]; then
-  WHITELIST="$( sort "$whitelist_file" )"
-elif [[ -n "$whitelist_file" ]]; then
-  echo "Expected second argument to be a path to a file with a whitelist: '$whitelist_file'"
+if [[ -f "$allowlist_file" ]]; then
+  WHITELIST="$( sort "$allowlist_file" )"
+elif [[ -n "$allowlist_file" ]]; then
+  echo "Expected second argument to be a path to a file with an allowlist: '$allowlist_file'"
   exit 1
 fi
 
@@ -47,12 +47,12 @@ fi
 
 if [[ "$false_pos" ]]; then
   cat << EOF
-ERROR: Directory that was previously whitelisted as not containing
+ERROR: Directory that was previously allowlisted as not containing
 ERROR: an OWNERS file is now containing the file, so it no longer
-ERROR: needs to be whitelisted. Please remove the appropriate line
-ERROR: from $whitelist_file.
+ERROR: needs to be allowlisted. Please remove the appropriate line
+ERROR: from $allowlist_file.
 
-ERROR: Directories to be removed from whitelist:
+ERROR: Directories to be removed from allowlist:
 
 $false_pos
 EOF
