@@ -1,0 +1,357 @@
+kind: Template
+apiVersion: template.openshift.io/v1
+
+# image-family openshift4-libvirt must exist in ${GOOGLE_PROJECT_ID} for this template
+# for more info see here: https://github.com/ironcladlou/openshift4-libvirt-gcp/blob/rhel8/IMAGES.md
+# This is the same image which is used for installer-e2e tests.
+parameters:
+  - name: JOB_NAME
+    required: true
+  - name: JOB_NAME_SAFE
+    required: true
+  - name: JOB_NAME_HASH
+    required: true
+  - name: NAMESPACE
+    required: true
+  - name: IMAGE_CRC
+    required: true
+  - name: CLUSTER_TYPE
+    value: "crc"
+  - name: TEST_COMMAND
+    required: true
+  - name: RELEASE_IMAGE_LATEST
+    required: false
+  - name: BUILD_ID
+    required: false
+
+objects:
+
+  # We want the cluster to be able to access these images
+  - kind: RoleBinding
+    apiVersion: authorization.openshift.io/v1
+    metadata:
+      name: ${JOB_NAME_SAFE}-image-puller
+      namespace: ${NAMESPACE}
+    roleRef:
+      name: system:image-puller
+    subjects:
+      - kind: SystemGroup
+        name: system:unauthenticated
+      - kind: SystemGroup
+        name: system:authenticated
+
+  # Give admin access to a known bot
+  - kind: RoleBinding
+    apiVersion: authorization.openshift.io/v1
+    metadata:
+      name: ${JOB_NAME_SAFE}-namespace-admins
+      namespace: ${NAMESPACE}
+    roleRef:
+      name: admin
+    subjects:
+      - kind: ServiceAccount
+        namespace: ci
+        name: ci-chat-bot
+
+  # The e2e pod spins up a cluster, runs e2e tests, and then cleans up the cluster.
+  - kind: Pod
+    apiVersion: v1
+    metadata:
+      name: ${JOB_NAME_SAFE}
+      namespace: ${NAMESPACE}
+      annotations:
+        # we want to gather the teardown logs no matter what
+        ci-operator.openshift.io/wait-for-container-artifacts: teardown
+        ci-operator.openshift.io/save-container-logs: "true"
+        ci-operator.openshift.io/container-sub-tests: "setup,test,teardown"
+    spec:
+      restartPolicy: Never
+      activeDeadlineSeconds: 21600
+      terminationGracePeriodSeconds: 900
+      volumes:
+        - name: artifacts
+          emptyDir: {}
+        - name: shared-tmp
+          emptyDir: {}
+        - name: cluster-profile
+          secret:
+            secretName: ${JOB_NAME_SAFE}-cluster-profile
+
+      containers:
+
+        # Once the cluster is up, executes shared tests
+        - name: test
+          image: ${IMAGE_CRC}
+          terminationMessagePolicy: FallbackToLogsOnError
+          resources:
+            requests:
+              cpu: 1
+              memory: 300Mi
+            limits:
+              memory: 3Gi
+          volumeMounts:
+            - name: shared-tmp
+              mountPath: /home/packer
+            - name: cluster-profile
+              mountPath: /tmp/cluster
+            - name: artifacts
+              mountPath: /tmp/artifacts
+          env:
+            - name: HOME
+              value: /home/packer
+            - name: NSS_WRAPPER_PASSWD
+              value: /home/packer/passwd
+            - name: NSS_WRAPPER_GROUP
+              value: /home/packer/group
+            - name: NSS_USERNAME
+              value: packer
+            - name: NSS_GROUPNAME
+              value: packer
+            - name: GOOGLE_PROJECT_ID
+              value: openshift-gce-devel-ci
+            - name: GOOGLE_COMPUTE_ZONE
+              value: us-east1-c
+            - name: INSTANCE_PREFIX
+              value: ${NAMESPACE}-${JOB_NAME_HASH}
+          command:
+            - /bin/bash
+            - -c
+            - |
+              #!/bin/bash
+              set -euo pipefail
+              trap 'touch "${HOME}"/exit' EXIT
+              trap 'jobs -p | xargs -r kill || true; exit 0' TERM
+              mock-nss.sh
+              gcloud auth activate-service-account \
+                --quiet --key-file /tmp/cluster/gce.json
+              gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
+              gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
+              # wait for install
+              while true; do
+                if [[ -f "${HOME}"/setup-failed ]]; then
+                  echo "Setup reported a failure, do not report test failure" 2>&1
+                  exit 0
+                fi
+                if [[ -f "${HOME}"/exit ]]; then
+                  echo "Another process exited" 2>&1
+                  exit 1
+                fi
+                if [[ ! -f "${HOME}"/setup-success ]]; then
+                  sleep 15 & wait
+                  continue
+                fi
+                break
+              done
+              set -x
+              LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+                --zone "${GOOGLE_COMPUTE_ZONE}" \
+                packer@"${INSTANCE_PREFIX}" \
+                --command 'export PULL_SECRET_FILE=/home/packer/pull-secret && export BUNDLE_LOCATION=--bundle-location=$HOME/Downloads/$BUNDLE && make integration'
+
+        # Runs an install
+        - name: setup
+          image: ${IMAGE_CRC}
+          volumeMounts:
+            - name: shared-tmp
+              mountPath: /home/packer
+            - name: cluster-profile
+              mountPath: /tmp/cluster
+            - name: artifacts
+              mountPath: /tmp/artifacts
+          env:
+            - name: HOME
+              value: /home/packer
+            - name: NSS_WRAPPER_PASSWD
+              value: /home/packer/passwd
+            - name: NSS_WRAPPER_GROUP
+              value: /home/packer/group
+            - name: NSS_USERNAME
+              value: packer
+            - name: NSS_GROUPNAME
+              value: packer
+            - name: GOOGLE_PROJECT_ID
+              value: openshift-gce-devel-ci
+            - name: GOOGLE_COMPUTE_ZONE
+              value: us-east1-c
+            - name: GOOGLE_COMPUTE_REGION
+              value: us-east1
+            - name: INSTANCE_PREFIX
+              value: ${NAMESPACE}-${JOB_NAME_HASH}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              #!/bin/bash
+              set -euo pipefail
+
+              trap 'rc=$?; if test "${rc}" -eq 0; then touch "${HOME}"/setup-success; else touch "${HOME}"/exit "${HOME}"/setup-failed; fi; exit "${rc}"' EXIT
+              trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+              cat  > "${HOME}"/run-tests.sh << 'EOF'
+              #!/bin/bash
+              set -euo pipefail
+              export PATH=/home/packer:$PATH
+              mkdir -p /tmp/artifacts/junit
+
+              function run-tests() {
+                openshift-tests run "${TEST_SUITE}" \
+                  -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
+                return 0
+              }
+
+              set -eu
+              ${TEST_COMMAND}
+              EOF
+              chmod +x "${HOME}"/run-tests.sh
+              mock-nss.sh
+              mkdir "${HOME}"/.ssh
+              gcloud auth activate-service-account \
+                --quiet --key-file /tmp/cluster/gce.json
+              gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
+              gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
+              gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
+              set -x
+
+              # Create the network and firewall rules to attach it to VM
+              gcloud compute networks create "${INSTANCE_PREFIX}" \
+                --subnet-mode=custom \
+                --bgp-routing-mode=regional
+              gcloud compute networks subnets create "${INSTANCE_PREFIX}" \
+                --network "${INSTANCE_PREFIX}" \
+                --range=10.0.0.0/9
+              gcloud compute firewall-rules create "${INSTANCE_PREFIX}" \
+                --network "${INSTANCE_PREFIX}" \
+                --allow tcp:22,icmp
+
+              # image-family openshift4-libvirt must exist in ${GOOGLE_PROJECT_ID} for this template
+              # for more info see here: https://github.com/ironcladlou/openshift4-libvirt-gcp/blob/rhel8/IMAGES.md
+              gcloud compute instances create "${INSTANCE_PREFIX}" \
+                --image-family openshift4-libvirt \
+                --zone "${GOOGLE_COMPUTE_ZONE}" \
+                --machine-type n1-standard-16 \
+                --min-cpu-platform "Intel Haswell" \
+                --boot-disk-type pd-ssd \
+                --boot-disk-size 256GB \
+                --subnet "${INSTANCE_PREFIX}" \
+                --network "${INSTANCE_PREFIX}"
+
+              LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+                --quiet \
+                --project "${GOOGLE_PROJECT_ID}" \
+                --zone "${GOOGLE_COMPUTE_ZONE}" \
+                --recurse "${HOME}"/run-tests.sh packer@"${INSTANCE_PREFIX}":~/run-tests.sh
+              LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+                --quiet \
+                --project "${GOOGLE_PROJECT_ID}" \
+                --zone "${GOOGLE_COMPUTE_ZONE}" \
+                --recurse "${HOME}"/openshift-tests packer@"${INSTANCE_PREFIX}":~/openshift-tests
+              LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+                --quiet \
+                --project "${GOOGLE_PROJECT_ID}" \
+                --zone "${GOOGLE_COMPUTE_ZONE}" \
+                --recurse /bin/crc packer@"${INSTANCE_PREFIX}":/home/packer/crc
+              LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+                --quiet \
+                --project "${GOOGLE_PROJECT_ID}" \
+                --zone "${GOOGLE_COMPUTE_ZONE}" \
+                /tmp/cluster/pull-secret packer@"${INSTANCE_PREFIX}":/home/packer/pull-secret
+              LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+                --zone "${GOOGLE_COMPUTE_ZONE}" \
+                packer@"${INSTANCE_PREFIX}" \
+                --command 'sudo mv /home/packer/crc /usr/local/bin/crc'
+              LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+                --zone "${GOOGLE_COMPUTE_ZONE}" \
+                packer@"${INSTANCE_PREFIX}" \
+                --command 'curl -L -O https://storage.googleapis.com/crc-bundle-github-ci/crc_libvirt_4.4.5.zip'
+
+        # Performs cleanup of all created resources and upload the artifacts
+        - name: teardown
+          image: ${IMAGE_CRC}
+          volumeMounts:
+            - name: shared-tmp
+              mountPath: /home/packer
+            - name: cluster-profile
+              mountPath: /tmp/cluster
+            - name: artifacts
+              mountPath: /tmp/artifacts
+          env:
+            - name: HOME
+              value: /home/packer
+            - name: NSS_WRAPPER_PASSWD
+              value: /home/packer/passwd
+            - name: NSS_WRAPPER_GROUP
+              value: /home/packer/group
+            - name: NSS_USERNAME
+              value: packer
+            - name: NSS_GROUPNAME
+              value: packer
+            - name: GOOGLE_PROJECT_ID
+              value: openshift-gce-devel-ci
+            - name: GOOGLE_COMPUTE_ZONE
+              value: us-east1-c
+            - name: INSTANCE_PREFIX
+              value: ${NAMESPACE}-${JOB_NAME_HASH}
+          command:
+            - /bin/bash
+            - -c
+            - |
+              #!/bin/bash
+              set -eo pipefail
+
+              function teardown() {
+                # This is for running the gcloud commands
+                mock-nss.sh
+                gcloud auth activate-service-account \
+                  --quiet --key-file /tmp/cluster/gce.json
+                gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
+                gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
+
+                set -x
+                set +e
+                echo 'Collect all the info about clusteroperators'
+                LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+                  --zone "${GOOGLE_COMPUTE_ZONE}" \
+                  packer@"${INSTANCE_PREFIX}" \
+                  --command 'export KUBECONFIG=/home/$USER/clusters/installer/auth/kubeconfig && bash -ce "oc get co"' | tee /tmp/artifacts/output-co-libvirt
+                echo 'Run must gather on the cluster'
+                LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+                  --zone "${GOOGLE_COMPUTE_ZONE}" \
+                  packer@"${INSTANCE_PREFIX}" \
+                  --command 'mkdir -p $HOME/must-gather && export KUBECONFIG=$HOME/clusters/installer/auth/kubeconfig && bash -ce "oc adm must-gather --dest-dir $HOME/must-gather || true && tar -czC "$HOME/must-gather -f $HOME/must-gather.tar.gz"'
+
+                echo "scp everything related to installer back to pod"
+                LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+                  --quiet \
+                  --project "${GOOGLE_PROJECT_ID}" \
+                  --zone "${GOOGLE_COMPUTE_ZONE}" \
+                  --recurse packer@"${INSTANCE_PREFIX}":$HOME/clusters/installer /tmp/artifacts
+                echo "scp must-gather logs back to pod"
+                LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+                  --quiet \
+                  --project "${GOOGLE_PROJECT_ID}" \
+                  --zone "${GOOGLE_COMPUTE_ZONE}" \
+                  --recurse packer@"${INSTANCE_PREFIX}":$HOME/must-gather.tar.gz /tmp/artifacts
+                echo "scp junit logs back to test pod"
+                LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+                  --quiet \
+                  --project "${GOOGLE_PROJECT_ID}" \
+                  --zone "${GOOGLE_COMPUTE_ZONE}" \
+                  --recurse packer@"${INSTANCE_PREFIX}":/tmp/artifacts/junit /tmp/artifacts
+
+                touch /home/packer/exit
+                echo "Deprovisioning cluster ..."
+                gcloud compute instances delete "${INSTANCE_PREFIX}" --quiet
+                gcloud compute firewall-rules delete "${INSTANCE_PREFIX}" --quiet
+                gcloud compute networks subnets delete "${INSTANCE_PREFIX}" --quiet
+                gcloud compute networks delete "${INSTANCE_PREFIX}" --quiet
+              }
+
+              trap 'teardown' EXIT
+              trap 'jobs -p | xargs -r kill || true; exit 0' TERM
+
+              set +x
+              for i in $(seq 1 220); do
+                if [[ -f /home/packer/exit ]]; then
+                  exit 0
+                fi
+                sleep 60 & wait
+              done
