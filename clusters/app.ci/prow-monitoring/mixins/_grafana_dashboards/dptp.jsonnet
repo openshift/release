@@ -23,7 +23,7 @@ dashboard.new(
 .addPanel(
     (graphPanel.new(
         'CI Operator Failure Rates by Reason',
-        description='sum(rate(ci_operator_error_rate{state="failed",reason!="executing_graph:step_failed:utilizing_lease",reason!="executing_graph:step_failed:running_pod",reason!="executing_graph:step_failed:building_cache_image",reason!="executing_graph:step_failed:building_image_from_source",reason!="executing_graph:step_failed:building_project_image",reason!="executing_graph:step_failed:cloning_source",reason!="executing_graph:interrupted"}[30m])) by (reason)',
+        description='sum(rate(ci_operator_error_rate{state="failed",reason!~".*executing_template",reason!~".*executing_multi_stage_test",reason!~".*building_image_from_source",reason!~".*building_.*_image",reason!="executing_graph:interrupted"}[30m])) by (reason)',
         datasource='prometheus',
         legend_alignAsTable=true,
         legend_rightSide=true,
@@ -31,7 +31,7 @@ dashboard.new(
         legend_current=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(rate(ci_operator_error_rate{state="failed",reason!="executing_graph:step_failed:utilizing_lease",reason!="executing_graph:step_failed:running_pod",reason!="executing_graph:step_failed:building_cache_image",reason!="executing_graph:step_failed:building_image_from_source",reason!="executing_graph:step_failed:building_project_image",reason!="executing_graph:step_failed:cloning_source",reason!="executing_graph:interrupted"}[30m])) by (reason)',
+        'sum(rate(ci_operator_error_rate{state="failed",reason!~".*executing_template",reason!~".*executing_multi_stage_test",reason!~".*building_image_from_source",reason!~".*building_.*_image",reason!="executing_graph:interrupted"}[30m])) by (reason)',
         legendFormat='{{reason}}',
     )), gridPos={
     h: 9,
