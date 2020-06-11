@@ -1,0 +1,41 @@
+base_images:
+  base:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- dockerfile_path: build/Dockerfile
+  from: base
+  to: managed-upgrade-operator
+promotion:
+  name: managed-upgrade-operator
+  namespace: osd-operators
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: verify
+  commands: |
+    export GOLANGCI_LINT_VERSION=$(cat .golangciversion)
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    curl -sfL "https://github.com/golangci/golangci-lint/releases/download/v${GOLANGCI_LINT_VERSION:?'golangci-lint version is unset'}/golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64.tar.gz" | tar -C /go/bin -zx --strip-components=1 "golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64/golangci-lint"
+    go mod download
+    make verify
+  container:
+    from: src
+- as: test
+  commands: |
+    make test
+  container:
+    from: src
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: managed-upgrade-operator
