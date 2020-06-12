@@ -581,6 +581,7 @@ presubmits:
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.6-e2e-aws-shared-vpc
     optional: true
@@ -588,28 +589,15 @@ presubmits:
     spec:
       containers:
       - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
         - --lease-server-password-file=/etc/boskos/password
-        - --lease-server-username=ci
-        - --lease-server=https://boskos-ci.svc.ci.openshift.org
-        - --repo=installer
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
         - --secret-dir=/usr/local/e2e-aws-shared-vpc-cluster-profile
         - --target=e2e-aws-shared-vpc
-        - --template=/usr/local/e2e-aws-shared-vpc
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: CLUSTER_VARIANT
-          value: shared-vpc
-        - name: JOB_NAME_SAFE
-          value: e2e-aws-shared-vpc
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance/parallel run-tests
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -625,14 +613,11 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-aws-shared-vpc-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-aws-shared-vpc
-          name: job-definition
-          subPath: cluster-launch-installer-e2e.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
+        - mountPath: /etc/report
+          name: result-aggregator
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
@@ -653,15 +638,12 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-e2e
-        name: job-definition
       - name: pull-secret
         secret:
           secretName: regcred
-      - name: sentry-dsn
+      - name: result-aggregator
         secret:
-          secretName: sentry-dsn
+          secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-shared-vpc,?($|\s.*)
   - agent: kubernetes
     always_run: true
@@ -908,6 +890,7 @@ presubmits:
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.6-e2e-azure-shared-vpc
     optional: true
@@ -915,28 +898,15 @@ presubmits:
     spec:
       containers:
       - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
         - --lease-server-password-file=/etc/boskos/password
-        - --lease-server-username=ci
-        - --lease-server=https://boskos-ci.svc.ci.openshift.org
-        - --repo=installer
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
         - --secret-dir=/usr/local/e2e-azure-shared-vpc-cluster-profile
         - --target=e2e-azure-shared-vpc
-        - --template=/usr/local/e2e-azure-shared-vpc
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: azure4
-        - name: CLUSTER_VARIANT
-          value: shared-vpc
-        - name: JOB_NAME_SAFE
-          value: e2e-azure-shared-vpc
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance/parallel run-tests
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -952,14 +922,11 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-azure-shared-vpc-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-azure-shared-vpc
-          name: job-definition
-          subPath: cluster-launch-installer-e2e.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
+        - mountPath: /etc/report
+          name: result-aggregator
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
@@ -980,15 +947,12 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-azure4
-      - configMap:
-          name: prow-job-cluster-launch-installer-e2e
-        name: job-definition
       - name: pull-secret
         secret:
           secretName: regcred
-      - name: sentry-dsn
+      - name: result-aggregator
         secret:
-          secretName: sentry-dsn
+          secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-azure-shared-vpc,?($|\s.*)
   - agent: kubernetes
     always_run: true
@@ -1163,6 +1127,7 @@ presubmits:
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.6-e2e-gcp-shared-vpc
     optional: true
@@ -1170,28 +1135,15 @@ presubmits:
     spec:
       containers:
       - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
         - --lease-server-password-file=/etc/boskos/password
-        - --lease-server-username=ci
-        - --lease-server=https://boskos-ci.svc.ci.openshift.org
-        - --repo=installer
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
         - --secret-dir=/usr/local/e2e-gcp-shared-vpc-cluster-profile
         - --target=e2e-gcp-shared-vpc
-        - --template=/usr/local/e2e-gcp-shared-vpc
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: gcp
-        - name: CLUSTER_VARIANT
-          value: shared-vpc
-        - name: JOB_NAME_SAFE
-          value: e2e-gcp-shared-vpc
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance/parallel run-tests
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -1207,14 +1159,11 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-gcp-shared-vpc-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-gcp-shared-vpc
-          name: job-definition
-          subPath: cluster-launch-installer-e2e.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
+        - mountPath: /etc/report
+          name: result-aggregator
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
@@ -1237,15 +1186,12 @@ presubmits:
               name: cluster-secrets-gcp
           - configMap:
               name: cluster-profile-gcp
-      - configMap:
-          name: prow-job-cluster-launch-installer-e2e
-        name: job-definition
       - name: pull-secret
         secret:
           secretName: regcred
-      - name: sentry-dsn
+      - name: result-aggregator
         secret:
-          secretName: sentry-dsn
+          secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-gcp-shared-vpc,?($|\s.*)
   - agent: kubernetes
     always_run: false
