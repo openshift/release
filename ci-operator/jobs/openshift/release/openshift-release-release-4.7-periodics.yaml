@@ -463,7 +463,9 @@ periodics:
     workdir: true
   interval: 24h
   labels:
+    ci.openshift.io/release-type: informing
     job-release: "4.7"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: promote-release-openshift-okd-machine-os-content-e2e-aws-4.7
   spec:
     containers:
@@ -592,15 +594,18 @@ periodics:
                   ostree --repo=/srv/repo cat "${ostree_ref}" /usr/lib/os-release > /tmp/os-release && \\
                   source /tmp/os-release && \\
                   sed -i 's/enabled=0/enabled=1/g' /etc/yum.repos.d/fedora-updates-testing-modular.repo && \\
+                  yum-config-manager --add-repo https://mirror.openshift.com/pub/openshift-v4/dependencies/rpms/4.5-beta && \\
                   rpm-ostree db list --repo /srv/repo "${ostree_ref}" > /tmp/packages && \\
                   dnf --setopt=releasever="\${VERSION_ID}" module enable -y cri-o:1.18 && \\
-                  if ! grep -q cri-o /tmp/packages; then yumdownloader -y --setopt=releasever="\${VERSION_ID}" --archlist=x86_64 --disablerepo=* --enablerepo=updates-testing-modular --destdir=/tmp/rpms cri-o cri-tools; fi && \\
+                  if ! grep -q cri-o /tmp/packages; then yumdownloader -y --setopt=releasever="\${VERSION_ID}" --archlist=x86_64 --disablerepo=* --enablerepo=updates-testing-modular --destdir=/tmp/rpms cri-o && \\
+                  yumdownloader -y --setopt=releasever="\${VERSION_ID}" --archlist=x86_64 --enablerepo=* --destdir=/tmp/rpms cri-tools; fi && \\
                   if ! grep -q glusterfs-fuse /tmp/packages; then yumdownloader --setopt=releasever="\${VERSION_ID}" -y --archlist=x86_64 --disablerepo=* --enablerepo=fedora --enablerepo=updates --destdir=/tmp/rpms  glusterfs glusterfs-client-xlators glusterfs-fuse glusterfs-libs psmisc; fi && \\
                   if ! grep -q open-vm-tools /tmp/packages; then yumdownloader --setopt=releasever="\${VERSION_ID}" -y --archlist=x86_64 --disablerepo=* --enablerepo=fedora --enablerepo=updates --destdir=/tmp/rpms  open-vm-tools xmlsec1 xmlsec1-openssl libxslt libtool-ltdl; fi && \\
                   cd /tmp/working && \\
                   for i in \$(find /tmp/rpms/ -name *.rpm); do echo "Extracting \$i ..."; rpm2cpio \$i | cpio -div; done && \\
                   mv etc usr/ && mv sbin/* usr/sbin/ && rm -rf sbin/ && \\
-                  ln -s ../vmtoolsd.service usr/lib/systemd/multi-user.target.wants/vmtoolsd.service && \\
+                  mkdir -p usr/lib/systemd/system/multi-user.target.wants && \\
+                  ln -s usr/lib/systemd/system/vmtoolsd.service usr/lib/systemd/system/multi-user.target.wants/vmtoolsd.service && \\
                   coreos-assembler dev-overlay --repo /srv/repo --rev "${ostree_ref}" --add-tree /tmp/working --output-ref "${ostree_ref}"
 
               FROM scratch
