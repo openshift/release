@@ -189,7 +189,7 @@ objects:
         trap "release" TERM
 
         while true; do
-          if [[ -f /tmp/shared/exit ]]; then
+          if [[ -f /tmp/shared/teardown-exit ]]; then
             echo "Another process exited" 2>&1
             exit 0
           fi
@@ -231,7 +231,7 @@ objects:
 
         export PATH=/usr/libexec/origin:$PATH
 
-        trap 'touch /tmp/shared/exit' EXIT
+        trap 'touch /tmp/shared/test-exit' EXIT
         trap 'kill $(jobs -p); exit 0' TERM
 
         mkdir -p "${HOME}"
@@ -517,7 +517,6 @@ objects:
 
         function teardown() {
           set +e
-          touch /tmp/shared/exit
           export PATH=$PATH:/tmp/shared
           source /etc/openshift-installer/ovirt.conf
 
@@ -604,11 +603,12 @@ objects:
           rm -f /tmp/artifacts/installer/ovirt-config.yaml
         }
 
-        trap 'teardown; exit $DELETE_FAIL' EXIT
-        trap 'kill $(jobs -p); teardown; exit $DELETE_FAIL' TERM
+        trap 'teardown; touch /tmp/shared/teardown-exit; exit $DELETE_FAIL' EXIT
+        trap 'kill $(jobs -p); teardown; touch /tmp/shared/teardown-exit; exit $DELETE_FAIL' TERM
 
         for i in $(seq 1 180); do
-          if [[ -f /tmp/shared/exit ]]; then
+
+          if [[ -f /tmp/shared/exit ]] || [[ -f /tmp/shared/test-exit ]]; then
             exit 0
           fi
           sleep 60 & wait
