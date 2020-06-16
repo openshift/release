@@ -565,9 +565,6 @@ presubmits:
         - --prowjob-kubeconfig=/var/prowjob-kubeconfig/kubeconfig
         command:
         - ./hack/pj-rehearse.sh
-        env:
-        - name: KUBECONFIG
-          value: /etc/build-farm-credentials/api.ci.kubeconfig:/etc/build-farm-credentials/build01.kubeconfig:/etc/build-farm-credentials/app.ci.kubeconfig:/etc/build-farm-credentials/build02.kubeconfig
         image: pj-rehearse:latest
         imagePullPolicy: Always
         name: ""
@@ -575,25 +572,10 @@ presubmits:
           requests:
             cpu: 500m
         volumeMounts:
-        - mountPath: /etc/build-farm-credentials
-          name: build-farm-credentials
-          readOnly: true
         - mountPath: /var/prowjob-kubeconfig
           name: prowjob-kubeconfig
       serviceAccountName: ci-operator
       volumes:
-      - name: build-farm-credentials
-        secret:
-          items:
-          - key: sa.plank.api.ci.config
-            path: api.ci.kubeconfig
-          - key: sa.plank.build01.config
-            path: build01.kubeconfig
-          - key: sa.plank.app.ci.config
-            path: app.ci.kubeconfig
-          - key: sa.plank.build02.config
-            path: build02.kubeconfig
-          secretName: build-farm-credentials
       - name: prowjob-kubeconfig
         secret:
           items:
