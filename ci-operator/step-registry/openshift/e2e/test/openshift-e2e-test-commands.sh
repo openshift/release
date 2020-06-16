@@ -62,12 +62,7 @@ if [[ "${CLUSTER_TYPE}" == gcp ]]; then
     popd
 fi
 
-test_suite=openshift/conformance/parallel
-if [[ -e "${SHARED_DIR}/test-suite.txt" ]]; then
-    test_suite=$(<"${SHARED_DIR}/test-suite.txt")
-fi
-
-openshift-tests run "${test_suite}" \
+openshift-tests "${TEST_COMMAND}" "${TEST_SUITE}" \
     --provider "${TEST_PROVIDER}" \
     -o /tmp/artifacts/e2e.log \
     --junit-dir /tmp/artifacts/junit
