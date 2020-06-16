@@ -545,10 +545,10 @@ periodics:
         latest="$( oc get istag -n origin ${TAG}:${BRANCH} --template '{{ index .image.dockerImageMetadata.Config.Labels "version" }} {{ index .image.dockerImageMetadata.Config.Labels "id-artifacts" }} {{ index .image.dockerImageMetadata.Config.Labels "id-machine-config-operator-rpms" }}' )"
         candidate="${build_id} ${origin_artifacts_id} ${origin_machine_config_operator_rpms_id}"
         echo "Comparing existing '$latest' against latest '$candidate'"
-        if [[ "${latest}" == "${candidate}" ]]; then
-          echo "No build necessary, content is up to date"
-          exit 0
-        fi
+        #if [[ "${latest}" == "${candidate}" ]]; then
+        #  echo "No build necessary, content is up to date"
+        #  exit 0
+        #fi
 
         curl -L https://github.com/mikefarah/yq/releases/download/2.4.0/yq_linux_amd64 2>/dev/null >/tmp/bin/yq
         chmod ug+x $HOME/bin/yq
@@ -637,10 +637,10 @@ periodics:
 
         # debug output
         oc describe -n ${namespace} istag/machine-os-content:latest
-        oc tag ${namespace}/machine-os-content:latest origin/machine-os-content:${BRANCH}
-        oc tag origin/machine-os-content:${BRANCH} ${TAG_NS}/${BRANCH}:machine-os-content
+        #oc tag ${namespace}/machine-os-content:latest origin/machine-os-content:${BRANCH}
+        #oc tag origin/machine-os-content:${BRANCH} ${TAG_NS}/${BRANCH}:machine-os-content
         # run tests
-        ci-operator $@ --target=e2e-aws --promote --namespace=${namespace}
+        ci-operator $@ --target=e2e-aws --namespace=${namespace}
       env:
       - name: TAG_NS
         value: origin
