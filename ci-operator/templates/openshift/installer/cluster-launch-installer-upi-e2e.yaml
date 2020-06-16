@@ -2001,12 +2001,25 @@ objects:
           VHD_URL="$(cat /var/lib/openshift-install/rhcos.json | jq -r .azure.url)"
 
           echo "Copying VHD image from ${VHD_URL}"
-          az storage container create --name vhd --account-name $ACCOUNT_NAME
-          az storage blob copy start --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY --destination-blob "rhcos.vhd" --destination-container vhd --source-uri "$VHD_URL"
+          az storage container create --name vhd --account-name $ACCOUNT_NAME --auth-mode login
+
+          status="false"
+          while [ "$status" == "false" ]
+          do
+            status=$(az storage container exists --account-name $ACCOUNT_NAME --name vhd --auth-mode login -o tsv --query exists)
+          done
+
+          az storage blob copy start --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY --destination-container vhd --destination-blob "rhcos.vhd" --source-uri "$VHD_URL"
+          status="false"
+          while [ "$status" == "false" ]
+          do
+            status=$(az storage blob exists --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY --container-name vhd --name "rhcos.vhd" -o tsv --query exists)
+          done
+
           status="pending"
           while [ "$status" == "pending" ]
           do
-            status=$(az storage blob show --container-name vhd --name "rhcos.vhd" --account-name ${CLUSTER_NAME}sa --account-key $ACCOUNT_KEY -o tsv --query properties.copy.status)
+            status=$(az storage blob show --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY --container-name vhd --name "rhcos.vhd" -o tsv --query properties.copy.status)
           done
           if [[ "$status" != "success" ]]; then
             echo "Error copying VHD image ${VHD_URL}"
@@ -2118,7 +2131,7 @@ objects:
           # Until an alternative solution can be found do not delete bootstrap.
           #terraform destroy -auto-approve -target module.bootstrap -no-color &
         elif [[ "${CLUSTER_TYPE}" == "azure4" ]]; then
-          az network nsg rule delete -g $RESOURCE_GROUP --nsg-name ${INFRA_ID}-controlplane-nsg --name bootstrap_ssh_in
+          az network nsg rule delete -g $RESOURCE_GROUP --nsg-name ${INFRA_ID}-nsg --name bootstrap_ssh_in
           az vm stop -g $RESOURCE_GROUP --name ${INFRA_ID}-bootstrap
           az vm deallocate -g $RESOURCE_GROUP --name ${INFRA_ID}-bootstrap
           az vm delete -g $RESOURCE_GROUP --name ${INFRA_ID}-bootstrap --yes
