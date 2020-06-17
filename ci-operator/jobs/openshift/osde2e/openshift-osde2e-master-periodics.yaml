@@ -13,20 +13,23 @@ periodics:
   spec:
     containers:
     - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/integr8ly-ci-secrets
-        addons;
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
       command:
-      - /bin/bash
-      - -c
+      - /osde2e
       env:
       - name: ADDON_IDS
         value: rhmi
       - name: ADDON_TEST_HARNESSES
         value: quay.io/integreatly/integreatly-operator-test-harness:osde2e
-      - name: OSD_ENV
-        value: stage
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/integr8ly-ci-secrets
+      - name: CONFIGS
+        value: aws,stage,addon-suite
+      image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
       resources:
@@ -61,20 +64,23 @@ periodics:
   spec:
     containers:
     - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
-        addons;
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
       command:
-      - /bin/bash
-      - -c
+      - /osde2e
       env:
       - name: ADDON_IDS
         value: prow-operator
       - name: ADDON_TEST_HARNESSES
         value: quay.io/miwilson/prow-operator-test-harness
-      - name: OSD_ENV
-        value: stage
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - name: CONFIGS
+        value: aws,stage,addon-suite
+      image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
       resources:
@@ -99,27 +105,25 @@ periodics:
   cluster: api.ci
   cron: 0 */4 * * *
   decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: osde2e
   labels:
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: osde2e-int-aws-e2e-osd-default-nightly
   spec:
     containers:
     - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
       command:
-      - /bin/bash
-      - -c
+      - /osde2e
       env:
-      - name: NEXT_RELEASE_AFTER_PROD_DEFAULT
-        value: "0"
-      - name: OSD_ENV
-        value: int
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - name: CONFIGS
+        value: aws,int,e2e-suite,nightly-release-for-prod-default
+      image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
       resources:
@@ -154,17 +158,19 @@ periodics:
   spec:
     containers:
     - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
       command:
-      - /bin/bash
-      - -c
+      - /osde2e
       env:
-      - name: NEXT_RELEASE_AFTER_PROD_DEFAULT_FOR_UPGRADE
-        value: "0"
-      - name: OSD_ENV
-        value: int
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - name: CONFIGS
+        value: aws,int,e2e-suite,upgrade-nightly-release-for-prod-default
+      image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
       resources:
@@ -199,17 +205,19 @@ periodics:
   spec:
     containers:
     - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
       command:
-      - /bin/bash
-      - -c
+      - /osde2e
       env:
-      - name: NEXT_RELEASE_AFTER_PROD_DEFAULT
-        value: "1"
-      - name: OSD_ENV
-        value: int
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - name: CONFIGS
+        value: aws,int,e2e-suite,one-release-from-prod-default
+      image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
       resources:
@@ -244,17 +252,19 @@ periodics:
   spec:
     containers:
     - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
       command:
-      - /bin/bash
-      - -c
+      - /osde2e
       env:
-      - name: NEXT_RELEASE_AFTER_PROD_DEFAULT_FOR_UPGRADE
-        value: "1"
-      - name: OSD_ENV
-        value: int
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - name: CONFIGS
+        value: aws,int,e2e-suite,upgrade-one-release-from-prod-default
+      image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
       resources:
@@ -289,17 +299,19 @@ periodics:
   spec:
     containers:
     - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
       command:
-      - /bin/bash
-      - -c
+      - /osde2e
       env:
-      - name: NEXT_RELEASE_AFTER_PROD_DEFAULT
-        value: "2"
-      - name: OSD_ENV
-        value: int
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - name: CONFIGS
+        value: aws,int,e2e-suite,two-releases-from-prod-default
+      image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
       resources:
@@ -334,18 +346,19 @@ periodics:
   spec:
     containers:
     - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
-        scale
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
       command:
-      - /bin/bash
-      - -c
+      - /osde2e
       env:
-      - name: NEXT_RELEASE_AFTER_PROD_DEFAULT
-        value: "0"
-      - name: OSD_ENV
-        value: int
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - name: CONFIGS
+        value: aws,int,scale-mastervertical-suite
+      image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
       resources:
@@ -380,15 +393,19 @@ periodics:
   spec:
     containers:
     - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
       command:
-      - /bin/bash
-      - -c
+      - /osde2e
       env:
-      - name: OSD_ENV
-        value: prod
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - name: CONFIGS
+        value: aws,prod,e2e-suite
+      image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
       resources:
@@ -423,16 +440,19 @@ periodics:
   spec:
     containers:
     - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
-        informing
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
       command:
-      - /bin/bash
-      - -c
+      - /osde2e
       env:
-      - name: OSD_ENV
-        value: prod
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - name: CONFIGS
+        value: aws,prod,informing-suite
+      image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
       resources:
@@ -467,16 +487,19 @@ periodics:
   spec:
     containers:
     - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
-        informing
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
       command:
-      - /bin/bash
-      - -c
+      - /osde2e
       env:
-      - name: OSD_ENV
-        value: stage
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - name: CONFIGS
+        value: aws,stage,informing-suite
+      image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
       resources:
@@ -511,17 +534,21 @@ periodics:
   spec:
     containers:
     - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
       command:
-      - /bin/bash
-      - -c
+      - /osde2e
       env:
-      - name: OSD_ENV
-        value: prod
       - name: UPGRADE_TO_CIS_IF_POSSIBLE
         value: "true"
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - name: CONFIGS
+        value: aws,prod,e2e-suite
+      image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
       resources:
@@ -556,19 +583,23 @@ periodics:
   spec:
     containers:
     - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
       command:
-      - /bin/bash
-      - -c
+      - /osde2e
       env:
-      - name: OSD_ENV
-        value: prod
       - name: UPGRADE_TO_CIS_IF_POSSIBLE
         value: "true"
       - name: PREVIOUS_RELEASE_FROM_DEFAULT
         value: "1"
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - name: CONFIGS
+        value: aws,prod,e2e-suite
+      image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
       resources:
@@ -603,19 +634,23 @@ periodics:
   spec:
     containers:
     - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
       command:
-      - /bin/bash
-      - -c
+      - /osde2e
       env:
-      - name: OSD_ENV
-        value: prod
       - name: UPGRADE_TO_CIS_IF_POSSIBLE
         value: "true"
       - name: PREVIOUS_RELEASE_FROM_DEFAULT
         value: "2"
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - name: CONFIGS
+        value: aws,prod,e2e-suite
+      image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
       resources:
@@ -650,19 +685,23 @@ periodics:
   spec:
     containers:
     - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
       command:
-      - /bin/bash
-      - -c
+      - /osde2e
       env:
-      - name: OSD_ENV
-        value: prod
       - name: UPGRADE_TO_CIS_IF_POSSIBLE
         value: "true"
       - name: PREVIOUS_RELEASE_FROM_DEFAULT
         value: "3"
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - name: CONFIGS
+        value: aws,prod,e2e-suite
+      image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
       resources:
@@ -697,19 +736,23 @@ periodics:
   spec:
     containers:
     - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
       command:
-      - /bin/bash
-      - -c
+      - /osde2e
       env:
-      - name: OSD_ENV
-        value: prod
       - name: UPGRADE_TO_CIS_IF_POSSIBLE
         value: "true"
       - name: PREVIOUS_RELEASE_FROM_DEFAULT
         value: "4"
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - name: CONFIGS
+        value: aws,prod,e2e-suite
+      image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
       resources:
@@ -744,16 +787,19 @@ periodics:
   spec:
     containers:
     - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
-        middle-imageset
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
       command:
-      - /bin/bash
-      - -c
+      - /osde2e
       env:
-      - name: OSD_ENV
-        value: prod
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - name: CONFIGS
+        value: aws,prod,e2e-suite,use-middle-version
+      image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
       resources:
@@ -788,17 +834,21 @@ periodics:
   spec:
     containers:
     - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
       command:
-      - /bin/bash
-      - -c
+      - /osde2e
       env:
-      - name: OSD_ENV
-        value: prod
       - name: USE_LATEST_VERSION_FOR_INSTALL
         value: "true"
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - name: CONFIGS
+        value: aws,prod,e2e-suite
+      image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
       resources:
@@ -833,18 +883,21 @@ periodics:
   spec:
     containers:
     - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
-        informing
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
       command:
-      - /bin/bash
-      - -c
+      - /osde2e
       env:
-      - name: OSD_ENV
-        value: prod
       - name: USE_LATEST_VERSION_FOR_INSTALL
         value: "true"
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - name: CONFIGS
+        value: aws,prod,informing-suite
+      image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
       resources:
@@ -879,18 +932,21 @@ periodics:
   spec:
     containers:
     - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
-        informing
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
       command:
-      - /bin/bash
-      - -c
+      - /osde2e
       env:
-      - name: OSD_ENV
-        value: stage
       - name: USE_LATEST_VERSION_FOR_INSTALL
         value: "true"
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - name: CONFIGS
+        value: aws,stage,informing-suite
+      image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
       resources:
@@ -925,16 +981,19 @@ periodics:
   spec:
     containers:
     - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
-        oldest-imageset
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
       command:
-      - /bin/bash
-      - -c
+      - /osde2e
       env:
-      - name: OSD_ENV
-        value: prod
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - name: CONFIGS
+        value: aws,prod,e2e-suite,use-oldest-version
+      image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
       resources:
@@ -969,16 +1028,19 @@ periodics:
   spec:
     containers:
     - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
-        scale
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
       command:
-      - /bin/bash
-      - -c
+      - /osde2e
       env:
-      - name: OSD_ENV
-        value: prod
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - name: CONFIGS
+        value: aws,prod,scale-mastervertical-suite
+      image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1013,15 +1075,19 @@ periodics:
   spec:
     containers:
     - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
       command:
-      - /bin/bash
-      - -c
+      - /osde2e
       env:
-      - name: OSD_ENV
-        value: stage
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - name: CONFIGS
+        value: aws,stage,e2e-suite
+      image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1056,19 +1122,23 @@ periodics:
   spec:
     containers:
     - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
       command:
-      - /bin/bash
-      - -c
+      - /osde2e
       env:
-      - name: OSD_ENV
-        value: stage
       - name: UPGRADE_TO_CIS_IF_POSSIBLE
         value: "true"
       - name: ONLY_UPGRADE_TO_Z_RELEASES
         value: "true"
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - name: CONFIGS
+        value: aws,stage,e2e-suite
+      image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1103,17 +1173,21 @@ periodics:
   spec:
     containers:
     - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
       command:
-      - /bin/bash
-      - -c
+      - /osde2e
       env:
-      - name: OSD_ENV
-        value: stage
       - name: UPGRADE_TO_CIS_IF_POSSIBLE
         value: "true"
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - name: CONFIGS
+        value: aws,stage,e2e-suite
+      image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1148,16 +1222,19 @@ periodics:
   spec:
     containers:
     - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
-        middle-imageset
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
       command:
-      - /bin/bash
-      - -c
+      - /osde2e
       env:
-      - name: OSD_ENV
-        value: stage
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - name: CONFIGS
+        value: aws,stage,e2e-suite,use-middle-version
+      image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1192,17 +1269,21 @@ periodics:
   spec:
     containers:
     - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
       command:
-      - /bin/bash
-      - -c
+      - /osde2e
       env:
-      - name: OSD_ENV
-        value: stage
       - name: USE_LATEST_VERSION_FOR_INSTALL
         value: "true"
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - name: CONFIGS
+        value: aws,stage,e2e-suite
+      image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1237,16 +1318,19 @@ periodics:
   spec:
     containers:
     - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
-        oldest-imageset
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
       command:
-      - /bin/bash
-      - -c
+      - /osde2e
       env:
-      - name: OSD_ENV
-        value: stage
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - name: CONFIGS
+        value: aws,stage,e2e-suite,use-oldest-version
+      image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1281,16 +1365,19 @@ periodics:
   spec:
     containers:
     - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
-        scale
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
       command:
-      - /bin/bash
-      - -c
+      - /osde2e
       env:
-      - name: OSD_ENV
-        value: stage
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - name: CONFIGS
+        value: aws,stage,scale-mastervertical-suite
+      image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1325,16 +1412,19 @@ periodics:
   spec:
     containers:
     - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        export MULTI_AZ=true; ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/osde2e-credentials
-        conformance
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
       command:
-      - /bin/bash
-      - -c
+      - /osde2e
       env:
-      - name: OSD_ENV
-        value: stage
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - name: CONFIGS
+        value: aws,stage,conformance-suite
+      image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1369,19 +1459,23 @@ periodics:
   spec:
     containers:
     - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/crw-osd-token addons;
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
       command:
-      - /bin/bash
-      - -c
+      - /osde2e
       env:
       - name: ADDON_IDS
         value: codeready-workspaces
       - name: ADDON_TEST_HARNESSES
         value: quay.io/crw/osd-e2e:latest
-      - name: OSD_ENV
-        value: stage
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/crw-osd-token
+      - name: CONFIGS
+        value: aws,stage,addon-suite
+      image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1416,19 +1510,23 @@ periodics:
   spec:
     containers:
     - args:
-      - set -o pipefail; export HOME=$(mktemp -d); export REPORT_DIR=${ARTIFACTS};
-        ./ci/prow_run_tests.sh /usr/local/osde2e-common,/usr/local/crw-osd-token addons;
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
       command:
-      - /bin/bash
-      - -c
+      - /osde2e
       env:
       - name: ADDON_IDS
         value: codeready-workspaces-qe
       - name: ADDON_TEST_HARNESSES
         value: quay.io/crw/osd-e2e:nightly
-      - name: OSD_ENV
-        value: stage
-      image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/crw-osd-token
+      - name: CONFIGS
+        value: aws,stage,addon-suite
+      image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
       resources:
