@@ -1844,6 +1844,39 @@ periodics:
         secretName: osde2e-credentials
 - agent: kubernetes
   cluster: api.ci
+  cron: 0 4 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: osde2e
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: osde2e-moa-cleanup
+  spec:
+    containers:
+    - args:
+      - set -o pipefail; ./scripts/clean-up-moa.sh /usr/local/osde2e-credentials
+      command:
+      - /bin/bash
+      - -c
+      image: amazon/aws-cli
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: osde2e-credentials
+      secret:
+        secretName: osde2e-credentials
+- agent: kubernetes
+  cluster: api.ci
   cron: 0 */8 * * *
   decorate: true
   extra_refs:
