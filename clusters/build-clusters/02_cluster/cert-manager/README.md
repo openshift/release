@@ -28,7 +28,7 @@ $ oc get clusterissuer
 NAME          READY   AGE
 cert-issuer   True    17m
 
-$ oc apply -f clusters/build-clusters/02_cluster/cert-manager/registry-build02_certificate.yaml
+$ oc apply -f clusters/build-clusters/02_cluster/openshift-image-registry/registry-build02_certificate.yaml
 $ oc describe CertificateRequest -n openshift-image-registry
 ...
 Events:

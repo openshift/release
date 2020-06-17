@@ -1,4 +1,4 @@
-# 01-Cluster
+# 02-Cluster
 
 [02-Cluster](https://console-openshift-console.apps.build02.gcp.ci.openshift.org) is an OpenShift-cluster managed by DPTP-team. It is one of the clusters for running Prow job pods.
 
@@ -78,3 +78,202 @@ Customize [platform.gcp.type](https://docs.openshift.com/container-platform/4.4/
 | api.ci  | n1-standard-16 | n1-standard-16 |
 | build01 | m5.2xlarge     | m5.4xlarge     |
 | build02 | n1-standard-8  | n1-standard-16 |
+
+
+## Configuration
+
+### openshift-image-registry
+
+#### customize router for image-registry
+
+The default one would be `default-route-openshift-image-registry.apps.build02.gcp.ci.openshift.org` but we like more to use `registry.build02.ci.openshift.org`.
+
+[Steps](https://docs.openshift.com/container-platform/4.4/registry/securing-exposing-registry.html):
+
+* [dns set up](https://cloud.ibm.com/docs/openshift?topic=openshift-openshift_routes): [No official doc yet](https://coreos.slack.com/archives/CCH60A77E/p1588774688400500).
+
+```
+oc --context build02 get svc -n openshift-ingress router-default 
+NAME                      TYPE           CLUSTER-IP      EXTERNAL-IP    PORT(S)                      AGE
+router-default            LoadBalancer   172.30.61.60    34.74.144.21   80:32716/TCP,443:31869/TCP   6d21h
+```
+
+GCP project `OpenShift Ci Infra`, Network Service, Cloud DNS: Set up an A record mapping `registry.build02.ci.openshift.org` to `34.74.144.21`.
+
+```
+$ dig +noall +answer registry.build02.ci.openshift.org
+registry.build02.ci.openshift.org. 245 IN A	34.74.144.21
+```
+* Configure the Registry Operator:
+
+```
+$ oc --as system:admin --context build02 edit configs.imageregistry.operator.openshift.io cluster
+spec:
+...
+  routes:
+  - hostname: registry.build02.ci.openshift.org
+    name: public-routes
+...
+
+$ oc --context build02 get route -n openshift-image-registry
+NAME            HOST/PORT                           PATH   SERVICES         PORT    TERMINATION   WILDCARD
+public-routes   registry.build02.ci.openshift.org          image-registry   <all>   reencrypt     None
+
+$ podman pull registry.build02.ci.openshift.org/ci/applyconfig --tls-verify=false
+```
+
+* Create a secret with your route’s TLS keys via [cert-manager](../cert-manager/readme.md).
+
+* Update the Registry Operator with the secret:
+
+```
+$ oc --as system:admin --context build02 edit configs.imageregistry.operator.openshift.io cluster
+spec:
+...
+  routes:
+  - hostname: registry.build02.ci.openshift.org
+    name: public-routes
+    secretName: public-route-tls
+...
+```
+
+Verify: the above `podman pull` works without `--tls-verify=false`.
+
+
+### openshift-ingress
+
+#### CA Certificate for app routes
+
+Openshift 4.2 has doc on [this topic](https://docs.openshift.com/container-platform/4.2/authentication/certificates/replacing-default-ingress-certificate.html).
+
+Manual steps: Those `yaml`s are applied automatically by `applyconfig`. We record the steps here for debugging purpose.
+
+[Google CloudDNS](https://cert-manager.io/docs/configuration/acme/dns01/google/): The key file of the service-account `cert-issuer` (in project "openshift-ci-build-farm") is uploaded to BW item `cert-issuer`.
+
+
+* *Generate the certificate by `cert-manager`
+
+```bash
+$ oc --as system:admin apply -f clusters/build-clusters/02_cluster/cert-manager/cert-issuer-ci-build-farm_clusterissuer.yaml
+$ oc --as system:admin apply -f clusters/build-clusters/02_cluster/openshift-ingress/apps-build02_certificate.yaml
+
+
+$ oc get secret -n openshift-ingress apps-build02-tls
+NAME               TYPE                DATA   AGE
+apps-build02-tls   kubernetes.io/tls   3      25m
+```
+
+* Use the secret in `openshift-ingress-operator`:
+
+```
+$ oc --as system:admin patch ingresscontroller.operator default \
+     --type=merge -p \
+     '{"spec":{"defaultCertificate": {"name": "apps-build02-tls"}}}' \
+     -n openshift-ingress-operator
+
+```
+
+Verify if it works:
+
+```
+$ site=console-openshift-console.apps.build02.gcp.ci.openshift.org
+$ curl --insecure -v "https://${site}" 2>&1 | awk 'BEGIN { cert=0 } /^\* Server certificate:/ { cert=1 } /^\*/ { if (cert) print }'
+* Server certificate:
+*  subject: CN=*.apps.build02.gcp.ci.openshift.org
+*  start date: Jun 15 19:08:40 2020 GMT
+*  expire date: Sep 13 19:08:40 2020 GMT
+*  issuer: C=US; O=Let's Encrypt; CN=Let's Encrypt Authority X3
+*  SSL certificate verify ok.
+* Connection #0 to host console-openshift-console.apps.build02.gcp.ci.openshift.org left intact
+* Closing connection 0
+
+```
+
+##### Troubleshooting
+
+* Due to [cert-manager/issues/2968](https://github.com/jetstack/cert-manager/issues/2968), we have to edit the deployment of cert-manager
+with the additional arg `--dns01-recursive-nameservers="8.8.8.8:53"`:
+
+```bash
+oc get deployment -n cert-manager cert-manager -o yaml | yq -r '.spec.template.spec.containers[0].args[]'
+--v=2
+--cluster-resource-namespace=$(POD_NAMESPACE)
+--leader-election-namespace=kube-system
+--dns01-recursive-nameservers="8.8.8.8:53"
+
+```
+
+* The above workaround does NOT work when we have selector defined in the clusterissuer
+
+```
+apiVersion: cert-manager.io/v1alpha2
+kind: ClusterIssuer
+metadata:
+  name: cert-issuer-staging
+spec:
+  acme:
+    email: openshift-ci-robot@redhat.com
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: cert-issuer-account-key
+    solvers:
+    - dns01:
+        clouddns:
+          project: openshift-ci-infra
+          serviceAccountSecretRef:
+            name: cert-issuer
+            key: key.json
+        selector:
+          matchLabels:
+            gcp-project: openshift-ci-infra
+    - dns01:
+        clouddns:
+          project: openshift-ci-build-farm
+          serviceAccountSecretRef:
+            name: cert-issuer
+            key: openshift-ci-build-farm-cert-issuer.json
+        selector:
+          matchLabels:
+            gcp-project: openshift-ci-build-farm
+```
+
+
+### openshift-apiserver
+
+#### CA Certificate for the API servers
+
+Openshift 4.2 has doc on [this topic](https://docs.openshift.com/container-platform/4.2/authentication/certificates/api-server.html).
+
+Manual steps: Those `yaml`s are applied automatically by `applyconfig`. We record the steps here for debugging purpose.
+
+* Generate the certificate by cert-manager:
+
+```
+$ oc --as system:admin --context build02 apply -f clusters/build-clusters/02_cluster/openshift-apiserver/apiserver-build02_certificate.yaml
+```
+
+* Use the certificates in API server:
+
+```
+oc --as system:admin patch apiserver cluster --type=merge -p '{"spec":{"servingCerts": {"namedCertificates": [{"names": ["api.build02.gcp.ci.openshift.org"], "servingCertificate": {"name": "apiserver-build02-tls"}}]}}}'
+```
+
+Verify if it works:
+
+```
+$ site=api.build02.gcp.ci.openshift.org:6443
+$ curl --insecure -v https://${site} 2>&1 | awk 'BEGIN { cert=0 } /^\* Server certificate:/ { cert=1 } /^\*/ { if (cert) print }'
+* Server certificate:
+*  subject: CN=api.build02.gcp.ci.openshift.org
+*  start date: Jun 16 11:46:39 2020 GMT
+*  expire date: Sep 14 11:46:39 2020 GMT
+*  issuer: C=US; O=Let's Encrypt; CN=Let's Encrypt Authority X3
+*  SSL certificate verify ok.
+* Using HTTP2, server supports multi-use
+* Connection state changed (HTTP/2 confirmed)
+* Copying HTTP/2 data in stream buffer to connection buffer after upgrade: len=0
+* Using Stream ID: 1 (easy handle 0x7ffd3780aa00)
+* Connection state changed (MAX_CONCURRENT_STREAMS == 2000)!
+* Connection #0 to host api.build02.gcp.ci.openshift.org left intact
+
+```
