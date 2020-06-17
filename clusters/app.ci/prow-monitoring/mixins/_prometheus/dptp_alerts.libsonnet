@@ -55,6 +55,24 @@
           }
         ],
       },
+      {
+        name: 'ssl_expiry',
+        rules: [
+          {
+            alert: 'SSLCertExpiringSoon',
+            expr: |||
+              probe_ssl_earliest_cert_expiry{job="blackbox"} - time() < 86400 * 30
+            |||,
+            'for': '1m',
+            labels: {
+              severity: 'critical',
+            },
+            annotations: {
+              message: 'The SSL certificates for instance {{ $labels.instance }} are expiring in 30 days.',
+            },
+          }
+        ],
+      },
     ],
   },
 }
