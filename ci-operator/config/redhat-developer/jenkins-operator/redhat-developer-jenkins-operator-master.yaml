@@ -18,28 +18,20 @@ images:
 resources:
   '*':
     requests:
-      cpu: 1000m
-      memory: 400Mi
+      cpu: 200m
+      memory: 200Mi
 tag_specification:
-  name: "4.3"
+  name: "4.6"
   namespace: ocp
 tests:
 - as: lint
   commands: |
-    export GOLANGCI_LINT_VERSION=$(cat .golangciversion 2&> /dev/null || echo "1.26.0")
-    export GOLANGCI_LINT_CACHE=/tmp/.golangcicache
-    export XDG_CACHE_HOME=/tmp/.xdgcache
-    export GOCACHE=/tmp/gocache
-    mkdir -p $(go env GOPATH)/bin
-    curl -sfL "https://github.com/golangci/golangci-lint/releases/download/v${GOLANGCI_LINT_VERSION:?'golangci-lint version is unset'}/golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64.tar.gz" | tar -C $(go env GOPATH)/bin -zx --strip-components=1 "golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64/golangci-lint"
     make lint
   container:
     from: src
 - as: unit
   commands: |
-    echo $PWD
-    ls -la *
-    cd /tmp
+    make test
   container:
     from: src
 zz_generated_metadata:
