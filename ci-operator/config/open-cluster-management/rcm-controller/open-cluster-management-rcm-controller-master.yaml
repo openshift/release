@@ -1,0 +1,43 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+binary_build_commands: GOFLAGS="" go build ./cmd/manager
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: open-cluster-management
+    tag: go1.14-linux-amd64
+images:
+- dockerfile_path: build/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/open-cluster-management/rcm-controller/rcm-controller
+  to: latest
+promotion:
+  name: rcm-controller
+  namespace: open-cluster-management
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- artifact_dir: /tmp/artifacts
+  as: sonar
+  commands: GOPROXY="proxy.golang.org,direct" make sonar/go/openshiftci
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+zz_generated_metadata:
+  branch: master
+  org: open-cluster-management
+  repo: rcm-controller
