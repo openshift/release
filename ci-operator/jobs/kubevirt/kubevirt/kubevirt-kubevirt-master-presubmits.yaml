@@ -5,17 +5,16 @@ presubmits:
     branches:
     - master
     cluster: api.ci
-    context: ci/prow/e2e-gcp-nested-virt
+    context: ci/prow/e2e-azure-nested-virt
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-kubevirt-kubevirt-master-e2e-gcp-nested-virt
+    name: pull-ci-kubevirt-kubevirt-master-e2e-azure-nested-virt
     path_alias: kubevirt.io/kubevirt
-    rerun_command: /test e2e-gcp-nested-virt
-    skip_report: true
+    rerun_command: /test e2e-azure-nested-virt
     spec:
       containers:
       - args:
@@ -23,20 +22,16 @@ presubmits:
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/e2e-gcp-nested-virt-cluster-profile
-        - --target=e2e-gcp-nested-virt
-        - --template=/usr/local/e2e-gcp-nested-virt
+        - --secret-dir=/usr/local/e2e-azure-nested-virt-cluster-profile
+        - --target=e2e-azure-nested-virt
+        - --template=/usr/local/e2e-azure-nested-virt
         command:
         - ci-operator
         env:
-        - name: CLUSTER_ENABLE_NESTED_VIRT
-          value: "true"
-        - name: CLUSTER_NESTED_VIRT_IMAGE
-          value: rhcos43-nested-virt
         - name: CLUSTER_TYPE
-          value: gcp
+          value: azure4
         - name: JOB_NAME_SAFE
-          value: e2e-gcp-nested-virt
+          value: e2e-azure-nested-virt
         - name: TEST_COMMAND
           value: ./hack/ci/test-pr.sh
         - name: TEST_IMAGESTREAM_TAG
@@ -51,9 +46,9 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-gcp-nested-virt-cluster-profile
+        - mountPath: /usr/local/e2e-azure-nested-virt-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-gcp-nested-virt
+        - mountPath: /usr/local/e2e-azure-nested-virt
           name: job-definition
           subPath: cluster-launch-installer-custom-test-image.yaml
         - mountPath: /etc/pull-secret
@@ -74,9 +69,7 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
+              name: cluster-secrets-azure4
       - configMap:
           name: prow-job-cluster-launch-installer-custom-test-image
         name: job-definition
@@ -86,7 +79,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-gcp-nested-virt,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-azure-nested-virt,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
