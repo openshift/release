@@ -1,0 +1,39 @@
+base_images:
+  ubi-minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- dockerfile_path: Dockerfile
+  from: ubi-minimal
+  to: ovirt-csi-driver-operator
+promotion:
+  name: csi-driver-operator
+  namespace: ovirt
+resources:
+  '*':
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+tests:
+- as: fmt
+  commands: make fmt
+  container:
+    from: src
+- as: vet
+  commands: make vet
+  container:
+    from: src
+- as: sanity
+  commands: make test
+  container:
+    from: src
+zz_generated_metadata:
+  branch: master
+  org: oVirt
+  repo: csi-driver-operator
