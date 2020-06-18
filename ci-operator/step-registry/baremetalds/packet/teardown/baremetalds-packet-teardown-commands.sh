@@ -7,10 +7,10 @@ set -o pipefail
 echo "************ baremetalds packet teardown command ************"
 
 # TODO: Remove once OpenShift CI will be upgraded to 4.2 (see https://access.redhat.com/articles/4859371)
-${HOME}/fix_uid.sh
+~/fix_uid.sh
 
 # Run Ansible playbook
-cd ${HOME}
+cd
 cat > packet-teardown.yaml <<-EOF
 - name: teardown Packet host
   hosts: localhost
