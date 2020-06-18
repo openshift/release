@@ -6,9 +6,9 @@ set -o pipefail
 
 set +x
 
-PACKET_PROJECT_ID=$(cat ${CLUSTER_PROFILE_DIR}/.packet-kni-vars|grep packet_project_id|awk '{print $2}')
-PACKET_AUTH_TOKEN=$(cat ${CLUSTER_PROFILE_DIR}/.packet-kni-vars|grep packet_auth_token|awk '{print $2}')
-SLACK_AUTH_TOKEN=$(cat ${CLUSTER_PROFILE_DIR}/.slackhook)
+PACKET_PROJECT_ID=$(grep packet_project_id "${CLUSTER_PROFILE_DIR}/.packet-kni-vars" | awk '{print $2}')
+PACKET_AUTH_TOKEN=$(grep packet_auth_token "${CLUSTER_PROFILE_DIR}/.packet-kni-vars" | awk '{print $2}')
+SLACK_AUTH_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/.slackhook")
 
 # Initial check
 if [ "${CLUSTER_TYPE}" != "packet" ] ; then
@@ -17,9 +17,9 @@ if [ "${CLUSTER_TYPE}" != "packet" ] ; then
 fi
 
 #Packet API call to get list of servers in project
-servers="$(curl -X GET --header 'Accept: application/json' --header "X-Auth-Token: ${PACKET_AUTH_TOKEN}"\
- "https://api.packet.net/projects/${PACKET_PROJECT_ID}/devices?exclude=root_password,ssh_keys,created_by,project,project_lite\
-,ip_addresses,plan,meta,operating_system,facility,network_ports&per_page=1000")"
+servers="$(curl -X GET --header 'Accept: application/json' --header "X-Auth-Token: ${PACKET_AUTH_TOKEN}" \
+ "https://api.packet.net/projects/${PACKET_PROJECT_ID}/devices?exclude=root_password,ssh_keys,created_by,project,project_lite,ip_addresses,plan,meta,operating_system,facility,network_ports&per_page=1000"
+)"
 
 #Assuming all servers created more than 4 hours = 14400 sec ago are leaks
 leaks="$(echo "$servers" | jq -r '.devices[]|select((now-(.created_at|fromdate))>14400 and any(.hostname; startswith("ipi-")))')"
@@ -43,8 +43,8 @@ then
     #send slack notification and delete e2e-metal-ipi leaked servers 
     curl -X POST --data-urlencode\
      "payload={\"text\":\"New Packet.net server leaks total: $leak_num. Deleting the following:\n\",\"attachments\":[{\"color\":\"warning\",\"text\":\"$leak_report\"}]}"\
-      https://hooks.slack.com/services/T027F3GAJ/B011TAG710V/${SLACK_AUTH_TOKEN}
-    
+     "https://hooks.slack.com/services/T027F3GAJ/B011TAG710V/${SLACK_AUTH_TOKEN}"
+
     #delete leaks
     for leak in $leak_ids
     do
