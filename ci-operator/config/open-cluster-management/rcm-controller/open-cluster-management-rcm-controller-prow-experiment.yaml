@@ -3,7 +3,7 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-binary_build_commands: GOFLAGS="" go build ./cmd/manager
+binary_build_commands: GOFLAGS="-mod=vendor" go build ./cmd/manager
 build_root:
   image_stream_tag:
     name: builder
@@ -31,7 +31,7 @@ resources:
 tests:
 - artifact_dir: /tmp/artifacts
   as: sonar
-  commands: GOPROXY="proxy.golang.org,direct" make sonar/go/openshiftci
+  commands: GOPROXY="proxy.golang.org,direct" GOFLAGS="-mod=vendor" go build ./cmd/manager
   container:
     from: src
   secrets:
