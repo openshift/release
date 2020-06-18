@@ -50,6 +50,11 @@ then
   scp "${SSHOPTS[@]}" "${SHARED_DIR}/dev-scripts-additional-config" "root@${IP}:dev-scripts-additional-config"
 fi
 
+if [[ -e ${SHARED_DIR}/makefile-target ]]
+then
+  TARGET=$(cat ${SHARED_DIR}/makefile-target)
+fi
+
 timeout -s 9 175m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 
 set -xeuo pipefail
@@ -92,7 +97,7 @@ fi
 
 echo 'export KUBECONFIG=/root/dev-scripts/ocp/ostest/auth/kubeconfig' >> /root/.bashrc
 
-timeout -s 9 105m make
+timeout -s 9 105m make ${TARGET:-default}
 
 EOF
 
