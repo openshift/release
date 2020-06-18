@@ -1,0 +1,45 @@
+base_images:
+  base:
+    name: "4.6"
+    namespace: ocp
+    tag: base
+binary_build_commands: make cross
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- dockerfile_path: images/openshift-ci/Dockerfile
+  from: base
+  inputs:
+    root:
+      as:
+      - builder
+      paths: null
+  to: crc
+promotion:
+  name: "4.6"
+  namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  crc:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+tag_specification:
+  name: "4.6"
+  namespace: ocp
+tests:
+- artifact_dir: /tmp/artifacts
+  as: e2e-crc
+  steps:
+    cluster_profile: gcp
+    workflow: crc-e2e
+zz_generated_metadata:
+  branch: master
+  org: code-ready
+  repo: crc
