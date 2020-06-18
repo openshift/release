@@ -19,11 +19,12 @@ base_images:
     name: "4.5"
     namespace: open-cluster-management
     tag: work
+binary_build_commands: GOFLAGS="" go build ./cmd/manager
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.13
+    name: builder
+    namespace: open-cluster-management
+    tag: go1.14-linux-amd64
 images:
 - dockerfile_path: build/Dockerfile
   from: base
@@ -31,10 +32,10 @@ images:
     bin:
       paths:
       - destination_dir: .
-        source_path: /go/src/github.com/open-cluster-management/rcm-controller
+        source_path: /go/src/github.com/open-cluster-management/rcm-controller/rcm-controller
   to: latest
 promotion:
-  name: "4.5"
+  name: rcm-controller
   namespace: open-cluster-management
 resources:
   '*':
@@ -43,15 +44,15 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: "4.5"
-  namespace: open-cluster-management
 tests:
-- as: unit
-  commands: |
-    GOFLAGS="-mod=vendor" go build ./cmd/manager
+- artifact_dir: /tmp/artifacts
+  as: sonar
+  commands: GOPROXY="proxy.golang.org,direct" GOFLAGS="" go help build
   container:
-    from: bin
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
 zz_generated_metadata:
   branch: prow-experiment
   org: open-cluster-management
