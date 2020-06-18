@@ -41,7 +41,7 @@
               message: 'The service %s has been down for 5 minutes.' % name,
             },
           }
-          for name in ['grafana', 'alertmanager', 'prometheus',]
+          for name in ['grafana', 'alertmanager', 'prometheus', 'blackbox',]
         ],
       },
     ],
