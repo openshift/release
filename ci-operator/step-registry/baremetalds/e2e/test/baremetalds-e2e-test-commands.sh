@@ -24,22 +24,22 @@ if [ "${CLUSTER_TYPE}" != "packet" ] ; then
 fi
 
 # Fetch packet server IP
-IP=$(cat ${SHARED_DIR}/server-ip)
+IP=$(cat "${SHARED_DIR}/server-ip")
 
-SSHOPTS="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90 -i ${CLUSTER_PROFILE_DIR}/.packet-kni-ssh-privatekey"
+SSHOPTS=(-o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -i "${CLUSTER_PROFILE_DIR}/.packet-kni-ssh-privatekey")
 
 # Copy test binaries on packet server
 echo "### Copying test binaries"
-scp $SSHOPTS /usr/bin/openshift-tests /usr/bin/kubectl root@$IP:/usr/local/bin
+scp "${SSHOPTS[@]}" /usr/bin/openshift-tests /usr/bin/kubectl "root@${IP}:/usr/local/bin"
 
 # Tests execution
 set +e
 echo "### Running tests"
-ssh $SSHOPTS root@$IP openshift-tests run "openshift/conformance/parallel" --dry-run \| grep 'Feature:ProjectAPI' \| openshift-tests run -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit -f -
+ssh "${SSHOPTS[@]}" "root@${IP}" openshift-tests run "openshift/conformance/parallel" --dry-run \| grep 'Feature:ProjectAPI' \| openshift-tests run -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit -f -
 rv=$?
 
 echo "### Fetching results"
-ssh $SSHOPTS root@$IP tar -czf - /tmp/artifacts | tar -C ${ARTIFACT_DIR} -xzf -
+ssh "${SSHOPTS[@]}" "root@${IP}" tar -czf - /tmp/artifacts | tar -C "${ARTIFACT_DIR}" -xzf -
 
 set -e
 echo "### Done! (${rv})"

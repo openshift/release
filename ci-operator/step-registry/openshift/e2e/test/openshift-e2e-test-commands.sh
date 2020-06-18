@@ -12,7 +12,7 @@ export PATH=/usr/libexec/origin:$PATH
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-mkdir -p "${HOME}"
+mkdir -p ~
 
 # if the cluster profile included an insights secret, install it to the cluster to
 # report support data from the support-operator
