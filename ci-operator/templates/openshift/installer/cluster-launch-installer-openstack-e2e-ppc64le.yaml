@@ -471,7 +471,6 @@ objects:
 
         OS_DEBUG=1 TF_LOG=trace openshift-install --dir=/tmp/artifacts/installer create cluster --log-level=debug &
         PID_OPENSHIFT_INSTALL=$!
-        echo "PID_OPENSHIFT_INSTALL=${PID_OPENSHIFT_INSTALL}"
 
         # Copy the ephemeral installer files in case there is a problem with them
         mkdir /tmp/artifacts/openshift-installer-files
@@ -489,9 +488,13 @@ objects:
         done
 
         # wait for installer create cluster and return its status
+        # disable errexit on pipeline failures for the wait command
+        set +e
+        echo "wait for installer PID ${PID_OPENSHIFT_INSTALL}"
         wait "${PID_OPENSHIFT_INSTALL}"
         RC=$?
-        echo "RC=${RC}"
+        echo "wait for installer PID ${PID_OPENSHIFT_INSTALL} RC=${RC}"
+        set -e
         if [ ${RC} -gt 0 ]
         then
                 OS_DEBUG=1 TF_LOG=trace openshift-install --dir=/tmp/artifacts/installer wait-for install-complete --log-level=debug
