@@ -1,0 +1,45 @@
+postsubmits:
+  oVirt/csi-driver-operator:
+  - agent: kubernetes
+    branches:
+    - ^master$
+    cluster: api.ci
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/is-promotion: "true"
+      ci-operator.openshift.io/prowgen-controlled: "true"
+    max_concurrency: 1
+    name: branch-ci-oVirt-csi-driver-operator-master-images
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --promote
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --target=[images]
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
