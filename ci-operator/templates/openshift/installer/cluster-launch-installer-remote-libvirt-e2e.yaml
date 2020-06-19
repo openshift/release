@@ -345,6 +345,10 @@ objects:
         # this is a multi-arch iamge
         cat << EOREGISTRY > /tmp/kube-test-repo-list
         e2eRegistry: quay.io/multiarch-k8s-e2e
+        e2eVolumeRegistry: quay.io/multiarch-k8s-e2e
+        quayIncubator: quay.io/multiarch-k8s-e2e
+        quayK8sCSI: quay.io/multiarch-k8s-e2e
+        promoterE2eRegistry: quay.io/multiarch-k8s-e2e
         EOREGISTRY
         export KUBE_TEST_REPO_LIST=/tmp/kube-test-repo-list
 
@@ -513,18 +517,22 @@ objects:
         export TF_LOG=DEBUG
         export TF_LOG_PATH=/tmp/artifacts/terraform.log
 
-        # Bump the libvirt masters memory to 16GB
-        export TF_VAR_libvirt_master_memory=16384
         mock-nss.sh openshift-install create manifests --dir=/tmp/artifacts/installer
         sed -i '/^  channel:/d' /tmp/artifacts/installer/manifests/cvo-overrides.yaml
+        
+        # Bump the libvirt masters memory to 16GB
+        export TF_VAR_libvirt_master_memory=16384
         ls /tmp/artifacts/installer/openshift
         for ((i=0; i<$MASTER_REPLICAS; i++))
         do
-            sed -i -e 's/7168/16384/g' /tmp/artifacts/installer/openshift/99_openshift-cluster-api_master-machines-${i}.yaml
+            yq write --inplace /tmp/artifacts/installer/openshift/99_openshift-cluster-api_master-machines-${i}.yaml spec.providerSpec.value[domainMemory] 16384
         done
         
         # Bump the libvirt workers memory to 8GB
-        sed -i -e 's/7168/8192/g' /tmp/artifacts/installer/openshift/99_openshift-cluster-api_worker-machineset-0.yaml
+        yq write --inplace /tmp/artifacts/installer/openshift/99_openshift-cluster-api_worker-machineset-0.yaml spec.template.spec.providerSpec.value[domainMemory] 8192
+        
+        # Bump the libvirt workers disk to to 30GB
+        yq write --inplace /tmp/artifacts/installer/openshift/99_openshift-cluster-api_worker-machineset-0.yaml spec.template.spec.providerSpec.value.volume[volumeSize] 32212254720
 
         mock-nss.sh openshift-install create cluster --dir=/tmp/artifacts/installer --log-level=debug || true &
         openshift_install="$!"
