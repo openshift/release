@@ -26,8 +26,10 @@ IP=$(cat ${SHARED_DIR}/server-ip)
 SSHOPTS="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90 -i ${CLUSTER_PROFILE_DIR}/.packet-kni-ssh-privatekey"
 
 function getlogs() {
-  echo "### Downloading logs..."
-  scp $SSHOPTS root@$IP:/tmp/artifacts/\*.tar\* ${ARTIFACT_DIR}
+  if ssh $SSHOPTS root@$IP [ -e /tmp/artifacts/\*.tar\* ]; then
+    echo "### Downloading logs..."
+    scp $SSHOPTS root@$IP:/tmp/artifacts/\*.tar\* ${ARTIFACT_DIR}
+  fi
 }
 
 # Gather logs regardless of what happens after this
