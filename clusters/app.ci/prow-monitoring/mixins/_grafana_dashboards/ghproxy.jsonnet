@@ -199,7 +199,7 @@ dashboard.new(
     y: 0,
   })
 .addPanel(
-    (graphPanel.new(    
+    (graphPanel.new(
         'Token Usage',
         description='GitHub token usage by login and API version.',
         datasource='prometheus',
@@ -328,6 +328,7 @@ dashboard.new(
         legend_avg=true,
         legend_sort='avg',
         legend_sortDesc=true,
+        stack=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
         'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login)) by (user_agent)',
@@ -350,6 +351,7 @@ dashboard.new(
         legend_avg=true,
         legend_sort='avg',
         legend_sortDesc=true,
+        stack=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
         'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login)) by (path)',
