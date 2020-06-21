@@ -7,7 +7,7 @@ set -o pipefail
 echo "************ baremetalds devscripts setup command ************"
 
 # TODO: Remove once OpenShift CI will be upgraded to 4.2 (see https://access.redhat.com/articles/4859371)
-${HOME}/fix_uid.sh
+~/fix_uid.sh
 
 # Initial check
 if [ "${CLUSTER_TYPE}" != "packet" ] ; then
@@ -16,14 +16,14 @@ if [ "${CLUSTER_TYPE}" != "packet" ] ; then
 fi
 
 # Fetch packet server IP
-IP=$(cat ${SHARED_DIR}/server-ip)
+IP=$(cat "${SHARED_DIR}/server-ip")
 
-SSHOPTS="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90 -i ${CLUSTER_PROFILE_DIR}/.packet-kni-ssh-privatekey"
+SSHOPTS=(-o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -i "${CLUSTER_PROFILE_DIR}/.packet-kni-ssh-privatekey")
 
 # Checkout dev-scripts and make
 for x in $(seq 10) ; do
-    test $x == 10 && exit 1
-    ssh $SSHOPTS root@$IP hostname && break
+    test "$x" -eq 10 && exit 1
+    ssh "${SSHOPTS[@]}" "root@${IP}" hostname && break
     sleep 10
 done
 
@@ -34,23 +34,23 @@ finished()
 
   # Get dev-scripts logs
   echo "dev-scripts setup completed, fetching logs"
-  ssh $SSHOPTS root@$IP tar -czf - /root/dev-scripts/logs | tar -C ${ARTIFACT_DIR} -xzf -
-  sed -i -e 's/.*auths.*/*** PULL_SECRET ***/g' ${ARTIFACT_DIR}/root/dev-scripts/logs/*
+  ssh "${SSHOPTS[@]}" "root@${IP}" tar -czf - /root/dev-scripts/logs | tar -C "${ARTIFACT_DIR}" -xzf -
+  sed -i -e 's/.*auths.*/*** PULL_SECRET ***/g' "${ARTIFACT_DIR}"/root/dev-scripts/logs/*
 }
 trap finished EXIT TERM
 
 # Copy dev-scripts source from current directory to the remote server
-tar -czf - . | ssh $SSHOPTS root@$IP "cat > /root/dev-scripts.tar.gz"
+tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/dev-scripts.tar.gz"
 
 # Prepare configuration and run dev-scripts
-scp $SSHOPTS ${CLUSTER_PROFILE_DIR}/pull-secret root@$IP:pull-secret
+scp "${SSHOPTS[@]}" "${CLUSTER_PROFILE_DIR}/pull-secret" "root@${IP}:pull-secret"
 
-if [[ -e ${SHARED_DIR}/dev-scripts-additional-config ]]
+if [[ -e "${SHARED_DIR}/dev-scripts-additional-config" ]]
 then
-  scp $SSHOPTS ${SHARED_DIR}/dev-scripts-additional-config root@$IP:dev-scripts-additional-config
+  scp "${SSHOPTS[@]}" "${SHARED_DIR}/dev-scripts-additional-config" "root@${IP}:dev-scripts-additional-config"
 fi
 
-timeout -s 9 175m ssh $SSHOPTS root@$IP bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
+timeout -s 9 175m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 
 set -xeuo pipefail
 
