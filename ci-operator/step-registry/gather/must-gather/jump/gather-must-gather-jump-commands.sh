@@ -10,6 +10,12 @@ export HOME=/tmp
 export WORKSPACE=${WORKSPACE:-/tmp}
 export SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 
+if [[ ! -s "${SHARED_DIR}/jump-host.txt" ]]
+then
+  echo "Missing jump host information in jump-host.txt"
+  exit 1
+fi
+
 # This must match exactly to the gather-must-gather-commands.sh
 cat >> ${WORKSPACE}/gather-must-gather-commands.sh << 'EOF'
 #!/bin/bash
