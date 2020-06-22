@@ -80,6 +80,12 @@ fi
 mkdir -p /tmp/loki-container-logs
 mkdir -p "${ARTIFACT_DIR}/loki-container-logs"
 
+echo "Checking if 'loki' namespace exists"
+if [[ $(oc get ns -o json | jq '.items[].metadata.name' | grep '"loki"' | wc -l) -eq 0 ]]; then
+  echo "Namespace 'loki' not found, skipping"
+  exit 0
+fi
+
 oc port-forward -n loki loki-0 3100:3100 &
 ocpordforwardpid="$!"
 
