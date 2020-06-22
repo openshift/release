@@ -72,13 +72,3 @@ items:
           sum(rate(apiserver_request_latencies_summary_sum{job="apiserver",subresource!="log",verb!~"^(?:LIST|WATCH|WATCHLIST|PROXY|CONNECT)$"}[5m])) without(instance, pod)
           /
           sum(rate(apiserver_request_latencies_summary_count{job="apiserver",subresource!="log",verb!~"^(?:LIST|WATCH|WATCHLIST|PROXY|CONNECT)$"}[5m])) without(instance, pod)
-    - name: release-controller-down
-      rules:
-      - alert: releaseControllerDown
-        expr: |
-          kube_deployment_status_replicas_unavailable{namespace="ci", deployment=~"release-controller.*"} >= 1
-        for: 5m
-        labels:
-          severity: critical
-        annotations:
-          message: '{{ $labels.deployment }} has been down for 5 minutes.'
