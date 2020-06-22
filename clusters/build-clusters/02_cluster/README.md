@@ -277,3 +277,41 @@ $ curl --insecure -v https://${site} 2>&1 | awk 'BEGIN { cert=0 } /^\* Server ce
 * Connection #0 to host api.build02.gcp.ci.openshift.org left intact
 
 ```
+
+### openshift-monitoring
+
+Customized domains:
+
+- grafana: monitoring.build01.ci.openshift.org
+- alertmanager: alerting.build01.ci.openshift.org
+- prometheus: metrics.build01.ci.openshift.org
+
+GCP project `OpenShift Ci Infra`, Network Service, Cloud DNS: Set up an A record mapping `monitoring.build02.ci.openshift.org` to `34.74.144.21`.
+
+```
+# check if it takes effect
+$ dig +noall +answer monitoring.build02.ci.openshift.org
+monitoring.build02.ci.openshift.org. 295 IN A	34.74.144.21
+```
+
+Generate the certs:
+
+```
+$ oc --as system:admin --context build02 apply -f clusters/build-clusters/02_cluster/openshift-monitoring/openshift-monitoring-build02_certificate.yaml
+```
+
+`cert-manager` stores the certs in the following secret:
+
+```
+oc --context build02 get secret -n openshift-monitoring openshift-monitoring-build02-tls
+NAME                               TYPE                DATA   AGE
+openshift-monitoring-build02-tls   kubernetes.io/tls   3      5m40s
+```
+
+Create the `ingress`:
+
+```
+$ oc --as system:admin --context build02 apply -f clusters/build-clusters/02_cluster/openshift-monitoring/openshift-monitoring-build02_ingress.yaml
+```
+
+TODO: Update monitoring's config.
