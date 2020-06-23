@@ -12,6 +12,18 @@ spec:
     kind: Service
     name: release-controller-ocp-ppc64le
 ---
+kind: Service
+apiVersion: v1
+metadata:
+  name: release-controller-ocp-ppc64le
+  namespace: ci
+spec:
+  selector:
+    app: release-controller-ocp-ppc64le
+  ports:
+  - port: 80
+    targetPort: 8080
+---
 kind: Deployment
 apiVersion: apps/v1
 metadata:
@@ -145,7 +157,7 @@ spec:
         - --job-config=/etc/job-config
         - --artifacts=openshift-release-artifacts-ppc64le.svc.ci.openshift.org
         - --prow-namespace=ci
-        - --prow-job-kubeconfig=/etc/prowjob-kubeconfig/kubeconfig
+        - --non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig
         - --job-namespace=ci-release-ppc64le
         - --tools-image-stream-tag=release-controller-bootstrap:tests
         - -v=4
