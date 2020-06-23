@@ -23,7 +23,7 @@ items:
       insecureEdgeTerminationPolicy: Redirect
     to:
       kind: Service
-      name: release-controller
+      name: release-controller-redirect
 - kind: Deployment
   apiVersion: apps/v1
   metadata:
@@ -32,6 +32,7 @@ items:
     annotations:
       image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"release-controller:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"controller\")].image"}]'
   spec:
+    replicas: 0
     selector:
       matchLabels:
         app: release-controller
@@ -159,3 +160,70 @@ items:
           - --job-namespace=ci-release
           - --tools-image-stream-tag=4.6:tests
           - -v=4
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: release-controller-redirect-config
+    namespace: ci
+  data:
+    "default.conf": |
+      server {
+        listen 8080;
+        return 302 $scheme://origin-release.apps.ci.l2s4.p1.openshiftapps.com$request_uri;
+      }
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    labels:
+      app: release-controller-redirect
+    name: release-controller-redirect
+    namespace: ci
+  spec:
+    replicas: 2
+    selector:
+      matchLabels:
+        component: release-controller-redirect
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: release-controller-redirect
+      spec:
+        affinity:
+          podAntiAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                - key: component
+                  operator: In
+                  values:
+                  - release-controller-redirect
+              topologyKey: "kubernetes.io/hostname"
+        containers:
+        - image: nginxinc/nginx-unprivileged:1.17
+          name: nginx
+          volumeMounts:
+          - name: config
+            mountPath: /etc/nginx/conf.d
+        volumes:
+        - name: config
+          configMap:
+            name: release-controller-redirect-config
+- apiVersion: v1
+  kind: Service
+  metadata:
+    labels:
+      app: prow
+      component: release-controller-redirect
+    name: release-controller-redirect
+    namespace: ci
+  spec:
+    ports:
+    - name: main
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+    selector:
+      component: release-controller-redirect
+    sessionAffinity: None
+    type: ClusterIP
