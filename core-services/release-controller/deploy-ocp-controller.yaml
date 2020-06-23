@@ -51,7 +51,7 @@ items:
       insecureEdgeTerminationPolicy: Redirect
     to:
       kind: Service
-      name: release-controller-ocp
+      name: release-controller-ocp-redirect
 - kind: Deployment
   apiVersion: apps/v1
   metadata:
@@ -60,6 +60,7 @@ items:
     annotations:
       image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"release-controller:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"controller\")].image"}]'
   spec:
+    replicas: 0
     selector:
       matchLabels:
         app: release-controller-ocp
@@ -196,3 +197,70 @@ items:
           - --bugzilla-api-key-path=/etc/bugzilla/api
           - --plugin-config=/etc/plugins/plugins.yaml
           - --verify-bugzilla
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: release-controller-ocp-redirect-config
+    namespace: ci
+  data:
+    "default.conf": |
+      server {
+        listen 8080;
+        return 302 $scheme://openshift-release.apps.ci.l2s4.p1.openshiftapps.com$request_uri;
+      }
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    labels:
+      app: release-controller-ocp-redirect
+    name: release-controller-ocp-redirect
+    namespace: ci
+  spec:
+    replicas: 2
+    selector:
+      matchLabels:
+        component: release-controller-ocp-redirect
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: release-controller-ocp-redirect
+      spec:
+        affinity:
+          podAntiAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                - key: component
+                  operator: In
+                  values:
+                  - release-controller-ocp-redirect
+              topologyKey: "kubernetes.io/hostname"
+        containers:
+        - image: nginxinc/nginx-unprivileged:1.17
+          name: nginx
+          volumeMounts:
+          - name: config
+            mountPath: /etc/nginx/conf.d
+        volumes:
+        - name: config
+          configMap:
+            name: release-controller-ocp-redirect-config
+- apiVersion: v1
+  kind: Service
+  metadata:
+    labels:
+      app: prow
+      component: release-controller-ocp-redirect
+    name: release-controller-ocp-redirect
+    namespace: ci
+  spec:
+    ports:
+    - name: main
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+    selector:
+      component: release-controller-ocp-redirect
+    sessionAffinity: None
+    type: ClusterIP

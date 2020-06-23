@@ -72,7 +72,7 @@ items:
       insecureEdgeTerminationPolicy: Redirect
     to:
       kind: Service
-      name: release-controller-ocp-s390x
+      name: release-controller-ocp-s390x-redirect
 - kind: Deployment
   apiVersion: apps/v1
   metadata:
@@ -80,6 +80,7 @@ items:
     namespace: ci
     annotations:
       image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"release-controller:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"controller\")].image"}]'
+  replicas: 0
   spec:
     selector:
       matchLabels:
@@ -216,3 +217,70 @@ items:
           - --bugzilla-api-key-path=/etc/bugzilla/api
           - --plugin-config=/etc/plugins/plugins.yaml
           - --verify-bugzilla
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: release-controller-ocp-s390x-redirect-config
+    namespace: ci
+  data:
+    "default.conf": |
+      server {
+        listen 8080;
+        return 302 $scheme://openshift-release-s390x.apps.ci.l2s4.p1.openshiftapps.com$request_uri;
+      }
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    labels:
+      app: release-controller-ocp-s390x-redirect
+    name: release-controller-ocp-s390x-redirect
+    namespace: ci
+  spec:
+    replicas: 2
+    selector:
+      matchLabels:
+        component: release-controller-ocp-s390x-redirect
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: release-controller-ocp-is390x-redirect
+      spec:
+        affinity:
+          podAntiAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                - key: component
+                  operator: In
+                  values:
+                  - release-controller-ocp-s390x-redirect
+              topologyKey: "kubernetes.io/hostname"
+        containers:
+        - image: nginxinc/nginx-unprivileged:1.17
+          name: nginx
+          volumeMounts:
+          - name: config
+            mountPath: /etc/nginx/conf.d
+        volumes:
+        - name: config
+          configMap:
+            name: release-controller-ocp-s390x-redirect-config
+- apiVersion: v1
+  kind: Service
+  metadata:
+    labels:
+      app: prow
+      component: release-controller-ocp-s390x-redirect
+    name: release-controller-ocp-s390x-redirect
+    namespace: ci
+  spec:
+    ports:
+    - name: main
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+    selector:
+      component: release-controller-ocp-redirect
+    sessionAffinity: None
+    type: ClusterIP
