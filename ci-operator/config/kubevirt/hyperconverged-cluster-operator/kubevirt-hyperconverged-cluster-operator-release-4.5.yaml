@@ -31,6 +31,14 @@ images:
 - dockerfile_path: deploy/Dockerfile.registry.upgrade
   from: operator-registry-base
   to: hco-registry-upgrade
+- dockerfile_path: deploy/nightly-bundle/Dockerfile
+  from: base
+  inputs:
+    root:
+      as:
+      - builder
+      paths: null
+  to: nightly-bundle-tests-runner
 promotion:
   additional_images:
     hyperconverged-cluster-operator-tests: src
@@ -59,6 +67,49 @@ tests:
     make upgrade-test
   openshift_installer_src:
     cluster_profile: aws
+- artifact_dir: /tmp/artifacts
+  as: hco-e2e-nightly-bundle-release-4-5-azure4
+  commands: |
+    set -e
+
+    ARTIFACTS_DIR=/tmp/artifacts
+    echo "Fetching quay secret"
+    auth_file=/tmp/openshift-cnv-auth.json
+    oc get secret/pull-secret -n openshift-config -o=jsonpath='{.data.\.dockerconfigjson}' | \
+        base64 -w0 -d |
+        jq 'map({"auths":{"quay.io/openshift-cnv"}})| .[]' -cM > "$auth_file"
+
+    echo "Generating debug info"
+    bundle_floating=quay.io/openshift-cnv/container-native-virtualization-hco-bundle-registry:2.4-latest
+    bundle_under_test="$(skopeo inspect --authfile "$auth_file" "docker://${bundle_floating}" | jq -r '.Name + "@" + .Digest')"
+    echo "$bundle_under_test" > "${ARTIFACTS_DIR}/bundle_under_test.txt"
+
+    set -x
+    echo "Deploying test infra"
+    oc create ns openshift-cnv
+    oc create -f /kubevirt-testing-infra.yaml
+
+    echo "Deploying nightly bundle"
+    export HCO_REGISTRY_IMAGE="${bundle_under_test}"
+    export HCO_VERSION=2.4.0
+    export HCO_CHANNEL=2.4
+    export TARGET_NAMESPACE=openshift-cnv
+    /deploy.sh
+
+    tests_filter="(Slirp Networking)|(with CPU spec)|(with TX offload disabled)|(with cni flannel and ptp plugin interface)|(with ovs-cni plugin)|(test_id:1752)|(SRIOV)|(with EFI)|(Operator)|(GPU)|(DataVolume Integration)|(test_id:3468)|(test_id:3466)|(test_id:1015)|(rfe_id:393)"
+    operator_image="$(oc get pod -n openshift-cnv -l kubevirt.io=virt-operator --no-headers -o=jsonpath='{.items[0].spec.containers[0].image}')"
+    test_pod_override="$(sed -e "s|@OPERATOR_IMAGE_URL@|${operator_image}|g" -e "s/@GINKGO_TESTS_TO_SKIP@/${tests_filter}/g" -e "s/@NAMESPACE@/${TARGET_NAMESPACE}/g" /kubevirt-tests-pod-spec-override.json.in)"
+    oc -n openshift-cnv run -i tests-runner --image=dummy --overrides="$test_pod_override" --restart=Never
+    echo "Test is finished"
+
+    echo "Tagging tested bundle"
+    TARGET_BUNDLE_REGISTRY=quay.io/openshift-cnv/container-native-virtualization-hco-bundle-registry-tested
+    skopeo copy --authfile "$auth_file" "docker://${bundle_under_test}" "docker://${TARGET_BUNDLE_REGISTRY}:4.5-tested"
+    echo "Nightly bundle test is finished."
+  cron: 2 3 * * *
+  openshift_installer_custom_test_image:
+    cluster_profile: azure4
+    from: pipeline:nightly-bundle-tests-runner
 zz_generated_metadata:
   branch: release-4.5
   org: kubevirt
