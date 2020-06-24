@@ -4,6 +4,8 @@ set -euo pipefail
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 INSTANCE_PREFIX="${NAMESPACE}"-"${JOB_NAME_HASH}"
+
+BUNDLE_VERSION="$(crc version | grep -oP '^OpenShift version\s*:\s*\K\S+')"
 BUNDLE=crc_libvirt_"${BUNDLE_VERSION}".crcbundle
 
 mkdir -p "${HOME}"/.ssh
