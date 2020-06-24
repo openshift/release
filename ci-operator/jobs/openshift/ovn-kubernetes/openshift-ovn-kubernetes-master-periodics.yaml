@@ -63,3 +63,94 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 0 * * *
+  context: ci/prow/e2e-aws-ovn-scale
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: ovn-kubernetes
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: pull-ci-openshift-ovn-kubernetes-master-e2e-aws-ovn-scale
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
+      - --repo=ovn-kubernetes
+      - --secret-dir=/usr/local/e2e-aws-ovn-cluster-profile
+      - --target=e2e-aws-ovn
+      - --template=/usr/local/e2e-aws-ovn
+      command:
+      - ci-operator
+      env:
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: CLUSTER_VARIANT
+        value: ovn
+      - name: JOB_NAME_SAFE
+        value: e2e-aws-ovn
+      - name: TEST_COMMAND
+        value: TEST_SUITE=openshift/conformance/parallel run-tests
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-ovn-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/e2e-aws-ovn
+        name: job-definition
+        subPath: cluster-launch-installer-e2e.yaml
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/sentry-dsn
+        name: sentry-dsn
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - configMap:
+        name: prow-job-cluster-launch-installer-e2e
+      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: sentry-dsn
+      secret:
+        secretName: sentry-dsn
