@@ -89,61 +89,24 @@ subjects:
   name: dptp-controller-manager
   namespace: ci
 ---
-# We can just use this and get rid of the services once we have prom operator 0.31+
-# https://github.com/coreos/prometheus-operator/blob/master/CHANGELOG.md#0310--2019-06-20
-#apiVersion: monitoring.coreos.com/v1
-#kind: PodMonitor
-#metadata:
-#  labels:
-#    app: dptp-controller-manager
-#  name: dptp-controller-manager
-#  namespace: prow-monitoring
-#spec:
-#  selector:
-#    matchLabels:
-#      app: dptp-controller-manager
-#  podMetricsEndpoints:
-#  - port: metrics
-#    interval: 15s
-#    scheme: http
-#  namespaceSelector:
-#    matchNames:
-#    - ci
----
-apiVersion: v1
-kind: Service
-metadata:
-  namespace: ci
-  labels:
-    app: dptp-controller-manager
-  name: dptp-controller-manager
-spec:
-  ports:
-  - name: metrics
-    port: 8080
-    protocol: TCP
-    targetPort: 8080
-  selector:
-    app: dptp-controller-manager
----
 apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
+kind: PodMonitor
 metadata:
   labels:
-    prow-app: really-why-can-it-not-just-select-on-the-ns
+    app: dptp-controller-manager
   name: dptp-controller-manager
   namespace: prow-monitoring
 spec:
-  endpoints:
-  - interval: 30s
-    port: metrics
+  selector:
+    matchLabels:
+      app: dptp-controller-manager
+  podMetricsEndpoints:
+  - port: metrics
+    interval: 15s
     scheme: http
   namespaceSelector:
     matchNames:
     - ci
-  selector:
-    matchLabels:
-      app: dptp-controller-manager
 ---
 spec:
 apiVersion: apps/v1
@@ -154,6 +117,7 @@ metadata:
   labels:
     app: dptp-controller-manager
   name: dptp-controller-manager
+  namespace: ci
 spec:
   replicas: 1
   selector:
