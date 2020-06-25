@@ -27,26 +27,22 @@ $ curl --insecure -v https://api.build01.ci.devcluster.openshift.com:6443 2>&1 |
 
 #### AWS IAM configuration
 
-[set up aws IAM user](https://github.com/Neilpang/acme.sh/wiki/How-to-use-Amazon-Route53-API): user `openshift-ci-robot` in group `acme` which
-    has the policy `acme`.
+[set up aws IAM user](https://cert-manager.io/docs/configuration/acme/dns01/route53/#set-up-an-iam-role): user `cert-manager` in group `cert-manager` which
+    has the policy `cert-manager`.
 
 #### Generate the certificate
 
-Using [acme.sh](https://github.com/Neilpang/acme.sh)
+Use `cert-manager` to generate the secret containing the certificates:
 
 ```bash
-$ podman run -it --rm neilpang/acme.sh /bin/ash
-### BitWarden: aws_ci_infra_openshift-ci-robot
-# export  AWS_ACCESS_KEY_ID=xxx
-# export  AWS_SECRET_ACCESS_KEY=yyy
-# acme.sh --issue --dns dns_aws -d api.build01.ci.devcluster.openshift.com
-...
+$ oc  --context build01 get secret -n openshift-config apiserver-build01-tls
+NAME                    TYPE                DATA   AGE
+apiserver-build01-tls   kubernetes.io/tls   3      6d21h
 ```
 
-> $ oc create secret tls apiserver-cert --cert=path/to/fullchain.cer --key=/path/to/the.key  -n openshift-config --dry-run -o yaml | oc apply -f -
+Use the secret in apiserver's config:
 
-
-> oc patch apiserver cluster --type=merge -p '{"spec":{"servingCerts": {"namedCertificates": [{"names": ["api.build01.ci.devcluster.openshift.com"], "servingCertificate": {"name": "apiserver-cert"}}]}}}' 
+> oc patch apiserver cluster --type=merge -p '{"spec":{"servingCerts": {"namedCertificates": [{"names": ["api.build01.ci.devcluster.openshift.com"], "servingCertificate": {"name": "apiserver-build01-tls"}}]}}}' 
 
 Verify if it works:
 
@@ -54,23 +50,16 @@ Verify if it works:
 $ curl --insecure -v https://api.build01.ci.devcluster.openshift.com:6443 2>&1 | awk 'BEGIN { cert=0 } /^\* Server certificate:/ { cert=1 } /^\*/ { if (cert) print }'
 * Server certificate:
 *  subject: CN=api.build01.ci.devcluster.openshift.com
-*  start date: Dec  9 18:28:27 2019 GMT
-*  expire date: Mar  8 18:28:27 2020 GMT
+*  start date: Jun 30 13:17:41 2020 GMT
+*  expire date: Sep 28 13:17:41 2020 GMT
 *  issuer: C=US; O=Let's Encrypt; CN=Let's Encrypt Authority X3
 *  SSL certificate verify ok.
-* Using HTTP2, server supports multi-use
 * Connection state changed (HTTP/2 confirmed)
 * Copying HTTP/2 data in stream buffer to connection buffer after upgrade: len=0
-* Using Stream ID: 1 (easy handle 0x55904adc9180)
+* Using Stream ID: 1 (easy handle 0x7f8c80808200)
 * Connection state changed (MAX_CONCURRENT_STREAMS == 2000)!
 * Connection #0 to host api.build01.ci.devcluster.openshift.com left intact
 
 ```
 
 Note that we no longer need `--insecure-skip-tls-verify=true` upon `oc login --token=token --server=https://api.build01.ci.devcluster.openshift.com:6443`.
-
-### Auto-reissue certificates
-
-The certificates provided by [letsencrypt](https://letsencrypt.org/2015/11/09/why-90-days.html) are valid for 90 days. Renewal of certificates require the generated folders and files by acme.
-For simplicity, we reissue the certificates and apply them in the above secrets.
-It is implemented by a periodic job `periodic-acme-cert-issuer-for-build01`.
