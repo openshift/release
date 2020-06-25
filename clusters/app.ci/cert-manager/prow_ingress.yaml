@@ -1,0 +1,33 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: cert-issuer
+  name: prow
+  namespace: ci
+spec:
+  tls:
+    - secretName: prow-tls
+      hosts:
+        - steps.ci.openshift.org
+        - prow.ci.openshift.org
+        - hook.ci.openshift.org
+  rules:
+    - host: steps.ci.openshift.org
+      http:
+        paths:
+          - backend:
+              serviceName: ci-operator-configresolver
+              servicePort: 8082
+    - host: prow.ci.openshift.org
+      http:
+        paths:
+          - backend:
+              serviceName: deck
+              servicePort: 80
+    - host: hook.ci.openshift.org
+      http:
+        paths:
+          - backend:
+              serviceName: hook
+              servicePort: 8888
