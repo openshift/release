@@ -57,6 +57,11 @@
         channel: '#operator-test',
         notify: 'olmcop',
       },
+      'openshift-virtualization': {
+        team: 'openshift-virtualization',
+        channel: '#kubevirt-ci-monitoring',
+        notify: 'build-officer',
+      },
     },
   },
 }
