@@ -4,7 +4,7 @@
       'periodic-openshift-library-import': {
         receiver: 'openshift-library',
       },
-      'endurance-cluster-maintenance-aws-4.3': {
+      'endurance-cluster-maintenance-aws-4.5': {
         receiver: 'endurance-cluster',
       },
       'endurance-cluster-maintenance-aws-4.4': {
