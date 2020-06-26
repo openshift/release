@@ -37,6 +37,7 @@ parameters:
   value: "performance"
 - name: BUILD_ID
   required: false
+- name: CLUSTER_VARIANT
 - name: USE_LEASE_CLIENT
 
 objects:
@@ -260,6 +261,8 @@ objects:
         value: ${CLUSTER_TYPE}
       - name: CLUSTER_NAME
         value: ${NAMESPACE}-${JOB_NAME_HASH}
+      - name: CLUSTER_VARIANT
+        value: ${CLUSTER_VARIANT}
       - name: AWS_SHARED_CREDENTIALS_FILE
         value: /etc/openshift-installer/.awscred
       - name: AWS_DEFAULT_REGION
@@ -395,8 +398,14 @@ objects:
         sed -i '/^  channel:/d' /tmp/artifacts/installer/manifests/cvo-overrides.yaml
 
         if [[ "${KURYR_ENABLED:-false}" != "true" ]]; then
-          echo "Forcing OpenShiftSDN by modifying manifests"
-          sed -i -e 's/networkType: .*$/networkType: OpenShiftSDN/g' /tmp/artifacts/installer/manifests/cluster-network-02-config.yml
+          if [[ "${CLUSTER_VARIANT:-sdn}" == "sdn" ]]; then
+            echo "Forcing OpenShiftSDN by modifying manifests"
+            sed -i -e 's/networkType: .*$/networkType: OpenShiftSDN/g' /tmp/artifacts/installer/manifests/cluster-network-02-config.yml
+          fi
+          if [[ "${CLUSTER_VARIANT:-sdn}" == "ovn" ]]; then
+            echo "Forcing OVNKubernetes by modifying manifests"
+            sed -i -e 's/networkType: .*$/networkType: OVNKubernetes/g' /tmp/artifacts/installer/manifests/cluster-network-02-config.yml
+          fi
         fi
         TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create cluster --log-level=debug 2>&1 | grep --line-buffered -v password &
         wait "$!"
