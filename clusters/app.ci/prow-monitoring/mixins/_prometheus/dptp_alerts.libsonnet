@@ -43,7 +43,7 @@
           {
             alert: 'high-ci-operator-error-rate',
             expr: |||
-              sum(rate(ci_operator_error_rate{state="failed"}[30m])) by (reason) > 0.04
+              sum(rate(ci_operator_error_rate{state="failed"}[30m])) by (reason) > 0.07
             |||,
             'for': '1m',
             labels: {
