@@ -4,7 +4,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-declare -a SAArray=( "config-updater" "deck" "plank" "sinker" "hook" "crier" "release-bot" "prow-controller-manager")
+declare -a SAArray=( "config-updater" "deck" "plank" "sinker" "hook" "crier" "release-bot" "prow-controller-manager" "pj-rehearse")
 readonly CLUSTER_NAME="app.ci"
 
 WORKDIR="$(mktemp -d /tmp/kubeconfigs-app-ci-$(date --iso-8601).XXXX)"
