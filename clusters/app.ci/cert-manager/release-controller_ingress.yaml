@@ -1,0 +1,40 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: cert-issuer
+  name: release-controller
+  namespace: ci
+spec:
+  tls:
+    - secretName: release-controller-tls
+      hosts:
+        - amd64.ocp.releases.ci.openshift.org
+        - ppc64le.ocp.releases.ci.openshift.org
+        - s390x.ocp.releases.ci.openshift.org
+        - amd64.origin.releases.ci.openshift.org
+  rules:
+    - host: amd64.origin.releases.ci.openshift.org
+      http:
+        paths:
+          - backend:
+              serviceName: release-controller
+              servicePort: 80
+    - host: amd64.ocp.releases.ci.openshift.org
+      http:
+        paths:
+          - backend:
+              serviceName: release-controller-ocp
+              servicePort: 80
+    - host: ppc64le.ocp.releases.ci.openshift.org
+      http:
+        paths:
+          - backend:
+              serviceName: release-controller-ocp-ppc64le
+              servicePort: 80
+    - host: s390x.ocp.releases.ci.openshift.org
+      http:
+        paths:
+          - backend:
+              serviceName: release-controller-ocp-s390x
+              servicePort: 80
