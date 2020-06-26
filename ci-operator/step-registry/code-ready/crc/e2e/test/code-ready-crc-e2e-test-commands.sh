@@ -5,10 +5,10 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 INSTANCE_PREFIX="${NAMESPACE}"-"${JOB_NAME_HASH}"
 
+mkdir -p "${HOME}"/.ssh
 BUNDLE_VERSION="$(crc version | grep -oP '^OpenShift version\s*:\s*\K\S+')"
 BUNDLE=crc_libvirt_"${BUNDLE_VERSION}".crcbundle
 
-mkdir -p "${HOME}"/.ssh
 mock-nss.sh
 
 # gcloud compute will use this key rather than create a new one
