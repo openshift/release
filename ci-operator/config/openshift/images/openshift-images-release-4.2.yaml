@@ -1,4 +1,8 @@
 base_images:
+  builder:
+    name: builder
+    namespace: ocp
+    tag: golang-1.12
   os:
     name: ubi
     namespace: ocp
@@ -7,7 +11,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.10
+    tag: golang-1.12
 images:
 - context_dir: base/
   dockerfile_path: Dockerfile.rhel
@@ -15,6 +19,15 @@ images:
   to: base
 - dockerfile_path: pod/Dockerfile.rhel
   from: os
+  inputs:
+    base:
+      as:
+      - registry.svc.ci.openshift.org/ocp/4.0:base
+      - registry.svc.ci.openshift.org/ocp/4.2:base
+    builder:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.10
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
   to: pod
 - context_dir: egress/router/
   from: base
