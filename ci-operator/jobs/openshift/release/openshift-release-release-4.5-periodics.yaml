@@ -7760,3 +7760,342 @@ periodics:
         - key: sa.release-bot.app.ci.config
           path: sa.release-bot.app.ci.config
         secretName: build-farm-credentials
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 0 * * 1
+  decorate: true
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: endurance-upgrade-aws-4.5
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
+      - --secret-dir=/usr/local/ci-credentials
+      - --secret-dir=/usr/local/endurance-cluster-credentials-aws
+      - --secret-dir=/usr/local/aws-openshift-llc-account-credentials
+      - --secret-dir=/usr/local/pull-secret
+      - --template=/usr/local/endurance-test/endurance-test.yaml
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --target=endurance-test
+      command:
+      - ci-operator
+      env:
+      - name: BRANCH
+        value: "4.5"
+      - name: RELEASE_IMAGE_LATEST
+        value: registry.svc.ci.openshift.org/ocp/release:4.5
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: CONFIG_SPEC
+        value: |
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+          resources:
+            '*':
+              requests:
+                cpu: 10m
+          tests:
+          - as: endurance-upgrade-$(CLUSTER_TYPE)
+            commands: TEST_SUITE=all run-upgrade-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+      - name: TEST_COMMAND
+        value: TEST_SUITE=all run-upgrade-tests
+      - name: JOB_NAME_SAFE
+        value: endurance-aws-upgrade
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/endurance-test
+        name: job-definition
+      - mountPath: /usr/local/ci-credentials
+        name: ci-credentials
+      - mountPath: /usr/local/aws-openshift-llc-account-credentials
+        name: aws-openshift-llc-account-credentials
+      - mountPath: /usr/local/endurance-cluster-credentials-aws
+        name: endurance-cluster-credentials-aws
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: aws-openshift-llc-account-credentials
+      secret:
+        secretName: aws-openshift-llc-account-credentials
+    - name: ci-credentials
+      secret:
+        secretName: cluster-secrets-aws
+    - name: endurance-cluster-credentials-aws
+      secret:
+        secretName: endurance-cluster-credentials-4.5-aws
+    - configMap:
+        name: prow-job-endurance-test
+      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 6 * * 1-5
+  decorate: true
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: endurance-e2e-aws-4.5
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
+      - --secret-dir=/usr/local/ci-credentials
+      - --secret-dir=/usr/local/endurance-cluster-credentials-aws
+      - --secret-dir=/usr/local/aws-openshift-llc-account-credentials
+      - --secret-dir=/usr/local/pull-secret
+      - --template=/usr/local/endurance-test/endurance-test.yaml
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --target=endurance-test
+      command:
+      - ci-operator
+      env:
+      - name: BRANCH
+        value: "4.5"
+      - name: RELEASE_IMAGE_LATEST
+        value: registry.svc.ci.openshift.org/ocp/release:4.5
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: CONFIG_SPEC
+        value: |
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+          resources:
+            '*':
+              requests:
+                cpu: 10m
+          tests:
+          - as: endurance-e2e-$(CLUSTER_TYPE)
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: false
+      - name: TEST_COMMAND
+        value: TEST_SUITE=openshift/conformance/parallel run-tests
+      - name: JOB_NAME_SAFE
+        value: endurance-e2e-aws
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/endurance-test
+        name: job-definition
+      - mountPath: /usr/local/ci-credentials
+        name: ci-credentials
+      - mountPath: /usr/local/aws-openshift-llc-account-credentials
+        name: aws-openshift-llc-account-credentials
+      - mountPath: /usr/local/endurance-cluster-credentials-aws
+        name: endurance-cluster-credentials-aws
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: aws-openshift-llc-account-credentials
+      secret:
+        secretName: aws-openshift-llc-account-credentials
+    - name: ci-credentials
+      secret:
+        secretName: cluster-secrets-aws
+    - name: endurance-cluster-credentials-aws
+      secret:
+        secretName: endurance-cluster-credentials-4.5-aws
+    - configMap:
+        name: prow-job-endurance-test
+      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 10 * * 1-5
+  decorate: true
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: endurance-cluster-maintenance-aws-4.5
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
+      - --secret-dir=/usr/local/ci-credentials
+      - --secret-dir=/usr/local/endurance-cluster-credentials-aws
+      - --secret-dir=/usr/local/aws-openshift-llc-account-credentials
+      - --secret-dir=/usr/local/pull-secret
+      - --template=/usr/local/endurance-install/endurance-install.yaml
+      - --target=endurance-install
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -euo pipefail
+        export PATH=$PATH:/tmp/bin
+        mkdir /tmp/bin
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.5/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
+        chmod ug+x /tmp/bin/oc
+        set +e
+        ci-operator $@ |& tee /tmp/ci-operator.log
+        rc=$?
+        set -e
+        namespace=$(grep "Creating namespace" /tmp/ci-operator.log | awk '{print $NF}')
+        # copy the cluster credentials secret that was created in the job namespace, into the ci namespace
+        # so it is persisted for future runs.
+        oc get --export secret endurance-cluster-credentials-aws-new -n $namespace -o yaml | grep -v namespace: > /tmp/secret.yaml
+        sed -i s/endurance-cluster-credentials-aws-new/endurance-cluster-credentials-4.5-aws/ /tmp/secret.yaml
+        oc apply -f /tmp/secret.yaml -n ci
+        exit $rc
+      - ""
+      env:
+      - name: BRANCH
+        value: "4.5"
+      - name: RELEASE_IMAGE_LATEST
+        value: registry.svc.ci.openshift.org/ocp/release:4.5
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: CONFIG_SPEC
+        value: |
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: endurance-install-$(CLUSTER_TYPE)
+            commands: sleep 9000 & wait
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: false
+      - name: JOB_NAME_SAFE
+        value: endurance-install-$(CLUSTER_TYPE)
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/endurance-install
+        name: job-definition
+      - mountPath: /usr/local/ci-credentials
+        name: ci-credentials
+      - mountPath: /usr/local/aws-openshift-llc-account-credentials
+        name: aws-openshift-llc-account-credentials
+      - mountPath: /usr/local/endurance-cluster-credentials-aws
+        name: endurance-cluster-credentials-aws
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: aws-openshift-llc-account-credentials
+      secret:
+        secretName: aws-openshift-llc-account-credentials
+    - name: ci-credentials
+      secret:
+        secretName: cluster-secrets-aws
+    - name: endurance-cluster-credentials-aws
+      secret:
+        secretName: endurance-cluster-credentials-4.5-aws
+    - configMap:
+        name: prow-job-endurance-install
+      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
