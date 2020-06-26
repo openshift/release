@@ -49,6 +49,6 @@ generate_reg_auth_value() {
   oc --context "${CONTEXT}" -n ci get secret $( oc --context ${CONTEXT} get secret -n ci -o "jsonpath={.items[?(@.metadata.annotations.kubernetes\.io/service-account\.name==\"build01\")].metadata.name}" ) -o "jsonpath={.items[?(@.type==\"kubernetes.io/dockercfg\")].data.\.dockercfg}" | base64 --decode | jq --arg reg "${registry}" -r '.[$reg].auth' | tr -d '\n' > "${WORKDIR}/build01_${cluster}_reg_auth_value.txt"
 }
 
-#generate_reg_auth_value "${CONTEXT}" "image-registry.openshift-image-registry.svc:5000"
+generate_reg_auth_value "${CONTEXT}" "image-registry.openshift-image-registry.svc:5000"
 
 echo "files are saved ${WORKDIR}"
