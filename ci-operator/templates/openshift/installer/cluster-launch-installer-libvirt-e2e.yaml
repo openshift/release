@@ -1,8 +1,6 @@
 kind: Template
 apiVersion: template.openshift.io/v1
 
-# image-family openshift4-libvirt must exist in ${GOOGLE_PROJECT_ID} for this template
-# for more info see here: https://github.com/ironcladlou/openshift4-libvirt-gcp/blob/rhel8/IMAGES.md
 parameters:
 - name: JOB_NAME
   required: true
@@ -102,22 +100,22 @@ objects:
           memory: 3Gi
       volumeMounts:
       - name: shared-tmp
-        mountPath: /home/packer
+        mountPath: /home/developer
       - name: cluster-profile
         mountPath: /tmp/cluster
       - name: artifacts
         mountPath: /tmp/artifacts
       env:
       - name: HOME
-        value: /home/packer
+        value: /home/developer
       - name: NSS_WRAPPER_PASSWD
-        value: /home/packer/passwd
+        value: /home/developer/passwd
       - name: NSS_WRAPPER_GROUP
-        value: /home/packer/group
+        value: /home/developer/group
       - name: NSS_USERNAME
-        value: packer
+        value: developer
       - name: NSS_GROUPNAME
-        value: packer
+        value: developer
       - name: GOOGLE_PROJECT_ID
         value: openshift-gce-devel-ci
       - name: GOOGLE_COMPUTE_ZONE
@@ -156,30 +154,30 @@ objects:
         set -x
         LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
           --zone "${GOOGLE_COMPUTE_ZONE}" \
-          packer@"${INSTANCE_PREFIX}" \
-          --command 'export KUBECONFIG=/home/packer/clusters/installer/auth/kubeconfig && /home/packer/run-tests.sh'
+          developer@"${INSTANCE_PREFIX}" \
+          --command 'export KUBECONFIG=/home/developer/clusters/installer/auth/kubeconfig && /home/developer/run-tests.sh'
 
     # Runs an install
     - name: setup
       image: ${IMAGE_LIBVIRT_INSTALLER}
       volumeMounts:
       - name: shared-tmp
-        mountPath: /home/packer
+        mountPath: /home/developer
       - name: cluster-profile
         mountPath: /tmp/cluster
       - name: artifacts
         mountPath: /tmp/artifacts
       env:
       - name: HOME
-        value: /home/packer
+        value: /home/developer
       - name: NSS_WRAPPER_PASSWD
-        value: /home/packer/passwd
+        value: /home/developer/passwd
       - name: NSS_WRAPPER_GROUP
-        value: /home/packer/group
+        value: /home/developer/group
       - name: NSS_USERNAME
-        value: packer
+        value: developer
       - name: NSS_GROUPNAME
-        value: packer
+        value: developer
       - name: GOOGLE_PROJECT_ID
         value: openshift-gce-devel-ci
       - name: GOOGLE_COMPUTE_ZONE
@@ -200,7 +198,7 @@ objects:
         cat  > "${HOME}"/run-tests.sh << 'EOF'
         #!/bin/bash
         set -euo pipefail
-        export PATH=/home/packer:$PATH
+        export PATH=/home/developer:$PATH
         mkdir -p /tmp/artifacts/junit
 
         function run-tests() {
@@ -239,7 +237,7 @@ objects:
         # image-family openshift4-libvirt must exist in ${GOOGLE_PROJECT_ID} for this template
         # for more info see here: https://github.com/ironcladlou/openshift4-libvirt-gcp/blob/rhel8/IMAGES.md
         gcloud compute instances create "${INSTANCE_PREFIX}" \
-          --image-family openshift4-libvirt \
+          --image-family openshift4-libvirt-source \
           --zone "${GOOGLE_COMPUTE_ZONE}" \
           --machine-type n1-standard-16 \
           --min-cpu-platform "Intel Haswell" \
@@ -252,57 +250,67 @@ objects:
           --quiet \
           --project "${GOOGLE_PROJECT_ID}" \
           --zone "${GOOGLE_COMPUTE_ZONE}" \
-          --recurse "${HOME}"/run-tests.sh packer@"${INSTANCE_PREFIX}":~/run-tests.sh
+          --recurse "${HOME}"/run-tests.sh developer@"${INSTANCE_PREFIX}":~/run-tests.sh
         LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
           --quiet \
           --project "${GOOGLE_PROJECT_ID}" \
           --zone "${GOOGLE_COMPUTE_ZONE}" \
-          --recurse "${HOME}"/openshift-tests packer@"${INSTANCE_PREFIX}":~/openshift-tests
+          --recurse "${HOME}"/openshift-tests developer@"${INSTANCE_PREFIX}":~/openshift-tests
         LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
           --quiet \
           --project "${GOOGLE_PROJECT_ID}" \
           --zone "${GOOGLE_COMPUTE_ZONE}" \
-          --recurse /bin/openshift-install packer@"${INSTANCE_PREFIX}":/home/packer/openshift-install
+          --recurse /bin/create-cluster developer@"${INSTANCE_PREFIX}":~/create-cluster
         LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
           --quiet \
           --project "${GOOGLE_PROJECT_ID}" \
           --zone "${GOOGLE_COMPUTE_ZONE}" \
-          /tmp/cluster/pull-secret packer@"${INSTANCE_PREFIX}":/home/packer/pull-secret
+          --recurse /bin/provision-host.sh developer@"${INSTANCE_PREFIX}":~/provision-host.sh
+        LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+          --quiet \
+          --project "${GOOGLE_PROJECT_ID}" \
+          --zone "${GOOGLE_COMPUTE_ZONE}" \
+          /tmp/cluster/pull-secret developer@"${INSTANCE_PREFIX}":/home/developer/pull-secret
         LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
           --zone "${GOOGLE_COMPUTE_ZONE}" \
           packer@"${INSTANCE_PREFIX}" \
-          --command 'sudo mv /home/packer/openshift-install /usr/local/bin/openshift-install'
+          --command 'sudo mv /home/developer/create-cluster /usr/local/bin/create-cluster'
         set +x
+        echo 'Will now run provision-host in the gce instance to prepare libvirt environment'
+        LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+          --zone "${GOOGLE_COMPUTE_ZONE}" \
+          developer@"${INSTANCE_PREFIX}" \
+          --command '/home/developer/provision-host.sh'
         echo 'Will now launch libvirt cluster in the gce instance with "${RELEASE_IMAGE_LATEST}"'
         # Install allows up to 30min beyond than what installer allows by default. In the create-cluster script
         # see the `wait-for install-complete` added here: https://github.com/ironcladlou/openshift4-libvirt-gcp/blob/rhel8/tools/create-cluster
         # https://github.com/openshift/installer/issues/3043
         LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
           --zone "${GOOGLE_COMPUTE_ZONE}" \
-          packer@"${INSTANCE_PREFIX}" \
-          --command 'export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_LATEST}" OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME}/${BUILD_ID} && timeout 150m bash -ce "create-cluster installer"'
+          developer@"${INSTANCE_PREFIX}" \
+          --command 'export RELEASE_IMAGE="${RELEASE_IMAGE_LATEST}" && OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME}/${BUILD_ID} && timeout 150m bash -ce "create-cluster installer"'
 
    # Performs cleanup of all created resources and upload the artifacts
     - name: teardown
       image: ${IMAGE_LIBVIRT_INSTALLER}
       volumeMounts:
       - name: shared-tmp
-        mountPath: /home/packer
+        mountPath: /home/developer
       - name: cluster-profile
         mountPath: /tmp/cluster
       - name: artifacts
         mountPath: /tmp/artifacts
       env:
       - name: HOME
-        value: /home/packer
+        value: /home/developer
       - name: NSS_WRAPPER_PASSWD
-        value: /home/packer/passwd
+        value: /home/developer/passwd
       - name: NSS_WRAPPER_GROUP
-        value: /home/packer/group
+        value: /home/developer/group
       - name: NSS_USERNAME
-        value: packer
+        value: developer
       - name: NSS_GROUPNAME
-        value: packer
+        value: developer
       - name: GOOGLE_PROJECT_ID
         value: openshift-gce-devel-ci
       - name: GOOGLE_COMPUTE_ZONE
@@ -329,12 +337,12 @@ objects:
           echo 'Collect all the info about clusteroperators'
           LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
             --zone "${GOOGLE_COMPUTE_ZONE}" \
-            packer@"${INSTANCE_PREFIX}" \
+            developer@"${INSTANCE_PREFIX}" \
             --command 'export KUBECONFIG=/home/$USER/clusters/installer/auth/kubeconfig && bash -ce "oc get co"' | tee /tmp/artifacts/output-co-libvirt
           echo 'Run must gather on the cluster'
           LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
             --zone "${GOOGLE_COMPUTE_ZONE}" \
-            packer@"${INSTANCE_PREFIX}" \
+            developer@"${INSTANCE_PREFIX}" \
             --command 'mkdir -p $HOME/must-gather && export KUBECONFIG=$HOME/clusters/installer/auth/kubeconfig && bash -ce "oc adm must-gather --dest-dir $HOME/must-gather || true && tar -czC "$HOME/must-gather -f $HOME/must-gather.tar.gz"'
 
           echo "scp everything related to installer back to pod"
@@ -342,21 +350,21 @@ objects:
             --quiet \
             --project "${GOOGLE_PROJECT_ID}" \
             --zone "${GOOGLE_COMPUTE_ZONE}" \
-            --recurse packer@"${INSTANCE_PREFIX}":$HOME/clusters/installer /tmp/artifacts
+            --recurse developer@"${INSTANCE_PREFIX}":$HOME/clusters/installer /tmp/artifacts
           echo "scp must-gather logs back to pod"
           LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
             --quiet \
             --project "${GOOGLE_PROJECT_ID}" \
             --zone "${GOOGLE_COMPUTE_ZONE}" \
-            --recurse packer@"${INSTANCE_PREFIX}":$HOME/must-gather.tar.gz /tmp/artifacts
+            --recurse developer@"${INSTANCE_PREFIX}":$HOME/must-gather.tar.gz /tmp/artifacts
           echo "scp junit logs back to test pod"
           LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
             --quiet \
             --project "${GOOGLE_PROJECT_ID}" \
             --zone "${GOOGLE_COMPUTE_ZONE}" \
-            --recurse packer@"${INSTANCE_PREFIX}":/tmp/artifacts/junit /tmp/artifacts
+            --recurse developer@"${INSTANCE_PREFIX}":/tmp/artifacts/junit /tmp/artifacts
 
-          touch /home/packer/exit
+          touch /home/developer/exit
           echo "Deprovisioning cluster ..."
           gcloud compute instances delete "${INSTANCE_PREFIX}" --quiet
           gcloud compute firewall-rules delete "${INSTANCE_PREFIX}" --quiet
@@ -369,7 +377,7 @@ objects:
 
         set +x
         for i in $(seq 1 220); do
-          if [[ -f /home/packer/exit ]]; then
+          if [[ -f /home/developer/exit ]]; then
             exit 0
           fi
           sleep 60 & wait
