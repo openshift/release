@@ -42,8 +42,8 @@ dashboard.new(
 .addPanel(
     (graphPanel.new(
         'Running Clusters by Platform',
-        description='sum(kube_pod_container_status_running{pod=~"e2e(-<regex>(-upgrade)?)?",container="teardown"})',
-        datasource='prometheus-k8s',
+        description='sum(label_replace(boskos_resources{state="leased"}, "type", "$1", "type", "(.*)-quota-slice")) by(type)',
+        datasource='prometheus',
         legend_alignAsTable=true,
         legend_rightSide=true,
         legend_values=true,
@@ -53,28 +53,8 @@ dashboard.new(
         legend_sortDesc=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(kube_pod_container_status_running{pod=~"(e2e|(.*-aws(-.*)?))",container="teardown"})',
-        legendFormat='aws',
-    ))
-    .addTarget(prometheus.target(
-        'sum(kube_pod_container_status_running{pod=~".*-vsphere(-.*)?",container="teardown"})',
-        legendFormat='vsphere',
-    ))
-    .addTarget(prometheus.target(
-        'sum(kube_pod_container_status_running{pod=~".*-gcp(-.*)?",container="teardown"})',
-        legendFormat='gcp',
-    ))
-    .addTarget(prometheus.target(
-        'sum(kube_pod_container_status_running{pod=~".*-azure(-.*)?",container="teardown"})',
-        legendFormat='azure',
-    ))
-    .addTarget(prometheus.target(
-        'sum(kube_pod_container_status_running{pod=~".*-packet(-.*)?",container="teardown"})',
-        legendFormat='packet',
-    ))
-    .addTarget(prometheus.target(
-        'sum(kube_pod_container_status_running{pod=~".*-openstack(-.*)?",container="teardown"})',
-        legendFormat='openstack',
+        'sum(label_replace(boskos_resources{state="leased"}, "type", "$1", "type", "(.*)-quota-slice")) by(type)',
+        legendFormat='{{type}}',
     )), gridPos={
     h: 9,
     w: 24,
