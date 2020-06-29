@@ -6,17 +6,22 @@ set -o pipefail
 
 echo "************ baremetalds gather command ************"
 
+# Sentinel file check
+if [[ -f "${SHARED_DIR}/e2e_test_complete" ]]; then
+  echo "baremetalds-e2e-test completed successfully; skipping log gathering."
+  exit 0
+fi
+
 # TODO: Remove once OpenShift CI will be upgraded to 4.2 (see https://access.redhat.com/articles/4859371)
 ~/fix_uid.sh
 
 # Initial check
-if [ "${CLUSTER_TYPE}" != "packet" ] ; then
-    echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"
-    exit 1
+if [ "${CLUSTER_TYPE}" != "packet" ]; then
+  echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"
+  exit 1
 fi
 
-if [[ ! -e "${SHARED_DIR}/server-ip" ]]
-then
+if [[ ! -e "${SHARED_DIR}/server-ip" ]]; then
   echo "No server IP found; skipping log gathering."
   exit 0
 fi
@@ -34,7 +39,7 @@ function getlogs() {
 trap getlogs EXIT
 
 echo "### Gathering logs..."
-timeout -s 9 15m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
+timeout -s 9 15m ssh "${SSHOPTS[@]}" "root@${IP}" bash - <<EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 cd dev-scripts
 
 # Get install-gather, if there is one
