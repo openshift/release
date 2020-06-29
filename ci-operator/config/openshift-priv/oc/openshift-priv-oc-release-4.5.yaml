@@ -7,6 +7,22 @@ base_images:
     name: 4.5-priv
     namespace: ocp-private
     tag: must-gather
+  ocp_4.2_base:
+    name: 4.2-priv
+    namespace: ocp-private
+    tag: base
+  ocp_4.2_cli:
+    name: 4.2-priv
+    namespace: ocp-private
+    tag: cli
+  ocp_4.5_cli:
+    name: 4.5-priv
+    namespace: ocp-private
+    tag: cli
+  openshift_release_golang-1.13:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
   tests-base:
     name: 4.5-priv
     namespace: ocp-private
@@ -26,9 +42,22 @@ images:
       as:
       - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
       paths: null
+    ocp_4.2_base:
+      as:
+      - registry.svc.ci.openshift.org/ocp/4.2:base
+      paths: null
+    openshift_release_golang-1.13:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      paths: null
   to: cli
 - dockerfile_path: images/tools/Dockerfile
   from: cli
+  inputs:
+    ocp_4.5_cli:
+      as:
+      - registry.svc.ci.openshift.org/ocp/4.5:cli
+      paths: null
   to: tools
 - dockerfile_path: images/cli/Dockerfile.rhel
   from: tests-base
@@ -37,6 +66,14 @@ images:
       as:
       - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
       paths: null
+    ocp_4.2_base:
+      as:
+      - registry.svc.ci.openshift.org/ocp/4.2:base
+      paths: null
+    openshift_release_golang-1.13:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      paths: null
   to: tests
 - dockerfile_path: images/cli/Dockerfile.rhel
   from: must-gather-base
@@ -44,6 +81,14 @@ images:
     bin:
       as:
       - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
+      paths: null
+    ocp_4.2_base:
+      as:
+      - registry.svc.ci.openshift.org/ocp/4.2:base
+      paths: null
+    openshift_release_golang-1.13:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.13
       paths: null
   to: must-gather
 - context_dir: images/deployer/
@@ -54,6 +99,10 @@ images:
       as:
       - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
       paths: null
+    ocp_4.2_cli:
+      as:
+      - registry.svc.ci.openshift.org/ocp/4.2:cli
+      paths: null
   to: deployer
 - context_dir: .
   dockerfile_path: images/cli-artifacts/Dockerfile.rhel
@@ -63,6 +112,14 @@ images:
       as:
       - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
       paths: null
+    ocp_4.2_cli:
+      as:
+      - registry.svc.ci.openshift.org/ocp/4.2:cli
+      paths: null
+    openshift_release_golang-1.13:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      paths: null
   to: cli-artifacts
 - context_dir: images/recycler/
   dockerfile_path: Dockerfile.rhel
@@ -71,6 +128,10 @@ images:
     bin:
       as:
       - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
+      paths: null
+    ocp_4.2_cli:
+      as:
+      - registry.svc.ci.openshift.org/ocp/4.2:cli
       paths: null
   to: recycler
 promotion:

@@ -7,6 +7,14 @@ base_images:
     name: test
     namespace: openshift-kni
     tag: dev-scripts
+  openshift_origin-v4.0_base:
+    name: origin-v4.0
+    namespace: openshift
+    tag: base
+  openshift_release_golang-1.12:
+    name: release
+    namespace: openshift
+    tag: golang-1.12
 binary_build_commands: hack/build-go.sh
 build_root:
   image_stream_tag:
@@ -17,6 +25,15 @@ canonical_go_repository: github.com/openshift/cluster-network-operator
 images:
 - dockerfile_path: Dockerfile
   from: base
+  inputs:
+    openshift_origin-v4.0_base:
+      as:
+      - registry.svc.ci.openshift.org/openshift/origin-v4.0:base
+      paths: null
+    openshift_release_golang-1.12:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.12
+      paths: null
   to: cluster-network-operator
 promotion:
   name: 4.4-priv
