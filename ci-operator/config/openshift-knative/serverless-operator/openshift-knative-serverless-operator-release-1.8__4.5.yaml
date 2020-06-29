@@ -3,10 +3,22 @@ base_images:
     name: "4.5"
     namespace: ocp
     tag: base
+  cli:
+    name: "4.5"
+    namespace: ocp
+    tag: cli
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
 images:
+- context_dir: openshift/ci-operator/source-image
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: serverless-operator-src
 - context_dir: serving/ingress
   from: base
   to: knative-openshift-ingress
@@ -23,18 +35,42 @@ tag_specification:
   namespace: ocp
 tests:
 - as: e2e-aws-ocp-45
-  commands: make test-e2e
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: serverless-e2e
+      commands: make test-e2e
+      from: serverless-operator-src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws
 - as: e2e-aws-ocp-45-continuous
-  commands: make test-e2e
   cron: 0 */6 * * *
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: serverless-e2e
+      commands: make test-e2e
+      from: serverless-operator-src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws
 - as: upgrade-tests-aws-ocp-45
-  commands: make test-upgrade
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: serverless-e2e
+      commands: make test-upgrade
+      from: serverless-operator-src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: release-1.8
   org: openshift-knative
