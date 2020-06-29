@@ -7,6 +7,26 @@ base_images:
     name: "4.7"
     namespace: ocp
     tag: base
+  ocp_4.4_base:
+    name: "4.4"
+    namespace: ocp
+    tag: base
+  ocp_4.6_ansible-operator:
+    name: "4.6"
+    namespace: ocp
+    tag: ansible-operator
+  ocp_4.6_cli:
+    name: "4.6"
+    namespace: ocp
+    tag: cli
+  ocp_4.6_metering-helm:
+    name: "4.6"
+    namespace: ocp
+    tag: metering-helm
+  openshift_release_golang-1.13:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
 build_root:
   project_image:
     context_dir: .
@@ -17,9 +37,31 @@ images:
   to: metering-reporting-operator
 - dockerfile_path: Dockerfile.metering-ansible-operator
   from: ansible-operator
+  inputs:
+    ocp_4.4_base:
+      as:
+      - registry.svc.ci.openshift.org/ocp/4.4:base
+      paths: null
+    ocp_4.6_ansible-operator:
+      as:
+      - registry.svc.ci.openshift.org/ocp/4.6:ansible-operator
+      paths: null
+    ocp_4.6_cli:
+      as:
+      - registry.svc.ci.openshift.org/ocp/4.6:cli
+      paths: null
+    ocp_4.6_metering-helm:
+      as:
+      - registry.svc.ci.openshift.org/ocp/4.6:metering-helm
+      paths: null
   to: metering-ansible-operator
 - dockerfile_path: olm_deploy/Dockerfile.registry
   from: base
+  inputs:
+    openshift_release_golang-1.13:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      paths: null
   to: metering-ansible-operator-registry
 promotion:
   name: "4.7"
