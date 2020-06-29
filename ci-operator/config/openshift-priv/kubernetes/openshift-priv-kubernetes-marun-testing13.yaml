@@ -27,31 +27,31 @@ base_images:
     name: 4.5-priv
     namespace: ocp-private
     tag: tools
-binary_build_commands: make build
+binary_build_commands: openshift-hack/build-go.sh
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.13
-canonical_go_repository: github.com/openshift/kubernetes
+canonical_go_repository: k8s.io/kubernetes
 images:
-- dockerfile_path: images/hyperkube/Dockerfile.rhel
+- dockerfile_path: openshift-hack/images/hyperkube/Dockerfile.rhel
   from: base
   inputs:
     bin:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
       paths: null
   to: hyperkube
-- dockerfile_path: images/tests/Dockerfile.rhel
+- dockerfile_path: openshift-hack/images/tests/Dockerfile.rhel
   from: tools
   inputs:
     bin:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
       paths: null
-  to: tests
-- context_dir: images/os/
+  to: kube-e2e-tests
+- context_dir: openshift-hack/images/os/
   from: base
   inputs:
     base-machine-with-rpms:
@@ -74,7 +74,7 @@ promotion:
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
-      mkdir -p _output/local/releases; touch _output/local/releases/CHECKSUM; echo $'FROM bin AS bin\nFROM rpms AS rpms\nFROM centos:7 \nCOPY --from=bin /go/src/github.com/openshift/kubernetes/_output/local/releases /srv/zips/ \nCOPY --from=oc-rpms /go/src/github.com/openshift/oc/_rpmbuild/SOURCES/* /srv/zips/ \nCOPY --from=rpms /go/src/github.com/openshift/kubernetes/_output/local/releases/rpms/* /srv/repo/ \nCOPY --from=oc-rpms /go/src/github.com/openshift/oc/_rpmbuild/RPMS/x86_64/* /srv/repo/ ' > _output/local/releases/Dockerfile; make build-cross;
+      mkdir -p _output/local/releases; touch _output/local/releases/CHECKSUM; echo $'FROM bin AS bin\nFROM rpms AS rpms\nFROM centos:7 \nCOPY --from=bin /go/src/k8s.io/kubernetes/_output/local/releases /srv/zips/ \nCOPY --from=oc-rpms /go/src/github.com/openshift/oc/_rpmbuild/SOURCES/* /srv/zips/ \nCOPY --from=rpms /go/src/k8s.io/kubernetes/_output/local/releases/rpms/* /srv/repo/ \nCOPY --from=oc-rpms /go/src/github.com/openshift/oc/_rpmbuild/RPMS/x86_64/* /srv/repo/ ' > _output/local/releases/Dockerfile; openshift-hack/build-go.sh;
     from: bin
     to: bin-cross
 - project_directory_image_build_step:
@@ -85,7 +85,7 @@ raw_steps:
         - bin
         paths:
         - destination_dir: .
-          source_path: /go/src/github.com/openshift/kubernetes/_output/local/releases/Dockerfile
+          source_path: /go/src/k8s.io/kubernetes/_output/local/releases/Dockerfile
       oc-rpms:
         as:
         - oc-rpms
@@ -164,21 +164,33 @@ resources:
     requests:
       cpu: "3"
       memory: 8Gi
-rpm_build_commands: make build-rpms
+rpm_build_commands: openshift-hack/build-rpms.sh
 tag_specification:
   name: 4.5-priv
   namespace: ocp-private
 tests:
 - as: unit
-  commands: make test GOFLAGS=-v
+  commands: TMPDIR=/tmp/volume openshift-hack/test-go.sh
+  container:
+    from: src
+    memory_backed_volume:
+      size: 4Gi
+- as: integration
+  commands: TMPDIR=/tmp/volume openshift-hack/test-integration.sh
   container:
     from: src
     memory_backed_volume:
       size: 4Gi
 - as: verify
-  commands: make verify
+  commands: OPENSHIFT_CI=true TMPDIR=/tmp/volume openshift-hack/verify.sh
   container:
     from: src
+    memory_backed_volume:
+      size: 4Gi
+- as: kubernetes-e2e
+  steps:
+    cluster_profile: aws
+    workflow: openshift-kubernetes-e2e
 - as: e2e-gcp
   steps:
     cluster_profile: gcp
@@ -192,30 +204,30 @@ tests:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
 - as: e2e-cmd
-  steps:
+  commands: TEST_SUITE=openshift/test-cmd run-tests
+  openshift_installer:
     cluster_profile: gcp
-    workflow: openshift-e2e-gcp-cmd
 - as: e2e-gcp-builds
-  steps:
+  commands: TEST_SUITE=openshift/build run-tests
+  openshift_installer:
     cluster_profile: gcp
-    workflow: openshift-e2e-gcp-builds
 - as: e2e-aws-disruptive
   commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance/parallel
     run-tests
   openshift_installer:
     cluster_profile: aws
 - as: e2e-aws-jenkins
-  steps:
+  commands: TEST_SUITE=openshift/jenkins-e2e run-tests
+  openshift_installer:
     cluster_profile: aws
-    workflow: openshift-e2e-aws-jenkins
 - as: e2e-gcp-image-ecosystem
-  steps:
+  commands: TEST_SUITE=openshift/image-ecosystem run-tests
+  openshift_installer:
     cluster_profile: gcp
-    workflow: openshift-e2e-gcp-image-ecosystem
 - as: e2e-aws-image-registry
-  steps:
+  commands: TEST_SUITE=openshift/image-registry run-tests
+  openshift_installer:
     cluster_profile: aws
-    workflow: openshift-e2e-aws-image-registry
 - as: e2e-gcp-upgrade
   commands: TEST_SUITE=all run-upgrade-tests
   openshift_installer:
@@ -233,11 +245,15 @@ tests:
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer_upi:
     cluster_profile: vsphere
+- as: launch-vsphere
+  commands: sleep 7200 & wait
+  openshift_installer_upi:
+    cluster_profile: vsphere
 - as: e2e-conformance-k8s
-  commands: test/extended/conformance-k8s.sh
+  commands: openshift-hack/conformance-k8s.sh
   openshift_installer_src:
     cluster_profile: aws
 zz_generated_metadata:
-  branch: marun-testing
+  branch: marun-testing13
   org: openshift-priv
   repo: kubernetes
