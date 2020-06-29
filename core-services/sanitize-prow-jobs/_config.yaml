@@ -10,12 +10,25 @@ groups:
     - pull-ci-openshift-release-master-build02-dry
     - branch-ci-openshift-release-master-build02-apply
   "build01":
-    paths:
-    - ".*openshift-priv/.*-presubmits.yaml$"
     jobs:
     - periodic-build01-upgrade
     - periodic-ci-image-import-to-build01
     - pull-ci-openshift-config-master-format
+  "api.ci":
+    paths:
+    - ".*-postsubmits.yaml$"
+    - ".*openshift/release/.*-periodics.yaml$"
+    - ".*-periodics.yaml$"
+    jobs:
+    - pull-ci-openshift-release-master-build01-dry
+    - pull-ci-openshift-release-master-core-dry
+    - pull-ci-openshift-release-master-services-dry
+    - periodic-acme-cert-issuer-for-build01
+  "build02":
+    paths:
+    - ".*openshift-priv/.*-presubmits.yaml$"
+    jobs:
+    - periodic-ci-image-import-to-build02
     #those are non-e2e jobs and we have been running them on build01 since OCP 4.3
     #This group and the other groups with volume, are only useful in the migration process because we do not want to migrate all jobs together
     #Once the migration is done, those jobs could be running on any cluster
@@ -3176,16 +3189,3 @@ groups:
     - pull-ci-redhat-developer-helm-release-next-images
     - pull-ci-redhat-developer-helm-release-next-lint
     - pull-ci-redhat-developer-helm-release-next-unit
-  "api.ci":
-    paths:
-    - ".*-postsubmits.yaml$"
-    - ".*openshift/release/.*-periodics.yaml$"
-    - ".*-periodics.yaml$"
-    jobs:
-    - pull-ci-openshift-release-master-build01-dry
-    - pull-ci-openshift-release-master-core-dry
-    - pull-ci-openshift-release-master-services-dry
-    - periodic-acme-cert-issuer-for-build01
-  "build02":
-    jobs:
-    - periodic-ci-image-import-to-build02
