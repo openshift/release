@@ -3,6 +3,10 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "8"
+  ocp_builder_golang-1.13:
+    name: builder
+    namespace: ocp
+    tag: golang-1.13
 build_root:
   image_stream_tag:
     name: release
@@ -12,15 +16,30 @@ canonical_go_repository: github.com/openshift/compliance-operator
 images:
 - dockerfile_path: Dockerfile.ci
   from: base
+  inputs:
+    ocp_builder_golang-1.13:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
+      paths: null
   to: compliance-operator
 - dockerfile_path: images/resultscollector/Dockerfile.ci
   from: base
+  inputs:
+    ocp_builder_golang-1.13:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
+      paths: null
   to: compliance-resultscollector
 - dockerfile_path: images/resultserver/Dockerfile.ci
   from: base
   to: compliance-resultserver
 - dockerfile_path: images/remediation-aggregator/Dockerfile.ci
   from: base
+  inputs:
+    ocp_builder_golang-1.13:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
+      paths: null
   to: compliance-remediation-aggregator
 promotion:
   name: 4.5-priv
