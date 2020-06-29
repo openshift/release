@@ -3,6 +3,14 @@ base_images:
     name: 4.3-priv
     namespace: ocp-private
     tag: base
+  openshift_origin-v4.0_base:
+    name: origin-v4.0
+    namespace: openshift
+    tag: base
+  openshift_release_golang-1.12:
+    name: release
+    namespace: openshift
+    tag: golang-1.12
 binary_build_commands: go build -o bin/manager sigs.k8s.io/cluster-api-provider-azure/cmd/manager/
 build_root:
   image_stream_tag:
@@ -13,6 +21,15 @@ canonical_go_repository: sigs.k8s.io/cluster-api-provider-azure
 images:
 - dockerfile_path: Dockerfile
   from: base
+  inputs:
+    openshift_origin-v4.0_base:
+      as:
+      - registry.svc.ci.openshift.org/openshift/origin-v4.0:base
+      paths: null
+    openshift_release_golang-1.12:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.12
+      paths: null
   to: azure-machine-controllers
 promotion:
   name: 4.3-priv

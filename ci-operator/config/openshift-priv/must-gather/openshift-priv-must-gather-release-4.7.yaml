@@ -3,6 +3,14 @@ base_images:
     name: 4.7-priv
     namespace: ocp-private
     tag: cli
+  openshift_origin-v4.0_cli:
+    name: origin-v4.0
+    namespace: openshift
+    tag: cli
+  openshift_release_golang-1.12:
+    name: release
+    namespace: openshift
+    tag: golang-1.12
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
@@ -13,6 +21,15 @@ canonical_go_repository: github.com/openshift/must-gather
 images:
 - dockerfile_path: Dockerfile
   from: base
+  inputs:
+    openshift_origin-v4.0_cli:
+      as:
+      - registry.svc.ci.openshift.org/openshift/origin-v4.0:cli
+      paths: null
+    openshift_release_golang-1.12:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.12
+      paths: null
   to: must-gather
 promotion:
   name: 4.7-priv
