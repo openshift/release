@@ -25,6 +25,18 @@ pushd ${dir}
 cp -t "${dir}" \
     "${SHARED_DIR}/install-config.yaml"
 
+### Read XPN config, if exists
+if [[ -s "${SHARED_DIR}/xpn.json" ]]; then
+  echo "Reading variables from ${SHARED_DIR}/xpn.json..."
+  IS_XPN=1
+  HOST_PROJECT=$(jq -r '.hostProject' ${SHARED_DIR}/xpn.json)
+  HOST_PROJECT_NETWORK=$(jq -r '.clusterNetwork' ${SHARED_DIR}/xpn.json)
+  HOST_PROJECT_COMPUTE_SUBNET=$(jq -r '.computeSubnet' ${SHARED_DIR}/xpn.json)
+
+  HOST_PROJECT_NETWORK_NAME=$(basename ${HOST_PROJECT_NETWORK})
+  HOST_PROJECT_COMPUTE_SUBNET_NAME=$(basename ${HOST_PROJECT_COMPUTE_SUBNET})
+fi
+
 ### Empty the compute pool (optional)
 echo "Emptying the compute pool..."
 python -c '
@@ -33,6 +45,17 @@ path = "install-config.yaml";
 data = yaml.load(open(path));
 data["compute"] = [ { "name": "worker", "replicas": 0 } ];
 open(path, "w").write(yaml.dump(data, default_flow_style=False))'
+
+### Enable private cluster setting (optional)
+if [[ -v IS_XPN ]]; then
+  echo "Enabling private cluster setting..."
+  python -c '
+import yaml;
+path = "install-config.yaml";
+data = yaml.load(open(path));
+data["publish"] = "Internal";
+open(path, "w").write(yaml.dump(data, default_flow_style=False))'
+fi
 
 ### Create manifests
 echo "Creating manifests..."
@@ -64,6 +87,34 @@ path = "manifests/cluster-scheduler-02-config.yml";
 data = yaml.load(open(path));
 data["spec"]["mastersSchedulable"] = False;
 open(path, "w").write(yaml.dump(data, default_flow_style=False))'
+
+### Remove DNS Zones (optional)
+if [[ -v IS_XPN ]]; then
+  echo "Removing DNS Zones..."
+  python -c '
+import yaml;
+path = "manifests/cluster-dns-02-config.yml";
+data = yaml.load(open(path));
+del data["spec"]["privateZone"];
+open(path, "w").write(yaml.dump(data, default_flow_style=False))'
+fi
+
+### Update the cloud-provider manifest ([Shared VPC (XPN)][sharedvpc] only)
+if [[ -v IS_XPN ]]; then
+  echo "Updating the cloud-provider manifest..."
+  sed -i "s/    subnetwork-name.*/    network-project-id = ${HOST_PROJECT}\\n    network-name    = ${HOST_PROJECT_NETWORK_NAME}\\n    subnetwork-name = ${HOST_PROJECT_COMPUTE_SUBNET_NAME}/" manifests/cloud-provider-config.yaml
+fi
+
+### Enable external ingress (optional)
+if [[ -v IS_XPN ]]; then
+  echo "Removing publish:internal bits..."
+  python -c '
+import yaml;
+path = "manifests/cluster-ingress-default-ingresscontroller.yaml";
+data = yaml.load(open(path));
+data["spec"]["endpointPublishingStrategy"]["loadBalancer"]["scope"] = "External";
+open(path, "w").write(yaml.dump(data, default_flow_style=False))'
+fi
 
 ### Create Ignition configs
 echo "Creating Ignition configs..."
