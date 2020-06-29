@@ -3,6 +3,14 @@ base_images:
     name: "4.3"
     namespace: ocp
     tag: base
+  openshift_origin-v4.0_base:
+    name: origin-v4.0
+    namespace: openshift
+    tag: base
+  openshift_release_golang-1.10:
+    name: release
+    namespace: openshift
+    tag: golang-1.10
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -13,6 +21,15 @@ canonical_go_repository: github.com/kubernetes-incubator/descheduler
 images:
 - dockerfile_path: images/descheduler/Dockerfile.origin
   from: base
+  inputs:
+    openshift_origin-v4.0_base:
+      as:
+      - registry.svc.ci.openshift.org/openshift/origin-v4.0:base
+      paths: null
+    openshift_release_golang-1.10:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.10
+      paths: null
   to: descheduler
 promotion:
   name: "4.3"
