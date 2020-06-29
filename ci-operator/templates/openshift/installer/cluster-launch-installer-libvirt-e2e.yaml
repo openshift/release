@@ -245,7 +245,6 @@ objects:
           --boot-disk-size 256GB \
           --subnet "${INSTANCE_PREFIX}" \
           --network "${INSTANCE_PREFIX}"
-
         LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
           --quiet \
           --project "${GOOGLE_PROJECT_ID}" \
@@ -256,16 +255,16 @@ objects:
           --project "${GOOGLE_PROJECT_ID}" \
           --zone "${GOOGLE_COMPUTE_ZONE}" \
           --recurse "${HOME}"/openshift-tests developer@"${INSTANCE_PREFIX}":~/openshift-tests
-        LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
-          --quiet \
-          --project "${GOOGLE_PROJECT_ID}" \
-          --zone "${GOOGLE_COMPUTE_ZONE}" \
-          --recurse /bin/create-cluster developer@"${INSTANCE_PREFIX}":~/create-cluster
-        LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
-          --quiet \
-          --project "${GOOGLE_PROJECT_ID}" \
-          --zone "${GOOGLE_COMPUTE_ZONE}" \
-          --recurse /bin/provision-host.sh developer@"${INSTANCE_PREFIX}":~/provision-host.sh
+        #LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+        #  --quiet \
+        #  --project "${GOOGLE_PROJECT_ID}" \
+        #  --zone "${GOOGLE_COMPUTE_ZONE}" \
+        #  --recurse /bin/create-cluster developer@"${INSTANCE_PREFIX}":~/create-cluster
+        #LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+        #  --quiet \
+        #  --project "${GOOGLE_PROJECT_ID}" \
+        #  --zone "${GOOGLE_COMPUTE_ZONE}" \
+        #  --recurse /bin/provision-host.sh developer@"${INSTANCE_PREFIX}":~/provision-host.sh
         LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
           --quiet \
           --project "${GOOGLE_PROJECT_ID}" \
@@ -273,8 +272,10 @@ objects:
           /tmp/cluster/pull-secret developer@"${INSTANCE_PREFIX}":/home/developer/pull-secret
         LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
           --zone "${GOOGLE_COMPUTE_ZONE}" \
-          packer@"${INSTANCE_PREFIX}" \
-          --command 'sudo mv /home/developer/create-cluster /usr/local/bin/create-cluster'
+          developer@"${INSTANCE_PREFIX}" \
+          --command 'curl -o ~/provision-host.sh https://raw.githubusercontent.com/openshift/installer/37f9e33b309daff485bd60f6e6b149f19b163623/images/libvirt/provision-host.sh && chmod +x ~/provision-host.sh && curl -o ~/create-cluster https://raw.githubusercontent.com/openshift/installer/37f9e33b309daff485bd60f6e6b149f19b163623/images/libvirt/create-cluster && chmod +x ~/create-cluster && sudo mv ~/create-cluster /usr/local/bin/create-cluster'
+        #--command 'sudo mv /home/developer/create-cluster /usr/local/bin/create-cluster'
+        # testing until the libvirt-installer image is updated
         set +x
         echo 'Will now run provision-host in the gce instance to prepare libvirt environment'
         LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
