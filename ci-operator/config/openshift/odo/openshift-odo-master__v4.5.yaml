@@ -6,9 +6,9 @@ base_images:
 binary_build_commands: make bin
 build_root:
   project_image:
-    dockerfile_path: openshift-ci/build-root/multistage/Dockerfile
+    dockerfile_path: openshift-ci/build-root/Dockerfile
 images:
-- dockerfile_path: openshift-ci/build-root/multistage/Dockerfile
+- context_dir: openshift-ci/build-root/source-image
   from: src
   inputs:
     cli:
@@ -25,11 +25,20 @@ tag_specification:
   name: "4.5"
   namespace: ocp
 tests:
+- as: integration-e2e-steps
+  steps:
+    cluster_profile: aws
+    test:
+    - as: integration-e2e
+      commands: scripts/openshiftci-presubmit-all-tests.sh
+      from: oc-bin-image
+      resources:
+        requests:
+          cpu: "2"
+          memory: 4Gi
+    workflow: ipi-aws
 - as: integration-e2e-periodic-steps
   cron: 0 */6 * * *
-  secret:
-    mount_path: /tmp/secret
-    name: odo-secret
   steps:
     cluster_profile: aws
     test:
