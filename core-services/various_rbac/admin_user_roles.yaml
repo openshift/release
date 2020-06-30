@@ -1,0 +1,881 @@
+kind: List
+apiVersion: v1
+items:
+- kind: Namespace
+  apiVersion: v1
+  metadata:
+    name: ci
+- kind: Namespace
+  apiVersion: v1
+  metadata:
+    name: ci-stg
+- kind: Namespace
+  apiVersion: v1
+  metadata:
+    name: origin-web-console
+- kind: Namespace
+  apiVersion: v1
+  metadata:
+    name: qe
+- kind: Namespace
+  apiVersion: v1
+  metadata:
+    name: telemeter
+- kind: Namespace
+  apiVersion: v1
+  metadata:
+    name: openshift-priv
+
+- kind: ServiceAccount
+  apiVersion: v1
+  metadata:
+    name: cci-jenkins
+    namespace: qe
+
+- kind: ServiceAccount
+  apiVersion: v1
+  metadata:
+    name: flexy-containerized-ci
+    namespace: qe
+
+- kind: Group
+  apiVersion: v1
+  metadata:
+    name: openshift-priv-admins
+  users:
+  - smarterclayton
+  - droslean
+  - petr-muller
+  - stevekuznetsov
+  - jupierce
+
+- kind: Group
+  apiVersion: v1
+  metadata:
+    name: ci-admins
+  users:
+  - smarterclayton
+  - danmcp
+  - deads2k
+  - stevekuznetsov
+  - jwforres
+  - bbguimaraes
+  - droslean
+  - petr-muller
+  - coverprice
+  - derekwaynecarr
+  - sosiouxme
+  - tbielawa
+  - vikaslaad
+  - bparees
+  - mfojtik
+  - hongkailiu
+  - AlexNPavel
+  - jupierce
+  - bradmwilliams
+  - alvaroaleman
+- kind: Group
+  apiVersion: v1
+  metadata:
+    name: release-admins
+  users:
+  - smarterclayton
+  - jwforres
+  - derekwaynecarr
+  - eparis
+  - crawford
+- kind: Group
+  apiVersion: v1
+  metadata:
+    name: patomic-ci-dev
+  users:
+  - ajeddeloh
+  - arithx
+  - ashcrow
+  - bgilbert
+  - cgwalters
+  - dm0-
+  - dustymabe
+  - jlebon
+  - peterbaouoft
+  - smarterclayton
+- kind: Group
+  apiVersion: v1
+  metadata:
+    name: qe-admins
+  users:
+  - akostadinov
+
+- kind: ClusterRoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: ci-admins-sudoers
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: ci-admins
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: sudoer
+- kind: ClusterRoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: ci-admins-to-cluster-reader
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: ci-admins
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: cluster-reader
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: ci-admins-to-monitoring-admins
+    namespace: prow-monitoring
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: ci-admins
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: admin
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: ci-admins-to-monitoring-stage-admins
+    namespace: prow-monitoring-stage
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: ci-admins
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: admin
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: openshift-priv-admins-to-openshift-priv-ns
+    namespace: openshift-priv
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: openshift-priv-admins
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: admin
+
+- kind: ClusterRole
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: ci-image-stream-view
+  rules:
+  - apiGroups: ["image.openshift.io"]
+    resources: ["imagestreams", "imagestreamtags", "imagestreamimages"]
+    verbs: ["get", "list"]
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: anonymous-users-to-get-images
+    namespace: openshift
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:unauthenticated
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: ci-image-stream-view
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: all-users-to-get-ci-images
+    namespace: ci
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:unauthenticated
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:authenticated
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: ci-image-stream-view
+
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: authenticated-users-to-view
+    namespace: origin-web-console
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:authenticated
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: view
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: image-puller
+    namespace: ci
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:unauthenticated
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:authenticated
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: system:image-puller
+
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: internal-image-puller
+    namespace: rhcos
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:authenticated
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: system:image-puller
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: internal-ci-admin-view
+    namespace: rhcos
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:authenticated
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: ci-image-stream-view
+
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: admin
+    namespace: ci
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: ci-admins
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: admin
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: edit
+    namespace: ocp
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: release-admins
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: edit
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: edit
+    namespace: ocp-s390x
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: release-admins
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: edit
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: edit
+    namespace: ocp-ppc64le
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: release-admins
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: edit
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: admin
+    namespace: ci-stg
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: ci-admins
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: admin
+
+- kind: Group
+  apiVersion: v1
+  metadata:
+    name: ci-monitoring-admins
+  users:
+  - smarterclayton
+  - brancz
+  - s-urbaniak
+  - squat
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: admin
+    namespace: openshift-monitoring
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: ci-monitoring-admins
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: admin
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: admin
+    namespace: telemeter
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: ci-monitoring-admins
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: admin
+
+- kind: Namespace
+  apiVersion: v1
+  metadata:
+    name: kiegroup
+- kind: Group
+  apiVersion: v1
+  metadata:
+    name: kie-cloud-dev
+  users:
+  - ruromero
+  - tchughesiv
+  - bmozaffa
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: admin
+    namespace: kiegroup
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: kie-cloud-dev
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: admin
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: image-puller
+    namespace: kiegroup
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:unauthenticated
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:authenticated
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: system:image-puller
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: admin
+    namespace: qe
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: qe-admins
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: admin
+
+- kind: Namespace
+  apiVersion: v1
+  metadata:
+    name: fabric8-services
+- kind: Group
+  apiVersion: v1
+  metadata:
+    name: toolchain-dev
+  users:
+  - sbose78
+  - alexeykazakov
+  - MatousJobanek
+  - dipak-pawar
+  - xcoulon
+  - sbryzak
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: admin
+    namespace: fabric8-services
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: toolchain-dev
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: admin
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: image-puller
+    namespace: fabric8-services
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:unauthenticated
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:authenticated
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: system:image-puller
+
+- kind: Namespace
+  apiVersion: v1
+  metadata:
+    name: hive-integration-access
+    annotations:
+      purpose: "Allows Hive integration environment access to latest build artifacts."
+- kind: Group
+  apiVersion: v1
+  metadata:
+    name: hive-integration-access
+  users:
+  - dgoodwin
+  - jeremyeder
+  - ethernetdan
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: admin
+    namespace: hive-integration-access
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: hive-integration-access
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: admin
+- kind: ServiceAccount
+  apiVersion: v1
+  metadata:
+    name: registry-access
+    namespace: hive-integration-access
+
+- kind: Namespace
+  apiVersion: v1
+  metadata:
+    name: osde2e
+- kind: Group
+  apiVersion: v1
+  metadata:
+    name: osde2e
+  users:
+  - jeremyeder
+  - jeefy
+  - meowfaceman
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: admin
+    namespace: osde2e
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: osde2e
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: admin
+- kind: ServiceAccount
+  apiVersion: v1
+  metadata:
+    name: nightly-puller
+    namespace: osde2e
+
+- kind: Group
+  apiVersion: v1
+  metadata:
+    name: ci-monitoring-viewers
+  users:
+  - abhinavdahiya
+  - adambkaplan
+  - akrzos
+  - aravindhp
+  - brancz
+  - cgwalters
+  - chancez
+  - childsb
+  - cooktheryan
+  - coverprice
+  - crawford
+  - derekwaynecarr
+  - dgoodwin
+  - dustymabe
+  - ecordell
+  - enxebre
+  - eparis
+  - ericavonb
+  - hexfusion
+  - jboyd01
+  - jcantrill
+  - jim-minter
+  - joelanford
+  - mfojtik
+  - mrunalp
+  - pmorie
+  - runcom
+  - sdodson
+  - shawn-hurley
+  - sjenning
+  - soltysh
+  - spadgett
+  - squeed
+  - stevekuznetsov
+  - sudhaponnaganti
+  - tbielawa
+  - TimMoran
+- kind: ClusterRoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: ci-monitoring-view
+    namespace: default
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: ci-monitoring-viewers
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: cluster-monitoring-view
+
+- kind: Group
+  apiVersion: v1
+  metadata:
+    name: ci-registry-viewers
+  users:
+  - adambkaplan
+  - dmage
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: ci-registry-view
+    namespace: default
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: ci-registry-viewers
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: registry-viewer
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: monitor
+    namespace: default
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: ci-registry-viewers
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: registry-monitoring
+
+- kind: Namespace
+  apiVersion: v1
+  metadata:
+    name: codeready-toolchain
+- kind: Group
+  apiVersion: v1
+  metadata:
+    name: codeready-toolchain-dev
+  users:
+  - sbose78
+  - alexeykazakov
+  - MatousJobanek
+  - dipak-pawar
+  - xcoulon
+  - sbryzak
+  - michaelkleinhenz
+  - nurali-techie
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: admin
+    namespace: codeready-toolchain
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: codeready-toolchain-dev
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: admin
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: image-puller
+    namespace: codeready-toolchain
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:unauthenticated
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:authenticated
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: system:image-puller
+
+- kind: Namespace
+  apiVersion: v1
+  metadata:
+    name: integr8ly
+- kind: Group
+  apiVersion: v1
+  metadata:
+    name: integr8ly-dev
+  users:
+  - mikenairn
+  - pmccarthy
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: admin
+    namespace: integr8ly
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: integr8ly-dev
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: admin
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: image-puller
+    namespace: integr8ly
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:unauthenticated
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:authenticated
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: system:image-puller
+
+- kind: Namespace
+  apiVersion: v1
+  metadata:
+    name: prow-monitoring-stage
+- kind: Group
+  apiVersion: v1
+  metadata:
+    name: prow-monitoring-stage-dev
+  users:
+  - meowfaceman
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: admin
+    namespace: prow-monitoring-stage
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: prow-monitoring-stage-dev
+  - kind: Group
+    name: ci-admins
+    apiGroup: rbac.authorization.k8s.io
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: admin
+
+- kind: ClusterRole
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: ci-admins-secret
+  rules:
+    - apiGroups:
+        - ""
+      resources:
+        - secrets
+      verbs:
+        - get
+        - create
+        - update
+        - patch
+- kind: ClusterRoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: ci-admins-secret
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: ci-admins
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: ci-admins-secret
+
+- kind: Namespace
+  apiVersion: v1
+  metadata:
+    name: hypershift-toolkit
+- kind: Group
+  apiVersion: v1
+  metadata:
+    name: hypershift-admin
+  users:
+  - csrwng
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: admin
+    namespace: hypershift-toolkit
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: hypershift-admin
+  - kind: Group
+    name: ci-admins
+    apiGroup: rbac.authorization.k8s.io
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: admin
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: image-puller
+    namespace: hypershift-toolkit
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:unauthenticated
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:authenticated
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: system:image-puller
+
+- kind: Namespace
+  apiVersion: v1
+  metadata:
+    name: open-cluster-management
+    annotations:
+      purpose: "RedHat Advanced Cluster Management Build Artifacts"
+- kind: Group
+  apiVersion: v1
+  metadata:
+    name: ocm-admins
+  users:
+  - ray-harris
+  - arewm
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: admin
+    namespace: open-cluster-management
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: ocm-admins
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: admin
+- kind: Role
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: image-tagger
+    namespace: open-cluster-management
+  rules:
+  - apiGroups:
+    - ""
+    - image.openshift.io
+    attributeRestrictions: null
+    resources:
+    - imagestreamtags
+    - imagestreams
+    verbs:
+    - update
+    - patch
+    - get
+    - create
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: ocm-image-tagger
+    namespace: open-cluster-management
+  roleRef:
+    kind: Role
+    name: image-tagger
+    namespace: open-cluster-management
+  subjects:
+  - kind: ServiceAccount
+    name: ci-operator
+    namespace: ci
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: image-puller
+    namespace: open-cluster-management
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:unauthenticated
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:authenticated
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: system:image-puller
