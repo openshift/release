@@ -23,7 +23,7 @@ mkdir -p ~/.ssh
 cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/kube_aws_rsa || true
 export KUBE_SSH_USER=core
 
-test_report_dir="${ARTIFACT_DIR}"
+test_report_dir="${ARTIFACTS:-/tmp/artifacts}"
 mkdir -p "${test_report_dir}"
 
 kube-e2e-tests \
