@@ -20,6 +20,7 @@ cat > packet-teardown.yaml <<-EOF
     - slackhook_path: "{{ lookup('env', 'CLUSTER_PROFILE_DIR') }}"
   vars_files:
     - "{{ lookup('env', 'CLUSTER_PROFILE_DIR') }}/.packet-kni-vars"
+    - "{{ lookup('env', 'SHARED_DIR') }}/packet_hostname"
   tasks:
 
   - name: check cluster type
@@ -54,4 +55,4 @@ cat > packet-teardown.yaml <<-EOF
         msg: "Packet teardown failed."
 EOF
 
-ansible-playbook packet-teardown.yaml -e "packet_hostname=ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}"
+ansible-playbook packet-teardown.yaml
