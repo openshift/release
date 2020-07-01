@@ -676,6 +676,30 @@ presubmits:
     branches:
     - master
     cluster: api.ci
+    context: ci/prow/prow-priv-release-controllers-valid
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-prow-priv-release-controllers-valid
+    rerun_command: /test prow-priv-release-controllers-valid
+    spec:
+      containers:
+      - args:
+        - ./
+        command:
+        - hack/validate-priv-release-controller-config.py
+        image: registry.svc.ci.openshift.org/ci/python-validation
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )prow-priv-release-controllers-valid,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: api.ci
     context: ci/prow/services-dry
     decorate: true
     labels:
