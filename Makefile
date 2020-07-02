@@ -86,11 +86,7 @@ postsubmit-update: origin-release cincinnati prow-release-controller-definitions
 all: roles prow projects
 .PHONY: all
 
-cluster-roles:
-	$(MAKE) apply WHAT=cluster/ci/config/roles.yaml
-.PHONY: cluster-roles
-
-roles: cluster-operator-roles cluster-roles
+roles: cluster-operator-roles
 .PHONY: roles
 
 prow: prow-ci-ns prow-ci-stg-ns
@@ -118,7 +114,6 @@ openshift-ns:
 prow-jobs: prow-artifacts
 	$(MAKE) apply WHAT=projects/prometheus/test/build.yaml
 	$(MAKE) apply WHAT=ci-operator/templates/os.yaml
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/ci-operator/roles.yaml
 .PHONY: prow-jobs
 
 prow-artifacts:
