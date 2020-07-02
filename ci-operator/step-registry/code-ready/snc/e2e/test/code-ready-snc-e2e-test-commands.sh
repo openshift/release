@@ -51,6 +51,7 @@ function run-tests() {
 
   # Run createdisk script
   export OPENSHIFT_VERSION=4.x.ci
+  export SNC_VALIDATE_CERT=false
   ./createdisk.sh crc-tmp-install-data
   popd
 }
