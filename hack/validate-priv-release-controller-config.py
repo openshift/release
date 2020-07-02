@@ -12,8 +12,8 @@ import yaml
 # The purpose of this validation is to ensure that the private release controller configurations are kept
 # up to date with the configuration of public release controllers.
 # - If the public release controller calls out a verification prowJob X, the corresponding
-#   core-services/release-controller/_releases/priv config must call out a prowJob named priv-X.
-# - If X has a CI operator configuration in the release periodics, priv-X must also be defined in the
+#   core-services/release-controller/_releases/priv config must call out a prowJob named X-priv.
+# - If X has a CI operator configuration in the release periodics, X-priv must also be defined in the
 #   same file and:
 #   - have "hidden: true"
 #   - have "cron: @yearly"
@@ -76,23 +76,23 @@ def run(git_clone_dir):
     pub_required_prowjobs, pub_optional_prowjobs = extract_prowjob_data(path_rc_configs)
 
     for pj_name in itertools.chain(priv_required_prowjobs.keys(), priv_optional_prowjobs):
-        if not pj_name.startswith('priv-'):
-            raise IOError('Prowjob in private release controller configuration is not prefixed with "priv-"')
+        if not pj_name.endswith('-priv'):
+            raise IOError(f'Prowjob ({pj_name}) in private release controller configuration is not suffixed with "-priv"')
 
     for pj_name, _ in pub_required_prowjobs.items():
-        expected_priv_name = f'priv-{pj_name}'
+        expected_priv_name = f'{pj_name}-priv'
         if expected_priv_name not in priv_required_prowjobs:
             raise IOError(f'A public release controller prowjob {pj_name} has no private analog {expected_priv_name} in {str(path_priv_rc_configs)}')
 
     for pj_name, _ in pub_optional_prowjobs.items():
-        expected_priv_name = f'priv-{pj_name}'
+        expected_priv_name = f'{pj_name}-priv'
         if expected_priv_name not in priv_optional_prowjobs:
             raise IOError(f'An optional public release controller prowjob {pj_name} has no private analog {expected_priv_name} in {str(path_priv_rc_configs)}')
 
     defined_prowjob_names = set()
 
     # Now look through the release prowjob definitions. Ensure:
-    # - Every priv- job has "hidden: true"
+    # - Every -priv job has "hidden: true"
     # - If a priv job has a corresponding public job, make sure the prowjob specs match.
     for filepath in itertools.chain(glob.glob(f'{str(path_release_jobs)}/*.yaml'), glob.glob('ci-operator/jobs/openshift/release/*.yml')):
         with open(filepath, mode='r', encoding='utf-8') as f:
@@ -113,7 +113,7 @@ def run(git_clone_dir):
                         raise IOError(f'Prowjob name {job_name} is duplicated in {filepath}')
                     defined_prowjob_names.add(job_name)
                     defined_prowjob_specs[job_name] = job_def['spec']
-                    if job_name.startswith('priv-'):
+                    if job_name.endswith('-priv'):
                         if 'cron' not in job_def or job_def['cron'] != '@yearly':
                             raise IOError('Private release jobs {job_name} must have "cron: \'@yearly\'"')
                         if 'hidden' not in job_def or not job_def['hidden']:
@@ -122,8 +122,8 @@ def run(git_clone_dir):
             # Find all priv jobs and verify they match their corresponding pub job (^^ logic assumes these are
             # defined within the same file.
             for job_name, job_spec in defined_prowjob_specs.items():
-                if job_name.startswith('priv-'):
-                    pub_job_name = job_name[5:]  # strip priv- prefix
+                if job_name.endswith('-priv'):
+                    pub_job_name = job_name[5:]  # strip -priv suffix
                     # Private jobs are a superset of public release jobs. So check if the private job has
                     # a corresponding public job.
                     if pub_job_name in defined_prowjob_specs:
@@ -137,7 +137,7 @@ def run(git_clone_dir):
             raise IOError(f'Release controller configuration requires {job_name} but it is not defined in {str(path_release_jobs)}')
 
     for job_name, _ in pub_optional_prowjobs.items():
-        expected_priv_name = f'priv-{job_name}'
+        expected_priv_name = f'{job_name}-priv'
         if job_name in defined_prowjob_names and expected_priv_name not in defined_prowjob_names:
             raise IOError(f'Release controller configuration has optional {job_name} but its private variation {expected_priv_name} is not defined in {str(path_release_jobs)}')
 
