@@ -7,18 +7,6 @@ base_images:
     name: 4.3-priv
     namespace: ocp-private
     tag: must-gather
-  ocp_4.2_base:
-    name: 4.2-priv
-    namespace: ocp-private
-    tag: base
-  ocp_4.2_cli:
-    name: 4.2-priv
-    namespace: ocp-private
-    tag: cli
-  ocp_builder_golang-1.12:
-    name: builder
-    namespace: ocp
-    tag: golang-1.12
   tests-base:
     name: 4.3-priv
     namespace: ocp-private
@@ -37,9 +25,6 @@ images:
     bin:
       as:
       - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
-    ocp_4.2_base:
-      as:
-      - registry.svc.ci.openshift.org/ocp/4.2:base
   to: cli
 - dockerfile_path: images/cli/Dockerfile.rhel
   from: tests-base
@@ -47,9 +32,6 @@ images:
     bin:
       as:
       - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
-    ocp_4.2_base:
-      as:
-      - registry.svc.ci.openshift.org/ocp/4.2:base
   to: tests
 - dockerfile_path: images/cli/Dockerfile.rhel
   from: must-gather-base
@@ -57,36 +39,18 @@ images:
     bin:
       as:
       - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
-    ocp_4.2_base:
-      as:
-      - registry.svc.ci.openshift.org/ocp/4.2:base
   to: must-gather
 - context_dir: images/deployer/
   dockerfile_path: Dockerfile.rhel
   from: cli
-  inputs:
-    ocp_4.2_cli:
-      as:
-      - registry.svc.ci.openshift.org/ocp/4.2:cli
   to: deployer
 - context_dir: .
   dockerfile_path: images/cli-artifacts/Dockerfile.rhel
   from: cli
-  inputs:
-    ocp_4.2_cli:
-      as:
-      - registry.svc.ci.openshift.org/ocp/4.2:cli
-    ocp_builder_golang-1.12:
-      as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
   to: cli-artifacts
 - context_dir: images/recycler/
   dockerfile_path: Dockerfile.rhel
   from: cli
-  inputs:
-    ocp_4.2_cli:
-      as:
-      - registry.svc.ci.openshift.org/ocp/4.2:cli
   to: recycler
 promotion:
   additional_images:

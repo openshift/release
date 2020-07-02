@@ -7,14 +7,6 @@ base_images:
     name: 4.5-priv
     namespace: ocp-private
     tag: elasticsearch-operator-src
-  ocp_4.5_elasticsearch-operator-src:
-    name: 4.5-priv
-    namespace: ocp-private
-    tag: elasticsearch-operator-src
-  openshift_release_golang-1.12:
-    name: release
-    namespace: openshift
-    tag: golang-1.12
 build_root:
   image_stream_tag:
     name: release
@@ -23,24 +15,12 @@ build_root:
 canonical_go_repository: github.com/openshift/cluster-logging-operator
 images:
 - from: base
-  inputs:
-    openshift_release_golang-1.12:
-      as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.12
   to: cluster-logging-operator
 - dockerfile_path: olm_deploy/operatorregistry/Dockerfile
   from: base
-  inputs:
-    openshift_release_golang-1.12:
-      as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.12
   to: cluster-logging-operator-registry
 - dockerfile_path: Dockerfile.e2e
   from: elasticsearch-operator-src
-  inputs:
-    ocp_4.5_elasticsearch-operator-src:
-      as:
-      - registry.svc.ci.openshift.org/ocp/4.5:elasticsearch-operator-src
   to: cluster-logging-operator-e2e
 promotion:
   name: 4.5-priv
