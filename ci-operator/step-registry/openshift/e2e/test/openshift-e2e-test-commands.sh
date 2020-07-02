@@ -14,6 +14,12 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 mkdir -p "${HOME}"
 
+# if the cluster profile included an insights secret, install it to the cluster to
+# report support data from the support-operator
+if [[ -f "${CLUSTER_PROFILE_DIR}/insights-live.yaml" ]]; then
+    oc create -f "${CLUSTER_PROFILE_DIR}/insights-live.yaml" || true
+fi
+
 # set up cloud-provider-specific env vars
 KUBE_SSH_BASTION="$( oc --insecure-skip-tls-verify get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
 KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
