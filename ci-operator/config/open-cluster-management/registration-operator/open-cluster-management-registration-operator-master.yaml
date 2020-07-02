@@ -85,11 +85,25 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    - as: e2e-test
+    - as: registration-e2e-test
       commands: |
         export IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:registration}
         /e2e.test -test.v -ginkgo.v
       from: registration
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: operator-e2e-test
+      commands: |
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar xvzf - oc
+        KUBECTL=oc
+        OLM_NAMESPACE=openshift-operator-lifecycle-manager
+        IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:registration-operator}
+        PATH=.:$PATH
+        export KUBECTL OLM_NAMESPACE PATH IMAGE_NAME
+        make deploy-spoke-operator run-e2e
+      from: src
       resources:
         requests:
           cpu: 100m
