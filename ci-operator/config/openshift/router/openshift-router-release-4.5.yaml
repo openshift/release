@@ -3,18 +3,6 @@ base_images:
     name: "4.5"
     namespace: ocp
     tag: base
-  openshift_origin-v4.0_base:
-    name: origin-v4.0
-    namespace: openshift
-    tag: base
-  openshift_origin-v4.0_base-router:
-    name: origin-v4.0
-    namespace: openshift
-    tag: base-router
-  openshift_release_golang-1.13:
-    name: release
-    namespace: openshift
-    tag: golang-1.13
 build_root:
   image_stream_tag:
     name: release
@@ -23,28 +11,13 @@ build_root:
 images:
 - dockerfile_path: images/router/base/Dockerfile
   from: base
-  inputs:
-    openshift_origin-v4.0_base:
-      as:
-      - registry.svc.ci.openshift.org/openshift/origin-v4.0:base
-    openshift_release_golang-1.13:
-      as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.13
   optional: true
   to: base-router
 - dockerfile_path: images/router/haproxy/Dockerfile
   from: base-router
-  inputs:
-    openshift_origin-v4.0_base-router:
-      as:
-      - registry.svc.ci.openshift.org/openshift/origin-v4.0:base-router
   to: haproxy-router
 - dockerfile_path: images/router/f5/Dockerfile
   from: base-router
-  inputs:
-    openshift_origin-v4.0_base-router:
-      as:
-      - registry.svc.ci.openshift.org/openshift/origin-v4.0:base-router
   to: f5-router
 promotion:
   name: "4.5"
