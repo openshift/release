@@ -553,13 +553,13 @@ periodics:
         curl -L https://github.com/mikefarah/yq/releases/download/2.4.0/yq_linux_amd64 2>/dev/null >/tmp/bin/yq
         chmod ug+x $HOME/bin/yq
 
-        # create namespace and set up basic environment
         namespace="ci-op-$( echo "${JOB_NAME}-${BUILD_ID}" | md5sum -t | cut -c 1-8 )"
         echo
         echo "--- Building machine-os-content for ${build_id} in namespace ${namespace}"
         oc registry login >/dev/null
-        oc new-project ${namespace} >/dev/null
-        oc policy add-role-to-group system:image-puller -n ${namespace} system:unauthenticated system:authenticated >/dev/null
+
+        # run build to do the image imports
+        ci-operator $@ --target=[images] --namespace=${namespace}
 
         function build {
           oc -n ${namespace} create -f $1 >/dev/null
@@ -587,7 +587,7 @@ periodics:
           output:
             to:
               kind: ImageStreamTag
-              name: machine-os-content:latest
+              name: pipeline:machine-os-content
           source:
             dockerfile: |
               FROM registry.svc.ci.openshift.org/${TAG_NS}/${BRANCH}@${origin_artifacts_id} AS artifacts
@@ -607,6 +607,7 @@ periodics:
                   sed -i 's/enabled=0/enabled=1/g' /etc/yum.repos.d/fedora-updates-testing-modular.repo && \\
                   yum-config-manager --add-repo https://mirror.openshift.com/pub/openshift-v4/dependencies/rpms/4.5-beta && \\
                   rpm-ostree db list --repo /srv/repo "${ostree_ref}" > /tmp/packages && \\
+                  dnf clean all && \\
                   dnf --setopt=releasever="\${VERSION_ID}" module enable -y cri-o:1.18 && \\
                   if ! grep -q cri-o /tmp/packages; then yumdownloader -y --setopt=releasever="\${VERSION_ID}" --archlist=x86_64 --disablerepo=* --enablerepo=updates-testing-modular --destdir=/tmp/rpms cri-o && \\
                   yumdownloader -y --setopt=releasever="\${VERSION_ID}" --archlist=x86_64 --enablerepo=* --destdir=/tmp/rpms cri-tools; fi && \\
@@ -637,9 +638,8 @@ periodics:
         build ${dir}/build.yaml machine-os-content
 
         # debug output
-        oc describe -n ${namespace} istag/machine-os-content:latest
-        oc tag ${namespace}/machine-os-content:latest origin/machine-os-content:${BRANCH}
-        oc tag origin/machine-os-content:${BRANCH} ${TAG_NS}/${BRANCH}:machine-os-content
+        oc describe -n ${namespace} istag/pipeline:machine-os-content
+        # run tests
         ci-operator $@ --target=e2e-aws --promote --namespace=${namespace}
       env:
       - name: TAG_NS
