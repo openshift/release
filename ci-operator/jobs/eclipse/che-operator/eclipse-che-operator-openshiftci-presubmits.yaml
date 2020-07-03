@@ -3,17 +3,17 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - openshiftci
     cluster: api.ci
-    context: ci/prow/eclipse-che-poc
+    context: ci/prow/e2e-operator
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-eclipse-che-operator-master-eclipse-che-poc
-    rerun_command: /test eclipse-che-poc
+    name: pull-ci-eclipse-che-operator-openshiftci-e2e-operator
+    rerun_command: /test e2e-operator
     spec:
       containers:
       - args:
@@ -21,19 +21,18 @@ presubmits:
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/eclipse-che-poc-cluster-profile
-        - --target=eclipse-che-poc
-        - --template=/usr/local/eclipse-che-poc
+        - --secret-dir=/usr/local/e2e-operator-cluster-profile
+        - --target=e2e-operator
+        - --template=/usr/local/e2e-operator
         command:
         - ci-operator
         env:
         - name: CLUSTER_TYPE
           value: aws
         - name: JOB_NAME_SAFE
-          value: eclipse-che-poc
+          value: e2e-operator
         - name: TEST_COMMAND
           value: |
-            cat /etc/os-release
             jq --version
             yq --version
         image: ci-operator:latest
@@ -46,9 +45,9 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/eclipse-che-poc-cluster-profile
+        - mountPath: /usr/local/e2e-operator-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/eclipse-che-poc
+        - mountPath: /usr/local/e2e-operator
           name: job-definition
           subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
@@ -79,4 +78,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )eclipse-che-poc,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-operator,?($|\s.*)
