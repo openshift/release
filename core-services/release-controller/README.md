@@ -37,7 +37,7 @@ Data about the release is tracked as an annotation on the release image stream t
 
 ### Initial configuration
 
-The `release-*.json` files are set as annotations on `ocp/4.X-art-latest` and `origin/4.X` image streamsy. A secret must be created in the `ci-release` namespace called `source` with a single file `config.json` that is a Docker config.json carrying the secrets required to pull sources for built images. The job that creates the payload will use this image, but the secret will not be used outside of that namespace for anything other than building the payload.
+The `release-*.json` files are set as annotations on `ocp/4.X-art-latest` and `origin/4.X` image streams. A secret must be created in the `ci-release` namespace called `source` with a single file `config.json` that is a Docker config.json carrying the secrets required to pull sources for built images. The job that creates the payload will use this image, but the secret will not be used outside of that namespace for anything other than building the payload.
 
 ### Admin actions:
 
@@ -55,7 +55,7 @@ To abort/remove a release tag:
 * `images-*.yaml` - definitions of the image streams used by the publish / build rules
 * `releases/release-*.json` - definitions of the build and publishing rules for sets of images
 * `repos/ocp-*-*.repo` - definitions where RPMs are loaded from for OCP builds
-* `rpms-*.yaml` - definitions of the services that exposed mirrored RPMs within the clutser
+* `rpms-*.yaml` - definitions of the services that exposed mirrored RPMs within the cluster
 
 ### RPM Mirrors
 
@@ -65,6 +65,6 @@ These proxies (one per core configuration) run from the `ocp` namespace and have
 
 See `rpms-ocp-*.yaml` for the definition of each proxy service, `ocp-*.repo` for each set of mirrored repos, and the root `Makefile` in the repo for the script that creates the Makefiles.
 
-In general, new RPMs should be added to the correct Brew tags at Red Hat for OCP first (since we need those to eventualyl build). Those are mirrored nightly by the SRE team to `https://mirror.openshift.com/enterprise/reposync/4.Y`.  If a set of RPMs need to be added (a separate brew tag) that is compatible with the existing RPM sets, then we would add it to the appropriate `ocp-4.Y-default.repo` (which all images can use). If the repo is incompatible with any of the RPMs in the default repos (like the OpenStack project), a new type of `ocp-4.Y-NAME.repo` has to be created (similar to `ocp-4.2-openstack.repo`) that points to the correct mirrors. Then the images that want to use that as a base have to inject the correct RPM repo (TODO: future changes will mount these automatically) and then depend on that base. For an example, see the `kuryr` ci-operator definitions.
+In general, new RPMs should be added to the correct Brew tags at Red Hat for OCP first (since we need those to eventually build). Those are mirrored nightly by the SRE team to `https://mirror.openshift.com/enterprise/reposync/4.Y`.  If a set of RPMs need to be added (a separate brew tag) that is compatible with the existing RPM sets, then we would add it to the appropriate `ocp-4.Y-default.repo` (which all images can use). If the repo is incompatible with any of the RPMs in the default repos (like the OpenStack project), a new type of `ocp-4.Y-NAME.repo` has to be created (similar to `ocp-4.2-openstack.repo`) that points to the correct mirrors. Then the images that want to use that as a base have to inject the correct RPM repo (TODO: future changes will mount these automatically) and then depend on that base. For an example, see the `kuryr` ci-operator definitions.
 
 See the OWNERS file in this directory for approvers.
