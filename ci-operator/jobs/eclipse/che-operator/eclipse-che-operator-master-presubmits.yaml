@@ -1,0 +1,84 @@
+presubmits:
+  eclipse/che-operator:
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: api.ci
+    context: ci/prow/eclipse-che-poc
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-eclipse-che-operator-master-eclipse-che-poc
+    rerun_command: /test eclipse-che-poc
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-password-file=/etc/boskos/password
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/usr/local/eclipse-che-poc-cluster-profile
+        - --target=eclipse-che-poc
+        - --template=/usr/local/eclipse-che-poc
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: JOB_NAME_SAFE
+          value: eclipse-che-poc
+        - name: TEST_COMMAND
+          value: |
+            cat /etc/os-release
+            curl -L https://github.com/mikefarah/yq/releases/download/2.4.0/yq_linux_amd64 2>/dev/null >/tmp/bin/yq
+            chmod ug+x $HOME/bin/yq
+            jq --version
+            yq --version
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/eclipse-che-poc-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/eclipse-che-poc
+          name: job-definition
+          subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-src
+        name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )eclipse-che-poc,?($|\s.*)
