@@ -172,3 +172,28 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: api.ci
+    context: ci/prow/make
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-update-keys-master-make
+    rerun_command: /test make
+    spec:
+      containers:
+      - args:
+        - -c
+        - make ci rhel && git diff --exit-code
+        command:
+        - sh
+        image: registry.svc.ci.openshift.org/ocp/4.6:cli
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 100m
+    trigger: (?m)^/test( | .* )make,?($|\s.*)
