@@ -31,6 +31,8 @@ parameters:
   value: gcp.devcluster.openshift.com
 - name: BUILD_ID
   required: false
+- name: JOB_SPEC
+  required: false
 
 objects:
 
@@ -340,7 +342,10 @@ objects:
         #!/bin/bash
         set -euo pipefail
 
-        trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/setup-success; else touch /tmp/exit; fi; exit "${rc}"' EXIT
+        trap 'rc=$?; if test "${rc}" -eq 0; \
+         then send_event_to_ovirt "Success" ; touch /tmp/setup-success; \
+          else send_event_to_ovirt "Failed" ; touch /tmp/exit; fi; \
+           exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
         # Wait untill lease is acquired
         while true; do
@@ -412,7 +417,7 @@ objects:
                 # 31 is used to trigger the instance customization (the disk size is 16 Gi)
                 sizeGB: 31
               vmType: server
-              instanceTypeID: 
+              instanceTypeID:
           replicas: 2
         controlPlane:
           hyperthreading: Enabled
@@ -428,7 +433,8 @@ objects:
                 sizeGB: 31
               vmType: server
               instanceTypeID:
-          replicas: 3
+          replicas: 3        
+
         platform:
           ovirt:
             ovirt_cluster_id: ${OVIRT_ENGINE_CLUSTER_ID}
@@ -448,6 +454,38 @@ objects:
             oc get configs.imageregistry.operator.openshift.io/cluster > /dev/null && break
           done
           oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'
+        }
+
+        function send_event_to_ovirt(){
+
+        local install_state="Installed"
+        local build_id=${BUILD_ID}
+
+        if [ "$#" -eq 1  ] ; then
+            install_state=$1
+        fi
+
+        #take the last 7 chars from the id and convert it to int
+        printf -v build_id '%d\n' $((10#${build_id: -7})) # ${build_id: -7}
+        epoch=$(date +'%s')
+        cat <<__EOF__ > /tmp/artifacts/installer/event.xml
+        <event>
+          <description>Openshift CI - cluster installation;${OCP_CLUSTER};${install_state};${JOB_SPEC} </description>
+          <severity>normal</severity>
+          <origin>openshift-ci</origin>
+          <custom_id>$((${epoch}+${build_id}))</custom_id>
+        </event>
+        __EOF__
+
+
+          curl --insecure  \
+          --request POST \
+          --header "Accept: application/xml"  \
+          --header "Content-Type: application/xml" \
+          -u "${OVIRT_ENGINE_USERNAME}:${OVIRT_ENGINE_PASSWORD}" \
+          -d @/tmp/artifacts/installer/event.xml \
+          ${OVIRT_ENGINE_URL}/events || true
+
         }
 
         #change the masters igntion , to use tempfs for etcd IOPS optimization
@@ -470,9 +508,14 @@ objects:
         export KUBECONFIG=/tmp/artifacts/installer/auth/kubeconfig
         update_image_registry &
 
+        #notify oVirt infrastucture that ocp installation started
+        #this allow us to connect running VMs to a PR number
+        send_event_to_ovirt "Started"
+
         TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create cluster --log-level=debug 2>&1 | grep --line-buffered -v password &
         wait "$!"
         install_exit_status=$?
+
         sleep 10m
         exit $install_exit_status
 
