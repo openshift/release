@@ -1,6 +1,7 @@
 kind: List
 apiVersion: v1
 items:
+  # cincinnati-ci namespace for authorized access
   - kind: Namespace
     apiVersion: v1
     metadata:
@@ -44,3 +45,59 @@ items:
     subjects:
       - kind: Group
         name: cincinnati-ci-admins
+  # cincinnati-ci-public namespace for unauthorized access
+  - kind: Namespace
+    apiVersion: v1
+    metadata:
+      name: cincinnati-ci-public
+  - kind: ServiceAccount
+    apiVersion: v1
+    metadata:
+      name: ci-image-sa
+      namespace: cincinnati-ci-public
+  - kind: RoleBinding
+    apiVersion: rbac.authorization.k8s.io/v1
+    metadata:
+      name: ci-image-sa
+      namespace: cincinnati-ci-public
+    roleRef:
+      apiGroup: rbac.authorization.k8s.io
+      kind: Role
+      name: image-builder
+    subjects:
+      - kind: ServiceAccount
+        name: ci-image-sa
+  - kind: Group
+    apiVersion: v1
+    metadata:
+      name: cincinnati-ci-admins
+    users:
+      - steveej
+      - lalatendum
+      - vrutkovs
+      - wking
+      - jottofar
+  - kind: RoleBinding
+    apiVersion: rbac.authorization.k8s.io/v1
+    metadata:
+      name: cincinnati-ci-admin-binding
+      namespace: cincinnati-ci-public
+    roleRef:
+      apiGroup: rbac.authorization.k8s.io
+      kind: Role
+      name: admin
+    subjects:
+      - kind: Group
+        name: cincinnati-ci-admins
+  - kind: RoleBinding
+    apiVersion: rbac.authorization.k8s.io/v1
+    metadata:
+      name: cincinnati-ci-public images
+      namespace: cincinnati-ci-public
+    roleRef:
+      apiGroup: rbac.authorization.k8s.io
+      kind: ClusterRole
+      name: system:image-puller
+    subjects:
+      - kind: Group
+        name: system:unauthenticated
