@@ -1,30 +1,24 @@
 postsubmits:
-  openshift-priv/images:
+  openshift/ib-sriov-cni:
   - agent: kubernetes
     branches:
-    - ^release-4\.7$
-    cluster: api.ci
+    - ^release-4\.6$
     decorate: true
     decoration_config:
       skip_cloning: true
-    hidden: true
     labels:
       ci-operator.openshift.io/is-promotion: "true"
       ci-operator.openshift.io/prowgen-controlled: "true"
     max_concurrency: 1
-    name: branch-ci-openshift-priv-images-release-4.7-images
-    path_alias: github.com/openshift/images
+    name: branch-ci-openshift-ib-sriov-cni-release-4.6-images
     spec:
       containers:
       - args:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --promote
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --target=[images]
-        - --target=base-7
-        - --target=base-8
         command:
         - ci-operator
         image: ci-operator:latest
@@ -34,9 +28,6 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -45,9 +36,6 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
           secretName: regcred
