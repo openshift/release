@@ -1,0 +1,119 @@
+base_images:
+  tools:
+    name: 4.6-priv
+    namespace: ocp-private
+    tag: tools
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+canonical_go_repository: github.com/openshift/origin
+images:
+- dockerfile_path: images/tests/Dockerfile.rhel
+  from: tools
+  inputs:
+    bin:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
+  to: tests
+promotion:
+  disabled: true
+  name: 4.6-priv
+  namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 4Gi
+  artifacts:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  bin:
+    requests:
+      cpu: "3"
+      memory: 7Gi
+  tests:
+    requests:
+      cpu: "3"
+      memory: 7Gi
+  verify:
+    requests:
+      cpu: "3"
+      memory: 8Gi
+tag_specification:
+  name: 4.6-priv
+  namespace: ocp-private
+tests:
+- artifact_dir: /tmp/artifacts
+  as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: bin
+- artifact_dir: /tmp/artifacts
+  as: verify-deps
+  commands: |
+    make verify-deps -k --warn-undefined-variables
+  container:
+    from: src
+- as: e2e-gcp
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-loki
+- as: e2e-aws-ovn
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-ovn
+- as: e2e-azure
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure
+- as: e2e-cmd
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-cmd
+- as: e2e-gcp-builds
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-builds
+- as: e2e-aws-disruptive
+  commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance/parallel
+    run-tests
+  openshift_installer:
+    cluster_profile: aws
+- as: e2e-aws-jenkins
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-jenkins
+- as: e2e-gcp-image-ecosystem
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-image-ecosystem
+- as: e2e-aws-image-registry
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-image-registry
+- as: e2e-gcp-upgrade
+  commands: TEST_SUITE=all run-upgrade-tests
+  openshift_installer:
+    cluster_profile: gcp
+    upgrade: true
+- as: e2e-aws-serial
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-serial
+- as: e2e-aws-csi
+  commands: TEST_INSTALL_CSI_DRIVERS=aws-ebs TEST_SUITE=openshift/csi run-tests
+  openshift_installer:
+    cluster_profile: aws
+- as: e2e-vsphere
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer_upi:
+    cluster_profile: vsphere
+zz_generated_metadata:
+  branch: marun-testing
+  org: openshift-priv
+  repo: origin
