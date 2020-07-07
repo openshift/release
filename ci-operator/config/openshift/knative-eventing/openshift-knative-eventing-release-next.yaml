@@ -17,6 +17,14 @@ images:
       - destination_dir: .
         source_path: /go/bin/apiserver_receive_adapter
   to: knative-eventing-apiserver-receive-adapter
+- dockerfile_path: openshift/ci-operator/knative-images/broker-cleanup/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/broker-cleanup
+  to: knative-eventing-broker-cleanup
 - dockerfile_path: openshift/ci-operator/knative-images/channel_controller/Dockerfile
   from: base
   inputs:
@@ -97,6 +105,14 @@ images:
       - destination_dir: .
         source_path: /go/bin/sendevent
   to: knative-eventing-sendevent
+- dockerfile_path: openshift/ci-operator/knative-images/sugar_controller/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/sugar_controller
+  to: knative-eventing-sugar-controller
 - dockerfile_path: openshift/ci-operator/knative-images/webhook/Dockerfile
   from: base
   inputs:
@@ -105,14 +121,14 @@ images:
       - destination_dir: .
         source_path: /go/bin/webhook
   to: knative-eventing-webhook
-- dockerfile_path: openshift/ci-operator/knative-test-images/recordevents/Dockerfile
+- dockerfile_path: openshift/ci-operator/knative-test-images/event-sender/Dockerfile
   from: base
   inputs:
     test-bin:
       paths:
       - destination_dir: .
-        source_path: /go/bin/recordevents
-  to: knative-eventing-test-recordevents
+        source_path: /go/bin/event-sender
+  to: knative-eventing-test-event-sender
 - dockerfile_path: openshift/ci-operator/knative-test-images/filterevents/Dockerfile
   from: base
   inputs:
@@ -145,14 +161,38 @@ images:
       - destination_dir: .
         source_path: /go/bin/print
   to: knative-eventing-test-print
-- dockerfile_path: openshift/ci-operator/knative-test-images/event-sender/Dockerfile
+- dockerfile_path: openshift/ci-operator/knative-test-images/recordevents/Dockerfile
   from: base
   inputs:
     test-bin:
       paths:
       - destination_dir: .
-        source_path: /go/bin/event-sender
-  to: knative-eventing-test-event-sender
+        source_path: /go/bin/recordevents
+  to: knative-eventing-test-recordevents
+- dockerfile_path: openshift/ci-operator/knative-test-images/request-sender/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/request-sender
+  to: knative-eventing-test-request-sender
+- dockerfile_path: openshift/ci-operator/knative-test-images/sequencestepper/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/sequencestepper
+  to: knative-eventing-test-sequencestepper
+- dockerfile_path: openshift/ci-operator/knative-test-images/transformevents/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/transformevents
+  to: knative-eventing-test-transformevents
 - dockerfile_path: openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
   from: base
   inputs:
@@ -177,31 +217,21 @@ images:
       - destination_dir: .
         source_path: /go/bin/wathola-sender
   to: knative-eventing-test-wathola-sender
-- dockerfile_path: openshift/ci-operator/knative-test-images/sequencestepper/Dockerfile
-  from: base
-  inputs:
-    test-bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/bin/sequencestepper
-  to: knative-eventing-test-sequencestepper
-- dockerfile_path: openshift/ci-operator/knative-test-images/transformevents/Dockerfile
-  from: base
-  inputs:
-    test-bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/bin/transformevents
-  to: knative-eventing-test-transformevents
 promotion:
+  additional_images:
+    knative-eventing-src: src
   name: knative-nightly
   namespace: openshift
 resources:
   '*':
+    limits:
+      memory: 6Gi
     requests:
       cpu: "4"
       memory: 6Gi
   bin:
+    limits:
+      memory: 6Gi
     requests:
       cpu: "4"
       memory: 6Gi
