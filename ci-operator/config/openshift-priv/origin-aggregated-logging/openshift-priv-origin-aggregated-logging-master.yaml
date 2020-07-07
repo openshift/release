@@ -3,50 +3,54 @@ base_images:
     name: 4.6-priv
     namespace: ocp-private
     tag: base
-  base-npm:
-    name: release
-    namespace: openshift
-    tag: nodejs-8
   base_centos:
     name: centos
     namespace: openshift
     tag: "7"
-  nodejs-10:
-    name: nodejs-10-rhel7
-    namespace: openshift
-    tag: latest
-  ruby-25:
-    name: release
-    namespace: openshift
-    tag: ruby-25
+  ubi7:
+    name: ubi
+    namespace: ocp
+    tag: "7"
+  ubi7-nodejs10:
+    name: ubi-nodejs-10
+    namespace: ocp
+    tag: "7"
+  ubi7-python36:
+    name: ubi-python-36
+    namespace: ocp
+    tag: "7"
+  ubi7-ruby25:
+    name: ubi-ruby-25
+    namespace: ocp
+    tag: "7"
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.10
+    tag: golang-1.13
 canonical_go_repository: github.com/openshift/origin-aggregated-logging
 images:
 - dockerfile_path: openshift/ci-operator/build-image/Dockerfile
   from: src
   to: origin-aggregated-logging-tests
 - dockerfile_path: test/unit/Dockerfile
-  from: ruby-25
+  from: ubi7-ruby25
   to: logging-test-unit
 - context_dir: fluentd/
-  dockerfile_path: Dockerfile.centos7
-  from: ruby-25
+  dockerfile_path: Dockerfile
+  from: ubi7-ruby25
   to: logging-fluentd
 - context_dir: elasticsearch/
-  dockerfile_path: Dockerfile.centos7
-  from: base_centos
+  dockerfile_path: Dockerfile.origin
+  from: ubi7
   to: logging-elasticsearch6
 - context_dir: kibana/
-  dockerfile_path: Dockerfile.centos7
-  from: nodejs-10
+  dockerfile_path: Dockerfile
+  from: ubi7-nodejs10
   to: logging-kibana6
 - context_dir: curator/
-  dockerfile_path: Dockerfile.centos7
-  from: base_centos
+  dockerfile_path: Dockerfile
+  from: ubi7-python36
   to: logging-curator5
 - context_dir: eventrouter/
   dockerfile_path: Dockerfile.centos7
