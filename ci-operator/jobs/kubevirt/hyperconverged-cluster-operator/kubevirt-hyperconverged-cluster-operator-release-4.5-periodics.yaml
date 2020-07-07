@@ -59,8 +59,14 @@ periodics:
           /deploy.sh
 
           tests_filter="(Slirp Networking)|(with CPU spec)|(with TX offload disabled)|(with cni flannel and ptp plugin interface)|(with ovs-cni plugin)|(test_id:1752)|(SRIOV)|(with EFI)|(Operator)|(GPU)|(DataVolume Integration)|(test_id:3468)|(test_id:3466)|(test_id:1015)|(rfe_id:393)"
+          focus_tests_filter="(rfe_id:1177)|(rfe_id:273)|(rfe_id:151)"
           operator_image="$(oc get pod -n openshift-cnv -l kubevirt.io=virt-operator --no-headers -o=jsonpath='{.items[0].spec.containers[0].image}')"
-          test_pod_override="$(sed -e "s|@OPERATOR_IMAGE_URL@|${operator_image}|g" -e "s/@GINKGO_TESTS_TO_SKIP@/${tests_filter}/g" -e "s/@NAMESPACE@/${TARGET_NAMESPACE}/g" /kubevirt-tests-pod-spec-override.json.in)"
+          test_pod_override="$(
+            sed -e "s|@OPERATOR_IMAGE_URL@|${operator_image}|g" \
+              -e "s/@GINKGO_TESTS_TO_SKIP@/${tests_filter}/g" \
+              -e "s/@GINKGO_TESTS_TO_FOCUS@/${focus_tests_filter}/g" \
+              -e "s/@NAMESPACE@/${TARGET_NAMESPACE}/g" /kubevirt-tests-pod-spec-override.json.in
+          )"
           oc -n openshift-cnv run -i tests-runner --image=dummy --overrides="$test_pod_override" --restart=Never
           echo "Test is finished"
 
