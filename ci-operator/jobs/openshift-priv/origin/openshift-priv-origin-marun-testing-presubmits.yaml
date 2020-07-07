@@ -1,11 +1,10 @@
 presubmits:
-  openshift-priv/installer:
+  openshift-priv/origin:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.7
-    cluster: api.ci
-    context: ci/prow/e2e-aws
+    - marun-testing
+    context: ci/prow/e2e-aws-csi
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -13,9 +12,9 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-installer-release-4.7-e2e-aws
-    path_alias: github.com/openshift/installer
-    rerun_command: /test e2e-aws
+    name: pull-ci-openshift-priv-origin-marun-testing-e2e-aws-csi
+    path_alias: github.com/openshift/origin
+    rerun_command: /test e2e-aws-csi
     spec:
       containers:
       - args:
@@ -24,10 +23,18 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/e2e-aws-cluster-profile
-        - --target=e2e-aws
+        - --secret-dir=/usr/local/e2e-aws-csi-cluster-profile
+        - --target=e2e-aws-csi
+        - --template=/usr/local/e2e-aws-csi
         command:
         - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: JOB_NAME_SAFE
+          value: e2e-aws-csi
+        - name: TEST_COMMAND
+          value: TEST_INSTALL_CSI_DRIVERS=aws-ebs TEST_SUITE=openshift/csi run-tests
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -38,11 +45,14 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-cluster-profile
+        - mountPath: /usr/local/e2e-aws-csi-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
+        - mountPath: /usr/local/e2e-aws-csi
+          name: job-definition
+          subPath: cluster-launch-installer-e2e.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -65,18 +75,20 @@ presubmits:
       - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
+      - configMap:
+          name: prow-job-cluster-launch-installer-e2e
+        name: job-definition
       - name: pull-secret
         secret:
           secretName: regcred
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-csi,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.7
-    cluster: api.ci
+    - marun-testing
     context: ci/prow/e2e-aws-disruptive
     decorate: true
     decoration_config:
@@ -85,8 +97,8 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-installer-release-4.7-e2e-aws-disruptive
-    path_alias: github.com/openshift/installer
+    name: pull-ci-openshift-priv-origin-marun-testing-e2e-aws-disruptive
+    path_alias: github.com/openshift/origin
     rerun_command: /test e2e-aws-disruptive
     spec:
       containers:
@@ -162,9 +174,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.7
-    cluster: api.ci
-    context: ci/prow/e2e-aws-scaleup-rhel7
+    - marun-testing
+    context: ci/prow/e2e-aws-image-registry
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -172,9 +183,9 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-installer-release-4.7-e2e-aws-scaleup-rhel7
-    path_alias: github.com/openshift/installer
-    rerun_command: /test e2e-aws-scaleup-rhel7
+    name: pull-ci-openshift-priv-origin-marun-testing-e2e-aws-image-registry
+    path_alias: github.com/openshift/origin
+    rerun_command: /test e2e-aws-image-registry
     spec:
       containers:
       - args:
@@ -183,100 +194,8 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/e2e-aws-scaleup-rhel7-cluster-profile
-        - --target=e2e-aws-scaleup-rhel7
-        - --template=/usr/local/e2e-aws-scaleup-rhel7
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: e2e-aws-scaleup-rhel7
-        - name: RPM_REPO_CRIO_DIR
-          value: 4.7-priv-rhel-7
-        - name: RPM_REPO_OPENSHIFT_ORIGIN
-          value: https://rpms.svc.ci.openshift.org/openshift-origin-v4.7-priv/
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance/parallel run-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-aws-scaleup-rhel7-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
-        - mountPath: /usr/local/e2e-aws-scaleup-rhel7
-          name: job-definition
-          subPath: cluster-scaleup-e2e-40.yaml
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: password
-            path: password
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-          - configMap:
-              name: cluster-profile-aws-centos-40
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - configMap:
-          name: prow-job-cluster-scaleup-e2e-40
-        name: job-definition
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-scaleup-rhel7,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.7
-    cluster: api.ci
-    context: ci/prow/e2e-aws-shared-vpc
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    hidden: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-installer-release-4.7-e2e-aws-shared-vpc
-    path_alias: github.com/openshift/installer
-    rerun_command: /test e2e-aws-shared-vpc
-    spec:
-      containers:
-      - args:
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --report-password-file=/etc/report/password.txt
-        - --report-username=ci
-        - --secret-dir=/usr/local/e2e-aws-shared-vpc-cluster-profile
-        - --target=e2e-aws-shared-vpc
+        - --secret-dir=/usr/local/e2e-aws-image-registry-cluster-profile
+        - --target=e2e-aws-image-registry
         command:
         - ci-operator
         image: ci-operator:latest
@@ -289,7 +208,7 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-shared-vpc-cluster-profile
+        - mountPath: /usr/local/e2e-aws-image-registry-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
@@ -322,13 +241,12 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-shared-vpc,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-image-registry,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.7
-    cluster: api.ci
-    context: ci/prow/e2e-aws-upgrade
+    - marun-testing
+    context: ci/prow/e2e-aws-jenkins
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -336,9 +254,9 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-installer-release-4.7-e2e-aws-upgrade
-    path_alias: github.com/openshift/installer
-    rerun_command: /test e2e-aws-upgrade
+    name: pull-ci-openshift-priv-origin-marun-testing-e2e-aws-jenkins
+    path_alias: github.com/openshift/origin
+    rerun_command: /test e2e-aws-jenkins
     spec:
       containers:
       - args:
@@ -347,8 +265,8 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/e2e-aws-upgrade-cluster-profile
-        - --target=e2e-aws-upgrade
+        - --secret-dir=/usr/local/e2e-aws-jenkins-cluster-profile
+        - --target=e2e-aws-jenkins
         command:
         - ci-operator
         image: ci-operator:latest
@@ -361,7 +279,7 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
+        - mountPath: /usr/local/e2e-aws-jenkins-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
@@ -394,13 +312,12 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-upgrade,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-jenkins,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.7
-    cluster: api.ci
-    context: ci/prow/e2e-aws-upi
+    - marun-testing
+    context: ci/prow/e2e-aws-ovn
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -408,9 +325,9 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-installer-release-4.7-e2e-aws-upi
-    path_alias: github.com/openshift/installer
-    rerun_command: /test e2e-aws-upi
+    name: pull-ci-openshift-priv-origin-marun-testing-e2e-aws-ovn
+    path_alias: github.com/openshift/origin
+    rerun_command: /test e2e-aws-ovn
     spec:
       containers:
       - args:
@@ -419,18 +336,10 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/e2e-aws-upi-cluster-profile
-        - --target=e2e-aws-upi
-        - --template=/usr/local/e2e-aws-upi
+        - --secret-dir=/usr/local/e2e-aws-ovn-cluster-profile
+        - --target=e2e-aws-ovn
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: e2e-aws-upi
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance/parallel run-tests
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -441,14 +350,11 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-upi-cluster-profile
+        - mountPath: /usr/local/e2e-aws-ovn-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-upi
-          name: job-definition
-          subPath: cluster-launch-installer-upi-e2e.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -471,21 +377,88 @@ presubmits:
       - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - configMap:
-          name: prow-job-cluster-launch-installer-upi-e2e
-        name: job-definition
       - name: pull-secret
         secret:
           secretName: regcred
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-upi,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-ovn,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.7
-    cluster: api.ci
+    - marun-testing
+    context: ci/prow/e2e-aws-serial
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    hidden: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-origin-marun-testing-e2e-aws-serial
+    path_alias: github.com/openshift/origin
+    rerun_command: /test e2e-aws-serial
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-password-file=/etc/boskos/password
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/usr/local/e2e-aws-serial-cluster-profile
+        - --target=e2e-aws-serial
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-aws-serial-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-serial,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - marun-testing
     context: ci/prow/e2e-azure
     decorate: true
     decoration_config:
@@ -494,8 +467,8 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-installer-release-4.7-e2e-azure
-    path_alias: github.com/openshift/installer
+    name: pull-ci-openshift-priv-origin-marun-testing-e2e-azure
+    path_alias: github.com/openshift/origin
     rerun_command: /test e2e-azure
     spec:
       containers:
@@ -556,9 +529,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.7
-    cluster: api.ci
-    context: ci/prow/e2e-azure-shared-vpc
+    - marun-testing
+    context: ci/prow/e2e-cmd
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -566,9 +538,9 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-installer-release-4.7-e2e-azure-shared-vpc
-    path_alias: github.com/openshift/installer
-    rerun_command: /test e2e-azure-shared-vpc
+    name: pull-ci-openshift-priv-origin-marun-testing-e2e-cmd
+    path_alias: github.com/openshift/origin
+    rerun_command: /test e2e-cmd
     spec:
       containers:
       - args:
@@ -577,8 +549,8 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/e2e-azure-shared-vpc-cluster-profile
-        - --target=e2e-azure-shared-vpc
+        - --secret-dir=/usr/local/e2e-cmd-cluster-profile
+        - --target=e2e-cmd
         command:
         - ci-operator
         image: ci-operator:latest
@@ -591,7 +563,7 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-azure-shared-vpc-cluster-profile
+        - mountPath: /usr/local/e2e-cmd-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
@@ -614,7 +586,9 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-azure4
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
       - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
@@ -624,98 +598,11 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-azure-shared-vpc,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-cmd,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.7
-    cluster: api.ci
-    context: ci/prow/e2e-azure-upi
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    hidden: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-installer-release-4.7-e2e-azure-upi
-    path_alias: github.com/openshift/installer
-    rerun_command: /test e2e-azure-upi
-    spec:
-      containers:
-      - args:
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --report-password-file=/etc/report/password.txt
-        - --report-username=ci
-        - --secret-dir=/usr/local/e2e-azure-upi-cluster-profile
-        - --target=e2e-azure-upi
-        - --template=/usr/local/e2e-azure-upi
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: azure4
-        - name: JOB_NAME_SAFE
-          value: e2e-azure-upi
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance/parallel run-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-azure-upi-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
-        - mountPath: /usr/local/e2e-azure-upi
-          name: job-definition
-          subPath: cluster-launch-installer-upi-e2e.yaml
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: password
-            path: password
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-azure4
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - configMap:
-          name: prow-job-cluster-launch-installer-upi-e2e
-        name: job-definition
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-azure-upi,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.7
-    cluster: api.ci
+    - marun-testing
     context: ci/prow/e2e-gcp
     decorate: true
     decoration_config:
@@ -724,8 +611,8 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-installer-release-4.7-e2e-gcp
-    path_alias: github.com/openshift/installer
+    name: pull-ci-openshift-priv-origin-marun-testing-e2e-gcp
+    path_alias: github.com/openshift/origin
     rerun_command: /test e2e-gcp
     spec:
       containers:
@@ -788,9 +675,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.7
-    cluster: api.ci
-    context: ci/prow/e2e-gcp-shared-vpc
+    - marun-testing
+    context: ci/prow/e2e-gcp-builds
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -798,9 +684,9 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-installer-release-4.7-e2e-gcp-shared-vpc
-    path_alias: github.com/openshift/installer
-    rerun_command: /test e2e-gcp-shared-vpc
+    name: pull-ci-openshift-priv-origin-marun-testing-e2e-gcp-builds
+    path_alias: github.com/openshift/origin
+    rerun_command: /test e2e-gcp-builds
     spec:
       containers:
       - args:
@@ -809,8 +695,8 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/e2e-gcp-shared-vpc-cluster-profile
-        - --target=e2e-gcp-shared-vpc
+        - --secret-dir=/usr/local/e2e-gcp-builds-cluster-profile
+        - --target=e2e-gcp-builds
         command:
         - ci-operator
         image: ci-operator:latest
@@ -823,7 +709,7 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-gcp-shared-vpc-cluster-profile
+        - mountPath: /usr/local/e2e-gcp-builds-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
@@ -858,12 +744,84 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-gcp-shared-vpc,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-gcp-builds,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.7
-    cluster: api.ci
+    - marun-testing
+    context: ci/prow/e2e-gcp-image-ecosystem
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    hidden: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-origin-marun-testing-e2e-gcp-image-ecosystem
+    path_alias: github.com/openshift/origin
+    rerun_command: /test e2e-gcp-image-ecosystem
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-password-file=/etc/boskos/password
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/usr/local/e2e-gcp-image-ecosystem-cluster-profile
+        - --target=e2e-gcp-image-ecosystem
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-gcp-image-ecosystem-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-gcp-image-ecosystem,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - marun-testing
     context: ci/prow/e2e-gcp-upgrade
     decorate: true
     decoration_config:
@@ -872,8 +830,8 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-installer-release-4.7-e2e-gcp-upgrade
-    path_alias: github.com/openshift/installer
+    name: pull-ci-openshift-priv-origin-marun-testing-e2e-gcp-upgrade
+    path_alias: github.com/openshift/origin
     rerun_command: /test e2e-gcp-upgrade
     spec:
       containers:
@@ -936,230 +894,7 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.7
-    cluster: api.ci
-    context: ci/prow/e2e-gcp-upi
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    hidden: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-installer-release-4.7-e2e-gcp-upi
-    path_alias: github.com/openshift/installer
-    rerun_command: /test e2e-gcp-upi
-    spec:
-      containers:
-      - args:
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --report-password-file=/etc/report/password.txt
-        - --report-username=ci
-        - --secret-dir=/usr/local/e2e-gcp-upi-cluster-profile
-        - --target=e2e-gcp-upi
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-gcp-upi-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: password
-            path: password
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-gcp-upi,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.7
-    cluster: api.ci
-    context: ci/prow/e2e-gcp-upi-xpn
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    hidden: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-installer-release-4.7-e2e-gcp-upi-xpn
-    path_alias: github.com/openshift/installer
-    rerun_command: /test e2e-gcp-upi-xpn
-    spec:
-      containers:
-      - args:
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --report-password-file=/etc/report/password.txt
-        - --report-username=ci
-        - --secret-dir=/usr/local/e2e-gcp-upi-xpn-cluster-profile
-        - --target=e2e-gcp-upi-xpn
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-gcp-upi-xpn-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: password
-            path: password
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-gcp-upi-xpn,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.7
-    cluster: api.ci
-    context: ci/prow/e2e-metal-ipi
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    hidden: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-installer-release-4.7-e2e-metal-ipi
-    path_alias: github.com/openshift/installer
-    rerun_command: /test e2e-metal-ipi
-    spec:
-      containers:
-      - args:
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --report-password-file=/etc/report/password.txt
-        - --report-username=ci
-        - --secret-dir=/usr/local/e2e-metal-ipi-cluster-profile
-        - --target=e2e-metal-ipi
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-metal-ipi-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: password
-            path: password
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-packet
-          - configMap:
-              name: cluster-profile-packet
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-ipi,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.7
-    cluster: api.ci
+    - marun-testing
     context: ci/prow/e2e-vsphere
     decorate: true
     decoration_config:
@@ -1168,8 +903,8 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-installer-release-4.7-e2e-vsphere
-    path_alias: github.com/openshift/installer
+    name: pull-ci-openshift-priv-origin-marun-testing-e2e-vsphere
+    path_alias: github.com/openshift/origin
     rerun_command: /test e2e-vsphere
     spec:
       containers:
@@ -1181,8 +916,16 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-vsphere-cluster-profile
         - --target=e2e-vsphere
+        - --template=/usr/local/e2e-vsphere
         command:
         - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: vsphere
+        - name: JOB_NAME_SAFE
+          value: e2e-vsphere
+        - name: TEST_COMMAND
+          value: TEST_SUITE=openshift/conformance/parallel run-tests
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -1198,87 +941,7 @@ presubmits:
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: password
-            path: password
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-vsphere
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-vsphere,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.7
-    cluster: api.ci
-    context: ci/prow/e2e-vsphere-upi
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    hidden: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-installer-release-4.7-e2e-vsphere-upi
-    path_alias: github.com/openshift/installer
-    rerun_command: /test e2e-vsphere-upi
-    spec:
-      containers:
-      - args:
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --report-password-file=/etc/report/password.txt
-        - --report-username=ci
-        - --secret-dir=/usr/local/e2e-vsphere-upi-cluster-profile
-        - --target=e2e-vsphere-upi
-        - --template=/usr/local/e2e-vsphere-upi
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: vsphere
-        - name: JOB_NAME_SAFE
-          value: e2e-vsphere-upi
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance/parallel run-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-vsphere-upi-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
-        - mountPath: /usr/local/e2e-vsphere-upi
+        - mountPath: /usr/local/e2e-vsphere
           name: job-definition
           subPath: cluster-launch-installer-upi-e2e.yaml
         - mountPath: /etc/pull-secret
@@ -1312,174 +975,11 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-vsphere-upi,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-vsphere,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.7
-    cluster: api.ci
-    context: ci/prow/gofmt
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    hidden: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-installer-release-4.7-gofmt
-    path_alias: github.com/openshift/installer
-    rerun_command: /test gofmt
-    spec:
-      containers:
-      - args:
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --report-password-file=/etc/report/password.txt
-        - --report-username=ci
-        - --target=gofmt
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )gofmt,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.7
-    cluster: api.ci
-    context: ci/prow/golint
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    hidden: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-installer-release-4.7-golint
-    path_alias: github.com/openshift/installer
-    rerun_command: /test golint
-    spec:
-      containers:
-      - args:
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --report-password-file=/etc/report/password.txt
-        - --report-username=ci
-        - --target=golint
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )golint,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.7
-    cluster: api.ci
-    context: ci/prow/govet
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    hidden: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-installer-release-4.7-govet
-    path_alias: github.com/openshift/installer
-    rerun_command: /test govet
-    spec:
-      containers:
-      - args:
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --report-password-file=/etc/report/password.txt
-        - --report-username=ci
-        - --target=govet
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )govet,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.7
-    cluster: api.ci
+    - marun-testing
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -1488,8 +988,8 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-installer-release-4.7-images
-    path_alias: github.com/openshift/installer
+    name: pull-ci-openshift-priv-origin-marun-testing-images
+    path_alias: github.com/openshift/origin
     rerun_command: /test images
     spec:
       containers:
@@ -1532,9 +1032,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.7
-    cluster: api.ci
-    context: ci/prow/unit
+    - marun-testing
+    context: ci/prow/verify
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -1542,9 +1041,9 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-installer-release-4.7-unit
-    path_alias: github.com/openshift/installer
-    rerun_command: /test unit
+    name: pull-ci-openshift-priv-origin-marun-testing-verify
+    path_alias: github.com/openshift/origin
+    rerun_command: /test verify
     spec:
       containers:
       - args:
@@ -1552,7 +1051,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --target=unit
+        - --target=verify
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1582,12 +1081,12 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )unit,?($|\s.*)
+    trigger: (?m)^/test( | .* )verify,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.7
-    context: ci/prow/verify-codegen
+    - marun-testing
+    context: ci/prow/verify-deps
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -1595,9 +1094,9 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-installer-release-4.7-verify-codegen
-    path_alias: github.com/openshift/installer
-    rerun_command: /test verify-codegen
+    name: pull-ci-openshift-priv-origin-marun-testing-verify-deps
+    path_alias: github.com/openshift/origin
+    rerun_command: /test verify-deps
     spec:
       containers:
       - args:
@@ -1605,7 +1104,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --target=verify-codegen
+        - --target=verify-deps
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1635,58 +1134,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )verify-codegen,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.7
-    cluster: api.ci
-    context: ci/prow/verify-vendor
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    hidden: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-installer-release-4.7-verify-vendor
-    path_alias: github.com/openshift/installer
-    rerun_command: /test verify-vendor
-    spec:
-      containers:
-      - args:
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --report-password-file=/etc/report/password.txt
-        - --report-username=ci
-        - --target=verify-vendor
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )verify-vendor,?($|\s.*)
+    trigger: (?m)^/test( | .* )verify-deps,?($|\s.*)
