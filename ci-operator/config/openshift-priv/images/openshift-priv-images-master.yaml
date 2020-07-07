@@ -1,37 +1,60 @@
 base_images:
-  os:
+  builder:
+    name: builder
+    namespace: ocp
+    tag: golang-1.13
+  os-7:
     name: ubi
     namespace: ocp
     tag: "7"
+  os-8:
+    name: ubi
+    namespace: ocp
+    tag: "8"
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.10
+    tag: golang-1.13
 canonical_go_repository: github.com/openshift/images
 images:
 - context_dir: base/
   dockerfile_path: Dockerfile.rhel
-  from: base-os
-  to: base
+  from: base-os-7
+  to: base-7
+- context_dir: base/
+  dockerfile_path: Dockerfile.rhel
+  from: base-os-8
+  to: base-8
 - dockerfile_path: pod/Dockerfile.rhel
-  from: os
+  from: os-7
+  inputs:
+    base-7:
+      as:
+      - registry.svc.ci.openshift.org/ocp/4.0:base
+      - registry.svc.ci.openshift.org/ocp/4.6:base
+    builder:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.10
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
   to: pod
 - context_dir: egress/router/
-  from: base
+  from: base-8
   to: egress-router
 - context_dir: egress/http-proxy/
-  from: base
+  from: base-8
   to: egress-http-proxy
 - context_dir: egress/dns-proxy/
-  from: base
+  from: base-8
   to: egress-dns-proxy
 - context_dir: ipfailover/keepalived/
-  from: base
+  from: base-8
   to: keepalived-ipfailover
 promotion:
   additional_images:
-    base: base
+    base: base-7
+    base-7: base-7
+    base-8: base-8
   name: 4.6-priv
   namespace: ocp-private
 raw_steps:
@@ -39,8 +62,14 @@ raw_steps:
     commands: |
       rm -rf /etc/yum.repos.d/*
       curl http://base-4-6.ocp.svc > /etc/yum.repos.d/content.repo
-    from: os
-    to: base-os
+    from: os-7
+    to: base-os-7
+- pipeline_image_cache_step:
+    commands: |
+      rm -rf /etc/yum.repos.d/*
+      curl http://base-4-6-rhel8.ocp.svc > /etc/yum.repos.d/content.repo
+    from: os-8
+    to: base-os-8
 resources:
   '*':
     requests:
