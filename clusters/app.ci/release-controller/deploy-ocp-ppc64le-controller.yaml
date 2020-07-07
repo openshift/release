@@ -1,60 +1,59 @@
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: release-controller-ocp
+  name: release-controller-ocp-ppc64le
   namespace: ci
 spec:
-  host: openshift-release.apps.ci.l2s4.p1.openshiftapps.com
+  host: openshift-release-ppc64le.apps.ci.l2s4.p1.openshiftapps.com
   tls:
     insecureEdgeTerminationPolicy: Redirect
     termination: Edge
   to:
     kind: Service
-    name: release-controller-ocp
+    name: release-controller-ocp-ppc64le
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: release-controller-ocp
+  name: release-controller-ocp-ppc64le
   namespace: ci
 spec:
   ports:
   - port: 80
     targetPort: 8080
   selector:
-    app: release-controller-ocp
+    app: release-controller-ocp-ppc64le
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   annotations:
     image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"release-controller:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"controller\")].image"}]'
-  name: release-controller-ocp
+  name: release-controller-ocp-ppc64le
   namespace: ci
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: release-controller-ocp
+      app: release-controller-ocp-ppc64le
   template:
     metadata:
       labels:
-        app: release-controller-ocp
+        app: release-controller-ocp-ppc64le
     spec:
       containers:
       - command:
         - /usr/bin/release-controller
         - --to=release
-        - --release-namespace=ocp
-        - --release-namespace=origin
+        - --release-namespace=ocp-ppc64le
         - --prow-config=/etc/config/config.yaml
         - --job-config=/etc/job-config
-        - --artifacts=openshift-release-artifacts.svc.ci.openshift.org
+        - --artifacts=openshift-release-artifacts-ppc64le.svc.ci.openshift.org
         - --prow-namespace=ci
         - --non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig
-        - --job-namespace=ci-release
-        - --tools-image-stream-tag=4.6:tests
-        - -v=6
+        - --job-namespace=ci-release-ppc64le
+        - --tools-image-stream-tag=release-controller-bootstrap:tests
+        - -v=4
         - --github-token-path=/etc/github/oauth
         - --github-endpoint=http://ghproxy
         - --github-graphql-endpoint=http://ghproxy/graphql
@@ -157,7 +156,7 @@ spec:
       - name: release-controller-kubeconfigs
         secret:
           items:
-          - key: sa.release-controller-ocp.api.ci.config
+          - key: sa.release-controller-ocp-ppc64le.api.ci.config
             path: kubeconfig
           secretName: release-controller-kubeconfigs
       - name: oauth
