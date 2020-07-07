@@ -56,6 +56,24 @@
         ],
       },
       {
+        name: 'jobs-failing-with-lease-acquire-timeout',
+        rules: [
+          {
+            alert: 'jobs-failing-with-lease-acquire-timeout',
+            expr: |||
+             sum(label_replace(ci_operator_error_rate{state="failed",reason=~"executing_graph:step_failed:utilizing_lease:acquiring_lease.*"}, "provider", "$1", "reason", "executing_graph:step_failed:utilizing_lease:acquiring_lease:(.*)-quota-slice")) by (provider)
+            |||,
+            'for': '1m',
+            labels: {
+              severity: 'critical',
+            },
+            annotations: {
+              message: 'Jobs on provider {{ $labels.provider }} fail because they were unable to acquire a lease.',
+            },
+          }
+        ],
+      },
+      {
         name: 'ssl_expiry',
         rules: [
           {
