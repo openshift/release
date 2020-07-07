@@ -1,0 +1,82 @@
+# Expose the files cache pod as a route so it is reachable.
+# The files cache pod is created on demand by the release controller
+# in the jobs-namespace, which for the app.ci controllers is in api.ci.
+kind: Service
+apiVersion: v1
+metadata:
+  name: files-cache
+  namespace: ci-release
+spec:
+  selector:
+    app: files-cache
+  ports:
+  - port: 80
+    targetPort: 8080
+---
+kind: Route
+apiVersion: v1
+metadata:
+  name: files-cache
+  namespace: ci-release
+spec:
+  host: openshift-release-artifacts.svc.ci.openshift.org
+  tls:
+    termination: Edge
+    insecureEdgeTerminationPolicy: Redirect
+  to:
+    kind: Service
+    name: files-cache
+
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: files-cache
+  namespace: ci-release-ppc64le
+spec:
+  selector:
+    app: files-cache
+  ports:
+  - port: 80
+    targetPort: 8080
+--- 
+kind: Route
+apiVersion: v1
+metadata:
+  name: files-cache
+  namespace: ci-release-ppc64le
+spec:
+  host: openshift-release-artifacts-ppc64le.svc.ci.openshift.org
+  tls:
+    termination: Edge
+    insecureEdgeTerminationPolicy: Redirect
+  to:
+    kind: Service
+    name: files-cache
+
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: files-cache
+  namespace: ci-release-s390x
+spec:
+  selector:
+    app: files-cache
+  ports:
+  - port: 80
+    targetPort: 8080
+---
+kind: Route
+apiVersion: v1
+metadata:
+  name: files-cache
+  namespace: ci-release-s390x
+spec:
+  host: openshift-release-artifacts-s390x.svc.ci.openshift.org
+  tls:
+    termination: Edge
+    insecureEdgeTerminationPolicy: Redirect
+  to:
+    kind: Service
+    name: files-cache
