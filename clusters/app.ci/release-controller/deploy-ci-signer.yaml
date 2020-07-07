@@ -25,11 +25,17 @@ spec:
       labels:
         app: release-controller-signer
     spec:
-      serviceAccountName: release-controller-ocp
+      serviceAccountName: release-controller
       volumes:
       - name: publisher
         secret:
           secretName: release-controller-signature-publisher
+      - name: release-controller-kubeconfigs
+        secret:
+          secretName: release-controller-kubeconfigs
+          items:
+          - key: sa.release-controller-ocp.api.ci.config
+            path: kubeconfig
       - name: signer
         secret:
           secretName: release-controller-signature-signer
@@ -40,6 +46,9 @@ spec:
         - name: publisher
           mountPath: /etc/release-controller/publisher
           readOnly: true
+        - name: release-controller-kubeconfigs
+          mountPath: /etc/kubeconfig
+          readOnly: true
         - name: signer
           mountPath: /etc/release-controller/signer
           readOnly: true
@@ -48,6 +57,7 @@ spec:
         - --release-namespace=ocp
         - --release-namespace=origin
         - --job-namespace=ci-release
+        - --non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig
         - --tools-image-stream-tag=4.6:tests
         - --audit=gs://openshift-ci-release/releases
         - --sign=/etc/release-controller/signer/openshift-ci.gpg
