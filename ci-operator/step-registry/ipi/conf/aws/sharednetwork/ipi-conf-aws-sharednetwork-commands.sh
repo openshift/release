@@ -10,7 +10,7 @@ curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -
 CONFIG="${SHARED_DIR}/install-config.yaml"
 PATCH="${SHARED_DIR}/install-config-sharednetwork.yaml.patch"
 
-aws_region=$(/tmp/yq r ${CONFIG} 'platform.aws.region')
+aws_region=$(/tmp/yq r "${CONFIG}" 'platform.aws.region')
 
 subnets="[]"
 case "${aws_region}_$((RANDOM % 4))" in
