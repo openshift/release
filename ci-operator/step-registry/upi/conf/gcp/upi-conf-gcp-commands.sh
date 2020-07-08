@@ -12,16 +12,16 @@ if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
   echo "RELEASE_IMAGE_LATEST is an empty string, exiting"
   exit 1
 fi
-export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST}
+export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_LATEST}"
 
 # Ensure ignition assets are configured with the correct invoker to track CI jobs.
-export OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID}
+export OPENSHIFT_INSTALL_INVOKER="openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID}"
 
-export GOOGLE_CLOUD_KEYFILE_JSON=${CLUSTER_PROFILE_DIR}/gce.json
+export GOOGLE_CLOUD_KEYFILE_JSON="${CLUSTER_PROFILE_DIR}/gce.json"
 
 dir=/tmp/installer
-mkdir "${dir}/"
-pushd ${dir}
+mkdir "${dir}"
+pushd "${dir}"
 cp -t "${dir}" \
     "${SHARED_DIR}/install-config.yaml"
 
@@ -29,12 +29,12 @@ cp -t "${dir}" \
 if [[ -s "${SHARED_DIR}/xpn.json" ]]; then
   echo "Reading variables from ${SHARED_DIR}/xpn.json..."
   IS_XPN=1
-  HOST_PROJECT=$(jq -r '.hostProject' ${SHARED_DIR}/xpn.json)
-  HOST_PROJECT_NETWORK=$(jq -r '.clusterNetwork' ${SHARED_DIR}/xpn.json)
-  HOST_PROJECT_COMPUTE_SUBNET=$(jq -r '.computeSubnet' ${SHARED_DIR}/xpn.json)
+  HOST_PROJECT="$(jq -r '.hostProject' "${SHARED_DIR}/xpn.json")"
+  HOST_PROJECT_NETWORK="$(jq -r '.clusterNetwork' "${SHARED_DIR}/xpn.json")"
+  HOST_PROJECT_COMPUTE_SUBNET="$(jq -r '.computeSubnet' "${SHARED_DIR}/xpn.json")"
 
-  HOST_PROJECT_NETWORK_NAME=$(basename ${HOST_PROJECT_NETWORK})
-  HOST_PROJECT_COMPUTE_SUBNET_NAME=$(basename ${HOST_PROJECT_COMPUTE_SUBNET})
+  HOST_PROJECT_NETWORK_NAME="$(basename "${HOST_PROJECT_NETWORK}")"
+  HOST_PROJECT_COMPUTE_SUBNET_NAME="$(basename "${HOST_PROJECT_COMPUTE_SUBNET}")"
 fi
 
 ### Empty the compute pool (optional)
