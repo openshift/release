@@ -61,7 +61,7 @@
           {
             alert: 'jobs-failing-with-lease-acquire-timeout',
             expr: |||
-             sum(label_replace(ci_operator_error_rate{state="failed",reason=~"executing_graph:step_failed:utilizing_lease:acquiring_lease.*"}, "provider", "$1", "reason", "executing_graph:step_failed:utilizing_lease:acquiring_lease:(.*)-quota-slice")) by (provider)
+             label_replace((sum(increase(ci_operator_error_rate{state="failed",reason=~"executing_graph:step_failed:utilizing_lease:acquiring_lease:.*"}[15m])) by (reason)), "provider", "$1", "reason", "executing_graph:step_failed:utilizing_lease:acquiring_lease:(.*)-quota-slice") > 0
             |||,
             'for': '1m',
             labels: {
