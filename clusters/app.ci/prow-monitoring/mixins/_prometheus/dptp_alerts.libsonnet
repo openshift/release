@@ -74,7 +74,7 @@
         ],
       },
       {
-        name: 'ssl_expiry',
+        name: 'http-probe',
         rules: [
           {
             alert: 'SSLCertExpiringSoon',
@@ -87,6 +87,19 @@
             },
             annotations: {
               message: 'The SSL certificates for instance {{ $labels.instance }} are expiring in 30 days.',
+            },
+          },
+          {
+            alert: 'ProbeFailing',
+            expr: |||
+              up{job="blackbox"} == 0 or probe_success{job="blackbox"} == 0
+            |||,
+            'for': '1m',
+            labels: {
+              severity: 'critical',
+            },
+            annotations: {
+              message: 'Probing the instance {{ $labels.instance }} has been failing for the past minute.',
             },
           }
         ],
