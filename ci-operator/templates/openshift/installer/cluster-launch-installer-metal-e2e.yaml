@@ -432,6 +432,12 @@ objects:
         PXE_KERNEL_URL="$(jq -r '.baseURI + .images["kernel"].path' /var/lib/openshift-install/rhcos.json)"
         # 4.3 unified 'metal-bios' and 'metal-uefi' into just 'metal'
         PXE_OS_IMAGE_URL="$(jq -r '.baseURI + (.images["metal-bios"].path // .images["metal"].path)' /var/lib/openshift-install/rhcos.json)"
+        if [[ $PXE_KERNEL_URL =~ "live" ]]; then
+          PXE_KERNEL_ARGS=""
+        else
+          PXE_KERNEL_ARGS="coreos.inst.image_url=${PXE_OS_IMAGE_URL}"
+        fi
+        # 4.3 unified 'metal-bios' and 'metal-uefi' into just 'metal', unused in 4.6
         cat > /tmp/artifacts/terraform/terraform.tfvars <<-EOF
         cluster_id = "${CLUSTER_NAME}"
         bootstrap_ign_file = "/tmp/artifacts/installer/bootstrap.ign"
@@ -448,6 +454,7 @@ objects:
         pxe_initrd_url = "${PXE_INITRD_URL}"
         pxe_kernel_url = "${PXE_KERNEL_URL}"
         pxe_os_image_url = "${PXE_OS_IMAGE_URL}"
+        pxe_kernel_args = "{PXE_KERNEL_ARGS}"
         worker_count = "${workers}"
         worker_ign_file = "/tmp/artifacts/installer/worker.ign"
         EOF
