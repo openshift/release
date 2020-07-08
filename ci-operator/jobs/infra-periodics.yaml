@@ -1180,3 +1180,38 @@ periodics:
         secretName: build-farm-credentials
     - emptyDir: {}
       name: config-volume
+- agent: kubernetes
+  cluster: api.ci
+  cron: '@hourly'
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci.openshift.io/role: infra
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-prow-auto-registry-replacer
+  spec:
+    containers:
+    - args:
+      - --github-token-path=/etc/github/oauth
+      - --github-endpoint=http://ghproxy
+      - --config-dir=./ci-operator/config
+      - --create-pr=true
+      command:
+      - /usr/bin/registry-replacer
+      image: registry.svc.ci.openshift.org/ci/registry-replacer:latest
+      imagePullPolicy: Always
+      name: auto-config-brancher
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: token
+        readOnly: true
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-bot
