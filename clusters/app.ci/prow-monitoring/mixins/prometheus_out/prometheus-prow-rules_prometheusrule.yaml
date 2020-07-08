@@ -233,7 +233,7 @@ spec:
       for: 1m
       labels:
         severity: critical
-  - name: ssl_expiry
+  - name: http-probe
     rules:
     - alert: SSLCertExpiringSoon
       annotations:
@@ -241,6 +241,15 @@ spec:
           in 30 days.
       expr: |
         probe_ssl_earliest_cert_expiry{job="blackbox"} - time() < 86400 * 30
+      for: 1m
+      labels:
+        severity: critical
+    - alert: ProbeFailing
+      annotations:
+        message: Probing the instance {{ $labels.instance }} has been failing for
+          the past minute.
+      expr: |
+        up{job="blackbox"} == 0 or probe_success{job="blackbox"} == 0
       for: 1m
       labels:
         severity: critical
