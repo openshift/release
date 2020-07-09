@@ -13,6 +13,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kubernetes-marun-testing13-e2e-aws-csi
+    optional: true
     path_alias: k8s.io/kubernetes
     rerun_command: /test e2e-aws-csi
     spec:
@@ -65,7 +66,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-csi,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - marun-testing13
     cluster: api.ci
@@ -77,6 +78,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kubernetes-marun-testing13-e2e-aws-disruptive
+    optional: true
     path_alias: k8s.io/kubernetes
     rerun_command: /test e2e-aws-disruptive
     spec:
@@ -144,85 +146,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-disruptive,?($|\s.*)
   - agent: kubernetes
-    always_run: true
-    branches:
-    - marun-testing13
-    cluster: api.ci
-    context: ci/prow/e2e-aws-image-registry
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-kubernetes-marun-testing13-e2e-aws-image-registry
-    path_alias: k8s.io/kubernetes
-    rerun_command: /test e2e-aws-image-registry
-    spec:
-      containers:
-      - args:
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
-        - --report-password-file=/etc/report/password.txt
-        - --report-username=ci
-        - --secret-dir=/usr/local/e2e-aws-image-registry-cluster-profile
-        - --target=e2e-aws-image-registry
-        - --template=/usr/local/e2e-aws-image-registry
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: e2e-aws-image-registry
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/image-registry run-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-aws-image-registry-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-aws-image-registry
-          name: job-definition
-          subPath: cluster-launch-installer-e2e.yaml
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: password
-            path: password
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-e2e
-        name: job-definition
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-image-registry,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - marun-testing13
     cluster: api.ci
@@ -300,7 +224,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-jenkins,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - marun-testing13
     cluster: api.ci
@@ -312,6 +236,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kubernetes-marun-testing13-e2e-aws-ovn
+    optional: true
     path_alias: k8s.io/kubernetes
     rerun_command: /test e2e-aws-ovn
     spec:
@@ -428,7 +353,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-serial,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - marun-testing13
     cluster: api.ci
@@ -440,6 +365,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kubernetes-marun-testing13-e2e-azure
+    optional: true
     path_alias: k8s.io/kubernetes
     rerun_command: /test e2e-azure
     spec:
@@ -504,6 +430,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kubernetes-marun-testing13-e2e-cmd
+    optional: true
     path_alias: k8s.io/kubernetes
     rerun_command: /test e2e-cmd
     spec:
@@ -572,7 +499,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-cmd,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - marun-testing13
     cluster: api.ci
@@ -720,166 +647,6 @@ presubmits:
     branches:
     - marun-testing13
     cluster: api.ci
-    context: ci/prow/e2e-gcp-builds
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-kubernetes-marun-testing13-e2e-gcp-builds
-    path_alias: k8s.io/kubernetes
-    rerun_command: /test e2e-gcp-builds
-    spec:
-      containers:
-      - args:
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
-        - --report-password-file=/etc/report/password.txt
-        - --report-username=ci
-        - --secret-dir=/usr/local/e2e-gcp-builds-cluster-profile
-        - --target=e2e-gcp-builds
-        - --template=/usr/local/e2e-gcp-builds
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: gcp
-        - name: JOB_NAME_SAFE
-          value: e2e-gcp-builds
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/build run-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-gcp-builds-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-gcp-builds
-          name: job-definition
-          subPath: cluster-launch-installer-e2e.yaml
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: password
-            path: password
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
-      - configMap:
-          name: prow-job-cluster-launch-installer-e2e
-        name: job-definition
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-gcp-builds,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - marun-testing13
-    cluster: api.ci
-    context: ci/prow/e2e-gcp-image-ecosystem
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-kubernetes-marun-testing13-e2e-gcp-image-ecosystem
-    path_alias: k8s.io/kubernetes
-    rerun_command: /test e2e-gcp-image-ecosystem
-    spec:
-      containers:
-      - args:
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
-        - --report-password-file=/etc/report/password.txt
-        - --report-username=ci
-        - --secret-dir=/usr/local/e2e-gcp-image-ecosystem-cluster-profile
-        - --target=e2e-gcp-image-ecosystem
-        - --template=/usr/local/e2e-gcp-image-ecosystem
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: gcp
-        - name: JOB_NAME_SAFE
-          value: e2e-gcp-image-ecosystem
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/image-ecosystem run-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-gcp-image-ecosystem-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-gcp-image-ecosystem
-          name: job-definition
-          subPath: cluster-launch-installer-e2e.yaml
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: password
-            path: password
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
-      - configMap:
-          name: prow-job-cluster-launch-installer-e2e
-        name: job-definition
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-gcp-image-ecosystem,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - marun-testing13
-    cluster: api.ci
     context: ci/prow/e2e-gcp-upgrade
     decorate: true
     decoration_config:
@@ -942,7 +709,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-gcp-upgrade,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - marun-testing13
     cluster: api.ci
@@ -954,6 +721,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kubernetes-marun-testing13-e2e-vsphere
+    optional: true
     path_alias: k8s.io/kubernetes
     rerun_command: /test e2e-vsphere
     spec:
@@ -1176,84 +944,6 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )kubernetes-e2e,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - marun-testing13
-    cluster: api.ci
-    context: ci/prow/launch-vsphere
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-kubernetes-marun-testing13-launch-vsphere
-    path_alias: k8s.io/kubernetes
-    rerun_command: /test launch-vsphere
-    spec:
-      containers:
-      - args:
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
-        - --report-password-file=/etc/report/password.txt
-        - --report-username=ci
-        - --secret-dir=/usr/local/launch-vsphere-cluster-profile
-        - --target=launch-vsphere
-        - --template=/usr/local/launch-vsphere
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: vsphere
-        - name: JOB_NAME_SAFE
-          value: launch-vsphere
-        - name: TEST_COMMAND
-          value: sleep 7200 & wait
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/launch-vsphere-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/launch-vsphere
-          name: job-definition
-          subPath: cluster-launch-installer-upi-e2e.yaml
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: password
-            path: password
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-vsphere
-      - configMap:
-          name: prow-job-cluster-launch-installer-upi-e2e
-        name: job-definition
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )launch-vsphere,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
