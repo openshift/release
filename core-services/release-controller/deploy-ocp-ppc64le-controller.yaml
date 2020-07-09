@@ -1,84 +1,80 @@
-kind: List
 apiVersion: v1
-items:
-# Redirects old URLs to the new server
-- kind: Route
-  apiVersion: v1
-  metadata:
-    name: release-controller-ocp-ppc64le
-    namespace: ci
-  spec:
-    host: openshift-release-ppc64le.svc.ci.openshift.org
-    tls:
-      termination: Edge
-      insecureEdgeTerminationPolicy: Redirect
-    to:
-      kind: Service
-      name: release-controller-ocp-ppc64le-redirect
-- apiVersion: v1
-  kind: ConfigMap
-  metadata:
-    name: release-controller-ocp-ppc64le-redirect-config
-    namespace: ci
-  data:
-    "default.conf": |
-      server {
-        listen 8080;
-        return 302 $scheme://openshift-release-ppc64le.apps.ci.l2s4.p1.openshiftapps.com$request_uri;
-      }
-- apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    labels:
-      app: release-controller-ocp-ppc64le-redirect
+kind: Route
+metadata:
+  name: release-controller-ocp-ppc64le
+  namespace: ci
+spec:
+  host: openshift-release-ppc64le.svc.ci.openshift.org
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: Edge
+  to:
+    kind: Service
     name: release-controller-ocp-ppc64le-redirect
-    namespace: ci
-  spec:
-    replicas: 2
-    selector:
-      matchLabels:
+---
+apiVersion: v1
+data:
+  default.conf: "server {\n  listen 8080;\n  return 302 $scheme://openshift-release-ppc64le.apps.ci.l2s4.p1.openshiftapps.com$request_uri;\n\
+    }\n"
+kind: ConfigMap
+metadata:
+  name: release-controller-ocp-ppc64le-redirect-config
+  namespace: ci
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: release-controller-ocp-ppc64le-redirect
+  name: release-controller-ocp-ppc64le-redirect
+  namespace: ci
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      component: release-controller-ocp-ppc64le-redirect
+  template:
+    metadata:
+      labels:
+        app: prow
         component: release-controller-ocp-ppc64le-redirect
-    template:
-      metadata:
-        labels:
-          app: prow
-          component: release-controller-ocp-ppc64le-redirect
-      spec:
-        affinity:
-          podAntiAffinity:
-            requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchExpressions:
-                - key: component
-                  operator: In
-                  values:
-                  - release-controller-ocp-ppc64le-redirect
-              topologyKey: "kubernetes.io/hostname"
-        containers:
-        - image: nginxinc/nginx-unprivileged:1.17
-          name: nginx
-          volumeMounts:
-          - name: config
-            mountPath: /etc/nginx/conf.d
-        volumes:
-        - name: config
-          configMap:
-            name: release-controller-ocp-ppc64le-redirect-config
-- apiVersion: v1
-  kind: Service
-  metadata:
-    labels:
-      app: prow
-      component: release-controller-ocp-ppc64le-redirect
-    name: release-controller-ocp-ppc64le-redirect
-    namespace: ci
-  spec:
-    ports:
-    - name: main
-      port: 8080
-      protocol: TCP
-      targetPort: 8080
-    selector:
-      component: release-controller-ocp-ppc64le-redirect
-    sessionAffinity: None
-    type: ClusterIP
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: component
+                operator: In
+                values:
+                - release-controller-ocp-ppc64le-redirect
+            topologyKey: kubernetes.io/hostname
+      containers:
+      - image: nginxinc/nginx-unprivileged:1.17
+        name: nginx
+        volumeMounts:
+        - mountPath: /etc/nginx/conf.d
+          name: config
+      volumes:
+      - configMap:
+          name: release-controller-ocp-ppc64le-redirect-config
+        name: config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: prow
+    component: release-controller-ocp-ppc64le-redirect
+  name: release-controller-ocp-ppc64le-redirect
+  namespace: ci
+spec:
+  ports:
+  - name: main
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    component: release-controller-ocp-ppc64le-redirect
+  sessionAffinity: None
+  type: ClusterIP
