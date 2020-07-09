@@ -5,6 +5,7 @@ This folder includes the resources for installation and configuration of [CI-clu
 * [build-clusters](./build-clusters)
     * [01_cluster](./build-clusters/01_cluster): build cluster hosted on AWS managed by DPTP-team.
     * [02_cluster](./build-clusters/02_cluster): build cluster hosted on GCP managed by DPTP-team.
+    * [vsphere](./build-clusters/vsphere): build cluster hosted on vSphere managed by SPLAT-team.
 
 ## Best practice for applyConfig
 
