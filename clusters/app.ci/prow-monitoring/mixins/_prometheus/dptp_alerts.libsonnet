@@ -94,12 +94,12 @@
             expr: |||
               up{job="blackbox"} == 0 or probe_success{job="blackbox"} == 0
             |||,
-            'for': '1m',
+            'for': '5m',
             labels: {
               severity: 'critical',
             },
             annotations: {
-              message: 'Probing the instance {{ $labels.instance }} has been failing for the past minute.',
+              message: 'Probing the instance {{ $labels.instance }} has been failing for the past 5 minutes.',
             },
           }
         ],
