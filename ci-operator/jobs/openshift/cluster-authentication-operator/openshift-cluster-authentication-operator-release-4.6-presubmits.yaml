@@ -5,15 +5,15 @@ presubmits:
     branches:
     - release-4.6
     cluster: api.ci
-    context: ci/prow/e2e-aws
+    context: ci/prow/e2e
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-authentication-operator-release-4.6-e2e-aws
-    rerun_command: /test e2e-aws
+    name: pull-ci-openshift-cluster-authentication-operator-release-4.6-e2e
+    rerun_command: /test e2e
     spec:
       containers:
       - args:
@@ -21,8 +21,8 @@ presubmits:
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/e2e-aws-cluster-profile
-        - --target=e2e-aws
+        - --secret-dir=/usr/local/e2e-cluster-profile
+        - --target=e2e
         command:
         - ci-operator
         image: ci-operator:latest
@@ -35,7 +35,7 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-cluster-profile
+        - mountPath: /usr/local/e2e-cluster-profile
           name: cluster-profile
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -55,28 +55,30 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-aws
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
       - name: pull-secret
         secret:
           secretName: regcred
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - release-4.6
     cluster: api.ci
-    context: ci/prow/e2e-aws-console-login
+    context: ci/prow/e2e-console-login
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-authentication-operator-release-4.6-e2e-aws-console-login
-    rerun_command: /test e2e-aws-console-login
+    name: pull-ci-openshift-cluster-authentication-operator-release-4.6-e2e-console-login
+    rerun_command: /test e2e-console-login
     spec:
       containers:
       - args:
@@ -84,16 +86,16 @@ presubmits:
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/e2e-aws-console-login-cluster-profile
-        - --target=e2e-aws-console-login
-        - --template=/usr/local/e2e-aws-console-login
+        - --secret-dir=/usr/local/e2e-console-login-cluster-profile
+        - --target=e2e-console-login
+        - --template=/usr/local/e2e-console-login
         command:
         - ci-operator
         env:
         - name: CLUSTER_TYPE
-          value: aws
+          value: gcp
         - name: JOB_NAME_SAFE
-          value: e2e-aws-console-login
+          value: e2e-console-login
         - name: TEST_COMMAND
           value: ./test-prow-e2e.sh login
         - name: TEST_IMAGESTREAM_TAG
@@ -108,9 +110,9 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-console-login-cluster-profile
+        - mountPath: /usr/local/e2e-console-login-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-aws-console-login
+        - mountPath: /usr/local/e2e-console-login
           name: job-definition
           subPath: cluster-launch-installer-custom-test-image.yaml
         - mountPath: /etc/pull-secret
@@ -131,7 +133,9 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-aws
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
       - configMap:
           name: prow-job-cluster-launch-installer-custom-test-image
         name: job-definition
@@ -141,21 +145,21 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-console-login,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-console-login,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - release-4.6
     cluster: api.ci
-    context: ci/prow/e2e-aws-operator
+    context: ci/prow/e2e-operator
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-authentication-operator-release-4.6-e2e-aws-operator
-    rerun_command: /test e2e-aws-operator
+    name: pull-ci-openshift-cluster-authentication-operator-release-4.6-e2e-operator
+    rerun_command: /test e2e-operator
     spec:
       containers:
       - args:
@@ -163,16 +167,16 @@ presubmits:
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/e2e-aws-operator-cluster-profile
-        - --target=e2e-aws-operator
-        - --template=/usr/local/e2e-aws-operator
+        - --secret-dir=/usr/local/e2e-operator-cluster-profile
+        - --target=e2e-operator
+        - --template=/usr/local/e2e-operator
         command:
         - ci-operator
         env:
         - name: CLUSTER_TYPE
-          value: aws
+          value: gcp
         - name: JOB_NAME_SAFE
-          value: e2e-aws-operator
+          value: e2e-operator
         - name: TEST_COMMAND
           value: |
             mkdir -p /tmp/artifacts
@@ -187,9 +191,9 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-operator-cluster-profile
+        - mountPath: /usr/local/e2e-operator-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-aws-operator
+        - mountPath: /usr/local/e2e-operator
           name: job-definition
           subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
@@ -210,7 +214,9 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-aws
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
       - configMap:
           name: prow-job-cluster-launch-installer-src
         name: job-definition
@@ -220,21 +226,21 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-operator,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-operator,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - release-4.6
     cluster: api.ci
-    context: ci/prow/e2e-aws-operator-encryption
+    context: ci/prow/e2e-operator-encryption
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-authentication-operator-release-4.6-e2e-aws-operator-encryption
-    rerun_command: /test e2e-aws-operator-encryption
+    name: pull-ci-openshift-cluster-authentication-operator-release-4.6-e2e-operator-encryption
+    rerun_command: /test e2e-operator-encryption
     spec:
       containers:
       - args:
@@ -242,16 +248,16 @@ presubmits:
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/e2e-aws-operator-encryption-cluster-profile
-        - --target=e2e-aws-operator-encryption
-        - --template=/usr/local/e2e-aws-operator-encryption
+        - --secret-dir=/usr/local/e2e-operator-encryption-cluster-profile
+        - --target=e2e-operator-encryption
+        - --template=/usr/local/e2e-operator-encryption
         command:
         - ci-operator
         env:
         - name: CLUSTER_TYPE
-          value: aws
+          value: gcp
         - name: JOB_NAME_SAFE
-          value: e2e-aws-operator-encryption
+          value: e2e-operator-encryption
         - name: TEST_COMMAND
           value: |
             mkdir -p /tmp/artifacts
@@ -266,9 +272,9 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-operator-encryption-cluster-profile
+        - mountPath: /usr/local/e2e-operator-encryption-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-aws-operator-encryption
+        - mountPath: /usr/local/e2e-operator-encryption
           name: job-definition
           subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
@@ -289,7 +295,9 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-aws
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
       - configMap:
           name: prow-job-cluster-launch-installer-src
         name: job-definition
@@ -299,21 +307,21 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-operator-encryption,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-operator-encryption,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - release-4.6
     cluster: api.ci
-    context: ci/prow/e2e-aws-upgrade
+    context: ci/prow/e2e-upgrade
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-authentication-operator-release-4.6-e2e-aws-upgrade
-    rerun_command: /test e2e-aws-upgrade
+    name: pull-ci-openshift-cluster-authentication-operator-release-4.6-e2e-upgrade
+    rerun_command: /test e2e-upgrade
     spec:
       containers:
       - args:
@@ -321,8 +329,8 @@ presubmits:
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/e2e-aws-upgrade-cluster-profile
-        - --target=e2e-aws-upgrade
+        - --secret-dir=/usr/local/e2e-upgrade-cluster-profile
+        - --target=e2e-upgrade
         command:
         - ci-operator
         image: ci-operator:latest
@@ -335,7 +343,7 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
+        - mountPath: /usr/local/e2e-upgrade-cluster-profile
           name: cluster-profile
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -355,14 +363,16 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-aws
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
       - name: pull-secret
         secret:
           secretName: regcred
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-upgrade,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-upgrade,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
