@@ -500,7 +500,7 @@ periodics:
         chmod ug+x $HOME/bin/oc $HOME/bin/jq
 
         # guard against starting if no okd stream exists yet
-        if ! oc get istag -n origin ${TAG}:${BRANCH}; then
+        if ! oc get istag -n origin ${BRANCH}:${TAG}; then
           echo "No build possible, no image stream"
           exit 0
         fi
@@ -542,7 +542,7 @@ periodics:
 
 
         # compare the latest image we have built against the potential candidate
-        latest="$( oc get istag -n origin ${TAG}:${BRANCH} --template '{{ index .image.dockerImageMetadata.Config.Labels "version" }} {{ index .image.dockerImageMetadata.Config.Labels "id-artifacts" }} {{ index .image.dockerImageMetadata.Config.Labels "id-machine-config-operator-rpms" }}' )"
+        latest="$( oc get istag -n origin ${BRANCH}:${TAG} --template '{{ index .image.dockerImageMetadata.Config.Labels "version" }} {{ index .image.dockerImageMetadata.Config.Labels "id-artifacts" }} {{ index .image.dockerImageMetadata.Config.Labels "id-machine-config-operator-rpms" }}' )"
         candidate="${build_id} ${origin_artifacts_id} ${origin_machine_config_operator_rpms_id}"
         echo "Comparing existing '$latest' against latest '$candidate'"
         if [[ "${latest}" == "${candidate}" ]]; then
