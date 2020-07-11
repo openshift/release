@@ -231,11 +231,6 @@ cincinnati:
 	$(MAKE) apply WHAT=projects/cincinnati/cincinnati.yaml
 .PHONY: cincinnati
 
-prow-monitoring-app-ci:
-	make -C cluster/ci/monitoring app-ci-deploy
-	oc apply -f core-services/monitoring/prometheus-cache.yaml
-.PHONY: prow-monitoring-app-ci
-
 build-farm-consistency:
 	@echo "diffing ns-ttl-controller assets ..."
 	diff -Naup ./core-services/ci-ns-ttl-controller/ci-ns-ttl-controller_dc.yaml ./clusters/build-clusters/01_cluster/openshift/ci-ns-ttl-controller/ci-ns-ttl-controller_dc.yaml
