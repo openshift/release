@@ -1,0 +1,205 @@
+kind: List
+apiVersion: v1
+items:
+
+- kind: ServiceAccount
+  apiVersion: v1
+  metadata:
+    name: ci-operator
+    namespace: ci
+  imagePullSecrets:
+  - name: regcred
+
+- kind: ClusterRoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: self-provisioner-ci-operator
+  roleRef:
+    kind: ClusterRole
+    name: self-provisioner
+  subjects:
+  - kind: ServiceAccount
+    name: ci-operator
+    namespace: ci
+
+- kind: ClusterRole
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: namespace-annotator
+  rules:
+  - apiGroups:
+    - ""
+    resources:
+    - namespaces
+    verbs:
+    - get
+    - update
+
+- kind: ClusterRoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: namespace-annotator-ci-operator
+  roleRef:
+    kind: ClusterRole
+    name: namespace-annotator
+  subjects:
+  - kind: ServiceAccount
+    name: ci-operator
+    namespace: ci
+
+- kind: ClusterRole
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: manage-events
+  rules:
+  - apiGroups:
+    - ""
+    resources:
+    - events
+    verbs:
+    - create
+    - get
+    - list
+    - watch
+
+- kind: ClusterRoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: manage-events-ci-operator
+  roleRef:
+    kind: ClusterRole
+    name: manage-events
+  subjects:
+  - kind: ServiceAccount
+    name: ci-operator
+    namespace: ci
+
+- kind: Role
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: image-tagger
+    namespace: ci
+  rules:
+  - apiGroups:
+    - ""
+    - image.openshift.io
+    attributeRestrictions: null
+    resources:
+    - imagestreamtags
+    - imagestreams
+    verbs:
+    - update
+    - patch
+    - get
+    - create
+
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: image-tagger-ci-operator
+    namespace: ci
+  roleRef:
+    kind: Role
+    name: image-tagger
+    namespace: ci
+  subjects:
+  - kind: ServiceAccount
+    name: ci-operator
+    namespace: ci
+
+- apiVersion: authorization.openshift.io/v1
+  kind: RoleBinding
+  metadata:
+    name: image-puller
+    namespace: ci
+  roleRef:
+    name: system:image-puller
+  subjects:
+  - kind: SystemGroup
+    name: system:unauthenticated
+  - kind: SystemGroup
+    name: system:authenticated
+
+- kind: Role
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: route-getter
+    namespace: openshift-console
+  rules:
+  - apiGroups:
+    - "route.openshift.io"
+    attributeRestrictions: null
+    resources:
+    - routes
+    resourceNames:
+    - console
+    verbs:
+    - get
+
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: route-getter
+    namespace: openshift-console
+  roleRef:
+    kind: Role
+    name: route-getter
+    namespace: openshift-console
+  subjects:
+  - kind: ServiceAccount
+    name: ci-operator
+    namespace: ci
+
+- kind: ClusterRole
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: namespace-watcher
+  rules:
+  - apiGroups:
+    - ""
+    resources:
+    - namespaces
+    verbs:
+    - list
+    - watch
+
+- kind: ClusterRoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: namespace-watcher-ci-operator
+  roleRef:
+    kind: ClusterRole
+    name: namespace-watcher
+  subjects:
+  - kind: ServiceAccount
+    name: ci-operator
+    namespace: ci
+
+- kind: Role
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: configmap-maintainer
+    namespace: ci
+  rules:
+  - apiGroups:
+    - ""
+    resources:
+    - configmaps
+    verbs:
+    - get
+    - create
+    - deletecollection
+
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: configmap-maintainer-ci-operator
+    namespace: ci
+  roleRef:
+    kind: Role
+    name: configmap-maintainer
+    namespace: ci
+  subjects:
+  - kind: ServiceAccount
+    name: ci-operator
+    namespace: ci
