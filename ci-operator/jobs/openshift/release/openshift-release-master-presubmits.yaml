@@ -768,6 +768,46 @@ presubmits:
             cpu: 10m
     trigger: (?m)^/test( | .* )step-registry-shellcheck,?($|\s.*)
   - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: app.ci
+    context: ci/build-farm/vsphere-dry
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-vsphere-dry
+    rerun_command: /test vsphere-dry
+    spec:
+      containers:
+      - args:
+        - --config-dir
+        - clusters/build-clusters/vsphere
+        - --kubeconfig
+        - /etc/build-farm-credentials/kubeconfig
+        - --as=
+        command:
+        - applyconfig
+        image: registry.svc.ci.openshift.org/ci/applyconfig:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.vsphere.config
+            path: kubeconfig
+          secretName: build-farm-credentials
+    trigger: (?m)^/test( | .* )vsphere-dry,?($|\s.*)
+  - agent: kubernetes
     always_run: false
     branches:
     - master
