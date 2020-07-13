@@ -2,7 +2,7 @@ SHELL=/usr/bin/env bash -o errexit
 
 .PHONY: check check-core check-services dry-core core dry-services services all
 
-CONTAINER_ENGINE ?= docker
+CONTAINER_ENGINE ?= podman
 
 all: core services
 
