@@ -171,6 +171,42 @@ postsubmits:
           secretName: build-farm-credentials
   - agent: kubernetes
     branches:
+    - master
+    cluster: app.ci
+    decorate: true
+    labels:
+      ci.openshift.io/role: infra
+    max_concurrency: 1
+    name: branch-ci-openshift-release-master-vsphere-apply
+    spec:
+      containers:
+      - args:
+        - --config-dir=clusters/build-clusters/vsphere
+        - --confirm=true
+        - --as=
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+        command:
+        - applyconfig
+        image: registry.svc.ci.openshift.org/ci/applyconfig:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.vsphere.config
+            path: kubeconfig
+          secretName: build-farm-credentials
+  - agent: kubernetes
+    branches:
     - ^master$
     cluster: api.ci
     decorate: true
