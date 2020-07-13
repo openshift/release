@@ -3,25 +3,22 @@ postsubmits:
   - agent: kubernetes
     branches:
     - ^release-4\.3$
+    cluster: api.ci
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/is-promotion: "true"
       ci-operator.openshift.io/prowgen-controlled: "true"
+    max_concurrency: 1
     name: branch-ci-openshift-psap-special-resource-operator-release-4.3-images
     spec:
       containers:
       - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --branch=release-4.3
-        - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --org=openshift-psap
         - --promote
-        - --repo=special-resource-operator
-        - --resolver-address=http://ci-operator-configresolver-ci.svc.ci.openshift.org
-        - --sentry-dsn-path=/etc/sentry-dsn/ci-operator
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
         - --target=[images]
         command:
         - ci-operator
@@ -32,26 +29,17 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
+        - mountPath: /etc/report
+          name: result-aggregator
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
       - name: pull-secret
         secret:
           secretName: regcred
-      - name: sentry-dsn
+      - name: result-aggregator
         secret:
-          secretName: sentry-dsn
+          secretName: result-aggregator
