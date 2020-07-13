@@ -1,0 +1,41 @@
+base_images:
+  base:
+    name: "4.4"
+    namespace: ocp
+    tag: base
+  openshift_release_golang-1.13:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- dockerfile_path: build/Dockerfile
+  from: base
+  inputs:
+    openshift_release_golang-1.13:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.13
+  to: custom-domains-operator
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  secret:
+    mount_path: /tmp/secret
+    name: custom-domains-operator-codecov-token
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: custom-domains-operator
