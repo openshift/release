@@ -1,3 +1,38 @@
+##################################################################################
+#                                DO NOT EDIT
+# File generated during execution of: generate-release-controllers.py
+##################################################################################
+
+
+#---------------------------------------------------------------------------------
+# redirect_and_files_cache_resources.py:226 added the following resource
+#---------------------------------------------------------------------------------
+
+# Bootstrap the environment for the amd64 tests image.  The caches require an amd64 "tests" image to execute on
+# the cluster.  This imagestream is used as a commandline parameter to the release-controller...
+#      --tools-image-stream-tag=release-controller-bootstrap:tests
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: release-controller-bootstrap
+  namespace: ocp-s390x
+spec:
+  lookupPolicy:
+    local: false
+  tags:
+  - from:
+      kind: DockerImage
+      name: registry.svc.ci.openshift.org/ocp/4.5:tests
+    importPolicy:
+      scheduled: true
+    name: tests
+    referencePolicy:
+      type: Source
+---
+#---------------------------------------------------------------------------------
+# redirect_and_files_cache_resources.py:247 added the following resource
+#---------------------------------------------------------------------------------
+
 apiVersion: v1
 kind: Route
 metadata:
@@ -12,15 +47,23 @@ spec:
     kind: Service
     name: release-controller-ocp-s390x-redirect
 ---
+#---------------------------------------------------------------------------------
+# redirect_and_files_cache_resources.py:261 added the following resource
+#---------------------------------------------------------------------------------
+
 apiVersion: v1
 data:
-  default.conf: "server {\n  listen 8080;\n  return 302 $scheme://openshift-release-s390x.apps.ci.l2s4.p1.openshiftapps.com$request_uri;\n\
+  default.conf: "server {\n  listen 8080;\n  return 302 https://openshift-release-s390x.apps.ci.l2s4.p1.openshiftapps.com$request_uri;\n\
     }\n"
 kind: ConfigMap
 metadata:
   name: release-controller-ocp-s390x-redirect-config
   namespace: ci
 ---
+#---------------------------------------------------------------------------------
+# redirect_and_files_cache_resources.py:318 added the following resource
+#---------------------------------------------------------------------------------
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -60,6 +103,10 @@ spec:
           name: release-controller-ocp-s390x-redirect-config
         name: config
 ---
+#---------------------------------------------------------------------------------
+# redirect_and_files_cache_resources.py:347 added the following resource
+#---------------------------------------------------------------------------------
+
 apiVersion: v1
 kind: Service
 metadata:
@@ -78,3 +125,39 @@ spec:
     component: release-controller-ocp-s390x-redirect
   sessionAffinity: None
   type: ClusterIP
+---
+#---------------------------------------------------------------------------------
+# redirect_and_files_cache_resources.py:24 added the following resource
+#---------------------------------------------------------------------------------
+
+# The release controller creates a files cache stateful set in each ci-release namespace
+# used by a release controller. Create a service and a route to this public instance.
+apiVersion: v1
+kind: Service
+metadata:
+  name: files-cache
+  namespace: ci-release-s390x
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: files-cache
+---
+#---------------------------------------------------------------------------------
+# redirect_and_files_cache_resources.py:44 added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Route
+metadata:
+  name: files-cache
+  namespace: ci-release-s390x
+spec:
+  host: openshift-release-artifacts-s390x.svc.ci.openshift.org
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: Edge
+  to:
+    kind: Service
+    name: files-cache
