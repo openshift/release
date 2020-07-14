@@ -1,0 +1,37 @@
+periodics:
+- agent: kubernetes
+  cluster: api.ci
+  cron: '@hourly'
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  name: periodic-open-cluster-management-registration-operator-fast-forward
+  spec:
+    containers:
+    - args:
+      - --config-dir=./ci-operator/config/open-cluster-management/registration-operator/
+      - --current-release=master
+      - --future-release=2.1
+      - --fast-forward
+      - --confirm
+      - --username=acm-cicd
+      - --token-path=/etc/github/oauth
+      command:
+      - repo-brancher
+      image: repo-brancher:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: acm-cicd-github
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: acm-cicd-github
+      secret:
+        secretName: acm-cicd-github
