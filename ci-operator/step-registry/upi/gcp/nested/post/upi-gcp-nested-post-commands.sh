@@ -2,13 +2,13 @@
 
 set -eo pipefail
 
-INSTANCE_PREFIX=${NAMESPACE}-${JOB_NAME_HASH}
+INSTANCE_PREFIX="${NAMESPACE}-${JOB_NAME_HASH}"
 
 function teardown() {
   # This is for running the gcloud commands
   mock-nss.sh
   gcloud auth activate-service-account \
-    --quiet --key-file ${CLUSTER_PROFILE_DIR}/gce.json
+    --quiet --key-file "${CLUSTER_PROFILE_DIR}/gce.json"
   gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
   gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
   gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
