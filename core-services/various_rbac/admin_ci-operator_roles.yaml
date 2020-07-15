@@ -756,3 +756,36 @@ items:
   - kind: ServiceAccount
     name: ci-operator
     namespace: ci
+
+- kind: Role
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: image-tagger
+    namespace: code-ready
+  rules:
+    - apiGroups:
+        - ""
+        - image.openshift.io
+      attributeRestrictions: null
+      resources:
+        - imagestreamtags
+        - imagestreams
+      verbs:
+        - update
+        - patch
+        - get
+        - create
+
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: image-tagger-ci-operator
+    namespace: code-ready
+  roleRef:
+    kind: Role
+    name: image-tagger
+    namespace: code-ready
+  subjects:
+    - kind: ServiceAccount
+      name: ci-operator
+      namespace: ci
