@@ -136,6 +136,89 @@ presubmits:
     branches:
     - release-4.6
     cluster: api.ci
+    context: ci/prow/metering-upgrade-aws
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-kube-reporting-metering-operator-release-4.6-metering-upgrade-aws
+    rerun_command: /test metering-upgrade-aws
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-password-file=/etc/boskos/password
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/usr/local/metering-upgrade-aws-cluster-profile
+        - --target=metering-upgrade-aws
+        - --template=/usr/local/metering-upgrade-aws
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: JOB_NAME_SAFE
+          value: metering-upgrade-aws
+        - name: TEST_COMMAND
+          value: |
+            set -x
+            # Increase the size of the machines so that there are machines large enough
+            # to run Presto, and the full metering stack.
+            kubectl -n openshift-machine-api get machinesets -o name | grep worker | cut -d/ -f2 | xargs -I{} kubectl -n openshift-machine-api scale machineset {} --replicas 3
+
+            TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/upgrade EXTRA_TEST_FLAGS="-run TestMeteringUpgrades" make e2e
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/metering-upgrade-aws-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/metering-upgrade-aws
+          name: job-definition
+          subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-src
+        name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )metering-upgrade-aws,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-4.6
+    cluster: api.ci
     context: ci/prow/unit
     decorate: true
     decoration_config:
