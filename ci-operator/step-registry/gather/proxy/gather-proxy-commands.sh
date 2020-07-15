@@ -17,7 +17,7 @@ REGION="$(cat "${SHARED_DIR}/proxyregion")"
 PROXY_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
 
 # cleaning up after ourselves
-if aws --region "${REGION}" s3api head-bucket --bucket "${PROXY_NAME}" /dev/null 2>&1
+if aws --region "${REGION}" s3api head-bucket --bucket "${PROXY_NAME}" > /dev/null 2>&1
 then
   aws --region "${REGION}" s3 rb "s3://${PROXY_NAME}" --force
 fi
