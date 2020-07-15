@@ -97,6 +97,16 @@ tests:
     TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/e2e EXTRA_TEST_FLAGS="-run TestManualMeteringInstall" make e2e
   openshift_installer_src:
     cluster_profile: aws
+- as: metering-upgrade-aws
+  commands: |
+    set -x
+    # Increase the size of the machines so that there are machines large enough
+    # to run Presto, and the full metering stack.
+    kubectl -n openshift-machine-api get machinesets -o name | grep worker | cut -d/ -f2 | xargs -I{} kubectl -n openshift-machine-api scale machineset {} --replicas 3
+
+    TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/upgrade EXTRA_TEST_FLAGS="-run TestMeteringUpgrades" make e2e
+  openshift_installer_src:
+    cluster_profile: aws
 zz_generated_metadata:
   branch: release-4.6
   org: kube-reporting
