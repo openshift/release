@@ -10,7 +10,7 @@ expiration_date=$(date -d '4 hours' --iso=minutes --utc)
 
 case "$((RANDOM % 4))" in
 0) aws_region=us-east-1
-   zone_1=us-east-1b
+   zone_1=us-east-1a
    zone_2=us-east-1c;;
 1) aws_region=us-east-2;;
 2) aws_region=us-west-1;;
