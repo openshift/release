@@ -15,7 +15,7 @@
               team: '%s' % $._config.alertManagerReceivers['build-cop'].team,
             },
             annotations: {
-              message: '@%s image mirroring jobs have failed. View failed jobs at the <https://prow.svc.ci.openshift.org/?job=periodic-image-mirroring-openshift|overview>.  If there is a consistent issue, open a bugzilla bug against Test Infrastructure and assign it to Clayton Coleman.' % $._config.alertManagerReceivers['build-cop'].notify,
+              message: '@%s image mirroring jobs have failed. View failed jobs at the <https://prow.ci.openshift.org/?job=periodic-image-mirroring-openshift|overview>.  If there is a consistent issue, open a bugzilla bug against Test Infrastructure and assign it to Clayton Coleman.' % $._config.alertManagerReceivers['build-cop'].notify,
             },
           }
         ],

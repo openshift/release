@@ -50,8 +50,8 @@ These alerts are usually triggered because of [flaky tests](https://hackernoon.c
 
 Use the following links to triage these alerts:
 
-https://prow.svc.ci.openshift.org/?type=postsubmit
+https://prow.ci.openshift.org/?type=postsubmit
 
-https://prow.svc.ci.openshift.org/?type=batch
+https://prow.ci.openshift.org/?type=batch
 
 TODO: Forward alerts via e-mail.
