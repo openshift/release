@@ -15,7 +15,7 @@
               team: '%s' % $._config.alertManagerReceivers[$._job_failures_config.alerts[job_name].receiver].team,
             },
             annotations: {
-              message: '@%s Prow job %s has failures. Check on <https://prow.svc.ci.openshift.org/?type=periodic&job=%s|deck>' % [$._config.alertManagerReceivers[$._job_failures_config.alerts[job_name].receiver].notify, job_name, job_name],
+              message: '@%s Prow job %s has failures. Check on <https://prow.ci.openshift.org/?type=periodic&job=%s|deck>' % [$._config.alertManagerReceivers[$._job_failures_config.alerts[job_name].receiver].notify, job_name, job_name],
             },
           }
           for job_name in std.objectFields($._job_failures_config.alerts)
@@ -30,7 +30,7 @@
               severity: 'critical',	
             },	
             annotations: {	
-              message: '`%s` jobs are passing at a rate of {{ $value | humanize }}%%, which is below the target (95%%). Check <https://prow.svc.ci.openshift.org/?job=%s|deck-portal>.' % [job_name, job_name],	
+              message: '`%s` jobs are passing at a rate of {{ $value | humanize }}%%, which is below the target (95%%). Check <https://prow.ci.openshift.org/?job=%s|deck-portal>.' % [job_name, job_name],	
             },	
           }	
           for job_name in ['periodic-ci-image-import-to-build01']

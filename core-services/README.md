@@ -41,11 +41,11 @@ There are two types of configuration: resources and ConfigMaps.
 ### Automation
 
 1. Everything is automatically applied to the cluster by a prow
-   [postsubmit](https://prow.svc.ci.openshift.org/?job=branch-ci-openshift-release-master-core-apply)
-   after each PR is merged, and also [periodically](https://prow.svc.ci.openshift.org/?job=openshift-release-master-core-apply).
+   [postsubmit](https://prow.ci.openshift.org/?job=branch-ci-openshift-release-master-core-apply)
+   after each PR is merged, and also [periodically](https://prow.ci.openshift.org/?job=openshift-release-master-core-apply).
 1. ConfigMaps are automatically updated by the `config-updater` Prow plugin,
    configured in its [config.yaml](02_config/_config.yaml) file.
-   Additionally, they are [periodically](https://prow.svc.ci.openshift.org/?job=openshift-release-master-config-bootstrapper)
+   Additionally, they are [periodically](https://prow.ci.openshift.org/?job=openshift-release-master-config-bootstrapper)
    synced by a Prow job.
 
 
