@@ -5,84 +5,6 @@ presubmits:
     branches:
     - master
     cluster: api.ci
-    context: ci/prow/hco-e2e-aws
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-kubevirt-hyperconverged-cluster-operator-master-hco-e2e-aws
-    rerun_command: /test hco-e2e-aws
-    spec:
-      containers:
-      - args:
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
-        - --report-password-file=/etc/report/password.txt
-        - --report-username=ci
-        - --secret-dir=/usr/local/hco-e2e-aws-cluster-profile
-        - --target=hco-e2e-aws
-        - --template=/usr/local/hco-e2e-aws
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: hco-e2e-aws
-        - name: TEST_COMMAND
-          value: |
-            make start && make functest
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/hco-e2e-aws-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/hco-e2e-aws
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: password
-            path: password
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )hco-e2e-aws,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    cluster: api.ci
     context: ci/prow/hco-e2e-azure
     decorate: true
     decoration_config:
@@ -161,15 +83,15 @@ presubmits:
     branches:
     - master
     cluster: api.ci
-    context: ci/prow/hco-e2e-upgrade-aws
+    context: ci/prow/hco-e2e-gcp
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-kubevirt-hyperconverged-cluster-operator-master-hco-e2e-upgrade-aws
-    rerun_command: /test hco-e2e-upgrade-aws
+    name: pull-ci-kubevirt-hyperconverged-cluster-operator-master-hco-e2e-gcp
+    rerun_command: /test hco-e2e-gcp
     spec:
       containers:
       - args:
@@ -177,19 +99,19 @@ presubmits:
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/hco-e2e-upgrade-aws-cluster-profile
-        - --target=hco-e2e-upgrade-aws
-        - --template=/usr/local/hco-e2e-upgrade-aws
+        - --secret-dir=/usr/local/hco-e2e-gcp-cluster-profile
+        - --target=hco-e2e-gcp
+        - --template=/usr/local/hco-e2e-gcp
         command:
         - ci-operator
         env:
         - name: CLUSTER_TYPE
-          value: aws
+          value: gcp
         - name: JOB_NAME_SAFE
-          value: hco-e2e-upgrade-aws
+          value: hco-e2e-gcp
         - name: TEST_COMMAND
           value: |
-            RELEASE_DELTA=1 make upgrade-test
+            make start && make functest
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -200,9 +122,9 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/hco-e2e-upgrade-aws-cluster-profile
+        - mountPath: /usr/local/hco-e2e-gcp-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/hco-e2e-upgrade-aws
+        - mountPath: /usr/local/hco-e2e-gcp
           name: job-definition
           subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
@@ -223,7 +145,9 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-aws
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
       - configMap:
           name: prow-job-cluster-launch-installer-src
         name: job-definition
@@ -233,7 +157,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )hco-e2e-upgrade-aws,?($|\s.*)
+    trigger: (?m)^/test( | .* )hco-e2e-gcp,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -317,15 +241,15 @@ presubmits:
     branches:
     - master
     cluster: api.ci
-    context: ci/prow/hco-e2e-upgrade-prev-aws
+    context: ci/prow/hco-e2e-upgrade-gcp
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-kubevirt-hyperconverged-cluster-operator-master-hco-e2e-upgrade-prev-aws
-    rerun_command: /test hco-e2e-upgrade-prev-aws
+    name: pull-ci-kubevirt-hyperconverged-cluster-operator-master-hco-e2e-upgrade-gcp
+    rerun_command: /test hco-e2e-upgrade-gcp
     spec:
       containers:
       - args:
@@ -333,19 +257,19 @@ presubmits:
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/hco-e2e-upgrade-prev-aws-cluster-profile
-        - --target=hco-e2e-upgrade-prev-aws
-        - --template=/usr/local/hco-e2e-upgrade-prev-aws
+        - --secret-dir=/usr/local/hco-e2e-upgrade-gcp-cluster-profile
+        - --target=hco-e2e-upgrade-gcp
+        - --template=/usr/local/hco-e2e-upgrade-gcp
         command:
         - ci-operator
         env:
         - name: CLUSTER_TYPE
-          value: aws
+          value: gcp
         - name: JOB_NAME_SAFE
-          value: hco-e2e-upgrade-prev-aws
+          value: hco-e2e-upgrade-gcp
         - name: TEST_COMMAND
           value: |
-            RELEASE_DELTA=2 make upgrade-test
+            RELEASE_DELTA=1 make upgrade-test
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -356,9 +280,9 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/hco-e2e-upgrade-prev-aws-cluster-profile
+        - mountPath: /usr/local/hco-e2e-upgrade-gcp-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/hco-e2e-upgrade-prev-aws
+        - mountPath: /usr/local/hco-e2e-upgrade-gcp
           name: job-definition
           subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
@@ -379,7 +303,9 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-aws
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
       - configMap:
           name: prow-job-cluster-launch-installer-src
         name: job-definition
@@ -389,7 +315,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )hco-e2e-upgrade-prev-aws,?($|\s.*)
+    trigger: (?m)^/test( | .* )hco-e2e-upgrade-gcp,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -468,6 +394,86 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )hco-e2e-upgrade-prev-azure,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: api.ci
+    context: ci/prow/hco-e2e-upgrade-prev-gcp
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-kubevirt-hyperconverged-cluster-operator-master-hco-e2e-upgrade-prev-gcp
+    rerun_command: /test hco-e2e-upgrade-prev-gcp
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-password-file=/etc/boskos/password
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/usr/local/hco-e2e-upgrade-prev-gcp-cluster-profile
+        - --target=hco-e2e-upgrade-prev-gcp
+        - --template=/usr/local/hco-e2e-upgrade-prev-gcp
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: gcp
+        - name: JOB_NAME_SAFE
+          value: hco-e2e-upgrade-prev-gcp
+        - name: TEST_COMMAND
+          value: |
+            RELEASE_DELTA=2 make upgrade-test
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/hco-e2e-upgrade-prev-gcp-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/hco-e2e-upgrade-prev-gcp
+          name: job-definition
+          subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - configMap:
+          name: prow-job-cluster-launch-installer-src
+        name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )hco-e2e-upgrade-prev-gcp,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
