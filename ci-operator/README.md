@@ -368,3 +368,35 @@ ci-operator \
     --secret-dir "$name-cluster-profile/" \
     --namespace mynamespace
 ```
+
+### Rebalancing AWS tests among regions and zones
+
+Occasionally we hit install errors like:
+
+```
+Error launching source instance: InsufficientInstanceCapacity: We currently do not have sufficient m5.xlarge capacity in the Availability Zone you requested (us-east-1b). Our system will be working on provisioning additional capacity. You can currently get m5.xlarge capacity by not specifying an Availability Zone in your request or choosing us-east-1a, us-east-1c, us-east-1d, us-east-1f
+```
+
+Or AWS will have issues in a particular region, resulting in:
+
+```
+[DEBUG] plugin.terraform-provider-aws: 2019/03/22 18:02:51 [DEBUG] [aws-sdk-go] DEBUG: Response ec2/RunInstances Details:"
+[DEBUG] plugin.terraform-provider-aws: ---[ RESPONSE ]--------------------------------------"
+[DEBUG] plugin.terraform-provider-aws: HTTP/1.1 500 Internal Server Error"
+```
+
+or similar.
+To keep CI going during these events, we can reconfigure to push CI load away from impacted regions and zones.
+Focusing on [step-registry](step-registry) consumers, you could avoid us-east-1b by changing:
+
+* [`ipi-conf-aws-commands.sh`](step-registry/ipi/conf/aws/ipi-conf-aws-commands.sh) to set explicit `zone_1` and `zone_2` for a particular `aws_region`.
+    You can also drop an entry entirely, although you will need to update `$((RANDOM % 4))` to match the number of defined entries.
+    If your changes affect concurrent AWS capacity (e.g. because you removed a high-volume region), you may also need to adjust [the Boskos lease capacity][boskos-leases] to avoid overloading the remaining capacity.
+* [`ipi-conf-aws-sharednetwork-commands.sh`](step-registry/ipi/conf/aws/sharednetwork/ipi-conf-aws-sharednetwork-commands.sh) to drop affected regions.
+    All of the same caveats from the previous `ipi-conf-aws-commands.sh` entry apply here too, although it is harder to shift zones within a region without creating completely new shared subnets.
+    If you do need to create new shared subnets, the procedure is covered [here][aws-creating-shared-subnets].
+* There are currently no steps excercising the user-provided flow on AWS, so no pointers about what to adjust there.
+* There are [legacy templates](templates/openshift/installer) which could be updated to pivot regions and zones, but they should have few consumers and leaving them impacted would help motivate the remaining consumers to move to the step registry.
+
+[aws-creating-shared-subnets]: https://github.com/openshift/release/pull/6949/commits/1b21187950b7d1d83f87774e9c52e74616e1b6c4
+[boskos-leases]: https://steps.ci.openshift.org/help/leases
