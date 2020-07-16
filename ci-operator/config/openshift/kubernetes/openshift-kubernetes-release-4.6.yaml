@@ -1,0 +1,246 @@
+base_images:
+  base:
+    name: "4.6"
+    namespace: ocp
+    tag: base
+  base-machine:
+    name: fedora
+    namespace: openshift
+    tag: "29"
+  cli:
+    name: "4.6"
+    namespace: ocp
+    tag: cli
+  cli-jq:
+    name: cli-jq
+    namespace: ocp
+    tag: latest
+  machine-os-content-base:
+    name: "4.6"
+    namespace: ocp
+    tag: machine-os-content
+  oc-rpms:
+    name: "4.6"
+    namespace: ocp
+    tag: oc-rpms
+  tools:
+    name: "4.6"
+    namespace: ocp
+    tag: tools
+binary_build_commands: openshift-hack/build-go.sh
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+canonical_go_repository: k8s.io/kubernetes
+images:
+- dockerfile_path: openshift-hack/images/hyperkube/Dockerfile.rhel
+  from: base
+  inputs:
+    bin:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
+  to: hyperkube
+- dockerfile_path: openshift-hack/images/tests/Dockerfile.rhel
+  from: tools
+  inputs:
+    bin:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
+  to: kubernetes-tests
+- context_dir: openshift-hack/images/os/
+  from: base
+  inputs:
+    base-machine-with-rpms:
+      as:
+      - fedora:29
+    machine-os-content-base:
+      as:
+      - registry.svc.ci.openshift.org/openshift/origin-v4.0:machine-os-content
+  to: machine-os-content
+promotion:
+  additional_images:
+    artifacts: artifacts
+  disabled: true
+  excluded_images:
+  - machine-os-content
+  name: "4.6"
+  namespace: ocp
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      mkdir -p _output/local/releases; touch _output/local/releases/CHECKSUM; echo $'FROM bin AS bin\nFROM rpms AS rpms\nFROM centos:7 \nCOPY --from=bin /go/src/k8s.io/kubernetes/_output/local/releases /srv/zips/ \nCOPY --from=oc-rpms /go/src/github.com/openshift/oc/_rpmbuild/SOURCES/* /srv/zips/ \nCOPY --from=rpms /go/src/k8s.io/kubernetes/_output/local/releases/rpms/* /srv/repo/ \nCOPY --from=oc-rpms /go/src/github.com/openshift/oc/_rpmbuild/RPMS/x86_64/* /srv/repo/ ' > _output/local/releases/Dockerfile; openshift-hack/build-go.sh;
+    from: bin
+    to: bin-cross
+- project_directory_image_build_step:
+    from: base
+    inputs:
+      bin-cross:
+        as:
+        - bin
+        paths:
+        - destination_dir: .
+          source_path: /go/src/k8s.io/kubernetes/_output/local/releases/Dockerfile
+      oc-rpms:
+        as:
+        - oc-rpms
+      rpms:
+        as:
+        - rpms
+      src: {}
+    optional: true
+    to: artifacts
+- output_image_tag_step:
+    from: artifacts
+    optional: true
+    to:
+      name: stable
+      namespace: ""
+      tag: artifacts
+- rpm_image_injection_step:
+    from: base
+    to: base-with-rpms
+- rpm_image_injection_step:
+    from: base-machine
+    to: base-machine-with-rpms
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 4Gi
+  artifacts:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  bin:
+    requests:
+      cpu: "3"
+      memory: 7Gi
+  bin-cross:
+    requests:
+      cpu: "3"
+      memory: 8Gi
+  cmd:
+    requests:
+      cpu: "4"
+      memory: 8Gi
+  e2e-conformance-k8s:
+    requests:
+      cpu: "1"
+      memory: 300Mi
+  hyperkube:
+    requests:
+      cpu: "3"
+      memory: 7Gi
+  hypershift:
+    requests:
+      cpu: "3"
+      memory: 7Gi
+  integration:
+    requests:
+      cpu: "6"
+      memory: 14Gi
+  rpms:
+    requests:
+      cpu: "4"
+      memory: 8Gi
+  tests:
+    requests:
+      cpu: "3"
+      memory: 7Gi
+  unit:
+    requests:
+      cpu: "6"
+      memory: 8Gi
+  verify:
+    requests:
+      cpu: "3"
+      memory: 8Gi
+rpm_build_commands: openshift-hack/build-rpms.sh
+tag_specification:
+  name: "4.6"
+  namespace: ocp
+tests:
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: TMPDIR=/tmp/volume openshift-hack/test-go.sh
+  container:
+    from: src
+    memory_backed_volume:
+      size: 4Gi
+- artifact_dir: /tmp/artifacts
+  as: integration
+  commands: TMPDIR=/tmp/volume openshift-hack/test-integration.sh
+  container:
+    from: src
+    memory_backed_volume:
+      size: 4Gi
+- artifact_dir: /tmp/artifacts
+  as: verify
+  commands: TMPDIR=/tmp/volume openshift-hack/verify.sh
+  container:
+    from: src
+    memory_backed_volume:
+      size: 4Gi
+- as: verify-commits
+  commands: openshift-hack/verify-commits.sh
+  container:
+    from: src
+    memory_backed_volume:
+      size: 4Gi
+- artifact_dir: /tmp/artifacts
+  as: kubernetes-e2e
+  steps:
+    cluster_profile: aws
+    workflow: openshift-kubernetes-e2e-aws
+- as: e2e-gcp
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
+- as: e2e-aws-ovn
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-ovn
+- as: e2e-azure
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure
+- as: e2e-cmd
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-cmd
+- as: e2e-aws-disruptive
+  commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance/parallel
+    run-tests
+  openshift_installer:
+    cluster_profile: aws
+- as: e2e-aws-jenkins
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-jenkins
+- as: e2e-gcp-upgrade
+  commands: TEST_SUITE=all run-upgrade-tests
+  openshift_installer:
+    cluster_profile: gcp
+    upgrade: true
+- as: e2e-aws-serial
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-serial
+- as: e2e-aws-csi
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-csi
+- as: e2e-vsphere
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer_upi:
+    cluster_profile: vsphere
+- as: e2e-conformance-k8s
+  commands: openshift-hack/conformance-k8s.sh
+  openshift_installer_src:
+    cluster_profile: aws
+zz_generated_metadata:
+  branch: release-4.6
+  org: openshift
+  repo: kubernetes
