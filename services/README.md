@@ -46,11 +46,11 @@ ConfigMaps.
 
 1. Admin resources are not automatically applied to the cluster.
 2. Other resources are automatically applied to the cluster by a Prow
-   [postsubmit](https://prow.svc.ci.openshift.org/?job=branch-ci-openshift-release-master-services-apply)
-   after each PR is merged, and also [periodically](https://prow.svc.ci.openshift.org/?job=openshift-release-master-services-apply).
+   [postsubmit](https://prow.ci.openshift.org/?job=branch-ci-openshift-release-master-services-apply)
+   after each PR is merged, and also [periodically](https://prow.ci.openshift.org/?job=openshift-release-master-services-apply).
 3. ConfigMaps are automatically updated by the `config-updater` Prow plugin,
    configured in its [config.yaml](02_config/_config.yaml) file.
-   Additionally, they are [periodically](https://prow.svc.ci.openshift.org/?job=openshift-release-master-config-bootstrapper)
+   Additionally, they are [periodically](https://prow.ci.openshift.org/?job=openshift-release-master-config-bootstrapper)
    synced by a Prow job.
 
 ### Manual
