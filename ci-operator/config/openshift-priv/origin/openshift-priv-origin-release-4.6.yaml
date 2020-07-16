@@ -1,28 +1,4 @@
 base_images:
-  base:
-    name: 4.6-priv
-    namespace: ocp-private
-    tag: base
-  base-machine:
-    name: fedora
-    namespace: openshift
-    tag: "29"
-  cli:
-    name: 4.6-priv
-    namespace: ocp-private
-    tag: cli
-  cli-jq:
-    name: cli-jq
-    namespace: ocp
-    tag: latest
-  machine-os-content-base:
-    name: 4.6-priv
-    namespace: ocp-private
-    tag: machine-os-content
-  oc-rpms:
-    name: 4.6-priv
-    namespace: ocp-private
-    tag: oc-rpms
   ocp_builder_golang-1.13:
     name: builder
     namespace: ocp
@@ -39,13 +15,6 @@ build_root:
     tag: golang-1.13
 canonical_go_repository: github.com/openshift/origin
 images:
-- dockerfile_path: images/hyperkube/Dockerfile.rhel
-  from: base
-  inputs:
-    ocp_builder_golang-1.13:
-      as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
-  to: hyperkube
 - dockerfile_path: images/tests/Dockerfile.rhel
   from: tools
   inputs:
@@ -53,61 +22,10 @@ images:
       as:
       - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
   to: tests
-- context_dir: images/os/
-  from: base
-  inputs:
-    base-machine-with-rpms:
-      as:
-      - fedora:29
-    machine-os-content-base:
-      as:
-      - registry.svc.ci.openshift.org/openshift/origin-v4.0:machine-os-content
-  to: machine-os-content
 promotion:
-  additional_images:
-    artifacts: artifacts
   disabled: true
-  excluded_images:
-  - machine-os-content
   name: 4.6-priv
   namespace: ocp-private
-raw_steps:
-- pipeline_image_cache_step:
-    commands: |
-      mkdir -p _output/local/releases; touch _output/local/releases/CHECKSUM; echo $'FROM bin AS bin\nFROM rpms AS rpms\nFROM centos:7 \nCOPY --from=bin /go/src/github.com/openshift/origin/_output/local/releases /srv/zips/ \nCOPY --from=oc-rpms /go/src/github.com/openshift/oc/_rpmbuild/SOURCES/* /srv/zips/ \nCOPY --from=rpms /go/src/github.com/openshift/origin/_output/local/releases/rpms/* /srv/repo/ \nCOPY --from=oc-rpms /go/src/github.com/openshift/oc/_rpmbuild/RPMS/x86_64/* /srv/repo/ ' > _output/local/releases/Dockerfile; make build-cross;
-    from: bin
-    to: bin-cross
-- project_directory_image_build_step:
-    from: base
-    inputs:
-      bin-cross:
-        as:
-        - bin
-        paths:
-        - destination_dir: .
-          source_path: /go/src/github.com/openshift/origin/_output/local/releases/Dockerfile
-      oc-rpms:
-        as:
-        - oc-rpms
-      rpms:
-        as:
-        - rpms
-      src: {}
-    optional: true
-    to: artifacts
-- output_image_tag_step:
-    from: artifacts
-    optional: true
-    to:
-      name: stable
-      namespace: ""
-      tag: artifacts
-- rpm_image_injection_step:
-    from: base
-    to: base-with-rpms
-- rpm_image_injection_step:
-    from: base-machine
-    to: base-machine-with-rpms
 resources:
   '*':
     requests:
@@ -121,61 +39,30 @@ resources:
     requests:
       cpu: "3"
       memory: 7Gi
-  bin-cross:
-    requests:
-      cpu: "3"
-      memory: 8Gi
-  e2e-conformance-k8s:
-    requests:
-      cpu: "1"
-      memory: 300Mi
-  hyperkube:
-    requests:
-      cpu: "3"
-      memory: 7Gi
-  hypershift:
-    requests:
-      cpu: "3"
-      memory: 7Gi
-  integration:
-    requests:
-      cpu: "6"
-      memory: 14Gi
-  rpms:
-    requests:
-      cpu: "4"
-      memory: 8Gi
   tests:
     requests:
       cpu: "3"
       memory: 7Gi
-  unit:
-    requests:
-      cpu: "6"
-      memory: 8Gi
   verify:
     requests:
       cpu: "3"
       memory: 8Gi
-rpm_build_commands: make build-rpms
 tag_specification:
   name: 4.6-priv
   namespace: ocp-private
 tests:
 - artifact_dir: /tmp/artifacts
-  as: unit
-  commands: TMPDIR=/tmp/volume GOTEST_FLAGS='-p 8' ARTIFACT_DIR=/tmp/artifacts TIMEOUT=360s
-    JUNIT_REPORT=1 TEST_KUBE=true KUBERNETES_SERVICE_HOST= hack/test-go.sh
-  container:
-    from: src
-    memory_backed_volume:
-      size: 4Gi
-- artifact_dir: /tmp/artifacts
   as: verify
-  commands: ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1 KUBERNETES_SERVICE_HOST= make
-    verify -k
+  commands: |
+    make verify -k --warn-undefined-variables
   container:
     from: bin
+- artifact_dir: /tmp/artifacts
+  as: verify-deps
+  commands: |
+    make verify-deps -k --warn-undefined-variables
+  container:
+    from: src
 - as: e2e-gcp
   steps:
     cluster_profile: gcp
@@ -230,10 +117,6 @@ tests:
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer_upi:
     cluster_profile: vsphere
-- as: e2e-conformance-k8s
-  commands: test/extended/conformance-k8s.sh
-  openshift_installer_src:
-    cluster_profile: aws
 zz_generated_metadata:
   branch: release-4.6
   org: openshift-priv
