@@ -942,7 +942,7 @@ objects:
           oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' > /tmp/nodes
           oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.spec.providerID}{"\n"}{end}' | sed 's|.*/||' > /tmp/node-provider-IDs
           oc --insecure-skip-tls-verify --request-timeout=5s -n openshift-machine-api get machines -o jsonpath --template '{range .items[*]}{.spec.providerID}{"\n"}{end}' | sed 's|.*/||' >> /tmp/node-provider-IDs
-          oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces --template '{{ range .items }}{{ $name := .metadata.name }}{{ $ns := .metadata.namespace }}{{ range .spec.containers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ range .spec.initContainers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ end }}' > /tmp/containers
+          oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces --template '{{ range .items }}{{ $name := .metadata.name }}{{ $ns := .metadata.namespace }}{{ $nodeName := .spec.nodeName }}{{ range .spec.containers }}-n {{ $ns }} {{ $name }} -c {{ .name }} {{ $nodeName }}{{ "\n" }}{{ end }}{{ range .spec.initContainers }}-n {{ $ns }} {{ $name }} -c {{ .name }} {{ $nodeName }}{{ "\n" }}{{ end }}{{ end }}' > /tmp/containers
           oc --insecure-skip-tls-verify --request-timeout=5s get pods -l openshift.io/component=api --all-namespaces --template '{{ range .items }}-n {{ .metadata.namespace }} {{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/pods-api
 
           queue /tmp/artifacts/config-resources.json oc --insecure-skip-tls-verify --request-timeout=5s get apiserver.config.openshift.io authentication.config.openshift.io build.config.openshift.io console.config.openshift.io dns.config.openshift.io featuregate.config.openshift.io image.config.openshift.io infrastructure.config.openshift.io ingress.config.openshift.io network.config.openshift.io oauth.config.openshift.io project.config.openshift.io scheduler.config.openshift.io -o json
@@ -1014,9 +1014,11 @@ objects:
           done < /tmp/pods-api
 
           while IFS= read -r i; do
-            file="$( echo "$i" | cut -d ' ' -f 2,3,5 | tr -s ' ' '_' )"
-            FILTER=gzip queue /tmp/artifacts/pods/${file}.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s $i
-            FILTER=gzip queue /tmp/artifacts/pods/${file}_previous.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s -p $i
+            file="$( echo "$i" | cut -d ' ' -f 3,5,6 | tr -s ' .' '_' )"
+            ns="$( echo "$i" | cut -d ' ' -f 2 )"
+            mkdir -p /tmp/artifacts/pods/${ns}
+            FILTER=gzip queue /tmp/artifacts/pods/${ns}/${file}.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s $i
+            FILTER=gzip queue /tmp/artifacts/pods/${ns}/${file}_previous.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s -p $i
           done < /tmp/containers
 
           echo "Snapshotting prometheus (may take 15s) ..."
