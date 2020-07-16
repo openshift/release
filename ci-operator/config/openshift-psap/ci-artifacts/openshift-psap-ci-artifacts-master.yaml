@@ -1,0 +1,37 @@
+base_images:
+  ansible-runner:
+    name: ansible-runner
+    namespace: openshift
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.14
+images:
+- from: base
+  to: ci-artifacts
+promotion:
+  name: "4.6"
+  namespace: psap
+resources:
+  '*':
+    requests:
+      cpu: 2000m
+      memory: 3Gi
+tag_specification:
+  name: "4.6"
+  namespace: psap
+tests:
+- as: gpu-operator-e2e
+  steps:
+    cluster_profile: aws
+    test:
+    - as: e2e
+      commands: ansible-playbook --version
+      from: src
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: master
+  org: openshift-psap
+  repo: ci-artifacts
