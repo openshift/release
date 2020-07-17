@@ -50,7 +50,6 @@ function run-tests() {
   done
 
   # Run createdisk script
-  export OPENSHIFT_VERSION=4.x.ci
   export SNC_VALIDATE_CERT=false
   ./createdisk.sh crc-tmp-install-data
   popd
@@ -82,4 +81,4 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   packer@"${INSTANCE_PREFIX}" \
-  --command "export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST}  && timeout 360m bash -ce \"/home/packer/run-tests.sh\""
+  --command "timeout 360m bash -ce \"/home/packer/run-tests.sh\""
