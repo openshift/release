@@ -41,9 +41,9 @@ for release in $( ls "${base}/core-services/release-controller/_releases/" | gre
 	annotate "ocp" "${release}-art-latest" "ocp-${release}.json"
 	annotate "ocp-s390x" "${release}-art-latest-s390x" "ocp-${release}-s390x.json"
 	annotate "ocp-ppc64le" "${release}-art-latest-ppc64le" "ocp-${release}-ppc64le.json"
-	annotate "ocp-priv" "${release}-art-latest" "ocp-${release}.json" "private"
-	annotate "ocp-s390x-priv" "${release}-art-latest-s390x" "ocp-${release}-s390x.json" "private"
-	annotate "ocp-ppc64le-priv" "${release}-art-latest-ppc64le" "ocp-${release}-ppc64le.json" "private"
+	annotate "ocp-priv" "${release}-art-latest-priv" "ocp-${release}.json" "private"
+	annotate "ocp-s390x-priv" "${release}-art-latest-s390x-priv" "ocp-${release}-s390x.json" "private"
+	annotate "ocp-ppc64le-priv" "${release}-art-latest-ppc64le-priv" "ocp-${release}-ppc64le.json" "private"
 done
 
 annotate "origin" "release" "origin-4.y-stable.json"
