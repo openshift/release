@@ -676,6 +676,30 @@ presubmits:
     branches:
     - master
     cluster: api.ci
+    context: ci/prow/release-controller-config
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-release-controller-config
+    rerun_command: /test release-controller-config
+    spec:
+      containers:
+      - args:
+        - ./
+        command:
+        - hack/validate-release-controller-config.sh
+        image: registry.svc.ci.openshift.org/ci/python-validation
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )release-controller-config,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: api.ci
     context: ci/prow/services-dry
     decorate: true
     labels:

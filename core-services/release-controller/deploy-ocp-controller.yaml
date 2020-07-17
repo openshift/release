@@ -1,84 +1,163 @@
-kind: List
+##################################################################################
+#                                DO NOT EDIT
+# File generated during execution of: generate-release-controllers.py
+##################################################################################
+
+
+#---------------------------------------------------------------------------------
+# redirect_and_files_cache_resources.py:226 added the following resource
+#---------------------------------------------------------------------------------
+
+# Bootstrap the environment for the amd64 tests image.  The caches require an amd64 "tests" image to execute on
+# the cluster.  This imagestream is used as a commandline parameter to the release-controller...
+#      --tools-image-stream-tag=release-controller-bootstrap:tests
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: release-controller-bootstrap
+  namespace: ocp
+spec:
+  lookupPolicy:
+    local: false
+  tags:
+  - from:
+      kind: DockerImage
+      name: registry.svc.ci.openshift.org/ocp/4.5:tests
+    importPolicy:
+      scheduled: true
+    name: tests
+    referencePolicy:
+      type: Source
+---
+#---------------------------------------------------------------------------------
+# redirect_and_files_cache_resources.py:247 added the following resource
+#---------------------------------------------------------------------------------
+
 apiVersion: v1
-items:
-# Redirects old URLs to the new server
-- kind: Route
-  apiVersion: v1
-  metadata:
-    name: release-controller-ocp
-    namespace: ci
-  spec:
-    host: openshift-release.svc.ci.openshift.org
-    tls:
-      termination: Edge
-      insecureEdgeTerminationPolicy: Redirect
-    to:
-      kind: Service
-      name: release-controller-ocp-redirect
-- apiVersion: v1
-  kind: ConfigMap
-  metadata:
-    name: release-controller-ocp-redirect-config
-    namespace: ci
-  data:
-    "default.conf": |
-      server {
-        listen 8080;
-        return 302 $scheme://openshift-release.apps.ci.l2s4.p1.openshiftapps.com$request_uri;
-      }
-- apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    labels:
-      app: release-controller-ocp-redirect
+kind: Route
+metadata:
+  name: release-controller-ocp
+  namespace: ci
+spec:
+  host: openshift-release.svc.ci.openshift.org
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: Edge
+  to:
+    kind: Service
     name: release-controller-ocp-redirect
-    namespace: ci
-  spec:
-    replicas: 2
-    selector:
-      matchLabels:
+---
+#---------------------------------------------------------------------------------
+# redirect_and_files_cache_resources.py:261 added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: v1
+data:
+  default.conf: "server {\n  listen 8080;\n  return 302 https://openshift-release.apps.ci.l2s4.p1.openshiftapps.com$request_uri;\n\
+    }\n"
+kind: ConfigMap
+metadata:
+  name: release-controller-ocp-redirect-config
+  namespace: ci
+---
+#---------------------------------------------------------------------------------
+# redirect_and_files_cache_resources.py:318 added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: release-controller-ocp-redirect
+  name: release-controller-ocp-redirect
+  namespace: ci
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      component: release-controller-ocp-redirect
+  template:
+    metadata:
+      labels:
+        app: prow
         component: release-controller-ocp-redirect
-    template:
-      metadata:
-        labels:
-          app: prow
-          component: release-controller-ocp-redirect
-      spec:
-        affinity:
-          podAntiAffinity:
-            requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchExpressions:
-                - key: component
-                  operator: In
-                  values:
-                  - release-controller-ocp-redirect
-              topologyKey: "kubernetes.io/hostname"
-        containers:
-        - image: nginxinc/nginx-unprivileged:1.17
-          name: nginx
-          volumeMounts:
-          - name: config
-            mountPath: /etc/nginx/conf.d
-        volumes:
-        - name: config
-          configMap:
-            name: release-controller-ocp-redirect-config
-- apiVersion: v1
-  kind: Service
-  metadata:
-    labels:
-      app: prow
-      component: release-controller-ocp-redirect
-    name: release-controller-ocp-redirect
-    namespace: ci
-  spec:
-    ports:
-    - name: main
-      port: 8080
-      protocol: TCP
-      targetPort: 8080
-    selector:
-      component: release-controller-ocp-redirect
-    sessionAffinity: None
-    type: ClusterIP
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: component
+                operator: In
+                values:
+                - release-controller-ocp-redirect
+            topologyKey: kubernetes.io/hostname
+      containers:
+      - image: nginxinc/nginx-unprivileged:1.17
+        name: nginx
+        volumeMounts:
+        - mountPath: /etc/nginx/conf.d
+          name: config
+      volumes:
+      - configMap:
+          name: release-controller-ocp-redirect-config
+        name: config
+---
+#---------------------------------------------------------------------------------
+# redirect_and_files_cache_resources.py:347 added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: prow
+    component: release-controller-ocp-redirect
+  name: release-controller-ocp-redirect
+  namespace: ci
+spec:
+  ports:
+  - name: main
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    component: release-controller-ocp-redirect
+  sessionAffinity: None
+  type: ClusterIP
+---
+#---------------------------------------------------------------------------------
+# redirect_and_files_cache_resources.py:24 added the following resource
+#---------------------------------------------------------------------------------
+
+# The release controller creates a files cache stateful set in each ci-release namespace
+# used by a release controller. Create a service and a route to this public instance.
+apiVersion: v1
+kind: Service
+metadata:
+  name: files-cache
+  namespace: ci-release
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: files-cache
+---
+#---------------------------------------------------------------------------------
+# redirect_and_files_cache_resources.py:44 added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Route
+metadata:
+  name: files-cache
+  namespace: ci-release
+spec:
+  host: openshift-release-artifacts.svc.ci.openshift.org
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: Edge
+  to:
+    kind: Service
+    name: files-cache
