@@ -38,6 +38,8 @@ function run-tests() {
   # wait till the cluster is stable
   sleep 5m
   export KUBECONFIG=crc-tmp-install-data/auth/kubeconfig
+  # Remove all the failed Pods
+  oc delete pods --field-selector=status.phase=Failed -A
 
   # Wait till all the pods are either running or completed or in terminating state
   while oc get pod --no-headers --all-namespaces | grep -v Running | grep -v Completed | grep -v Terminating; do
@@ -50,7 +52,6 @@ function run-tests() {
   done
 
   # Run createdisk script
-  export OPENSHIFT_VERSION=4.x.ci
   export SNC_VALIDATE_CERT=false
   ./createdisk.sh crc-tmp-install-data
   popd
@@ -82,4 +83,4 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   packer@"${INSTANCE_PREFIX}" \
-  --command "export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST}  && timeout 360m bash -ce \"/home/packer/run-tests.sh\""
+  --command "timeout 360m bash -ce \"/home/packer/run-tests.sh\""
