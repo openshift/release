@@ -6,7 +6,7 @@ import os
 from inspect import getframeinfo, stack
 import pathlib
 
-# If set to True, a call to gendoc will simple read & rewrite a filename in lexical order.
+# If set to True, a call to gendoc will simply read & rewrite a filename in lexical order.
 # This may be used as a first pass to help reduce git diffs between hand crafted and generated
 # files when first making the transition.
 SORT_ONLY = False
@@ -30,8 +30,8 @@ class GenDoc():
         self.who = {}  # Maps resource index to the caller who added the resource
 
         # This flag should only be set to True when a user is attempting to reformat a file
-        # prior to the first generating it's content. This step allows git diffs to be far
-        # more comparable when migrating from hand-crafted to migrated resources.
+        # prior to generating its content. This step allows git diffs to be far more
+        # comparable when migrating from hand-crafted to migrated resources.
         self.sort_only = SORT_ONLY
         if self.sort_only:
             self.sort_file()

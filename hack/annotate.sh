@@ -13,23 +13,23 @@ function annotate() {
 	local conf="${base}/core-services/release-controller/_releases/release-$3"
 
 	if [[ -n "${private}" ]]; then
-  	conf="${base}/core-services/release-controller/_releases/priv/release-$3"
-  fi
+        conf="${base}/core-services/release-controller/_releases/priv/release-$3"
+    fi
 
 	if [[ -s "${conf}" ]]; then
 		echo "${conf}"
 		jq . <"${conf}"
 
-  	# If this is a configuration for a private release controller, enforce that all ProwJob
-  	# names include "priv". This attempts to ensure that no on introduce a ProwJob without
-  	# "hidden: true" to the verfication steps of embargoed release payloads.
-  	if [[ -n "${private}" ]]; then
-      local nonpriv_hits=$(cat ${conf} | jq -r '.verify | keys[] as $k | (.[$k] | .prowJob.name)' | grep -v priv)
-      if [[ -n "${nonpriv_hits}" ]]; then
-        echo "${conf} contains prowJob name 'priv' substring ; Please use naming convention to ensure embargoed releases are not tested publicly."
-        exit 1
-      fi
-    fi
+		# If this is a configuration for a private release controller, enforce that all ProwJob
+		# names include "priv". This attempts to ensure that no on introduces a ProwJob without
+		# "hidden: true" to the verification steps of embargoed release payloads.
+		if [[ -n "${private}" ]]; then
+			local nonpriv_hits=$(cat ${conf} | jq -r '.verify | keys[] as $k | (.[$k] | .prowJob.name)' | grep -v priv)
+			if [[ -n "${nonpriv_hits}" ]]; then
+				echo "${conf} contains prowJob name without 'priv' substring ; Please use naming convention to ensure embargoed releases are not tested publicly."
+				exit 1
+			fi
+		fi
 
 		oc annotate -n "${namespace}" "is/${name}" "release.openshift.io/config=$( cat "${conf}" )" --overwrite
 	fi

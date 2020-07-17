@@ -300,7 +300,7 @@ def _add_osd_rc_deployment(gendoc):
 def add_osd_rc_deployments(gendoc):
     gendoc.add_comments("""
 Resources required to deploy release controller instances on
-the OSD api.ci clusters.
+the app.ci clusters.
 """)
     _add_osd_rc_route(gendoc)
     _add_osd_rc_service(gendoc)
