@@ -15,7 +15,7 @@ if [[ ! -d "${base_dir}" ]]; then
 fi
 
 gather_rc_md5s() {
-    find "${base_dir}/core-services/release-controller" "${base_dir}/clusters/app.ci/release-controller" -type f -exec md5sum '{}' \; | sort
+    find "${base_dir}/core-services/release-controller" "${base_dir}/clusters/app.ci/release-controller" -type f -exec md5sum '{}' + | sort
 }
 
 PRE_RC_GEN=$(gather_rc_md5s)

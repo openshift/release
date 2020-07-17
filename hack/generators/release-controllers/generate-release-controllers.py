@@ -82,7 +82,7 @@ def run(git_clone_dir):
     path_priv_rc_annotations = path_rc_annotations.joinpath('priv')  # location where priv release controller annotations are generated
     path_priv_rc_annotations.mkdir(exist_ok=True)
 
-    releases_4x.sort()
+    releases_4x.sort()  # Glob does provide any guarantees on ordering, so force an order by sorting.
     config = Config(releases_4x)
     for private in (False, True):
         for arch in config.arches:

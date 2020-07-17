@@ -4,7 +4,7 @@ def add_osd_rc_service_account_resources(gendoc):
     config = gendoc.context
     sa_annotations = {}
     for arch in config.arches:
-        arch_priv_suffix = config.get_suffix(arch, True)
+        arch_priv_suffix = config.get_suffix(arch, private=True)
         sa_annotations[
             f'serviceaccounts.openshift.io/oauth-redirectreference.ocp{arch_priv_suffix}'] = '{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"release-controller-ocp%s"}}' % arch_priv_suffix
 
