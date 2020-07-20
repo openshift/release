@@ -1,0 +1,88 @@
+postsubmits:
+  open-cluster-management/work:
+  - agent: kubernetes
+    branches:
+    - ^release-2\.1$
+    cluster: api.ci
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/is-promotion: "true"
+      ci-operator.openshift.io/prowgen-controlled: "true"
+    max_concurrency: 1
+    name: branch-ci-open-cluster-management-work-release-2.1-images
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --promote
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --target=[images]
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    branches:
+    - ^release-2\.1$
+    cluster: api.ci
+    decorate: true
+    name: branch-ci-open-cluster-management-work-release-2.1-publish
+    spec:
+      containers:
+      - args:
+        - -f
+        - /opt/build-harness/Makefile.build-harness-openshift-ci
+        - pipeline-manifest/update
+        command:
+        - make
+        env:
+        - name: COMPONENT_NAME
+          value: work
+        - name: COMPONENT_VERSION
+          value: 0.0.2
+        - name: SELF
+          value: make -f /opt/build-harness/Makefile.build-harness-openshift-ci
+        image: registry.svc.ci.openshift.org/open-cluster-management/builder:go1.14-linux-amd64
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/github
+          name: acm-cicd-github
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: acm-cicd-github
+        secret:
+          secretName: acm-cicd-github
