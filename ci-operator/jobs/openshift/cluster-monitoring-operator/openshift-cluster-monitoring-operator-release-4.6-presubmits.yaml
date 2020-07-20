@@ -210,31 +210,44 @@ presubmits:
     cluster: api.ci
     context: ci/prow/generate
     decorate: true
+    decoration_config:
+      skip_cloning: true
     labels:
-      ci.openshift.io/manually-branched: "true"
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-monitoring-operator-release-4.6-generate
     rerun_command: /test generate
     spec:
       containers:
       - args:
-        - -c
-        - make generate && git diff --exit-code
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --target=generate
         command:
-        - sh
-        env:
-        - name: GO111MODULE
-          value: "on"
-        - name: GOPATH
-          value: /go:/home/prow/go
-        - name: USER
-          value: deadbeef
-        image: quay.io/coreos/jsonnet-ci:release-0.38
+        - ci-operator
+        image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
         resources:
           requests:
-            cpu: 500m
-    trigger: (?m)^/test generate
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )generate,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
