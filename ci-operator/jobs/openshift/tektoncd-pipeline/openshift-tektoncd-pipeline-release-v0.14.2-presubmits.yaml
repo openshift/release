@@ -1,0 +1,386 @@
+presubmits:
+  openshift/tektoncd-pipeline:
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-v0.14.2
+    cluster: api.ci
+    context: ci/prow/4.3-e2e
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: "4.3"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-tektoncd-pipeline-release-v0.14.2-4.3-e2e
+    path_alias: github.com/tektoncd/pipeline
+    rerun_command: /test 4.3-e2e
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-password-file=/etc/boskos/password
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/usr/local/e2e-cluster-profile
+        - --target=e2e
+        - --template=/usr/local/e2e
+        - --variant=4.3
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: JOB_NAME_SAFE
+          value: e2e
+        - name: TEST_COMMAND
+          value: make test-e2e
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e
+          name: job-definition
+          subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-src
+        name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.3-e2e,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-v0.14.2
+    cluster: api.ci
+    context: ci/prow/4.3-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: "4.3"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-tektoncd-pipeline-release-v0.14.2-4.3-images
+    path_alias: github.com/tektoncd/pipeline
+    rerun_command: /test 4.3-images
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --target=[images]
+        - --variant=4.3
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.3-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-v0.14.2
+    cluster: api.ci
+    context: ci/prow/4.4-e2e
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: "4.4"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-tektoncd-pipeline-release-v0.14.2-4.4-e2e
+    path_alias: github.com/tektoncd/pipeline
+    rerun_command: /test 4.4-e2e
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-password-file=/etc/boskos/password
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/usr/local/e2e-cluster-profile
+        - --target=e2e
+        - --template=/usr/local/e2e
+        - --variant=4.4
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: JOB_NAME_SAFE
+          value: e2e
+        - name: TEST_COMMAND
+          value: make test-e2e
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e
+          name: job-definition
+          subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-src
+        name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.4-e2e,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-v0.14.2
+    cluster: api.ci
+    context: ci/prow/4.4-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: "4.4"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-tektoncd-pipeline-release-v0.14.2-4.4-images
+    path_alias: github.com/tektoncd/pipeline
+    rerun_command: /test 4.4-images
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --target=[images]
+        - --variant=4.4
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.4-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-v0.14.2
+    cluster: api.ci
+    context: ci/prow/4.5-e2e
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: "4.5"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-tektoncd-pipeline-release-v0.14.2-4.5-e2e
+    path_alias: github.com/tektoncd/pipeline
+    rerun_command: /test 4.5-e2e
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-password-file=/etc/boskos/password
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/usr/local/e2e-cluster-profile
+        - --target=e2e
+        - --template=/usr/local/e2e
+        - --variant=4.5
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: JOB_NAME_SAFE
+          value: e2e
+        - name: TEST_COMMAND
+          value: make test-e2e
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e
+          name: job-definition
+          subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-src
+        name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.5-e2e,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-v0.14.2
+    cluster: api.ci
+    context: ci/prow/4.5-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: "4.5"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-tektoncd-pipeline-release-v0.14.2-4.5-images
+    path_alias: github.com/tektoncd/pipeline
+    rerun_command: /test 4.5-images
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --target=[images]
+        - --variant=4.5
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.5-images,?($|\s.*)
