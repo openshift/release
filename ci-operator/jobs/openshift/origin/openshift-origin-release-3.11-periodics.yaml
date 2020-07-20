@@ -1,0 +1,72 @@
+periodics:
+- agent: kubernetes
+  cluster: api.ci
+  cron: 20 4 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: release-3.11
+    org: openshift
+    repo: origin
+  labels:
+    ci.openshift.io/release-type: informing
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-origin-release-3.11-e2e-gcp
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/usr/local/e2e-gcp-periodic-cluster-profile
+      - --target=e2e-gcp-periodic
+      - --template=/usr/local/e2e-gcp-periodic
+      command:
+      - ci-operator
+      env:
+      - name: RPM_REPO_OPENSHIFT_ORIGIN
+        value: https://rpms.svc.ci.openshift.org/openshift-origin-v3.11/
+      - name: CLUSTER_TYPE
+        value: gcp
+      - name: JOB_NAME_SAFE
+        value: e2e-gcp-periodic
+      - name: TEST_COMMAND
+        value: TEST_FOCUS=Suite:openshift/conformance/parallel TEST_FOCUS_SERIAL=Suite:openshift/conformance/serial/minimal
+          run-tests
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/e2e-gcp-periodic-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/e2e-gcp-periodic
+        name: job-definition
+        subPath: cluster-launch-e2e.yaml
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-gcp
+        - configMap:
+            name: cluster-profile-gcp
+    - configMap:
+        name: prow-job-cluster-launch-e2e
+      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
