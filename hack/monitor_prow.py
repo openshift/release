@@ -97,6 +97,8 @@ def highlight(log_dir, dc):
                 cmd += ['--container', 'deck']
             if "component=boskos" in dc and not "-" in dc:
                 cmd += ['--container', 'boskos']
+            if "release-controller" in dc and "priv" in dc:
+                cmd += ['--container', 'controller']
             debug("deployment/{}: pod/{}: getting logs".format(dc, pod))
             try:
                 for l in run_oc(cmd).splitlines():
@@ -145,15 +147,18 @@ def renderHeader(dc):
     available = status.get("availableReplicas", 0)
     version = "<unknown-version>"
     containers = spec.get("template", {}).get("spec", {}).get("containers", [])
+    if  "jenkins-dev-operator" in name:
+        container_name = "jenkins-operator"
+    elif "deck-internal" in name:
+        container_name = "deck"
+    elif "priv" in dc and "release-controller" in dc:
+        container_name = "controller"
+    elif len(containers) == 1:
+        container_name = containers[0].get("name", "")
+    else:
+        container_name = dc
+    debug("deployment/{}: got container name {}".format(dc, container_name))
     for container in containers:
-        if  "jenkins-dev-operator" in name:
-            container_name = "jenkins-operator"
-        elif "deck-internal" in name:
-            container_name = "deck"
-        elif len(containers) == 1:
-            container_name = container.get("name", "")
-        else:
-            container_name = dc
         if container.get("name") == container_name:
             image = container.get("image", "")
             version = image.split(":")[-1]
