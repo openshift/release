@@ -369,6 +369,31 @@ ci-operator \
     --namespace mynamespace
 ```
 
+### Rebalancing tests among platforms
+
+If test volume for a given platform exceeds [the Boskos lease capacity][boskos-leases], [`jobs-failing-with-lease-acquire-timeout`](../clusters/app.ci/prow-monitoring/mixins/prometheus_out/prometheus-prow-rules_prometheusrule.yaml) will fire.
+Presubmit jobs may be rebalanced to move platform-agnostic jobs to platforms with available capacity.
+Component teams may mark their presubmit jobs as platform-agnostic by configuring `as` names which exclude the platform slug (e.g. `aws`), whose absence is used as a marker of "this test is platform-agnostic".
+For example, see [release#10152][release-10152].
+To locate platform-specific jobs which might be good candidates for moving to the platform-agnostic pool, you can use:
+
+```console
+$ hack/step-jobs-by-platform.py
+workflows which need alternative platforms to support balancing:
+  baremetalds-e2e
+  ipi-aws
+  ipi-aws-ovn-hybrid
+  openshift-e2e-aws-csi
+...
+count	platform	status	alternatives	job
+39	gcp	balanceable	aws,azure,vsphere	pull-ci-openshift-cluster-version-operator-master-e2e
+26	aws	unknown	azure,gcp,vsphere	pull-ci-openshift-sriov-dp-admission-controller-master-e2e-aws
+15	aws	unknown	azure,gcp,vsphere	pull-ci-openshift-cluster-authentication-operator-master-e2e-aws
+10	aws	balanceable	azure,vsphere	pull-ci-openshift-machine-config-operator-master-e2e-ovn-step-registry
+9	aws	unknown	gcp	pull-ci-openshift-cluster-samples-operator-release-4.1-e2e-aws-image-ecosystem
+...
+```
+
 ### Rebalancing AWS tests among regions and zones
 
 Occasionally we hit install errors like:
@@ -400,3 +425,4 @@ Focusing on [step-registry](step-registry) consumers, you could avoid us-east-1b
 
 [aws-creating-shared-subnets]: https://github.com/openshift/release/pull/6949/commits/1b21187950b7d1d83f87774e9c52e74616e1b6c4
 [boskos-leases]: https://steps.ci.openshift.org/help/leases
+[release-10152]: https://github.com/openshift/release/pull/10152
