@@ -98,6 +98,11 @@ def _get_osd_rc_deployment_sidecars(context):
 
     if context.private:
         sidecars.append({
+            "resources": {
+                "requests": {
+                    "memory": "50Mi"
+                },
+            },
             'args': ['-provider=openshift',
                      '-https-address=:8443',
                      '-http-address=',
@@ -168,6 +173,11 @@ def _add_osd_rc_deployment(gendoc):
                     'containers': [
                         *_get_osd_rc_deployment_sidecars(context),
                         {
+                            "resources": {
+                                "requests": {
+                                    "memory": "2Gi"
+                                },
+                            },
                             'command': ['/usr/bin/release-controller',
                                         # '--to=release',  # Removed according to release controller help
                                         *extra_rc_args,
