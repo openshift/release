@@ -38,6 +38,7 @@ RUN yum install -y /tmp/origin-rpm/*.rpm && \
         gotest.tools/gotestsum \
         github.com/openshift/release/tools/gotest2junit \
         github.com/openshift/imagebuilder/cmd/imagebuilder && \
+    GO111MODULE=on go get gotest.tools/gotestsum@v0.5.2 && \
     mv $GOPATH/bin/* /usr/bin/ && \
     rm -rf $GOPATH/* $GOPATH/.cache && \
     mkdir $GOPATH/bin && \
