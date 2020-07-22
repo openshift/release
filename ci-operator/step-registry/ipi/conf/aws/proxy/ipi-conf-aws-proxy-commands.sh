@@ -237,12 +237,12 @@ Resources:
         }
 
 Outputs:
-  ProxyPublicIp:
-    Description: The proxy node public IP address.
-    Value: !GetAtt ProxyInstance.PublicIp
   ProxyId:
     Description: The proxy node instanceId.
     Value: !Ref ProxyInstance
+  ProxyPrivateIp:
+    Description: The proxy node private IP address.
+    Value: !GetAtt ProxyInstance.PrivateIp
 EOF
 }
 
@@ -372,7 +372,7 @@ INSTANCE_ID="$(aws --region "${REGION}" cloudformation describe-stacks --stack-n
 echo "${INSTANCE_ID}" >> "${SHARED_DIR}/aws-instance-ids.txt"
 
 PROXY_IP="$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${PROXY_NAME}-proxy" \
-  --query 'Stacks[].Outputs[?OutputKey == `ProxyPublicIp`].OutputValue' --output text)"
+  --query 'Stacks[].Outputs[?OutputKey == `ProxyPrivateIp`].OutputValue' --output text)"
 
 # echo proxy IP to ${SHARED_DIR}/proxyip
 echo "${PROXY_IP}" >> "${SHARED_DIR}/proxyip"
