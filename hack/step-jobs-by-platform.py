@@ -17,7 +17,7 @@ def load_config(directory):
             _path = os.path.join(_basedir, _filename)
             try:
                 with open(_path, 'r') as f:
-                    _config = yaml.load(f)
+                    _config = yaml.safe_load(f)
             except:
                 print('failed to load YAML from {}'.format(_path))
                 raise
