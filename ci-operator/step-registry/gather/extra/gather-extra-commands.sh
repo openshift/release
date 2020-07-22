@@ -42,6 +42,10 @@ queue ${ARTIFACT_DIR}/configmaps.json oc --insecure-skip-tls-verify --request-ti
 queue ${ARTIFACT_DIR}/oc_cmds/configmaps oc --insecure-skip-tls-verify --request-timeout=5s get configmaps --all-namespaces
 queue ${ARTIFACT_DIR}/credentialsrequests.json oc --insecure-skip-tls-verify --request-timeout=5s get credentialsrequests --all-namespaces -o json
 queue ${ARTIFACT_DIR}/oc_cmds/credentialsrequests oc --insecure-skip-tls-verify --request-timeout=5s get credentialsrequests --all-namespaces
+queue ${ARTIFACT_DIR}/csidrivers.json oc --insecure-skip-tls-verify --request-timeout=5s get csidrivers -o json
+queue ${ARTIFACT_DIR}/oc_cmds/csidrivers oc --insecure-skip-tls-verify --request-timeout=5s get csidrivers
+queue ${ARTIFACT_DIR}/csinodes.json oc --insecure-skip-tls-verify --request-timeout=5s get csinodes -o json
+queue ${ARTIFACT_DIR}/oc_cmds/csinodes oc --insecure-skip-tls-verify --request-timeout=5s get csinodes
 queue ${ARTIFACT_DIR}/csr.json oc --insecure-skip-tls-verify --request-timeout=5s get csr -o json
 queue ${ARTIFACT_DIR}/endpoints.json oc --insecure-skip-tls-verify --request-timeout=5s get endpoints --all-namespaces -o json
 queue ${ARTIFACT_DIR}/oc_cmds/endpoints oc --insecure-skip-tls-verify --request-timeout=5s get endpoints --all-namespaces
@@ -87,6 +91,8 @@ FILTER=gzip queue ${ARTIFACT_DIR}/statefulsets.json.gz oc --insecure-skip-tls-ve
 queue ${ARTIFACT_DIR}/statefulsets oc --insecure-skip-tls-verify --request-timeout=5s get statefulsets --all-namespaces
 queue ${ARTIFACT_DIR}/storages.json oc --insecure-skip-tls-verify --request-timeout=5s get storages -o json
 queue ${ARTIFACT_DIR}/oc_cmds/storages oc --insecure-skip-tls-verify --request-timeout=5s get storages
+queue ${ARTIFACT_DIR}/volumeattachments.json oc --insecure-skip-tls-verify --request-timeout=5s get volumeattachments -o json
+queue ${ARTIFACT_DIR}/oc_cmds/volumeattachments oc --insecure-skip-tls-verify --request-timeout=5s get volumeattachments
 
 FILTER=gzip queue ${ARTIFACT_DIR}/openapi.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get --raw /openapi/v2
 
