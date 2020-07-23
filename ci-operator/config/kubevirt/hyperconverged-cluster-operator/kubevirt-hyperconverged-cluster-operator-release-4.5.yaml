@@ -86,24 +86,21 @@ tests:
   as: hco-e2e-nightly-bundle-release-4-5-azure4
   commands: |
     set -e
-
-    ARTIFACTS_DIR=/tmp/artifacts
+    export ARTIFACTS_DIR=/tmp/artifacts
     echo "Fetching quay secret"
     auth_file=/tmp/openshift-cnv-auth.json
     oc get secret/pull-secret -n openshift-config -o=jsonpath='{.data.\.dockerconfigjson}' | \
         base64 -w0 -d |
         jq 'map({"auths":{"quay.io/openshift-cnv"}})| .[]' -cM > "$auth_file"
-
     echo "Generating debug info"
     bundle_floating=quay.io/openshift-cnv/container-native-virtualization-hco-bundle-registry:2.4-latest
-    bundle_under_test="$(skopeo inspect --authfile "$auth_file" "docker://${bundle_floating}" | jq -r '.Name + "@" + .Digest')"
+    bundle_metadata="$(skopeo inspect --authfile "$auth_file" "docker://${bundle_floating}")"
+    bundle_under_test="$(jq -r '.Name + "@" + .Digest' <<<"$bundle_metadata")"
     echo "$bundle_under_test" > "${ARTIFACTS_DIR}/bundle_under_test.txt"
-
     set -x
     echo "Deploying test infra"
     oc create ns openshift-cnv
     oc create -f /kubevirt-testing-infra.yaml
-
     echo "Deploying nightly bundle"
     export HCO_REGISTRY_IMAGE="${bundle_under_test}"
     export HCO_VERSION=2.4.0
@@ -111,18 +108,28 @@ tests:
     export TARGET_NAMESPACE=openshift-cnv
     /deploy.sh
 
-    tests_filter="(Slirp Networking)|(with CPU spec)|(with TX offload disabled)|(with cni flannel and ptp plugin interface)|(with ovs-cni plugin)|(test_id:1752)|(SRIOV)|(with EFI)|(Operator)|(GPU)|(DataVolume Integration)|(test_id:3468)|(test_id:3466)|(test_id:1015)|(rfe_id:393)"
-    focus_tests_filter="(rfe_id:1177)|(rfe_id:273)|(rfe_id:151)"
     operator_image="$(oc get pod -n openshift-cnv -l kubevirt.io=virt-operator --no-headers -o=jsonpath='{.items[0].spec.containers[0].image}')"
-    test_pod_override="$(
-      sed -e "s|@OPERATOR_IMAGE_URL@|${operator_image}|g" \
-        -e "s/@GINKGO_TESTS_TO_SKIP@/${tests_filter}/g" \
-        -e "s/@GINKGO_TESTS_TO_FOCUS@/${focus_tests_filter}/g" \
-        -e "s/@NAMESPACE@/${TARGET_NAMESPACE}/g" /kubevirt-tests-pod-spec-override.json.in
-    )"
-    oc -n openshift-cnv run -i tests-runner --image=dummy --overrides="$test_pod_override" --restart=Never
-    echo "Test is finished"
+    kv_tag="$(skopeo inspect --authfile "$auth_file" "docker://${operator_image}" | jq -r '.Labels["upstream-version"]')"
 
+    echo '{' > /tmp/kv-testconfig.json
+    echo '  "storageClassLocal": "hostpath-provisioner",' >> /tmp/kv-testconfig.json
+    echo '  "storageClassHostPath": "hostpath-provisioner",' >> /tmp/kv-testconfig.json
+    echo '  "storageClassRhel": "hostpath-provisioner",' >> /tmp/kv-testconfig.json
+    echo '  "storageClassWindows": "hostpath-provisioner",' >> /tmp/kv-testconfig.json
+    echo '  "manageStorageClasses": false' >> /tmp/kv-testconfig.json
+    echo '}' >> /tmp/kv-testconfig.json
+    curl -L https://github.com/kubevirt/kubevirt/releases/download/v${kv_tag}/tests.test -o /tmp/kubevirt.test
+    chmod u+x /tmp/kubevirt.test
+    ./tmp/kubevirt.test \
+      -installed-namespace="$TARGET_NAMESPACE" \
+      -cdi-namespace="$TARGET_NAMESPACE" \
+      -config=/tmp/kv-testconfig.json \
+      -kubeconfig="$KUBECONFIG" \
+      -ginkgo.focus='(rfe_id:1177)|(rfe_id:273)|(rfe_id:151)' \
+      -ginkgo.skip='(Slirp Networking)|(with CPU spec)|(with TX offload disabled)|(with cni flannel and ptp plugin interface)|(with ovs-cni plugin)|(test_id:1752)|(SRIOV)|(with EFI)|(Operator)|(GPU)|(DataVolume Integration)|(test_id:3468)|(test_id:3466)|(test_id:1015)|(rfe_id:393)' \
+      -junit-output="${ARTIFACTS_DIR}/junit.functest.xml" \
+      -ginkgo.seed=0
+    echo "Test is finished"
     echo "Tagging tested bundle"
     TARGET_BUNDLE_REGISTRY=quay.io/openshift-cnv/container-native-virtualization-hco-bundle-registry-tested
     skopeo copy --authfile "$auth_file" "docker://${bundle_under_test}" "docker://${TARGET_BUNDLE_REGISTRY}:4.5-tested"
