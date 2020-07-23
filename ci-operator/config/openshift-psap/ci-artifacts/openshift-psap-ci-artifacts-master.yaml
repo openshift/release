@@ -1,20 +1,42 @@
-base_images:
-  ansible-runner:
-    name: ansible-runner
+base_rpm_images:
+  os:
+    name: centos
     namespace: openshift
-    tag: latest
+    tag: "7"
 build_root:
   image_stream_tag:
-    name: ansible-runner
+    name: release
     namespace: openshift
-    tag: latest
+    tag: golang-1.14
 images:
 - dockerfile_path: build/Dockerfile
   from: base
-  to: ci-artifacts
+  to: ansible
 promotion:
   name: "4.6"
-  namespace: psap
+  namespace: ocp
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      INSTALL_PKGS="which tar jq ansible ansible-runner python-kubernetes python-openshift wget hostname sysvinit-tools util-linux socat tree findutils lsof bind-utils shadow-utils"
+      cat <<DOCKERFILE > /opt/Dockerfile
+      FROM os
+      RUN mkdir -p /var/lib/origin && \
+          yum install -y ${INSTALL_PKGS} && \
+          rpm -V ${INSTALL_PKGS} && \
+          yum clean all && rm -rf /var/cache/yum/*
+      DOCKERFILE
+    from: os
+    to: src-dockerfile
+- project_directory_image_build_step:
+    from: os
+    inputs:
+      src: {}
+      src-dockerfile:
+        paths:
+        - destination_dir: .
+          source_path: /opt/Dockerfile
+    to: base
 resources:
   '*':
     requests:
@@ -22,19 +44,37 @@ resources:
       memory: 3Gi
   unit:
     requests:
-      cpu: "1"
-      memory: 1.5Gi
+      cpu: "2"
+      memory: 3Gi
+rpm_build_commands: tito tag --offline --accept-auto-changelog --use-release '9999%{?dist}';
+  tito build --output="_output/local/releases" --rpm --test --offline --quiet; mkdir
+  -p _output/local/releases/rpms; mv _output/local/releases/noarch/* _output/local/releases/rpms;
+  createrepo _output/local/releases/rpms
 tag_specification:
   name: "4.6"
-  namespace: psap
+  namespace: ocp
+test_binary_build_commands: |
+  set -eo pipefail
+  yum install -y gcc libffi-devel python-devel openssl-devel python3
+  pip3 install tox virtualenv==16.7.9
+  chmod uga+w /etc/passwd
 tests:
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: |
+    set -o pipefail
+    echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
+    tox 2>&1 | tee /tmp/artifacts/output.log
+  container:
+    from: test-bin
 - as: gpu-operator-e2e
   steps:
     cluster_profile: aws
     test:
     - as: e2e
-      commands: ansible-playbook --version
-      from: ci-artifacts
+      cron: 0 1,13 * * * 
+      commands: gpu-ci
+      from: base
       resources:
         requests:
           cpu: 2000m
