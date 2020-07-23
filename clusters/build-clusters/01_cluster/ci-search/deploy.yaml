@@ -54,6 +54,14 @@ metadata:
   annotations:
     image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"ci-search:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"web\")].image"}]'
 spec:
+  # Force the thing onto its own snowflake node so it only harms itself and not others.
+  nodeSelector:
+    ci.openshift.io/ci-search: "true"
+    tolerations:
+    - key: ci.openshift.io/ci-search
+      value: "true"
+      effect: NoSchedule
+      operator: Equal
   replicas: 2
   selector:
     matchLabels:
