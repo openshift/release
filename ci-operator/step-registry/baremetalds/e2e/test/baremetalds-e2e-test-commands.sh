@@ -34,8 +34,15 @@ scp "${SSHOPTS[@]}" /usr/bin/openshift-tests /usr/bin/kubectl "root@${IP}:/usr/l
 
 # Tests execution
 set +e
-echo "### Running tests"
-ssh "${SSHOPTS[@]}" "root@${IP}" openshift-tests run "openshift/conformance/parallel" --dry-run \| grep 'Feature:ProjectAPI' \| openshift-tests run -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit -f -
+if [[ -s "${SHARED_DIR}/test-list" ]]; then
+    echo "### Copying test-list file"
+    scp "${SSHOPTS[@]}" "${SHARED_DIR}/test-list" "root@${IP}:/tmp/test-list"
+    echo "### Running tests"
+    ssh "${SSHOPTS[@]}" "root@${IP}" openshift-tests run "openshift/conformance/parallel" --dry-run \| grep -Ff /tmp/test-list \|openshift-tests run -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit -f -
+else
+    echo "### Running tests"
+    ssh "${SSHOPTS[@]}" "root@${IP}" openshift-tests run "openshift/conformance/parallel" --dry-run \| grep 'Feature:ProjectAPI' \| openshift-tests run -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit -f -
+fi
 rv=$?
 
 echo "### Fetching results"
