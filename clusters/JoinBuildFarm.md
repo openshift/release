@@ -48,3 +48,7 @@ TODO
 ### container based tests
 
 ### e2e tests
+
+Requirement:
+
+*  The certificates of the registry [are trusted](https://docs.openshift.com/container-platform/4.5/registry/securing-exposing-registry.html).
