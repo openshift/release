@@ -1,12 +1,39 @@
+base_images:
+  base:
+    name: "4.6"
+    namespace: ocp
+    tag: base
+  openshift_release_golang-1.14:
+    name: release
+    namespace: openshift
+    tag: golang-1.14
+  ubi8:
+    name: ubi
+    namespace: ocp
+    tag: "8"
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.14
 images:
-- dockerfile_path: Dockerfile.bm-inventory-build
-  from: src
-  to: assisted-service
+- dockerfile_path: Dockerfile
+  from: base-os
+  inputs:
+    openshift_release_golang-1.14:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.14
+  to: assisted-service 
+promotion:
+  name: "4.6"
+  namespace: ocp
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      rm -rf /etc/yum.repos.d/*
+      curl http://base-4-6-rhel8.ocp.svc > /etc/yum.repos.d/base-4-6-rhel8.repo
+    from: ubi8
+    to: base-os
 resources:
   '*':
     requests:
@@ -16,10 +43,14 @@ tag_specification:
   name: "4.6"
   namespace: ocp
 tests:
-- as: unit
-  commands: make unit-test
+- as: build
+  commands: |
+    export XDG_CACHE_HOME=/tmp/.cache GO111MODULE=on GOPATH=${HOME}/go GOBIN=${HOME}/go/bin GOPROXY=https://proxy.golang.org
+    export PATH="${GOBIN}:${PATH}" GOCACHE="${GOPATH}/pkg/mod"     
+    go get -u github.com/golangci/golangci-lint/cmd/golangci-lint
+    golangci-lint run -v
   container:
-    from: assisted-service
+    from: openshift_release_golang-1.14
 zz_generated_metadata:
   branch: master
   org: openshift
