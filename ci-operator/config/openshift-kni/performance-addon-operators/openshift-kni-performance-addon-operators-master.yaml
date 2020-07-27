@@ -11,7 +11,7 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-binary_build_commands: make build
+binary_build_commands: IMAGE_BUILD_CMD=docker make build generate-manifests-index
 build_root:
   project_image:
     dockerfile_path: openshift-ci/Dockerfile.tools
@@ -43,6 +43,13 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/openshift-kni/performance-addon-operators/build/_output/manifests
   to: performance-addon-operator-bundle
+- dockerfile_path: openshift-ci/Dockerfile.index.ci
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift-kni/performance-addon-operators/build/_output/database
+  to: performance-addon-operator-index
 promotion:
   excluded_images:
   - operator-registry-base
