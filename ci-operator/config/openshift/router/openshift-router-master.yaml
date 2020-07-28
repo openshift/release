@@ -51,6 +51,38 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
+- as: e2e-metal-ipi-router
+  steps:
+    cluster_profile: packet
+    pre:
+    - ref: baremetalds-packet-setup
+    - ref: ipi-install-rbac
+    - ref: baremetalds-devscripts-conf-dualstack
+    - ref: baremetalds-devscripts-setup
+    test:
+    - as: baremetalds-e2e-conf-router
+      commands: |
+        #!/bin/bash
+
+        set -o nounset
+        set -o errexit
+        set -o pipefail
+
+        echo "************ baremetalds e2e router conf command ************"
+
+        read -d '#' INCL << EOF
+        [sig-api-machinery] Watchers should be able to start watching from a specific resource version
+        #
+        EOF
+
+        cat <(echo "$INCL") > "${SHARED_DIR}/test-list"
+      from: baremetal-installer
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    - ref: baremetalds-e2e-test
+    workflow: baremetalds-e2e
 - as: e2e-upgrade
   commands: TEST_SUITE=all run-upgrade-tests
   openshift_installer:
