@@ -11,6 +11,10 @@ base_images:
     name: 4.1-priv
     namespace: ocp-private
     tag: machine-os-content
+  ocp_builder_golang-1.11:
+    name: builder
+    namespace: ocp
+    tag: golang-1.11
 binary_build_commands: make build WHAT='cmd/hypershift vendor/k8s.io/kubernetes/cmd/hyperkube'
 build_root:
   image_stream_tag:
@@ -21,24 +25,48 @@ canonical_go_repository: github.com/openshift/origin
 images:
 - dockerfile_path: images/template-service-broker/Dockerfile.rhel
   from: base
+  inputs:
+    ocp_builder_golang-1.11:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.11
   to: template-service-broker
 - dockerfile_path: images/cli/Dockerfile.rhel
   from: base
+  inputs:
+    ocp_builder_golang-1.11:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.11
   to: cli
 - dockerfile_path: images/cli-artifacts/Dockerfile.rhel
   from: cli
+  inputs:
+    ocp_builder_golang-1.11:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.11
   to: cli-artifacts
 - dockerfile_path: images/hypershift/Dockerfile.rhel
   from: base
+  inputs:
+    ocp_builder_golang-1.11:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.11
   to: hypershift
 - dockerfile_path: images/hyperkube/Dockerfile.rhel
   from: base
+  inputs:
+    ocp_builder_golang-1.11:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.11
   to: hyperkube
 - dockerfile_path: images/kube-proxy/Dockerfile.rhel
   from: hyperkube
   to: kube-proxy
 - dockerfile_path: images/tests/Dockerfile.rhel
   from: cli
+  inputs:
+    ocp_builder_golang-1.11:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.11
   to: tests
 - context_dir: images/deployer/
   dockerfile_path: Dockerfile.rhel
@@ -50,6 +78,10 @@ images:
   to: recycler
 - dockerfile_path: images/sdn/Dockerfile.rhel
   from: base
+  inputs:
+    ocp_builder_golang-1.11:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.11
   to: node
 - context_dir: images/os/
   from: base
