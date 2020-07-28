@@ -3,6 +3,10 @@ base_images:
     name: 4.6-priv
     namespace: ocp-private
     tag: base
+  ocp_builder_golang-1.13:
+    name: builder
+    namespace: ocp
+    tag: golang-1.13
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
@@ -13,9 +17,17 @@ canonical_go_repository: github.com/openshift/sdn
 images:
 - dockerfile_path: images/sdn/Dockerfile.rhel
   from: base
+  inputs:
+    ocp_builder_golang-1.13:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
   to: sdn
 - dockerfile_path: images/kube-proxy/Dockerfile.rhel
   from: base
+  inputs:
+    ocp_builder_golang-1.13:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
   to: kube-proxy
 promotion:
   disabled: true
