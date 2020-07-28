@@ -103,7 +103,7 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   packer@"${INSTANCE_PREFIX}" \
-  --command 'sudo yum install -y podman make'
+  --command 'sudo rm -fr /usr/local/go; sudo yum install -y podman make golang'
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
