@@ -23,6 +23,10 @@ base_images:
     name: 4.6-priv
     namespace: ocp-private
     tag: oc-rpms
+  ocp_builder_golang-1.13:
+    name: builder
+    namespace: ocp
+    tag: golang-1.13
   tools:
     name: 4.6-priv
     namespace: ocp-private
@@ -37,9 +41,17 @@ canonical_go_repository: k8s.io/kubernetes
 images:
 - dockerfile_path: openshift-hack/images/hyperkube/Dockerfile.rhel
   from: base
+  inputs:
+    ocp_builder_golang-1.13:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
   to: hyperkube
 - dockerfile_path: openshift-hack/images/tests/Dockerfile.rhel
   from: tools
+  inputs:
+    ocp_builder_golang-1.13:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
   to: kubernetes-tests
 - context_dir: openshift-hack/images/os/
   from: base
