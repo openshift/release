@@ -19,7 +19,7 @@ build_root:
 canonical_go_repository: github.com/openshift/baremetal-runtimecfg
 images:
 - dockerfile_path: Dockerfile
-  from: base
+  from: base-os
   inputs:
     openshift_release_golang-1.12:
       as:
@@ -28,6 +28,13 @@ images:
 promotion:
   name: 4.6-priv
   namespace: ocp-private
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      rm -rf /etc/yum.repos.d/*
+      curl http://base-4-6-rhel8.ocp.svc > /etc/yum.repos.d/base-4-6-rhel8.repo
+    from: base
+    to: base-os
 resources:
   '*':
     requests:
