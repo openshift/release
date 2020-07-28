@@ -90,7 +90,7 @@ objects:
         # fetch the oc binary so we can talk to the cluster.  
         export PATH=$PATH:/tmp/shared/bin
         mkdir /tmp/shared/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.3/linux/oc.tar.gz | tar xvzf - -C /tmp/shared/bin/ oc
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.5/linux/oc.tar.gz | tar xvzf - -C /tmp/shared/bin/ oc
         chmod ug+x /tmp/shared/bin/oc
 
         # setup the persisted metadata.json and kubeconfig files that 
@@ -120,7 +120,7 @@ objects:
         # gather artifacts, tear down the endurance cluster, install a new one, 
         # and fail this job.
         echo "Fetching cluster operator status...."
-        oc get clusteroperators &> /tmp/operators.out
+        oc get clusteroperators > /tmp/operators.out
         rc=$?
         cat /tmp/operators.out
         if [ ! $rc -eq 0 ]; then
@@ -139,7 +139,7 @@ objects:
         fi          
        
         echo "Fetching node status...."
-        oc get nodes &> /tmp/nodes.out
+        oc get nodes > /tmp/nodes.out
         rc=$?
         cat /tmp/nodes.out
         if [ ! $rc -eq 0 ]; then
@@ -152,7 +152,7 @@ objects:
         grep NotReady /tmp/nodes.out
         rc=$?
         if [ $rc -eq 0 ]; then
-          echo "Some operators are not available, collecting must-gather from cluster"
+          echo "Some nodes are not available, collecting must-gather from cluster"
           touch /tmp/shared/mustgather
           exit 0
         fi          
