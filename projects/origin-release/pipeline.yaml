@@ -69,8 +69,8 @@ objects:
           name: origin-release:base
         imageOptimizationPolicy: SkipLayers
     triggers:
-    - imageChange: {} 
-      type: ImageChange       
+    - imageChange: {}
+      type: ImageChange
 - apiVersion: v1
   kind: BuildConfig
   metadata:
@@ -99,8 +99,8 @@ objects:
           name: origin-release:base
         imageOptimizationPolicy: SkipLayers
     triggers:
-    - imageChange: {} 
-      type: ImageChange       
+    - imageChange: {}
+      type: ImageChange
 - apiVersion: v1
   kind: BuildConfig
   metadata:
@@ -129,8 +129,8 @@ objects:
           name: origin-release:base
         imageOptimizationPolicy: SkipLayers
     triggers:
-    - imageChange: {} 
-      type: ImageChange       
+    - imageChange: {}
+      type: ImageChange
 - apiVersion: v1
   kind: BuildConfig
   metadata:
@@ -247,6 +247,68 @@ objects:
         from:
           kind: ImageStreamTag
           name: origin-release:base
+        imageOptimizationPolicy: SkipLayers
+    triggers:
+    - imageChange: {}
+      type: ImageChange
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    labels:
+      app: origin-release
+    name: "art-based-rhel-7-release-golang-1.14"
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: DockerImage
+        name: "${PUSH_REPOSITORY}:rhel-7-golang-1.14"
+      pushSecret:
+        name: "dockerhub"
+    source:
+      git:
+        ref: "${SOURCE_REF}"
+        uri: "${SOURCE_URL}"
+      contextDir: "projects/origin-release/rhel-7-golang-1.14/"
+      type: Git
+    strategy:
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: builder:rhel-7-golang-1.14.art
+          namespace: ocp
+        imageOptimizationPolicy: SkipLayers
+    triggers:
+    - imageChange: {}
+      type: ImageChange
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    labels:
+      app: origin-release
+    name: "art-based-rhel-8-release-golang-1.14"
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: DockerImage
+        name: "${PUSH_REPOSITORY}:rhel-8-golang-1.14"
+      pushSecret:
+        name: "dockerhub"
+    source:
+      git:
+        ref: "${SOURCE_REF}"
+        uri: "${SOURCE_URL}"
+      contextDir: "projects/origin-release/rhel-8-golang-1.14/"
+      type: Git
+    strategy:
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: builder:rhel-8-golang-1.14.art
+          namespace: ocp
         imageOptimizationPolicy: SkipLayers
     triggers:
     - imageChange: {}
