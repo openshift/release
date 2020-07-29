@@ -23,6 +23,15 @@ def add_art_publish(gendoc):
                 }
             })
 
+            gendoc.append({
+                'apiVersion': 'v1',
+                'kind': 'ImageStream',
+                'metadata': {
+                    'name': f'release{config.get_suffix(arch, private)}',
+                    'namespace': f'ocp{config.get_suffix(arch, private)}'
+                }
+            })
+
             for major_minor in config.releases_4x:
                 gendoc.append({
                     'apiVersion': 'v1',
