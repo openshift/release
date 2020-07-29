@@ -14,6 +14,13 @@ Claim a folder in [README.md](../README.md), e.g.,
 
 The folder `build-clusters/vsphere` then can be used to store the files related to the cluster.
 
+Make a softlink to the [common](./common)  folder.
+
+```
+$ cd build-clusters/vsphere
+$ ln -s ../common common
+```
+
 ## Set up applyConfig against the cluster
 
 Create the namespace:
