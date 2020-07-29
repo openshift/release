@@ -31,7 +31,7 @@ oc get -nopenshift-machine-api machineset $ref_machineset_name -o json \
     | jq --arg gpu_machineset_name "${gpu_machineset_name}" '.metadata.name = $gpu_machineset_name' \
     | jq --arg gpu_machineset_name "${gpu_machineset_name}" '.spec.template.metadata.labels."machine.openshift.io/cluster-api-machineset" = $gpu_machineset_name' \
     | jq --arg gpu_machineset_name "${gpu_machineset_name}" '.spec.selector.matchLabels."machine.openshift.io/cluster-api-machineset" = $gpu_machineset_name' \
-    | oc create -f-
+    | oc create -f -
 set -o errexit
 
 # Wait until the new node is provisioned by the control plane
