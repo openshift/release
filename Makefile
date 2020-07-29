@@ -1,8 +1,11 @@
 SHELL=/usr/bin/env bash -o errexit
 
-.PHONY: check check-core check-services dry-core core dry-services services all
+.PHONY: help check check-core check-services dry-core core dry-services services all
 
 CONTAINER_ENGINE ?= docker
+
+help:
+	@echo "Run 'make all' to update configuration against the current KUBECONFIG"
 
 all: core services
 
