@@ -1064,6 +1064,47 @@ periodics:
       secret:
         secretName: github-credentials-openshift-merge-robot
 - agent: kubernetes
+  cluster: api.ci
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+    workdir: true
+  interval: 12h
+  name: periodic-auto-publicize-config
+  spec:
+    containers:
+    - args:
+      - --github-token-path=/etc/github/oauth
+      - --github-endpoint=http://ghproxy
+      - --github-endpoint=https://api.github.com
+      - --github-graphql-endpoint=http://ghproxy/graphql
+      - --dry-run=false
+      - --self-approve=true
+      - --github-login=openshift-merge-robot
+      - --git-name=openshift-bot
+      - --git-email=openshift-bot@redhat.com
+      - --publicize-config=./clusters/app.ci/publicize/_config.yaml
+      - --release-repo-path=./
+      - --whitelist-file=./core-services/openshift-priv/_whitelist.yaml
+      command:
+      - /usr/bin/autopublicizeconfig
+      image: registry.svc.ci.openshift.org/ci/autopublicizeconfig:latest
+      imagePullPolicy: Always
+      name: auto-publicize-config
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: token
+        readOnly: true
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-merge-robot
+- agent: kubernetes
   cluster: app.ci
   decorate: true
   decoration_config:
