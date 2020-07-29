@@ -11,6 +11,10 @@ base_images:
     name: release
     namespace: openshift
     tag: golang-1.12
+  ubi8:
+    name: ubi
+    namespace: ocp
+    tag: "8"
 build_root:
   image_stream_tag:
     name: release
@@ -18,8 +22,11 @@ build_root:
     tag: golang-1.12
 images:
 - dockerfile_path: Dockerfile
-  from: base-os
+  from: base-dockerfile
   inputs:
+    base-ubi8:
+      as:
+      - ubi
     openshift_release_golang-1.12:
       as:
       - registry.svc.ci.openshift.org/openshift/release:golang-1.12
@@ -32,8 +39,29 @@ raw_steps:
     commands: |
       rm -rf /etc/yum.repos.d/*
       curl http://base-4-6-rhel8.ocp.svc > /etc/yum.repos.d/base-4-6-rhel8.repo
+    from: ubi8
+    to: base-ubi8
+- pipeline_image_cache_step:
+    commands: |
+      cat <<DOCKERFILE > /opt/Dockerfile
+       FROM registry.svc.ci.openshift.org/openshift/release:golang-1.12 AS builder
+       
+       FROM ubi
+
+       RUN yum install -y dhcp-client && yum clean all
+
+      DOCKERFILE
     from: base
-    to: base-os
+    to: src-dockerfile
+- project_directory_image_build_step:
+    from: base
+    inputs:
+      src: {}
+      src-dockerfile:
+        paths:
+        - destination_dir: .
+          source_path: /opt/Dockerfile
+    to: base-dockerfile
 resources:
   '*':
     requests:
