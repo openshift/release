@@ -772,6 +772,30 @@ presubmits:
     branches:
     - master
     cluster: api.ci
+    context: ci/prow/step-registry-metadata
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-step-registry-metadata
+    rerun_command: /test step-registry-metadata
+    spec:
+      containers:
+      - args:
+        - ./
+        command:
+        - hack/validate-registry-metadata.sh
+        image: generate-registry-metadata:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: ((?m)^/test step-registry-metadata,?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: api.ci
     context: ci/prow/step-registry-shellcheck
     decorate: true
     labels:

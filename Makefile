@@ -55,6 +55,10 @@ ci-operator-config:
 	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/determinize-ci-operator:latest
 	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/ci-operator/config:/ci-operator/config:z" registry.svc.ci.openshift.org/ci/determinize-ci-operator:latest --config-dir /ci-operator/config --confirm
 
+registry-metadata:
+	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/generate-registry-metadata:latest
+	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/ci-operator/step-registry:/ci-operator/step-registry:z" registry.svc.ci.openshift.org/ci/generate-registry-metadata:latest --registry /ci-operator/step-registry
+
 prow-config:
 	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/determinize-prow-config:latest
 	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/core-services/prow/02_config:/config:z" registry.svc.ci.openshift.org/ci/determinize-prow-config:latest --prow-config-dir /config
