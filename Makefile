@@ -243,13 +243,6 @@ cincinnati:
 	$(MAKE) apply WHAT=projects/cincinnati/cincinnati.yaml
 .PHONY: cincinnati
 
-build-farm-consistency:
-	@echo "diffing ns-ttl-controller assets ..."
-	diff -Naup ./core-services/ci-ns-ttl-controller/ci-ns-ttl-controller_dc.yaml ./clusters/build-clusters/01_cluster/openshift/ci-ns-ttl-controller/ci-ns-ttl-controller_dc.yaml
-	@echo "diffing rpms-ocp assets ..."
-	for file in ./core-services/release-controller/rpms-ocp-*.yaml; do diff -Naup "$${file}" "./clusters/build-clusters/01_cluster/openshift/release-controller/$${file##*/}"; done
-.PHONY: build-farm-consistency
-
 bump-pr:
 	$(MAKE) job JOB=periodic-prow-image-autobump
 .PHONY: bump-pr
