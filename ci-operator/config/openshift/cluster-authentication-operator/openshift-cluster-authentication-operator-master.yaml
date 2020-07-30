@@ -50,34 +50,34 @@ tests:
     make test-unit JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
   container:
     from: src
-- as: e2e-aws
+- as: e2e
   steps:
-    cluster_profile: aws
-    workflow: openshift-e2e-aws
-- as: e2e-aws-operator
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
+- as: e2e-operator
   commands: |
     mkdir -p /tmp/artifacts
     make test-e2e JUNITFILE=/tmp/artifacts/junit_report.xml
   openshift_installer_src:
-    cluster_profile: aws
-- as: e2e-aws-upgrade
+    cluster_profile: gcp
+- as: e2e-upgrade
   commands: TEST_SUITE=all run-upgrade-tests
   openshift_installer:
-    cluster_profile: aws
+    cluster_profile: gcp
     upgrade: true
 - artifact_dir: /tmp/artifacts
-  as: e2e-aws-console-login
+  as: e2e-console-login
   commands: ./test-prow-e2e.sh login
   openshift_installer_custom_test_image:
-    cluster_profile: aws
+    cluster_profile: gcp
     from: stable:console-tests
 - artifact_dir: /tmp/artifacts
-  as: e2e-aws-operator-encryption
+  as: e2e-operator-encryption
   commands: |
     mkdir -p /tmp/artifacts
     make test-e2e-encryption JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
   openshift_installer_src:
-    cluster_profile: aws
+    cluster_profile: gcp
 zz_generated_metadata:
   branch: master
   org: openshift
