@@ -53,18 +53,33 @@ tag_specification:
   name: "4.4"
   namespace: ocp
 tests:
-- artifact_dir: /tmp/artifacts
-  as: cargo-test
-  commands: |
-    env CINCINNATI_TEST_CREDENTIALS_PATH=/usr/local/ci-secrets/cincinnati-secrets-cincinnati-credentials/registry_credentials_docker.json \
-        CINCINNATI_TEST_QUAY_API_TOKEN_PATH=/usr/local/ci-secrets/cincinnati-secrets-cincinnati-credentials/quay_api_access_token.key \
-        CINCINNATI_GITHUB_SCRAPER_OAUTH_TOKEN_PATH=/usr/local/ci-secrets/cincinnati-secrets-cincinnati-credentials/github_token.key \
-    dist/cargo_test.sh
-  container:
-    from: src
-  secret:
-    mount_path: /usr/local/ci-secrets/cincinnati-secrets-cincinnati-credentials
-    name: cincinnati-secrets-cincinnati-credentials
+- as: cargo-test
+  steps:
+    test:
+    - as: cargo-test
+      commands: dist/cargo_test.sh
+      credentials:
+      - mount_path: /usr/local/ci-secrets/cincinnati-secrets-cincinnati-credentials
+        name: cincinnati-secrets-cincinnati-credentials
+        namespace: test-credentials
+      - mount_path: /usr/local/ci-secrets/ci-image-sa-dockercfg
+        name: cincinnati-ci-ci-image-sa-dockercfg
+        namespace: test-credentials
+      - mount_path: /usr/local/ci-secrets/public-ci-image-sa-dockercfg
+        name: cincinnati-ci-public-ci-image-sa-dockercfg
+        namespace: test-credentials
+      env:
+      - default: /usr/local/ci-secrets/cincinnati-secrets-cincinnati-credentials/registry_credentials_docker.json
+        name: CINCINNATI_TEST_CREDENTIALS_PATH
+      - default: /usr/local/ci-secrets/cincinnati-secrets-cincinnati-credentials/quay_api_access_token.key
+        name: CINCINNATI_TEST_QUAY_API_TOKEN_PATH
+      - default: /usr/local/ci-secrets/cincinnati-secrets-cincinnati-credentials/github_token.key
+        name: CINCINNATI_GITHUB_SCRAPER_OAUTH_TOKEN_PATH
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: yaml-lint
   commands: dist/prow_yaml_lint.sh
   container:
