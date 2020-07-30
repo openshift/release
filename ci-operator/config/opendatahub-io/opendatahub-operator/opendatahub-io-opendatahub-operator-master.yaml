@@ -1,0 +1,38 @@
+base_images:
+  os:
+    name: centos
+    namespace: origin
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.14
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 200Mi
+tag_specification:
+  name: "4.4"
+  namespace: ocp
+tests:
+- as: unit-tests
+  commands: |
+    go get -u github.com/jstemmer/go-junit-report
+    go mod vendor
+    make test-junit
+  container:
+    from: src
+- as: opendatahub-operator-nightly
+  commands: |
+    go get -u github.com/jstemmer/go-junit-report
+    go mod vendor
+    make test-junit
+  container:
+    from: src
+  cron: 30 0 * * *
+zz_generated_metadata:
+  branch: master
+  org: opendatahub-io
+  repo: opendatahub-operator
