@@ -1,15 +1,10 @@
 kind: List
 apiVersion: v1
 items:
-- apiVersion: v1
-  kind: ServiceAccount
-  metadata:
-    name: hook
-    namespace: ci
 - kind: Role
   apiVersion: rbac.authorization.k8s.io/v1
   metadata:
-    name: hook
+    name: hook-api-ci
     namespace: ci
   rules:
     - apiGroups:
@@ -21,50 +16,15 @@ items:
         - get
         - list
         - update
-    - apiGroups:
-        - ""
-      resources:
-        - configmaps
-      verbs:
-        - get
-        - update
-        - create
 - kind: RoleBinding
   apiVersion: rbac.authorization.k8s.io/v1
   metadata:
-    name: hook
+    name: hook-api-ci
     namespace: ci
   roleRef:
     apiGroup: rbac.authorization.k8s.io
     kind: Role
-    name: hook
+    name: hook-api-ci
   subjects:
   - kind: ServiceAccount
     name: hook
-- apiVersion: rbac.authorization.k8s.io/v1
-  kind: Role
-  metadata:
-    name: ci-hook
-    namespace: prow-monitoring
-  rules:
-  - apiGroups:
-    - ""
-    resources:
-    - configmaps
-    verbs:
-    - create
-    - get
-    - update
-- apiVersion: rbac.authorization.k8s.io/v1
-  kind: RoleBinding
-  metadata:
-    name: ci-hook
-    namespace: prow-monitoring
-  roleRef:
-    apiGroup: rbac.authorization.k8s.io
-    kind: Role
-    name: ci-hook
-  subjects:
-  - kind: ServiceAccount
-    name: hook
-    namespace: ci
