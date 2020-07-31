@@ -36,7 +36,7 @@ function run-tests() {
   export PULL_SECRET_FILE=--pull-secret-file="${HOME}"/pull-secret
   export BUNDLE_LOCATION=--bundle-location="${HOME}"/$(cat "${HOME}"/bundle)
   export CRC_BINARY=--crc-binary=/tmp/
-  make integration
+  make integration GODOG_OPTS="--godog.tags='~@story_registry && @linux'"
   if [[ $? -ne 0 ]]; then
     exit 1
     popd
