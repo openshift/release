@@ -3,24 +3,24 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - prow_integration
     cluster: api.ci
-    context: ci/prow/build
+    context: ci/prow/lint
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-master-build
-    rerun_command: /test build
+    name: pull-ci-openshift-assisted-service-prow_integration-lint
+    rerun_command: /test lint
     spec:
       containers:
       - args:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --target=build
+        - --target=lint
         command:
         - ci-operator
         image: ci-operator:latest
@@ -44,4 +44,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )build,?($|\s.*)
+    trigger: (?m)^/test( | .* )lint,?($|\s.*)
