@@ -22,6 +22,11 @@ def add_imagestream_namespace_rbac(gendoc):
             'kind': 'Group',
             'name': 'qe'
         })
+        puller_subjects.append({
+            'apiGroup': 'rbac.authorization.k8s.io',
+            'kind': 'Group',
+            'name': 'release-team'
+        })
 
     resources.append({
         'apiVersion': 'rbac.authorization.k8s.io/v1beta1',
