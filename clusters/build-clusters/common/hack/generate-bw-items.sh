@@ -11,8 +11,11 @@ set -o pipefail
 WORKDIR="$(mktemp -d)"
 readonly WORKDIR
 
-CONTEXT="build02"
-readonly CONTEXT
+declare -a App_CI_SAArray=("config-updater" "deck" "plank" "sinker" "hook" "crier" "release-bot" "prow-controller-manager" "pj-rehearse")
+declare -a Build01_SAArray=("config-updater" "deck" "plank" "sinker" "hook" "crier" "dptp-controller-manager" "prow-controller-manager" "ci-operator")
+declare -a Build02_SAArray=("${Build01_SAArray[@]}")
+
+declare -a Context_Array=("app.ci" "build01" "build02")
 
 SED_COMMAND="sed"
 if [[ "$(uname -s)" == "Darwin" ]]; then
@@ -32,13 +35,19 @@ generate_kubeconfig() {
   fi
 }
 
-declare -a SAArray=( "config-updater" "deck" "plank" "sinker" "hook" "crier" "ci-operator" "dptp-controller-manager" "prow-controller-manager" "ci-operator")
+declare -a SAArray=()
 
-# Iterate the string array using for loop
-for name in ${SAArray[@]}; do
-  if ! generate_kubeconfig "${name}"; then
-     exit 1
-  fi
+for ctx in ${Context_Array[@]}; do
+  CONTEXT=${ctx}
+  if [[ ${CONTEXT} == "app.ci" ]]; then SAArray=("${App_CI_SAArray[@]}"); fi
+  if [[ ${CONTEXT} == "build01" ]]; then SAArray=("${Build01_SAArray[@]}"); fi
+  if [[ ${CONTEXT} == "build02" ]]; then SAArray=("${Build02_SAArray[@]}"); fi
+  for name in ${SAArray[@]}; do
+    if ! generate_kubeconfig "${name}"; then
+      echo "failed"
+      exit 1
+    fi
+  done
 done
 
 generate_reg_auth_value() {
@@ -49,6 +58,9 @@ generate_reg_auth_value() {
   oc --context "${CONTEXT}" -n ci get secret $( oc --context ${CONTEXT} get secret -n ci -o "jsonpath={.items[?(@.metadata.annotations.kubernetes\.io/service-account\.name==\"build01\")].metadata.name}" ) -o "jsonpath={.items[?(@.type==\"kubernetes.io/dockercfg\")].data.\.dockercfg}" | base64 --decode | jq --arg reg "${registry}" -r '.[$reg].auth' | tr -d '\n' > "${WORKDIR}/build01_${cluster}_reg_auth_value.txt"
 }
 
-generate_reg_auth_value "${CONTEXT}" "image-registry.openshift-image-registry.svc:5000"
+for ctx in ${Context_Array[@]}; do
+  CONTEXT=${ctx}
+  generate_reg_auth_value "${CONTEXT}" "image-registry.openshift-image-registry.svc:5000"
+done
 
 echo "files are saved ${WORKDIR}"
