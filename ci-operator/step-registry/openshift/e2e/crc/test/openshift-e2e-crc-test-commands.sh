@@ -79,7 +79,7 @@ function run-tests() {
   export PULL_SECRET_FILE=--pull-secret-file="${HOME}"/pull-secret
   export BUNDLE_LOCATION=--bundle-location="${HOME}"/snc/crc_libvirt_"${BUNDLE_VERSION}".crcbundle
   export CRC_BINARY=--crc-binary="${HOME}"/crc/out/linux-amd64
-  make integration
+  make integration GODOG_OPTS="--godog.tags='~@story_registry && @linux'"
   popd
 }
 
