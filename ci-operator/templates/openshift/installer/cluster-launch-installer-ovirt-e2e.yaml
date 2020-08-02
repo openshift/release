@@ -337,6 +337,8 @@ objects:
         value: ${INSTALL_INITIAL_RELEASE}
       - name: RELEASE_IMAGE_INITIAL
         value: ${RELEASE_IMAGE_INITIAL}
+      - name: JOB_NAME
+        value: ${JOB_NAME}
       command:
       - /bin/sh
       - -c
@@ -429,7 +431,7 @@ objects:
                 sizeGB: 31
               vmType: server
               instanceTypeID:
-          replicas: 3        
+          replicas: 3
 
         platform:
           ovirt:
@@ -504,7 +506,11 @@ objects:
         cat /tmp/artifacts/installer/manifests/cluster-infrastructure-02-config.yml
 
         export KUBECONFIG=/tmp/artifacts/installer/auth/kubeconfig
-        update_image_registry &
+        echo "JOB_NAME is $JOB_NAME"
+        # On 4.4 and 4.5 we don't have CSI Driver so we need to patch that image registry
+        if [[ "$JOB_NAME" =~ ((.*4.5)|(.*4.4))(?!.*4.6.*) ]]; then
+          update_image_registry &
+        fi
 
         #notify oVirt infrastucture that ocp installation started
         #this allow us to connect running VMs to a PR number
