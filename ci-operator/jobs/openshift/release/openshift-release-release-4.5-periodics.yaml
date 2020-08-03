@@ -55,6 +55,9 @@ periodics:
         # also tag the image into the art-latest stream
         oc tag "${to_quay}" "ocp/${BRANCH}-art-latest:${TAG}"
 
+        # also tag the image into the private art-latest stream
+        oc tag "${to_quay}" "ocp-priv/${BRANCH}-art-latest-priv:${TAG}"
+
         # also tag the image into the ocp private stream
         oc tag "${to_quay}" "ocp-private/${BRANCH}-priv:${TAG}"
       - ""
@@ -202,6 +205,9 @@ periodics:
 
         # Tag the image into the art-latest stream for the arch
         oc tag "${to_quay}" "ocp-${ARCH}/${BRANCH}-art-latest-${ARCH}:${TAG}"
+
+        # Tag the image into the private art-latest stream for the arch
+        oc tag "${to_quay}" "ocp-${ARCH}-priv/${BRANCH}-art-latest-${ARCH}-priv:${TAG}"
       env:
       - name: TAG_NS
         value: rhcos
@@ -348,6 +354,9 @@ periodics:
 
         # Tag the image into the art-latest stream for the arch
         oc tag "${to_quay}" "ocp-${ARCH}/${BRANCH}-art-latest-${ARCH}:${TAG}"
+
+        # Tag the image into the private art-latest stream for the arch
+        oc tag "${to_quay}" "ocp-${ARCH}-priv/${BRANCH}-art-latest-${ARCH}-priv:${TAG}"
       env:
       - name: TAG_NS
         value: rhcos
@@ -4839,8 +4848,7 @@ periodics:
       - name: JOB_NAME_SAFE
         value: e2e-aws-disruptive
       - name: TEST_COMMAND
-        value: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance/parallel
-          run-tests
+        value: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance/parallel run-tests
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -7279,7 +7287,7 @@ periodics:
         secretName: sentry-dsn
 - agent: kubernetes
   cluster: api.ci
-  cron: 0 0,4,8,12,16,20 * * *
+  cron: 0 0,3,7,11,15,19 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -7671,8 +7679,7 @@ periodics:
       - name: JOB_NAME_SAFE
         value: e2e-operator
       - name: TEST_COMMAND
-        value: FAKE_HOME_DIR=/tmp/home LOG_DIR=/tmp/artifacts/logging-logs ARTIFACT_DIR=/tmp/artifacts/logging-artifacts
-          make test-e2e-olm
+        value: FAKE_HOME_DIR=/tmp/home LOG_DIR=/tmp/artifacts/logging-logs ARTIFACT_DIR=/tmp/artifacts/logging-artifacts make test-e2e-olm
       - name: TEST_IMAGESTREAM_TAG
         value: stable:cluster-logging-operator-e2e
       - name: CONFIG_SPEC

@@ -389,6 +389,9 @@ periodics:
         # also tag the image into the art-latest stream
         oc tag "${to_quay}" "ocp/${BRANCH}-art-latest:${TAG}"
 
+        # also tag the image into the private art-latest stream
+        oc tag "${to_quay}" "ocp-priv/${BRANCH}-art-latest-priv:${TAG}"
+
         # also tag the image into the ocp private stream
         oc tag "${to_quay}" "ocp-private/${BRANCH}-priv:${TAG}"
       - ""
@@ -536,6 +539,9 @@ periodics:
 
         # Tag the image into the art-latest stream for the arch
         oc tag "${to_quay}" "ocp-${ARCH}/${BRANCH}-art-latest-${ARCH}:${TAG}"
+
+        # Tag the image into the private art-latest stream for the arch
+        oc tag "${to_quay}" "ocp-${ARCH}-priv/${BRANCH}-art-latest-${ARCH}-priv:${TAG}"
       env:
       - name: TAG_NS
         value: rhcos
@@ -1092,6 +1098,9 @@ periodics:
 
         # Tag the image into the art-latest stream for the arch
         oc tag "${to_quay}" "ocp-${ARCH}/${BRANCH}-art-latest-${ARCH}:${TAG}"
+
+        # Tag the image into the private art-latest stream for the arch
+        oc tag "${to_quay}" "ocp-${ARCH}-priv/${BRANCH}-art-latest-${ARCH}-priv:${TAG}"
       env:
       - name: TAG_NS
         value: rhcos
@@ -4861,8 +4870,7 @@ periodics:
       - name: JOB_NAME_SAFE
         value: e2e-aws-disruptive
       - name: TEST_COMMAND
-        value: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance/parallel
-          run-tests
+        value: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance/parallel run-tests
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -5510,8 +5518,7 @@ periodics:
         secretName: ci-pull-credentials
 - agent: kubernetes
   annotations:
-    description: The general conformance suite of end to end openshift tests, run
-      against a v4.4.z cluster running on AWS with a standard 3 master/3 worker topology
+    description: The general conformance suite of end to end openshift tests, run against a v4.4.z cluster running on AWS with a standard 3 master/3 worker topology
   cluster: api.ci
   decorate: true
   interval: 24h
@@ -7188,14 +7195,6 @@ periodics:
       - name: BRANCH
         value: "4.4"
       - name: CLUSTER_TYPE
-        value: openstack-vexxhost
-      - name: OPENSTACK_EXTERNAL_NETWORK
-        value: public
-      - name: OPENSTACK_FLAVOR
-        value: v1-standard-4
-      - name: OPENSTACK_MASTER_VOLUME_TYPE
-        value: rbd
-      - name: OS_CLOUD
         value: openstack
       - name: CONFIG_SPEC
         value: |
@@ -7261,20 +7260,6 @@ periodics:
       projected:
         sources:
         - secret:
-            items:
-            - key: clouds.yaml
-              path: clouds.yaml
-            name: cluster-secrets-openstack-vexxhost
-        - secret:
-            items:
-            - key: .awscred
-              path: .awscred
-            - key: ssh-privatekey
-              path: ssh-privatekey
-            - key: ssh-publickey
-              path: ssh-publickey
-            - key: pull-secret
-              path: pull-secret
             name: cluster-secrets-openstack
     - configMap:
         name: prow-job-cluster-launch-installer-openstack-e2e
@@ -7418,14 +7403,6 @@ periodics:
       - name: BRANCH
         value: "4.4"
       - name: CLUSTER_TYPE
-        value: openstack-vexxhost
-      - name: OPENSTACK_EXTERNAL_NETWORK
-        value: public
-      - name: OPENSTACK_FLAVOR
-        value: v1-standard-4
-      - name: OPENSTACK_MASTER_VOLUME_TYPE
-        value: rbd
-      - name: OS_CLOUD
         value: openstack
       - name: CONFIG_SPEC
         value: |
@@ -7495,20 +7472,6 @@ periodics:
       projected:
         sources:
         - secret:
-            items:
-            - key: clouds.yaml
-              path: clouds.yaml
-            name: cluster-secrets-openstack-vexxhost
-        - secret:
-            items:
-            - key: .awscred
-              path: .awscred
-            - key: ssh-privatekey
-              path: ssh-privatekey
-            - key: ssh-publickey
-              path: ssh-publickey
-            - key: pull-secret
-              path: pull-secret
             name: cluster-secrets-openstack
     - configMap:
         name: prow-job-cluster-launch-installer-openstack-e2e
@@ -7791,10 +7754,7 @@ periodics:
       - name: MULTIARCH_RELEASE_IMAGE_LATEST
         value: registry.svc.ci.openshift.org/ocp-ppc64le/release-ppc64le:4.4
       - name: CONFIG_SPEC
-        value: "resources:\n  '*':\n    limits:\n      memory: 4Gi\n    requests:\n
-          \     cpu: 100m\n      memory: 200Mi\ntag_specification:\n  name: \"$(BRANCH)\"\n
-          \ namespace: ocp\ntests:\n- as: e2e-$(CLUSTER_TYPE)-all\n  commands: $(TEST_COMMAND)\n
-          \ openshift_installer:\n    cluster_profile: libvirt-ppc64le \n"
+        value: "resources:\n  '*':\n    limits:\n      memory: 4Gi\n    requests:\n      cpu: 100m\n      memory: 200Mi\ntag_specification:\n  name: \"$(BRANCH)\"\n  namespace: ocp\ntests:\n- as: e2e-$(CLUSTER_TYPE)-all\n  commands: $(TEST_COMMAND)\n  openshift_installer:\n    cluster_profile: libvirt-ppc64le \n"
       - name: JOB_NAME_SAFE
         value: e2e-remote-libvirt
       - name: TEST_COMMAND

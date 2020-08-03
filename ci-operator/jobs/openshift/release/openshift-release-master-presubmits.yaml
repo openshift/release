@@ -62,35 +62,6 @@ presubmits:
     branches:
     - master
     cluster: api.ci
-    context: ci/prow/build-farm-consistency
-    decorate: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-release-master-build-farm-consistency
-    rerun_command: /test build-farm-consistency
-    spec:
-      containers:
-      - args:
-        - -c
-        - |
-          set -o errexit
-          set -o nounset
-          set -o pipefail
-          make build-farm-consistency
-        command:
-        - /bin/bash
-        image: registry.svc.ci.openshift.org/openshift/release:golang-1.13
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-    trigger: (?m)^/test( | .* )build-farm-consistency,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    cluster: api.ci
     context: ci/build-farm/build01-dry
     decorate: true
     labels:
@@ -112,11 +83,6 @@ presubmits:
           valueFrom:
             secretKeyRef:
               key: build01_build01_reg_auth_value.txt
-              name: build-farm-credentials
-        - name: build01_build02_reg_auth_value
-          valueFrom:
-            secretKeyRef:
-              key: build01_build02_reg_auth_value.txt
               name: build-farm-credentials
         - name: build01_ci_reg_auth_value
           valueFrom:
@@ -179,11 +145,6 @@ presubmits:
         command:
         - applyconfig
         env:
-        - name: build01_build01_reg_auth_value
-          valueFrom:
-            secretKeyRef:
-              key: build01_build01_reg_auth_value.txt
-              name: build-farm-credentials
         - name: build01_build02_reg_auth_value
           valueFrom:
             secretKeyRef:
@@ -334,7 +295,7 @@ presubmits:
         - mismatched-tide-lenient
         command:
         - /checkconfig
-        image: gcr.io/k8s-prow/checkconfig:v20200729-2a25cd5714
+        image: gcr.io/k8s-prow/checkconfig:v20200801-2eac54f721
         imagePullPolicy: Always
         name: ""
         resources:
@@ -361,16 +322,6 @@ presubmits:
         command:
         - applyconfig
         env:
-        - name: build01_build01_reg_auth_value
-          valueFrom:
-            secretKeyRef:
-              key: build01_build01_reg_auth_value.txt
-              name: build-farm-credentials
-        - name: build01_build02_reg_auth_value
-          valueFrom:
-            secretKeyRef:
-              key: build01_build02_reg_auth_value.txt
-              name: build-farm-credentials
         - name: build01_ci_reg_auth_value
           valueFrom:
             secretKeyRef:

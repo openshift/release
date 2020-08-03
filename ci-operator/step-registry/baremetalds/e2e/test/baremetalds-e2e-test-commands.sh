@@ -50,7 +50,4 @@ ssh "${SSHOPTS[@]}" "root@${IP}" tar -czf - /tmp/artifacts | tar -C "${ARTIFACT_
 
 set -e
 echo "### Done! (${rv})"
-if [ $rv -eq 0 ]; then
-    touch "${SHARED_DIR}/e2e_test_complete"
-fi
 exit $rv

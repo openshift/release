@@ -1,0 +1,35 @@
+kind: List
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    annotations:
+      serviceaccounts.openshift.io/oauth-redirectreference.deck-internal: '{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"deck-internal"}}'
+    name: deck
+    namespace: ci
+- kind: Role
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: deck
+    namespace: ci
+  rules:
+    - apiGroups:
+        - ""
+      resources:
+        - pods #pods is required for pods/log
+        - pods/log
+      verbs:
+        - get
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: deck
+    namespace: ci
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: Role
+    name: deck
+  subjects:
+  - kind: ServiceAccount
+    name: deck

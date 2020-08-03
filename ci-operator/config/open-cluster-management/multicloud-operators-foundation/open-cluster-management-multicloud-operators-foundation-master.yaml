@@ -1,0 +1,54 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+promotion:
+  name: "4.5"
+  namespace: open-cluster-management
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.4"
+  namespace: ocp
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
+tests:
+- as: build
+  commands: |
+    true
+  container:
+    from: bin
+- as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: bin
+- as: verify-deps
+  commands: |
+    make verify-deps -k --warn-undefined-variables
+  container:
+    from: bin
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: |
+    curl -L https://go.kubebuilder.io/dl/2.2.0/linux/amd64 | tar -xz
+    KUBEBUILDER_ASSETS="$(pwd)/kubebuilder_2.2.0_linux_amd64/bin"
+    export KUBEBUILDER_ASSETS
+    make test --warn-undefined-variables
+  container:
+    from: test-bin
+zz_generated_metadata:
+  branch: master
+  org: open-cluster-management
+  repo: multicloud-operators-foundation

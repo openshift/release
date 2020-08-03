@@ -85,8 +85,7 @@ echo "export OPENSHIFT_CI=true" >> /root/dev-scripts/config_root.sh
 echo "export MIRROR_IMAGES=true" >> /root/dev-scripts/config_root.sh
 echo "export WORKER_MEMORY=16384" >> /root/dev-scripts/config_root.sh
 
-# FIXME: temporarily switch to IPv4 until https://github.com/openshift/ovn-kubernetes/pull/216
-# lands.
+# FIXME(stbenjam): Temporary to work around ovn bug
 echo "export IP_STACK=v4" >> /root/dev-scripts/config_root.sh
 
 if [[ -e /root/dev-scripts-additional-config ]]
