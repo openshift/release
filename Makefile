@@ -42,7 +42,6 @@ update:
 
 release-controllers:
 	./hack/generators/release-controllers/generate-release-controllers.py .
-	cp ./core-services/release-controller/rpms-ocp-*.yaml ./clusters/build-clusters/01_cluster/openshift/release-controller
 .PHONY: release-controllers
 
 jobs:
