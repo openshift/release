@@ -34,12 +34,24 @@ tag_specification:
   name: "4.5"
   namespace: ocp
 tests:
-- as: e2e-aws-ocp-45
+- as: operator-e2e-aws-ocp-45
+  steps:
+    cluster_profile: aws
+    test:
+    - as: operator-e2e
+      commands: make test-e2e
+      from: serverless-operator-src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws
+- as: upstream-e2e-aws-ocp-45
   steps:
     cluster_profile: aws
     test:
     - as: serverless-e2e
-      commands: make test-e2e
+      commands: make test-upstream-e2e-no-upgrade
       from: serverless-operator-src
       resources:
         requests:
@@ -52,7 +64,7 @@ tests:
     cluster_profile: aws
     test:
     - as: serverless-e2e
-      commands: make test-all
+      commands: make test-all-e2e
       from: serverless-operator-src
       resources:
         requests:
