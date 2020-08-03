@@ -47,6 +47,11 @@
         channel: '#forum-logging',
         notify: 'aoslogging',
       },
+      'openshift-metering': {
+        team: 'metering-team',
+        channel: '#metering-ci-notifications',
+        notify: 'tflannag',
+      },
       'openshift-dev-services': {
         team: 'openshift-dev-services',
         channel: '#forum-os-dev-services',
