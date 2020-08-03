@@ -101,10 +101,7 @@ promotion:
   namespace: ocp
 raw_steps:
 - pipeline_image_cache_step:
-    commands: mkdir -p _output/local/releases; touch _output/local/releases/CHECKSUM;
-      echo $'FROM bin AS bin\nFROM rpms AS rpms\nFROM centos:7\nCOPY --from=bin /go/src/github.com/openshift/origin/_output/local/releases
-      /srv/zips/\nCOPY --from=rpms /go/src/github.com/openshift/origin/_output/local/releases/rpms/*
-      /srv/repo/' > _output/local/releases/Dockerfile; make build-cross
+    commands: mkdir -p _output/local/releases; touch _output/local/releases/CHECKSUM; echo $'FROM bin AS bin\nFROM rpms AS rpms\nFROM centos:7\nCOPY --from=bin /go/src/github.com/openshift/origin/_output/local/releases /srv/zips/\nCOPY --from=rpms /go/src/github.com/openshift/origin/_output/local/releases/rpms/* /srv/repo/' > _output/local/releases/Dockerfile; make build-cross
     from: bin
     to: bin-cross
 - project_directory_image_build_step:
@@ -187,32 +184,28 @@ tag_specification:
 tests:
 - artifact_dir: /tmp/artifacts
   as: cmd
-  commands: TMPDIR=/tmp/volume ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1 KUBERNETES_SERVICE_HOST=
-    make test-cmd -k
+  commands: TMPDIR=/tmp/volume ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1 KUBERNETES_SERVICE_HOST= make test-cmd -k
   container:
     from: bin
     memory_backed_volume:
       size: 4Gi
 - artifact_dir: /tmp/artifacts
   as: unit
-  commands: TMPDIR=/tmp/volume GOTEST_FLAGS='-p 8' ARTIFACT_DIR=/tmp/artifacts TIMEOUT=240s
-    JUNIT_REPORT=1 TEST_KUBE=true KUBERNETES_SERVICE_HOST= hack/test-go.sh
+  commands: TMPDIR=/tmp/volume GOTEST_FLAGS='-p 8' ARTIFACT_DIR=/tmp/artifacts TIMEOUT=240s JUNIT_REPORT=1 TEST_KUBE=true KUBERNETES_SERVICE_HOST= hack/test-go.sh
   container:
     from: src
     memory_backed_volume:
       size: 4Gi
 - artifact_dir: /tmp/artifacts
   as: integration
-  commands: GOMAXPROCS=8 TMPDIR=/tmp/volume ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1
-    KUBERNETES_SERVICE_HOST= make test-integration
+  commands: GOMAXPROCS=8 TMPDIR=/tmp/volume ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1 KUBERNETES_SERVICE_HOST= make test-integration
   container:
     from: bin
     memory_backed_volume:
       size: 4Gi
 - artifact_dir: /tmp/artifacts
   as: verify
-  commands: ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1 KUBERNETES_SERVICE_HOST= make
-    verify -k
+  commands: ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1 KUBERNETES_SERVICE_HOST= make verify -k
   container:
     from: bin
 - as: e2e-aws
@@ -224,8 +217,7 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-builds
 - as: e2e-aws-disruptive
-  commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance/parallel
-    run-tests
+  commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: aws
 - as: e2e-aws-image-ecosystem
