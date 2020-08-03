@@ -82,7 +82,6 @@ curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.g
 echo "export OPENSHIFT_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}" >> /root/dev-scripts/config_root.sh
 echo "export ADDN_DNS=\$(awk '/nameserver/ { print \$2;exit; }' /etc/resolv.conf)" >> /root/dev-scripts/config_root.sh
 echo "export OPENSHIFT_CI=true" >> /root/dev-scripts/config_root.sh
-echo "export MIRROR_IMAGES=true" >> /root/dev-scripts/config_root.sh
 echo "export WORKER_MEMORY=16384" >> /root/dev-scripts/config_root.sh
 
 # FIXME(stbenjam): Temporary to work around ovn bug
