@@ -162,7 +162,10 @@ objects:
           get_nodes=$(oc --request-timeout=60s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}')
           nodes=( $get_nodes )
           # bash doesn't handle '.' in array elements easily
-          for i in {0..5}; do
+          num_nodes="${#nodes[@]}"
+          # TODO: This must be replaced by code that waits for all the expected number
+          # of nodes to be ready.
+          for (( i=0; i<$num_nodes; i++ )); do
             attempt=0
             while true; do
                 out=$(oc --request-timeout=60s -n default debug node/"${nodes[i]}" -- cat /proc/sys/crypto/fips_enabled || true)
