@@ -203,3 +203,34 @@ items:
   - kind: ServiceAccount
     name: ci-operator
     namespace: ci
+#https://issues.redhat.com/browse/DPTP-1417
+- kind: Role
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: configmap-pruner
+    namespace: ci
+  rules:
+  - apiGroups:
+    - ""
+    resources:
+    - configmaps
+    verbs:
+    - get
+    - create
+    - update
+    - delete
+    - deletecollection
+
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: configmap-pruner-ci-operator
+    namespace: ci
+  roleRef:
+    kind: Role
+    name: configmap-pruner
+    namespace: ci
+  subjects:
+  - kind: ServiceAccount
+    name: ci-operator
+    namespace: ci
