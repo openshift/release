@@ -45,6 +45,7 @@ cat > packet-setup.yaml <<-EOF
         facility: any
         wait_for_public_IPv: 4
         state: active
+        tags: "{{ lookup('env', 'PROW_JOB_ID') }}"
       register: hosts
       no_log: true
     - name: wait for ssh
