@@ -1,7 +1,7 @@
 # Layers CI appropriate yum repository configurations on top of the ART base images.
+FROM replaced-by-buildconfig
 ARG MAJOR
 ARG MINOR
-FROM replaced-by-buildconfig
 
 # The repo files in the ART image will not work in CI. Remove them in preference of
 # those appropriate for upstream dependencies.
