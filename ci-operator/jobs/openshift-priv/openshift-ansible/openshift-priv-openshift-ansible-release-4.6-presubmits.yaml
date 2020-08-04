@@ -4,8 +4,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.6
-    cluster: api.ci
-    context: ci/prow/e2e-aws-scaleup-rhel7
+    context: ci/prow/e2e-aws-workers-rhel7
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -13,9 +12,9 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-openshift-ansible-release-4.6-e2e-aws-scaleup-rhel7
+    name: pull-ci-openshift-priv-openshift-ansible-release-4.6-e2e-aws-workers-rhel7
     path_alias: github.com/openshift/openshift-ansible
-    rerun_command: /test e2e-aws-scaleup-rhel7
+    rerun_command: /test e2e-aws-workers-rhel7
     spec:
       containers:
       - args:
@@ -24,22 +23,10 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/e2e-aws-scaleup-rhel7-cluster-profile
-        - --target=e2e-aws-scaleup-rhel7
-        - --template=/usr/local/e2e-aws-scaleup-rhel7
+        - --secret-dir=/usr/local/e2e-aws-workers-rhel7-cluster-profile
+        - --target=e2e-aws-workers-rhel7
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: e2e-aws-scaleup-rhel7
-        - name: RPM_REPO_CRIO_DIR
-          value: 4.6-priv-rhel-7
-        - name: RPM_REPO_OPENSHIFT_ORIGIN
-          value: https://rpms.svc.ci.openshift.org/openshift-origin-v4.6-priv/
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance/parallel run-tests
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -50,14 +37,11 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-scaleup-rhel7-cluster-profile
+        - mountPath: /usr/local/e2e-aws-workers-rhel7-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-scaleup-rhel7
-          name: job-definition
-          subPath: cluster-scaleup-e2e-40.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -77,21 +61,16 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
-          - configMap:
-              name: cluster-profile-aws-centos-40
       - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - configMap:
-          name: prow-job-cluster-scaleup-e2e-40
-        name: job-definition
       - name: pull-secret
         secret:
           secretName: regcred
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-scaleup-rhel7,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-workers-rhel7,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
