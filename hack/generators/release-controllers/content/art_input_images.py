@@ -27,7 +27,7 @@ def add_golang_builders(gendoc, clone_dir, major, minor):
                         }
                     },
                     'source': {
-                        'contextDir': f'{resources_dir}/Dockerfile.rhel-{rhel_ver}-golang',
+                        'contextDir': f'{resources_dir}/rhel-{rhel_ver}/golang',
                         'git': {
                             'ref': 'master',
                             'uri': 'https://github.com/openshift/release.git'
@@ -99,7 +99,7 @@ def add_golang_release_builders(gendoc, clone_dir, major, minor):
                         }
                     },
                     'source': {
-                        'contextDir': f'{resources_dir}/Dockerfile.rhel-{rhel_ver}-release',
+                        'contextDir': f'{resources_dir}/rhel-{rhel_ver}/release',
                         'git': {
                             'ref': 'master',
                             'uri': 'https://github.com/openshift/release.git'
@@ -174,7 +174,7 @@ def add_base_image_builders(gendoc, clone_dir, major, minor):
                         }
                     },
                     'source': {
-                        'contextDir': f'{resources_dir}/Dockerfile.rhel-{rhel_ver}-base',
+                        'contextDir': f'{resources_dir}/rhel-{rhel_ver}/base',
                         'git': {
                             'ref': 'master',
                             'uri': 'https://github.com/openshift/release.git'
