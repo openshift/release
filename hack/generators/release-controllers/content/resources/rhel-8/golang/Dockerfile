@@ -1,7 +1,7 @@
 # Layers CI appropriate yum repository configurations on top of the ART builder images.
+FROM replaced-by-buildconfig
 ARG MAJOR
 ARG MINOR
-FROM replaced-by-buildconfig
 
 ENV VERSION=rhel-8-golang-openshift-${MAJOR}.${MINOR} \
     GOCACHE=/go/.cache \

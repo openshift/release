@@ -2,9 +2,9 @@
 # ART golang builder and has packages layered on top of support CI only use cases
 # (e.g. compiling test cases) that simply don't occur downstream.
 
+FROM replaced-by-buildconfig
 ARG MAJOR
 ARG MINOR
-FROM replaced-by-buildconfig
 
 # Install common CI tools and epel for packages like tito.
 RUN yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm && \
