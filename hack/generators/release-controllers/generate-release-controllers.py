@@ -79,7 +79,7 @@ def run(git_clone_dir):
     path_rc_deployments = path_base.joinpath('clusters/app.ci/release-controller')
     path_rc_release_resources = path_base.joinpath('core-services/release-controller')
 
-    path_rc_build_configs = path_rc_release_resources.joinpath('_builds')
+    path_rc_build_configs = path_rc_release_resources
     path_rc_build_configs.mkdir(exist_ok=True)
 
     path_rc_annotations = path_rc_release_resources.joinpath('_releases')
@@ -112,10 +112,12 @@ def run(git_clone_dir):
 
     with genlib.GenDoc(path_rc_build_configs.joinpath(f'ci-builder-images.yaml')) as gendoc_builders:
         with genlib.GenDoc(path_rc_build_configs.joinpath(f'ci-release-images.yaml')) as gendoc_release:
-            for major_minor in releases_4x:
-                major, minor = major_minor.split('.')
-                content.add_golang_builders(gendoc_builders, clone_dir=git_clone_dir, major=major, minor=minor)
-                content.add_golang_release_builders(gendoc_release, clone_dir=git_clone_dir, major=major, minor=minor)
+            with genlib.GenDoc(path_rc_build_configs.joinpath(f'ci-base-images.yaml')) as gendoc_base:
+                for major_minor in releases_4x:
+                    major, minor = major_minor.split('.')
+                    content.add_golang_builders(gendoc_builders, clone_dir=git_clone_dir, major=major, minor=minor)
+                    content.add_golang_release_builders(gendoc_release, clone_dir=git_clone_dir, major=major, minor=minor)
+                    content.add_base_image_builders(gendoc_base, clone_dir=git_clone_dir, major=major, minor=minor)
 
     for major_minor in releases_4x:
         major, minor = major_minor.split('.')
