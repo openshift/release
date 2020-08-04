@@ -350,26 +350,27 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )vendor,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - master
     cluster: api.ci
-    context: ci/prow/version
+    context: ci/prow/versions
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-integr8ly-integreatly-operator-master-version
-    rerun_command: /test version
+    name: pull-ci-integr8ly-integreatly-operator-master-versions
+    rerun_command: /test versions
+    run_if_changed: pkg/apis/integreatly/v1alpha1/rhmi_types.go
     spec:
       containers:
       - args:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --target=version
+        - --target=versions
         command:
         - ci-operator
         image: ci-operator:latest
@@ -393,4 +394,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )version,?($|\s.*)
+    trigger: (?m)^/test( | .* )versions,?($|\s.*)
