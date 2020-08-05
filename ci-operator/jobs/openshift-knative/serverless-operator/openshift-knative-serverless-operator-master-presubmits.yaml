@@ -1,20 +1,20 @@
 presubmits:
   openshift-knative/serverless-operator:
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
-    cluster: build01
-    context: ci/prow/4.3-azure-images
+    cluster: api.ci
+    context: ci/prow/4.5-azure-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: 4.3-azure
+      ci-operator.openshift.io/variant: 4.5-azure
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-serverless-operator-master-4.3-azure-images
-    rerun_command: /test 4.3-azure-images
+    name: pull-ci-openshift-knative-serverless-operator-master-4.5-azure-images
+    rerun_command: /test 4.5-azure-images
     spec:
       containers:
       - args:
@@ -22,7 +22,7 @@ presubmits:
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --target=[images]
-        - --variant=4.3-azure
+        - --variant=4.5-azure
         command:
         - ci-operator
         image: ci-operator:latest
@@ -46,22 +46,22 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.3-azure-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )4.5-azure-images,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
-    cluster: build01
-    context: ci/prow/4.3-gcp-images
+    cluster: api.ci
+    context: ci/prow/4.5-gcp-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: 4.3-gcp
+      ci-operator.openshift.io/variant: 4.5-gcp
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-serverless-operator-master-4.3-gcp-images
-    rerun_command: /test 4.3-gcp-images
+    name: pull-ci-openshift-knative-serverless-operator-master-4.5-gcp-images
+    rerun_command: /test 4.5-gcp-images
     spec:
       containers:
       - args:
@@ -69,7 +69,7 @@ presubmits:
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --target=[images]
-        - --variant=4.3-gcp
+        - --variant=4.5-gcp
         command:
         - ci-operator
         image: ci-operator:latest
@@ -93,54 +93,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.3-gcp-images,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - master
-    cluster: build01
-    context: ci/prow/4.3-vsphere-images
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: 4.3-vsphere
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-serverless-operator-master-4.3-vsphere-images
-    rerun_command: /test 4.3-vsphere-images
-    spec:
-      containers:
-      - args:
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-password-file=/etc/report/password.txt
-        - --report-username=ci
-        - --target=[images]
-        - --variant=4.3-vsphere
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.3-vsphere-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )4.5-gcp-images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -385,6 +338,53 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )4.5-upstream-e2e-aws-ocp-45,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: api.ci
+    context: ci/prow/4.5-vsphere-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: 4.5-vsphere
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-serverless-operator-master-4.5-vsphere-images
+    rerun_command: /test 4.5-vsphere-images
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --target=[images]
+        - --variant=4.5-vsphere
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.5-vsphere-images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
