@@ -4,11 +4,7 @@ ARG MAJOR
 ARG MINOR
 
 ENV VERSION=rhel-8-golang-openshift-${MAJOR}.${MINOR} \
-    GOCACHE=/go/.cache \
     GOARM=5 \
-    GOPATH=/go \
-    GOROOT=/usr/local/go \
-    GOFLAGS='-mod=vendor' \
     LOGNAME=deadbeef
 ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
 
