@@ -11,87 +11,9 @@ periodics:
     repo: serverless-operator
   labels:
     ci-operator.openshift.io/prowgen-controlled: "true"
-    ci-operator.openshift.io/variant: 4.3-azure
+    ci-operator.openshift.io/variant: 4.5-azure
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-master-4.3-azure-e2e-azure-ocp-43-continuous
-  spec:
-    containers:
-    - args:
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-password-file=/etc/boskos/password
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
-      - --secret-dir=/usr/local/e2e-azure-ocp-43-continuous-cluster-profile
-      - --target=e2e-azure-ocp-43-continuous
-      - --template=/usr/local/e2e-azure-ocp-43-continuous
-      - --variant=4.3-azure
-      command:
-      - ci-operator
-      env:
-      - name: CLUSTER_TYPE
-        value: azure4
-      - name: JOB_NAME_SAFE
-        value: e2e-azure-ocp-43-continuous
-      - name: TEST_COMMAND
-        value: make test-e2e
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/e2e-azure-ocp-43-continuous-cluster-profile
-        name: cluster-profile
-      - mountPath: /usr/local/e2e-azure-ocp-43-continuous
-        name: job-definition
-        subPath: cluster-launch-installer-src.yaml
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: password
-          path: password
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-azure4
-    - configMap:
-        name: prow-job-cluster-launch-installer-src
-      name: job-definition
-    - name: pull-secret
-      secret:
-        secretName: regcred
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: api.ci
-  cron: 0 */12 * * 1-5
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: master
-    org: openshift-knative
-    repo: serverless-operator
-  labels:
-    ci-operator.openshift.io/prowgen-controlled: "true"
-    ci-operator.openshift.io/variant: "4.3"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-master-4.3-e2e-aws-ocp-43-continuous
+  name: periodic-ci-openshift-knative-serverless-operator-master-4.5-azure-e2e-azure-ocp-45-continuous
   reporter_config:
     slack:
       channel: '#serverless-dev'
@@ -107,9 +29,9 @@ periodics:
       - --lease-server-password-file=/etc/boskos/password
       - --report-password-file=/etc/report/password.txt
       - --report-username=ci
-      - --secret-dir=/usr/local/e2e-aws-ocp-43-continuous-cluster-profile
-      - --target=e2e-aws-ocp-43-continuous
-      - --variant=4.3
+      - --secret-dir=/usr/local/e2e-azure-ocp-45-continuous-cluster-profile
+      - --target=e2e-azure-ocp-45-continuous
+      - --variant=4.5-azure
       command:
       - ci-operator
       image: ci-operator:latest
@@ -122,7 +44,7 @@ periodics:
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
-      - mountPath: /usr/local/e2e-aws-ocp-43-continuous-cluster-profile
+      - mountPath: /usr/local/e2e-azure-ocp-45-continuous-cluster-profile
         name: cluster-profile
       - mountPath: /etc/pull-secret
         name: pull-secret
@@ -151,237 +73,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: api.ci
-  cron: 0 0 * * 0
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: master
-    org: openshift-knative
-    repo: serverless-operator
-  labels:
-    ci-operator.openshift.io/prowgen-controlled: "true"
-    ci-operator.openshift.io/variant: 4.3-gcp
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-master-4.3-gcp-e2e-gcp-ocp-43-continuous
-  spec:
-    containers:
-    - args:
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-password-file=/etc/boskos/password
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
-      - --secret-dir=/usr/local/e2e-gcp-ocp-43-continuous-cluster-profile
-      - --target=e2e-gcp-ocp-43-continuous
-      - --template=/usr/local/e2e-gcp-ocp-43-continuous
-      - --variant=4.3-gcp
-      command:
-      - ci-operator
-      env:
-      - name: CLUSTER_TYPE
-        value: gcp
-      - name: JOB_NAME_SAFE
-        value: e2e-gcp-ocp-43-continuous
-      - name: TEST_COMMAND
-        value: make test-e2e
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/e2e-gcp-ocp-43-continuous-cluster-profile
-        name: cluster-profile
-      - mountPath: /usr/local/e2e-gcp-ocp-43-continuous
-        name: job-definition
-        subPath: cluster-launch-installer-src.yaml
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: password
-          path: password
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-gcp
-        - configMap:
-            name: cluster-profile-gcp
-    - configMap:
-        name: prow-job-cluster-launch-installer-src
-      name: job-definition
-    - name: pull-secret
-      secret:
-        secretName: regcred
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: api.ci
-  cron: 0 0 * * 0
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: master
-    org: openshift-knative
-    repo: serverless-operator
-  labels:
-    ci-operator.openshift.io/prowgen-controlled: "true"
-    ci-operator.openshift.io/variant: 4.3-vsphere
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-master-4.3-vsphere-e2e-vsphere-ocp-43-continuous
-  spec:
-    containers:
-    - args:
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-password-file=/etc/boskos/password
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
-      - --secret-dir=/usr/local/e2e-vsphere-ocp-43-continuous-cluster-profile
-      - --target=e2e-vsphere-ocp-43-continuous
-      - --template=/usr/local/e2e-vsphere-ocp-43-continuous
-      - --variant=4.3-vsphere
-      command:
-      - ci-operator
-      env:
-      - name: CLUSTER_TYPE
-        value: vsphere
-      - name: JOB_NAME_SAFE
-        value: e2e-vsphere-ocp-43-continuous
-      - name: TEST_COMMAND
-        value: SCALE_UP=-1 make test-e2e
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/e2e-vsphere-ocp-43-continuous-cluster-profile
-        name: cluster-profile
-      - mountPath: /usr/local/e2e-vsphere-ocp-43-continuous
-        name: job-definition
-        subPath: cluster-launch-installer-upi-src.yaml
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: password
-          path: password
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-vsphere
-    - configMap:
-        name: prow-job-cluster-launch-installer-upi-src
-      name: job-definition
-    - name: pull-secret
-      secret:
-        secretName: regcred
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: api.ci
   cron: 0 */12 * * 1-5
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: master
-    org: openshift-knative
-    repo: serverless-operator
-  labels:
-    ci-operator.openshift.io/prowgen-controlled: "true"
-    ci-operator.openshift.io/variant: "4.4"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-master-4.4-e2e-aws-ocp-44-continuous
-  reporter_config:
-    slack:
-      channel: '#serverless-dev'
-      job_states_to_report:
-      - success
-      - failure
-      - error
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}} :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :volcano: {{end}}'
-  spec:
-    containers:
-    - args:
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-password-file=/etc/boskos/password
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
-      - --secret-dir=/usr/local/e2e-aws-ocp-44-continuous-cluster-profile
-      - --target=e2e-aws-ocp-44-continuous
-      - --variant=4.4
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/e2e-aws-ocp-44-continuous-cluster-profile
-        name: cluster-profile
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: password
-          path: password
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws
-    - name: pull-secret
-      secret:
-        secretName: regcred
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: api.ci
-  cron: 0 */12 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -417,6 +109,150 @@ periodics:
         name: boskos
         readOnly: true
       - mountPath: /usr/local/e2e-aws-ocp-45-continuous-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 0 * * 0
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift-knative
+    repo: serverless-operator
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: 4.5-gcp
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-knative-serverless-operator-master-4.5-gcp-e2e-gcp-ocp-45-continuous
+  reporter_config:
+    slack:
+      channel: '#serverless-dev'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}} :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :volcano: {{end}}'
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/usr/local/e2e-gcp-ocp-45-continuous-cluster-profile
+      - --target=e2e-gcp-ocp-45-continuous
+      - --variant=4.5-gcp
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/e2e-gcp-ocp-45-continuous-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 0 * * 0
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift-knative
+    repo: serverless-operator
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: 4.5-vsphere
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-knative-serverless-operator-master-4.5-vsphere-e2e-vsphere-ocp-45-continuous
+  reporter_config:
+    slack:
+      channel: '#serverless-dev'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}} :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :volcano: {{end}}'
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/usr/local/e2e-vsphere-ocp-45-continuous-cluster-profile
+      - --target=e2e-vsphere-ocp-45-continuous
+      - --variant=4.5-vsphere
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/e2e-vsphere-ocp-45-continuous-cluster-profile
         name: cluster-profile
       - mountPath: /etc/pull-secret
         name: pull-secret
