@@ -31,6 +31,9 @@ images:
 - dockerfile_path: deploy/Dockerfile.registry.upgrade
   from: operator-registry-base
   to: hco-registry-upgrade
+- dockerfile_path: deploy/Dockerfile.registry.upgrade-prev
+  from: operator-registry-base
+  to: hco-registry-upgrade-prev
 promotion:
   additional_images:
     hyperconverged-cluster-operator-tests: src
@@ -38,6 +41,7 @@ promotion:
   - operator-registry-base
   - hco-registry
   - hco-registry-upgrade
+  - hco-registry-upgrade-prev
   name: hco1.1_4.5
   namespace: ocp
 resources:
@@ -56,9 +60,29 @@ tests:
     cluster_profile: aws
 - as: hco-e2e-upgrade-aws
   commands: |
-    make upgrade-test
+    RELEASE_DELTA=1 make upgrade-test
   openshift_installer_src:
     cluster_profile: aws
+- as: hco-e2e-upgrade-prev-aws
+  commands: |
+    RELEASE_DELTA=2 PREV=true make upgrade-test
+  openshift_installer_src:
+    cluster_profile: aws
+- as: hco-e2e-azure
+  commands: |
+    make start && make functest
+  openshift_installer_src:
+    cluster_profile: azure4
+- as: hco-e2e-upgrade-azure
+  commands: |
+    RELEASE_DELTA=1 make upgrade-test
+  openshift_installer_src:
+    cluster_profile: azure4
+- as: hco-e2e-upgrade-prev-azure
+  commands: |
+    RELEASE_DELTA=2 PREV=true make upgrade-test
+  openshift_installer_src:
+    cluster_profile: azure4
 zz_generated_metadata:
   branch: release-1.1
   org: kubevirt
