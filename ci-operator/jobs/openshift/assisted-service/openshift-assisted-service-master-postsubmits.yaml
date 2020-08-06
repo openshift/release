@@ -1,27 +1,25 @@
-presubmits:
+postsubmits:
   openshift/assisted-service:
   - agent: kubernetes
-    always_run: true
     branches:
-    - master
+    - ^master$
     cluster: api.ci
-    context: ci/prow/images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/is-promotion: "true"
       ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-master-images
-    rerun_command: /test images
+    max_concurrency: 1
+    name: branch-ci-openshift-assisted-service-master-images
     spec:
       containers:
       - args:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --promote
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --target=[images]
-        - --target=[release:latest]
         command:
         - ci-operator
         image: ci-operator:latest
@@ -45,4 +43,3 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
