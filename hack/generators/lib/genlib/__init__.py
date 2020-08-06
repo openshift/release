@@ -85,6 +85,9 @@ class GenDoc():
         for res in resource_list:
             self.append(res, comment=comment, caller=caller)
 
+    def set_context(self, context):
+        self.context = context
+
     def __enter__(self):
         if self.sort_only:
             return self
@@ -117,7 +120,7 @@ class GenDoc():
             comments = self.comments.get(i, None)
             if comments:
                 self.stream.writelines(comments)
-            yaml.safe_dump(res, self.stream, default_flow_style=False)
+            yaml.dump(res, self.stream, default_flow_style=False)
 
         if self.owns_file:
             self.stream.close()

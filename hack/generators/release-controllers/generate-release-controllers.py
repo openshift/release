@@ -9,12 +9,16 @@
 # All non-static methods in contexts
 # pylint: disable=R0201
 
+# Turn off too many statements
+# pylint: disable=R0915
+
 import logging
 import sys
 import pathlib
 import glob
 import os
 import json
+import yaml
 
 # Change python path so we can import genlib
 sys.path.append(str(pathlib.Path(__file__).absolute().parent.parent.joinpath('lib')))
@@ -69,6 +73,14 @@ class Context:
 
 
 def run(git_clone_dir):
+
+    def str_presenter(dumper, data):
+        if len(data.splitlines()) > 1:  # check for multiline string
+            return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='|')
+        return dumper.represent_scalar('tag:yaml.org,2002:str', data)
+
+    yaml.add_representer(str, str_presenter)
+
     releases_4x = []
     for name in glob.glob(f'{git_clone_dir}/ci-operator/config/openshift/origin/openshift-origin-release-4.*.yaml'):
         bn = os.path.splitext(os.path.basename(name))[0]  # e.g. openshift-origin-release-4.4
@@ -85,6 +97,8 @@ def run(git_clone_dir):
     path_rc_annotations = path_rc_release_resources.joinpath('_releases')
     path_priv_rc_annotations = path_rc_annotations.joinpath('priv')  # location where priv release controller annotations are generated
     path_priv_rc_annotations.mkdir(exist_ok=True)
+
+    path_release_controller_config_jobs = path_base.joinpath('ci-operator/jobs/openshift/release-controller-config')
 
     releases_4x.sort()  # Glob does provide any guarantees on ordering, so force an order by sorting.
     config = Config(releases_4x)
@@ -110,14 +124,16 @@ def run(git_clone_dir):
     with genlib.GenDoc(path_rc_release_resources.joinpath('admin_deploy-ocp-publish-art.yaml'), context=config) as gendoc:
         content.add_art_publish(gendoc)
 
-    with genlib.GenDoc(path_rc_build_configs.joinpath(f'ci-builder-images.yaml')) as gendoc_builders:
-        with genlib.GenDoc(path_rc_build_configs.joinpath(f'ci-release-images.yaml')) as gendoc_release:
-            with genlib.GenDoc(path_rc_build_configs.joinpath(f'ci-base-images.yaml')) as gendoc_base:
-                for major_minor in releases_4x:
-                    major, minor = major_minor.split('.')
-                    content.add_golang_builders(gendoc_builders, clone_dir=git_clone_dir, major=major, minor=minor)
-                    content.add_golang_release_builders(gendoc_release, clone_dir=git_clone_dir, major=major, minor=minor)
-                    content.add_base_image_builders(gendoc_base, clone_dir=git_clone_dir, major=major, minor=minor)
+    gendoc_builders = genlib.GenDoc(path_rc_build_configs.joinpath(f'ci-builder-images.yaml'))
+    gendoc_release = genlib.GenDoc(path_rc_build_configs.joinpath(f'ci-release-images.yaml'))
+    gendoc_base = genlib.GenDoc(path_rc_build_configs.joinpath(f'ci-base-images.yaml'))
+
+    with gendoc_builders, gendoc_release, gendoc_base:
+        for major_minor in releases_4x:
+            major, minor = major_minor.split('.')
+            content.add_golang_builders(gendoc_builders, clone_dir=git_clone_dir, major=major, minor=minor)
+            content.add_golang_release_builders(gendoc_release, clone_dir=git_clone_dir, major=major, minor=minor)
+            content.add_base_image_builders(gendoc_base, clone_dir=git_clone_dir, major=major, minor=minor)
 
     for major_minor in releases_4x:
         major, minor = major_minor.split('.')
@@ -147,6 +163,12 @@ def run(git_clone_dir):
 
             with path_priv_rc_annotations.joinpath(annotation_filename).open(mode='w+', encoding='utf-8') as f:
                 json.dump(priv_annotation, f, sort_keys=True, indent=4)
+
+        with genlib.GenDoc(path_release_controller_config_jobs.joinpath(f'openshift-release-controller-config-release-{major_minor}-periodics.yaml')) as gendoc:
+            for private in (False, True):
+                for arch in config.arches:
+                    gendoc.set_context(Context(config, arch, private))
+                    content.add_machine_os_content_promoter(gendoc, major, minor)
 
 
 if __name__ == '__main__':

@@ -8,3 +8,4 @@ from .art_namespaces_rbac import add_imagestream_namespace_rbac
 from .redirect_and_files_cache_resources import add_redirect_and_files_cache_resources
 from .art_rpm_mirroring_services import add_rpm_mirror_service
 from .art_input_images import add_golang_release_builders, add_golang_builders, add_base_image_builders
+from .machine_os_content_promotions import add_machine_os_content_promoter
