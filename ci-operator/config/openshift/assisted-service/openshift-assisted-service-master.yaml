@@ -1,0 +1,46 @@
+base_images:
+  openshift_release_golang-1.14:
+    name: release
+    namespace: openshift
+    tag: golang-1.14
+  ubi8:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- dockerfile_path: Dockerfile
+  from: src-dockerfile
+  inputs:
+    openshift_release_golang-1.14:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.14
+    src-dockerfile:
+      paths:
+      - destination_dir: .
+        source_path: /opt/Dockerfile
+    ubi8:
+      as:
+      - registry.access.redhat.com/ubi8/ubi-minimal:latest
+  to: assisted-service
+raw_steps:
+- pipeline_image_cache_step:
+    commands: "cat << DOCKERFILE > /opt/Dockerfile\n FROM registry.access.redhat.com/ubi8/ubi-minimal:latest as certs\n FROM jimschubert/swagger-codegen-cli:2.3.1 as swagger\n                                                                                                                       \n COPY swagger.yaml .\n RUN mkdir /build && sed -i '/pattern:/d' swagger.yaml && \\\n         echo '{\"packageName\" : \"bm_inventory_client\", \"packageVersion\": \"1.0.0\"}' > config.json && \\\n         /docker-entrypoint.sh generate --lang python --config config.json --output /build --input-spec swagger.yaml\n\n FROM registry.svc.ci.openshift.org/openshift/release:golang-1.14 as builder\n\n COPY . . \n RUN GOFLAGS=\"\" GO111MODULE=on go build -o /build/bm-inventory cmd/main.go\n COPY --from=swagger /build build\n RUN cd build && python3 setup.py sdist --dist-dir /bm-inventory-client\n\n FROM scratch\n COPY --from=certs /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /etc/ssl/certs/ca-bundle.crt\n COPY --from=certs /etc/pki/ca-trust/extracted/openssl/ca-bundle.trust.crt /etc/ssl/certs/ca-bundle.trust.crt\n ARG GIT_REVISION\n LABEL \"git_revision\"=${GIT_REVISION}\n\n COPY --from=builder /build/bm-inventory /bm-inventory\n COPY --from=builder /bm-inventory-client/bm-inventory-client-1.0.0.tar.gz /clients/bm-inventory-client-1.0.0.tar.gz\n CMD [\"/bm-inventory\"]\nDOCKERFILE\n"
+    from: src
+    to: src-dockerfile
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.6"
+  namespace: ocp
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: assisted-service
