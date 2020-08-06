@@ -1,0 +1,81 @@
+presubmits:
+  eclipse/che-operator:
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ocp_ci
+    cluster: api.ci
+    context: ci/prow/v6-che-operator-olm-nightly
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: v6
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-eclipse-che-operator-ocp_ci-v6-che-operator-olm-nightly
+    rerun_command: /test v6-che-operator-olm-nightly
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-password-file=/etc/boskos/password
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/usr/local/che-operator-olm-nightly-cluster-profile
+        - --target=che-operator-olm-nightly
+        - --template=/usr/local/che-operator-olm-nightly
+        - --variant=v6
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: JOB_NAME_SAFE
+          value: che-operator-olm-nightly
+        - name: TEST_COMMAND
+          value: .ci/cico_olm_openshift.sh
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/che-operator-olm-nightly-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/che-operator-olm-nightly
+          name: job-definition
+          subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-src
+        name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )v6-che-operator-olm-nightly,?($|\s.*)
