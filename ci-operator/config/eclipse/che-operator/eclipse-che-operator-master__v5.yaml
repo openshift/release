@@ -10,6 +10,9 @@ base_images:
 build_root:
   project_image:
     dockerfile_path: .ci/openshift-ci/Dockerfile
+images:
+- dockerfile_path: olm/eclipse-che-preview-openshift/Dockerfile
+  to: che-operator-catalog
 resources:
   '*':
     limits:
@@ -23,6 +26,10 @@ tag_specification:
 tests:
 - as: che-operator-update
   commands: .ci/cico_updates_openshift.sh
+  openshift_installer_src:
+    cluster_profile: aws
+- as: che-operator-olm-nightly
+  commands: "/bin/bash olm/testCatalogSource.sh openshift nightly che marketplace marketplace_image \n"
   openshift_installer_src:
     cluster_profile: aws
 zz_generated_metadata:
