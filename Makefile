@@ -48,6 +48,7 @@ update:
 
 release-controllers:
 	./hack/generators/release-controllers/generate-release-controllers.py .
+	$(MAKE) jobs
 .PHONY: release-controllers
 
 jobs:

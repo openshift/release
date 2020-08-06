@@ -1,0 +1,306 @@
+periodics:
+- agent: kubernetes
+  cluster: api.ci
+  decorate: true
+  interval: 15m
+  labels:
+    ci.openshift.io/release-type: informing
+    job-release: "4.5"
+  name: promote-release-openshift-machine-os-content-e2e-aws-4.5
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
+      - --secret-dir=/usr/local/pull-secret
+      - --secret-dir=/usr/local/e2e-aws-cluster-profile
+      - --template=/usr/local/e2e-aws
+      - --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME)
+      - --promote
+      command:
+      - /bin/bash
+      - -c
+      - |2
+
+        #!/bin/bash
+        set -euo pipefail
+
+        # NOTE: This is generated bash. This is why you will see static variables compared against literals.
+
+        # prow doesn't allow init containers or a second container
+        export PATH=$PATH:/tmp/bin
+        mkdir /tmp/bin
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.5/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
+        chmod ug+x /tmp/bin/oc
+
+        # if the source and destination are identical, do nothing
+        from=$( oc get istag --ignore-not-found -n "rhcos" "machine-os-content:4.5" -o template='{{ .image.metadata.name }}' )
+
+        if [[ -z "$from" ]]; then
+            echo "There is currently no rhcos istag/machine-os-content:4.5 image available"
+            exit 1
+        fi
+
+        to=$( oc get istag --ignore-not-found -n ocp "4.5:machine-os-content" -o template='{{ .image.metadata.name }}' )
+        if [[ "$from" == "$to" ]]; then
+            echo "info: rhcos istag/machine-os-content:4.5 matches ocp istag/4.5:machine-os-content (currently $to); no action necessary"
+            exit 0
+        fi
+        echo "Will promote rhcos istag/machine-os-content:4.5 ($from), to ocp istag/4.5:machine-os-content (current value: $to)"
+
+        # error out if the image isn't on quay
+        to_quay="quay.io/openshift-release-dev/ocp-v4.0-art-dev@$from"
+        if ! oc image info -a "/usr/local/pull-secret/.dockerconfigjson" "$to_quay"; then
+            echo "error: The source image has not been pushed to quay; missing $to_quay"
+            exit 1
+        fi
+
+        # verify the tests pass
+        ci-operator $@
+      env:
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: CONFIG_SPEC
+        value: |
+          base_images:
+            machine-os-content:
+              name: machine-os-content
+              namespace: rhcos
+              tag: '4.5'
+          build_root:
+            image_stream_tag:
+              name: release
+              namespace: openshift
+              tag: golang-1.12
+          promotion:
+            name: '4.5'
+            namespace: ocp
+          raw_steps:
+          - output_image_tag_step:
+              from: machine-os-content
+              to:
+                name: stable
+                tag: machine-os-content
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tag_specification:
+            name: '4.5'
+            namespace: ocp
+          tests:
+          - as: e2e-aws
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: aws
+      - name: JOB_NAME_SAFE
+        value: e2e-aws
+      - name: TEST_COMMAND
+        value: TEST_SUITE=openshift/conformance/parallel run-tests
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/e2e-aws
+        name: job-definition
+        subPath: cluster-launch-installer-e2e.yaml
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - configMap:
+        name: prow-job-cluster-launch-installer-e2e
+      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
+  cluster: api.ci
+  decorate: true
+  hidden: true
+  interval: 15m
+  labels:
+    ci.openshift.io/release-type: informing
+    job-release: "4.5"
+  name: promote-release-openshift-machine-os-content-e2e-aws-4.5-priv
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --lease-server=https://boskos-ci.svc.ci.openshift.org
+      - --secret-dir=/usr/local/pull-secret
+      - --secret-dir=/usr/local/e2e-aws-cluster-profile
+      - --template=/usr/local/e2e-aws
+      - --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME)
+      - --promote
+      command:
+      - /bin/bash
+      - -c
+      - |2
+
+        #!/bin/bash
+        set -euo pipefail
+
+        # NOTE: This is generated bash. This is why you will see static variables compared against literals.
+
+        # prow doesn't allow init containers or a second container
+        export PATH=$PATH:/tmp/bin
+        mkdir /tmp/bin
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.5/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
+        chmod ug+x /tmp/bin/oc
+
+        # if the source and destination are identical, do nothing
+        from=$( oc get istag --ignore-not-found -n "rhcos" "machine-os-content:4.5" -o template='{{ .image.metadata.name }}' )
+
+        if [[ -z "$from" ]]; then
+            echo "There is currently no rhcos istag/machine-os-content:4.5 image available"
+            exit 1
+        fi
+
+        to=$( oc get istag --ignore-not-found -n ocp-private "4.5-priv:machine-os-content" -o template='{{ .image.metadata.name }}' )
+        if [[ "$from" == "$to" ]]; then
+            echo "info: rhcos istag/machine-os-content:4.5 matches ocp-private istag/4.5-priv:machine-os-content (currently $to); no action necessary"
+            exit 0
+        fi
+        echo "Will promote rhcos istag/machine-os-content:4.5 ($from), to ocp-private istag/4.5-priv:machine-os-content (current value: $to)"
+
+        # error out if the image isn't on quay
+        to_quay="quay.io/openshift-release-dev/ocp-v4.0-art-dev@$from"
+        if ! oc image info -a "/usr/local/pull-secret/.dockerconfigjson" "$to_quay"; then
+            echo "error: The source image has not been pushed to quay; missing $to_quay"
+            exit 1
+        fi
+
+        # verify the tests pass
+        ci-operator $@
+      env:
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: CONFIG_SPEC
+        value: |
+          base_images:
+            machine-os-content:
+              name: machine-os-content
+              namespace: rhcos
+              tag: '4.5'
+          build_root:
+            image_stream_tag:
+              name: release
+              namespace: openshift
+              tag: golang-1.12
+          promotion:
+            name: 4.5-priv
+            namespace: ocp-private
+          raw_steps:
+          - output_image_tag_step:
+              from: machine-os-content
+              to:
+                name: stable
+                tag: machine-os-content
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tag_specification:
+            name: 4.5-priv
+            namespace: ocp-private
+          tests:
+          - as: e2e-aws
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: aws
+      - name: JOB_NAME_SAFE
+        value: e2e-aws
+      - name: TEST_COMMAND
+        value: TEST_SUITE=openshift/conformance/parallel run-tests
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/e2e-aws
+        name: job-definition
+        subPath: cluster-launch-installer-e2e.yaml
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - configMap:
+        name: prow-job-cluster-launch-installer-e2e
+      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: regcred
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials

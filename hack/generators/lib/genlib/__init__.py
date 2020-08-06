@@ -12,12 +12,19 @@ import pathlib
 SORT_ONLY = False
 
 
-class GenDoc():
+class GenDoc(object):
+
+    """
+    A GenDoc should be used as a typical python contextmanager. Within that contextmanager's scope,
+    you can add python dicts and comments associated with those dicts define elements on the CI
+    cluster(s) to create. When the contextmanager exits, the resources/comments you have added
+    will be rendered to a deterministically sorted YAML file.
+    """
 
     def __init__(self, filename_or_stream, context=None):
         """
         :param filename_or_stream: The filename or stream to which yaml resources should be serialized.
-        :param context: The context object to store and make available to rendering functions
+        :param context: An arbitrary context object to store and make available to rendering functions.
         """
         if isinstance(filename_or_stream, pathlib.Path):
             filename_or_stream = str(filename_or_stream)
@@ -85,6 +92,9 @@ class GenDoc():
         for res in resource_list:
             self.append(res, comment=comment, caller=caller)
 
+    def set_context(self, context):
+        self.context = context
+
     def __enter__(self):
         if self.sort_only:
             return self
@@ -117,7 +127,7 @@ class GenDoc():
             comments = self.comments.get(i, None)
             if comments:
                 self.stream.writelines(comments)
-            yaml.safe_dump(res, self.stream, default_flow_style=False)
+            yaml.dump(res, self.stream, default_flow_style=False)
 
         if self.owns_file:
             self.stream.close()
