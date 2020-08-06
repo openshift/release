@@ -7,6 +7,13 @@ images:
 - dockerfile_path: Dockerfile.assisted-service-build-ci
   from: src
   to: assisted-service
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+        swagger generate server --template=stratoscale -f swagger.yaml --template-dir=go-swagger/generator/templates/contrib
+        swagger generate client --template=stratoscale -f swagger.yaml --template-dir=go-swagger/generator/templates/contrib
+    from: assisted-service
+    to: assisted-service-swagger
 resources:
   '*':
     requests:
@@ -25,9 +32,21 @@ tests:
   container:
     from: assisted-service
 - as: lint
-  commands: make lint
+  commands: |
+      export GO111MODULE=on \
+             TMP=/tmp \
+             GOPATH=${TMP}/go \
+             GOBIN=${TMP}/go/bin \
+             GOFLAGS="" \
+             GOPROXY=https://proxy.golang.org \
+             GOROOT=/usr/local/go \
+             GOLANGCI_LINT_CACHE=/tmp/go/.cache/go-build/.cache
+      export PATH="${GOBIN}:${HOME}/.go/bin:${PATH}" \
+             GOCACHE="${GOPATH}/pkg/mod" \
+             XDG_CACHE_HOME=${TMP}
+      make lint
   container:
-    from: assisted-service
+    from: assisted-service-swagger
 zz_generated_metadata:
   branch: prow_integration
   org: openshift
