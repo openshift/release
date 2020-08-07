@@ -1053,3 +1053,76 @@ objects:
           fi
           sleep 60 & wait
         done
+
+    # Monitors the cluster during its entire life (instalation + tests)
+    - name: monitor
+      image: ${IMAGE_TESTS}
+      terminationMessagePolicy: FallbackToLogsOnError
+      resources:
+        requests:
+          cpu: 500m
+          memory: 500Mi
+        limits:
+          memory: 4Gi
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      - name: cluster-profile
+        mountPath: /tmp/cluster
+      - name: artifacts
+        mountPath: /tmp/artifacts
+      env:
+      - name: ARTIFACT_DIR
+        value: /tmp/artifacts
+      - name: HOME
+        value: /tmp/home
+      - name: KUBECONFIG
+        value: /tmp/artifacts/installer/auth/kubeconfig
+      command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -euxo pipefail
+
+        export PATH=$PATH:/tmp/shared
+
+        export REPOSITORY_PATH=/tmp/resourcewatch
+
+        function stop_jobs() {
+          jobs -p | xargs -r kill || true; exit 0
+        }
+
+        function finish() {
+          set +e
+
+          echo "Stoping monitors"
+
+          stop_jobs
+
+          tar -cf "${ARTIFACT_DIR}/resourcewatch.tar" "${REPOSITORY_PATH}
+        }
+
+        trap 'finish' EXIT
+        trap 'stop_jobs' TERM
+
+        # Wait for installer to create the kubeconfig
+        until [ -f "${KUBECONFIG}" ]
+        do
+             sleep 1
+        done
+        echo "kubeconfig detected at: $( date )"
+
+        # don't let clients impact the global kubeconfig
+        cp "${KUBECONFIG}" /tmp/admin.kubeconfig
+        export KUBECONFIG=/tmp/admin.kubeconfig
+
+        openshift-tests run-resourcewatch --kubeconfig=${KUBECONFIG} --namespace=ci-operator-monitor &
+
+        while true; do
+          if [[ -f /tmp/shared/exit ]]; then
+            exit 0
+          fi
+
+          sleep 1;
+        done
