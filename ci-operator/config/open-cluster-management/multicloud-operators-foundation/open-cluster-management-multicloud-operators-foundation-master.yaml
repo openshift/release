@@ -43,15 +43,19 @@ tests:
     make verify-deps -k --warn-undefined-variables
   container:
     from: bin
-- artifact_dir: /tmp/artifacts
-  as: unit
+- as: unit
   commands: |
-    curl -L https://go.kubebuilder.io/dl/2.2.0/linux/amd64 | tar -xz
-    KUBEBUILDER_ASSETS="$(pwd)/kubebuilder_2.2.0_linux_amd64/bin"
-    export KUBEBUILDER_ASSETS
     make test --warn-undefined-variables
   container:
     from: test-bin
+- as: e2e
+  commands: |
+    KUBECTL=oc
+    IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:multicloud-operators-foundation}
+    export KUBECTL IMAGE_NAME
+    make test-e2e
+  openshift_installer_src:
+    cluster_profile: aws
 zz_generated_metadata:
   branch: master
   org: open-cluster-management
