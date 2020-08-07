@@ -1,0 +1,163 @@
+base_images:
+  base:
+    name: "4.6"
+    namespace: origin
+    tag: base
+  ocp_4.1_cli:
+    name: "4.1"
+    namespace: ocp
+    tag: cli
+  ocp_builder_golang-1.13:
+    name: builder
+    namespace: ocp
+    tag: golang-1.13
+  openshift_release_golang-1.13:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+  origin_4.2_cli:
+    name: "4.2"
+    namespace: origin
+    tag: cli
+  origin_4.6_cli:
+    name: "4.6"
+    namespace: origin
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- dockerfile_path: images/installer/Dockerfile.ci
+  from: base
+  inputs:
+    openshift_release_golang-1.13:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.13
+  to: installer
+- dockerfile_path: images/installer-artifacts/Dockerfile.rhel
+  from: installer
+  inputs:
+    ocp_builder_golang-1.13:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
+  to: installer-artifacts
+- dockerfile_path: images/libvirt/Dockerfile.ci
+  from: base
+  inputs:
+    openshift_release_golang-1.13:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.13
+  to: libvirt-installer
+- dockerfile_path: images/installer/Dockerfile.upi.ci
+  from: base
+  inputs:
+    ocp_4.1_cli:
+      as:
+      - registry.svc.ci.openshift.org/ocp/4.1:cli
+    ocp_builder_golang-1.13:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
+  to: upi-installer
+- dockerfile_path: images/openstack/Dockerfile.ci
+  from: base
+  inputs:
+    openshift_release_golang-1.13:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.13
+    origin_4.6_cli:
+      as:
+      - registry.svc.ci.openshift.org/origin/4.6:cli
+  to: openstack-installer
+- dockerfile_path: images/baremetal/Dockerfile.ci
+  from: base
+  inputs:
+    openshift_release_golang-1.13:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.13
+  to: baremetal-installer
+promotion:
+  name: "4.6"
+  namespace: origin
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  baremetal-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  govet:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  installer-artifacts:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  libvirt-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  openstack-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  unit:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  upi-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+tag_specification:
+  name: "4.6"
+  namespace: origin
+tests:
+- as: unit
+  commands: go test ./pkg/...
+  container:
+    from: src
+- as: gofmt
+  commands: IS_CONTAINER=TRUE ./hack/go-fmt.sh .
+  container:
+    from: src
+- as: govet
+  commands: IS_CONTAINER=TRUE ./hack/go-vet.sh ./...
+  container:
+    from: src
+- as: golint
+  commands: IS_CONTAINER=TRUE ./hack/go-lint.sh -min_confidence 0.3 $(go list -f '{{ .ImportPath }}' ./...)
+  container:
+    from: src
+- as: verify-vendor
+  commands: IS_CONTAINER=TRUE ./hack/verify-vendor.sh
+  container:
+    from: src
+- as: e2e-gcp
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
+- as: e2e-aws
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-vsphere-upi
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer_upi:
+    cluster_profile: vsphere
+- as: e2e-vsphere
+  steps:
+    cluster_profile: vsphere
+    workflow: openshift-e2e-vsphere
+zz_generated_metadata:
+  branch: master-fcos
+  org: openshift
+  repo: installer
