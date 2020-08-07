@@ -11,23 +11,17 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.5"
+  name: "4.6"
   namespace: ocp
 tests:
-- as: performance-test
-  steps:
-    test:
-    - as: performance-test
-      commands: /bin/bash .ci/ci-eclipse-che-perf.sh
-      credentials:
-      - mount_path: /usr/local/ci-secrets/test-harness-secrets
-        name: test-harness-secrets
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+- as: performance-tests
+  commands: .ci/ci-eclipse-che-perf.sh
+  cron: 0 */12 * * *
+  openshift_installer_src:
+    cluster_profile: aws
+  secret:
+    mount_path: /usr/local/test-harness-secrets
+    name: test-harness-secrets
 zz_generated_metadata:
   branch: master
   org: che-incubator
