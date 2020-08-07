@@ -142,8 +142,6 @@ def run(git_clone_dir):
             priv_annotation.pop('check', None)  # Don't worry about the state of other releases
             priv_annotation.pop('publish', None)  # Don't publish these images anywhere
             priv_annotation['message'] = "<!-- GENERATED FROM PUBLIC ANNOTATION CONFIG - DO NOT EDIT. -->" + priv_annotation['message']
-            for _, test_config in priv_annotation['verify'].items():
-                test_config['prowJob']['name'] += '-priv'
 
             with path_priv_rc_annotations.joinpath(annotation_filename).open(mode='w+', encoding='utf-8') as f:
                 json.dump(priv_annotation, f, sort_keys=True, indent=4)
