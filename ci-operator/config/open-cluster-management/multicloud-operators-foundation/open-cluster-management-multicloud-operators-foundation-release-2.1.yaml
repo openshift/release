@@ -40,6 +40,19 @@ tests:
     make verify-deps -k --warn-undefined-variables
   container:
     from: bin
+- as: unit
+  commands: |
+    make test --warn-undefined-variables
+  container:
+    from: test-bin
+- as: e2e
+  commands: |
+    KUBECTL=oc
+    IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:multicloud-operators-foundation}
+    export KUBECTL IMAGE_NAME
+    make test-e2e
+  openshift_installer_src:
+    cluster_profile: aws
 zz_generated_metadata:
   branch: release-2.1
   org: open-cluster-management
