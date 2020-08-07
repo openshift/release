@@ -84,7 +84,7 @@ presubmits:
     branches:
     - master
     cluster: api.ci
-    context: ci/prow/v5-che-operator-olm-nightly
+    context: ci/prow/v5-che-operator-olm-latest-changes-tests
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -92,8 +92,8 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       ci-operator.openshift.io/variant: v5
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-eclipse-che-operator-master-v5-che-operator-olm-nightly
-    rerun_command: /test v5-che-operator-olm-nightly
+    name: pull-ci-eclipse-che-operator-master-v5-che-operator-olm-latest-changes-tests
+    rerun_command: /test v5-che-operator-olm-latest-changes-tests
     spec:
       containers:
       - args:
@@ -101,9 +101,9 @@ presubmits:
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/che-operator-olm-nightly-cluster-profile
-        - --target=che-operator-olm-nightly
-        - --template=/usr/local/che-operator-olm-nightly
+        - --secret-dir=/usr/local/che-operator-olm-latest-changes-tests-cluster-profile
+        - --target=che-operator-olm-latest-changes-tests
+        - --template=/usr/local/che-operator-olm-latest-changes-tests
         - --variant=v5
         command:
         - ci-operator
@@ -111,9 +111,9 @@ presubmits:
         - name: CLUSTER_TYPE
           value: aws
         - name: JOB_NAME_SAFE
-          value: che-operator-olm-nightly
+          value: che-operator-olm-latest-changes-tests
         - name: TEST_COMMAND
-          value: "/bin/bash olm/testCatalogSource.sh openshift nightly che marketplace marketplace_image \n"
+          value: .ci/cico_olm_openshift.sh
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -124,9 +124,9 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/che-operator-olm-nightly-cluster-profile
+        - mountPath: /usr/local/che-operator-olm-latest-changes-tests-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/che-operator-olm-nightly
+        - mountPath: /usr/local/che-operator-olm-latest-changes-tests
           name: job-definition
           subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
@@ -157,7 +157,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )v5-che-operator-olm-nightly,?($|\s.*)
+    trigger: (?m)^/test( | .* )v5-che-operator-olm-latest-changes-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
