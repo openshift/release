@@ -1101,10 +1101,6 @@ periodics:
       mediaTypes:
         log: text/plain
     gcs_credentials_secret: gce-sa-credentials-gcs-private
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: release
   hidden: true
   interval: 12h
   labels:
@@ -1113,9 +1109,9 @@ periodics:
   spec:
     containers:
     - args:
-      - --bw-password-path=/etc/ci-secret-bootstrap/bw_password
+      - --bw-password-path=/etc/ci-secret-bootstrap-bitwarden/bw_password
       - --bw-user=openshift-dev-infra+ci-bitwarden-bot@redhat.com
-      - --config=./core-services/ci-secret-bootstrap/_config.yaml
+      - --config=/etc/ci-secret-bootstrap/_config.yaml
       - --dry-run=false
       - --force=true
       command:
@@ -1130,18 +1126,23 @@ periodics:
         requests:
           cpu: 500m
       volumeMounts:
-      - mountPath: /etc/ci-secret-bootstrap
-        name: ci-secret-bootstrap
+      - mountPath: /etc/ci-secret-bootstrap-bitwarden
+        name: ci-secret-bootstrap-bitwarden
         readOnly: true
       - mountPath: /etc/build-farm-credentials
         name: build-farm-credentials
         readOnly: true
       - mountPath: /.config
         name: config-volume
+      - mountPath: /etc/ci-secret-bootstrap
+        name: ci-secret-bootstrap
     volumes:
-    - name: ci-secret-bootstrap
+    - name: ci-secret-bootstrap-bitwarden
       secret:
         secretName: bitwarden-credentials-openshift-ci-bitwarden-bot
+    - configMap:
+        name: ci-secret-bootstrap
+      name: ci-secret-bootstrap
     - name: build-farm-credentials
       secret:
         items:
