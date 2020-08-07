@@ -14,18 +14,15 @@ images:
   from: base
   to: multicloud-operators-foundation
 promotion:
-  name: "4.5"
+  name: "2.1"
   namespace: open-cluster-management
 resources:
   '*':
     limits:
-      memory: 4Gi
+      memory: 6Gi
     requests:
       cpu: 100m
-      memory: 200Mi
-tag_specification:
-  name: "4.4"
-  namespace: ocp
+      memory: 1Gi
 test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
 tests:
 - as: build
@@ -43,20 +40,7 @@ tests:
     make verify-deps -k --warn-undefined-variables
   container:
     from: bin
-- as: unit
-  commands: |
-    make test --warn-undefined-variables
-  container:
-    from: test-bin
-- as: e2e
-  commands: |
-    KUBECTL=oc
-    IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:multicloud-operators-foundation}
-    export KUBECTL IMAGE_NAME
-    make test-e2e
-  openshift_installer_src:
-    cluster_profile: aws
 zz_generated_metadata:
-  branch: master
+  branch: release-2.1
   org: open-cluster-management
   repo: multicloud-operators-foundation
