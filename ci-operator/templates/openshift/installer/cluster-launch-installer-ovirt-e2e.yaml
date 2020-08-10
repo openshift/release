@@ -131,20 +131,20 @@ objects:
         lease_type="${CLUSTER_TYPE}-quota-slice"
 
         echo "[INFO] Acquiring a lease ..."
-        resource="$( boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" acquire --type "${lease_type}" --state "free" --target-state "leased" --timeout 150m )"
+        resource="$( boskosctl --server-url http://boskos-ci.apps.ci.l2s4.p1.openshiftapps.com --owner-name "${CLUSTER_NAME}" acquire --type "${lease_type}" --state "free" --target-state "leased" --timeout 150m )"
         resource_name="$(echo "${resource}"|jq .name --raw-output)"
         lease_path="/etc/openshift-installer/${resource_name}.json"
         echo "[INFO] Lease acquired! at $(date --utc) Leased resource: ${resource}"
         echo "[INFO] Sending heartbeats to retain the lease ${resource_name}"
-        boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" heartbeat --resource "${resource}" &
+        boskosctl --server-url http://boskos-ci.apps.ci.l2s4.p1.openshiftapps.com --owner-name "${CLUSTER_NAME}" heartbeat --resource "${resource}" &
         heartbeats_pid=$!
 
         #For conformance runs we require double resources
         if [ "${LEASE_TYPE}" == "conformance" ]; then
-          resource_conformance="$( boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" acquire --type "${lease_type}" --state "free" --target-state "leased" --timeout 150m )"
+          resource_conformance="$( boskosctl --server-url http://boskos-ci.apps.ci.l2s4.p1.openshiftapps.com --owner-name "${CLUSTER_NAME}" acquire --type "${lease_type}" --state "free" --target-state "leased" --timeout 150m )"
           resource_conformance_name="$(echo "${resource_conformance}"|jq .name --raw-output)"
           echo "[INFO] Lease acquired! at $(date --utc) Leased resource: ${resource_conformance}"
-          boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" heartbeat --resource "${resource_conformance}" &
+          boskosctl --server-url http://boskos-ci.apps.ci.l2s4.p1.openshiftapps.com --owner-name "${CLUSTER_NAME}" heartbeat --resource "${resource_conformance}" &
           heartbeats_conformance_pid=$!
         fi
 
@@ -184,12 +184,12 @@ objects:
             echo "killing heartbeat process "${heartbeats_pid}" at $(date --utc)"
             kill -9 "${heartbeats_pid}"
             echo "[INFO] Releasing the lease on resouce ${resource_name}"
-            boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" release --name "${resource_name}" --target-state "free"
+            boskosctl --server-url http://boskos-ci.apps.ci.l2s4.p1.openshiftapps.com --owner-name "${CLUSTER_NAME}" release --name "${resource_name}" --target-state "free"
             if [ "${LEASE_TYPE}" == "conformance" ]; then
               echo "killing heartbeat process "${heartbeats_conformance_pid}" at $(date --utc)"
               kill -9 "${heartbeats_conformance_pid}"
               echo "[INFO] Releasing the lease on resouce ${resource_conformance}"
-              boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" release --name "${resource_conformance_name}" --target-state "free"
+              boskosctl --server-url http://boskos-ci.apps.ci.l2s4.p1.openshiftapps.com --owner-name "${CLUSTER_NAME}" release --name "${resource_conformance_name}" --target-state "free"
             fi
         }
 
