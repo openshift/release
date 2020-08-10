@@ -835,33 +835,7 @@ periodics:
       - name: JOB_NAME_SAFE
         value: e2e-remote-libvirt
       - name: TEST_COMMAND
-        value: |
-          # these tests are not able to run in CI due to
-          # missing test image dependencies.  They must be
-          # run manually
-          cat > invert_excluded.py <<EOSCRIPT
-          #!/usr/libexec/platform-python
-          import sys
-          all_tests = set()
-          excluded_tests = set()
-          for l in sys.stdin.readlines():
-            all_tests.add(l.strip())
-          with open(sys.argv[1], "r") as f:
-            for l in f.readlines():
-              excluded_tests.add(l.strip())
-          test_suite = all_tests - excluded_tests
-          for t in test_suite:
-            print(t)
-          EOSCRIPT
-          chmod +x invert_excluded.py
-          cat > excluded_tests <<EOEXCLUDE
-          ""
-          EOEXCLUDE
-          export PATH=/usr/libexec/origin:$PATH
-          openshift-tests run-upgrade all --dry-run --to-image "${IMAGE:-${MULTIARCH_RELEASE_IMAGE_LATEST}}" | ./invert_excluded.py excluded_tests > test-suite.txt
-          echo "Generated test suite:"
-          cat test-suite.txt
-          TEST_SUITE="--file=test-suite.txt" run-upgrade-tests
+        value: TEST_SUITE="all" run-upgrade-tests
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
