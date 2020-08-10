@@ -1,15 +1,10 @@
 # Secret Mirroring
 
-This directory contains deployment manifests and configuration for the
-[ci-secret-mirroring-controller](https://github.com/openshift/ci-secret-mirroring-controller).
-This tool mirrors secrets from one location in the cluster to another, allowing
+This directory contains the configuration file for the
+[secretsyncer](https://github.com/openshift/ci-tools/tree/master/pkg/controller/secretsyncer).
+This tool mirrors secrets from one location in the api.ci cluster to another in all clusters of the build-farm, allowing
 users to provide secrets without requiring RBAC privileges on secrets in a central
 namespace.
-
-Note that the tool can mirror secrets from a source to the target on the same cluster and 
-is deployed on all the clusters in the CI-infrastructure.
-Please ensure that the source secrets are available on all the clusters, in
-order to mirror them to the targets on all the clusters.
 
 # Self-managed secrets
 
