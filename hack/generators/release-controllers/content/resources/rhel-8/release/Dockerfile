@@ -17,6 +17,7 @@ RUN yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.n
     git config --system user.email origin-release@redhat.com
 
 # Install common go tools upstream devs are expecting in CI.
+# Pure cargo culting from https://github.com/openshift/release/blob/51d92eb6a6d730e932a5daf68829ca7936739904/projects/origin-release/golang-1.13/Dockerfile#L41
 RUN go get golang.org/x/tools/cmd/cover \
         github.com/Masterminds/glide \
         golang.org/x/tools/cmd/goimports \
@@ -33,10 +34,6 @@ RUN go get golang.org/x/tools/cmd/cover \
     ln -s /usr/bin/goimports $GOPATH/bin/goimports && \
     curl -L https://github.com/golang/dep/releases/download/v0.5.4/dep-linux-amd64 > /usr/bin/dep && \
     chmod +x /usr/bin/dep
-    # TODO: symlink for backwards compatibility with hack/build-images.sh only, remove
-
-RUN chmod g+xw -R $GOPATH && \
-    chmod g+xw -R $(go env GOROOT)
 
 WORKDIR /go/src/github.com/openshift/origin
 LABEL io.k8s.display-name="OpenShift ${MAJOR}.${MINOR} RHEL-8 Golang Release Image" \
