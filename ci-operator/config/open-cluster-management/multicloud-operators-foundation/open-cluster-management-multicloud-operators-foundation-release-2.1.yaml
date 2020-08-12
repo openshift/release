@@ -23,6 +23,9 @@ resources:
     requests:
       cpu: 100m
       memory: 1Gi
+tag_specification:
+  name: "4.4"
+  namespace: ocp
 test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
 tests:
 - as: build
@@ -40,6 +43,19 @@ tests:
     make verify-deps -k --warn-undefined-variables
   container:
     from: bin
+- as: unit
+  commands: |
+    make test --warn-undefined-variables
+  container:
+    from: test-bin
+- as: e2e
+  commands: |
+    KUBECTL=oc
+    FOUNDATION_IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:multicloud-operators-foundation}
+    export KUBECTL FOUNDATION_IMAGE_NAME
+    make test-e2e
+  openshift_installer_src:
+    cluster_profile: aws
 zz_generated_metadata:
   branch: release-2.1
   org: open-cluster-management
