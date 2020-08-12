@@ -469,7 +469,8 @@ objects:
         with open(bootstrap_ign, 'r') as f:
             ignition = json.load(f)
 
-        files = ignition['storage'].get('files', [])
+        storage = ignition.get('storage', {})
+        files = storage.get('files', [])
 
         infra_id = os.environ.get('INFRA_ID', 'openshift').encode()
         hostname_b64 = base64.standard_b64encode(infra_id + b'-bootstrap\n').decode().strip()
@@ -478,10 +479,8 @@ objects:
             'path': '/etc/hostname',
             'mode': 420,
             'contents': {
-                'source': 'data:text/plain;charset=utf-8;base64,' + hostname_b64,
-                'verification': {}
-            },
-            'filesystem': 'root',
+                'source': 'data:text/plain;charset=utf-8;base64,' + hostname_b64
+            }
         })
 
         ca_cert_path = os.environ.get('OS_CACERT', '')
@@ -495,13 +494,12 @@ objects:
                 'path': '/opt/openshift/tls/cloud-ca-cert.pem',
                 'mode': 420,
                 'contents': {
-                    'source': 'data:text/plain;charset=utf-8;base64,' + ca_cert_b64,
-                    'verification': {}
-                },
-                'filesystem': 'root',
+                    'source': 'data:text/plain;charset=utf-8;base64,' + ca_cert_b64
+                }
             })
 
-        ignition['storage']['files'] = files;
+        storage['files'] = files
+        ignition['storage'] = storage
 
         with open(bootstrap_ign, 'w') as f:
             json.dump(ignition, f)
@@ -523,36 +521,29 @@ objects:
           export OPENSTACK_TOKEN=$(openstack token issue --format value -c id)
           cat > ${ASSETS_DIR}/$INFRA_ID-bootstrap-ignition.json << EOF
         {
-        "ignition": {
+          "ignition": {
             "config": {
-                "append": [
-                  {
-                    "source": "$GLANCE_IMAGE_URL",
-                    "verification": {},
-                    "httpHeaders": [
-                      {
-                         "name": "X-Auth-Token",
-                         "value": "$OPENSTACK_TOKEN"
-                      }
-                    ]
-                  }
-                ]
+              "merge": [
+                {
+                  "source": "$GLANCE_IMAGE_URL",
+                  "httpHeaders": [
+                    {
+                      "name": "X-Auth-Token",
+                      "value": "$OPENSTACK_TOKEN"
+                    }
+                  ]
+                }
+              ]
             },
-            "security": {},
-            "timeouts": {},
-            "version": "2.4.0"
-        },
-        "networkd": {},
-        "passwd": {},
-        "storage": {
-                  "files": [{
-                      "filesystem": "root",
-                      "path": "/etc/hostname",
-                      "mode": 420,
-                      "contents": { "source": "$HOSTNAME_CONFIG_DATA_URL" }
-                  }]
-        },
-        "systemd": {}
+          "version": "3.1.0"
+          },
+          "storage": {
+            "files": [{
+              "path": "/etc/hostname",
+              "mode": 420,
+              "contents": { "source": "$HOSTNAME_CONFIG_DATA_URL" }
+            }]
+          }
         }
         EOF
 
@@ -565,9 +556,11 @@ objects:
               MASTER_HOSTNAME="$INFRA_ID-master-$index\n"
               python -c "import base64, json, sys;
         ignition = json.load(sys.stdin);
-        files = ignition['storage'].get('files', []);
-        files.append({'path': '/etc/hostname', 'mode': 420, 'contents': {'source': 'data:text/plain;charset=utf-8;base64,' + base64.standard_b64encode(b'$MASTER_HOSTNAME').decode().strip(), 'verification': {}}, 'filesystem': 'root'});
-        ignition['storage']['files'] = files;
+        storage = ignition.get('storage', {});
+        files = storage.get('files', []);
+        files.append({'path': '/etc/hostname', 'mode': 420, 'contents': {'source': 'data:text/plain;charset=utf-8;base64,' + base64.standard_b64encode(b'$MASTER_HOSTNAME').decode().strip()}});
+        storage['files'] = files;
+        ignition['storage'] = storage
         json.dump(ignition, sys.stdout)
         " <$MASTER_IGN_PATH >"${ASSETS_DIR}/$INFRA_ID-master-$index-ignition.json"
           done
