@@ -29,7 +29,7 @@ Create the namespaces:
 
 Create the SA for the `appyconfig` job:
 
-> oc apply -f clusters/build-clusters/common/ci-operator/admin_ci-operator_rbac.yaml
+> oc apply -f clusters/build-clusters/common/prow/admin_config-updater_rbac.yaml
 
 Note that this will promote `system:serviceaccount:ci:config-updater` to `cluster-admin`.
 
