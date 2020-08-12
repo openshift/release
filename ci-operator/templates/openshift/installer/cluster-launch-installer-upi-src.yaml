@@ -341,6 +341,10 @@ objects:
         trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/setup-success; else touch /tmp/exit /tmp/setup-failed; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+        # The oc binary is placed in the shared-tmp by the test container and we want to use
+        # that oc for all actions.
+        export PATH=/tmp:${PATH}
+
         GATHER_BOOTSTRAP_ARGS=
 
         function gather_bootstrap_and_fail() {
