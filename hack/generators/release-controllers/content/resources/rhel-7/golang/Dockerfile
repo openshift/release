@@ -8,9 +8,8 @@ ENV VERSION=rhel-7-golang-openshift-${MAJOR}.${MINOR} \
     LOGNAME=deadbeef \
     GOCACHE=/go/.cache \
     GOPATH=/go \
-    GOROOT=/usr/local/go \
     LOGNAME=deadbeef
-ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
+ENV PATH=$PATH:$GOPATH/bin
 
 # The repo files in the ART image will not work in CI. Remove them in preference of
 # those appropriate for upstream dependencies.
@@ -19,7 +18,7 @@ RUN rm -rf /etc/yum.repos.d/*.repo && \
 	curl http://base-${MAJOR}-${MINOR}.ocp.svc > /etc/yum.repos.d/rpm-mirrors.repo
 
 # make go related directories writeable since builds in CI will run as non-root.
-RUN mkdir -p $GOPATH $GOROOT && \
+RUN mkdir -p $GOPATH && \
     chmod g+xw -R $GOPATH && \
     chmod g+xw -R $(go env GOROOT)
 
