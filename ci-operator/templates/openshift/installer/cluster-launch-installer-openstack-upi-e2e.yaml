@@ -250,7 +250,7 @@ objects:
         function check_early_failures() {
           # if the installer does not have the upi openstack directory no need to continue
           if [[ ! -d "${OS_UPI_DIR}" ]]; then
-              echo "FAILURE: ${OS_UPI_DIR} does not exists on the installer image"
+              echo "FAILURE: '${OS_UPI_DIR}' does not exist on the installer image"
               signal_early_failure
               exit 1
           fi
@@ -316,10 +316,6 @@ objects:
           mkdir -p ~/.ssh
           cp "${SSH_PRIVATE_KEY_PATH}" ~/.ssh/id_rsa
           chmod 0600 ~/.ssh/id_rsa
-
-          #The following prepairs the playbooks being used depending on the release.
-          # for example, for release 4.4 the playbooks need to be renamed.
-          prepare_ansible_playbooks
 
           echo "OPENSTACK platform installer is using: ${IMAGE_OPENSTACK_INSTALLER} for testing"
         }
@@ -593,55 +589,74 @@ objects:
           awk '/^\s+'$1':/ { print $2 }' "$OS_CLIENT_CONFIG_FILE" | sed -e 's/^"//' -e 's/"$//'
         }
 
+        # Copy the playbooks in the assets directory
         function prepare_ansible_playbooks() {
-          # The name of the playbooks changed between release 4.4 and 4.5
-          # we need to normalize the playbook names
+          cp "${OS_UPI_DIR}/common.yaml" "${ASSETS_DIR}"
+
+          # Playbook numbers were removed in in 4.5
           if [ -f "${OS_UPI_DIR}/01_security-groups.yaml" ]; then
-              cp ${OS_UPI_DIR}/01_security-groups.yaml ${OS_UPI_DIR}/security-groups.yaml
-              cp ${OS_UPI_DIR}/02_network.yaml ${OS_UPI_DIR}/network.yaml
-              cp ${OS_UPI_DIR}/03_bootstrap.yaml ${OS_UPI_DIR}/bootstrap.yaml
-              cp ${OS_UPI_DIR}/04_control-plane.yaml ${OS_UPI_DIR}/control-plane.yaml
-              cp ${OS_UPI_DIR}/05_compute-nodes.yaml ${OS_UPI_DIR}/compute-nodes.yaml
+            cp "${OS_UPI_DIR}/01_security-groups.yaml"      "${ASSETS_DIR}/security-groups.yaml"
+            cp "${OS_UPI_DIR}/02_network.yaml"              "${ASSETS_DIR}/network.yaml"
+            cp "${OS_UPI_DIR}/03_bootstrap.yaml"            "${ASSETS_DIR}/bootstrap.yaml"
+            cp "${OS_UPI_DIR}/04_control-plane.yaml"        "${ASSETS_DIR}/control-plane.yaml"
+            cp "${OS_UPI_DIR}/05_compute-nodes.yaml"        "${ASSETS_DIR}/compute-nodes.yaml"
 
-              cp ${OS_UPI_DIR}/down-01_security-groups.yaml ${OS_UPI_DIR}/down-security-groups.yaml
-              cp ${OS_UPI_DIR}/down-02_network.yaml ${OS_UPI_DIR}/down-network.yaml
-              cp ${OS_UPI_DIR}/down-03_bootstrap.yaml ${OS_UPI_DIR}/down-bootstrap.yaml
-              cp ${OS_UPI_DIR}/down-04_control-plane.yaml ${OS_UPI_DIR}/down-control-plane.yaml
-              cp ${OS_UPI_DIR}/down-05_compute-nodes.yaml ${OS_UPI_DIR}/down-compute-nodes.yaml
-              cp ${OS_UPI_DIR}/down-06_load-balancers.yaml ${OS_UPI_DIR}/down-load-balancers.yaml
+            cp "${OS_UPI_DIR}/down-01_security-groups.yaml" "${ASSETS_DIR}/down-security-groups.yaml"
+            cp "${OS_UPI_DIR}/down-02_network.yaml"         "${ASSETS_DIR}/down-network.yaml"
+            cp "${OS_UPI_DIR}/down-03_bootstrap.yaml"       "${ASSETS_DIR}/down-bootstrap.yaml"
+            cp "${OS_UPI_DIR}/down-04_control-plane.yaml"   "${ASSETS_DIR}/down-control-plane.yaml"
+            cp "${OS_UPI_DIR}/down-05_compute-nodes.yaml"   "${ASSETS_DIR}/down-compute-nodes.yaml"
+            cp "${OS_UPI_DIR}/down-06_load-balancers.yaml"  "${ASSETS_DIR}/down-load-balancers.yaml"
+          else
+            cp \
+              "${OS_UPI_DIR}/security-groups.yaml"      \
+              "${OS_UPI_DIR}/network.yaml"              \
+              "${OS_UPI_DIR}/bootstrap.yaml"            \
+              "${OS_UPI_DIR}/control-plane.yaml"        \
+              "${OS_UPI_DIR}/compute-nodes.yaml"        \
+                                                        \
+              "${OS_UPI_DIR}/down-security-groups.yaml" \
+              "${OS_UPI_DIR}/down-network.yaml"         \
+              "${OS_UPI_DIR}/down-bootstrap.yaml"       \
+              "${OS_UPI_DIR}/down-control-plane.yaml"   \
+              "${OS_UPI_DIR}/down-compute-nodes.yaml"   \
+              "${OS_UPI_DIR}/down-load-balancers.yaml"  \
+                                                        \
+              "${ASSETS_DIR}"
           fi
-        }
 
-        function prepare_ansible_playbooks_workspace() {
+          # down-containers.yaml was introduced in 4.6
+          if [ -f "${OS_UPI_DIR}/down-containers.yaml" ]; then
+            cp "${OS_UPI_DIR}/down-containers.yaml" "$ASSETS_DIR"
+          else
+            # If not present, create a valid empty playbook.
+          sed -n '/tasks/q;p' "${ASSETS_DIR}/network.yaml" > "${ASSETS_DIR}/down-containers.yaml"
+          fi
+
           OPENSTACK_REGION="$(get_clouds_param 'region_name')"
-          echo "OpenStack UPI directory: ${OS_UPI_DIR}"
-          #prepare inventory.yaml
-          cp ${OS_UPI_DIR}/inventory.yaml ${OS_UPI_DIR}/inventory.yaml.bkk
-          sed -i "s~os_subnet_range.*~os_subnet_range: \'${OS_SUBNET_RANGE}\'~g" ${OS_UPI_DIR}/inventory.yaml
-          sed -i "s/os_flavor_master.*/os_flavor_master: \'${OPENSTACK_FLAVOR}\'/g" ${OS_UPI_DIR}/inventory.yaml
-          sed -i "s/os_flavor_worker.*/os_flavor_worker: \'${OPENSTACK_FLAVOR}\'/g" ${OS_UPI_DIR}/inventory.yaml
-          sed -i "s/os_image_rhcos.*/os_image_rhcos: \'${RHCOS_GLANCE_IMAGE_NAME}\'/g" ${OS_UPI_DIR}/inventory.yaml
-          sed -i "s/os_external_network.*/os_external_network: \'${OPENSTACK_EXTERNAL_NETWORK}\'/g" ${OS_UPI_DIR}/inventory.yaml
-          sed -i "s/os_api_fip.*/os_api_fip: \'${LB_FIP_IP}\'/g" ${OS_UPI_DIR}/inventory.yaml
-          sed -i "s/os_ingress_fip.*/os_ingress_fip: \'${INGRESS_FIP_IP}\'/g" ${OS_UPI_DIR}/inventory.yaml
-          sed -i "s/os_region_name.*/os_region_name: \'${OPENSTACK_REGION}\'/g" ${OS_UPI_DIR}/inventory.yaml
-          sed -i "s/os_cp_nodes_number.*/os_cp_nodes_number: ${NUMBER_OF_MASTERS}/g" ${OS_UPI_DIR}/inventory.yaml
-          sed -i "s/os_compute_nodes_number.*/os_compute_nodes_number: ${NUMBER_OF_WORKERS}/g" ${OS_UPI_DIR}/inventory.yaml
-
-          # The metadata.json  and ignition json files needs to be in the same directory as playbooks
-          cp ${ASSETS_DIR}/*.json ${OS_UPI_DIR}/
-          cp ${ASSETS_DIR}/*.ign ${OS_UPI_DIR}/
+          sed "
+            s~os_subnet_range.*~os_subnet_range: \'${OS_SUBNET_RANGE}\'~;
+            s/os_flavor_master.*/os_flavor_master: \'${OPENSTACK_FLAVOR}\'/;
+            s/os_flavor_worker.*/os_flavor_worker: \'${OPENSTACK_FLAVOR}\'/;
+            s/os_image_rhcos.*/os_image_rhcos: \'${RHCOS_GLANCE_IMAGE_NAME}\'/;
+            s/os_external_network.*/os_external_network: \'${OPENSTACK_EXTERNAL_NETWORK}\'/;
+            s/os_api_fip.*/os_api_fip: \'${LB_FIP_IP}\'/;
+            s/os_ingress_fip.*/os_ingress_fip: \'${INGRESS_FIP_IP}\'/;
+            s/os_region_name.*/os_region_name: \'${OPENSTACK_REGION}\'/;
+            s/os_cp_nodes_number.*/os_cp_nodes_number: ${NUMBER_OF_MASTERS}/;
+            s/os_compute_nodes_number.*/os_compute_nodes_number: ${NUMBER_OF_WORKERS}/;
+            " "${OS_UPI_DIR}/inventory.yaml" > "${ASSETS_DIR}/inventory.yaml"
         }
 
         function verify_playbooks_status() {
           # We first do a dry run with --list-tasks to catch any configuration errors right up front
           # before we start the full run.
-          ansible-playbook -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/security-groups.yaml" --list-tasks
-          ansible-playbook -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/network.yaml" --list-tasks
-          ansible-playbook -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/bootstrap.yaml" --list-tasks
-          ansible-playbook -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/control-plane.yaml" --list-tasks
-          ansible-playbook -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/compute-nodes.yaml" --list-tasks
-          echo "SUCCEFULLY verified all playbooks with --list-tasks flag"
+          ansible-playbook --list-tasks -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/security-groups.yaml"
+          ansible-playbook --list-tasks -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/network.yaml"
+          ansible-playbook --list-tasks -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/bootstrap.yaml"
+          ansible-playbook --list-tasks -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/control-plane.yaml"
+          ansible-playbook --list-tasks -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/compute-nodes.yaml"
+          echo "SUCCESSFULLY verified all playbooks with --list-tasks flag"
         }
 
 
@@ -662,13 +677,13 @@ objects:
 
         function run_bootstrap_playbooks() {
           #Security Groups
-          ansible-playbook -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/security-groups.yaml"
+          ansible-playbook -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/security-groups.yaml"
 
           #Network and Subnet
-          ansible-playbook -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/network.yaml"
+          ansible-playbook -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/network.yaml"
 
           #Bootstrap
-          ansible-playbook  -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/bootstrap.yaml"
+          ansible-playbook  -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/bootstrap.yaml"
           get_bootstrap_fip > ${TMP_SHARED}/BOOTSTRAP_FIP
           export BOOTSTRAP_FIP=$(cat ${TMP_SHARED}/BOOTSTRAP_FIP)
           wait_for_bootstrap_at_port 6443
@@ -677,7 +692,7 @@ objects:
 
         function run_control_plane_playbooks() {
           #Control plane
-          ansible-playbook -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/control-plane.yaml"
+          ansible-playbook -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/control-plane.yaml"
         }
 
         function wait_for_control_plane() {
@@ -721,12 +736,12 @@ objects:
           echo "destroying bootstrap resources"
           gather_bootstrap_logs
           mv ${TMP_SHARED}/BOOTSTRAP_FIP ${TMP_SHARED}/BOOTSTRAP_FIP_logs_collected
-          ansible-playbook -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-bootstrap.yaml"
+          ansible-playbook -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-bootstrap.yaml"
           openstack image delete $GLANCE_SHIM_IMAGE_ID
         }
 
         function deploy_compute_nodes() {
-          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/compute-nodes.yaml"
+          ansible-playbook -vvv -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/compute-nodes.yaml"
         }
 
         function wait_for_compute_nodes() {
@@ -777,7 +792,7 @@ objects:
         create_manifest_files
         create_ignition_configs_and_jsons
         upload_rhcos_image
-        prepare_ansible_playbooks_workspace
+        prepare_ansible_playbooks
         verify_playbooks_status
         run_bootstrap_playbooks
         run_control_plane_playbooks
@@ -1056,12 +1071,6 @@ objects:
           mkdir -p ${ARTIFACT_DIR}/pods ${ARTIFACT_DIR}/nodes ${ARTIFACT_DIR}/metrics ${ARTIFACT_DIR}/bootstrap ${ARTIFACT_DIR}/network
         }
 
-        function prepare_ansible_playbooks_workspace() {
-          # The metadata.json  and ignition json files needs to be in the same directory as playbooks
-          cp ${ASSETS_DIR}/*.json ${OS_UPI_DIR}/
-          cp ${ASSETS_DIR}/*.ign ${OS_UPI_DIR}/
-        }
-
 
         function gather_openstack_information() {
           echo "Gathering openstack server list"
@@ -1237,31 +1246,23 @@ objects:
         }
 
         function verify_teardown_playbooks() {
-          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-load-balancers.yaml" --list-tasks
-          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-compute-nodes.yaml" --list-tasks
-          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-control-plane.yaml" --list-tasks
-          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-bootstrap.yaml" --list-tasks
-          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-network.yaml" --list-tasks
-          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-security-groups.yaml" --list-tasks
-
-          # down-containers.yaml was introduced in 4.6
-          if [ -f "${OS_UPI_DIR}/down-containers.yaml" ]; then
-                ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-containers.yaml" --list-tasks
-          fi
+          ansible-playbook --list-tasks -vvv -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-load-balancers.yaml"
+          ansible-playbook --list-tasks -vvv -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-compute-nodes.yaml"
+          ansible-playbook --list-tasks -vvv -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-control-plane.yaml"
+          ansible-playbook --list-tasks -vvv -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-bootstrap.yaml"
+          ansible-playbook --list-tasks -vvv -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-network.yaml"
+          ansible-playbook --list-tasks -vvv -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-security-groups.yaml"
+          ansible-playbook --list-tasks -vvv -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-containers.yaml"
         }
 
         function run_teardown_playbooks() {
-          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-load-balancers.yaml"
-          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-compute-nodes.yaml"
-          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-control-plane.yaml"
-          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-bootstrap.yaml"
-          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-network.yaml"
-          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-security-groups.yaml"
-
-          # down-containers.yaml was introduced in 4.6
-          if [ -f "${OS_UPI_DIR}/down-containers.yaml" ]; then
-                ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-containers.yaml" --list-tasks
-          fi
+          ansible-playbook -vvv -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-load-balancers.yaml"
+          ansible-playbook -vvv -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-compute-nodes.yaml"
+          ansible-playbook -vvv -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-control-plane.yaml"
+          ansible-playbook -vvv -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-bootstrap.yaml"
+          ansible-playbook -vvv -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-network.yaml"
+          ansible-playbook -vvv -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-security-groups.yaml"
+          ansible-playbook -vvv -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-containers.yaml"
         }
 
         function delete_cluster_credentials() {
@@ -1307,7 +1308,6 @@ objects:
           gather_bootstrap_logs
           exit_on_setup_early_failure
           collect_logs_from_proxy
-          prepare_ansible_playbooks_workspace
           gather_openstack_information
           gather_openshift_information
           remove_dns_entries
@@ -1321,10 +1321,6 @@ objects:
           delete_cluster_credentials
           echo "Teardown completed succesfully"
         }
-
-
-
-
 
         #Teardown execution
         trap 'teardown' EXIT
