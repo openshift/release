@@ -35,6 +35,11 @@ RUN go get golang.org/x/tools/cmd/cover \
     curl -L https://github.com/golang/dep/releases/download/v0.5.4/dep-linux-amd64 > /usr/bin/dep && \
     chmod +x /usr/bin/dep
 
+# make go related directories writeable since builds in CI will run as non-root.
+RUN mkdir -p $GOPATH && \
+    chmod g+xw -R $GOPATH && \
+    chmod g+xw -R $(go env GOROOT)
+
 WORKDIR /go/src/github.com/openshift/origin
 LABEL io.k8s.display-name="OpenShift ${MAJOR}.${MINOR} RHEL-8 Golang Release Image" \
       io.k8s.description="This is the standard Release environment for building OpenShift ${MAJOR}.${MINOR} RHEL-8 images."
