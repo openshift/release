@@ -3,7 +3,7 @@ base_images:
     name: test
     namespace: openshift-kni
     tag: dev-scripts
-  ubi8:
+  os:
     name: ubi
     namespace: ocp
     tag: "8"
@@ -14,11 +14,18 @@ build_root:
     tag: golang-1.12
 images:
 - dockerfile_path: Dockerfile.ocp
-  from: ubi8
+  from: base-os
   to: ironic-static-ip-manager
 promotion:
   name: "4.7"
   namespace: ocp
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      rm -rf /etc/yum.repos.d/*
+      curl http://base-4-6-rhel8.ocp.svc > /etc/yum.repos.d/base-4-6-rhel8.repo
+    from: os
+    to: base-os
 resources:
   '*':
     requests:
