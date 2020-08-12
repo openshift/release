@@ -470,7 +470,7 @@ objects:
         epoch=$(date +'%s')
         cat <<__EOF__ > /tmp/artifacts/installer/event.xml
         <event>
-          <description>Openshift CI - cluster installation;${OCP_CLUSTER};${install_state};${JOB_SPEC} </description>
+          <description>Openshift CI - cluster installation;${OCP_CLUSTER};${install_state};${JOB_SPEC} ;${rchos_image} </description>
           <severity>normal</severity>
           <origin>openshift-ci</origin>
           <custom_id>$((${epoch}+${build_id}))</custom_id>
@@ -512,7 +512,18 @@ objects:
           update_image_registry &
         fi
 
+        # we need jq for later rhcos url extraction 
+        mkdir /tmp/bin
+        (curl -L -o /tmp/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 2>/dev/null && chmod +x /tmp/bin/jq)
+        if ! command -V /tmp/bin/jq; then
+            echo "Failed to fetch jq"
+            exit 1
+        fi
+
+        rchos_image=$(cat /tmp/artifacts/installer/.openshift_install_state.json | /tmp/bin/jq '."*rhcos.Image"')
+
         #notify oVirt infrastucture that ocp installation started
+
         #this allow us to connect running VMs to a PR number
         send_event_to_ovirt "Started"
 
