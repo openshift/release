@@ -74,29 +74,28 @@ periodics:
         value: aws
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
-          promotion:
-            name: "$(BRANCH)"
-            namespace: ocp
-            additional_images:
-              $(TAG): $(TAG)
-          build_root:
-            image_stream_tag:
-              name: release
-              namespace: openshift
-              tag: golang-1.12
           base_images:
             $(TAG):
               name: $(TAG)
               namespace: rhcos
               tag: "4.5"
+          build_root:
+            image_stream_tag:
+              name: release
+              namespace: openshift
+              tag: golang-1.12
+          promotion:
+            additional_images:
+              $(TAG): $(TAG)
+            name: $(BRANCH)
+            namespace: ocp
           raw_steps:
           - output_image_tag_step:
               from: $(TAG)
+              optional: false
               to:
                 name: stable
+                namespace: ""
                 tag: $(TAG)
           resources:
             '*':
@@ -105,11 +104,18 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            name: $(BRANCH)
+            namespace: ocp
           tests:
           - as: e2e-aws
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
             openshift_installer:
               cluster_profile: aws
+          zz_generated_metadata:
+            branch: ""
+            org: ""
+            repo: ""
       - name: JOB_NAME_SAFE
         value: e2e-aws
       - name: TEST_COMMAND
@@ -223,29 +229,28 @@ periodics:
         value: aws
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: "ocp-$(ARCH)"
-          promotion:
-            name: "$(BRANCH)"
-            namespace: "ocp-$(ARCH)"
-            additional_images:
-              $(TAG): $(TAG)
+          base_images:
+            $(TAG):
+              name: $(TAG)
+              namespace: rhcos
+              tag: $(BRANCH)-$(ARCH)
           build_root:
             image_stream_tag:
               name: release
               namespace: openshift
               tag: golang-1.12
-          base_images:
-            $(TAG):
-              name: $(TAG)
-              namespace: rhcos
-              tag: "$(BRANCH)-$(ARCH)"
+          promotion:
+            additional_images:
+              $(TAG): $(TAG)
+            name: $(BRANCH)
+            namespace: ocp-$(ARCH)
           raw_steps:
           - output_image_tag_step:
               from: $(TAG)
+              optional: false
               to:
                 name: stable
+                namespace: ""
                 tag: $(TAG)
           resources:
             '*':
@@ -254,11 +259,18 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            name: $(BRANCH)
+            namespace: ocp-$(ARCH)
           tests:
           - as: e2e-aws
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
             openshift_installer:
               cluster_profile: aws
+          zz_generated_metadata:
+            branch: ""
+            org: ""
+            repo: ""
       - name: JOB_NAME_SAFE
         value: e2e-aws
       - name: TEST_COMMAND
@@ -372,29 +384,28 @@ periodics:
         value: aws
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: "ocp-$(ARCH)"
-          promotion:
-            name: "$(BRANCH)"
-            namespace: "ocp-$(ARCH)"
-            additional_images:
-              $(TAG): $(TAG)
+          base_images:
+            $(TAG):
+              name: $(TAG)
+              namespace: rhcos
+              tag: $(BRANCH)-$(ARCH)
           build_root:
             image_stream_tag:
               name: release
               namespace: openshift
               tag: golang-1.12
-          base_images:
-            $(TAG):
-              name: $(TAG)
-              namespace: rhcos
-              tag: "$(BRANCH)-$(ARCH)"
+          promotion:
+            additional_images:
+              $(TAG): $(TAG)
+            name: $(BRANCH)
+            namespace: ocp-$(ARCH)
           raw_steps:
           - output_image_tag_step:
               from: $(TAG)
+              optional: false
               to:
                 name: stable
+                namespace: ""
                 tag: $(TAG)
           resources:
             '*':
@@ -403,11 +414,18 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            name: $(BRANCH)
+            namespace: ocp-$(ARCH)
           tests:
           - as: e2e-aws
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
             openshift_installer:
               cluster_profile: aws
+          zz_generated_metadata:
+            branch: ""
+            org: ""
+            repo: ""
       - name: JOB_NAME_SAFE
         value: e2e-aws
       - name: TEST_COMMAND
@@ -663,29 +681,28 @@ periodics:
         value: aws
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: origin
-          promotion:
-            name: "$(BRANCH)"
-            namespace: origin
-            additional_images:
-              $(TAG): $(TAG)
-          build_root:
-            image_stream_tag:
-              name: release
-              namespace: openshift
-              tag: golang-1.13
           base_images:
             $(TAG):
               name: $(TAG)
               namespace: origin
               tag: "4.5"
+          build_root:
+            image_stream_tag:
+              name: release
+              namespace: openshift
+              tag: golang-1.13
+          promotion:
+            additional_images:
+              $(TAG): $(TAG)
+            name: $(BRANCH)
+            namespace: origin
           raw_steps:
           - output_image_tag_step:
               from: $(TAG)
+              optional: false
               to:
                 name: stable
+                namespace: ""
                 tag: $(TAG)
           resources:
             '*':
@@ -694,11 +711,18 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            name: $(BRANCH)
+            namespace: origin
           tests:
           - as: e2e-aws
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
             openshift_installer:
               cluster_profile: aws
+          zz_generated_metadata:
+            branch: ""
+            org: ""
+            repo: ""
       - name: JOB_NAME_SAFE
         value: e2e-aws
       - name: TEST_COMMAND
@@ -1167,9 +1191,6 @@ periodics:
         value: aws
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "none" # don't import anything to avoid a race between 4.4 latest and the chosen version
-            namespace: ocp
           build_root:
             image_stream_tag:
               name: release
@@ -1182,14 +1203,21 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            name: none
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)-upgrade
             commands: |
               TEST_SUITE=all run-upgrade-tests
               TEST_SUITE=openshift/conformance/parallel TEST_UNSUPPORTED_ALLOW_VERSION_SKEW=1 run-tests
             openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
+              cluster_profile: $(CLUSTER_TYPE)
               upgrade: true
+          zz_generated_metadata:
+            branch: ""
+            org: ""
+            repo: ""
       - name: JOB_NAME_SAFE
         value: e2e-aws-upgrade
       - name: TEST_COMMAND
@@ -5726,9 +5754,6 @@ periodics:
         value: aws
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -5736,26 +5761,33 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            name: $(BRANCH)
+            namespace: ocp
           tests:
           - as: e2e-$(CLUSTER_TYPE)
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
             openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
+              cluster_profile: $(CLUSTER_TYPE)
           - as: e2e-$(CLUSTER_TYPE)-serial
             commands: TEST_SUITE=openshift/conformance/serial run-tests
             openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
+              cluster_profile: $(CLUSTER_TYPE)
           - as: e2e-$(CLUSTER_TYPE)-upgrade
             commands: |
               TEST_SUITE=all IMAGE=RELEASE_IMAGES run-upgrade-tests
               TEST_SUITE=openshift/conformance/parallel run-tests
             openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
+              cluster_profile: $(CLUSTER_TYPE)
               upgrade: true
           - as: launch-$(CLUSTER_TYPE)
             commands: sleep 9000 & wait
             openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
+              cluster_profile: $(CLUSTER_TYPE)
+          zz_generated_metadata:
+            branch: ""
+            org: ""
+            repo: ""
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -5857,9 +5889,6 @@ periodics:
         value: aws
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "4.4"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -5867,12 +5896,19 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            name: "4.4"
+            namespace: ocp
           tests:
           - as: e2e-aws-upgrade
             commands: TEST_SUITE=all run-upgrade-tests
             openshift_installer:
-              cluster_profile: "aws"
+              cluster_profile: aws
               upgrade: true
+          zz_generated_metadata:
+            branch: ""
+            org: ""
+            repo: ""
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -5982,9 +6018,6 @@ periodics:
         value: aws
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "4.4"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -5992,12 +6025,19 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            name: "4.4"
+            namespace: ocp
           tests:
           - as: e2e-aws-upgrade
             commands: TEST_SUITE=all TEST_OPTIONS=abort-at=99 run-upgrade-tests
             openshift_installer:
-              cluster_profile: "aws"
+              cluster_profile: aws
               upgrade: true
+          zz_generated_metadata:
+            branch: ""
+            org: ""
+            repo: ""
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -6107,9 +6147,6 @@ periodics:
         value: aws
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "4.5"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -6117,12 +6154,19 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            name: "4.5"
+            namespace: ocp
           tests:
           - as: e2e-aws-upgrade
             commands: TEST_SUITE=all TEST_OPTIONS=abort-at=random run-upgrade-tests
             openshift_installer:
-              cluster_profile: "aws"
+              cluster_profile: aws
               upgrade: true
+          zz_generated_metadata:
+            branch: ""
+            org: ""
+            repo: ""
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -6342,9 +6386,6 @@ periodics:
         value: gcp
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "4.5"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -6352,12 +6393,19 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            name: "4.5"
+            namespace: ocp
           tests:
           - as: e2e-gcp-upgrade
             commands: TEST_SUITE=all run-upgrade-tests
             openshift_installer:
-              cluster_profile: "gcp"
+              cluster_profile: gcp
               upgrade: true
+          zz_generated_metadata:
+            branch: ""
+            org: ""
+            repo: ""
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -6469,9 +6517,6 @@ periodics:
         value: azure4
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "4.5"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -6479,12 +6524,19 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            name: "4.5"
+            namespace: ocp
           tests:
           - as: e2e-azure-upgrade
             commands: TEST_SUITE=all run-upgrade-tests
             openshift_installer:
-              cluster_profile: "azure4"
+              cluster_profile: azure4
               upgrade: true
+          zz_generated_metadata:
+            branch: ""
+            org: ""
+            repo: ""
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -7509,9 +7561,6 @@ periodics:
         value: gcp
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "4.4"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -7519,12 +7568,19 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            name: "4.4"
+            namespace: ocp
           tests:
           - as: e2e-gcp-upgrade
             commands: TEST_SUITE=all run-upgrade-tests
             openshift_installer:
-              cluster_profile: "gcp"
+              cluster_profile: gcp
               upgrade: true
+          zz_generated_metadata:
+            branch: ""
+            org: ""
+            repo: ""
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -7632,9 +7688,6 @@ periodics:
         value: azure4
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "4.4"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -7642,12 +7695,19 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            name: "4.4"
+            namespace: ocp
           tests:
           - as: e2e-azure-upgrade
             commands: TEST_SUITE=all run-upgrade-tests
             openshift_installer:
-              cluster_profile: "azure4"
+              cluster_profile: azure4
               upgrade: true
+          zz_generated_metadata:
+            branch: ""
+            org: ""
+            repo: ""
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -7883,8 +7943,12 @@ periodics:
           - as: e2e-ovirt-upgrade
             commands: TEST_SUITE=all run-upgrade-tests
             openshift_installer:
-              cluster_profile: "ovirt"
+              cluster_profile: ovirt
               upgrade: true
+          zz_generated_metadata:
+            branch: ""
+            org: ""
+            repo: ""
       - name: JOB_NAME_SAFE
         value: e2e-ovirt
       - name: TEST_COMMAND
@@ -8217,9 +8281,6 @@ periodics:
         value: aws
       - name: CONFIG_SPEC
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           resources:
             '*':
               limits:
@@ -8227,12 +8288,18 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
+          tag_specification:
+            name: $(BRANCH)
+            namespace: ocp
           tests:
           - as: endurance-install-$(CLUSTER_TYPE)
             commands: sleep 9000 & wait
             openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: false
+              cluster_profile: $(CLUSTER_TYPE)
+          zz_generated_metadata:
+            branch: ""
+            org: ""
+            repo: ""
       - name: JOB_NAME_SAFE
         value: endurance-install-$(CLUSTER_TYPE)
       image: ci-operator:latest
