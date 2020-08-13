@@ -6,7 +6,7 @@
 #
 FROM        centos:7
 
-ENV VERSION=1.15.0 \
+ENV VERSION=1.15 \
     GOCACHE=/go/.cache \
     GOARM=5 \
     GOPATH=/go \
@@ -26,10 +26,8 @@ RUN yum install -y epel-release && \
     git config --system user.name origin-release-container && \
     git config --system user.email origin-release@redhat.com
 
-ADD *.rpm /tmp/origin-rpm/
-RUN yum install -y /tmp/origin-rpm/*.rpm && \
-    yum clean all && \
-    curl https://storage.googleapis.com/golang/go$VERSION.linux-$(uname -m | sed 's/x86_64/amd64/g').tar.gz | tar -C /usr/local -xzf - && \
+RUN \
+    curl --fail --retry 3 -L https://golang.org/dl/go$VERSION.linux-amd64.tar.gz | tar -C /usr/local -xzf - && \
     go get golang.org/x/tools/cmd/cover \
         github.com/Masterminds/glide \
         golang.org/x/tools/cmd/goimports \
