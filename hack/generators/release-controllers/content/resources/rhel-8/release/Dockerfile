@@ -30,6 +30,7 @@ RUN go get golang.org/x/tools/cmd/cover \
     mv $GOPATH/bin/* /usr/bin/ && \
     rm -rf $GOPATH/* $GOPATH/.cache && \
     mkdir $GOPATH/bin && \
+    mkdir -p /go/src/github.com/openshift/origin && \
     ln -s /usr/bin/imagebuilder $GOPATH/bin/imagebuilder && \
     ln -s /usr/bin/goimports $GOPATH/bin/goimports && \
     curl -L https://github.com/golang/dep/releases/download/v0.5.4/dep-linux-amd64 > /usr/bin/dep && \
