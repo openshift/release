@@ -5863,21 +5863,6 @@ periodics:
         #!/bin/bash
         set -euo pipefail
 
-        initial=$(ARTIFACTS)/release-initial.json
-        latest=$(ARTIFACTS)/release-latest.json
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest --data-urlencode 'in=>4.4.0-0 <4.5.0-0' > ${initial}; then
-          echo "error: Could not find a stable version"
-          exit 1
-        fi
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.5.0-0.ci/latest > ${latest}; then
-          echo "error: Could not find newest version"
-          exit 1
-        fi
-
-        from=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${initial}" )
-        to=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${latest}" )
 
 
         ci-operator $@
@@ -5889,6 +5874,20 @@ periodics:
         value: aws
       - name: CONFIG_SPEC
         value: |
+          releases:
+            initial:
+              prerelease:
+                architecture: amd64
+                product: ocp
+                version_bounds:
+                  lower: 4.4.0-0
+                  upper: 4.5.0-0
+            latest:
+              candidate:
+                architecture: amd64
+                product: ocp
+                stream: ci
+                version: "4.5"
           resources:
             '*':
               limits:
@@ -5896,9 +5895,6 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
-          tag_specification:
-            name: "4.4"
-            namespace: ocp
           tests:
           - as: e2e-aws-upgrade
             commands: TEST_SUITE=all run-upgrade-tests
@@ -5992,21 +5988,6 @@ periodics:
         #!/bin/bash
         set -euo pipefail
 
-        initial=$(ARTIFACTS)/release-initial.json
-        latest=$(ARTIFACTS)/release-latest.json
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest --data-urlencode 'in=>4.4.0-0 <4.5.0-0' > ${initial}; then
-          echo "error: Could not find a stable version"
-          exit 1
-        fi
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.5.0-0.ci/latest > ${latest}; then
-          echo "error: Could not find newest version"
-          exit 1
-        fi
-
-        from=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${initial}" )
-        to=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${latest}" )
 
 
         ci-operator $@
@@ -6018,6 +5999,20 @@ periodics:
         value: aws
       - name: CONFIG_SPEC
         value: |
+          releases:
+            initial:
+              prerelease:
+                architecture: amd64
+                product: ocp
+                version_bounds:
+                  lower: 4.4.0-0
+                  upper: 4.5.0-0
+            latest:
+              candidate:
+                architecture: amd64
+                product: ocp
+                stream: ci
+                version: "4.5"
           resources:
             '*':
               limits:
@@ -6025,9 +6020,6 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
-          tag_specification:
-            name: "4.4"
-            namespace: ocp
           tests:
           - as: e2e-aws-upgrade
             commands: TEST_SUITE=all TEST_OPTIONS=abort-at=99 run-upgrade-tests
@@ -6121,21 +6113,6 @@ periodics:
         #!/bin/bash
         set -euo pipefail
 
-        initial=$(ARTIFACTS)/release-initial.json
-        latest=$(ARTIFACTS)/release-latest.json
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.5.0-0.ci/latest --data-urlencode 'rel=1' > ${initial}; then
-          echo "error: Could not find a stable version"
-          exit 1
-        fi
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.5.0-0.ci/latest > ${latest}; then
-          echo "error: Could not find newest version"
-          exit 1
-        fi
-
-        from=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${initial}" )
-        to=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${latest}" )
 
 
         ci-operator $@
@@ -6147,6 +6124,20 @@ periodics:
         value: aws
       - name: CONFIG_SPEC
         value: |
+          releases:
+            initial:
+              candidate:
+                architecture: amd64
+                product: ocp
+                relative: 1
+                stream: ci
+                version: "4.5"
+            latest:
+              candidate:
+                architecture: amd64
+                product: ocp
+                stream: ci
+                version: "4.5"
           resources:
             '*':
               limits:
@@ -6154,9 +6145,6 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
-          tag_specification:
-            name: "4.5"
-            namespace: ocp
           tests:
           - as: e2e-aws-upgrade
             commands: TEST_SUITE=all TEST_OPTIONS=abort-at=random run-upgrade-tests
@@ -6360,21 +6348,6 @@ periodics:
         #!/bin/bash
         set -euo pipefail
 
-        initial=$(ARTIFACTS)/release-initial.json
-        latest=$(ARTIFACTS)/release-latest.json
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.5.0-0.ci/latest --data-urlencode 'rel=1' > ${initial}; then
-          echo "error: Could not find a stable version"
-          exit 1
-        fi
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.5.0-0.ci/latest > ${latest}; then
-          echo "error: Could not find newest version"
-          exit 1
-        fi
-
-        from=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${initial}" )
-        to=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${latest}" )
 
 
         ci-operator $@
@@ -6386,6 +6359,20 @@ periodics:
         value: gcp
       - name: CONFIG_SPEC
         value: |
+          releases:
+            initial:
+              candidate:
+                architecture: amd64
+                product: ocp
+                relative: 1
+                stream: ci
+                version: "4.5"
+            latest:
+              candidate:
+                architecture: amd64
+                product: ocp
+                stream: ci
+                version: "4.5"
           resources:
             '*':
               limits:
@@ -6393,9 +6380,6 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
-          tag_specification:
-            name: "4.5"
-            namespace: ocp
           tests:
           - as: e2e-gcp-upgrade
             commands: TEST_SUITE=all run-upgrade-tests
@@ -6491,21 +6475,6 @@ periodics:
         #!/bin/bash
         set -euo pipefail
 
-        initial=$(ARTIFACTS)/release-initial.json
-        latest=$(ARTIFACTS)/release-latest.json
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.5.0-0.ci/latest --data-urlencode 'rel=1' > ${initial}; then
-          echo "error: Could not find a stable version"
-          exit 1
-        fi
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.5.0-0.ci/latest > ${latest}; then
-          echo "error: Could not find newest version"
-          exit 1
-        fi
-
-        from=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${initial}" )
-        to=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${latest}" )
 
 
         ci-operator $@
@@ -6517,6 +6486,20 @@ periodics:
         value: azure4
       - name: CONFIG_SPEC
         value: |
+          releases:
+            initial:
+              candidate:
+                architecture: amd64
+                product: ocp
+                relative: 1
+                stream: ci
+                version: "4.5"
+            latest:
+              candidate:
+                architecture: amd64
+                product: ocp
+                stream: ci
+                version: "4.5"
           resources:
             '*':
               limits:
@@ -6524,9 +6507,6 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
-          tag_specification:
-            name: "4.5"
-            namespace: ocp
           tests:
           - as: e2e-azure-upgrade
             commands: TEST_SUITE=all run-upgrade-tests
@@ -7535,21 +7515,6 @@ periodics:
         #!/bin/bash
         set -euo pipefail
 
-        initial=$(ARTIFACTS)/release-initial.json
-        latest=$(ARTIFACTS)/release-latest.json
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest --data-urlencode 'in=>4.4.0-0 <4.5.0-0' > ${initial}; then
-          echo "error: Could not find a stable version"
-          exit 1
-        fi
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.5.0-0.ci/latest > ${latest}; then
-          echo "error: Could not find newest version"
-          exit 1
-        fi
-
-        from=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${initial}" )
-        to=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${latest}" )
 
 
         ci-operator $@
@@ -7561,6 +7526,20 @@ periodics:
         value: gcp
       - name: CONFIG_SPEC
         value: |
+          releases:
+            initial:
+              prerelease:
+                architecture: amd64
+                product: ocp
+                version_bounds:
+                  lower: 4.4.0-0
+                  upper: 4.5.0-0
+            latest:
+              candidate:
+                architecture: amd64
+                product: ocp
+                stream: ci
+                version: "4.5"
           resources:
             '*':
               limits:
@@ -7568,9 +7547,6 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
-          tag_specification:
-            name: "4.4"
-            namespace: ocp
           tests:
           - as: e2e-gcp-upgrade
             commands: TEST_SUITE=all run-upgrade-tests
@@ -7662,21 +7638,6 @@ periodics:
         #!/bin/bash
         set -euo pipefail
 
-        initial=$(ARTIFACTS)/release-initial.json
-        latest=$(ARTIFACTS)/release-latest.json
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest --data-urlencode 'in=>4.4.0-0 <4.5.0-0' > ${initial}; then
-          echo "error: Could not find a stable version"
-          exit 1
-        fi
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.5.0-0.ci/latest > ${latest}; then
-          echo "error: Could not find newest version"
-          exit 1
-        fi
-
-        from=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${initial}" )
-        to=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${latest}" )
 
 
         ci-operator $@
@@ -7688,6 +7649,20 @@ periodics:
         value: azure4
       - name: CONFIG_SPEC
         value: |
+          releases:
+            initial:
+              prerelease:
+                architecture: amd64
+                product: ocp
+                version_bounds:
+                  lower: 4.4.0-0
+                  upper: 4.5.0-0
+            latest:
+              candidate:
+                architecture: amd64
+                product: ocp
+                stream: ci
+                version: "4.5"
           resources:
             '*':
               limits:
@@ -7695,9 +7670,6 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
-          tag_specification:
-            name: "4.4"
-            namespace: ocp
           tests:
           - as: e2e-azure-upgrade
             commands: TEST_SUITE=all run-upgrade-tests
@@ -7900,21 +7872,6 @@ periodics:
         #!/bin/bash
         set -euo pipefail
 
-        initial=$(ARTIFACTS)/release-initial.json
-        latest=$(ARTIFACTS)/release-latest.json
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest --data-urlencode 'in=>4.4.0-0 <4.5.0-0' > ${initial}; then
-          echo "error: Could not find a stable version"
-          exit 1
-        fi
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.5.0-0.ci/latest > ${latest}; then
-          echo "error: Could not find newest version"
-          exit 1
-        fi
-
-        from=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${initial}" )
-        to=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${latest}" )
         export INSTALL_INITIAL_RELEASE="true"
 
 
@@ -7929,6 +7886,20 @@ periodics:
         value: conformance
       - name: CONFIG_SPEC
         value: |
+          releases:
+            initial:
+              prerelease:
+                architecture: amd64
+                product: ocp
+                version_bounds:
+                  lower: 4.4.0-0
+                  upper: 4.5.0-0
+            latest:
+              candidate:
+                architecture: amd64
+                product: ocp
+                stream: ci
+                version: "4.5"
           resources:
             '*':
               limits:
@@ -7936,9 +7907,6 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
-          tag_specification:
-            name: "4.4"
-            namespace: ocp
           tests:
           - as: e2e-ovirt-upgrade
             commands: TEST_SUITE=all run-upgrade-tests
