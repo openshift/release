@@ -1,16 +1,28 @@
 base_images:
   base:
-    name: "4.7"
+    name: builder
     namespace: ocp
-    tag: base
+    tag: rhel-8-base-openshift-4.6
+  hbuilder:
+    name: release
+    namespace: openshift
+    tag: rhel-7-release-openshift-4.6
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: rhel-7-release-openshift-4.6
 images:
-- dockerfile_path: Dockerfile.okd
+- dockerfile_path: Dockerfile.rhel
   from: base
+  inputs:
+    base:
+      as:
+      - rhel7:7-released
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-base-openshift-4.6
+    hbuilder:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:rhel-7-release-openshift-4.6
   to: metering-hadoop
 promotion:
   name: "4.7"
