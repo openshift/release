@@ -10,6 +10,7 @@ ENV VERSION=rhel-8-golang-openshift-${MAJOR}.${MINOR} \
     GOPATH=/go \
     LOGNAME=deadbeef
 ENV PATH=$PATH:$GOPATH/bin
+ENV OPENSHIFT_CI=true
 
 # The repo files in the ART image will not work in CI. Remove them in preference of
 # those appropriate for upstream dependencies.

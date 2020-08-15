@@ -5,6 +5,7 @@
 FROM replaced-by-buildconfig
 ARG MAJOR
 ARG MINOR
+ENV OPENSHIFT_CI=true
 
 # Install common CI tools and epel for packages like tito.
 RUN yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm && \

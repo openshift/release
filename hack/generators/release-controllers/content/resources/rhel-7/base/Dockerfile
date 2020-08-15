@@ -3,6 +3,8 @@ FROM replaced-by-buildconfig
 ARG MAJOR
 ARG MINOR
 
+ENV OPENSHIFT_CI=true
+
 # The repo files in the ART image will not work in CI. Remove them in preference of
 # those appropriate for upstream dependencies.
 RUN rm -rf /etc/yum.repos.d/*.repo && \
