@@ -1,0 +1,39 @@
+base_images:
+  os:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- dockerfile_path: ci/Dockerfile
+  from: os
+  to: test-runner
+promotion:
+  excluded_images:
+  - test-runner
+  name: "4.6"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: sanity
+  commands: make test-sanity
+  container:
+    from: test-runner
+- as: integration
+  commands: make test-integration
+  openshift_installer_src:
+    cluster_profile: aws
+zz_generated_metadata:
+  branch: main
+  org: ansible-collections
+  repo: community.okd
