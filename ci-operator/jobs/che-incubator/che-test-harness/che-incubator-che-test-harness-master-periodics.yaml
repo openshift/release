@@ -20,6 +20,7 @@ periodics:
       - --lease-server-password-file=/etc/boskos/password
       - --report-password-file=/etc/report/password.txt
       - --report-username=ci
+      - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/performance-tests-cluster-profile
       - --target=performance-tests
       command:
@@ -33,6 +34,9 @@ periodics:
       volumeMounts:
       - mountPath: /etc/boskos
         name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/performance-tests-cluster-profile
         name: cluster-profile
@@ -50,6 +54,9 @@ periodics:
         - key: password
           path: password
         secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: cluster-profile
       projected:
         sources:
