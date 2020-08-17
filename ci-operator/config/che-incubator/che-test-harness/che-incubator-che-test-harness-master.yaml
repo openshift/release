@@ -15,13 +15,20 @@ tag_specification:
   namespace: ocp
 tests:
 - as: performance-tests
-  commands: .ci/ci-eclipse-che-perf.sh
   cron: 0 */12 * * *
-  openshift_installer_src:
-    cluster_profile: aws
-  secret:
-    mount_path: /usr/local/test-harness-secrets
-    name: test-harness-secrets
+  steps:
+    test:
+    - as: performance-tests
+      commands: .ci/ci-eclipse-che-perf.sh
+      credentials:
+      - mount_path: /usr/local/ci-secrets/test-harness-secrets
+        name: test-harness-secrets
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: master
   org: che-incubator
