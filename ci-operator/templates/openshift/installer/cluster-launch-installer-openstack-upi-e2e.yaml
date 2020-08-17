@@ -566,18 +566,18 @@ objects:
           correct_ip=$1
           lookup=$(nslookup $2)
           if [[ $? -eq 0 ]]; then
-            if [[ ${lookup} =~ "$1" ]]; then
+            if [[ ${lookup} == *"$1"* ]]; then
                echo $2 resolves to $1
                return 0
             fi
           fi
-          echo $2 does not resolv to $1
+          echo $2 does not resolve to $1
           return 1
         }
 
 
-        function verify_dns_resolvs() {
-          echo Verifying we can resolv api.$CLUSTER_NAME.$BASE_DOMAIN
+        function verify_dns_resolves() {
+          echo Verifying we can resolve api.$CLUSTER_NAME.$BASE_DOMAIN
           check_ip_resolves "${LB_FIP_IP}" "api.$CLUSTER_NAME.$BASE_DOMAIN"
           if [[ "$?" -ne "0" ]] ; then
                 echo dns verification failed!
@@ -797,7 +797,7 @@ objects:
         run_bootstrap_playbooks
         run_control_plane_playbooks
         wait_for_control_plane
-        verify_dns_resolvs
+        verify_dns_resolves
         wait_for_bootstrap_complete
         access_the_openshiftapi
         delete_bootstrap_resources
@@ -1210,12 +1210,23 @@ objects:
           if [ -z "$DO_NOT_CREATE_DNS_RECORD" ]; then
             echo "Removing entries from DNS ..."
             export HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "shiftstack.devcluster.openshift.com" | python -c 'import json,sys;print json.load(sys.stdin)["HostedZones"][0]["Id"].split("/")[-1]')
-            sed -e's/UPSERT/DELETE/g' ${ASSETS_DIR}/api-record.json > ${ASSETS_DIR}/delete-api-record.json
-            sed -e's/Create/Delete/g' ${ASSETS_DIR}/api-record.json > ${ASSETS_DIR}/delete-api-record.json
-            aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file://${ASSETS_DIR}/delete-api-record.json
-            sed -e's/UPSERT/DELETE/g' ${ASSETS_DIR}/ingress-record.json > ${ASSETS_DIR}/delete-ingress-record.json
-            sed -e's/Create/Delete/g' ${ASSETS_DIR}/ingress-record.json > ${ASSETS_DIR}/delete-ingress-record.json
-            aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file://${ASSETS_DIR}/delete-ingress-record.json
+
+            sed '
+              s/UPSERT/DELETE/;
+              s/Create/Delete/;
+              ' "${ASSETS_DIR}/api-record.json" > "${ASSETS_DIR}/delete-api-record.json"
+            aws route53 change-resource-record-sets \
+              --hosted-zone-id "$HOSTED_ZONE_ID" \
+              --change-batch "file://${ASSETS_DIR}/delete-api-record.json"
+
+            sed '
+              s/UPSERT/DELETE/;
+              s/Create/Delete/;
+            ' "${ASSETS_DIR}/ingress-record.json" > "${ASSETS_DIR}/delete-ingress-record.json"
+            aws route53 change-resource-record-sets \
+              --hosted-zone-id "$HOSTED_ZONE_ID" \
+              --change-batch "file://${ASSETS_DIR}/delete-ingress-record.json"
+
           else
             echo "There are no DNS entries to remove"
           fi
