@@ -5,6 +5,51 @@ presubmits:
     branches:
     - release-4.7
     cluster: api.ci
+    context: ci/prow/ci-index
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-kube-reporting-metering-operator-release-4.7-ci-index
+    rerun_command: /test ci-index
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --target=ci-index
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ci-index,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-4.7
+    cluster: api.ci
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -69,19 +114,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/metering-e2e-aws-cluster-profile
         - --target=metering-e2e-aws
-        - --template=/usr/local/metering-e2e-aws
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: metering-e2e-aws
-        - name: TEST_COMMAND
-          value: |
-            set -x
-
-            TEST_ENABLE_MACHINE_AUTOSCALING="true" TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/e2e EXTRA_TEST_FLAGS="-run TestManualMeteringInstall" make e2e
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -94,9 +128,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/metering-e2e-aws-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/metering-e2e-aws
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -116,9 +147,6 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
           secretName: regcred
