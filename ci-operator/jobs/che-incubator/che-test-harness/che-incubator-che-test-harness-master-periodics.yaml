@@ -17,8 +17,10 @@ periodics:
     containers:
     - args:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
       - --report-password-file=/etc/report/password.txt
       - --report-username=ci
+      - --secret-dir=/usr/local/performance-tests-cluster-profile
       - --target=performance-tests
       command:
       - ci-operator
@@ -29,6 +31,11 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/performance-tests-cluster-profile
+        name: cluster-profile
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
@@ -37,6 +44,17 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
     - name: pull-secret
       secret:
         secretName: regcred
