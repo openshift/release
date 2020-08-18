@@ -13,7 +13,8 @@ build_root:
     namespace: openshift
     tag: golang-1.12
 images:
-- from: base
+- dockerfile_path: Dockerfile
+  from: base
   inputs:
     openshift_release_golang-1.12:
       as:
@@ -37,14 +38,12 @@ tests:
   container:
     from: src
 - as: cluster-logging-operator-e2e
-  commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=/tmp/artifacts/logging-logs ARTIFACT_DIR=/tmp/artifacts/logging-artifacts
-    make test-e2e-olm
+  commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=/tmp/artifacts/logging-logs ARTIFACT_DIR=/tmp/artifacts/logging-artifacts make test-e2e-olm
   openshift_installer_custom_test_image:
     cluster_profile: aws
     from: stable:cluster-logging-operator-e2e
 - as: elasticsearch-operator-e2e
-  commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=/tmp/artifacts/logging-logs ARTIFACT_DIR=/tmp/artifacts/logging-artifacts
-    make test-e2e-olm
+  commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=/tmp/artifacts/logging-logs ARTIFACT_DIR=/tmp/artifacts/logging-artifacts make test-e2e-olm
   openshift_installer_custom_test_image:
     cluster_profile: aws
     from: stable:elasticsearch-operator-src

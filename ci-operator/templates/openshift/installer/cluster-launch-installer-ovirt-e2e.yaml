@@ -156,9 +156,9 @@ objects:
           master_mem="16384"
         else
           worker_cpu="4"
-          worker_mem="8392"
+          worker_mem="9000"
           master_cpu="4"
-          master_mem="8392"
+          master_mem="9000"
           ovirt_engine_template_name="${ovirt_engine_template_name}-8G"
         fi
 
@@ -173,6 +173,8 @@ objects:
         MASTER_MEM="${master_mem}"
         OCP_CLUSTER="$(extract_leases_info cluster_name ${lease_path})"
         OVIRT_ENGINE_CLUSTER_ID="$(extract_leases_info ovirt_engine_cluster_id ${lease_path})"
+        OVIRT_ENGINE_NETWORK="$(extract_leases_info ovirt_network_name ${lease_path})"
+        OVIRT_ENGINE_VNIC_PEOFILE_ID="$(extract_leases_info ovirt_vnic_profile_id ${lease_path})"
         OVIRT_ENGINE_TEMPLATE_NAME="${ovirt_engine_template_name}"
         EOF
 
@@ -335,6 +337,8 @@ objects:
         value: ${INSTALL_INITIAL_RELEASE}
       - name: RELEASE_IMAGE_INITIAL
         value: ${RELEASE_IMAGE_INITIAL}
+      - name: JOB_NAME
+        value: ${JOB_NAME}
       command:
       - /bin/sh
       - -c
@@ -382,12 +386,6 @@ objects:
         export TF_VAR_ovirt_master_mem=${MASTER_MEM}
         export TF_VAR_ovirt_master_cpu=${MASTER_CPU}
 
-        ## Image handling - for now the CI uses a fixed rhcos template
-        ## TODO - the fixed template is saving time and space when creating the
-        ## cluster in the cost of having to maitain the supported version. This
-        ## maintnance procedure does not exist yet.
-        export OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE=${OVIRT_ENGINE_TEMPLATE_NAME}
-
         # We want the setup to download the latest CA from the engine
         # Therefor living it empty
         export OVIRT_CONFIG=/tmp/artifacts/installer/ovirt-config.yaml
@@ -433,7 +431,7 @@ objects:
                 sizeGB: 31
               vmType: server
               instanceTypeID:
-          replicas: 3        
+          replicas: 3
 
         platform:
           ovirt:
@@ -441,6 +439,8 @@ objects:
             ovirt_storage_domain_id: ${OVIRT_ENGINE_STORAGE_DOMAIN_ID}
             api_vip: ${OVIRT_APIVIP}
             dns_vip: ${OVIRT_DNSVIP}
+            ovirt_network_name: ${OVIRT_ENGINE_NETWORK}
+            vnicProfileID: ${OVIRT_ENGINE_VNIC_PEOFILE_ID}
             ingress_vip: ${OVIRT_INGRESSVIP}
         pullSecret: >
           ${PULL_SECRET}
@@ -470,7 +470,7 @@ objects:
         epoch=$(date +'%s')
         cat <<__EOF__ > /tmp/artifacts/installer/event.xml
         <event>
-          <description>Openshift CI - cluster installation;${OCP_CLUSTER};${install_state};${JOB_SPEC} </description>
+          <description>Openshift CI - cluster installation;${OCP_CLUSTER};${install_state};${JOB_SPEC} ;${rchos_image} </description>
           <severity>normal</severity>
           <origin>openshift-ci</origin>
           <custom_id>$((${epoch}+${build_id}))</custom_id>
@@ -506,9 +506,25 @@ objects:
         cat /tmp/artifacts/installer/manifests/cluster-infrastructure-02-config.yml
 
         export KUBECONFIG=/tmp/artifacts/installer/auth/kubeconfig
-        update_image_registry &
+        echo "JOB_NAME is $JOB_NAME"
+        # On 4.4 and 4.5 we don't have CSI Driver so we need to patch that image registry
+        # This is a temporary workaround until ovirt will port to workflows, blocked by issue DPTP-1174
+        if [[ -n $(echo "$JOB_NAME" |grep -P '((.*4.5)|(.*4.4))(?!.*4.6.*)') ]]; then
+          update_image_registry &
+        fi
+
+        # we need jq for later rhcos url extraction 
+        mkdir /tmp/bin
+        (curl -L -o /tmp/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 2>/dev/null && chmod +x /tmp/bin/jq)
+        if ! command -V /tmp/bin/jq; then
+            echo "Failed to fetch jq"
+            exit 1
+        fi
+
+        rchos_image=$(cat /tmp/artifacts/installer/.openshift_install_state.json | /tmp/bin/jq '."*rhcos.Image"')
 
         #notify oVirt infrastucture that ocp installation started
+
         #this allow us to connect running VMs to a PR number
         send_event_to_ovirt "Started"
 
@@ -640,6 +656,10 @@ objects:
 
           echo "Waiting for logs ..."
           wait
+
+          # This is a temporary conversion of cluster operator status to JSON matching the upgrade - may be moved to code in the future
+          curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 >/tmp/jq && chmod ug+x /tmp/jq
+          </tmp/artifacts/clusteroperators.json /tmp/jq -r 'def one(condition; t): t as $t | first([.[] | select(condition)] | map(.type=t)[]) // null; def msg: "Operator \(.type) (\(.reason)): \(.message)"; def xmlfailure: if .failure then "<failure message=\"\(.failure | @html)\">\(.failure | @html)</failure>" else "" end; def xmltest: "<testcase name=\"\(.name | @html)\">\( xmlfailure )</testcase>"; def withconditions: map({name: "operator install \(.metadata.name)"} + (.status.conditions | (one(.type=="Available" and .status!="True"; "unavailable") // one(.type=="Degraded" and .status=="True"; "degraded") // one(.type=="Progressing" and .status=="True"; "progressing") // null) | if . then {failure: .|msg} else null end)); .items | withconditions | "<testsuite name=\"Operator results\" tests=\"\( length )\" failures=\"\( [.[] | select(.failure)] | length )\">\n\( [.[] | xmltest] | join("\n"))\n</testsuite>"' >/tmp/artifacts/junit/junit_install_status.xml
 
           #We set OVIRT_CONFIG and insert he path to the engine ca to the config file
           export OVIRT_CONFIG=/tmp/artifacts/installer/ovirt-config.yaml

@@ -7,18 +7,22 @@ base_images:
     name: release
     namespace: openshift
     tag: golang-1.13
+  openshift_release_golang-1.14:
+    name: release
+    namespace: openshift
+    tag: golang-1.14
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: golang-1.14
 canonical_go_repository: github.com/openshift/elasticsearch-operator
 images:
 - from: base
   inputs:
-    openshift_release_golang-1.13:
+    openshift_release_golang-1.14:
       as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.14
   to: elasticsearch-operator
 - dockerfile_path: olm_deploy/operatorregistry/Dockerfile
   from: base
@@ -48,8 +52,7 @@ tests:
   openshift_installer_src:
     cluster_profile: aws
 - as: cluster-logging-operator-e2e
-  commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=/tmp/artifacts/logging-logs ARTIFACT_DIR=/tmp/artifacts/logging-artifacts
-    make test-e2e-olm
+  commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=/tmp/artifacts/logging-logs ARTIFACT_DIR=/tmp/artifacts/logging-artifacts make test-e2e-olm
   openshift_installer_custom_test_image:
     cluster_profile: aws
     from: stable:cluster-logging-operator-e2e

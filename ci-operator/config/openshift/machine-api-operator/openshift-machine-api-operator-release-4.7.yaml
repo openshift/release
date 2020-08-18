@@ -3,6 +3,14 @@ base_images:
     name: "4.7"
     namespace: ocp
     tag: base
+  dev-scripts:
+    name: test
+    namespace: openshift-kni
+    tag: dev-scripts
+  ocp_builder_golang-1.13:
+    name: builder
+    namespace: ocp
+    tag: golang-1.13
   openshift_release_golang-1.13:
     name: release
     namespace: openshift
@@ -14,11 +22,12 @@ build_root:
     namespace: openshift
     tag: golang-1.13
 images:
-- from: base
+- dockerfile_path: Dockerfile.rhel7
+  from: base
   inputs:
-    openshift_release_golang-1.13:
+    ocp_builder_golang-1.13:
       as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
   to: machine-api-operator
 promotion:
   name: "4.7"
@@ -71,10 +80,10 @@ tests:
   openshift_installer:
     cluster_profile: aws
     upgrade: true
-- as: e2e-aws-scaleup-rhel7
-  commands: TEST_SUITE=openshift/conformance/parallel run-tests
-  openshift_ansible_40:
-    cluster_profile: aws-centos-40
+- as: e2e-aws-workers-rhel7
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-workers-rhel7
 - as: e2e-azure-operator
   commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
   openshift_installer_custom_test_image:

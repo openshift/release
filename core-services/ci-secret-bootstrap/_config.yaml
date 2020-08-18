@@ -16,6 +16,9 @@
     - cluster: build02
       namespace: ocp
       name: mirror.openshift.com
+    - cluster: vsphere
+      namespace: ocp
+      name: mirror.openshift.com
 # Host keys for the SSHD bastions
 - from:
     authorized_keys:
@@ -134,6 +137,9 @@
       namespace: bugzilla-operator
       name: bugzilla-credentials-openshift-bugzilla-robot
     - cluster: app.ci
+      namespace: ci
+      name: bugzilla-credentials-openshift-bugzilla-robot
+    - cluster: build01
       namespace: ci
       name: bugzilla-credentials-openshift-bugzilla-robot
 # Jenkins credentials are stored as separate items in Bitwarden,
@@ -417,6 +423,9 @@
     - cluster: build02
       namespace: ci
       name: gce-sa-credentials-gcs-publisher
+    - cluster: vsphere
+      namespace: ci
+      name: gce-sa-credentials-gcs-publisher
 - from:
     service-account.json:
       bw_item: gcs-tide-publisher
@@ -443,6 +452,9 @@
       namespace: ci
       name: gce-sa-credentials-gcs-private
     - cluster: build02
+      namespace: ci
+      name: gce-sa-credentials-gcs-private
+    - cluster: vsphere
       namespace: ci
       name: gce-sa-credentials-gcs-private
 - from:
@@ -576,6 +588,22 @@
     - cluster: api.ci
       namespace: ci
       name: registry-push-credentials-quay.io-ovirt
+- from:
+    config.json:
+      bw_item: quay.io/redhat-developer
+      field: Push Credentials
+  to:
+    - cluster: api.ci
+      namespace: ci
+      name: registry-push-credentials-quay.io-redhat-developer
+- from:
+    config.json:
+      bw_item: quay.io/open-cluster-management
+      attachment: docker.cfg
+  to:
+    - cluster: api.ci
+      namespace: ci
+      name: registry-push-credentials-quay.io-open-cluster-management
 #Pull Credentials
 - from:
     config.json:
@@ -591,6 +619,14 @@
       field: Pull Credentials
   to:
     - cluster: api.ci
+      namespace: ci
+      name: ci-pull-credentials
+      type: kubernetes.io/dockerconfigjson
+    - cluster: build01
+      namespace: ci
+      name: ci-pull-credentials
+      type: kubernetes.io/dockerconfigjson
+    - cluster: build02
       namespace: ci
       name: ci-pull-credentials
       type: kubernetes.io/dockerconfigjson
@@ -759,6 +795,9 @@
       namespace: ci
       name: cluster-secrets-vsphere
     - cluster: build02
+      namespace: ci
+      name: cluster-secrets-vsphere
+    - cluster: vsphere
       namespace: ci
       name: cluster-secrets-vsphere
 # metal
@@ -1029,6 +1068,9 @@
     sa.sinker.vsphere.config:
       bw_item: build_farm
       attachment: sa.sinker.vsphere.config
+    build01_vsphere_reg_auth_value.txt:
+      bw_item: build_farm
+      attachment: build01_vsphere_reg_auth_value.txt
   to:
     - cluster: api.ci
       namespace: ci
@@ -1113,6 +1155,9 @@
       namespace: ci
       name: boskos-credentials
     - cluster: build02
+      namespace: ci
+      name: boskos-credentials
+    - cluster: vsphere
       namespace: ci
       name: boskos-credentials
 # collects all the secrets for aws iamuser ci-build01-audit-logs-uploader iamuser under account ci-infra
@@ -1228,14 +1273,6 @@
       namespace: ci
       name: dptp-controller-manager
 - from:
-    config.json:
-      bw_item: registry-push-credentials-quay.io-open-cluster-management
-      attachment: docker.cfg
-  to:
-    - cluster: api.ci
-      namespace: ci
-      name: registry-push-credentials-quay.io-open-cluster-management
-- from:
     password.txt:
       bw_item: result-aggregator
       attribute: password
@@ -1250,6 +1287,9 @@
       namespace: ci
       name: result-aggregator
     - cluster: build02
+      namespace: ci
+      name: result-aggregator
+    - cluster: vsphere
       namespace: ci
       name: result-aggregator
 - from:
@@ -1381,12 +1421,3 @@
     - cluster: app.ci
       namespace: ci
       name: release-controller-signature-signer
-##bugzilla api key for ci-search tool
-- from:
-    api:
-      bw_item: bugzilla-credentials-bugzilla.redhat.com
-      field: api
-  to:
-    - cluster: app.ci
-      namespace: ci-search
-      name: bugzilla-credentials-bugzilla.redhat.com

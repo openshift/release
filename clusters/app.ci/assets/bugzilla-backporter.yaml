@@ -1,21 +1,6 @@
 kind: List
 apiVersion: v1
 items:
-- kind: ImageStream
-  apiVersion: image.openshift.io/v1
-  metadata:
-    name: bugzilla-backporter
-    namespace: ci
-  spec:
-    lookupPolicy:
-      local: true
-    tags:
-    - name: latest
-      importPolicy:
-        scheduled: true
-      from:
-        kind: DockerImage
-        name: registry.svc.ci.openshift.org/ci/bugzilla-backporter
 - apiVersion: v1
   kind: Service
   metadata:
@@ -63,7 +48,7 @@ items:
     annotations:
       image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"bugzilla-backporter:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"bugzilla-backporter\")].image"}]'
   spec:
-    replicas: 1
+    replicas: 2
     strategy:
       type: RollingUpdate
     selector:

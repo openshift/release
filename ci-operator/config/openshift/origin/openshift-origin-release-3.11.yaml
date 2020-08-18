@@ -72,10 +72,7 @@ promotion:
   namespace: openshift
 raw_steps:
 - pipeline_image_cache_step:
-    commands: mkdir -p _output/local/releases; touch _output/local/releases/CHECKSUM;
-      echo $'FROM bin AS bin\nFROM rpms AS rpms\nFROM centos:7\nCOPY --from=bin /go/src/github.com/openshift/origin/_output/local/releases
-      /srv/zips/\nCOPY --from=rpms /go/src/github.com/openshift/origin/_output/local/releases/rpms/*
-      /srv/repo/' > _output/local/releases/Dockerfile; make build-cross
+    commands: mkdir -p _output/local/releases; touch _output/local/releases/CHECKSUM; echo $'FROM bin AS bin\nFROM rpms AS rpms\nFROM centos:7\nCOPY --from=bin /go/src/github.com/openshift/origin/_output/local/releases /srv/zips/\nCOPY --from=rpms /go/src/github.com/openshift/origin/_output/local/releases/rpms/* /srv/repo/' > _output/local/releases/Dockerfile; make build-cross
     from: bin
     to: bin-cross
 - project_directory_image_build_step:
@@ -139,22 +136,19 @@ tag_specification:
 tests:
 - artifact_dir: /tmp/artifacts
   as: unit
-  commands: ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1 TEST_KUBE=true KUBERNETES_SERVICE_HOST=
-    hack/test-go.sh
+  commands: ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1 TEST_KUBE=true KUBERNETES_SERVICE_HOST= hack/test-go.sh
   container:
     from: src
 - artifact_dir: /tmp/artifacts
   as: integration
-  commands: TMPDIR=/tmp/volume ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1 KUBERNETES_SERVICE_HOST=
-    make test-integration
+  commands: TMPDIR=/tmp/volume ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1 KUBERNETES_SERVICE_HOST= make test-integration
   container:
     from: bin
     memory_backed_volume:
       size: 4Gi
 - artifact_dir: /tmp/artifacts
   as: verify
-  commands: ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1 KUBERNETES_SERVICE_HOST= make
-    verify -k
+  commands: ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1 KUBERNETES_SERVICE_HOST= make verify -k
   container:
     from: bin
 - as: e2e-conformance-k8s
@@ -162,13 +156,11 @@ tests:
   openshift_ansible_src:
     cluster_profile: gcp
 - as: e2e-gcp
-  commands: TEST_FOCUS=Suite:openshift/conformance/parallel TEST_FOCUS_SERIAL=Suite:openshift/conformance/serial/minimal
-    run-tests
+  commands: TEST_FOCUS=Suite:openshift/conformance/parallel TEST_FOCUS_SERIAL=Suite:openshift/conformance/serial/minimal run-tests
   openshift_ansible:
     cluster_profile: gcp
 - as: e2e-gcp-crio
-  commands: TEST_FOCUS=Suite:openshift/conformance/parallel TEST_FOCUS_SERIAL=Suite:openshift/conformance/serial/minimal
-    run-tests
+  commands: TEST_FOCUS=Suite:openshift/conformance/parallel TEST_FOCUS_SERIAL=Suite:openshift/conformance/serial/minimal run-tests
   openshift_ansible:
     cluster_profile: gcp-crio
 zz_generated_metadata:

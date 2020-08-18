@@ -22,6 +22,11 @@ def add_imagestream_namespace_rbac(gendoc):
             'kind': 'Group',
             'name': 'qe'
         })
+        puller_subjects.append({
+            'apiGroup': 'rbac.authorization.k8s.io',
+            'kind': 'Group',
+            'name': 'release-team'
+        })
 
     resources.append({
         'apiVersion': 'rbac.authorization.k8s.io/v1beta1',
@@ -360,3 +365,23 @@ def add_imagestream_namespace_rbac(gendoc):
                 'namespace': context.jobs_namespace
             }]
         })
+
+    # The release-controller's caches, running as the 'default' user, need explicit
+    # access to `oc adm release` commands in the jobs_namespace.
+    resources.append({
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
+        'kind': 'RoleBinding',
+        'metadata': {
+            'name': f'release-controller-jobs-binding',
+            'namespace': context.is_namespace,
+        },
+        'roleRef': {
+            'kind': 'ClusterRole',
+            'name': 'edit'
+        },
+        'subjects': [{
+            'kind': 'ServiceAccount',
+            'name': 'default',
+            'namespace': context.jobs_namespace
+        }]
+    })

@@ -6,12 +6,6 @@ set -o pipefail
 
 echo "************ baremetalds gather command ************"
 
-# Sentinel file check
-if [[ -f "${SHARED_DIR}/e2e_test_complete" ]]; then
-  echo "baremetalds-e2e-test completed successfully; skipping log gathering."
-  exit 0
-fi
-
 # TODO: Remove once OpenShift CI will be upgraded to 4.2 (see https://access.redhat.com/articles/4859371)
 ~/fix_uid.sh
 

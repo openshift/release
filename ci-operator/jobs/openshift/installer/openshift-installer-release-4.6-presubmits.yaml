@@ -4,7 +4,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/e2e-aws
     decorate: true
     decoration_config:
@@ -68,7 +68,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/e2e-aws-disruptive
     decorate: true
     decoration_config:
@@ -97,8 +97,7 @@ presubmits:
         - name: JOB_NAME_SAFE
           value: e2e-aws-disruptive
         - name: TEST_COMMAND
-          value: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance/parallel
-            run-tests
+          value: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance/parallel run-tests
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -147,7 +146,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/e2e-aws-fips
     decorate: true
     decoration_config:
@@ -241,7 +240,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/e2e-aws-proxy
     decorate: true
     decoration_config:
@@ -305,7 +304,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/e2e-aws-rhel8
     decorate: true
     decoration_config:
@@ -430,94 +429,10 @@ presubmits:
           secretName: regcred
     trigger: (?m)^/test( | .* )e2e-aws-rhel8,?($|\s.*)
   - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.6
-    cluster: api.ci
-    context: ci/prow/e2e-aws-scaleup-rhel7
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-release-4.6-e2e-aws-scaleup-rhel7
-    optional: true
-    rerun_command: /test e2e-aws-scaleup-rhel7
-    spec:
-      containers:
-      - args:
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
-        - --report-password-file=/etc/report/password.txt
-        - --report-username=ci
-        - --secret-dir=/usr/local/e2e-aws-scaleup-rhel7-cluster-profile
-        - --target=e2e-aws-scaleup-rhel7
-        - --template=/usr/local/e2e-aws-scaleup-rhel7
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: e2e-aws-scaleup-rhel7
-        - name: RPM_REPO_CRIO_DIR
-          value: 4.6-rhel-7
-        - name: RPM_REPO_OPENSHIFT_ORIGIN
-          value: https://rpms.svc.ci.openshift.org/openshift-origin-v4.6/
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance/parallel run-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-aws-scaleup-rhel7-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-aws-scaleup-rhel7
-          name: job-definition
-          subPath: cluster-scaleup-e2e-40.yaml
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: password
-            path: password
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-          - configMap:
-              name: cluster-profile-aws-centos-40
-      - configMap:
-          name: prow-job-cluster-scaleup-e2e-40
-        name: job-definition
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-scaleup-rhel7,?($|\s.*)
-  - agent: kubernetes
     always_run: false
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/e2e-aws-shared-vpc
     decorate: true
     decoration_config:
@@ -581,7 +496,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/e2e-aws-upgrade
     decorate: true
     decoration_config:
@@ -644,7 +559,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/e2e-aws-upi
     decorate: true
     decoration_config:
@@ -719,10 +634,74 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-upi,?($|\s.*)
   - agent: kubernetes
+    always_run: true
+    branches:
+    - release-4.6
+    cluster: build01
+    context: ci/prow/e2e-aws-workers-rhel7
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-release-4.6-e2e-aws-workers-rhel7
+    optional: true
+    rerun_command: /test e2e-aws-workers-rhel7
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-password-file=/etc/boskos/password
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/usr/local/e2e-aws-workers-rhel7-cluster-profile
+        - --target=e2e-aws-workers-rhel7
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-aws-workers-rhel7-cluster-profile
+          name: cluster-profile
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-workers-rhel7,?($|\s.*)
+  - agent: kubernetes
     always_run: false
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/e2e-azure
     decorate: true
     decoration_config:
@@ -786,7 +765,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/e2e-azure-shared-vpc
     decorate: true
     decoration_config:
@@ -850,7 +829,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/e2e-azure-upi
     decorate: true
     decoration_config:
@@ -927,7 +906,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/e2e-crc
     decorate: true
     decoration_config:
@@ -992,7 +971,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/e2e-gcp
     decorate: true
     decoration_config:
@@ -1058,7 +1037,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/e2e-gcp-shared-vpc
     decorate: true
     decoration_config:
@@ -1124,7 +1103,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/e2e-gcp-upgrade
     decorate: true
     decoration_config:
@@ -1189,7 +1168,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/e2e-gcp-upi
     decorate: true
     decoration_config:
@@ -1255,7 +1234,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/e2e-gcp-upi-xpn
     decorate: true
     decoration_config:
@@ -1320,7 +1299,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/e2e-libvirt
     decorate: true
     name: pull-ci-openshift-installer-release-4.6-e2e-libvirt
@@ -1523,7 +1502,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/e2e-metal
     decorate: true
     decoration_config:
@@ -1595,7 +1574,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/e2e-metal-ipi
     decorate: true
     decoration_config:
@@ -1660,7 +1639,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/e2e-openstack
     decorate: true
     decoration_config:
@@ -1747,7 +1726,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/e2e-openstack-parallel
     decorate: true
     decoration_config:
@@ -1912,7 +1891,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/e2e-vsphere
     decorate: true
     decoration_config:
@@ -1976,7 +1955,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/e2e-vsphere-upi
     decorate: true
     decoration_config:
@@ -2219,7 +2198,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/shellcheck
     decorate: true
     labels:
@@ -2246,7 +2225,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/tf-fmt
     decorate: true
     labels:
@@ -2274,7 +2253,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/tf-lint
     decorate: true
     labels:
@@ -2346,7 +2325,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/verify-codegen
     decorate: true
     decoration_config:
@@ -2436,7 +2415,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/yaml-lint
     decorate: true
     labels:

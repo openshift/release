@@ -8,6 +8,10 @@ branch-protection:
           branches:
             master:
               protect: false
+    che-incubator:
+      repos:
+        chectl:
+          protect: false
     code-ready:
       repos:
         crc:
@@ -360,8 +364,9 @@ deck:
           - Resolved release
           - '"level":"error"'
           - level=error
-          - The namespace in which this test is executing has been deleted, cancelling
-            the test
+          - '"level":"fatal"'
+          - level=fatal
+          - The namespace in which this test is executing has been deleted, cancelling the test
         name: buildlog
       required_files:
       - build-log.txt
@@ -392,24 +397,13 @@ in_repo_config:
     '*':
     - default
 jenkins_operators:
-- job_url_template: https://prow.ci.openshift.org/view/gcs/origin-{{if eq .Spec.Type
-    "presubmit"}}{{if eq .Spec.Refs.Org "kubernetes"}}federated-results{{else if eq
-    .Spec.Refs.Org "kubernetes-incubator"}}federated-results{{else if eq .Spec.Refs.Org
-    "cri-o"}}federated-results{{else}}ci-test{{end}}{{else}}ci-test{{end}}/{{if eq
-    .Spec.Type "presubmit"}}pr-logs/pull{{else if eq .Spec.Type "batch"}}pr-logs/pull{{else}}logs{{end}}{{if
-    ne .Spec.Refs.Repo "origin"}}/{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}{{end}}{{if
-    eq .Spec.Type "presubmit"}}/{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}{{else
-    if eq .Spec.Type "batch"}}/batch{{end}}/{{.Spec.Job}}/{{.Status.JenkinsBuildID}}/
+- job_url_template: https://prow.ci.openshift.org/view/gcs/origin-{{if eq .Spec.Type "presubmit"}}{{if eq .Spec.Refs.Org "kubernetes"}}federated-results{{else if eq .Spec.Refs.Org "kubernetes-incubator"}}federated-results{{else if eq .Spec.Refs.Org "cri-o"}}federated-results{{else}}ci-test{{end}}{{else}}ci-test{{end}}/{{if eq .Spec.Type "presubmit"}}pr-logs/pull{{else if eq .Spec.Type "batch"}}pr-logs/pull{{else}}logs{{end}}{{if ne .Spec.Refs.Repo "origin"}}/{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}{{end}}{{if eq .Spec.Type "presubmit"}}/{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}{{else if eq .Spec.Type "batch"}}/batch{{end}}/{{.Spec.Job}}/{{.Status.JenkinsBuildID}}/
   label_selector: master=ci.openshift.redhat.com
   max_concurrency: 150
   max_goroutines: 20
   report_templates:
-    '*': '[Full PR test history](https://prow.ci.openshift.org/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
-      index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://prow.ci.openshift.org/pr?query=is:pr+state:open+author:{{with
-      index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
-    openshift-priv: '[Full PR test history](https://deck-internal-ci.svc.ci.openshift.org/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
-      index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://deck-internal-ci.svc.ci.openshift.org/pr?query=is:pr+state:open+author:{{with
-      index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
+    '*': '[Full PR test history](https://prow.ci.openshift.org/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://prow.ci.openshift.org/pr?query=is:pr+state:open+author:{{with index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
+    openshift-priv: '[Full PR test history](https://deck-internal-ci.svc.ci.openshift.org/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://deck-internal-ci.svc.ci.openshift.org/pr?query=is:pr+state:open+author:{{with index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
 - job_url_template: https://ci.dev.openshift.redhat.com/jenkins/job/{{.Spec.Job}}/{{.Status.JenkinsBuildID}}
   label_selector: master=ci.dev.openshift.redhat.com
   max_concurrency: 25
@@ -468,10 +462,10 @@ plank:
             memory: 20Mi
       timeout: 4h0m0s
       utility_images:
-        clonerefs: gcr.io/k8s-prow/clonerefs:v20200721-6da441fc91
-        entrypoint: gcr.io/k8s-prow/entrypoint:v20200721-6da441fc91
-        initupload: gcr.io/k8s-prow/initupload:v20200721-6da441fc91
-        sidecar: gcr.io/k8s-prow/sidecar:v20200721-6da441fc91
+        clonerefs: gcr.io/k8s-prow/clonerefs:v20200817-6982bbf62b
+        entrypoint: gcr.io/k8s-prow/entrypoint:v20200817-6982bbf62b
+        initupload: gcr.io/k8s-prow/initupload:v20200817-6982bbf62b
+        sidecar: gcr.io/k8s-prow/sidecar:v20200817-6982bbf62b
     openshift-priv:
       gcs_configuration:
         bucket: origin-ci-private
@@ -481,26 +475,18 @@ plank:
   job_url_prefix_config:
     '*': https://prow.ci.openshift.org/view/
     openshift-priv: https://deck-internal-ci.svc.ci.openshift.org/view/
-  job_url_template: https://{{if .Spec.Hidden }}deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/view/gcs/origin-ci-private/{{else}}prow.ci.openshift.org/view/gcs/origin-ci-test/{{end}}
-    {{if eq .Spec.Type "presubmit"}}pr-logs/pull{{else if eq .Spec.Type "batch"}}pr-logs/pull{{else}}logs{{end}}{{if
-    ne .Spec.Refs.Repo "origin"}}/{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}{{end}}{{if
-    eq .Spec.Type "presubmit"}}/{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}{{else
-    if eq .Spec.Type "batch"}}/batch{{end}}/{{.Spec.Job}}/{{.Status.BuildID}}/
+  job_url_template: https://{{if .Spec.Hidden }}deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/view/gcs/origin-ci-private/{{else}}prow.ci.openshift.org/view/gcs/origin-ci-test/{{end}} {{if eq .Spec.Type "presubmit"}}pr-logs/pull{{else if eq .Spec.Type "batch"}}pr-logs/pull{{else}}logs{{end}}{{if ne .Spec.Refs.Repo "origin"}}/{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}{{end}}{{if eq .Spec.Type "presubmit"}}/{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}{{else if eq .Spec.Type "batch"}}/batch{{end}}/{{.Spec.Job}}/{{.Status.BuildID}}/
   max_concurrency: 1000
   max_goroutines: 20
   pod_pending_timeout: 15m0s
   pod_running_timeout: 48h0m0s
   pod_unscheduled_timeout: 5m0s
   report_templates:
-    '*': '[Full PR test history](https://prow.ci.openshift.org/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
-      index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://prow.ci.openshift.org/pr?query=is:pr+state:open+author:{{with
-      index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
+    '*': '[Full PR test history](https://prow.ci.openshift.org/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://prow.ci.openshift.org/pr?query=is:pr+state:open+author:{{with index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
     integr8ly/integreatly-operator: |-
       ### Report flaky E2E tests and PROW issues in [INTLY-7197](https://issues.redhat.com/browse/INTLY-7197) epic. Detailed instructions can be found in the description of said epic.
       [Full PR test history](https://prow.ci.openshift.org/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://prow.ci.openshift.org/pr?query=is:pr+state:open+author:{{with index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).
-    openshift-priv: '[Full PR test history](https://deck-internal-ci.svc.ci.openshift.org/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
-      index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://deck-internal-ci.svc.ci.openshift.org/pr?query=is:pr+state:open+author:{{with
-      index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
+    openshift-priv: '[Full PR test history](https://deck-internal-ci.svc.ci.openshift.org/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://deck-internal-ci.svc.ci.openshift.org/pr?query=is:pr+state:open+author:{{with index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
 pod_namespace: ci
 prowjob_namespace: ci
 push_gateway:
@@ -516,8 +502,7 @@ slack_reporter_configs:
     channel: '#ops-testplatform'
     job_states_to_report: null
     job_types_to_report: null
-    report_template: Job {{.Spec.Job}} of type {{.Spec.Type}} ended with state {{.Status.State}}.
-      <{{.Status.URL}}|View logs>
+    report_template: Job {{.Spec.Job}} of type {{.Spec.Type}} ended with state {{.Status.State}}. <{{.Status.URL}}|View logs>
 status_error_link: https://github.com/kubernetes/test-infra/issues
 tide:
   blocker_label: tide/merge-blocker
@@ -560,7 +545,9 @@ tide:
     coreos/rpm-ostree: rebase
     integr8ly/ansible-tower-configuration: rebase
     integr8ly/heimdall: rebase
+    opendatahub-io/manifests: squash
     opendatahub-io/odh-manifests: squash
+    opendatahub-io/opendatahub-operator: squash
     openshift-knative/eventing-operator: squash
     openshift-knative/kourier: squash
     openshift-knative/serverless-operator: squash
@@ -568,6 +555,7 @@ tide:
     openshift-kni/baremetal-deploy: squash
     openshift-metal3/dev-scripts: squash
     openshift-priv/ansible-service-broker: squash
+    openshift-priv/assisted-service: squash
     openshift-priv/bond-cni: squash
     openshift-priv/cluster-api: rebase
     openshift-priv/cluster-api-provider-azure: rebase
@@ -580,6 +568,10 @@ tide:
     openshift-priv/template-service-broker-operator: squash
     openshift-psap/special-resource-operator: squash
     openshift/ansible-service-broker: squash
+    openshift/assisted-ignition-generator: squash
+    openshift/assisted-installer: squash
+    openshift/assisted-installer-agent: squash
+    openshift/assisted-service: squash
     openshift/assisted-test-infra: squash
     openshift/bond-cni: squash
     openshift/cluster-api: rebase
@@ -601,6 +593,7 @@ tide:
     openshift/template-service-broker-operator: squash
     openshift/verification-tests: squash
     redhat-developer/build: squash
+    redhat-developer/jenkins-operator: rebase
     redhat-developer/openshift-jenkins-operator: rebase
     redhat-developer/service-binding-operator: squash
   pr_status_base_urls:
@@ -619,6 +612,7 @@ tide:
     - open-cluster-management/api
     - open-cluster-management/image-builder
     - open-cluster-management/multicloud-operators-application
+    - open-cluster-management/multicloud-operators-foundation
     - open-cluster-management/registration
     - open-cluster-management/registration-operator
     - open-cluster-management/work
@@ -1122,6 +1116,7 @@ tide:
     - openshift-priv/ansible-service-broker
     - openshift-priv/api
     - openshift-priv/apiserver-library-go
+    - openshift-priv/assisted-service
     - openshift-priv/aws-ebs-csi-driver
     - openshift-priv/aws-ebs-csi-driver-operator
     - openshift-priv/aws-pod-identity-webhook
@@ -1288,6 +1283,10 @@ tide:
     - openshift/ansible-service-broker
     - openshift/api
     - openshift/apiserver-library-go
+    - openshift/assisted-ignition-generator
+    - openshift/assisted-installer
+    - openshift/assisted-installer-agent
+    - openshift/assisted-service
     - openshift/assisted-test-infra
     - openshift/autoheal
     - openshift/aws-ebs-csi-driver
@@ -1435,6 +1434,7 @@ tide:
     - openshift/ovirt-csi-driver-operator
     - openshift/ovn-kubernetes
     - openshift/pod-checkpointer-operator
+    - openshift/projected-resource-csi-driver
     - openshift/prom-label-proxy
     - openshift/prometheus
     - openshift/prometheus-alertmanager
@@ -1659,6 +1659,7 @@ tide:
     - do-not-merge/work-in-progress
     - do-not-merge/invalid-owners-file
     repos:
+    - redhat-developer/jenkins-operator
     - redhat-developer/openshift-jenkins-operator
   - labels:
     - lgtm
@@ -1793,7 +1794,6 @@ tide:
     - openshift/ci-chat-bot
     - openshift/ci-ns-ttl-controller
     - openshift/ci-search
-    - openshift/ci-secret-mirroring-controller
     - openshift/ci-tools
     - openshift/ci-vm-operator
     - openshift/cincinnati
@@ -1902,7 +1902,9 @@ tide:
     - do-not-merge/work-in-progress
     - do-not-merge/invalid-owners-file
     repos:
+    - opendatahub-io/manifests
     - opendatahub-io/odh-manifests
+    - opendatahub-io/opendatahub-operator
   - labels:
     - lgtm
     - approved

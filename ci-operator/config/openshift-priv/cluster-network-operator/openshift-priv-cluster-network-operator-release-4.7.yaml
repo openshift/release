@@ -7,6 +7,10 @@ base_images:
     name: test
     namespace: openshift-kni
     tag: dev-scripts
+  ocp_builder_golang-1.12:
+    name: builder
+    namespace: ocp
+    tag: golang-1.12
   openshift_release_golang-1.13:
     name: release
     namespace: openshift
@@ -19,12 +23,12 @@ build_root:
     tag: golang-1.13
 canonical_go_repository: github.com/openshift/cluster-network-operator
 images:
-- dockerfile_path: Dockerfile
+- dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    openshift_release_golang-1.13:
+    ocp_builder_golang-1.12:
       as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
   to: cluster-network-operator
 promotion:
   name: 4.7-priv
@@ -43,11 +47,7 @@ tests:
   container:
     from: src
 - as: verify
-  commands: "export GOLANGCI_LINT_VERSION=$(cat .golangciversion 2&> /dev/null ||
-    echo \"1.23.8\")  \nexport GOLANGCI_LINT_CACHE=/tmp/.cache\ncurl -sfL \"https://github.com/golangci/golangci-lint/releases/download/v${GOLANGCI_LINT_VERSION:?'golangci-lint
-    version is unset'}/golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64.tar.gz\"
-    | tar -C /go/bin -zx --strip-components=1 \"golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64/golangci-lint\"\n
-    ./hack/verify-style.sh\n"
+  commands: "export GOLANGCI_LINT_VERSION=$(cat .golangciversion 2&> /dev/null || echo \"1.23.8\")  \nexport GOLANGCI_LINT_CACHE=/tmp/.cache\ncurl -sfL \"https://github.com/golangci/golangci-lint/releases/download/v${GOLANGCI_LINT_VERSION:?'golangci-lint version is unset'}/golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64.tar.gz\" | tar -C /go/bin -zx --strip-components=1 \"golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64/golangci-lint\"\n ./hack/verify-style.sh\n"
   container:
     from: src
 - as: e2e-gcp

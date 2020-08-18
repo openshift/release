@@ -79,7 +79,7 @@ function run-tests() {
   export PULL_SECRET_FILE=--pull-secret-file="${HOME}"/pull-secret
   export BUNDLE_LOCATION=--bundle-location="${HOME}"/snc/crc_libvirt_"${BUNDLE_VERSION}".crcbundle
   export CRC_BINARY=--crc-binary="${HOME}"/crc/out/linux-amd64
-  make integration
+  make integration GODOG_OPTS="--godog.tags='~@story_registry && @linux'"
   popd
 }
 
@@ -103,7 +103,7 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   packer@"${INSTANCE_PREFIX}" \
-  --command 'sudo yum install -y podman make'
+  --command 'sudo rm -fr /usr/local/go; sudo yum install -y podman make golang'
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \

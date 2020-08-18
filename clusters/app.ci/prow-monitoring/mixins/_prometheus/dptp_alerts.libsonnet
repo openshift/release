@@ -14,7 +14,20 @@
               severity: 'critical',
             },
             annotations: {
-              message: 'plank jobs {{ $labels.job_name }} with infra role has failures. Check on <https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/%s/dptp-dashboard?orgId=1&fullscreen&panelId=3|grafana> and <https://prow.ci.openshift.org/?job={{ $labels.job_name }}|deck>' % $._config.grafanaDashboardIDs['dptp.json'],
+              message: 'plank jobs {{ $labels.job_name }} with infra role has failures. Check on <https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/%s/dptp-dashboard?orgId=1&fullscreen&panelId=4|grafana> and <https://prow.ci.openshift.org/?job={{ $labels.job_name }}|deck>.' % $._config.grafanaDashboardIDs['dptp.json'],
+            },
+          },
+          {
+            alert: 'plank-job-with-infra-internal-role-failures',
+            expr: |||
+              sum(rate(prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state="failure"}[5m])) by (job_name) * on (job_name) group_left prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_role="infra-internal"} > 0
+            |||,
+            'for': '1m',
+            labels: {
+              severity: 'critical',
+            },
+            annotations: {
+              message: 'plank jobs {{ $labels.job_name }} with infra-internal role has failures. Check on <https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/?job={{ $labels.job_name }}|deck-internal>.',
             },
           }
         ],
@@ -79,14 +92,14 @@
           {
             alert: 'SSLCertExpiringSoon',
             expr: |||
-              probe_ssl_earliest_cert_expiry{job="blackbox"} - time() < 86400 * 30
+              probe_ssl_earliest_cert_expiry{job="blackbox"} - time() < 86400 * 28
             |||,
             'for': '1m',
             labels: {
               severity: 'critical',
             },
             annotations: {
-              message: 'The SSL certificates for instance {{ $labels.instance }} are expiring in 30 days.',
+              message: 'The SSL certificates for instance {{ $labels.instance }} are expiring in 28 days.',
             },
           },
           {
@@ -94,12 +107,12 @@
             expr: |||
               up{job="blackbox"} == 0 or probe_success{job="blackbox"} == 0
             |||,
-            'for': '5m',
+            'for': '1m',
             labels: {
               severity: 'critical',
             },
             annotations: {
-              message: 'Probing the instance {{ $labels.instance }} has been failing for the past 5 minutes.',
+              message: 'Probing the instance {{ $labels.instance }} has been failing for the past minute.',
             },
           }
         ],

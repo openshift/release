@@ -1,8 +1,11 @@
 SHELL=/usr/bin/env bash -o errexit
 
-.PHONY: check check-core check-services dry-core core dry-services services all
+.PHONY: help check check-core check-services dry-core core dry-services services all
 
 CONTAINER_ENGINE ?= docker
+
+help:
+	@echo "Run 'make all' to update configuration against the current KUBECONFIG"
 
 all: core services
 
@@ -39,7 +42,6 @@ update:
 
 release-controllers:
 	./hack/generators/release-controllers/generate-release-controllers.py .
-	cp ./core-services/release-controller/rpms-ocp-*.yaml ./clusters/build-clusters/01_cluster/openshift/release-controller
 .PHONY: release-controllers
 
 jobs:
@@ -51,6 +53,10 @@ jobs:
 ci-operator-config:
 	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/determinize-ci-operator:latest
 	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/ci-operator/config:/ci-operator/config:z" registry.svc.ci.openshift.org/ci/determinize-ci-operator:latest --config-dir /ci-operator/config --confirm
+
+registry-metadata:
+	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/generate-registry-metadata:latest
+	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/ci-operator/step-registry:/ci-operator/step-registry:z" registry.svc.ci.openshift.org/ci/generate-registry-metadata:latest --registry /ci-operator/step-registry
 
 prow-config:
 	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/determinize-prow-config:latest
@@ -235,13 +241,6 @@ coreos:
 cincinnati:
 	$(MAKE) apply WHAT=projects/cincinnati/cincinnati.yaml
 .PHONY: cincinnati
-
-build-farm-consistency:
-	@echo "diffing ns-ttl-controller assets ..."
-	diff -Naup ./core-services/ci-ns-ttl-controller/ci-ns-ttl-controller_dc.yaml ./clusters/build-clusters/01_cluster/openshift/ci-ns-ttl-controller/ci-ns-ttl-controller_dc.yaml
-	@echo "diffing rpms-ocp assets ..."
-	for file in ./core-services/release-controller/rpms-ocp-*.yaml; do diff -Naup "$${file}" "./clusters/build-clusters/01_cluster/openshift/release-controller/$${file##*/}"; done
-.PHONY: build-farm-consistency
 
 bump-pr:
 	$(MAKE) job JOB=periodic-prow-image-autobump

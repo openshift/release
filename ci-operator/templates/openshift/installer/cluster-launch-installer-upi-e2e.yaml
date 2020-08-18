@@ -205,6 +205,9 @@ objects:
 
         mkdir -p "${HOME}"
 
+        # Share oc with other containers
+        cp "$(command -v oc)" /tmp/shared
+
         # wait for the API to come up
         while true; do
           if [[ -f /tmp/shared/setup-failed ]]; then
@@ -347,6 +350,10 @@ objects:
 
         trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/setup-success; else touch /tmp/exit /tmp/setup-failed; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+
+        # The oc binary is placed in the shared-tmp by the test container and we want to use
+        # that oc for all actions.
+        export PATH=/tmp:${PATH}
 
         function backoff() {
             local attempt=0
@@ -2160,6 +2167,7 @@ objects:
         fi
 
         function approve_csrs() {
+          oc version --client
           while true; do
             if [[ ! -f /tmp/install-complete ]]; then
               # even if oc get csr fails continue
@@ -2366,6 +2374,10 @@ objects:
 
           echo "Waiting for logs ..."
           wait
+
+          # This is a temporary conversion of cluster operator status to JSON matching the upgrade - may be moved to code in the future
+          curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 >/tmp/jq && chmod ug+x /tmp/jq
+          </tmp/artifacts/clusteroperators.json /tmp/jq -r 'def one(condition; t): t as $t | first([.[] | select(condition)] | map(.type=t)[]) // null; def msg: "Operator \(.type) (\(.reason)): \(.message)"; def xmlfailure: if .failure then "<failure message=\"\(.failure | @html)\">\(.failure | @html)</failure>" else "" end; def xmltest: "<testcase name=\"\(.name | @html)\">\( xmlfailure )</testcase>"; def withconditions: map({name: "operator install \(.metadata.name)"} + (.status.conditions | (one(.type=="Available" and .status!="True"; "unavailable") // one(.type=="Degraded" and .status=="True"; "degraded") // one(.type=="Progressing" and .status=="True"; "progressing") // null) | if . then {failure: .|msg} else null end)); .items | withconditions | "<testsuite name=\"Operator results\" tests=\"\( length )\" failures=\"\( [.[] | select(.failure)] | length )\">\n\( [.[] | xmltest] | join("\n"))\n</testsuite>"' >/tmp/artifacts/junit/junit_install_status.xml
 
           tar -czC /tmp/artifacts/must-gather -f /tmp/artifacts/must-gather.tar.gz . &&
           rm -rf /tmp/artifacts/must-gather

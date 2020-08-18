@@ -1,5 +1,3 @@
-
-
 def add_osd_rc_service_account_resources(gendoc):
     config = gendoc.context
     sa_annotations = {}
@@ -148,5 +146,44 @@ def add_osd_rc_service_account_resources(gendoc):
         comment="""
 A service account to be used by ART to query data from the private release controllers. This account
 may pass through the release-controller oauth proxy by virtue of its openshift-delegate-urls.
+        """
+    )
+
+    gendoc.append_all(
+        [
+            {
+                'apiVersion': 'rbac.authorization.k8s.io/v1',
+                'kind': 'RoleBinding',
+                'metadata': {
+                    'name': 'priv-rc-query-binding',
+                    'namespace': 'ocp-private'
+                },
+                'roleRef': {
+                    'apiGroup': 'rbac.authorization.k8s.io',
+                    'kind': 'Role',
+                    'name': 'art-rc-query',
+                },
+                'subjects': [
+                    {
+                        'apiGroup': 'rbac.authorization.k8s.io',
+                        'kind': 'Group',
+                        'name': 'openshift-priv-admins'
+                    },
+                    {
+                        'apiGroup': 'rbac.authorization.k8s.io',
+                        'kind': 'Group',
+                        'name': 'qe'
+                    },
+                    {
+                        'apiGroup': 'rbac.authorization.k8s.io',
+                        'kind': 'Group',
+                        'name': 'release-team'
+                    },
+                ]
+            },
+        ],
+        comment="""
+Enable the release controller oauth sar check to pass for parties who need to interact with the private
+release controllers.         
         """
     )

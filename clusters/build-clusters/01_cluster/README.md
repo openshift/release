@@ -88,13 +88,75 @@ Deploy `./**/admin_*.yaml`.
 ### Deploy non-admin assets
 Automated by [branch-ci-openshift-release-master-build01-apply](https://github.com/openshift/release/blob/0ac7c4c6559316a5cf40c40ca7f05a0df150ef8d/ci-operator/jobs/openshift/release/openshift-release-master-postsubmits.yaml#L9) and [Prow's config-updater plugin](https://github.com/openshift/release/blob/0ac7c4c6559316a5cf40c40ca7f05a0df150ef8d/core-services/prow/02_config/_plugins.yaml#L198).
 
-## CA certificates: Semi-Manual
+### CA certificates: Semi-Manual
 
 It is semi-manual because rotation of the CAs is automated and patching to config (needed only once) is not.
 
-* API server CA: see [readme](../openshift-apiserver/README.md)
+#### API server CA
+Manual steps
 
-* App domain: see [readme](../openshift-ingress-operator/README.md)
+* [Set up aws IAM user](https://cert-manager.io/docs/configuration/acme/dns01/route53/#set-up-an-iam-role): user `cert-manager` in group `cert-manager` which has the policy `cert-manager`.
+
+* Use `cert-manager` to generate the secret containing the certificates:
+
+```bash
+$ oc  --context build01 get secret -n openshift-config apiserver-build01-tls
+NAME                    TYPE                DATA   AGE
+apiserver-build01-tls   kubernetes.io/tls   3      6d21h
+```
+
+Use the secret in apiserver's config:
+
+> oc patch apiserver cluster --type=merge -p '{"spec":{"servingCerts": {"namedCertificates": [{"names": ["api.build01.ci.devcluster.openshift.com"], "servingCertificate": {"name": "apiserver-build01-tls"}}]}}}' 
+
+Verify if it works:
+
+```
+$ curl --insecure -v https://api.build01.ci.devcluster.openshift.com:6443 2>&1 | awk 'BEGIN { cert=0 } /^\* Server certificate:/ { cert=1 } /^\*/ { if (cert) print }'
+* Server certificate:
+*  subject: CN=api.build01.ci.devcluster.openshift.com
+*  start date: Jun 30 13:17:41 2020 GMT
+*  expire date: Sep 28 13:17:41 2020 GMT
+*  issuer: C=US; O=Let's Encrypt; CN=Let's Encrypt Authority X3
+*  SSL certificate verify ok.
+* Connection state changed (HTTP/2 confirmed)
+* Copying HTTP/2 data in stream buffer to connection buffer after upgrade: len=0
+* Using Stream ID: 1 (easy handle 0x7f8c80808200)
+* Connection state changed (MAX_CONCURRENT_STREAMS == 2000)!
+* Connection #0 to host api.build01.ci.devcluster.openshift.com left intact
+
+```
+
+#### App domain: see [readme](../openshift-ingress-operator/README.md)
+Use `cert-manager` to generate the secret containing the certificates:
+
+```bash
+$ oc  --context build01 get secret -n openshift-ingress apps-build01-tls
+NAME               TYPE                DATA   AGE
+apps-build01-tls   kubernetes.io/tls   3      6d23h
+```
+
+Use the secret in apiserver's config:
+
+> oc patch ingresscontroller.operator default \
+     --type=merge -p \
+     '{"spec":{"defaultCertificate": {"name": "apps-build01-tls"}}}' \
+     -n openshift-ingress-operator
+
+Verify if it works:
+
+```
+$ curl --insecure -v https://default-route-openshift-image-registry.apps.build01.ci.devcluster.openshift.com 2>&1 | awk 'BEGIN { cert=0 } /^\* Server certificate:/ { cert=1 } /^\*/ { if (cert) print }'
+* Server certificate:
+*  subject: CN=*.apps.build01.ci.devcluster.openshift.com
+*  start date: Jun 30 13:17:41 2020 GMT
+*  expire date: Sep 28 13:17:41 2020 GMT
+*  issuer: C=US; O=Let's Encrypt; CN=Let's Encrypt Authority X3
+*  SSL certificate verify ok.
+* Connection #0 to host default-route-openshift-image-registry.apps.build01.ci.devcluster.openshift.com left intact
+
+```
+
 
 ### update BW items: Semi-Manual
 

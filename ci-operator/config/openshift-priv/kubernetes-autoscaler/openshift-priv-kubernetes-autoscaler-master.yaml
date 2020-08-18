@@ -3,6 +3,10 @@ base_images:
     name: 4.6-priv
     namespace: ocp-private
     tag: base
+  ocp_builder_golang-1.13:
+    name: builder
+    namespace: ocp
+    tag: golang-1.13
   openshift_release_golang-1.12:
     name: release
     namespace: openshift
@@ -11,6 +15,10 @@ base_images:
     name: release
     namespace: openshift
     tag: golang-1.13
+  openshift_release_golang-1.14:
+    name: release
+    namespace: openshift
+    tag: golang-1.14
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -19,20 +27,20 @@ build_root:
     tag: golang-1.13
 canonical_go_repository: k8s.io/autoscaler
 images:
-- dockerfile_path: images/cluster-autoscaler/Dockerfile
+- dockerfile_path: images/cluster-autoscaler/Dockerfile.rhel7
   from: base
   inputs:
-    openshift_release_golang-1.13:
+    ocp_builder_golang-1.13:
       as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
   to: cluster-autoscaler
 - context_dir: vertical-pod-autoscaler
   dockerfile_path: Dockerfile.openshift
   from: base
   inputs:
-    openshift_release_golang-1.12:
+    openshift_release_golang-1.14:
       as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.12
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.14
   to: vertical-pod-autoscaler
 promotion:
   name: 4.6-priv

@@ -23,6 +23,9 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tag_specification:
+  name: "4.4"
+  namespace: ocp
 test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
 tests:
 - as: build
@@ -50,6 +53,14 @@ tests:
   commands: make test-integration
   container:
     from: test-bin
+- as: e2e
+  commands: |
+    KUBECTL=oc
+    IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:work}
+    export KUBECTL IMAGE_NAME
+    make test-e2e
+  openshift_installer_src:
+    cluster_profile: aws
 zz_generated_metadata:
   branch: master
   org: open-cluster-management

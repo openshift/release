@@ -4,7 +4,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -49,7 +49,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/metering-e2e-aws
     decorate: true
     decoration_config:
@@ -79,14 +79,8 @@ presubmits:
         - name: TEST_COMMAND
           value: |
             set -x
-            # Increase the size of the machines so that there are machines large enough
-            # to run Presto, and the full metering stack.
-            kubectl -n openshift-machine-api get machinesets -o name | grep worker | cut -d/ -f2 | xargs -I{} kubectl -n openshift-machine-api scale machineset {} --replicas 3
 
-            # Note: re-enable upgrade testing once CRD + apiserver issues have been dealt with
-            # TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/upgrade EXTRA_TEST_FLAGS="-run TestMeteringUpgrades" make e2e
-
-            TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/e2e EXTRA_TEST_FLAGS="-run TestManualMeteringInstall" make e2e
+            TEST_ENABLE_MACHINE_AUTOSCALING="true" TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/e2e EXTRA_TEST_FLAGS="-run TestManualMeteringInstall" make e2e
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -135,7 +129,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/metering-upgrade-aws
     decorate: true
     decoration_config:
@@ -218,7 +212,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -263,7 +257,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/vendor
     decorate: true
     decoration_config:
@@ -308,7 +302,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/verify
     decorate: true
     decoration_config:

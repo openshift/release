@@ -1,7 +1,21 @@
+base_images:
+  cli:
+    name: "4.2"
+    namespace: ocp
+    tag: cli
 binary_build_commands: make bin
 build_root:
   project_image:
     dockerfile_path: openshift-ci/build-root/Dockerfile
+images:
+- context_dir: openshift-ci/build-root/source-image
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: oc-bin-image
 resources:
   '*':
     requests:
@@ -12,10 +26,18 @@ tag_specification:
   namespace: ocp
 tests:
 - as: integration-e2e-periodic
-  commands: scripts/openshiftci-periodic-tests.sh
   cron: 0 */6 * * *
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: integration-e2e-periodic-steps
+      commands: scripts/openshiftci-periodic-tests.sh
+      from: oc-bin-image
+      resources:
+        requests:
+          cpu: "2"
+          memory: 4Gi
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: openshift

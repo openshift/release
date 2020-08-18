@@ -25,6 +25,9 @@ images:
 - context_dir: knative-operator
   from: base
   to: knative-operator
+promotion:
+  name: openshift-serverless-nightly
+  namespace: openshift
 resources:
   '*':
     requests:
@@ -34,11 +37,12 @@ tag_specification:
   name: "4.5"
   namespace: ocp
 tests:
-- as: e2e-aws-ocp-45
+- as: operator-e2e-aws-ocp-45
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws
     test:
-    - as: serverless-e2e
+    - as: operator-e2e
       commands: make test-e2e
       from: serverless-operator-src
       resources:
@@ -46,13 +50,26 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-aws
+- as: upstream-e2e-aws-ocp-45
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws
+    test:
+    - as: serverless-e2e
+      commands: make test-upstream-e2e-no-upgrade
+      from: serverless-operator-src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws
 - as: e2e-aws-ocp-45-continuous
-  cron: 0 */12 * * *
+  cron: 0 */12 * * 1-5
   steps:
     cluster_profile: aws
     test:
     - as: serverless-e2e
-      commands: make test-all
+      commands: make test-all-e2e
       from: serverless-operator-src
       resources:
         requests:
@@ -61,6 +78,7 @@ tests:
     workflow: openshift-e2e-aws
 - as: upgrade-tests-aws-ocp-45
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws
     test:
     - as: serverless-e2e

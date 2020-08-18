@@ -8,4 +8,4 @@ set -o pipefail
 # and added to the kubernetes-test binary. This is simpler to maintain
 # since the tests and the wrapper that executes the m can be iterated
 # on in a single PR.
-kubernetes-test-e2e.sh
+test-kubernetes-e2e.sh

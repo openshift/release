@@ -46,6 +46,14 @@ items:
         annotations:
           message: Ci-Op Pod {{$labels.pod}} in namespace {{$labels.namespace}} has over 150% CPU usage than initially requested. Ci-Op Pod {{$labels.pod}} in namespace {{$labels.namespace}} has high CPU usage {{ printf "%0.0f" $value }}.
 
+      - alert: ETCD_OOMKilled_Soon
+        expr: |
+          sum(container_memory_rss{namespace=~"kube-system",pod_name=~"master-etcd.*",container_name="etcd"}) > 18000000000
+        labels:
+          severity: critical
+        annotations:
+          message: '@dptp-triage etcd is using too much memory. Gather the data here: https://gist.github.com/smarterclayton/b2d16a476434eb818a69d4029181e219 and paste into channel.'
+
       - alert: OverMemoryRequests
         expr: |
           100 * ( sum(label_replace(container_memory_working_set_bytes{namespace=~"ci-op-.*"}, "pod", "$1", "pod_name", "(.*)")) by (pod,namespace)

@@ -7,6 +7,10 @@ base_images:
     name: test
     namespace: openshift-kni
     tag: dev-scripts
+  ocp_builder_golang-1.13:
+    name: builder
+    namespace: ocp
+    tag: golang-1.13
   openshift_release_golang-1.13:
     name: release
     namespace: openshift
@@ -17,12 +21,12 @@ build_root:
     namespace: openshift
     tag: golang-1.13
 images:
-- dockerfile_path: Dockerfile
+- dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    openshift_release_golang-1.13:
+    ocp_builder_golang-1.13:
       as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
   to: machine-config-operator
 promotion:
   name: "4.7"
@@ -58,13 +62,12 @@ tests:
   openshift_installer:
     cluster_profile: gcp
     upgrade: true
-- as: e2e-aws-scaleup-rhel7
-  commands: TEST_SUITE=openshift/conformance/parallel run-tests
-  openshift_ansible_40:
-    cluster_profile: aws-centos-40
+- as: e2e-aws-workers-rhel7
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-workers-rhel7
 - as: e2e-aws-disruptive
-  commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance/parallel
-    run-tests
+  commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: aws
 - as: cluster-bootimages

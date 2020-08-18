@@ -23,6 +23,14 @@ base_images:
     name: 4.7-priv
     namespace: ocp-private
     tag: oc-rpms
+  ocp_builder_golang-1.13:
+    name: builder
+    namespace: ocp
+    tag: golang-1.13
+  ocp_builder_golang-1.14:
+    name: builder
+    namespace: ocp
+    tag: golang-1.14
   tools:
     name: 4.7-priv
     namespace: ocp-private
@@ -32,22 +40,22 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: golang-1.14
 canonical_go_repository: k8s.io/kubernetes
 images:
 - dockerfile_path: openshift-hack/images/hyperkube/Dockerfile.rhel
   from: base
   inputs:
-    bin:
+    ocp_builder_golang-1.14:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.14
   to: hyperkube
 - dockerfile_path: openshift-hack/images/tests/Dockerfile.rhel
   from: tools
   inputs:
-    bin:
+    ocp_builder_golang-1.14:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.14
   to: kubernetes-tests
 - context_dir: openshift-hack/images/os/
   from: base
@@ -189,10 +197,10 @@ tests:
     memory_backed_volume:
       size: 4Gi
 - artifact_dir: /tmp/artifacts
-  as: kubernetes-e2e
+  as: gcp-e2e-kubernetes
   steps:
-    cluster_profile: aws
-    workflow: openshift-kubernetes-e2e-aws
+    cluster_profile: gcp
+    workflow: openshift-kubernetes-e2e-gcp
 - as: e2e-gcp
   steps:
     cluster_profile: gcp
@@ -210,8 +218,7 @@ tests:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-cmd
 - as: e2e-aws-disruptive
-  commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance/parallel
-    run-tests
+  commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: aws
 - as: e2e-aws-jenkins
