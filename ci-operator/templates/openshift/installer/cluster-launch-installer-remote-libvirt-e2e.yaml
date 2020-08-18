@@ -26,22 +26,34 @@ parameters:
   required: false
 - name: BASTION_SVC_IP
   required: true
-- name: BASTION_SVC_1_IP
+- name: BASTION_SVC_0_1_IP
   value: 127.0.0.1
   required: false
-- name: BASTION_SVC_2_IP
+- name: BASTION_SVC_0_2_IP
   value: 127.0.0.1
   required: false
-- name: BASTION_SVC_3_IP
+- name: BASTION_SVC_0_3_IP
   value: 127.0.0.1
   required: false
-- name: BASTION_SVC_4_IP
+- name: BASTION_SVC_0_4_IP
   value: 127.0.0.1
   required: false
-- name: BASTION_SVC
-  required: true
+- name: BASTION_SVC_0_1_IP
+  value: 127.0.0.1
+  required: false
+- name: BASTION_SVC_0_2_IP
+  value: 127.0.0.1
+  required: false
+- name: BASTION_SVC_0_3_IP
+  value: 127.0.0.1
+  required: false
+- name: BASTION_SVC_0_4_IP
+  value: 127.0.0.1
+  required: false
 - name: REMOTE_LIBVIRT_HOSTNAME
   required: true
+- name: REMOTE_LIBVIRT_HOSTNAME_1
+  required: false
 - name: MULTIARCH_RELEASE_IMAGE_LATEST
   required: true
 
@@ -406,8 +418,6 @@ objects:
         value: registry.svc.ci.openshift.org/${NAMESPACE}/release
       - name: REMOTE_LIBVIRT_URI
         value: "qemu+tcp://${REMOTE_LIBVIRT_HOSTNAME}/system"
-      - name: BASTION_SVC
-        value: sshd.bastion-z.svc.cluster.local
       - name: MASTER_REPLICAS
         value: "3"
       - name: WORKER_REPLICAS
@@ -460,11 +470,16 @@ objects:
 
         # declare environments to extract subnet
         declare -A SUBNETS
-        SUBNETS["${CLUSTER_TYPE}-00"]="126"
-        SUBNETS["${CLUSTER_TYPE}-01"]="1"
-        SUBNETS["${CLUSTER_TYPE}-02"]="2"
-        SUBNETS["${CLUSTER_TYPE}-03"]="3"
-        SUBNETS["${CLUSTER_TYPE}-04"]="4"
+        SUBNETS["${CLUSTER_TYPE}-0_0"]="126"
+        SUBNETS["${CLUSTER_TYPE}-0_1"]="1"
+        SUBNETS["${CLUSTER_TYPE}-0_2"]="2"
+        SUBNETS["${CLUSTER_TYPE}-0_3"]="3"
+        SUBNETS["${CLUSTER_TYPE}-0_4"]="4"
+        SUBNETS["${CLUSTER_TYPE}-1_0"]="126"
+        SUBNETS["${CLUSTER_TYPE}-1_1"]="1"
+        SUBNETS["${CLUSTER_TYPE}-1_2"]="2"
+        SUBNETS["${CLUSTER_TYPE}-1_3"]="3"
+        SUBNETS["${CLUSTER_TYPE}-1_4"]="4"
 
         # get cluster subnet or default it to 126
         cluster_subnet="${SUBNETS[$BASE_DOMAIN]}"
@@ -723,46 +738,92 @@ objects:
     - ip: "${BASTION_SVC_IP}"
       hostnames:
       - "${REMOTE_LIBVIRT_HOSTNAME}"
-      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-00"
-      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-00"
-      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-00"
-      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-00"
-      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-00"
-      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-00"
-      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-00"
-    - ip: "${BASTION_SVC_1_IP}"
+      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0_0"
+      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0_0"
+      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0_0"
+      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0_0"
+      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0_0"
+      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0_0"
+      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0_0"
+    - ip: "${BASTION_SVC_0_1_IP}"
       hostnames:
-      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-01"
-      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-01"
-      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-01"
-      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-01"
-      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-01"
-      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-01"
-      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-01"
-    - ip: "${BASTION_SVC_2_IP}"
+      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0_1"
+      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0_1"
+      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0_1"
+      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0_1"
+      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0_1"
+      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0_1"
+      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0_1"
+    - ip: "${BASTION_SVC_0_2_IP}"
       hostnames:
-      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-02"
-      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-02"
-      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-02"
-      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-02"
-      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-02"
-      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-02"
-      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-02"
-    - ip: "${BASTION_SVC_3_IP}"
+      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0_2"
+      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0_2"
+      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0_2"
+      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0_2"
+      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0_2"
+      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0_2"
+      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0_2"
+    - ip: "${BASTION_SVC_0_3_IP}"
       hostnames:
-      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-03"
-      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-03"
-      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-03"
-      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-03"
-      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-03"
-      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-03"
-      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-03"
-    - ip: "${BASTION_SVC_4_IP}"
+      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0_3"
+      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0_3"
+      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0_3"
+      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0_3"
+      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0_3"
+      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0_3"
+      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0_3"
+    - ip: "${BASTION_SVC_0_4_IP}"
       hostnames:
-      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-04"
-      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-04"
-      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-04"
-      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-04"
-      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-04"
-      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-04"
-      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-04"
+      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0_4"
+      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0_4"
+      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0_4"
+      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0_4"
+      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0_4"
+      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0_4"
+      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0_4"
+    - ip: "${BASTION_SVC_1_O_IP}"
+      hostnames:
+      - "${REMOTE_LIBVIRT_HOSTNAME_1}"
+      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1_0"
+      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1_0"
+      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1_0"
+      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1_0"
+      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1_0"
+      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1_0"
+      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1_0"
+    - ip: "${BASTION_SVC_1_1_IP}"
+      hostnames:
+      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1_1"
+      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1_1"
+      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1_1"
+      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1_1"
+      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1_1"
+      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1_1"
+      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1_1"
+    - ip: "${BASTION_SVC_1_2_IP}"
+      hostnames:
+      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1_2"
+      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1_2"
+      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1_2"
+      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1_2"
+      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1_2"
+      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1_2"
+      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1_2"
+    - ip: "${BASTION_SVC_1_3_IP}"
+      hostnames:
+      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1_3"
+      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1_3"
+      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1_3"
+      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1_3"
+      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1_3"
+      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1_3"
+      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1_3"
+    - ip: "${BASTION_SVC_1_4_IP}"
+      hostnames:
+      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1_4"
+      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1_4"
+      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1_4"
+      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1_4"
+      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1_4"
+      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1_4"
+      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1_4"
