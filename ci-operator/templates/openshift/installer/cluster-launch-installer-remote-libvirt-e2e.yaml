@@ -181,7 +181,7 @@ objects:
 
         function acquire_lease() {
           if [[ "${ARCH}" != "s390x" && "${ARCH}" != "ppc64le" ]]; then
-            resource_name="${CLUSTER_TYPE}-00"
+            resource_name="${CLUSTER_TYPE}-0-0"
             return
           fi
 
@@ -419,14 +419,14 @@ objects:
         value: test
       - name: MIRROR_BASE
         value: registry.svc.ci.openshift.org/${NAMESPACE}/release
-      - name: REMOTE_LIBVIRT_URI
-        value: "qemu+tcp://${REMOTE_LIBVIRT_HOSTNAME}/system"
       - name: MASTER_REPLICAS
         value: "3"
       - name: WORKER_REPLICAS
         value: "2"
       - name: INSTALL_INITIAL_RELEASE
       - name: RELEASE_IMAGE_INITIAL
+      - name: REMOTE_LIBVIRT_HOSTNAME
+      - name: REMOTE_LIBVIRT_HOSTNAME_1
       command:
       - /bin/bash
       - -c
@@ -490,6 +490,25 @@ objects:
            cluster_subnet=126
         fi
 
+        declare -A LIBVIRT_HOSTS
+        LIBVIRT_HOSTS["${CLUSTER_TYPE}-0-0"]="${REMOTE_LIBVIRT_HOSTNAME}"
+        LIBVIRT_HOSTS["${CLUSTER_TYPE}-0-1"]="${REMOTE_LIBVIRT_HOSTNAME}"
+        LIBVIRT_HOSTS["${CLUSTER_TYPE}-0-2"]="${REMOTE_LIBVIRT_HOSTNAME}"
+        LIBVIRT_HOSTS["${CLUSTER_TYPE}-0-3"]="${REMOTE_LIBVIRT_HOSTNAME}"
+        LIBVIRT_HOSTS["${CLUSTER_TYPE}-0-4"]="${REMOTE_LIBVIRT_HOSTNAME}"
+        LIBVIRT_HOSTS["${CLUSTER_TYPE}-1-0"]="${REMOTE_LIBVIRT_HOSTNAME_1}"
+        LIBVIRT_HOSTS["${CLUSTER_TYPE}-1-1"]="${REMOTE_LIBVIRT_HOSTNAME_1}"
+        LIBVIRT_HOSTS["${CLUSTER_TYPE}-1-2"]="${REMOTE_LIBVIRT_HOSTNAME_1}"
+        LIBVIRT_HOSTS["${CLUSTER_TYPE}-1-3"]="${REMOTE_LIBVIRT_HOSTNAME_1}"
+        LIBVIRT_HOSTS["${CLUSTER_TYPE}-1-4"]="${REMOTE_LIBVIRT_HOSTNAME_1}"
+        
+        # get cluster libvirt uri or default it the first host
+        remote_libvirt_uri="qemu+tcp://${LIBVIRT_HOSTS[$BASE_DOMAIN]}/system"
+        if [[ -z "$remote_libvirt_uri" ]]; then
+           remote_libvirt_uri="qemu+tcp://${REMOTE_LIBVIRT_HOSTNAME}/system"
+        fi
+        echo $remote_libvirt_uri
+
         if [[ "${ARCH}" = "s390x" || "${ARCH}" = "ppc64le" ]]; then
             master_type=null
             subnets="[]"
@@ -518,7 +537,7 @@ objects:
           replicas: ${WORKER_REPLICAS}
         platform:
           libvirt:
-            URI: "${REMOTE_LIBVIRT_URI}"
+            URI: ${remote_libvirt_uri}
             network:
               if: "br${JOB_NAME_HASH}${BUILD_ID: -4}"
         pullSecret: >
@@ -564,7 +583,7 @@ objects:
         while kill -0 $openshift_install 2> /dev/null; do
             sleep 60
             echo "Polling libvirt for network, attempt #$((++i))"
-            libvirt_network=$(mock-nss.sh virsh --connect "${REMOTE_LIBVIRT_URI}" net-list --name | grep "${NAMESPACE}-${JOB_NAME_HASH}" || true)
+            libvirt_network=$(mock-nss.sh virsh --connect "${remote_libvirt_uri}" net-list --name | grep "${NAMESPACE}-${JOB_NAME_HASH}" || true)
             if [[ -n "${libvirt_network}" ]]; then
                 cat > /tmp/artifacts/installer/worker-hostrecords.xml << EOF
         <host ip='192.168.${cluster_subnet}.51'>
@@ -577,7 +596,7 @@ objects:
         </host>
         EOF
                 echo "Libvirt network found. Injecting worker DNS records."
-                mock-nss.sh virsh --connect "${REMOTE_LIBVIRT_URI}" net-update --network "${libvirt_network}" --command add-last --section dns-host --xml "$(< /tmp/artifacts/installer/worker-hostrecords.xml)"
+                mock-nss.sh virsh --connect "${remote_libvirt_uri}" net-update --network "${libvirt_network}" --command add-last --section dns-host --xml "$(< /tmp/artifacts/installer/worker-hostrecords.xml)"
                 break
             fi
         done
