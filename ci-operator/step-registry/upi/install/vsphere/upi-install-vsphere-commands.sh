@@ -69,14 +69,10 @@ function gather_bootstrap_and_fail() {
     done
 
     # shellcheck disable=SC2154
-    GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --bootstrap ${bootstrap_0_ip}"
-    # shellcheck disable=SC2154
-    GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --master ${control_plane_0_ip} --master ${control_plane_1_ip} --master ${control_plane_2_ip}"
+    GATHER_BOOTSTRAP_ARGS=("--bootstrap ${bootstrap_0_ip}" "--master ${control_plane_0_ip} --master ${control_plane_1_ip} --master ${control_plane_2_ip}")
 
     set -e
-  if test -n "${GATHER_BOOTSTRAP_ARGS}"; then
-    openshift-install --dir=/tmp/artifacts/installer gather bootstrap --key "${SSH_PRIVATE_KEY_PATH}" "${GATHER_BOOTSTRAP_ARGS}"
-  fi
+    openshift-install --dir=/tmp/artifacts/installer gather bootstrap --key "${SSH_PRIVATE_KEY_PATH}" "${GATHER_BOOTSTRAP_ARGS[@]}"
 
   return 1
 }
@@ -113,6 +109,17 @@ echo "$(date -u --rfc-3339=seconds) - terraform apply..."
 terraform apply -auto-approve -no-color &
 wait "$!"
 
+echo "Testing terraform show values"
+TERRAFORM_SHOW_DATA=$(terraform show -json | sed 's/,/\n/g')
+control_plane_0_ip=$(echo "${TERRAFORM_SHOW_DATA}" | grep -Po '"body":"\{\\\"control-plane-0.*' | grep -Eo '([0-9]*\.){3}[0-9]*')
+control_plane_1_ip=$(echo "${TERRAFORM_SHOW_DATA}" | grep -Po '"body":"\{\\\"control-plane-1.*' | grep -Eo '([0-9]*\.){3}[0-9]*')
+control_plane_2_ip=$(echo "${TERRAFORM_SHOW_DATA}" | grep -Po '"body":"\{\\\"control-plane-2.*' | grep -Eo '([0-9]*\.){3}[0-9]*')
+bootstrap_0_ip=$(echo "${TERRAFORM_SHOW_DATA}" | grep -Po '"body":"\{\\\"bootstrap-0.*' | grep -Eo '([0-9]*\.){3}[0-9]*')
+
+echo Control Plane 0 ip $control_plane_0_ip
+echo Control Plane 1 ip $control_plane_1_ip
+echo Control Plane 2 ip $control_plane_2_ip
+echo Bootstrap 0 ip $bootstrap_0_ip
 # The terraform state could be larger than the maximum 1mb
 # in a secret
 tar -Jcf "${SHARED_DIR}/terraform_state.tar.xz" terraform.tfstate
