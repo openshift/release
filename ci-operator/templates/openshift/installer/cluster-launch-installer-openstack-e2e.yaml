@@ -616,6 +616,16 @@ objects:
 
           echo "Deprovisioning cluster ..."
           openshift-install --dir /tmp/artifacts/installer --log-level=debug destroy cluster
+
+          declare -ra to_be_deleted=(
+            '/tmp/artifacts/installer/auth'
+          )
+          for f in "${to_be_deleted[@]}"; do
+            if [ -e "$f" ]; then
+                echo "Deleting stale resource '${f}'..."
+                rm -rf "$f"
+            fi
+          done
         }
 
         # We have to truncate cluster name to 14 chars, because there is a limitation in the install-config
