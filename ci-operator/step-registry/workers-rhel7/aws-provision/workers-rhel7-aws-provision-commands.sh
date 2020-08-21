@@ -133,6 +133,7 @@ cat > create_machineset.yaml <<-'EOF'
   register: oc_apply
   args:
     stdin: "{{ machineset | to_yaml }}"
+  until: oc_apply is succeeded
   changed_when:
   - ('created' in oc_apply.stdout) or
     ('configured' in oc_apply.stdout)
@@ -145,6 +146,7 @@ cat > create_machineset.yaml <<-'EOF'
     --selector='machine.openshift.io/cluster-api-machineset={{ machineset_name }}'
     --output=json
   register: oc_get_machine
+  until: oc_get_machine is succeeded
   changed_when: false
 
 - name: Create list of machines
@@ -175,6 +177,7 @@ cat > create_machineset.yaml <<-'EOF'
     --selector='machine.openshift.io/cluster-api-machineset={{ machineset_name }}'
     --output=json
   register: oc_get_machine
+  until: oc_get_machine is succeeded
   changed_when: false
 
 - name: Add hostname to new_workers_list
