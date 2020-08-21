@@ -1193,7 +1193,46 @@ periodics:
       - /usr/bin/registry-replacer
       image: registry.svc.ci.openshift.org/ci/registry-replacer:latest
       imagePullPolicy: Always
-      name: auto-config-brancher
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: token
+        readOnly: true
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-bot
+- agent: kubernetes
+  cluster: api.ci
+  cron: '@hourly'
+  decorate: true
+  extra_refs:
+  - base_ref: openshift-4.6-rhel-8
+    org: openshift
+    repo: ocp-build-data
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-ocp-build-data-enforcer
+  spec:
+    containers:
+    - args:
+      - --github-token-path=/etc/github/oauth
+      - --github-endpoint=http://ghproxy
+      - --ocp-build-data-repo-dir=./
+      - --create-prs=true
+      - --minor=6
+      - --pr-creation-ceiling=1
+      command:
+      - /usr/bin/ocp-build-data-enforcer
+      env:
+      - name: CLICOLOR_FORCE
+        value: "1"
+      image: registry.svc.ci.openshift.org/ci/ocp-build-data-enforcer:latest
+      imagePullPolicy: Always
+      name: ""
       resources:
         requests:
           cpu: 500m
