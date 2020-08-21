@@ -1,1 +1,1 @@
-../install/ipi-install-install-commands.sh
+../ipi-install-commands.sh
