@@ -173,8 +173,6 @@ publishing-bot:
 
 origin-stable:
 	$(MAKE) apply WHAT=projects/origin-stable/release.yaml
-	$(MAKE) apply WHAT=projects/origin-stable/stable-3.9.yaml
-	$(MAKE) apply WHAT=projects/origin-stable/stable-3.10.yaml
 .PHONY: origin-stable
 
 origin-release:
