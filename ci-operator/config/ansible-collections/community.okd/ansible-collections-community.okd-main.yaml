@@ -1,0 +1,42 @@
+base_images:
+  os:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- dockerfile_path: ci/Dockerfile
+  from: os
+  to: molecule-test-runner
+promotion:
+  excluded_images:
+  - molecule-test-runner
+  name: "4.6"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.6"
+  namespace: ocp
+tests:
+- as: sanity
+  commands: SANITY_TEST_ARGS='--venv' make test-sanity
+  container:
+    from: molecule-test-runner
+- as: integration
+  commands: make test-integration-incluster
+  openshift_installer_src:
+    cluster_profile: aws
+zz_generated_metadata:
+  branch: main
+  org: ansible-collections
+  repo: community.okd
