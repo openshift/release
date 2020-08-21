@@ -11,10 +11,12 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "7"
-binary_build_commands: make build
+binary_build_commands: make build-go
 build_root:
-  project_image:
-    dockerfile_path: openshift-ci/Dockerfile.tools
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
 images:
 - dockerfile_path: openshift-ci/Dockerfile.deploy
   from: os
@@ -91,7 +93,7 @@ tests:
     from: src
 - as: ocs-operator-ci
   commands: |
-    make ocs-operator-ci
+    make ocs-operator-ci GOFLAGS=''
   container:
     from: src
 - as: ocs-operator-bundle-e2e-aws
