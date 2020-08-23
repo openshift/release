@@ -31,9 +31,15 @@ images:
 - dockerfile_path: deploy/Dockerfile.registry.upgrade
   from: operator-registry-base
   to: hco-registry-upgrade
+  dependencies:
+    name: hyperconverged-cluster-operator
+    env: HCO_IMAGE_NAME
 - dockerfile_path: deploy/Dockerfile.registry.upgrade-prev
   from: operator-registry-base
   to: hco-registry-upgrade-prev
+  dependencies:
+    name: hyperconverged-cluster-operator
+    env: HCO_IMAGE_NAME
 promotion:
   additional_images:
     hyperconverged-cluster-operator-tests: src
@@ -58,31 +64,49 @@ tests:
     make start && make functest
   openshift_installer_src:
     cluster_profile: aws
+  dependencies:
+    name: hyperconverged-cluster-operator
+    env: HCO_IMAGE_NAME
 - as: hco-e2e-upgrade-aws
   commands: |
     RELEASE_DELTA=1 make upgrade-test
   openshift_installer_src:
     cluster_profile: aws
+  dependencies:
+    name: hyperconverged-cluster-operator
+    env: HCO_IMAGE_NAME
 - as: hco-e2e-upgrade-prev-aws
   commands: |
     RELEASE_DELTA=2 PREV=true make upgrade-test
   openshift_installer_src:
     cluster_profile: aws
+  dependencies:
+    name: hyperconverged-cluster-operator
+    env: HCO_IMAGE_NAME
 - as: hco-e2e-azure
   commands: |
     make start && make functest
   openshift_installer_src:
     cluster_profile: azure4
+  dependencies:
+    name: hyperconverged-cluster-operator
+    env: HCO_IMAGE_NAME
 - as: hco-e2e-upgrade-azure
   commands: |
     RELEASE_DELTA=1 make upgrade-test
   openshift_installer_src:
     cluster_profile: azure4
+  dependencies:
+    name: hyperconverged-cluster-operator
+    env: HCO_IMAGE_NAME
 - as: hco-e2e-upgrade-prev-azure
   commands: |
     RELEASE_DELTA=2 PREV=true make upgrade-test
   openshift_installer_src:
     cluster_profile: azure4
+  dependencies:
+    name: hyperconverged-cluster-operator
+    env: HCO_IMAGE_NAME
 zz_generated_metadata:
   branch: master
   org: kubevirt
