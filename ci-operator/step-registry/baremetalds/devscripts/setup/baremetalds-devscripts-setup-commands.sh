@@ -47,7 +47,7 @@ scp "${SSHOPTS[@]}" "${CLUSTER_PROFILE_DIR}/pull-secret" "root@${IP}:pull-secret
 
 if [[ -e "${SHARED_DIR}/dev-scripts-additional-config" ]]
 then
-  scp "${SSHOPTS[@]}" "${SHARED_DIR}/dev-scripts-additional-config" "root@${IP}:dev-scripts-additional-config"
+  scp "${SSHOPTS[@]}" "${SHARED_DIR}/dev-scripts-additional-config" "root@${IP}:/root/dev-scripts/dev-scripts-additional-config"
 fi
 
 timeout -s 9 175m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
@@ -87,9 +87,9 @@ echo "export WORKER_MEMORY=16384" >> /root/dev-scripts/config_root.sh
 # FIXME(stbenjam): Temporary to work around ovn bug
 echo "export IP_STACK=v4" >> /root/dev-scripts/config_root.sh
 
-if [[ -e /root/dev-scripts-additional-config ]]
+if [[ -e /root/dev-scripts/dev-scripts-additional-config ]]
 then
-  cat /root/dev-scripts-additional-config >> /root/dev-scripts/config_root.sh
+  cat /root/dev-scripts/dev-scripts-additional-config >> /root/dev-scripts/config_root.sh
 fi
 
 echo 'export KUBECONFIG=/root/dev-scripts/ocp/ostest/auth/kubeconfig' >> /root/.bashrc
