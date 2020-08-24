@@ -1,7 +1,7 @@
 presubmits:
   openshift/machine-config-operator:
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build01
@@ -78,7 +78,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )cluster-bootimages,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build01
@@ -91,7 +91,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-config-operator-master-e2e-aws
     rerun_command: /test e2e-aws
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
     spec:
       containers:
       - args:
@@ -142,7 +141,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build01
@@ -154,7 +153,6 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-config-operator-master-e2e-aws-disruptive
-    optional: true
     rerun_command: /test e2e-aws-disruptive
     spec:
       containers:
@@ -220,7 +218,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-disruptive,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build01
@@ -232,7 +230,6 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-config-operator-master-e2e-aws-proxy
-    optional: true
     rerun_command: /test e2e-aws-proxy
     spec:
       containers:
@@ -296,7 +293,6 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-config-operator-master-e2e-aws-workers-rhel7
-    optional: true
     rerun_command: /test e2e-aws-workers-rhel7
     spec:
       containers:
@@ -348,7 +344,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-workers-rhel7,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build01
@@ -360,7 +356,6 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-config-operator-master-e2e-azure
-    optional: true
     rerun_command: /test e2e-azure
     spec:
       containers:
@@ -412,7 +407,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-azure,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build01
@@ -425,7 +420,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-config-operator-master-e2e-gcp-op
     rerun_command: /test e2e-gcp-op
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
     spec:
       containers:
       - args:
@@ -569,7 +563,6 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-config-operator-master-e2e-metal-ipi
-    optional: true
     rerun_command: /test e2e-metal-ipi
     spec:
       containers:
@@ -623,168 +616,6 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-metal-ipi,?($|\s.*)
   - agent: kubernetes
-    always_run: false
-    branches:
-    - master
-    cluster: build01
-    context: ci/prow/e2e-openstack
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-machine-config-operator-master-e2e-openstack
-    optional: true
-    rerun_command: /test e2e-openstack
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --lease-server-password-file=/etc/boskos/password
-        - --lease-server-username=ci
-        - --lease-server=https://boskos-ci.svc.ci.openshift.org
-        - --repo=machine-config-operator
-        - --secret-dir=/usr/local/e2e-openstack-cluster-profile
-        - --target=e2e-openstack
-        - --template=/usr/local/e2e-openstack
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: openstack
-        - name: JOB_NAME_SAFE
-          value: e2e-openstack
-        - name: TEST_COMMAND
-          value: run-minimal-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-openstack-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-openstack
-          name: job-definition
-          subPath: cluster-launch-installer-openstack-e2e.yaml
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
-      - name: boskos
-        secret:
-          items:
-          - key: password
-            path: password
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-openstack
-      - configMap:
-          name: prow-job-cluster-launch-installer-openstack-e2e
-        name: job-definition
-      - name: pull-secret
-        secret:
-          secretName: regcred
-    trigger: (?m)^/test( | .* )e2e-openstack,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - master
-    cluster: api.ci
-    context: ci/prow/e2e-ovirt
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-machine-config-operator-master-e2e-ovirt
-    optional: true
-    rerun_command: /test e2e-ovirt
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --repo=machine-config-operator
-        - --secret-dir=/usr/local/e2e-ovirt-cluster-profile
-        - --target=e2e-ovirt
-        - --template=/usr/local/e2e-ovirt
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: ovirt
-        - name: JOB_NAME_SAFE
-          value: e2e-ovirt
-        - name: LEASE_TYPE
-          value: minimal
-        - name: TEST_COMMAND
-          value: run-minimal-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-ovirt-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-ovirt
-          name: job-definition
-          subPath: cluster-launch-installer-ovirt-e2e.yaml
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-ovirt
-          - secret:
-              name: ovirt-infra-secrets
-          - configMap:
-              name: cluster-profile-ovirt
-      - configMap:
-          name: prow-job-cluster-launch-installer-ovirt-e2e
-        name: job-definition
-      - name: pull-secret
-        secret:
-          secretName: regcred
-    trigger: (?m)^/test( | .* )e2e-ovirt,?($|\s.*)
-  - agent: kubernetes
     always_run: true
     branches:
     - master
@@ -797,7 +628,6 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-config-operator-master-e2e-ovn-step-registry
-    optional: true
     rerun_command: /test e2e-ovn-step-registry
     spec:
       containers:
@@ -849,7 +679,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-ovn-step-registry,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build01
@@ -861,7 +691,6 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-config-operator-master-e2e-vsphere
-    optional: true
     rerun_command: /test e2e-vsphere
     spec:
       containers:
@@ -913,10 +742,10 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-vsphere,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
-    cluster: build01
+    cluster: vsphere
     context: ci/prow/e2e-vsphere-upi
     decorate: true
     decoration_config:
@@ -925,7 +754,6 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-config-operator-master-e2e-vsphere-upi
-    optional: true
     rerun_command: /test e2e-vsphere-upi
     spec:
       containers:
@@ -1050,7 +878,6 @@ presubmits:
       ci-operator.openshift.io/variant: okd
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-config-operator-master-okd-e2e-aws
-    optional: true
     rerun_command: /test okd-e2e-aws
     spec:
       containers:
@@ -1103,7 +930,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )okd-e2e-aws,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build01
@@ -1116,7 +943,6 @@ presubmits:
       ci-operator.openshift.io/variant: okd
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-config-operator-master-okd-e2e-gcp-op
-    optional: true
     rerun_command: /test okd-e2e-gcp-op
     spec:
       containers:
@@ -1185,7 +1011,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )okd-e2e-gcp-op,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build01
@@ -1198,7 +1024,6 @@ presubmits:
       ci-operator.openshift.io/variant: okd
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-config-operator-master-okd-e2e-gcp-upgrade
-    optional: true
     rerun_command: /test okd-e2e-gcp-upgrade
     spec:
       containers:
@@ -1266,7 +1091,6 @@ presubmits:
       ci-operator.openshift.io/variant: okd
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-config-operator-master-okd-images
-    optional: true
     rerun_command: /test okd-images
     spec:
       containers:

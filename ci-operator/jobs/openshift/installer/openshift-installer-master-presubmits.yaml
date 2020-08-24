@@ -1,7 +1,7 @@
 presubmits:
   openshift/installer:
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build01
@@ -14,7 +14,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-master-e2e-aws
     rerun_command: /test e2e-aws
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
     spec:
       containers:
       - args:
@@ -65,7 +64,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build01
@@ -77,7 +76,6 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-master-e2e-aws-disruptive
-    optional: true
     rerun_command: /test e2e-aws-disruptive
     spec:
       containers:
@@ -143,102 +141,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-disruptive,?($|\s.*)
   - agent: kubernetes
-    always_run: false
-    branches:
-    - master
-    cluster: build01
-    context: ci/prow/e2e-aws-fips
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-master-e2e-aws-fips
-    optional: true
-    rerun_command: /test e2e-aws-fips
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --lease-server-password-file=/etc/boskos/password
-        - --lease-server-username=ci
-        - --lease-server=https://boskos-ci.svc.ci.openshift.org
-        - --repo=installer
-        - --secret-dir=/usr/local/e2e-aws-fips-cluster-profile
-        - --target=e2e-aws-fips
-        - --template=/usr/local/e2e-aws-fips
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: CLUSTER_VARIANT
-          value: fips
-        - name: JOB_NAME_SAFE
-          value: e2e-aws-fips
-        - name: TEST_COMMAND
-          value: |
-            fips_check
-            TEST_SUITE=openshift/conformance/parallel run-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-aws-fips-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-aws-fips
-          name: job-definition
-          subPath: cluster-launch-installer-e2e.yaml
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
-      - name: boskos
-        secret:
-          items:
-          - key: password
-            path: password
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-e2e
-        name: job-definition
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: sentry-dsn
-        secret:
-          secretName: sentry-dsn
-    trigger: (?m)^/test( | .* )e2e-aws-fips,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build01
@@ -250,7 +153,6 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-master-e2e-aws-proxy
-    optional: true
     rerun_command: /test e2e-aws-proxy
     spec:
       containers:
@@ -302,135 +204,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-proxy,?($|\s.*)
   - agent: kubernetes
-    always_run: false
-    branches:
-    - master
-    cluster: build01
-    context: ci/prow/e2e-aws-rhel8
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    name: pull-ci-openshift-installer-master-e2e-aws-rhel8
-    optional: true
-    rerun_command: /test e2e-aws-rhel8
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --lease-server-password-file=/etc/boskos/password
-        - --lease-server-username=ci
-        - --lease-server=https://boskos-ci.svc.ci.openshift.org
-        - --repo=installer
-        - --secret-dir=/usr/local/e2e-aws-rhel8-cluster-profile
-        - --target=e2e-aws-rhel8
-        - --template=/usr/local/e2e-aws-rhel8
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: CONFIG_SPEC
-          value: |
-            base_images:
-              base:
-                name: '4.4'
-                namespace: ocp
-                tag: base
-              machine-os-content:
-                name: machine-os-content
-                namespace: rhcos
-                tag: latest
-            build_root:
-              image_stream_tag:
-                name: release
-                namespace: openshift
-                tag: golang-1.13
-            canonical_go_repository: github.com/openshift/installer
-            images:
-            - dockerfile_path: images/installer/Dockerfile.ci
-              from: base
-              inputs:
-                root:
-                  as:
-                  - builder
-              to: installer
-            raw_steps:
-            - output_image_tag_step:
-                from: machine-os-content
-                to:
-                  name: stable
-                  tag: machine-os-content
-            resources:
-              '*':
-                limits:
-                  memory: 4Gi
-                requests:
-                  cpu: 100m
-                  memory: 200Mi
-            tag_specification:
-              name: '4.4'
-              namespace: ocp
-            tests:
-            - as: e2e-aws
-              commands: TEST_SUITE=openshift/conformance/parallel run-tests
-              openshift_installer:
-                cluster_profile: aws
-        - name: JOB_NAME_SAFE
-          value: e2e-aws-rhel8
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance/parallel run-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-aws-rhel8-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-aws-rhel8
-          name: job-definition
-          subPath: cluster-launch-installer-e2e.yaml
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
-      - name: boskos
-        secret:
-          items:
-          - key: password
-            path: password
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-e2e
-        name: job-definition
-      - name: pull-secret
-        secret:
-          secretName: regcred
-    trigger: (?m)^/test( | .* )e2e-aws-rhel8,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build01
@@ -442,7 +216,6 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-master-e2e-aws-shared-vpc
-    optional: true
     rerun_command: /test e2e-aws-shared-vpc
     spec:
       containers:
@@ -494,7 +267,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-shared-vpc,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build01
@@ -507,7 +280,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-master-e2e-aws-upgrade
     rerun_command: /test e2e-aws-upgrade
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
     spec:
       containers:
       - args:
@@ -558,7 +330,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-upgrade,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build01
@@ -570,7 +342,6 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-master-e2e-aws-upi
-    optional: true
     rerun_command: /test e2e-aws-upi
     spec:
       containers:
@@ -648,7 +419,6 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-master-e2e-aws-workers-rhel7
-    optional: true
     rerun_command: /test e2e-aws-workers-rhel7
     spec:
       containers:
@@ -700,7 +470,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-workers-rhel7,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build01
@@ -712,7 +482,6 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-master-e2e-azure
-    optional: true
     rerun_command: /test e2e-azure
     spec:
       containers:
@@ -764,7 +533,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-azure,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build01
@@ -776,7 +545,6 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-master-e2e-azure-shared-vpc
-    optional: true
     rerun_command: /test e2e-azure-shared-vpc
     spec:
       containers:
@@ -828,7 +596,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-azure-shared-vpc,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build01
@@ -840,7 +608,6 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-master-e2e-azure-upi
-    optional: true
     rerun_command: /test e2e-azure-upi
     spec:
       containers:
@@ -918,7 +685,6 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-master-e2e-crc
-    optional: true
     rerun_command: /test e2e-crc
     spec:
       containers:
@@ -972,7 +738,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-crc,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build01
@@ -984,7 +750,6 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-master-e2e-gcp
-    optional: true
     rerun_command: /test e2e-gcp
     spec:
       containers:
@@ -1038,7 +803,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-gcp,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build01
@@ -1050,7 +815,6 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-master-e2e-gcp-shared-vpc
-    optional: true
     rerun_command: /test e2e-gcp-shared-vpc
     spec:
       containers:
@@ -1104,7 +868,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-gcp-shared-vpc,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build01
@@ -1169,7 +933,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-gcp-upgrade,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build01
@@ -1181,7 +945,6 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-master-e2e-gcp-upi
-    optional: true
     rerun_command: /test e2e-gcp-upi
     spec:
       containers:
@@ -1235,7 +998,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-gcp-upi,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build01
@@ -1247,7 +1010,6 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-master-e2e-gcp-upi-xpn
-    optional: true
     rerun_command: /test e2e-gcp-upi-xpn
     spec:
       containers:
@@ -1301,283 +1063,6 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-gcp-upi-xpn,?($|\s.*)
   - agent: kubernetes
-    always_run: false
-    branches:
-    - master
-    cluster: build01
-    context: ci/prow/e2e-libvirt
-    decorate: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-master-e2e-libvirt
-    optional: true
-    rerun_command: /test e2e-libvirt
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --repo=installer
-        - --secret-dir=/usr/local/e2e-libvirt-cluster-profile
-        - --target=e2e-libvirt
-        - --template=/usr/local/e2e-libvirt
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: gcp
-        - name: JOB_NAME_SAFE
-          value: e2e-libvirt
-        - name: TEST_COMMAND
-          value: |
-            cat >tests <<EOTESTS
-            "[Conformance][Area:Networking][Feature:Router] The HAProxy router should override the route host for overridden domains with a custom value [Suite:openshift/conformance/parallel/minimal]"
-            "[Conformance][Area:Networking][Feature:Router] The HAProxy router should override the route host with a custom value [Suite:openshift/conformance/parallel/minimal]"
-            "[Conformance][Area:Networking][Feature:Router] The HAProxy router should run even if it has no access to update status [Suite:openshift/conformance/parallel/minimal]"
-            "[Conformance][templates] templateinstance creation with invalid object reports error  should report a failure on creation [Suite:openshift/conformance/parallel/minimal]"
-            "[Conformance][templates] templateinstance cross-namespace test should create and delete objects across namespaces [Suite:openshift/conformance/parallel/minimal]"
-            "[Conformance][templates] templateinstance impersonation tests should pass impersonation creation tests [Suite:openshift/conformance/parallel/minimal]"
-            "[Conformance][templates] templateinstance impersonation tests should pass impersonation deletion tests [Suite:openshift/conformance/parallel/minimal]"
-            "[Conformance][templates] templateinstance impersonation tests should pass impersonation update tests [Suite:openshift/conformance/parallel/minimal]"
-            "[Conformance][templates] templateinstance object kinds test should create and delete objects from varying API groups [Suite:openshift/conformance/parallel/minimal]"
-            "[Conformance][templates] templateinstance security tests  should pass security tests [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:AnnotationTrigger] Annotation trigger reconciles after the image is overwritten [Suite:openshift/conformance/parallel]"
-            "[Feature:Builds] buildconfig secret injector  should inject secrets to the appropriate buildconfigs [Suite:openshift/conformance/parallel]"
-            "[Feature:Builds][Conformance] imagechangetriggers  imagechangetriggers should trigger builds of all types [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds][Conformance] oc new-app  should fail with a --name longer than 58 characters [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds][Conformance] remove all builds when build configuration is removed  oc delete buildconfig should start builds and delete the buildconfig [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds][Conformance] s2i build with a quota  Building from a template should create an s2i build with a quota and run it [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds][Conformance][valueFrom] process valueFrom in build strategy environment variables  should fail resolving unresolvable valueFrom in docker build environment variable references [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds][Conformance][valueFrom] process valueFrom in build strategy environment variables  should fail resolving unresolvable valueFrom in sti build environment variable references [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds][pruning] prune builds based on settings in the buildconfig  [Conformance] buildconfigs should have a default history limit set when created via the group api [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds][pruning] prune builds based on settings in the buildconfig  should prune builds after a buildConfig change [Suite:openshift/conformance/parallel]"
-            "[Feature:Builds][pruning] prune builds based on settings in the buildconfig  should prune canceled builds based on the failedBuildsHistoryLimit setting [Suite:openshift/conformance/parallel]"
-            "[Feature:Builds][pruning] prune builds based on settings in the buildconfig  should prune errored builds based on the failedBuildsHistoryLimit setting [Suite:openshift/conformance/parallel]"
-            "[Feature:Builds][pullsecret][Conformance] docker build using a pull secret  Building from a template should create a docker build that pulls using a secret run it [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:DeploymentConfig] deploymentconfigs ignores deployer and lets the config with a NewReplicationControllerCreated reason [Conformance] should let the deployment config with a NewReplicationControllerCreated reason [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:DeploymentConfig] deploymentconfigs initially [Conformance] should not deploy if pods never transition to ready [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:DeploymentConfig] deploymentconfigs should respect image stream tag reference policy [Conformance] resolve the image pull spec [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:DeploymentConfig] deploymentconfigs when run iteratively [Conformance] should immediately start a new deployment [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:DeploymentConfig] deploymentconfigs with env in params referencing the configmap [Conformance] should expand the config map key to a value [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:ImageLayers][registry] Image layer subresource should identify a deleted image as missing [Suite:openshift/conformance/parallel]"
-            "[Feature:ImageLookup][registry][Conformance] Image policy should perform lookup when the pod has the resolve-names annotation [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:ImageLookup][registry][Conformance] Image policy should update standard Kube object image fields when local names are on [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Machines][Smoke] Managed cluster should have machine resources [Suite:openshift/conformance/parallel]"
-            "[Feature:Platform] Managed cluster should have operators on the cluster version [Suite:openshift/conformance/parallel]"
-            "[Feature:Platform] OLM should list catalogsources [Suite:openshift/conformance/parallel]"
-            "[Feature:Platform] OLM should list clusterserviceversions [Suite:openshift/conformance/parallel]"
-            "[Feature:Platform] OLM should list installplans [Suite:openshift/conformance/parallel]"
-            "[Feature:Platform] OLM should list operatorgroups [Suite:openshift/conformance/parallel]"
-            "[Feature:Platform] OLM should list packagemanifests [Suite:openshift/conformance/parallel]"
-            "[Feature:Platform] OLM should list subscriptions [Suite:openshift/conformance/parallel]"
-            "[Feature:Platform][Smoke] Managed cluster should ensure pods use images from our release image with proper ImagePullPolicy [Suite:openshift/conformance/parallel]"
-            "[Feature:Platform][Smoke] Managed cluster should start all core operators [Suite:openshift/conformance/parallel]"
-            "[k8s.io] Container Runtime blackbox test when running a container with a new image should be able to pull from private registry with secret [NodeConformance] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[k8s.io] Container Runtime blackbox test when running a container with a new image should be able to pull image from docker hub [NodeConformance] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[k8s.io] Container Runtime blackbox test when starting a container that exits should report termination message from log output if TerminationMessagePolicy FallbackToLogOnError is set [NodeConformance] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[k8s.io] Container Runtime blackbox test when starting a container that exits should report termination message if TerminationMessagePath is set as non-root user and at a non-default path [NodeConformance] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[k8s.io] Docker Containers should be able to override the image's default arguments (docker cmd) [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[k8s.io] InitContainer [NodeConformance] should invoke init containers on a RestartAlways pod [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[k8s.io] InitContainer [NodeConformance] should not start app containers and fail the pod if init containers fail on a RestartNever pod [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[k8s.io] Pods should be submitted and removed [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[k8s.io] Probing container with readiness probe should not be ready before initial delay and never restart [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[k8s.io] Probing container with readiness probe that fails should never be ready and never restart [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[k8s.io] Security Context When creating a container with runAsUser should run the container with uid 0 [NodeConformance] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[k8s.io] Security Context When creating a pod with privileged should run the container as unprivileged when false [NodeConformance] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[k8s.io] Security Context When creating a pod with readOnlyRootFilesystem should run the container with readonly rootfs when readOnlyRootFilesystem=true [NodeConformance] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[k8s.io] Security Context when creating containers with AllowPrivilegeEscalation should not allow privilege escalation when false [NodeConformance] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[k8s.io] Variable Expansion should allow composing env vars into new env vars [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[k8s.io] Variable Expansion should allow substituting values in a container's command [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[k8s.io] [sig-node] Pods Extended [k8s.io] Pods Set QOS Class should be submitted and removed  [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[k8s.io] [sig-node] Security Context [Feature:SecurityContext] should support pod.Spec.SecurityContext.SupplementalGroups [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[k8s.io] [sig-node] Security Context [Feature:SecurityContext] should support seccomp alpha unconfined annotation on the container [Feature:Seccomp] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[k8s.io] [sig-node] Security Context [Feature:SecurityContext] should support seccomp alpha unconfined annotation on the pod [Feature:Seccomp] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[k8s.io] [sig-node] Security Context [Feature:SecurityContext] should support seccomp default which is unconfined [Feature:Seccomp] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-api-machinery] Garbage collector should orphan RS created by deployment when deleteOptions.PropagationPolicy is Orphan [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[sig-api-machinery] Generated clientset should create v1beta1 cronJobs, delete cronJobs, watch cronJobs [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-api-machinery] Servers with support for API chunking should return chunks of results for list calls [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-api-machinery] Servers with support for Table transformation should return a 406 for a backend which does not implement metadata [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-api-machinery] Servers with support for Table transformation should return chunks of table results for list calls [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-api-machinery] Watchers should be able to restart watching from the last resource version observed by the previous watch [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[sig-api-machinery] Watchers should be able to start watching from a specific resource version [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[sig-api-machinery] Watchers should observe add, update, and delete watch notifications on configmaps [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[sig-apps] CronJob should remove from active list jobs that have been deleted [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-apps] Deployment RollingUpdateDeployment should delete old pods and create new ones [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[sig-apps] Deployment deployment reaping should cascade to its replica sets and pods [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-apps] Deployment deployment should delete old replica sets [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[sig-apps] Deployment deployment should support proportional scaling [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[sig-apps] Deployment iterative rollouts should eventually progress [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-apps] DisruptionController evictions: maxUnavailable deny evictions, integer => should not allow an eviction [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-apps] DisruptionController evictions: no PDB => should allow an eviction [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-apps] DisruptionController evictions: too few pods, replicaSet, percentage => should not allow an eviction [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-apps] DisruptionController should update PodDisruptionBudget status [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-apps] Job should delete a job [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] Should recreate evicted statefulset [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[sig-auth] Certificates API should support building a client with a CSR [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-auth] ServiceAccounts should allow opting out of API token automount  [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[sig-auth] [Feature:NodeAuthorizer] A node shouldn't be able to create another node [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-auth] [Feature:NodeAuthorizer] A node shouldn't be able to delete another node [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-auth] [Feature:NodeAuthorizer] Getting a non-existent secret should exit with the Forbidden error, not a NotFound error [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-cli] Kubectl client [k8s.io] Kubectl apply should reuse port when apply to an existing SVC [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-cli] Kubectl client [k8s.io] Kubectl run default should create an rc or deployment from an image  [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[sig-cli] Kubectl client [k8s.io] Kubectl run job should create a job from an image when restart is OnFailure  [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[sig-cli] Kubectl client [k8s.io] Kubectl run pod should create a pod from an image when restart is Never  [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[sig-cli] Kubectl client [k8s.io] Kubectl version should check is all data is printed  [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[sig-cli] Kubectl client [k8s.io] Proxy server should support --unix-socket=/path  [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[sig-cli] Kubectl client [k8s.io] Simple pod should support exec [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-cli] Kubectl client [k8s.io] Simple pod should support exec through kubectl proxy [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-cli] Kubectl client [k8s.io] Simple pod should support port-forward [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-cli] Kubectl client [k8s.io] Update Demo should scale a replication controller  [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[sig-instrumentation] MetricsGrabber should grab all metrics from a Kubelet. [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] DNS should support configurable pod resolv.conf [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Pods should function for intra-pod communication: http [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[sig-network] Services should be able to update NodePorts with two same port numbers but different protocols [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Services should check NodePort out-of-range [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Services should use same NodePort with same port but different protocols [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-scheduling] ResourceQuota [Feature:PodPriority] should verify ResourceQuota's priority class scope (cpu, memory quota set) against a pod with same priority class. [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-scheduling] ResourceQuota [Feature:ScopeSelectors] should verify ResourceQuota with terminating scopes through scope selectors. [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-scheduling] ResourceQuota should create a ResourceQuota and capture the life of a persistent volume claim with a storage class. [sig-storage] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-scheduling] ResourceQuota should create a ResourceQuota and capture the life of a replication controller. [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-scheduling] ResourceQuota should verify ResourceQuota with best effort scope. [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-scheduling] ResourceQuota should verify ResourceQuota with terminating scopes. [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] ConfigMap binary data should be reflected in volume [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[sig-storage] ConfigMap should be consumable from pods in volume [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[sig-storage] ConfigMap should be consumable from pods in volume with mappings and Item mode set [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[sig-storage] ConfigMap should be consumable from pods in volume with mappings as non-root [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[sig-storage] Downward API volume should provide container's cpu request [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[sig-storage] Downward API volume should provide podname as non-root with fsgroup [NodeFeature:FSGroup] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] Downward API volume should provide podname as non-root with fsgroup and defaultMode [NodeFeature:FSGroup] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] EmptyDir volumes should support (non-root,0644,tmpfs) [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[sig-storage] EmptyDir volumes should support (root,0644,tmpfs) [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[sig-storage] EmptyDir volumes volume on tmpfs should have the correct mode [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[sig-storage] EmptyDir volumes when FSGroup is specified [NodeFeature:FSGroup] volume on tmpfs should have the correct mode using FSGroup [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] Ephemeralstorage When pod refers to non-existent ephemeral storage should allow deletion of pod with invalid volume : configmap [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] Ephemeralstorage When pod refers to non-existent ephemeral storage should allow deletion of pod with invalid volume : secret [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Inline-volume (default fs)] subPath should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Inline-volume (default fs)] subPath should be able to unmount after the subpath directory is deleted [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Inline-volume (default fs)] subPath should support existing single file [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Inline-volume (default fs)] subPath should support file as subpath [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Inline-volume (default fs)] subPath should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] Secrets should be consumable from pods in volume with mappings [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[sig-storage] Subpath Atomic writer volumes should support subpaths with downward pod [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            EOTESTS
-            TEST_SUITE="--file=tests" run-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-libvirt-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-libvirt
-          name: job-definition
-          subPath: cluster-launch-installer-libvirt-e2e.yaml
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
-      - configMap:
-          name: prow-job-cluster-launch-installer-libvirt-e2e
-        name: job-definition
-      - name: pull-secret
-        secret:
-          secretName: regcred
-    trigger: (?m)^/test( | .* )e2e-libvirt,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - master
-    cluster: build01
-    context: ci/prow/e2e-metal
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-master-e2e-metal
-    optional: true
-    rerun_command: /test e2e-metal
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --repo=installer
-        - --secret-dir=/usr/local/e2e-metal-cluster-profile
-        - --target=e2e-metal
-        - --template=/usr/local/e2e-metal
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: metal
-        - name: JOB_NAME_SAFE
-          value: e2e-metal
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance/parallel run-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-metal-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-metal
-          name: job-definition
-          subPath: cluster-launch-installer-metal-e2e.yaml
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-metal
-      - configMap:
-          name: prow-job-cluster-launch-installer-metal-e2e
-        name: job-definition
-      - name: pull-secret
-        secret:
-          secretName: regcred
-    trigger: (?m)^/test( | .* )e2e-metal,?($|\s.*)
-  - agent: kubernetes
     always_run: true
     branches:
     - master
@@ -1590,7 +1075,6 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-master-e2e-metal-ipi
-    optional: true
     rerun_command: /test e2e-metal-ipi
     spec:
       containers:
@@ -1644,345 +1128,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-metal-ipi,?($|\s.*)
   - agent: kubernetes
-    always_run: false
-    branches:
-    - master
-    cluster: build01
-    context: ci/prow/e2e-openstack
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-master-e2e-openstack
-    optional: true
-    rerun_command: /test e2e-openstack
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --lease-server-password-file=/etc/boskos/password
-        - --lease-server-username=ci
-        - --lease-server=https://boskos-ci.svc.ci.openshift.org
-        - --repo=installer
-        - --secret-dir=/usr/local/e2e-openstack-cluster-profile
-        - --target=e2e-openstack
-        - --template=/usr/local/e2e-openstack
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: openstack
-        - name: JOB_NAME_SAFE
-          value: e2e-openstack
-        - name: KURYR_ENABLED
-          value: "false"
-        - name: TEST_COMMAND
-          value: run-minimal-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-openstack-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-openstack
-          name: job-definition
-          subPath: cluster-launch-installer-openstack-e2e.yaml
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
-      - name: boskos
-        secret:
-          items:
-          - key: password
-            path: password
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-openstack
-      - configMap:
-          name: prow-job-cluster-launch-installer-openstack-e2e
-        name: job-definition
-      - name: pull-secret
-        secret:
-          secretName: regcred
-    trigger: (?m)^/test( | .* )e2e-openstack,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - master
-    cluster: build01
-    context: ci/prow/e2e-openstack-parallel
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-master-e2e-openstack-parallel
-    optional: true
-    rerun_command: /test e2e-openstack-parallel
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --lease-server-password-file=/etc/boskos/password
-        - --lease-server-username=ci
-        - --lease-server=https://boskos-ci.svc.ci.openshift.org
-        - --repo=installer
-        - --secret-dir=/usr/local/e2e-openstack-parallel-cluster-profile
-        - --target=e2e-openstack-parallel
-        - --template=/usr/local/e2e-openstack-parallel
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: openstack
-        - name: JOB_NAME_SAFE
-          value: e2e-openstack-parallel
-        - name: KURYR_ENABLED
-          value: "false"
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance/parallel run-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-openstack-parallel-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-openstack-parallel
-          name: job-definition
-          subPath: cluster-launch-installer-openstack-e2e.yaml
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
-      - name: boskos
-        secret:
-          items:
-          - key: password
-            path: password
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-openstack
-      - configMap:
-          name: prow-job-cluster-launch-installer-openstack-e2e
-        name: job-definition
-      - name: pull-secret
-        secret:
-          secretName: regcred
-    trigger: (?m)^/test( | .* )e2e-openstack-parallel,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - master
-    cluster: build01
-    context: ci/prow/e2e-openstack-upi
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-master-e2e-openstack-upi
-    optional: true
-    rerun_command: /test e2e-openstack-upi
-    run_if_changed: ^upi/openstack/.*
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --lease-server-password-file=/etc/boskos/password
-        - --lease-server-username=ci
-        - --lease-server=https://boskos-ci.svc.ci.openshift.org
-        - --secret-dir=/usr/local/e2e-openstack-upi-cluster-profile
-        - --target=e2e-openstack-upi
-        - --template=/usr/local/e2e-openstack-upi
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: openstack
-        - name: JOB_NAME_SAFE
-          value: e2e-openstack-upi
-        - name: KURYR_ENABLED
-          value: "false"
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance/parallel run-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-openstack-upi-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-openstack-upi
-          name: job-definition
-          subPath: cluster-launch-installer-openstack-upi-e2e.yaml
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
-      - name: boskos
-        secret:
-          items:
-          - key: password
-            path: password
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-openstack
-      - configMap:
-          name: prow-job-cluster-launch-installer-openstack-upi-e2e
-        name: job-definition
-      - name: pull-secret
-        secret:
-          secretName: regcred
-    trigger: (?m)^/test( | .* )e2e-openstack-upi,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - master
-    cluster: api.ci
-    context: ci/prow/e2e-ovirt
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-master-e2e-ovirt
-    optional: true
-    rerun_command: /test e2e-ovirt
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --repo=installer
-        - --secret-dir=/usr/local/e2e-ovirt-cluster-profile
-        - --target=e2e-ovirt
-        - --template=/usr/local/e2e-ovirt
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: ovirt
-        - name: JOB_NAME_SAFE
-          value: e2e-ovirt
-        - name: LEASE_TYPE
-          value: minimal
-        - name: TEST_COMMAND
-          value: run-minimal-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-ovirt-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-ovirt
-          name: job-definition
-          subPath: cluster-launch-installer-ovirt-e2e.yaml
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-ovirt
-          - secret:
-              name: ovirt-infra-secrets
-          - configMap:
-              name: cluster-profile-ovirt
-      - configMap:
-          name: prow-job-cluster-launch-installer-ovirt-e2e
-        name: job-definition
-      - name: pull-secret
-        secret:
-          secretName: regcred
-    trigger: (?m)^/test( | .* )e2e-ovirt,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build01
@@ -1994,7 +1140,6 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-master-e2e-vsphere
-    optional: true
     rerun_command: /test e2e-vsphere
     spec:
       containers:
@@ -2046,10 +1191,10 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-vsphere,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
-    cluster: build01
+    cluster: vsphere
     context: ci/prow/e2e-vsphere-upi
     decorate: true
     decoration_config:
@@ -2058,7 +1203,6 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-master-e2e-vsphere-upi
-    optional: true
     rerun_command: /test e2e-vsphere-upi
     spec:
       containers:
@@ -2110,7 +1254,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-vsphere-upi,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build01
@@ -2123,7 +1267,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-master-gofmt
     rerun_command: /test gofmt
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
     spec:
       containers:
       - args:
@@ -2156,7 +1299,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )gofmt,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build01
@@ -2169,7 +1312,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-master-golint
     rerun_command: /test golint
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
     spec:
       containers:
       - args:
@@ -2202,7 +1344,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )golint,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build01
@@ -2215,7 +1357,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-master-govet
     rerun_command: /test govet
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
     spec:
       containers:
       - args:
@@ -2248,7 +1389,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )govet,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build01
@@ -2261,7 +1402,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-master-images
     rerun_command: /test images
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
     spec:
       containers:
       - args:
@@ -2295,92 +1435,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: false
-    branches:
-    - master
-    cluster: build01
-    context: ci/prow/shellcheck
-    decorate: true
-    labels:
-      ci.openshift.io/manually-branched: "true"
-    name: pull-ci-openshift-installer-master-shellcheck
-    rerun_command: /test shellcheck
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
-    spec:
-      containers:
-      - args:
-        - ./hack/shellcheck.sh
-        command:
-        - sh
-        env:
-        - name: IS_CONTAINER
-          value: "TRUE"
-        image: quay.io/coreos/shellcheck-alpine:v0.5.0
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 500m
-    trigger: (?m)^/test shellcheck
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - master
-    cluster: build01
-    context: ci/prow/tf-fmt
-    decorate: true
-    labels:
-      ci.openshift.io/manually-branched: "true"
-    name: pull-ci-openshift-installer-master-tf-fmt
-    optional: true
-    rerun_command: /test tf-fmt
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
-    spec:
-      containers:
-      - args:
-        - ./hack/tf-fmt.sh
-        command:
-        - sh
-        env:
-        - name: IS_CONTAINER
-          value: "TRUE"
-        image: quay.io/coreos/terraform-alpine:v0.12.0-rc1
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 500m
-    trigger: (?m)^/test( | .* )tf-fmt,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - master
-    cluster: build01
-    context: ci/prow/tf-lint
-    decorate: true
-    labels:
-      ci.openshift.io/manually-branched: "true"
-    name: pull-ci-openshift-installer-master-tf-lint
-    rerun_command: /test tf-lint
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
-    spec:
-      containers:
-      - args:
-        - ./hack/tf-lint.sh
-        command:
-        - sh
-        env:
-        - name: IS_CONTAINER
-          value: "TRUE"
-        image: quay.io/coreos/tflint
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 500m
-    trigger: (?m)^/test tf-lint
-  - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build01
@@ -2393,7 +1448,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-master-unit
     rerun_command: /test unit
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
     spec:
       containers:
       - args:
@@ -2471,7 +1525,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )verify-codegen,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build01
@@ -2484,7 +1538,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-master-verify-vendor
     rerun_command: /test verify-vendor
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
     spec:
       containers:
       - args:
@@ -2516,31 +1569,3 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )verify-vendor,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - master
-    cluster: build01
-    context: ci/prow/yaml-lint
-    decorate: true
-    labels:
-      ci.openshift.io/manually-branched: "true"
-    name: pull-ci-openshift-installer-master-yaml-lint
-    rerun_command: /test yaml-lint
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
-    spec:
-      containers:
-      - args:
-        - ./hack/yaml-lint.sh
-        command:
-        - sh
-        env:
-        - name: IS_CONTAINER
-          value: "TRUE"
-        image: quay.io/coreos/yamllint
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 500m
-    trigger: (?m)^/test yaml-lint
