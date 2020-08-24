@@ -21,7 +21,9 @@ if ! config-shard-validator --release-repo-dir="${base_dir}" > "${workdir}/outpu
 	cat << EOF
 ERROR: This check enforces that configuration YAML files will be uploaded automatically
 ERROR: as they change. You are adding a file that is not covered by the automatic upload.
-ERROR: Contact an administrator to resolve this issue.
+ERROR: See the following page for more details:
+
+https://steps.ci.openshift.org/release#sharding
 
 ERROR: The following errors were found:
 
