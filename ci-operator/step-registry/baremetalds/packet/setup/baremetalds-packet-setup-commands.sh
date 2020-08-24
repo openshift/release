@@ -14,6 +14,8 @@ cd
 cat > packet-setup.yaml <<-EOF
 - name: setup Packet host
   hosts: localhost
+  collections:
+   - community.general
   gather_facts: no
   vars:
     - cluster_type: "{{ lookup('env', 'CLUSTER_TYPE') }}"
@@ -40,6 +42,7 @@ cat > packet-setup.yaml <<-EOF
         facility: any
         wait_for_public_IPv: 4
         state: active
+        tags: "{{ 'PR:', lookup('env', 'PULL_NUMBER'), 'Job name:', lookup('env', 'JOB_NAME'), 'Job id:', lookup('env', 'PROW_JOB_ID') }}"
       register: hosts
       no_log: true
     - name: wait for ssh
