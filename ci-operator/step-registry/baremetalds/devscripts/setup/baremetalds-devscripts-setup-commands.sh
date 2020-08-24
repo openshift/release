@@ -83,9 +83,6 @@ echo "export ADDN_DNS=\$(awk '/nameserver/ { print \$2;exit; }' /etc/resolv.conf
 echo "export OPENSHIFT_CI=true" >> /root/dev-scripts/config_root.sh
 echo "export WORKER_MEMORY=16384" >> /root/dev-scripts/config_root.sh
 
-# FIXME(stbenjam): Temporary to work around ovn bug
-echo "export IP_STACK=v4" >> /root/dev-scripts/config_root.sh
-
 # Inject PR additional configuration, if available
 if [[ -e /root/dev-scripts/dev-scripts-additional-config ]]
 then
