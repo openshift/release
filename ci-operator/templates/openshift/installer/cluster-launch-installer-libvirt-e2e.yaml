@@ -108,6 +108,8 @@ objects:
       - name: artifacts
         mountPath: /tmp/artifacts
       env:
+      - name: ARTIFACT_DIR
+        value: /tmp/artifacts
       - name: HOME
         value: /home/packer
       - name: NSS_WRAPPER_PASSWD
@@ -170,6 +172,8 @@ objects:
       - name: artifacts
         mountPath: /tmp/artifacts
       env:
+      - name: ARTIFACT_DIR
+        value: /tmp/artifacts
       - name: HOME
         value: /home/packer
       - name: NSS_WRAPPER_PASSWD
@@ -201,11 +205,11 @@ objects:
         #!/bin/bash
         set -euo pipefail
         export PATH=/home/packer:$PATH
-        mkdir -p /tmp/artifacts/junit
+        mkdir -p ${ARTIFACT_DIR}/junit
 
         function run-tests() {
           openshift-tests run "${TEST_SUITE}" \
-            -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
+            -o ${ARTIFACT_DIR}/e2e.log --junit-dir ${ARTIFACT_DIR}/junit
           return 0
         }
 
@@ -293,6 +297,8 @@ objects:
       - name: artifacts
         mountPath: /tmp/artifacts
       env:
+      - name: ARTIFACT_DIR
+        value: /tmp/artifacts
       - name: HOME
         value: /home/packer
       - name: NSS_WRAPPER_PASSWD
@@ -330,7 +336,7 @@ objects:
           LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
             --zone "${GOOGLE_COMPUTE_ZONE}" \
             packer@"${INSTANCE_PREFIX}" \
-            --command 'export KUBECONFIG=/home/$USER/clusters/installer/auth/kubeconfig && bash -ce "oc get co"' | tee /tmp/artifacts/output-co-libvirt
+            --command 'export KUBECONFIG=/home/$USER/clusters/installer/auth/kubeconfig && bash -ce "oc get co"' | tee ${ARTIFACT_DIR}/output-co-libvirt
           echo 'Run must gather on the cluster'
           LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
             --zone "${GOOGLE_COMPUTE_ZONE}" \
@@ -342,19 +348,19 @@ objects:
             --quiet \
             --project "${GOOGLE_PROJECT_ID}" \
             --zone "${GOOGLE_COMPUTE_ZONE}" \
-            --recurse packer@"${INSTANCE_PREFIX}":$HOME/clusters/installer /tmp/artifacts
+            --recurse packer@"${INSTANCE_PREFIX}":$HOME/clusters/installer ${ARTIFACT_DIR}
           echo "scp must-gather logs back to pod"
           LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
             --quiet \
             --project "${GOOGLE_PROJECT_ID}" \
             --zone "${GOOGLE_COMPUTE_ZONE}" \
-            --recurse packer@"${INSTANCE_PREFIX}":$HOME/must-gather.tar.gz /tmp/artifacts
+            --recurse packer@"${INSTANCE_PREFIX}":$HOME/must-gather.tar.gz ${ARTIFACT_DIR}
           echo "scp junit logs back to test pod"
           LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
             --quiet \
             --project "${GOOGLE_PROJECT_ID}" \
             --zone "${GOOGLE_COMPUTE_ZONE}" \
-            --recurse packer@"${INSTANCE_PREFIX}":/tmp/artifacts/junit /tmp/artifacts
+            --recurse packer@"${INSTANCE_PREFIX}":${ARTIFACT_DIR}/junit ${ARTIFACT_DIR}
 
           touch /home/packer/exit
           echo "Deprovisioning cluster ..."
