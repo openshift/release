@@ -141,6 +141,10 @@ if [ $ret -ne 0 ]; then
   exit "$ret"
 fi
 
+
+## What version is oc?
+oc version --client
+
 ## Approving the CSR requests for nodes
 approve_csrs &
 
