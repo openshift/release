@@ -135,6 +135,10 @@ def validate_names(path, data):
                     print("[INFO] {}: ci-operator job {} is ignored because it's generated and assumed to be right".format(path, job["name"]))
                     continue
 
+                #https://bugzilla.redhat.com/show_bug.cgi?id=1869832
+                if job["name"] in ["pull-ci-openshift-cluster-openshift-controller-manager-operator-release-4.3-e2e-aws-pthread-limit", "pull-ci-openshift-cluster-openshift-controller-manager-operator-release-4.3-e2e-aws-pthread-nolimit"]:
+                    continue
+
                 targets = []
                 for arg in job["spec"]["containers"][0].get("args", []) + job["spec"]["containers"][0]["command"]:
                     if arg.startswith("--target="):
