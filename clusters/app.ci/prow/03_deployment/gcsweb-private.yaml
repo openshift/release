@@ -1,0 +1,79 @@
+kind: List
+apiVersion: v1
+items:
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    labels:
+      app: gcsweb-private
+    name: gcsweb-private
+    namespace: ci
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        component: gcsweb-private
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: gcsweb-private
+      spec:
+        containers:
+        - name: oauth-proxy
+          image: openshift/oauth-proxy:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+          - containerPort: 8443
+            name: web
+          args:
+          - -provider=openshift
+          - -https-address=:8443
+          - -http-address=
+          - -email-domain=*
+          - -upstream=http://localhost:8080
+          - -client-id=system:serviceaccount:ci:deck
+          - -openshift-ca=/etc/pki/tls/cert.pem
+          - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          - '-openshift-sar={"verb": "get", "resource": "secrets", "namespace": "openshift-priv"}'
+          - '-openshift-delegate-urls={"/": {"verb": "get", "resource": "secrets", "namespace": "openshift-priv"}}'
+          - -client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
+        - image: gcr.io/k8s-prow/gcsweb:v20200825-967ee0e48b
+          name: gcsweb-private
+          args:
+          - "-b"
+          - "origin-ci-private"
+- kind: Service
+  apiVersion: v1
+  metadata:
+    name: gcsweb-private
+    namespace: ci
+    labels:
+      app: gcsweb-private
+    annotations:
+      service.openshift.io/infrastructure: 'true'
+  spec:
+    ports:
+    - name: web
+      protocol: TCP
+      port: 80
+      targetPort: 8080
+      nodePort: 0
+    selector:
+      component: gcsweb-private
+    type: ClusterIP
+    sessionAffinity: None
+- kind: Route
+  apiVersion: v1
+  metadata:
+    name: gcsweb-private
+    namespace: ci
+    labels:
+      app: gcsweb-private
+  spec:
+    to:
+      kind: Service
+      name: gcsweb-private
+    tls:
+      termination: edge
+      insecureEdgeTerminationPolicy: Redirect
