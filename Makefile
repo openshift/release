@@ -39,6 +39,7 @@ update:
 	$(MAKE) jobs
 	$(MAKE) ci-operator-config
 	$(MAKE) prow-config
+	$(MAKE) registry-metadata
 
 release-controllers:
 	./hack/generators/release-controllers/generate-release-controllers.py .
