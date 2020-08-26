@@ -1,13 +1,21 @@
-kind: List
-apiVersion: v1
-items:
+apiVersion: template.openshift.io/v1
+kind: Template
+parameters:
+- description: The session secret for the component.
+  name: SESSION_SECRET
+  generate: expression
+  from: "[a-zA-Z0-9]{43}"
+- description: namespace
+  name: namespace
+  value: ci
+objects:
 - apiVersion: apps/v1
   kind: Deployment
   metadata:
     labels:
       app: gcsweb-private
     name: gcsweb-private
-    namespace: ci
+    namespace: ${namespace}
   spec:
     replicas: 1
     selector:
@@ -19,6 +27,7 @@ items:
           app: prow
           component: gcsweb-private
       spec:
+        serviceAccountName: gcsweb-private
         containers:
         - name: oauth-proxy
           image: openshift/oauth-proxy:latest
@@ -32,48 +41,67 @@ items:
           - -http-address=
           - -email-domain=*
           - -upstream=http://localhost:8080
-          - -client-id=system:serviceaccount:ci:deck
+          - -client-id=system:serviceaccount:${namespace}:gcsweb-private
           - -openshift-ca=/etc/pki/tls/cert.pem
           - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
           - '-openshift-sar={"verb": "get", "resource": "secrets", "namespace": "openshift-priv"}'
           - '-openshift-delegate-urls={"/": {"verb": "get", "resource": "secrets", "namespace": "openshift-priv"}}'
           - -client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
+          - -cookie-secret-file=/etc/proxy/secrets/session_secret
+          - -tls-cert=/etc/tls/private/tls.crt
+          - -tls-key=/etc/tls/private/tls.key
+          volumeMounts:
+          - mountPath: /etc/tls/private
+            name: gcsweb-private-tls
+          - mountPath: /etc/proxy/secrets
+            name: session-secret
         - image: gcr.io/k8s-prow/gcsweb:v20200825-967ee0e48b
           name: gcsweb-private
           args:
           - "-b"
           - "origin-ci-private"
-- kind: Service
-  apiVersion: v1
+        volumes:
+        - name: gcsweb-private-tls
+          secret:
+            secretName: gcsweb-private-tls
+        - name: session-secret
+          secret:
+            secretName: gcsweb-private-session-secret
+- apiVersion: v1
+  kind: Service
   metadata:
-    name: gcsweb-private
-    namespace: ci
     labels:
-      app: gcsweb-private
+      app: prow
+      component: gcsweb-private
+    name: gcsweb-private
+    namespace: ${namespace}
     annotations:
-      service.openshift.io/infrastructure: 'true'
+      service.alpha.openshift.io/serving-cert-secret-name: gcsweb-private-tls
   spec:
+    selector:
+      app: prow
+      component: gcsweb-private
     ports:
     - name: web
       protocol: TCP
       port: 80
-      targetPort: 8080
-      nodePort: 0
-    selector:
-      component: gcsweb-private
-    type: ClusterIP
-    sessionAffinity: None
-- kind: Route
-  apiVersion: v1
+      targetPort: 8443
+- apiVersion: v1
+  kind: Secret
+  metadata:
+    name: gcsweb-private-session-secret
+    namespace: ${namespace}
+  stringData:
+    session_secret: "${SESSION_SECRET}="
+- apiVersion: v1
+  kind: Route
   metadata:
     name: gcsweb-private
-    namespace: ci
-    labels:
-      app: gcsweb-private
+    namespace: ${namespace}
   spec:
     to:
       kind: Service
       name: gcsweb-private
     tls:
-      termination: edge
       insecureEdgeTerminationPolicy: Redirect
+      termination: Reencrypt
