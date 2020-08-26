@@ -33,7 +33,8 @@ cat > /tmp/rhcos.json << EOF
    "PowerOn": false,
    "InjectOvfEnv": false,
    "WaitForIP": false,
-   "Name": "${vm_template}"
+   "Name": "${vm_template}",
+   "NetworkMapping":[{"Name":"VM Network","Network":"ci-segment"}]
 }
 EOF
 
