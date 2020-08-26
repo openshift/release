@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-tfvars_path=/var/run/secrets/ci.openshift.io/cluster-profile/secret.auto.tfvars
+tfvars_path=/var/run/secrets/ci.openshift.io/cluster-profile/vmc.secret.auto.tfvars
 cluster_name=${NAMESPACE}-${JOB_NAME_HASH}
 ipam_token=$(grep -oP 'ipam_token\s*=\s*"\K[^"]+' ${tfvars_path})
 
@@ -19,7 +19,7 @@ do
   args=$(jq -n \
             --arg hostn "$cluster_name-$i" \
             --arg token "$ipam_token" \
-            '{network: "139.178.94.128", hostname: $hostn, ipam: "139.178.89.254", ipam_token: $token}')
+            '{network: "172.31.252.0", hostname: $hostn, ipam: "139.178.89.254", ipam_token: $token}')
 
   vip_json=$(echo "$args" | bash <(curl -s https://raw.githubusercontent.com/openshift/installer/master/upi/vsphere/ipam/cidr_to_ip.sh))
   vips[$i]=$(echo "$vip_json" | jq -r .ip_address )
