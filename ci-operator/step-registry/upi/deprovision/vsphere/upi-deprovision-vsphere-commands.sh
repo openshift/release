@@ -15,7 +15,7 @@ export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
 export AWS_DEFAULT_REGION=us-east-1
 
 installer_dir=/tmp/installer
-tfvars_path=/var/run/secrets/ci.openshift.io/cluster-profile/secret.auto.tfvars
+tfvars_path=/var/run/secrets/ci.openshift.io/cluster-profile/vmc.secret.auto.tfvars
 echo "$(date -u --rfc-3339=seconds) - Copying config from shared dir..."
 
 mkdir -p "${installer_dir}/auth"
