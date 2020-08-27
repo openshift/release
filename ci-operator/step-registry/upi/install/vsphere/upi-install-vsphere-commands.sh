@@ -105,6 +105,16 @@ function update_image_registry() {
   oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'
 }
 
+
+
+# TESTING
+
+oc expose pod e2e-vsphere-upi-upi-install-vsphere --target-port 8080 --port 8080
+
+# No sense in creating the cluster, we need to test this above first
+exit 1
+
+
 echo "$(date -u --rfc-3339=seconds) - terraform init..."
 terraform init -input=false -no-color &
 wait "$!"
