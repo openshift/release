@@ -3,33 +3,27 @@ base_images:
     name: 4.6-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_golang-1.14:
-    name: builder
-    namespace: ocp
-    tag: golang-1.14
   ocp_builder_rhel-8-golang-openshift-4.6:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-openshift-4.6
-  openshift_release_golang-1.14:
-    name: release
-    namespace: openshift
-    tag: golang-1.14
+binary_build_commands: make build
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.14
-canonical_go_repository: github.com/openshift/cluster-kube-descheduler-operator
+    tag: golang-1.13
+canonical_go_repository: github.com/openshift/csi-driver-projected-resource
 images:
-- dockerfile_path: Dockerfile.rhel7
+- dockerfile_path: Dockerfile
   from: base
   inputs:
     ocp_builder_rhel-8-golang-openshift-4.6:
       as:
       - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-openshift-4.6
-  to: cluster-kube-descheduler-operator
+  to: csi-driver-projected-resource
 promotion:
+  disabled: true
   name: 4.6-priv
   namespace: ocp-private
 resources:
@@ -41,19 +35,21 @@ tag_specification:
   name: 4.6-priv
   namespace: ocp-private
 tests:
-- as: verify
-  commands: make verify-gofmt
+- artifact_dir: /tmp/artifacts
+  as: verify
+  commands: |
+    mkdir -p /tmp/artifacts
+    make verify -k --warn-undefined-variables
+  container:
+    from: bin
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: |
+    mkdir -p /tmp/artifacts
+    make test JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
   container:
     from: src
-- as: unit
-  commands: make test-unit
-  container:
-    from: src
-- as: e2e-aws-operator
-  commands: make test-e2e
-  openshift_installer_src:
-    cluster_profile: aws
 zz_generated_metadata:
-  branch: master
+  branch: release-4.6
   org: openshift-priv
-  repo: cluster-kube-descheduler-operator
+  repo: csi-driver-projected-resource
