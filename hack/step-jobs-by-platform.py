@@ -27,7 +27,7 @@ def load_config(directory):
             if _org_repo not in _repo_config:
                 _repo_config[_org_repo] = {}
             for _test in _config.get('tests', []):
-                if 'cluster_profile' not in _test.get('steps', {}):
+                if 'cluster_profile' not in _test.get('steps', {}) or 'workflow' not in _test['steps']:
                     continue
                 _job_name = 'pull-ci-{org}-{repo}-{branch}-{test_as}'.format(test_as=_test['as'], **_config['zz_generated_metadata'])
                 _test['steps']['platform'] = cluster_profile_platform(cluster_profile=_test['steps']['cluster_profile'])
@@ -40,6 +40,10 @@ def platform_stripped_workflows(repo_config):
     _stripped = {}
     for _jobs in repo_config.values():
         for _job, _steps in _jobs.items():
+            if 'workflow' not in _steps:
+                raise KeyError('no workflow in {}: {}'.format(_job, _steps))
+            if 'platform' not in _steps:
+                raise KeyError('no workflow in {}: {}'.format(_job, _steps))
             _stripped_workflow = platform_stripped_workflow(workflow=_steps['workflow'], platform=_steps['platform'])
             if not _stripped_workflow:
                 if _steps['workflow'] not in _unstrippable:
