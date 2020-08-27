@@ -42,6 +42,15 @@ cp -rt "${installer_dir}" \
 cp -t "${installer_dir}" \
     ${tfvars_path}
 
+# TESTING
+
+oc expose pod e2e-vsphere-upi-upi-install-vsphere \
+    --target-port 8080 \
+    --port 8080
+
+# No sense in creating the cluster, we need to test this above first
+exit 1
+
 export KUBECONFIG="${installer_dir}/auth/kubeconfig"
 
 function gather_bootstrap_and_fail() {
@@ -107,12 +116,6 @@ function update_image_registry() {
 
 
 
-# TESTING
-
-oc expose pod e2e-vsphere-upi-upi-install-vsphere --target-port 8080 --port 8080
-
-# No sense in creating the cluster, we need to test this above first
-exit 1
 
 
 echo "$(date -u --rfc-3339=seconds) - terraform init..."
