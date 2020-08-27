@@ -90,6 +90,8 @@ cat > prep.yaml <<-'EOF'
         url: https://mirror.openshift.com/enterprise/other/openshift-ansible/rteague/x86_64/kernel-3.10.0-1148.el7.x86_64.rpm
         dest: /tmp/kernel-3.10.0-1148.el7.x86_64.rpm
         client_cert: /var/lib/yum/ops-mirror.pem
+      register: result
+      until: result is succeeded
 
     - name: Install pre-release kernel
       yum:
