@@ -668,8 +668,8 @@ objects:
 
           #We set OVIRT_CONFIG and insert he path to the engine ca to the config file
           export OVIRT_CONFIG=${ARTIFACT_DIR}/installer/ovirt-config.yaml
-          curl -k -o "${ARTIFACT_DIR}/installer/ovirt-engine.ca" ${OVIRT_ENGINE_URL::-4}/services/pki-resource?resource=ca-certificate
-          sed 's|ovirt_cafile: ""|ovirt_cafile: ${ARTIFACT_DIR}/installer/ovirt-engine.ca|' -i ${ARTIFACT_DIR}/installer/ovirt-config.yaml
+          curl -k --retry 30 --retry-delay 30 -o "${ARTIFACT_DIR}/installer/ovirt-engine.ca" ${OVIRT_ENGINE_URL::-4}/services/pki-resource?resource=ca-certificate
+          sed "s|ovirt_cafile: \"\"|ovirt_cafile: ${ARTIFACT_DIR}/installer/ovirt-engine.ca|" -i ${ARTIFACT_DIR}/installer/ovirt-config.yaml
           echo "Destroy bootstrap ..."
           openshift-install --dir ${ARTIFACT_DIR}/installer destroy bootstrap
           echo "Destroy cluster ..."
