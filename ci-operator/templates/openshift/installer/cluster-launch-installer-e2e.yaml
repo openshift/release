@@ -112,6 +112,50 @@ objects:
         secretName: ${JOB_NAME_SAFE}-cluster-profile
 
     containers:
+    - name: resourcewatch
+      image: ${IMAGE_TESTS}
+      terminationMessagePolicy: FallbackToLogsOnError
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      - name: artifacts
+        mountPath: /tmp/artifacts
+      env:
+      - name: ARTIFACT_DIR
+        value: /tmp/artifacts
+      - name: HOME
+        value: /tmp/home
+      - name: KUBECONFIG
+        value: /tmp/artifacts/installer/auth/kubeconfig
+      command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -uo pipefail
+
+        function wait_for_cluster() {
+          while true; do
+            [[ ! -f "${KUBECONFIG}" ]] && echo "Waiting for ${KUBECONFIG} file ..." && sleep 1s && continue
+            oc --request-timeout=60s get clusteroperators || echo "Waiting for cluster to be available ..." && sleep 1s && continue
+            break
+          done
+        }
+
+        trap 'jobs -p | xargs -r kill || true; exit 0' TERM
+
+        # wait for kubeconfig to exists and cluster to be accessible
+        wait_for_cluster
+
+        export REPOSITORY_PATH=/tmp/artifacts/resourcewatch
+        mkdir -p ${REPOSITORY_PATH}
+
+        # run the resource watcher until /tmp/shared/exit is created
+        openshift-tests run-resourcewatch --kubeconfig=${KUBECONFIG} --terminate-on-files=/tmp/shared/exit
+
+        # archive the git repository in artifacts
+        tar cf /tmp/artifacts/resourcewatch-git.tar /tmp/artifacts/resourcewatch && rm -rf /tmp/artifacts/resourcewatch
+
     # Once the cluster is up, executes shared tests
     - name: test
       image: ${IMAGE_TESTS}
