@@ -47,7 +47,22 @@ aws)
     export KUBE_SSH_USER=core
     ;;
 azure4) export TEST_PROVIDER=azure;;
-vsphere) export TEST_PROVIDER=vsphere;;
+vsphere)
+    # Using Kubernetes version is the only reliable
+    # way to determine which version of OpenShift
+    # we are executing with.
+    version=$(oc version | grep -Po "Kubernetes Version:\sv\K(.+)")
+    export TEST_PROVIDER=vsphere
+
+    # NOTE: Disable OpenShift v4.3 vSphere tests. This
+    # was not enabled when using the older template.
+    # It would take significant work for this to function
+    # correctly.
+    if [[ $version == *"1.16"* ]]; then
+        unset TEST_PROVIDER
+    fi
+
+    ;;
 *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
 esac
 
@@ -83,7 +98,7 @@ if [[ -n "${TEST_SKIPS}" ]]; then
     TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
 fi
 
-openshift-tests "${TEST_COMMAND}" "${TEST_SUITE}" ${TEST_ARGS:-} \
-    --provider "${TEST_PROVIDER}" \
+openshift-tests "${TEST_COMMAND}" "${TEST_SUITE}" "${TEST_ARGS:-}" \
+    --provider "${TEST_PROVIDER:-}" \
     -o /tmp/artifacts/e2e.log \
     --junit-dir /tmp/artifacts/junit

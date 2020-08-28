@@ -13,9 +13,24 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 export HOME=/tmp
 export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
 export AWS_DEFAULT_REGION=us-east-1
+export AWS_MAX_ATTEMPTS=7
+export AWS_RETRY_MODE=adaptive
 
 installer_dir=/tmp/installer
 tfvars_path=/var/run/secrets/ci.openshift.io/cluster-profile/vmc.secret.auto.tfvars
+cluster_name=$(<"${SHARED_DIR}"/clustername.txt)
+
+if ! command -v aws &> /dev/null
+then
+    echo "$(date -u --rfc-3339=seconds) - Install AWS cli..."
+    export PATH="${HOME}/.local/bin:${PATH}"
+    easy_install --user pip  # our Python 2.7.5 is even too old for ensurepip
+    pip install --user awscli
+fi
+
+echo "$(date -u --rfc-3339=seconds) - Remove S3 bucket..."
+aws s3 rb "s3://${cluster_name}" --force
+
 echo "$(date -u --rfc-3339=seconds) - Copying config from shared dir..."
 
 mkdir -p "${installer_dir}/auth"
