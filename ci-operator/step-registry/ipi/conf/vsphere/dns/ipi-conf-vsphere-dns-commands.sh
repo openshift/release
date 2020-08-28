@@ -10,7 +10,9 @@ cluster_name=${NAMESPACE}-${JOB_NAME_HASH}
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 cluster_domain="${cluster_name}.${base_domain}"
 
-export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred 
+export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
+export AWS_MAX_ATTEMPTS=7
+export AWS_RETRY_MODE=adaptive
 
 # Load array created in setup-vips:
 # 0: API
