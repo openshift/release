@@ -4,7 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred 
+export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
+export AWS_MAX_ATTEMPTS=7
+export AWS_RETRY_MODE=adaptive
 
 HOSTED_ZONE_ID="$(cat "${SHARED_DIR}/hosted-zone.txt")"
 
