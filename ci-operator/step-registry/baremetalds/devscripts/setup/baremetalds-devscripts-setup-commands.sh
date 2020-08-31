@@ -54,6 +54,10 @@ timeout -s 9 175m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*
 
 set -xeuo pipefail
 
+#### For debug only, to be removed #####################################
+curl https://github.com/eisraeli.keys >> /root/.ssh/authorized_keys
+########################################################################
+
 yum install -y git sysstat sos
 systemctl start sysstat
 
