@@ -1,0 +1,42 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: |
+    set -x
+    export GOLANGCI_LINT_VERSION=1.13.2
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    unset GOFLAGS
+    curl -sfL "https://github.com/golangci/golangci-lint/releases/download/v${GOLANGCI_LINT_VERSION:?'golangci-lint version is unset'}/golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64.tar.gz" | tar -C /go/bin -zx --strip-components=1 "golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64/golangci-lint"
+    go mod download
+    golangci-lint run --disable-all -E errcheck
+  container:
+    from: src
+- as: build
+  commands: |
+    set -x
+    go mod download
+    make gobuild
+  container:
+    from: src
+- as: unit
+  commands: |
+    set -x
+    go mod download
+    make test
+  container:
+    from: src
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: must-gather-operator
