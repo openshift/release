@@ -12,7 +12,7 @@ periodics:
   labels:
     ci-operator.openshift.io/prowgen-controlled: "true"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-kubevirt-hyperconverged-cluster-operator-release-4.5-hco-e2e-nightly-bundle-release-4-5-azure4
+  name: periodic-ci-kubevirt-hyperconverged-cluster-operator-release-4.5-hco-e2e-nightly-bundle
   spec:
     containers:
     - args:
@@ -20,16 +20,18 @@ periodics:
       - --lease-server-password-file=/etc/boskos/password
       - --report-password-file=/etc/report/password.txt
       - --report-username=ci
-      - --secret-dir=/usr/local/hco-e2e-nightly-bundle-release-4-5-azure4-cluster-profile
-      - --target=hco-e2e-nightly-bundle-release-4-5-azure4
-      - --template=/usr/local/hco-e2e-nightly-bundle-release-4-5-azure4
+      - --secret-dir=/usr/local/hco-e2e-nightly-bundle-cluster-profile
+      - --target=hco-e2e-nightly-bundle
+      - --template=/usr/local/hco-e2e-nightly-bundle
       command:
       - ci-operator
       env:
+      - name: CLUSTER_ENABLE_NESTED_VIRT
+        value: "true"
       - name: CLUSTER_TYPE
-        value: azure4
+        value: gcp
       - name: JOB_NAME_SAFE
-        value: hco-e2e-nightly-bundle-release-4-5-azure4
+        value: hco-e2e-nightly-bundle
       - name: TEST_COMMAND
         value: |
           set -e
@@ -93,9 +95,9 @@ periodics:
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
-      - mountPath: /usr/local/hco-e2e-nightly-bundle-release-4-5-azure4-cluster-profile
+      - mountPath: /usr/local/hco-e2e-nightly-bundle-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/hco-e2e-nightly-bundle-release-4-5-azure4
+      - mountPath: /usr/local/hco-e2e-nightly-bundle
         name: job-definition
         subPath: cluster-launch-installer-custom-test-image.yaml
       - mountPath: /etc/pull-secret
@@ -116,7 +118,9 @@ periodics:
       projected:
         sources:
         - secret:
-            name: cluster-secrets-azure4
+            name: cluster-secrets-gcp
+        - configMap:
+            name: cluster-profile-gcp
     - configMap:
         name: prow-job-cluster-launch-installer-custom-test-image
       name: job-definition
