@@ -78,7 +78,7 @@ cat > /tmp/proxy.ign << EOF
   "systemd": {
     "units": [
       {
-        "contents": "[Service]\n\nExecStart=bash /etc/squid.sh\n\n[Install]\nWantedBy=multi-user.target\n",
+        "contents": "[Service]\nStandardOutput=kmsg+console\nStandardError=kmsg+console\nExecStart=bash /etc/squid.sh\n[Install]\nWantedBy=multi-user.target\n",
         "enabled": true,
         "name": "squid.service"
       },
@@ -308,6 +308,9 @@ EOF
 # define squid.sh
 SQUID_SH="$(base64 -w0 << EOF
 #!/bin/bash
+
+set -x
+
 podman run --entrypoint='["bash", "/squid/proxy.sh"]' --expose=3128 --net host --volume /etc/squid:/squid:Z ${PROXY_IMAGE}
 EOF
 )"
@@ -326,6 +329,7 @@ squid -N -f /squid/squid.conf
 EOF
 )"
 
+# no-op
 
 # create ignition entries for certs and script to start squid and systemd unit entry
 # create the proxy stack and then get its IP
@@ -385,3 +389,5 @@ proxy:
   httpsProxy: ${PROXY_URL}
   httpProxy: ${PROXY_URL}
 EOF
+
+echo "using ignition: $(cat /tmp/proxy.ign)"
