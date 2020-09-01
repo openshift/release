@@ -4,7 +4,58 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+mkdir -p "${ARTIFACT_DIR}/junit"
+mkfifo /tmp/junit-pipe
+python -c "
+import time
+
+start = time.time()
+tests = []
+test = {}
+done = False
+while not done:
+    with open('/tmp/junit-pipe', 'r') as f:
+        for line in f:
+            print('read {!r}'.format(line))
+            if line.strip() == 'done':
+                done = True
+                break
+            verb_obj = line.strip().split(' ', 1)
+            verb = verb_obj[0]
+            if len(verb_obj) > 1:
+                obj = verb_obj[1]
+            if verb == 'start':
+                test['start'] = time.time()
+                test['name'] = obj
+                continue
+            test['duration'] = time.time() - test['start']
+            if verb == 'fail':
+                test['failure'] = obj
+            tests.append(test)
+            test = {}
+if 'start' in test and 'duration' not in test:
+    test['duration'] = time.time() - test['start']
+    test'failure'] = 'unknown'
+    tests.append(test)
+end = time.time()
+
+with open('${ARTIFACT_DIR}/junit/junit_install.xml', 'w') as f:
+    f.write('<testsuite name=\"Cluster install\" tests=\"{}\" failures=\"{}\" skipped=\"0\" time=\"{}\">\n'.format(len(tests), len([t for t in tests if 'failure' in t]), int(end - start)))
+    for t in tests:
+        f.write('<testcase name=\"{name}\" time=\"{duration}\">\n'.format(**t))
+        if 'failure' in t:
+            f.write('<failure message="">{failure}</failure>\n'.format(**t))
+    f.write('</testsuite>\n')
+" &
+WRITE_JUNIT_PID="$!"
+
+function die() {
+	echo fail "${@}" >/tmp/junit-pipe
+	exit 1
+}
+
+trap 'echo done >/tmp/junit-pipe &; wait' EXIT
+trap 'echo done >/tmp/junit-pipe &; sleep 1; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 export HOME=/tmp
 
@@ -12,11 +63,14 @@ export SSH_PRIV_KEY_PATH="${CLUSTER_PROFILE_DIR}/ssh-privatekey"
 export OPENSHIFT_INSTALL_INVOKER="openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID}"
 
 echo "$(date -u --rfc-3339=seconds) - Configuring gcloud..."
+echo 'start configure-gcloud' >/tmp/junit-pipe
 export GOOGLE_CLOUD_KEYFILE_JSON="${CLUSTER_PROFILE_DIR}/gce.json"
-gcloud auth activate-service-account --key-file="${GOOGLE_CLOUD_KEYFILE_JSON}"
-gcloud config set project "$(jq -r .gcp.projectID "${SHARED_DIR}/metadata.json")"
+gcloud auth activate-service-account --key-file="${GOOGLE_CLOUD_KEYFILE_JSON}" || die 'activate-service-account'
+gcloud config set project "$(jq -r .gcp.projectID "${SHARED_DIR}/metadata.json")" || die 'set project'
+echo pass >/tmp/junit-pipe
 
 echo "$(date -u --rfc-3339=seconds) - Copying config from shared dir..."
+echo 'start assemble configuration' >/tmp/junit-pipe
 dir=/tmp/installer
 mkdir -p "${dir}/auth"
 pushd "${dir}"
@@ -87,9 +141,11 @@ else
   # Set HOST_PROJECT to the cluster project so commands with `--project` work in both scenarios.
   HOST_PROJECT="${PROJECT_NAME}"
 fi
+echo pass >/tmp/junit-pipe
 
 ## Create the VPC
 echo "$(date -u --rfc-3339=seconds) - Creating the VPC..."
+echo 'start create VPC' >/tmp/junit-pipe
 if [[ -v IS_XPN ]]; then
   echo "$(date -u --rfc-3339=seconds) - Using pre-existing XPN VPC..."
   CLUSTER_NETWORK="${HOST_PROJECT_NETWORK}"
@@ -109,16 +165,18 @@ resources:
     worker_subnet_cidr: '${WORKER_SUBNET_CIDR}'
 EOF
 
-  gcloud deployment-manager deployments create "${INFRA_ID}-vpc" --config 01_vpc.yaml
+  gcloud deployment-manager deployments create "${INFRA_ID}-vpc" --config 01_vpc.yaml || die 'create deployment'
 
   ## Configure VPC variables
   CLUSTER_NETWORK="$(gcloud compute networks describe "${INFRA_ID}-network" --format json | jq -r .selfLink)"
   CONTROL_SUBNET="$(gcloud compute networks subnets describe "${INFRA_ID}-master-subnet" "--region=${REGION}" --format json | jq -r .selfLink)"
   COMPUTE_SUBNET="$(gcloud compute networks subnets describe "${INFRA_ID}-worker-subnet" "--region=${REGION}" --format json | jq -r .selfLink)"
 fi
+echo pass >/tmp/junit-pipe
 
 ## Create DNS entries and load balancers
 echo "$(date -u --rfc-3339=seconds) - Creating load balancers and DNS zone..."
+echo 'start create load balancers and DNS zone' >/tmp/junit-pipe
 if [[ -v IS_XPN ]]; then
   echo "$(date -u --rfc-3339=seconds) - Using pre-existing XPN private zone..."
   PRIVATE_ZONE_NAME="${HOST_PROJECT_PRIVATE_ZONE_NAME}"
@@ -206,6 +264,7 @@ CLUSTER_PUBLIC_IP="$(gcloud compute addresses describe "${INFRA_ID}-cluster-publ
 
 ### Add internal DNS entries
 echo "$(date -u --rfc-3339=seconds) - Adding internal DNS entries..."
+
 if [ -f transaction.yaml ]; then rm transaction.yaml; fi
 gcloud --project="${HOST_PROJECT}" dns record-sets transaction start --zone "${PRIVATE_ZONE_NAME}"
 gcloud --project="${HOST_PROJECT}" dns record-sets transaction add "${CLUSTER_IP}" --name "api.${CLUSTER_NAME}.${BASE_DOMAIN}." --ttl 60 --type A --zone "${PRIVATE_ZONE_NAME}"
@@ -219,8 +278,11 @@ gcloud dns record-sets transaction start --zone "${BASE_DOMAIN_ZONE_NAME}"
 gcloud dns record-sets transaction add "${CLUSTER_PUBLIC_IP}" --name "api.${CLUSTER_NAME}.${BASE_DOMAIN}." --ttl 60 --type A --zone "${BASE_DOMAIN_ZONE_NAME}"
 gcloud dns record-sets transaction execute --zone "${BASE_DOMAIN_ZONE_NAME}"
 
+echo pass >/tmp/junit-pipe
+
 ## Create firewall rules and IAM roles
 echo "$(date -u --rfc-3339=seconds) - Creating service accounts and firewall rules..."
+echo 'start service accounts and firewall rules' >/tmp/junit-pipe
 if [[ -v IS_XPN ]]; then
   echo "$(date -u --rfc-3339=seconds) - Using pre-existing XPN firewall rules..."
   echo "$(date -u --rfc-3339=seconds) - using pre-existing XPN service accounts..."
@@ -284,22 +346,28 @@ fi
 
 ## Generate a service-account-key for signing the bootstrap.ign url
 gcloud iam service-accounts keys create service-account-key.json "--iam-account=${MASTER_SERVICE_ACCOUNT}"
+echo pass >/tmp/junit-pipe
 
 ## Create the cluster image.
 echo "$(date -u --rfc-3339=seconds) - Creating the cluster image..."
+echo 'start create cluster image' >/tmp/junit-pipe
 IMAGE_SOURCE="$(jq -r .gcp.url /var/lib/openshift-install/rhcos.json)"
 gcloud compute images create "${INFRA_ID}-rhcos-image" --source-uri="${IMAGE_SOURCE}"
 CLUSTER_IMAGE="$(gcloud compute images describe "${INFRA_ID}-rhcos-image" --format json | jq -r .selfLink)"
+echo pass >/tmp/junit-pipe
 
 ## Upload the bootstrap.ign to a new bucket
 echo "$(date -u --rfc-3339=seconds) - Uploading the bootstrap.ign to a new bucket..."
+echo 'start upload bootstrap Ignition config' >/tmp/junit-pipe
 gsutil mb "gs://${INFRA_ID}-bootstrap-ignition"
 gsutil cp bootstrap.ign "gs://${INFRA_ID}-bootstrap-ignition/"
 
 BOOTSTRAP_IGN="$(gsutil signurl -d 1h service-account-key.json "gs://${INFRA_ID}-bootstrap-ignition/bootstrap.ign" | grep "^gs:" | awk '{print $5}')"
+echo pass >/tmp/junit-pipe
 
 ## Launch temporary bootstrap resources
 echo "$(date -u --rfc-3339=seconds) - Launching temporary bootstrap resources..."
+echo 'start launch bootstrap resources' >/tmp/junit-pipe
 cat <<EOF > 04_bootstrap.yaml
 imports:
 - path: 04_bootstrap.py
@@ -334,9 +402,11 @@ fi
 
 BOOTSTRAP_IP="$(gcloud compute addresses describe --region "${REGION}" "${INFRA_ID}-bootstrap-public-ip" --format json | jq -r .address)"
 GATHER_BOOTSTRAP_ARGS=('--bootstrap' "${BOOTSTRAP_IP}")
+echo pass >/tmp/junit-pipe
 
 ## Launch permanent control plane
 echo "$(date -u --rfc-3339=seconds) - Launching permanent control plane..."
+echo 'start launch permanent control plane' >/tmp/junit-pipe
 cat <<EOF > 05_control_plane.yaml
 imports:
 - path: 05_control_plane.py
@@ -411,9 +481,11 @@ fi
 gcloud compute target-pools add-instances "${INFRA_ID}-api-target-pool" "--instances-zone=${ZONE_0}" "--instances=${INFRA_ID}-${MASTER}-0"
 gcloud compute target-pools add-instances "${INFRA_ID}-api-target-pool" "--instances-zone=${ZONE_1}" "--instances=${INFRA_ID}-${MASTER}-1"
 gcloud compute target-pools add-instances "${INFRA_ID}-api-target-pool" "--instances-zone=${ZONE_2}" "--instances=${INFRA_ID}-${MASTER}-2"
+echo pass >/tmp/junit-pipe
 
 ## Launch additional compute nodes
 echo "$(date -u --rfc-3339=seconds) - Launching additional compute nodes..."
+echo 'start launch compute nodes' >/tmp/junit-pipe
 mapfile -t ZONES < <(gcloud compute regions describe "${REGION}" --format=json | jq -r .zones[] | cut -d '/' -f9)
 cat <<EOF > 06_worker.yaml
 imports:
@@ -438,9 +510,11 @@ EOF
 done;
 
 gcloud deployment-manager deployments create "${INFRA_ID}-worker" --config 06_worker.yaml
+pass >/tmp/junit-pipe
 
 ## Monitor for `bootstrap-complete`
 echo "$(date -u --rfc-3339=seconds) - Monitoring for bootstrap to complete"
+echo 'start bootstrap complete'
 openshift-install --dir="${dir}" wait-for bootstrap-complete &
 
 set +e
@@ -449,6 +523,7 @@ ret="$?"
 set -e
 
 if [ "$ret" -ne 0 ]; then
+	echo 'fail bootstrap-complete' >/tmp/junit-pipe
   set +e
   # Attempt to gather bootstrap logs.
   echo "$(date -u --rfc-3339=seconds) - Bootstrap failed, attempting to gather bootstrap logs..."
@@ -458,9 +533,11 @@ if [ "$ret" -ne 0 ]; then
   set -e
   exit "$ret"
 fi
+echo pass >/tmp/junit-pipe
 
 ## Destroy bootstrap resources
 echo "$(date -u --rfc-3339=seconds) - Bootstrap complete, destroying bootstrap resources"
+echo 'start destroy bootstrap resources' >/tmp/junit-pipe
 if [ -f 02_lb_int.py ]; then # for workflow using internal load balancers
   # https://github.com/openshift/installer/pull/3270
   # https://github.com/openshift/installer/pull/3309
@@ -472,13 +549,15 @@ fi
 gsutil rm "gs://${INFRA_ID}-bootstrap-ignition/bootstrap.ign"
 gsutil rb "gs://${INFRA_ID}-bootstrap-ignition"
 gcloud deployment-manager deployments delete -q "${INFRA_ID}-bootstrap"
+echo pass >/tmp/junit-pipe
 
 ## Approving the CSR requests for nodes
 echo "$(date -u --rfc-3339=seconds) - Approving the CSR requests for nodes..."
 function approve_csrs() {
   while true; do
     oc get csr -ojson | jq -r '.items[] | select(.status == {} ) | .metadata.name' | xargs --no-run-if-empty oc adm certificate approve
-    sleep 15 & wait
+    sleep 15 &
+    wait "$!"
     continue
   done
 }
@@ -487,6 +566,7 @@ approve_csrs &
 ## Wait for the default-router to have an external ip...(and not <pending>)
 if [[ -v IS_XPN ]]; then
   echo "$(date -u --rfc-3339=seconds) - Waiting for the default-router to have an external ip..."
+  echo 'start wait for default router' >/tmp/junit-pipe
   set +e
   ROUTER_IP="$(oc -n openshift-ingress get service router-default --no-headers | awk '{print $4}')"
   while [[ "$ROUTER_IP" == "" || "$ROUTER_IP" == "<pending>" ]]; do
@@ -494,11 +574,13 @@ if [[ -v IS_XPN ]]; then
     ROUTER_IP="$(oc -n openshift-ingress get service router-default --no-headers | awk '{print $4}')"
   done
   set -e
+  echo pass >/tmp/junit-pipe
 fi
 
 ## Create default router dns entries
 if [[ -v IS_XPN ]]; then
   echo "$(date -u --rfc-3339=seconds) - Creating default router DNS entries..."
+  echo 'start create default router DNS entries' >/tmp/junit-pipe
   if [ -f transaction.yaml ]; then rm transaction.yaml; fi
   gcloud "--project=${HOST_PROJECT}" dns record-sets transaction start --zone "${PRIVATE_ZONE_NAME}"
   gcloud "--project=${HOST_PROJECT}" dns record-sets transaction add "${ROUTER_IP}" --name "*.apps.${CLUSTER_NAME}.${BASE_DOMAIN}." --ttl 300 --type A --zone "${PRIVATE_ZONE_NAME}"
@@ -508,10 +590,12 @@ if [[ -v IS_XPN ]]; then
   gcloud dns record-sets transaction start --zone "${BASE_DOMAIN_ZONE_NAME}"
   gcloud dns record-sets transaction add "${ROUTER_IP}" --name "*.apps.${CLUSTER_NAME}.${BASE_DOMAIN}." --ttl 300 --type A --zone "${BASE_DOMAIN_ZONE_NAME}"
   gcloud dns record-sets transaction execute --zone "${BASE_DOMAIN_ZONE_NAME}"
+  echo pass >/tmp/junit-pipe
 fi
 
 ## Monitor for cluster completion
 echo "$(date -u --rfc-3339=seconds) - Monitoring for cluster completion..."
+echo 'start wait for install-complete' >/tmp/junit-pipe
 openshift-install --dir="${dir}" wait-for install-complete 2>&1 | grep --line-buffered -v password &
 
 set +e
@@ -522,8 +606,10 @@ set -e
 sed 's/password: .*/password: REDACTED/' "${dir}/.openshift_install.log" >>"${ARTIFACT_DIR}/.openshift_install.log"
 
 if [ $ret -ne 0 ]; then
+  echo 'fail install-complete' >/tmp/junit-pipe
   exit "$ret"
 fi
+echo pass >/tmp/junit-pipe
 
 cp -t "${SHARED_DIR}" \
     "${dir}/auth/kubeconfig"
