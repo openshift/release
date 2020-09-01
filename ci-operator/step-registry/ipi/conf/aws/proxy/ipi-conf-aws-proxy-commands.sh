@@ -78,7 +78,7 @@ cat > /tmp/proxy.ign << EOF
   "systemd": {
     "units": [
       {
-        "contents": "[Service]\nStandardOutput=kmsg+console\nStandardError=kmsg+console\nExecStart=bash /etc/squid.sh\n[Install]\nWantedBy=multi-user.target\n",
+        "contents": "[Unit]\nWants=network-online.target\nAfter=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nStandardOutput=kmsg+console\nStandardError=kmsg+console\nExecStart=bash /etc/squid.sh\n\n[Install]\nWantedBy=multi-user.target\n",
         "enabled": true,
         "name": "squid.service"
       },
