@@ -1,8 +1,16 @@
 base_images:
+  dev-scripts:
+    name: test
+    namespace: openshift-kni
+    tag: dev-scripts
   openshift_release_golang-1.14:
     name: release
     namespace: openshift
     tag: golang-1.14
+  test-infra:
+    name: "4.6"
+    namespace: ocp
+    tag: assisted-test-infra
   ubi8:
     name: ubi
     namespace: ocp
@@ -20,7 +28,16 @@ images:
       as:
       - registry.svc.ci.openshift.org/openshift/release:golang-1.14
   to: assisted-service
+- dockerfile_path: Dockerfile.test-infra
+  from: test-infra
+  inputs:
+    assisted-service:
+      as:
+      - quay.io/ocpmetal/assisted-service:latest
+  to: assisted-test-infra
 promotion:
+  excluded_images:
+  - assisted-test-infra
   name: "4.6"
   namespace: ocp
 resources:
@@ -31,6 +48,17 @@ resources:
 tag_specification:
   name: "4.6"
   namespace: ocp
+tests:
+- as: e2e-metal-assisted
+  steps:
+    cluster_profile: packet
+    post:
+    - ref: baremetalds-packet-teardown
+    pre:
+    - ref: baremetalds-packet-setup
+    - ref: ipi-install-rbac
+    - ref: baremetalds-assisted-conf-service
+    - ref: baremetalds-assisted-setup
 zz_generated_metadata:
   branch: master
   org: openshift
