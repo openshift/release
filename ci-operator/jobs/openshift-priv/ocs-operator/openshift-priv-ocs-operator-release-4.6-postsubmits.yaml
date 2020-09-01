@@ -1,29 +1,27 @@
-presubmits:
-  openshift-priv/kubernetes:
+postsubmits:
+  openshift-priv/ocs-operator:
   - agent: kubernetes
-    always_run: true
     branches:
-    - oc-4.6-kubernetes-1.19-rc.1
-    cluster: api.ci
-    context: ci/prow/unit
+    - ^release-4\.6$
     decorate: true
     decoration_config:
       skip_cloning: true
     hidden: true
     labels:
+      ci-operator.openshift.io/is-promotion: "true"
       ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-kubernetes-oc-4.6-kubernetes-1.19-rc.1-unit
-    path_alias: github.com/openshift/kubernetes
-    rerun_command: /test unit
+    max_concurrency: 1
+    name: branch-ci-openshift-priv-ocs-operator-release-4.6-images
+    path_alias: github.com/openshift/ocs-operator
     spec:
       containers:
       - args:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --promote
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --target=unit
+        - --target=[images]
         command:
         - ci-operator
         image: ci-operator:latest
@@ -53,4 +51,3 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )unit,?($|\s.*)
