@@ -623,7 +623,14 @@ periodics:
                   if ! grep -q glusterfs-fuse /tmp/packages; then yumdownloader --setopt=releasever="\${VERSION_ID}" -y --archlist=x86_64 --disablerepo=* --enablerepo=fedora --enablerepo=updates --destdir=/tmp/rpms  glusterfs glusterfs-client-xlators glusterfs-fuse glusterfs-libs psmisc; fi && \\
                   if ! grep -q open-vm-tools /tmp/packages; then yumdownloader --setopt=releasever="\${VERSION_ID}" -y --archlist=x86_64 --disablerepo=* --enablerepo=fedora --enablerepo=updates --destdir=/tmp/rpms  open-vm-tools xmlsec1 xmlsec1-openssl libxslt libtool-ltdl; fi && \\
                   if ! grep -q policycoreutils /tmp/packages; then yumdownloader --setopt=releasever="\${VERSION_ID}" -y --archlist=noarch --disablerepo=* --enablerepo=fedora --enablerepo=updates --destdir=/tmp/rpms policycoreutils; fi && \\
-                  if ! grep -q NetworkManager-ovs /tmp/packages; then yumdownloader --setopt=releasever="\${VERSION_ID}" -y --archlist=x86_64 --disablerepo=* --enablerepo=fedora --enablerepo=updates --destdir=/tmp/rpms NetworkManager-ovs openvswitch dpdk gdbm-libs libxcrypt-compat unbound-libs python3-libs jq; fi && \\
+                  if ! grep -q NetworkManager-ovs /tmp/packages; then yumdownloader --setopt=releasever="\${VERSION_ID}" -y --archlist=x86_64 --disablerepo=* --enablerepo=fedora --enablerepo=updates --destdir=/tmp/rpms openvswitch dpdk gdbm-libs libxcrypt-compat unbound-libs python3-libs jq; fi && \\
+                  pushd /tmp/rpms && \\
+                  curl -O https://kojipkgs.fedoraproject.org//packages/NetworkManager/1.22.16/1.fc32/x86_64/NetworkManager-1.22.16-1.fc32.x86_64.rpm && \\
+                  curl -O https://kojipkgs.fedoraproject.org//packages/NetworkManager/1.22.16/1.fc32/x86_64/NetworkManager-libnm-1.22.16-1.fc32.x86_64.rpm && \\
+                  curl -O https://kojipkgs.fedoraproject.org//packages/NetworkManager/1.22.16/1.fc32/x86_64/NetworkManager-team-1.22.16-1.fc32.x86_64.rpm && \\
+                  curl -O https://kojipkgs.fedoraproject.org//packages/NetworkManager/1.22.16/1.fc32/x86_64/NetworkManager-tui-1.22.16-1.fc32.x86_64.rpm && \\
+                  curl -O https://kojipkgs.fedoraproject.org//packages/NetworkManager/1.22.16/1.fc32/x86_64/NetworkManager-ovs-1.22.16-1.fc32.x86_64.rpm && \\
+                  popd && \\
                   cd /tmp/working && \\
                   for i in \$(find /tmp/rpms/ -name *.rpm); do echo "Extracting \$i ..."; rpm2cpio \$i | cpio -div; done && \\
                   rm -rf etc/localtime && \\
