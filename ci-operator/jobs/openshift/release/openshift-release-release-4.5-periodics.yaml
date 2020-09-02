@@ -773,6 +773,8 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-remote-libvirt-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-remote-libvirt
@@ -822,7 +824,7 @@ periodics:
           - as: e2e-$(CLUSTER_TYPE)-all
             commands: $(TEST_COMMAND)
             openshift_installer:
-              cluster_profile: libvirt-s390x
+              cluster_profile: "$(CLUSTER_TYPE)"
       - name: JOB_NAME_SAFE
         value: e2e-remote-libvirt
       - name: MULTIARCH_RELEASE_IMAGE_LATEST
@@ -1083,6 +1085,9 @@ periodics:
       - mountPath: /etc/apici
         name: apici-ci-operator-credentials
         readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-remote-libvirt-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-remote-libvirt
@@ -1101,6 +1106,12 @@ periodics:
         - key: sa.ci-operator.apici.config
           path: kubeconfig
         secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -8096,6 +8107,8 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-remote-libvirt-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-remote-libvirt
@@ -8141,7 +8154,7 @@ periodics:
           - as: e2e-$(CLUSTER_TYPE)-all
             commands: $(TEST_COMMAND)
             openshift_installer:
-              cluster_profile: libvirt-ppc64le
+              cluster_profile: "$(CLUSTER_TYPE)"
       - name: JOB_NAME_SAFE
         value: e2e-remote-libvirt
       - name: MULTIARCH_RELEASE_IMAGE_LATEST
@@ -8355,6 +8368,9 @@ periodics:
       - mountPath: /etc/apici
         name: apici-ci-operator-credentials
         readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-remote-libvirt-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-remote-libvirt
@@ -8373,6 +8389,12 @@ periodics:
         - key: sa.ci-operator.apici.config
           path: kubeconfig
         secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
