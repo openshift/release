@@ -86,6 +86,9 @@ objects:
     - name: cluster-profile
       secret:
         secretName: ${JOB_NAME_SAFE}-cluster-profile
+    - name: boskos-credentials
+      secret:
+        secretName: boskos
 
     containers:
 
@@ -105,6 +108,8 @@ objects:
         mountPath: /etc/openshift-installer
       - name: artifacts
         mountPath: /tmp/artifacts
+      - name: boskos-credentials
+        mountPath: /etc/boskos
       env:
       - name: ARTIFACT_DIR
         value: /tmp/artifacts
@@ -112,6 +117,10 @@ objects:
         value: ${CLUSTER_TYPE}
       - name: CLUSTER_NAME
         value: ${NAMESPACE}-${JOB_NAME_HASH}
+      - name: LEASE_SERVER
+        value: https://boskos-ci.apps.ci.l2s4.p1.openshiftapps.com
+      - name: LEASE_SERVER_USERNAME
+        value: ci
       command:
       - /bin/bash
       - -c
@@ -121,11 +130,6 @@ objects:
 
         trap 'rc=$?; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi; if test "${rc}" -ne 0; then touch /tmp/shared/exit; fi; exit "${rc}"' EXIT
 
-        # hack for bazel
-        function boskosctl() {
-          /app/boskos/cmd/cli/app.binary "${@}"
-        }
-
         function extract_leases_info() {
           echo "$( jq ."${1}" --raw-output "${2}" )"
         }
@@ -133,12 +137,12 @@ objects:
         lease_type="${CLUSTER_TYPE}-quota-slice"
 
         echo "[INFO] Acquiring a lease ..."
-        resource="$( boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" acquire --type "${lease_type}" --state "free" --target-state "leased" --timeout 150m )"
+        resource="$( boskosctl --server-url ${LEASE_SERVER} --username ${LEASE_SERVER_USERNAME} --password-file /etc/boskos/password --owner-name "${CLUSTER_NAME}" acquire --type "${lease_type}" --state "free" --target-state "leased" --timeout 150m )"
         resource_name="$(echo "${resource}"|jq .name --raw-output)"
         lease_path="/etc/openshift-installer/${resource_name}.json"
         echo "[INFO] Lease acquired! at $(date --utc) Leased resource: ${resource}"
         echo "[INFO] Sending heartbeats to retain the lease ${resource_name}"
-        boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" heartbeat --resource "${resource}" &
+        boskosctl --server-url ${LEASE_SERVER} --username ${LEASE_SERVER_USERNAME} --password-file /etc/boskos/password --owner-name "${CLUSTER_NAME}" heartbeat --resource "${resource}" &
         heartbeats_pid=$!
 
         #For conformance runs we require double resources
@@ -146,7 +150,7 @@ objects:
           resource_conformance="$( boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" acquire --type "${lease_type}" --state "free" --target-state "leased" --timeout 150m )"
           resource_conformance_name="$(echo "${resource_conformance}"|jq .name --raw-output)"
           echo "[INFO] Lease acquired! at $(date --utc) Leased resource: ${resource_conformance}"
-          boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" heartbeat --resource "${resource_conformance}" &
+          boskosctl --server-url ${LEASE_SERVER} --username ${LEASE_SERVER_USERNAME} --password-file /etc/boskos/password --owner-name "${CLUSTER_NAME}" heartbeat --resource "${resource_conformance}" &
           heartbeats_conformance_pid=$!
         fi
 
@@ -186,12 +190,12 @@ objects:
             echo "killing heartbeat process "${heartbeats_pid}" at $(date --utc)"
             kill -9 "${heartbeats_pid}"
             echo "[INFO] Releasing the lease on resouce ${resource_name}"
-            boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" release --name "${resource_name}" --target-state "free"
+            boskosctl --server-url ${LEASE_SERVER} --username ${LEASE_SERVER_USERNAME} --password-file /etc/boskos/password --owner-name "${CLUSTER_NAME}" release --name "${resource_name}" --target-state "free"
             if [ "${LEASE_TYPE}" == "conformance" ]; then
               echo "killing heartbeat process "${heartbeats_conformance_pid}" at $(date --utc)"
               kill -9 "${heartbeats_conformance_pid}"
               echo "[INFO] Releasing the lease on resouce ${resource_conformance}"
-              boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" release --name "${resource_conformance_name}" --target-state "free"
+              boskosctl --server-url ${LEASE_SERVER} --username ${LEASE_SERVER_USERNAME} --password-file /etc/boskos/password --owner-name "${CLUSTER_NAME}" release --name "${resource_conformance_name}" --target-state "free"
             fi
         }
 
@@ -517,7 +521,7 @@ objects:
           update_image_registry &
         fi
 
-        # we need jq for later rhcos url extraction 
+        # we need jq for later rhcos url extraction
         mkdir /tmp/bin
         (curl -L -o /tmp/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 2>/dev/null && chmod +x /tmp/bin/jq)
         if ! command -V /tmp/bin/jq; then
