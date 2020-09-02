@@ -21,7 +21,7 @@ controlPlane:
   platform:
     vsphere:
       osDisk:
-        diskSizeGB: 60
+        diskSizeGB: 120
 compute:
 - name: "worker"
   replicas: 3
@@ -31,7 +31,7 @@ compute:
       coresPerSocket: 1
       memoryMB: 16384
       osDisk:
-        diskSizeGB: 60
+        diskSizeGB: 120
 platform:
   vsphere:
     vcenter: "vcenter.sddc-35-155-70-129.vmwarevmc.com"
