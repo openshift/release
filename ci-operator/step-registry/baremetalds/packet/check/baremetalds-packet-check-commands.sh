@@ -32,7 +32,7 @@ leak_num="$(echo "$leak_ids" | wc -w)"
 leak_report="${leak_report}\nProw job references per leaked server:" 
 for server in $leak_servers
 do
-  leak_report="${leak_report}\n<https://search.apps.build01.ci.devcluster.openshift.com/?search=$server&maxAge=48h&context=-1&type=build-log|$server>"
+  leak_report="${leak_report}\n<https://search.ci.openshift.org/?search=$server&maxAge=48h&context=-1&type=build-log|$server>"
 done
 set -x
 
