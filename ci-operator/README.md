@@ -393,7 +393,7 @@ or similar.
 To keep CI going during these events, we can reconfigure to push CI load away from impacted regions and zones.
 Focusing on [step-registry](step-registry) consumers, you could avoid us-east-1b by changing:
 
-* [`ipi-conf-aws-commands.sh`](step-registry/ipi/conf/aws/ipi-conf-aws-commands.sh) to set explicit `zone_1` and `zone_2` for a particular `aws_region`.
+* [`ipi-conf-aws-commands.sh`](step-registry/ipi/conf/aws/ipi-conf-aws-commands.sh) to set explicit `zone_1` and `zone_2` for a particular `aws_region` or to adjust weighting between available regions.
     You can also drop an entry entirely, although you will need to update `$((RANDOM % 4))` to match the number of defined entries.
     If your changes affect concurrent AWS capacity (e.g. because you removed a high-volume region), you may also need to adjust [the Boskos lease capacity][boskos-leases] to avoid overloading the remaining capacity.
 * [`ipi-conf-aws-sharednetwork-commands.sh`](step-registry/ipi/conf/aws/sharednetwork/ipi-conf-aws-sharednetwork-commands.sh) to drop affected regions.
