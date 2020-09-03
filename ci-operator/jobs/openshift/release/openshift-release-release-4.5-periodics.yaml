@@ -773,6 +773,8 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-remote-libvirt-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-remote-libvirt
@@ -782,10 +784,6 @@ periodics:
       env:
       - name: ARCH
         value: s390x
-      - name: BRANCH
-        value: "4.5"
-      - name: BASTION_SVC_IP
-        value: 172.30.20.161
       - name: BASTION_SVC_0_1_IP
         value: 172.30.60.61
       - name: BASTION_SVC_0_2_IP
@@ -804,6 +802,10 @@ periodics:
         value: 172.30.198.47
       - name: BASTION_SVC_1_4_IP
         value: 172.30.220.83
+      - name: BASTION_SVC_IP
+        value: 172.30.20.161
+      - name: BRANCH
+        value: "4.5"
       - name: CLUSTER_TYPE
         value: libvirt-s390x
       - name: CONFIG_SPEC
@@ -822,7 +824,7 @@ periodics:
           - as: e2e-$(CLUSTER_TYPE)-all
             commands: $(TEST_COMMAND)
             openshift_installer:
-              cluster_profile: libvirt-s390x
+              cluster_profile: "$(CLUSTER_TYPE)"
       - name: JOB_NAME_SAFE
         value: e2e-remote-libvirt
       - name: MULTIARCH_RELEASE_IMAGE_LATEST
@@ -1083,6 +1085,9 @@ periodics:
       - mountPath: /etc/apici
         name: apici-ci-operator-credentials
         readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-remote-libvirt-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-remote-libvirt
@@ -1101,6 +1106,12 @@ periodics:
         - key: sa.ci-operator.apici.config
           path: kubeconfig
         secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -8096,6 +8107,8 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-remote-libvirt-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-remote-libvirt
@@ -8105,10 +8118,6 @@ periodics:
       env:
       - name: ARCH
         value: ppc64le
-      - name: BRANCH
-        value: "4.5"
-      - name: BASTION_SVC_IP
-        value: 172.30.185.48
       - name: BASTION_SVC_0_1_IP
         value: 172.30.185.14
       - name: BASTION_SVC_0_2_IP
@@ -8123,6 +8132,10 @@ periodics:
         value: 172.30.114.129
       - name: BASTION_SVC_1_3_IP
         value: 172.30.131.153
+      - name: BASTION_SVC_IP
+        value: 172.30.185.48
+      - name: BRANCH
+        value: "4.5"
       - name: CLUSTER_TYPE
         value: libvirt-ppc64le
       - name: CONFIG_SPEC
@@ -8141,7 +8154,7 @@ periodics:
           - as: e2e-$(CLUSTER_TYPE)-all
             commands: $(TEST_COMMAND)
             openshift_installer:
-              cluster_profile: libvirt-ppc64le
+              cluster_profile: "$(CLUSTER_TYPE)"
       - name: JOB_NAME_SAFE
         value: e2e-remote-libvirt
       - name: MULTIARCH_RELEASE_IMAGE_LATEST
@@ -8355,6 +8368,9 @@ periodics:
       - mountPath: /etc/apici
         name: apici-ci-operator-credentials
         readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /usr/local/e2e-remote-libvirt-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/e2e-remote-libvirt
@@ -8373,6 +8389,12 @@ periodics:
         - key: sa.ci-operator.apici.config
           path: kubeconfig
         secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
     - name: cluster-profile
       projected:
         sources:
