@@ -149,5 +149,7 @@ if __name__ == '__main__':
         'openshift/cluster-api-provider-ovirt',
         'openshift/installer',
         'openshift/machine-config-operator',
+        'openshift/windows-machine-config-operator',
+        'openshift/windows-machine-config-bootstrapper',
     }
     print_counts(counts=_counts, job_steps=_job_steps, job_org_repos=_job_org_repos, stripped_workflows=_stripped_workflows, platform_specific_repositories=_platform_specific_repositories)
