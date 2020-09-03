@@ -74,24 +74,6 @@ cat > /tmp/proxy.ign << EOF
         "mode": 420
       }
     ]
-  },
-  "systemd": {
-    "units": [
-      {
-        "contents": "[Unit]\nWants=network-online.target\nAfter=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nStandardOutput=kmsg+console\nStandardError=kmsg+console\nExecStart=bash /etc/squid.sh\n\n[Install]\nWantedBy=multi-user.target\n",
-        "enabled": true,
-        "name": "squid.service"
-      },
-      {
-        "dropins": [
-          {
-            "contents": "[Service]\nExecStart=\nExecStart=/usr/lib/systemd/systemd-journal-gatewayd \\\n  --key=/opt/openshift/tls/journal-gatewayd.key \\\n  --cert=/opt/openshift/tls/journal-gatewayd.crt \\\n  --trust=/opt/openshift/tls/root-ca.crt\n",
-            "name": "certs.conf"
-          }
-        ],
-        "name": "systemd-journal-gatewayd.service"
-      }
-    ]
   }
 }
 EOF
