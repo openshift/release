@@ -65,6 +65,77 @@ read -d '#' INCL << EOF
 [sig-api-machinery] Garbage collector should keep the rc around until all its pods are deleted if the deleteOptions says so
 [sig-api-machinery] ResourceQuota should verify ResourceQuota with best effort scope.
 [sig-api-machinery] Garbage collector should not delete dependents that have both valid owner and owner that's waiting for dependents to be deleted
+[k8s.io] Container Runtime blackbox test on terminated container should report termination
+[sig-apps] CronJob [Top Level] [sig-apps] CronJob should delete failed finished jobs with limit of one job 
+[sig-apps] CronJob [Top Level] [sig-apps] CronJob should delete successful finished jobs with limit of one successful job 
+[sig-apps] CronJob [Top Level] [sig-apps] CronJob should not emit unexpected warnings 
+[sig-apps] CronJob [Top Level] [sig-apps] CronJob should remove from active list jobs that have been deleted 
+[sig-apps] CronJob [Top Level] [sig-apps] CronJob should replace jobs when ReplaceConcurrent 
+[sig-apps] CronJob [Top Level] [sig-apps] CronJob should schedule multiple jobs concurrently 
+[sig-apps] Deployment [Top Level] [sig-apps] Deployment RecreateDeployment should delete old pods and create new ones 
+[sig-apps] Deployment [Top Level] [sig-apps] Deployment RollingUpdateDeployment should delete old pods and create new ones 
+[sig-apps] Deployment [Top Level] [sig-apps] Deployment deployment reaping should cascade to its replica sets and pods 
+[sig-apps] Deployment [Top Level] [sig-apps] Deployment deployment should delete old replica sets 
+[sig-apps] Deployment [Top Level] [sig-apps] Deployment deployment should support proportional scaling 
+[sig-apps] Deployment [Top Level] [sig-apps] Deployment deployment should support rollover 
+[sig-apps] Deployment [Top Level] [sig-apps] Deployment iterative rollouts should eventually progress 
+[sig-apps] Deployment [Top Level] [sig-apps] Deployment should not disrupt a cloud load-balancer's connectivity during rollout 
+[sig-apps] Deployment [Top Level] [sig-apps] Deployment test Deployment ReplicaSet orphaning and adoption regarding controllerRef 
+[sig-apps] DisruptionController [Top Level] [sig-apps] DisruptionController evictions: enough pods, absolute => should allow an eviction 
+[sig-apps] DisruptionController [Top Level] [sig-apps] DisruptionController evictions: enough pods, replicaSet, percentage => should allow an eviction 
+[sig-apps] DisruptionController [Top Level] [sig-apps] DisruptionController evictions: maxUnavailable allow single eviction, percentage => should allow an eviction 
+[sig-apps] DisruptionController [Top Level] [sig-apps] DisruptionController evictions: maxUnavailable deny evictions, integer => should not allow an eviction 
+[sig-apps] DisruptionController [Top Level] [sig-apps] DisruptionController evictions: no PDB => should allow an eviction 
+[sig-apps] DisruptionController [Top Level] [sig-apps] DisruptionController evictions: too few pods, absolute => should not allow an eviction 
+[sig-apps] DisruptionController [Top Level] [sig-apps] DisruptionController evictions: too few pods, replicaSet, percentage => should not allow an eviction 
+[sig-apps] DisruptionController [Top Level] [sig-apps] DisruptionController should block an eviction until the PDB is updated to allow it 
+[sig-apps] DisruptionController [Top Level] [sig-apps] DisruptionController should create a PodDisruptionBudget 
+[sig-apps] DisruptionController [Top Level] [sig-apps] DisruptionController should update PodDisruptionBudget status 
+[sig-apps] Job [Top Level] [sig-apps] Job should adopt matching orphans and release non-matching pods 
+[sig-apps] Job [Top Level] [sig-apps] Job should delete a job 
+[sig-apps] Job [Top Level] [sig-apps] Job should fail to exceed backoffLimit 
+[sig-apps] Job [Top Level] [sig-apps] Job should fail when exceeds active deadline 
+[sig-apps] Job [Top Level] [sig-apps] Job should remove pods when job is deleted 
+[sig-apps] Job [Top Level] [sig-apps] Job should run a job to completion when tasks sometimes fail and are locally restarted 
+[sig-apps] Job [Top Level] [sig-apps] Job should run a job to completion when tasks succeed 
+[sig-apps] ReplicaSet [Top Level] [sig-apps] ReplicaSet should adopt matching pods on creation and release no longer matching pods 
+[sig-apps] ReplicaSet [Top Level] [sig-apps] ReplicaSet should serve a basic image on each replica with a private image 
+[sig-apps] ReplicaSet [Top Level] [sig-apps] ReplicaSet should serve a basic image on each replica with a public image  
+[sig-apps] ReplicaSet [Top Level] [sig-apps] ReplicaSet should surface a failure condition on a common issue like exceeded quota 
+[sig-apps] ReplicationController [Top Level] [sig-apps] ReplicationController should adopt matching pods on creation 
+[sig-apps] ReplicationController [Top Level] [sig-apps] ReplicationController should release no longer matching pods 
+[sig-apps] ReplicationController [Top Level] [sig-apps] ReplicationController should serve a basic image on each replica with a private image 
+[sig-apps] ReplicationController [Top Level] [sig-apps] ReplicationController should serve a basic image on each replica with a public image  
+[sig-apps] ReplicationController [Top Level] [sig-apps] ReplicationController should surface a failure condition on a common issue like exceeded quota 
+[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] [Top Level] [sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] Should recreate evicted statefulset 
+[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] [Top Level] [sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] should adopt matching orphans and release non-matching pods 
+[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] [Top Level] [sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] should have a working scale subresource 
+[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] [Top Level] [sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] should implement legacy replacement when the update strategy is OnDelete 
+[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] [Top Level] [sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] should not deadlock when a pod's predecessor fails 
+[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] [Top Level] [sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] should perform canary updates and phased rolling updates of template modifications 
+[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] [Top Level] [sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] should perform rolling updates and roll backs of template modifications 
+[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] [Top Level] [sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] should perform rolling updates and roll backs of template modifications with PVCs 
+[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] [Top Level] [sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] should provide basic identity 
+[sig-instrumentation] Events API should delete a collection of events
+[sig-instrumentation] Events API should ensure that an event can be fetched, patched, deleted, and listed
+[sig-instrumentation] MetricsGrabber should grab all metrics from API server. 
+[sig-instrumentation] MetricsGrabber should grab all metrics from a ControllerManager. 
+[sig-instrumentation] MetricsGrabber should grab all metrics from a Kubelet. 
+[sig-instrumentation] MetricsGrabber should grab all metrics from a Scheduler. 
+[sig-instrumentation] Prometheus when installed on the cluster should have a AlertmanagerReceiversNotConfigured alert in firing state 
+[sig-instrumentation] Prometheus when installed on the cluster should have important platform topology metrics 
+[sig-instrumentation] Prometheus when installed on the cluster should have non-Pod host cAdvisor metrics 
+[sig-instrumentation] Prometheus when installed on the cluster should provide named network metrics 
+[sig-instrumentation] Prometheus when installed on the cluster should report telemetry if a cloud.openshift.com token is present 
+[sig-instrumentation] Prometheus when installed on the cluster shouldn't have failing rules evaluation 
+[sig-instrumentation] Prometheus when installed on the cluster when using openshift-sdn should be able to get the sdn ovs flows 
+[sig-instrumentation][Late] Alerts should have a Watchdog alert in firing state the entire cluster run 
+[sig-instrumentation][Late] Alerts shouldn't exceed the 500 series limit of total series sent via telemetry from each cluster 
+[sig-instrumentation][Late] Alerts shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured 
+[sig-arch][Early] Managed cluster should start all core operators
+[sig-cluster-lifecycle][Feature:Machines][Early] Managed cluster should have same number of Machines and Nodes
+[sig-node]
+[Late]
 #
 EOF
 
