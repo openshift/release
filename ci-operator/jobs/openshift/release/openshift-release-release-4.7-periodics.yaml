@@ -604,33 +604,64 @@ periodics:
               USER 0
               COPY --from=artifacts /srv/repo/*.rpm /tmp/rpms/
               COPY --from=machine_config_operator_rpms /srv/repo/*.rpm /tmp/rpms/
-              RUN set -xeuo pipefail && \\
-                  mkdir -p /srv/repo /tmp/working && \\
-                  curl -L "${tar_url}" | tar xf - -C /srv/repo/ && \\
+              RUN set -exuo pipefail && \\
+                  EXTENSION_RPMS=(           \\
+                    attr                     \\
+                    glusterfs                \\
+                    glusterfs-client-xlators \\
+                    glusterfs-fuse           \\
+                    glusterfs-libs           \\
+                    psmisc                   \\
+                    NetworkManager-ovs       \\
+                    openvswitch              \\
+                    dpdk                     \\
+                    gdbm-libs                \\
+                    libxcrypt-compat         \\
+                    unbound-libs             \\
+                    python3-libs             \\
+                    libdrm                   \\
+                    libmspack                \\
+                    libpciaccess             \\
+                    pciutils                 \\
+                    pciutils-libs            \\
+                    python3-libs             \\
+                    open-vm-tools            \\
+                    xmlsec1                  \\
+                    xmlsec1-openssl          \\
+                    libxslt                  \\
+                    libtool-ltdl             \\
+                  )                       && \\
+                  CRIO_RPMS=(                \\
+                    cri-o                    \\
+                    cri-tools                \\
+                  )                       && \\
+                  CRIO_VERSION="1.18"     && \\
+                  mkdir /srv/repo && \\
+                  curl -L "${tar_url}" | tar xf - -C /srv/repo/ --no-same-owner && \\
                   rm -rf /etc/yum.repos.d && \\
                   ostree --repo=/srv/repo checkout "${ostree_ref}" --subpath /usr/etc/yum.repos.d --user-mode /etc/yum.repos.d && \\
                   ostree --repo=/srv/repo cat "${ostree_ref}" /usr/lib/os-release > /tmp/os-release && \\
                   source /tmp/os-release && \\
-                  sed -i 's/enabled=0/enabled=1/g' /etc/yum.repos.d/fedora-updates-testing-modular.repo && \\
-                  rpm-ostree db list --repo /srv/repo "${ostree_ref}" > /tmp/packages && \\
                   dnf clean all && \\
-                  dnf --setopt=releasever="\${VERSION_ID}" module enable -y cri-o:1.18 && \\
-                  if ! grep -q cri-o /tmp/packages; then yumdownloader -y --setopt=releasever="\${VERSION_ID}" --archlist=x86_64 --disablerepo=* --enablerepo=updates-testing-modular --destdir=/tmp/rpms cri-o cri-tools; fi && \\
-                  if ! grep -q glusterfs-fuse /tmp/packages; then yumdownloader --setopt=releasever="\${VERSION_ID}" -y --archlist=x86_64 --disablerepo=* --enablerepo=fedora --enablerepo=updates --destdir=/tmp/rpms  glusterfs glusterfs-client-xlators glusterfs-fuse glusterfs-libs psmisc; fi && \\
-                  if ! grep -q open-vm-tools /tmp/packages; then yumdownloader --setopt=releasever="\${VERSION_ID}" -y --archlist=x86_64 --disablerepo=* --enablerepo=fedora --enablerepo=updates --destdir=/tmp/rpms  open-vm-tools xmlsec1 xmlsec1-openssl libxslt libtool-ltdl; fi && \\
-                  if ! grep -q policycoreutils /tmp/packages; then yumdownloader --setopt=releasever="\${VERSION_ID}" -y --archlist=noarch --disablerepo=* --enablerepo=fedora --enablerepo=updates --destdir=/tmp/rpms policycoreutils; fi && \\
-                  if ! grep -q NetworkManager-ovs /tmp/packages; then yumdownloader --setopt=releasever="\${VERSION_ID}" -y --archlist=x86_64 --disablerepo=* --enablerepo=fedora --enablerepo=updates --destdir=/tmp/rpms NetworkManager-ovs openvswitch dpdk gdbm-libs libxcrypt-compat unbound-libs python3-libs jq; fi && \\
-                  cd /tmp/working && \\
-                  for i in \$(find /tmp/rpms/ -name *.rpm); do echo "Extracting \$i ..."; rpm2cpio \$i | cpio -div; done && \\
-                  rm -rf etc/localtime && \\
-                  ln -s ../usr/share/zoneinfo/UTC etc/localtime && \\
-                  mv etc usr/ && mv sbin/* usr/sbin/ && rm -rf sbin/ && \\
-                  mkdir -p usr/lib/systemd/system/multi-user.target.wants && \\
-                  ln -s usr/lib/systemd/system/vmtoolsd.service usr/lib/systemd/system/multi-user.target.wants/vmtoolsd.service && \\
+                  mkdir -p /extensions/okd && \\
+                  yumdownloader --archlist=x86_64 --disablerepo='*' --destdir=/extensions/okd --enablerepo=fedora --enablerepo=updates --enablerepo=updates-testing \${EXTENSION_RPMS[*]} && \\
+                  createrepo_c --no-database /extensions && \\
+                  mkdir /tmp/working && \\
+                  pushd /tmp/working && \\
+                    sed -i 's/enabled=0/enabled=1/g' /etc/yum.repos.d/fedora-updates-testing-modular.repo && \\
+                    dnf module enable -y cri-o:\${CRIO_VERSION} && \\
+                    yumdownloader --archlist=x86_64 --disablerepo='*' --destdir=/tmp/rpms --enablerepo=updates-testing-modular \${CRIO_RPMS[*]} && \\
+                    for i in \$(find /tmp/rpms/ -iname *.rpm); do echo "Extracting \$i ..."; rpm2cpio \$i | cpio -div; done && \\
+                    rm -rf etc/localtime && \\
+                    ln -s ../usr/share/zoneinfo/UTC etc/localtime && \\
+                    mv etc usr/ && \\
+                  popd && \\
+                  rm -rf /tmp/working/etc/yum.repos.d && \\
                   coreos-assembler dev-overlay --repo /srv/repo --rev "${ostree_ref}" --add-tree /tmp/working --output-ref "${ostree_ref}"
 
               FROM scratch
               COPY --from=build /srv/ /srv/
+              COPY --from=build /extensions/ /extensions/
               LABEL version=${build_id} \\
                     id-artifacts=${origin_artifacts_id} \\
                     id-machine-config-operator-rpms=${origin_machine_config_operator_rpms_id} \\
