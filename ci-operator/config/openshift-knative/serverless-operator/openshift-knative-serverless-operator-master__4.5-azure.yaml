@@ -25,6 +25,11 @@ images:
 - context_dir: knative-operator
   from: base
   to: knative-operator
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.5"
 resources:
   '*':
     limits:
@@ -32,9 +37,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: "4.5"
-  namespace: ocp
 tests:
 - as: e2e-azure-ocp-45-continuous
   cron: 0 0 * * 0
@@ -43,6 +45,11 @@ tests:
     test:
     - as: serverless-e2e
       commands: make install-mesh test-all-e2e
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
       from: serverless-operator-src
       resources:
         requests:
