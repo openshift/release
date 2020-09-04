@@ -145,6 +145,16 @@ sslclientcert = /var/lib/yum/ops-mirror.pem
 sslclientkey = /var/lib/yum/ops-mirror.pem
 sslverify = 0
 enabled = 1
+
+[rhel-7-fast-datapath-rpms]
+name = Red Hat Enterprise Linux 7 Server - Fast Datapath (RPMs)
+baseurl = https://mirror.openshift.com/enterprise/reposync/ci-deps/rhel-fast-datapath-rpms/
+failovermethod = priority
+gpgcheck = 0
+sslclientcert = /var/lib/yum/ops-mirror.pem
+sslclientkey = /var/lib/yum/ops-mirror.pem
+sslverify = 0
+enabled = 1
 EOF
 
 ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
