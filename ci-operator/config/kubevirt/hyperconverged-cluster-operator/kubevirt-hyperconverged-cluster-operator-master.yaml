@@ -75,8 +75,10 @@ tests:
     test:
     - as: e2e-test
       commands: |
-        echo "MARK"
-        ls -la
+        oc get deployments -n "${OO_TARGET_NAMESPACES}"
+        oc apply -n "${OO_TARGET_NAMESPACES}" -f deploy/hco.cr.yaml
+        sleep 30
+        oc wait -n "${OO_TARGET_NAMESPACES}" HyperConverged kubevirt-hyperconverged --for condition=Available --timeout 20m
       from: src
       resources:
         requests:
