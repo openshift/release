@@ -1,0 +1,617 @@
+kind: Template
+apiVersion: template.openshift.io/v1
+
+parameters:
+- name: JOB_NAME
+  required: true
+- name: JOB_NAME_SAFE
+  required: true
+- name: JOB_NAME_HASH
+  required: true
+- name: NAMESPACE
+  required: true
+- name: IMAGE_TESTS
+  required: true
+- name: IMAGE_KUBEVIRT_INSTALLER
+  required: true
+- name: CLUSTER_TYPE
+  value: kubevirt
+- name: TEST_COMMAND
+  required: true
+- name: LEASE_TYPE
+  required: true
+- name: RELEASE_IMAGE_INITIAL
+  required: false
+- name: INSTALL_INITIAL_RELEASE
+  required: false
+- name: RELEASE_IMAGE_LATEST
+  required: true
+- name: BASE_DOMAIN
+  required: true
+  value: gcp.devcluster.openshift.com
+- name: BUILD_ID
+  required: false
+- name: JOB_SPEC
+  required: false
+
+objects:
+
+# We want the cluster to be able to access these images
+- kind: RoleBinding
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: ${JOB_NAME_SAFE}-image-puller
+    namespace: ${NAMESPACE}
+  roleRef:
+    name: system:image-puller
+  subjects:
+  - kind: SystemGroup
+    name: system:unauthenticated
+  - kind: SystemGroup
+    name: system:authenticated
+
+# Give admin access to a known bot
+- kind: RoleBinding
+  apiVersion: authorization.openshift.io/v1
+  metadata:
+    name: ${JOB_NAME_SAFE}-namespace-admins
+    namespace: ${NAMESPACE}
+  roleRef:
+    name: admin
+  subjects:
+  - kind: ServiceAccount
+    namespace: ci
+    name: ci-chat-bot
+
+# The e2e pod spins up a cluster, runs e2e tests, and then cleans up the cluster.
+- kind: Pod
+  apiVersion: v1
+  metadata:
+    name: ${JOB_NAME_SAFE}
+    namespace: ${NAMESPACE}
+    annotations:
+      # we want to gather the teardown logs no matter what
+      ci-operator.openshift.io/wait-for-container-artifacts: teardown
+      ci-operator.openshift.io/save-container-logs: "true"
+      ci-operator.openshift.io/container-sub-tests: "lease,setup,test,teardown"
+  spec:
+    restartPolicy: Never
+    activeDeadlineSeconds: 14400
+    terminationGracePeriodSeconds: 900
+    volumes:
+    - name: artifacts
+      emptyDir: {}
+    - name: shared-tmp
+      emptyDir: {}
+    - name: cluster-profile
+      secret:
+        secretName: ${JOB_NAME_SAFE}-cluster-profile
+
+    containers:
+
+    - name: lease
+      image: registry.svc.ci.openshift.org/ci/boskoscli:latest
+      terminationMessagePolicy: FallbackToLogsOnError
+      resources:
+        requests:
+          cpu: 10m
+          memory: 10Mi
+        limits:
+          memory: 200Mi
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      - name: cluster-profile
+        mountPath: /etc/openshift-installer
+      - name: artifacts
+        mountPath: /tmp/artifacts
+      env:
+      - name: ARTIFACT_DIR
+        value: /tmp/artifacts
+      - name: CLUSTER_TYPE
+        value: ${CLUSTER_TYPE}
+      - name: CLUSTER_NAME
+        value: ${NAMESPACE}-${JOB_NAME_HASH}
+      command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -euo pipefail
+
+        trap 'rc=$?; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi; if test "${rc}" -ne 0; then touch /tmp/shared/exit; fi; exit "${rc}"' EXIT
+
+        function extract_leases_info() {
+          echo "$( jq ."${1}" --raw-output "${2}" )"
+        }
+
+        lease_type="${CLUSTER_TYPE}-quota-slice"
+
+        echo "[INFO] Acquiring a lease ..."
+        resource="$( boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" acquire --type "${lease_type}" --state "free" --target-state "leased" --timeout 150m )"
+        resource_name="$(echo "${resource}"|jq .name --raw-output)"
+        lease_path="/etc/openshift-installer/${resource_name}.json"
+        echo "[INFO] Lease acquired! at $(date --utc) Leased resource: ${resource}"
+        echo "[INFO] Sending heartbeats to retain the lease ${resource_name}"
+        boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" heartbeat --resource "${resource}" &
+        heartbeats_pid=$!
+
+        #For conformance runs we require double resources
+        if [ "${LEASE_TYPE}" == "conformance" ]; then
+          resource_conformance="$( boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" acquire --type "${lease_type}" --state "free" --target-state "leased" --timeout 150m )"
+          resource_conformance_name="$(echo "${resource_conformance}"|jq .name --raw-output)"
+          echo "[INFO] Lease acquired! at $(date --utc) Leased resource: ${resource_conformance}"
+          boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" heartbeat --resource "${resource_conformance}" &
+          heartbeats_conformance_pid=$!
+        fi
+
+        ovirt_engine_template_name="$(extract_leases_info ovirt_engine_template_name ${lease_path})"
+        if [ "${LEASE_TYPE}" == "conformance" ]; then
+          worker_cpu="8"
+          worker_mem="16384"
+          master_cpu="8"
+          master_mem="16384"
+        else
+          worker_cpu="4"
+          worker_mem="9000"
+          master_cpu="4"
+          master_mem="9000"
+          ovirt_engine_template_name="${ovirt_engine_template_name}-8G"
+        fi
+
+        #Saving parameters for the env
+        cat > /tmp/shared/ovirt-lease.conf <<EOF
+        OVIRT_APIVIP="$(extract_leases_info ovirt_apivip ${lease_path})"
+        OVIRT_DNSVIP="$(extract_leases_info ovirt_dnsvip ${lease_path})"
+        OVIRT_INGRESSVIP="$(extract_leases_info ovirt_ingressvip ${lease_path})"
+        WORKER_CPU="${worker_cpu}"
+        WORKER_MEM="${worker_mem}"
+        MASTER_CPU="${master_cpu}"
+        MASTER_MEM="${master_mem}"
+        OCP_CLUSTER="$(extract_leases_info cluster_name ${lease_path})"
+        OVIRT_ENGINE_CLUSTER_ID="$(extract_leases_info ovirt_engine_cluster_id ${lease_path})"
+        OVIRT_ENGINE_NETWORK="$(extract_leases_info ovirt_network_name ${lease_path})"
+        OVIRT_ENGINE_VNIC_PEOFILE_ID="$(extract_leases_info ovirt_vnic_profile_id ${lease_path})"
+        OVIRT_ENGINE_TEMPLATE_NAME="${ovirt_engine_template_name}"
+        EOF
+
+        touch /tmp/shared/leased
+
+        function release() {
+            echo "killing heartbeat process "${heartbeats_pid}" at $(date --utc)"
+            kill -9 "${heartbeats_pid}"
+            echo "[INFO] Releasing the lease on resouce ${resource_name}"
+            boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" release --name "${resource_name}" --target-state "free"
+            if [ "${LEASE_TYPE}" == "conformance" ]; then
+              echo "killing heartbeat process "${heartbeats_conformance_pid}" at $(date --utc)"
+              kill -9 "${heartbeats_conformance_pid}"
+              echo "[INFO] Releasing the lease on resouce ${resource_conformance}"
+              boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" release --name "${resource_conformance_name}" --target-state "free"
+            fi
+        }
+
+        trap "release" EXIT
+        trap "release" TERM
+
+        while true; do
+          if [[ -f /tmp/shared/teardown-exit ]]; then
+            echo "Another process exited" 2>&1
+            exit 0
+          fi
+
+          sleep 15 & wait $!
+        done
+
+
+    # Once the cluster is up, executes shared tests
+    - name: test
+      image: ${IMAGE_TESTS}
+      terminationMessagePolicy: FallbackToLogsOnError
+      resources:
+        requests:
+          cpu: 4
+          memory: 600Mi
+        limits:
+          memory: 4Gi
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      - name: cluster-profile
+        mountPath: /tmp/cluster
+      - name: artifacts
+        mountPath: /tmp/artifacts
+      env:
+      - name: ARTIFACT_DIR
+        value: /tmp/artifacts
+      - name: HOME
+        value: /tmp/home
+      - name: KUBECONFIG
+        value: /tmp/artifacts/installer/auth/kubeconfig
+      command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -euo pipefail
+
+        export PATH=/usr/libexec/origin:$PATH
+
+        trap 'touch /tmp/shared/test-exit' EXIT
+        trap 'kill $(jobs -p); exit 0' TERM
+
+        mkdir -p "${HOME}"
+
+        # Share oc with other containers
+        cp "$(command -v oc)" /tmp/shared
+
+        # wait for the API to come up
+        while true; do
+          if [[ -f /tmp/shared/exit ]]; then
+            echo "Another process exited" 2>&1
+            exit 1
+          fi
+          if [[ ! -f /tmp/shared/setup-success ]]; then
+            sleep 15 & wait
+            continue
+          fi
+          # don't let clients impact the global kubeconfig
+          cp "${KUBECONFIG}" /tmp/admin.kubeconfig
+          export KUBECONFIG=/tmp/admin.kubeconfig
+          break
+        done
+
+        # if the cluster profile included an insights secret, install it to the cluster to
+        # report support data from the support-operator
+        if [[ -f /tmp/cluster/insights-live.yaml ]]; then
+          oc create -f /tmp/cluster/insights-live.yaml || true
+        fi
+
+        # set up env vars
+        export KUBE_SSH_BASTION="$( oc --insecure-skip-tls-verify get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
+        export KUBE_SSH_KEY_PATH=/tmp/cluster/ssh-privatekey
+        export TEST_PROVIDER='{"type":"kubevirt"}'
+        mkdir -p ~/.ssh
+        cp /tmp/cluster/ssh-privatekey ~/.ssh/kubevirt_rsa || true
+
+        mkdir -p /tmp/output
+        cd /tmp/output
+
+        function run-upgrade-tests() {
+          openshift-tests run-upgrade "${TEST_SUITE}" --to-image "${IMAGE:-${RELEASE_IMAGE_LATEST}}" \
+            --options "${TEST_OPTIONS:-}" \
+            --provider "${TEST_PROVIDER:-}" -o ${ARTIFACT_DIR}/e2e.log --junit-dir ${ARTIFACT_DIR}/junit
+        }
+
+        function run-tests() {
+          openshift-tests run "${TEST_SUITE}" \
+            --provider "${TEST_PROVIDER:-}" -o ${ARTIFACT_DIR}/e2e.log --junit-dir ${ARTIFACT_DIR}/junit
+        }
+
+        function run-minimal-tests() {
+          # Grab all of the tests marked Feature:Builds and conformance/parallel/minimal
+          openshift-tests run openshift/conformance/parallel --dry-run |
+            grep 'Early' |
+          openshift-tests run -o ${ARTIFACT_DIR}/e2e.log \
+            --junit-dir ${ARTIFACT_DIR}/junit -f -
+        }
+
+        # https://bugzilla.redhat.com/show_bug.cgi?id=1839463
+
+        # TODO: change the base domain after the infra-cluster would be up and running
+        curl -k --connect-timeout 2 --retry 30 --retry-delay 30 https://api.${OCP_CLUSTER}.gcp.devcluster.openshift.com:6443/apis/config.openshift.io/v1/infrastructures/cluster
+        ${TEST_COMMAND}
+
+    # Runs an install
+    - name: setup
+      # TODO: need to point the IMAGE_KUBEVIRT_INSTALLER to our image in docker.io
+      image: ${IMAGE_KUBEVIRT_INSTALLER}
+      terminationMessagePolicy: FallbackToLogsOnError
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp
+      - name: cluster-profile
+        mountPath: /etc/openshift-installer
+      - name: artifacts
+        mountPath: /tmp/artifacts
+      env:
+      - name: ARTIFACT_DIR
+        value: /tmp/artifacts
+      - name: TYPE
+        value: ${CLUSTER_TYPE}
+      - name: CLUSTER_NAME
+        value: kubevirt
+      - name: BASE_DOMAIN
+        value: ${BASE_DOMAIN}
+      - name: SSH_PUB_KEY_PATH
+        value: /etc/openshift-installer/ssh-publickey
+      - name: PULL_SECRET_PATH
+        value: /etc/openshift-installer/pull-secret
+      - name: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+        value: ${RELEASE_IMAGE_LATEST}
+      - name: OPENSHIFT_INSTALL_INVOKER
+        value: openshift-internal-ci/${JOB_NAME}/${BUILD_ID}
+      - name: USER
+        value: test
+      - name: HOME
+        value: /tmp
+      - name: INSTALL_INITIAL_RELEASE
+        value: ${INSTALL_INITIAL_RELEASE}
+      - name: RELEASE_IMAGE_INITIAL
+        value: ${RELEASE_IMAGE_INITIAL}
+      - name: JOB_NAME
+        value: ${JOB_NAME}
+      command:
+      - /bin/sh
+      - -c
+      - |
+        #!/bin/bash
+        set -euo pipefail
+
+        # TODO: Wait untill lease is acquired
+
+        if [[ -n "${INSTALL_INITIAL_RELEASE}" && -n "${RELEASE_IMAGE_INITIAL}" ]]; then
+          echo "Installing from initial release ${RELEASE_IMAGE_INITIAL}"
+          OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_INITIAL}"
+        else
+          echo "Installing from release ${RELEASE_IMAGE_LATEST}"
+        fi
+        # poll to make sure that the test container has dropped oc into the shared volume
+        while [ ! command -V oc ]; do sleep 1; done
+        cp "$(command -v openshift-install)" /tmp
+        mkdir ${ARTIFACT_DIR}/installer
+
+        # TODO: when adding a lease change it
+
+        #source /tmp/kubevirt-lease
+        source /etc/openshift-installer/kubeconfig-infra-cluster
+        export PATH=$PATH:/tmp
+        export INFRA_CLUSTER_KUBECONFIG=/etc/openshift-installer/kubeconfig-infra-cluster
+        export EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
+        export SSH_PUB_KEY=$(cat "${SSH_PUB_KEY_PATH}")
+        export PULL_SECRET=$(cat "${PULL_SECRET_PATH}")
+
+        # TODO: download the kubeconfig
+
+        cat > ${ARTIFACT_DIR}/installer/install-config.yaml << EOF
+        apiVersion: v1
+        baseDomain: ${BASE_DOMAIN}
+        metadata:
+          name: ${OCP_CLUSTER}
+        compute:
+        - hyperthreading: Enabled
+          architecture: amd64
+          name: worker
+          platform:
+            kubevirt:
+              cpu: ${WORKER_CPU}
+              memory: ${WORKER_MEM}
+               # TODO: export WORKER_STORAGE_SIZE
+              storageSize: ${WORKER_STORAGE_SIZE}
+          replicas: 2
+        controlPlane:
+          hyperthreading: Enabled
+          architecture: amd64
+          name: master
+          platform:
+            kubevirt:
+              cpu: ${MASTER_CPU}
+              memory: ${MASTER_MEM}
+              # TODO: export MASTER_STORAGE_SIZE
+              storageSize: ${MASTER_STORAGE_SIZE}
+          replicas: 3
+        networking:
+          clusterNetwork:
+          - cidr: ${CLUSTER_NETWORK_CIDER}
+            hostPrefix: ${CLUSTER_NETWORK_HOSTPREFIX}
+          machineNetwork:
+          - cidr: ${MACHINE_NETWORK_CIDER}
+          networkType: ${NETWORK_TYPE}
+          serviceNetwork:
+          - ${SERVICE_NETWORK}
+
+        platform:
+          kubevirt:
+            # TODO: export KUBEVIRT_APIVIP
+            apiVip: ${KUBEVIRT_APIVIP}
+            # TODO: export KUBEVIRT_INGRESSVIP
+            ingressVip: ${KUBEVIRT_INGRESSVIP}
+            # TODO: export INFRA_CLUSTER_KUBECONFIG
+            kubeconfig: {INFRA_CLUSTER_KUBECONFIG}
+            # TODO: export KUBEVIRT_IFRA_NAMESPACE_FOR_TENANT_CLUSTER
+            namespace: ${KUBEVIRT_IFRA_NAMESPACE_FOR_TENANT_CLUSTER}
+            # TODO: export KUBEVIRT_TENANT_NETWORK_NAME
+            networkName: ${KUBEVIRT_TENANT_NETWORK_NAME}
+            # TODO: export KUBEVIRT_TENANT_STORAGE_CLASS_NAME
+            storageClass: ${KUBEVIRT_TENANT_STORAGE_CLASS_NAME}
+        pullSecret: >
+          ${PULL_SECRET}
+        sshKey: |
+          ${SSH_PUB_KEY}
+        EOF
+
+        # TODO: understand where is the image registry saved?
+
+        #TODO: change the masters igntion , to use tempfs for etcd IOPS optimization
+        # if the hard-disk is good enough remove it (min 9GB)
+        TF_LOG=debug openshift-install --dir=${ARTIFACT_DIR}/installer create ignition-configs --log-level=debug
+        python -c \
+            'import json, sys; j = json.load(sys.stdin); j[u"systemd"] = {}; j[u"systemd"][u"units"] = [{u"contents": "[Unit]\nDescription=Mount etcd as a ramdisk\nBefore=local-fs.target\n[Mount]\n What=none\nWhere=/var/lib/etcd\nType=tmpfs\nOptions=size=2G\n[Install]\nWantedBy=local-fs.target", u"enabled": True, u"name":u"var-lib-etcd.mount"}]; json.dump(j, sys.stdout)' \
+            <${ARTIFACT_DIR}/installer/master.ign \
+            >${ARTIFACT_DIR}/installer/master.ign.out
+        mv ${ARTIFACT_DIR}/installer/master.ign.out ${ARTIFACT_DIR}/installer/master.ign
+
+        # Remove the formal channels of openshift
+        sed -i '/^  channel:/d' ${ARTIFACT_DIR}/installer/manifests/cvo-overrides.yaml
+
+        # This is for debugging purposes, allows us to map a job to a VM
+        cat ${ARTIFACT_DIR}/installer/manifests/cluster-infrastructure-02-config.yml
+
+        # tenant kubeconfig
+        export KUBECONFIG=${ARTIFACT_DIR}/installer/auth/kubeconfig
+
+        # we need jq for later rhcos url extraction 
+        mkdir /tmp/bin
+        (curl -L -o /tmp/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 2>/dev/null && chmod +x /tmp/bin/jq)
+        if ! command -V /tmp/bin/jq; then
+            echo "Failed to fetch jq"
+            exit 1
+        fi
+
+        TF_LOG=debug openshift-install --dir=${ARTIFACT_DIR}/installer create cluster --log-level=debug 2>&1 | grep --line-buffered -v password &
+        wait "$!"
+        install_exit_status=$?
+
+        sleep 10m
+        exit $install_exit_status
+
+        # Password for the cluster gets leaked in the installer logs and hence removing them.
+        sed -i 's/password: .*/password: REDACTED"/g' ${ARTIFACT_DIR}/installer/.openshift_install.log
+
+    # Performs cleanup of all created resources
+    - name: teardown
+      image: ${IMAGE_KUBEVIRT_INSTALLER}
+      terminationMessagePolicy: FallbackToLogsOnError
+      volumeMounts:
+      - name: shared-tmp
+        mountPath: /tmp/shared
+      - name: cluster-profile
+        mountPath: /etc/openshift-installer
+      - name: artifacts
+        mountPath: /tmp/artifacts
+      env:
+      - name: ARTIFACT_DIR
+        value: /tmp/artifacts
+      - name: TYPE
+        value: ${CLUSTER_TYPE}
+      - name: CLUSTER_NAME
+        value: kubevirt
+      - name: KUBECONFIG
+        value: /tmp/artifacts/installer/auth/kubeconfig
+      command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -eo pipefail
+
+        function queue() {
+          local TARGET="${1}"
+          shift
+          local LIVE="$(jobs | wc -l)"
+          while [[ "${LIVE}" -ge 45 ]]; do
+            sleep 1
+            LIVE="$(jobs | wc -l)"
+          done
+          echo "${@}"
+          if [[ -n "${FILTER}" ]]; then
+            "${@}" | "${FILTER}" >"${TARGET}" &
+          else
+            "${@}" >"${TARGET}" &
+          fi
+        }
+
+        function teardown() {
+          set +e
+          export PATH=$PATH:/tmp/shared
+          # TODO: change it to be kubevirt lease
+          source /tmp/shared/kubeonfig-infra-cluster
+          source /etc/openshift-installer/ovirt.conf
+          export OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE=""
+
+          echo "Gathering artifacts ..."
+          mkdir -p ${ARTIFACT_DIR}/pods ${ARTIFACT_DIR}/nodes ${ARTIFACT_DIR}/metrics ${ARTIFACT_DIR}/bootstrap ${ARTIFACT_DIR}/network
+
+          # WORKAROUND https://github.com/openshift/installer/issues/1467
+          # We need this to be able to collect logs
+          oc --insecure-skip-tls-verify --request-timeout=5s get csr -o name | xargs oc --insecure-skip-tls-verify --request-timeout=5s adm certificate approve
+
+          oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' > /tmp/nodes
+          oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces --template '{{ range .items }}{{ $name := .metadata.name }}{{ $ns := .metadata.namespace }}{{ range .spec.containers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ range .spec.initContainers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ end }}' > /tmp/containers
+          oc --insecure-skip-tls-verify --request-timeout=5s get pods -l openshift.io/component=api --all-namespaces --template '{{ range .items }}-n {{ .metadata.namespace }} {{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/pods-api
+
+          queue ${ARTIFACT_DIR}/apiservices.json oc --insecure-skip-tls-verify --request-timeout=5s get apiservices -o json
+          queue ${ARTIFACT_DIR}/clusteroperators.json oc --insecure-skip-tls-verify --request-timeout=5s get clusteroperators -o json
+          queue ${ARTIFACT_DIR}/clusterversion.json oc --insecure-skip-tls-verify --request-timeout=5s get clusterversion -o json
+          queue ${ARTIFACT_DIR}/configmaps.json oc --insecure-skip-tls-verify --request-timeout=5s get configmaps --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/csr.json oc --insecure-skip-tls-verify --request-timeout=5s get csr -o json
+          queue ${ARTIFACT_DIR}/endpoints.json oc --insecure-skip-tls-verify --request-timeout=5s get endpoints --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/deployments.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get deployments --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/daemonsets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get daemonsets --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/events.json oc --insecure-skip-tls-verify --request-timeout=5s get events --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/kubeapiserver.json oc --insecure-skip-tls-verify --request-timeout=5s get kubeapiserver -o json
+          queue ${ARTIFACT_DIR}/kubecontrollermanager.json oc --insecure-skip-tls-verify --request-timeout=5s get kubecontrollermanager -o json
+          queue ${ARTIFACT_DIR}/machineconfigpools.json oc --insecure-skip-tls-verify --request-timeout=5s get machineconfigpools -o json
+          queue ${ARTIFACT_DIR}/machineconfigs.json oc --insecure-skip-tls-verify --request-timeout=5s get machineconfigs -o json
+          queue ${ARTIFACT_DIR}/namespaces.json oc --insecure-skip-tls-verify --request-timeout=5s get namespaces -o json
+          queue ${ARTIFACT_DIR}/nodes.json oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o json
+          queue ${ARTIFACT_DIR}/openshiftapiserver.json oc --insecure-skip-tls-verify --request-timeout=5s get openshiftapiserver -o json
+          queue ${ARTIFACT_DIR}/pods.json oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/persistentvolumes.json oc --insecure-skip-tls-verify --request-timeout=5s get persistentvolumes --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/persistentvolumeclaims.json oc --insecure-skip-tls-verify --request-timeout=5s get persistentvolumeclaims --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/replicasets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get replicasets --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/rolebindings.json oc --insecure-skip-tls-verify --request-timeout=5s get rolebindings --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/roles.json oc --insecure-skip-tls-verify --request-timeout=5s get roles --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/services.json oc --insecure-skip-tls-verify --request-timeout=5s get services --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/statefulsets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get statefulsets --all-namespaces -o json
+
+          FILTER=gzip queue ${ARTIFACT_DIR}/openapi.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get --raw /openapi/v2
+
+          # gather nodes first in parallel since they may contain the most relevant debugging info
+          while IFS= read -r i; do
+            mkdir -p ${ARTIFACT_DIR}/nodes/$i
+            queue ${ARTIFACT_DIR}/nodes/$i/heap oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/debug/pprof/heap
+            FILTER=gzip queue ${ARTIFACT_DIR}/nodes/$i/journal.gz oc --insecure-skip-tls-verify adm node-logs $i --unify=false
+          done < /tmp/nodes
+
+          # Snapshot iptables-save on each node for debugging possible kube-proxy issues
+          oc --insecure-skip-tls-verify get --request-timeout=20s -n openshift-sdn -l app=sdn pods --template '{{ range .items }}{{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/sdn-pods
+          while IFS= read -r i; do
+            queue ${ARTIFACT_DIR}/network/iptables-save-$i oc --insecure-skip-tls-verify rsh --timeout=20 -n openshift-sdn -c sdn $i iptables-save -c
+          done < /tmp/sdn-pods
+
+          while IFS= read -r i; do
+            file="$( echo "$i" | cut -d ' ' -f 3 | tr -s ' ' '_' )"
+            queue ${ARTIFACT_DIR}/metrics/${file}-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig'
+            queue ${ARTIFACT_DIR}/metrics/${file}-controllers-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig'
+          done < /tmp/pods-api
+
+          while IFS= read -r i; do
+            file="$( echo "$i" | cut -d ' ' -f 2,3,5 | tr -s ' ' '_' )"
+            FILTER=gzip queue ${ARTIFACT_DIR}/pods/${file}.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s $i
+            FILTER=gzip queue ${ARTIFACT_DIR}/pods/${file}_previous.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s -p $i
+          done < /tmp/containers
+
+          echo "Snapshotting prometheus (may take 15s) ..."
+          queue ${ARTIFACT_DIR}/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring prometheus-k8s-0 -- tar cvzf - -C /prometheus .
+
+          echo "Waiting for logs ..."
+          wait
+
+          # This is a temporary conversion of cluster operator status to JSON matching the upgrade - may be moved to code in the future
+          mkdir -p ${ARTIFACT_DIR}/junit
+          curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 >/tmp/jq && chmod ug+x /tmp/jq
+          <${ARTIFACT_DIR}/clusteroperators.json /tmp/jq -r 'def one(condition; t): t as $t | first([.[] | select(condition)] | map(.type=t)[]) // null; def msg: "Operator \(.type) (\(.reason)): \(.message)"; def xmlfailure: if .failure then "<failure message=\"\(.failure | @html)\">\(.failure | @html)</failure>" else "" end; def xmltest: "<testcase name=\"\(.name | @html)\">\( xmlfailure )</testcase>"; def withconditions: map({name: "operator install \(.metadata.name)"} + ((.status.conditions // [{type:"Available",status: "False",message:"operator is not reporting conditions"}]) | (one(.type=="Available" and .status!="True"; "unavailable") // one(.type=="Degraded" and .status=="True"; "degraded") // one(.type=="Progressing" and .status=="True"; "progressing") // null) | if . then {failure: .|msg} else null end)); .items | withconditions | "<testsuite name=\"Operator results\" tests=\"\( length )\" failures=\"\( [.[] | select(.failure)] | length )\">\n\( [.[] | xmltest] | join("\n"))\n</testsuite>"' >${ARTIFACT_DIR}/junit/junit_install_status.xml
+
+          #We set KUBEVIRT_CONFIG and insert he path to the engine ca to the config file
+          export KUBEVIRT_CONFIG=${ARTIFACT_DIR}/installer/kubeconfig-infra-cluster
+
+          # TODO: implemenet destroy: https://issues.redhat.com/browse/OCPCNV-66
+          echo "Destroy bootstrap ..."
+          openshift-install --dir ${ARTIFACT_DIR}/installer destroy bootstrap
+          echo "Destroy cluster ..."
+          openshift-install --dir ${ARTIFACT_DIR}/installer destroy cluster
+          # Clean up
+          rm -f ${ARTIFACT_DIR}/installer/kubeconfig-infra-cluster
+        }
+
+        # catch exit code if the proccess is failing and run the touch command
+        trap 'teardown; touch /tmp/shared/teardown-exit; exit $DELETE_FAIL' EXIT
+        trap 'kill $(jobs -p); teardown; touch /tmp/shared/teardown-exit; exit $DELETE_FAIL' TERM
+
+        for i in $(seq 1 180); do
+
+          if [[ -f /tmp/shared/exit ]] || [[ -f /tmp/shared/test-exit ]]; then
+            exit 0
+          fi
+          sleep 60 & wait
+        done
