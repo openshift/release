@@ -34,6 +34,13 @@ images:
 - dockerfile_path: deploy/Dockerfile.registry.upgrade-prev
   from: operator-registry-base
   to: hco-registry-upgrade-prev
+operator:
+  bundles:
+  - context_dir: deploy/olm-catalog
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/kubevirt/hyperconverged-cluster-operator@sha256:d015b58b0ed77fb20eab5cf5c4d530b3eebcba03fc75e571b1ec56dace9cb254
+    with: hyperconverged-cluster-operator
 promotion:
   additional_images:
     hyperconverged-cluster-operator-tests: src
@@ -53,36 +60,57 @@ tag_specification:
   name: "4.5"
   namespace: ocp
 tests:
-- as: hco-e2e-aws
-  commands: |
-    make start && make functest
-  openshift_installer_src:
+- as: hco-oo-mock-tests-aws
+  steps:
     cluster_profile: aws
-- as: hco-e2e-upgrade-aws
-  commands: |
-    RELEASE_DELTA=1 make upgrade-test
-  openshift_installer_src:
-    cluster_profile: aws
-- as: hco-e2e-upgrade-prev-aws
-  commands: |
-    RELEASE_DELTA=2 PREV=true make upgrade-test
-  openshift_installer_src:
-    cluster_profile: aws
-- as: hco-e2e-azure
-  commands: |
-    make start && make functest
-  openshift_installer_src:
+    env:
+      OO_CHANNEL: 1.2.0
+      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
+      OO_PACKAGE: kubevirt-hyperconverged
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e-test
+      commands: echo "MARK"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
+- as: hco-oo-mock-tests-gcp
+  steps:
+    cluster_profile: gcp
+    env:
+      OO_CHANNEL: 1.2.0
+      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
+      OO_PACKAGE: kubevirt-hyperconverged
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e-test
+      commands: echo "MARK"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-gcp
+- as: hco-oo-mock-tests-azure
+  steps:
     cluster_profile: azure4
-- as: hco-e2e-upgrade-azure
-  commands: |
-    RELEASE_DELTA=1 make upgrade-test
-  openshift_installer_src:
-    cluster_profile: azure4
-- as: hco-e2e-upgrade-prev-azure
-  commands: |
-    RELEASE_DELTA=2 PREV=true make upgrade-test
-  openshift_installer_src:
-    cluster_profile: azure4
+    env:
+      OO_CHANNEL: 1.2.0
+      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
+      OO_PACKAGE: kubevirt-hyperconverged
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e-test
+      commands: echo "MARK"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-azure
 zz_generated_metadata:
   branch: master
   org: kubevirt
