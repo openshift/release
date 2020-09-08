@@ -5,21 +5,8 @@ set -o errexit
 set -o pipefail
 set -x
 
+export KUBECONFIG=${SHARED_DIR}/kubeconfig
 export OPS_MIRROR_KEY=${CLUSTER_PROFILE_DIR}/ops-mirror.pem
-
-# Temporarily use this workaround since we don't have a way to determine the cluster version
-# Revisit once this story is complete, https://issues.redhat.com/browse/DPTP-1311
-case "${PULL_BASE_REF}" in
-master) export CLUSTER_VERSION="4.6";;
-release-4.7) export CLUSTER_VERSION="4.6";;
-release-4.6) export CLUSTER_VERSION="4.6";;
-release-4.5) export CLUSTER_VERSION="4.5";;
-release-4.4) export CLUSTER_VERSION="4.4";;
-release-4.3) export CLUSTER_VERSION="4.3";;
-release-4.2) export CLUSTER_VERSION="4.2";;
-release-4.1) export CLUSTER_VERSION="4.1";;
-*) echo >&2 "Unsupported PULL_BASE_REF '${PULL_BASE_REF}'"
-esac
 
 # Ensure our UID, which is randomly generated, is in /etc/passwd. This is required
 # to be able to SSH.
@@ -32,6 +19,12 @@ if ! whoami &> /dev/null; then
     fi
 fi
 
+# Install an updated version of the client
+mkdir -p /tmp/client
+curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz | tar --directory=/tmp/client -xzf -
+PATH=/tmp/client:$PATH
+oc version --client
+
 cat > prep.yaml <<-'EOF'
 ---
 - name: Prep Playbook
@@ -40,19 +33,23 @@ cat > prep.yaml <<-'EOF'
   gather_facts: false
 
   vars:
-    cluster_version: "{{ lookup('env', 'CLUSTER_VERSION') }}"
+    kubeconfig_path: "{{ lookup('env', 'KUBECONFIG') }}"
     ops_mirror_path: "{{ lookup('env', 'OPS_MIRROR_KEY') }}"
 
   tasks:
-  - name: Fail if 'CLUSTER_VERSION' is not defined
-    fail:
-      msg: "'CLUSTER_VERSION' must be a defined environment variable"
-    when:
-    - cluster_version == ''
+  - name: Get cluster version
+    command: >
+      oc get clusterversion
+      --kubeconfig={{ kubeconfig_path }}
+      --output=jsonpath='{.items[0].status.desired.version}'
+    delegate_to: localhost
+    register: oc_get
+    until:
+    - oc_get.stdout != ''
 
-  - name: Set release_version to payload version
+  - name: Set release_version to cluster version
     set_fact:
-      release_version: "{{ cluster_version | regex_search('^\\d+\\.\\d+') }}"
+      release_version: "{{ oc_get.stdout | regex_search('^\\d+\\.\\d+') }}"
 
   - name: Wait for host connection to ensure SSH has started
     wait_for_connection:
