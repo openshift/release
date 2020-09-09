@@ -41,6 +41,8 @@ operator:
   substitutions:
   - pullspec: quay.io/kubevirt/hyperconverged-cluster-operator@sha256:d015b58b0ed77fb20eab5cf5c4d530b3eebcba03fc75e571b1ec56dace9cb254
     with: hyperconverged-cluster-operator
+  - pullspec: '- name: KVM_EMULATION'
+    with: '- name: KVM_EMULATION\\n                  value: "true"'
 promotion:
   additional_images:
     hyperconverged-cluster-operator-tests: src
@@ -75,7 +77,9 @@ tests:
       OO_TARGET_NAMESPACES: '!install'
     test:
     - as: e2e-test
-      commands: echo "MARK"
+      commands: |
+        make deploy_cr
+        make functest
       from: src
       resources:
         requests:
