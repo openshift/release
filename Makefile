@@ -124,7 +124,6 @@ openshift-ns:
 .PHONY: openshift-ns
 
 prow-jobs: prow-artifacts
-	$(MAKE) apply WHAT=projects/prometheus/test/build.yaml
 	$(MAKE) apply WHAT=ci-operator/templates/os.yaml
 .PHONY: prow-jobs
 
@@ -181,21 +180,9 @@ origin-release:
 	oc tag docker.io/centos/ruby-25-centos7:latest --scheduled openshift/release:ruby-25
 .PHONY: origin-release
 
-prometheus: node-exporter alert-buffer
-	$(MAKE) apply WHAT=projects/prometheus/prometheus.yaml
-.PHONY: prometheus
-
-node-exporter:
-	$(MAKE) apply WHAT=projects/prometheus/node_exporter.yaml
-.PHONY: node-exporter
-
 service-idler:
 	$(MAKE) apply WHAT=projects/service-idler/pipeline.yaml
 .PHONY: service-idler
-
-alert-buffer:
-	$(MAKE) apply WHAT=projects/prometheus/alert-buffer.yaml
-.PHONY: alert-buffer
 
 cluster-operator-roles:
 	oc create ns openshift-cluster-operator --dry-run -o yaml | oc apply -f -
