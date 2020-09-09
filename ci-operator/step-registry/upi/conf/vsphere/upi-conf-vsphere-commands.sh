@@ -41,7 +41,7 @@ vm_template="${ova_url##*/}"
 
 echo "$(date -u --rfc-3339=seconds) - Creating govc.sh file..."
 cat >> "${SHARED_DIR}/govc.sh" << EOF
-export GOVC_URL=vcenter.sddc-35-155-70-129.vmwarevmc.com
+export GOVC_URL=vcenter.sddc-44-236-21-251.vmwarevmc.com
 export GOVC_USERNAME="${vsphere_user}"
 export GOVC_PASSWORD="${vsphere_password}"
 export GOVC_INSECURE=1
@@ -70,7 +70,7 @@ platform:
     network: "ci-segment"
     password: ${vsphere_password}
     username: ${vsphere_user}
-    vCenter: vcenter.sddc-35-155-70-129.vmwarevmc.com
+    vCenter: vcenter.sddc-44-236-21-251.vmwarevmc.com
     folder: "/SDDC-Datacenter/vm/${cluster_name}"
 EOF
 
@@ -81,7 +81,7 @@ vm_template = "${vm_template}"
 vsphere_cluster = "Cluster-1"
 vsphere_datacenter = "SDDC-Datacenter"
 vsphere_datastore = "WorkloadDatastore"
-vsphere_server = "vcenter.sddc-35-155-70-129.vmwarevmc.com"
+vsphere_server = "vcenter.sddc-44-236-21-251.vmwarevmc.com"
 ipam = "139.178.89.254"
 cluster_id = "${cluster_name}"
 base_domain = "${base_domain}"
