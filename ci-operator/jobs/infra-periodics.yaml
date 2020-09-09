@@ -1246,3 +1246,49 @@ periodics:
     - name: token
       secret:
         secretName: github-credentials-openshift-bot
+- agent: kubernetes
+  cluster: api.ci
+  cron: '@daily'
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  - base_ref: master
+    org: kubernetes
+    repo: test-infra
+    workdir: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-prow-auto-testgrid-generator
+  spec:
+    containers:
+    - args:
+      - --github-token-path=/etc/github/oauth
+      - --github-endpoint=https://api.github.com
+      - --github-graphql-endpoint=http://ghproxy/graphql
+      - --github-login=openshift-bot
+      - --git-name=openshift-bot
+      - --git-email=openshift-bot@redhat.com
+      - --working-dir=.
+      - --assign=stevekuznetsov
+      - --testgrid-config=./config/testgrids/openshift
+      - --release-config=../../openshift/release/core-services/release-controller/_releases
+      - --prow-jobs-dir=../../openshift/release/ci-operator/jobs
+      - --allow-list=../../openshift/release/core-services/testgrid-config-generator/_allow-list.yaml
+      command:
+      - /usr/bin/autotestgridgenerator
+      image: registry.svc.ci.openshift.org/ci/auto-testgrid-generator:latest
+      imagePullPolicy: Always
+      name: auto-testgrid-generator
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: token
+        readOnly: true
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-bot
