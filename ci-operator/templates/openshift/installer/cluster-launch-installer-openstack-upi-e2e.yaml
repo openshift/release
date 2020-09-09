@@ -681,7 +681,7 @@ objects:
           ansible-playbook -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/network.yaml"
 
           #Bootstrap
-          ansible-playbook  -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/bootstrap.yaml"
+          ansible-playbook -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/bootstrap.yaml"
           get_bootstrap_fip > ${TMP_SHARED}/BOOTSTRAP_FIP
           export BOOTSTRAP_FIP=$(cat ${TMP_SHARED}/BOOTSTRAP_FIP)
           wait_for_bootstrap_at_port 6443
@@ -739,7 +739,7 @@ objects:
         }
 
         function deploy_compute_nodes() {
-          ansible-playbook -vvv -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/compute-nodes.yaml"
+          ansible-playbook -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/compute-nodes.yaml"
         }
 
         function wait_for_compute_nodes() {
@@ -1258,30 +1258,33 @@ objects:
         }
 
         function verify_teardown_playbooks() {
-          ansible-playbook --list-tasks -vvv -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-load-balancers.yaml"
-          ansible-playbook --list-tasks -vvv -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-compute-nodes.yaml"
-          ansible-playbook --list-tasks -vvv -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-control-plane.yaml"
-          ansible-playbook --list-tasks -vvv -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-bootstrap.yaml"
-          ansible-playbook --list-tasks -vvv -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-network.yaml"
-          ansible-playbook --list-tasks -vvv -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-security-groups.yaml"
-          ansible-playbook --list-tasks -vvv -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-containers.yaml"
+          ansible-playbook --list-tasks -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-load-balancers.yaml"
+          ansible-playbook --list-tasks -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-compute-nodes.yaml"
+          ansible-playbook --list-tasks -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-control-plane.yaml"
+          ansible-playbook --list-tasks -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-bootstrap.yaml"
+          ansible-playbook --list-tasks -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-network.yaml"
+          ansible-playbook --list-tasks -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-security-groups.yaml"
+          ansible-playbook --list-tasks -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-containers.yaml"
         }
 
         function run_teardown_playbooks() {
-          ansible-playbook -vvv -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-load-balancers.yaml"
-          ansible-playbook -vvv -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-compute-nodes.yaml"
-          ansible-playbook -vvv -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-control-plane.yaml"
-          ansible-playbook -vvv -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-bootstrap.yaml"
-          ansible-playbook -vvv -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-network.yaml"
-          ansible-playbook -vvv -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-security-groups.yaml"
-          ansible-playbook -vvv -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-containers.yaml"
+          ansible-playbook -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-load-balancers.yaml"
+          ansible-playbook -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-compute-nodes.yaml"
+          ansible-playbook -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-control-plane.yaml"
+          ansible-playbook -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-bootstrap.yaml"
+          ansible-playbook -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-network.yaml"
+          ansible-playbook -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-security-groups.yaml"
+          ansible-playbook -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-containers.yaml"
         }
 
         function delete_cluster_credentials() {
+          ignition_sponge="$(mktemp)"
+          jq '.ignition.config.merge[].httpHeaders[].value="REDACTED"' "${ASSETS_DIR}/${INFRA_ID}-bootstrap-ignition.json" > "$ignition_sponge"
+          mv "$ignition_sponge" "${ASSETS_DIR}/${INFRA_ID}-bootstrap-ignition.json"
+
           rm -r \
             ${ASSETS_DIR}/auth \
             ${ASSETS_DIR}/bootstrap.ign
-            ${ASSETS_DIR}/$INFRA_ID-bootstrap-ignition.json
         }
 
         function destroy_cluster() {
