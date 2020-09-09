@@ -90,7 +90,7 @@ ssh_public_key_path = "${ssh_pub_key_path}"
 compute_memory = "16384"
 compute_num_cpus = "4"
 vm_network = "ci-segment"
-vm_dns_addresses = ["10.2.192.12"]
+vm_dns_addresses = ["10.0.0.2"]
 EOF
 
 dir=/tmp/installer
