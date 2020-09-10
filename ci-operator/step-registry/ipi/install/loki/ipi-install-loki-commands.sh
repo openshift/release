@@ -10,6 +10,8 @@ then
 	exit 0
 fi
 
+export LOKI_VERSION="1.3.0"
+
 cat << EOF > /tmp/loki-manifests
 ---
 apiVersion: v1
@@ -172,7 +174,7 @@ cat << 'EOF' > /tmp/loki-manifests
          "app.kubernetes.io/instance": "loki",
          "app.kubernetes.io/name": "loki",
          "app.kubernetes.io/part-of": "loki",
-         "app.kubernetes.io/version": "1.3.0"
+         "app.kubernetes.io/version": "${LOKI_VERSION}"
       },
       "name": "loki",
       "namespace": "loki"
@@ -235,7 +237,7 @@ cat << 'EOF' > /tmp/loki-manifests
                "app.kubernetes.io/instance": "loki",
                "app.kubernetes.io/name": "loki",
                "app.kubernetes.io/part-of": "loki",
-               "app.kubernetes.io/version": "1.3.0"
+               "app.kubernetes.io/version": "${LOKI_VERSION}"
             }
          },
          "spec": {
@@ -244,7 +246,7 @@ cat << 'EOF' > /tmp/loki-manifests
                   "args": [
                      "-config.file=/etc/loki/loki.yaml"
                   ],
-                  "image": "grafana/loki:v1.3.0",
+                  "image": "grafana/loki:v${LOKI_VERSION}",
                   "imagePullPolicy": "IfNotPresent",
                   "livenessProbe": {
                      "httpGet": {
@@ -891,7 +893,7 @@ data:
                "app.kubernetes.io/instance": "loki-promtail",
                "app.kubernetes.io/name": "promtail",
                "app.kubernetes.io/part-of": "loki",
-               "app.kubernetes.io/version": "1.3.0"
+               "app.kubernetes.io/version": "${LOKI_VERSION}"
             }
          },
          "spec": {
@@ -910,7 +912,7 @@ data:
                         }
                      }
                   ],
-                  "image": "grafana/promtail:v1.3.0",
+                  "image": "grafana/promtail:v${LOKI_VERSION}",
                   "imagePullPolicy": "IfNotPresent",
                   "name": "promtail",
                   "ports": [
