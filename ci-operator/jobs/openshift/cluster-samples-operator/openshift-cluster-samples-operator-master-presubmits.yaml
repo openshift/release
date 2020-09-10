@@ -445,204 +445,6 @@ presubmits:
     branches:
     - master
     cluster: api.ci
-    context: ci/prow/okd-e2e-aws
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: okd
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-samples-operator-master-okd-e2e-aws
-    optional: true
-    rerun_command: /test okd-e2e-aws
-    spec:
-      containers:
-      - args:
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
-        - --report-password-file=/etc/report/password.txt
-        - --report-username=ci
-        - --secret-dir=/usr/local/e2e-aws-cluster-profile
-        - --target=e2e-aws
-        - --variant=okd
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-aws-cluster-profile
-          name: cluster-profile
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: password
-            path: password
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )okd-e2e-aws,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    cluster: api.ci
-    context: ci/prow/okd-e2e-aws-builds
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: okd
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-samples-operator-master-okd-e2e-aws-builds
-    optional: true
-    rerun_command: /test okd-e2e-aws-builds
-    spec:
-      containers:
-      - args:
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
-        - --report-password-file=/etc/report/password.txt
-        - --report-username=ci
-        - --secret-dir=/usr/local/e2e-aws-builds-cluster-profile
-        - --target=e2e-aws-builds
-        - --variant=okd
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-aws-builds-cluster-profile
-          name: cluster-profile
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: password
-            path: password
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )okd-e2e-aws-builds,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    cluster: api.ci
-    context: ci/prow/okd-e2e-aws-image-ecosystem
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: okd
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-samples-operator-master-okd-e2e-aws-image-ecosystem
-    optional: true
-    rerun_command: /test okd-e2e-aws-image-ecosystem
-    spec:
-      containers:
-      - args:
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
-        - --report-password-file=/etc/report/password.txt
-        - --report-username=ci
-        - --secret-dir=/usr/local/e2e-aws-image-ecosystem-cluster-profile
-        - --target=e2e-aws-image-ecosystem
-        - --variant=okd
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-aws-image-ecosystem-cluster-profile
-          name: cluster-profile
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: password
-            path: password
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )okd-e2e-aws-image-ecosystem,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    cluster: api.ci
     context: ci/prow/okd-e2e-aws-jenkins
     decorate: true
     decoration_config:
@@ -652,7 +454,6 @@ presubmits:
       ci-operator.openshift.io/variant: okd
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-samples-operator-master-okd-e2e-aws-jenkins
-    optional: true
     rerun_command: /test okd-e2e-aws-jenkins
     spec:
       containers:
@@ -709,7 +510,7 @@ presubmits:
     branches:
     - master
     cluster: api.ci
-    context: ci/prow/okd-e2e-aws-operator
+    context: ci/prow/okd-e2e-gcp
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -717,9 +518,8 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       ci-operator.openshift.io/variant: okd
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-samples-operator-master-okd-e2e-aws-operator
-    optional: true
-    rerun_command: /test okd-e2e-aws-operator
+    name: pull-ci-openshift-cluster-samples-operator-master-okd-e2e-gcp
+    rerun_command: /test okd-e2e-gcp
     spec:
       containers:
       - args:
@@ -727,17 +527,218 @@ presubmits:
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/e2e-aws-operator-cluster-profile
-        - --target=e2e-aws-operator
-        - --template=/usr/local/e2e-aws-operator
+        - --secret-dir=/usr/local/e2e-gcp-cluster-profile
+        - --target=e2e-gcp
+        - --variant=okd
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-gcp-cluster-profile
+          name: cluster-profile
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )okd-e2e-gcp,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: api.ci
+    context: ci/prow/okd-e2e-gcp-builds
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: okd
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-samples-operator-master-okd-e2e-gcp-builds
+    rerun_command: /test okd-e2e-gcp-builds
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-password-file=/etc/boskos/password
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/usr/local/e2e-gcp-builds-cluster-profile
+        - --target=e2e-gcp-builds
+        - --variant=okd
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-gcp-builds-cluster-profile
+          name: cluster-profile
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )okd-e2e-gcp-builds,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: api.ci
+    context: ci/prow/okd-e2e-gcp-image-ecosystem
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: okd
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-samples-operator-master-okd-e2e-gcp-image-ecosystem
+    rerun_command: /test okd-e2e-gcp-image-ecosystem
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-password-file=/etc/boskos/password
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/usr/local/e2e-gcp-image-ecosystem-cluster-profile
+        - --target=e2e-gcp-image-ecosystem
+        - --variant=okd
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-gcp-image-ecosystem-cluster-profile
+          name: cluster-profile
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )okd-e2e-gcp-image-ecosystem,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: api.ci
+    context: ci/prow/okd-e2e-gcp-operator
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: okd
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-samples-operator-master-okd-e2e-gcp-operator
+    rerun_command: /test okd-e2e-gcp-operator
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-password-file=/etc/boskos/password
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/usr/local/e2e-gcp-operator-cluster-profile
+        - --target=e2e-gcp-operator
+        - --template=/usr/local/e2e-gcp-operator
         - --variant=okd
         command:
         - ci-operator
         env:
         - name: CLUSTER_TYPE
-          value: aws
+          value: gcp
         - name: JOB_NAME_SAFE
-          value: e2e-aws-operator
+          value: e2e-gcp-operator
         - name: TEST_COMMAND
           value: make test-e2e-okd
         image: ci-operator:latest
@@ -750,9 +751,9 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-operator-cluster-profile
+        - mountPath: /usr/local/e2e-gcp-operator-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-aws-operator
+        - mountPath: /usr/local/e2e-gcp-operator
           name: job-definition
           subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
@@ -773,7 +774,9 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-aws
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
       - configMap:
           name: prow-job-cluster-launch-installer-src
         name: job-definition
@@ -783,13 +786,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )okd-e2e-aws-operator,?($|\s.*)
+    trigger: (?m)^/test( | .* )okd-e2e-gcp-operator,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - master
     cluster: api.ci
-    context: ci/prow/okd-e2e-aws-upgrade
+    context: ci/prow/okd-e2e-gcp-upgrade
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -797,9 +800,8 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       ci-operator.openshift.io/variant: okd
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-samples-operator-master-okd-e2e-aws-upgrade
-    optional: true
-    rerun_command: /test okd-e2e-aws-upgrade
+    name: pull-ci-openshift-cluster-samples-operator-master-okd-e2e-gcp-upgrade
+    rerun_command: /test okd-e2e-gcp-upgrade
     spec:
       containers:
       - args:
@@ -807,8 +809,8 @@ presubmits:
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/e2e-aws-upgrade-cluster-profile
-        - --target=e2e-aws-upgrade
+        - --secret-dir=/usr/local/e2e-gcp-upgrade-cluster-profile
+        - --target=e2e-gcp-upgrade
         - --variant=okd
         command:
         - ci-operator
@@ -822,7 +824,7 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
+        - mountPath: /usr/local/e2e-gcp-upgrade-cluster-profile
           name: cluster-profile
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -842,14 +844,16 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-aws
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
       - name: pull-secret
         secret:
           secretName: regcred
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )okd-e2e-aws-upgrade,?($|\s.*)
+    trigger: (?m)^/test( | .* )okd-e2e-gcp-upgrade,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
