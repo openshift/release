@@ -78,14 +78,22 @@ tests:
   openshift_installer_src:
     cluster_profile: azure4
 - as: e2e-vsphere
-  commands: TEST_SUITE=openshift/conformance/parallel run-tests
-  openshift_installer_upi:
+  steps:
     cluster_profile: vsphere
-- artifact_dir: /tmp/artifacts
-  as: e2e-vsphere-operator
-  commands: JUNIT_REPORT=1 make test-e2e
-  openshift_installer_upi_src:
+    workflow: openshift-e2e-vsphere
+- as: e2e-vsphere-operator
+  steps:
     cluster_profile: vsphere
+    test:
+    - artifact_dir: /tmp/artifacts
+      as: e2e-test
+      commands: JUNIT_REPORT=1 make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-vsphere
 - as: verify
   commands: make verify
   container:
