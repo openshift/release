@@ -74,9 +74,7 @@ fi
 
 cd dev-scripts
 
-set +x
-echo "export PULL_SECRET='\$(cat /root/pull-secret)'" > /root/dev-scripts/config_root.sh
-set -x
+cp /root/pull-secret /root/dev-scripts/pull_secret.json
 
 curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar -C /usr/bin -xzf -
 
