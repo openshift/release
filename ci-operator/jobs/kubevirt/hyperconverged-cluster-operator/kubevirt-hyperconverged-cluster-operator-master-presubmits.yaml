@@ -206,15 +206,15 @@ presubmits:
     branches:
     - master
     cluster: api.ci
-    context: ci/prow/hco-e2e-image-index-aws
+    context: ci/prow/hco-e2e-image-index-gcp
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-kubevirt-hyperconverged-cluster-operator-master-hco-e2e-image-index-aws
-    rerun_command: /test hco-e2e-image-index-aws
+    name: pull-ci-kubevirt-hyperconverged-cluster-operator-master-hco-e2e-image-index-gcp
+    rerun_command: /test hco-e2e-image-index-gcp
     spec:
       containers:
       - args:
@@ -222,8 +222,8 @@ presubmits:
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/hco-e2e-image-index-aws-cluster-profile
-        - --target=hco-e2e-image-index-aws
+        - --secret-dir=/usr/local/hco-e2e-image-index-gcp-cluster-profile
+        - --target=hco-e2e-image-index-gcp
         command:
         - ci-operator
         image: ci-operator:latest
@@ -236,7 +236,7 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/hco-e2e-image-index-aws-cluster-profile
+        - mountPath: /usr/local/hco-e2e-image-index-gcp-cluster-profile
           name: cluster-profile
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -256,14 +256,16 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-aws
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
       - name: pull-secret
         secret:
           secretName: regcred
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )hco-e2e-image-index-aws,?($|\s.*)
+    trigger: (?m)^/test( | .* )hco-e2e-image-index-gcp,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:

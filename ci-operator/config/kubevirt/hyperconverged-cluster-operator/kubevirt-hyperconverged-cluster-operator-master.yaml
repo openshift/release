@@ -41,8 +41,6 @@ operator:
   substitutions:
   - pullspec: quay.io/kubevirt/hyperconverged-cluster-operator@sha256:d015b58b0ed77fb20eab5cf5c4d530b3eebcba03fc75e571b1ec56dace9cb254
     with: hyperconverged-cluster-operator
-  - pullspec: '- name: KVM_EMULATION'
-    with: '- name: KVM_EMULATION\\n                  value: "true"'
 promotion:
   additional_images:
     hyperconverged-cluster-operator-tests: src
@@ -67,9 +65,9 @@ tests:
     make start && make functest
   openshift_installer_src:
     cluster_profile: aws
-- as: hco-e2e-image-index-aws
+- as: hco-e2e-image-index-gcp
   steps:
-    cluster_profile: aws
+    cluster_profile: gcp
     env:
       OO_CHANNEL: 1.2.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
@@ -78,6 +76,7 @@ tests:
     test:
     - as: e2e-test
       commands: |
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.6/linux/oc.tar.gz | tar -C /usr/bin -xzf -
         make deploy_cr
         make functest
       from: src
@@ -85,7 +84,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: optional-operators-ci-aws
+    workflow: optional-operators-ci-gcp
 - as: hco-e2e-upgrade-aws
   commands: |
     RELEASE_DELTA=1 make upgrade-test
