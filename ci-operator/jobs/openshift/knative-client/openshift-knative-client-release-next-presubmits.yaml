@@ -5,16 +5,17 @@ presubmits:
     branches:
     - release-next
     cluster: api.ci
-    context: ci/prow/e2e-aws-ocp-43
+    context: ci/prow/45-e2e-aws-ocp-45
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: "45"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-client-release-next-e2e-aws-ocp-43
+    name: pull-ci-openshift-knative-client-release-next-45-e2e-aws-ocp-45
     path_alias: github.com/knative/client
-    rerun_command: /test e2e-aws-ocp-43
+    rerun_command: /test 45-e2e-aws-ocp-45
     spec:
       containers:
       - args:
@@ -22,16 +23,17 @@ presubmits:
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/e2e-aws-ocp-43-cluster-profile
-        - --target=e2e-aws-ocp-43
-        - --template=/usr/local/e2e-aws-ocp-43
+        - --secret-dir=/usr/local/e2e-aws-ocp-45-cluster-profile
+        - --target=e2e-aws-ocp-45
+        - --template=/usr/local/e2e-aws-ocp-45
+        - --variant=45
         command:
         - ci-operator
         env:
         - name: CLUSTER_TYPE
           value: aws
         - name: JOB_NAME_SAFE
-          value: e2e-aws-ocp-43
+          value: e2e-aws-ocp-45
         - name: TEST_COMMAND
           value: make test-e2e
         image: ci-operator:latest
@@ -44,9 +46,9 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-ocp-43-cluster-profile
+        - mountPath: /usr/local/e2e-aws-ocp-45-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-aws-ocp-43
+        - mountPath: /usr/local/e2e-aws-ocp-45
           name: job-definition
           subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
@@ -77,22 +79,23 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-ocp-43,?($|\s.*)
+    trigger: (?m)^/test( | .* )45-e2e-aws-ocp-45,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - release-next
-    cluster: build01
-    context: ci/prow/images
+    cluster: api.ci
+    context: ci/prow/45-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: "45"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-client-release-next-images
+    name: pull-ci-openshift-knative-client-release-next-45-images
     path_alias: github.com/knative/client
-    rerun_command: /test images
+    rerun_command: /test 45-images
     spec:
       containers:
       - args:
@@ -100,6 +103,7 @@ presubmits:
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --target=[images]
+        - --variant=45
         command:
         - ci-operator
         image: ci-operator:latest
@@ -123,4 +127,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
+    trigger: (?m)^/test( | .* )45-images,?($|\s.*)

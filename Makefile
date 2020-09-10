@@ -39,10 +39,10 @@ update:
 	$(MAKE) jobs
 	$(MAKE) ci-operator-config
 	$(MAKE) prow-config
+	$(MAKE) registry-metadata
 
 release-controllers:
 	./hack/generators/release-controllers/generate-release-controllers.py .
-	cp ./core-services/release-controller/rpms-ocp-*.yaml ./clusters/build-clusters/01_cluster/openshift/release-controller
 .PHONY: release-controllers
 
 jobs:
@@ -92,7 +92,7 @@ applyTemplate:
 	oc process -f $(WHAT) | oc apply -f -
 .PHONY: applyTemplate
 
-postsubmit-update: origin-release cincinnati prow-release-controller-definitions
+postsubmit-update: origin-release origin-stable cincinnati prow-release-controller-definitions
 .PHONY: postsubmit-update
 
 all: roles prow projects
@@ -124,7 +124,6 @@ openshift-ns:
 .PHONY: openshift-ns
 
 prow-jobs: prow-artifacts
-	$(MAKE) apply WHAT=projects/prometheus/test/build.yaml
 	$(MAKE) apply WHAT=ci-operator/templates/os.yaml
 .PHONY: prow-jobs
 
@@ -174,8 +173,6 @@ publishing-bot:
 
 origin-stable:
 	$(MAKE) apply WHAT=projects/origin-stable/release.yaml
-	$(MAKE) apply WHAT=projects/origin-stable/stable-3.9.yaml
-	$(MAKE) apply WHAT=projects/origin-stable/stable-3.10.yaml
 .PHONY: origin-stable
 
 origin-release:
@@ -183,21 +180,9 @@ origin-release:
 	oc tag docker.io/centos/ruby-25-centos7:latest --scheduled openshift/release:ruby-25
 .PHONY: origin-release
 
-prometheus: node-exporter alert-buffer
-	$(MAKE) apply WHAT=projects/prometheus/prometheus.yaml
-.PHONY: prometheus
-
-node-exporter:
-	$(MAKE) apply WHAT=projects/prometheus/node_exporter.yaml
-.PHONY: node-exporter
-
 service-idler:
 	$(MAKE) apply WHAT=projects/service-idler/pipeline.yaml
 .PHONY: service-idler
-
-alert-buffer:
-	$(MAKE) apply WHAT=projects/prometheus/alert-buffer.yaml
-.PHONY: alert-buffer
 
 cluster-operator-roles:
 	oc create ns openshift-cluster-operator --dry-run -o yaml | oc apply -f -

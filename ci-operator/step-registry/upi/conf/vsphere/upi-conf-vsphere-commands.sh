@@ -32,7 +32,7 @@ cluster_domain=$(<"${SHARED_DIR}"/clusterdomain.txt)
 
 ssh_pub_key_path="${CLUSTER_PROFILE_DIR}/ssh-publickey"
 install_config="${SHARED_DIR}/install-config.yaml"
-tfvars_path=/var/run/secrets/ci.openshift.io/cluster-profile/secret.auto.tfvars
+tfvars_path=/var/run/secrets/ci.openshift.io/cluster-profile/vmc.secret.auto.tfvars
 vsphere_user=$(grep -oP 'vsphere_user\s*=\s*"\K[^"]+' ${tfvars_path})
 vsphere_password=$(grep -oP 'vsphere_password\s*=\s*"\K[^"]+' ${tfvars_path})
 ova_url="$(jq -r '.baseURI + .images["vmware"].path' /var/lib/openshift-install/rhcos.json)"
@@ -41,12 +41,12 @@ vm_template="${ova_url##*/}"
 
 echo "$(date -u --rfc-3339=seconds) - Creating govc.sh file..."
 cat >> "${SHARED_DIR}/govc.sh" << EOF
-export GOVC_URL=vcsa-ci.vmware.devcluster.openshift.com
+export GOVC_URL=vcenter.sddc-44-236-21-251.vmwarevmc.com
 export GOVC_USERNAME="${vsphere_user}"
 export GOVC_PASSWORD="${vsphere_password}"
 export GOVC_INSECURE=1
-export GOVC_DATACENTER=dc1
-export GOVC_DATASTORE=vsanDatastore
+export GOVC_DATACENTER=SDDC-Datacenter
+export GOVC_DATASTORE=WorkloadDatastore
 EOF
 
 echo "$(date -u --rfc-3339=seconds) - Extend install-config.yaml ..."
@@ -64,24 +64,24 @@ compute:
   replicas: 0
 platform:
   vsphere:
-    cluster: devel
-    datacenter: dc1
-    defaultDatastore: vsanDatastore
-    network: "VM Network"
+    cluster: Cluster-1
+    datacenter: SDDC-Datacenter
+    defaultDatastore: WorkloadDatastore
+    network: "ci-segment"
     password: ${vsphere_password}
     username: ${vsphere_user}
-    vCenter: vcsa-ci.vmware.devcluster.openshift.com
-    folder: "/dc1/vm/${cluster_name}"
+    vCenter: vcenter.sddc-44-236-21-251.vmwarevmc.com
+    folder: "/SDDC-Datacenter/vm/${cluster_name}"
 EOF
 
 echo "$(date -u --rfc-3339=seconds) - Create terraform.tfvars ..."
 cat > "${SHARED_DIR}/terraform.tfvars" <<-EOF
-machine_cidr = "139.178.94.128/25"
+machine_cidr = "172.31.252.0/22"
 vm_template = "${vm_template}"
-vsphere_cluster = "devel"
-vsphere_datacenter = "dc1"
-vsphere_datastore = "vsanDatastore"
-vsphere_server = "vcsa-ci.vmware.devcluster.openshift.com"
+vsphere_cluster = "Cluster-1"
+vsphere_datacenter = "SDDC-Datacenter"
+vsphere_datastore = "WorkloadDatastore"
+vsphere_server = "vcenter.sddc-44-236-21-251.vmwarevmc.com"
 ipam = "139.178.89.254"
 cluster_id = "${cluster_name}"
 base_domain = "${base_domain}"
@@ -89,6 +89,8 @@ cluster_domain = "${cluster_domain}"
 ssh_public_key_path = "${ssh_pub_key_path}"
 compute_memory = "16384"
 compute_num_cpus = "4"
+vm_network = "ci-segment"
+vm_dns_addresses = ["10.0.0.2"]
 EOF
 
 dir=/tmp/installer

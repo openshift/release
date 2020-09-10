@@ -31,10 +31,6 @@ parameters:
   value: external
 - name: OPENSTACK_FLAVOR
   value: m1.s2.xlarge
-- name: OPENSTACK_MASTER_VOLUME_SIZE
-  value: "25"
-- name: OPENSTACK_MASTER_VOLUME_TYPE
-  value: "performance"
 - name: BUILD_ID
   required: false
 - name: CLUSTER_VARIANT
@@ -218,12 +214,12 @@ objects:
         function run-upgrade-tests() {
           openshift-tests run-upgrade "${TEST_SUITE}" --to-image "${IMAGE:-${RELEASE_IMAGE_LATEST}}" \
             --options "${TEST_OPTIONS:-}" \
-            --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
+            --provider "${TEST_PROVIDER:-}" -o ${ARTIFACT_DIR}/e2e.log --junit-dir ${ARTIFACT_DIR}/junit
         }
 
         function run-tests() {
           openshift-tests run "${TEST_SUITE}" \
-            --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
+            --provider "${TEST_PROVIDER:-}" -o ${ARTIFACT_DIR}/e2e.log --junit-dir ${ARTIFACT_DIR}/junit
         }
 
         function run-minimal-tests() {
@@ -232,8 +228,8 @@ objects:
           # reliably.
           openshift-tests run openshift/conformance/parallel --dry-run |
             grep 'Smoke\|Early' |
-          openshift-tests run -o /tmp/artifacts/e2e.log \
-            --junit-dir /tmp/artifacts/junit -f -
+          openshift-tests run -o ${ARTIFACT_DIR}/e2e.log \
+            --junit-dir ${ARTIFACT_DIR}/junit -f -
           return 0
         }
 
@@ -257,6 +253,8 @@ objects:
       - name: artifacts
         mountPath: /tmp/artifacts
       env:
+      - name: ARTIFACT_DIR
+        value: /tmp/artifacts
       - name: TYPE
         value: ${CLUSTER_TYPE}
       - name: CLUSTER_NAME
@@ -295,11 +293,6 @@ objects:
         value: test
       - name: HOME
         value: /tmp
-      # we must boot from performance volumes to reduce disk speed related etcd failures
-      - name: OPENSTACK_MASTER_VOLUME_SIZE
-        value: "${OPENSTACK_MASTER_VOLUME_SIZE}"
-      - name: OPENSTACK_MASTER_VOLUME_TYPE
-        value: "${OPENSTACK_MASTER_VOLUME_TYPE}"
       - name: INSTALL_INITIAL_RELEASE
       - name: RELEASE_IMAGE_INITIAL
       command:
@@ -312,7 +305,7 @@ objects:
         trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/setup-success; else touch /tmp/exit /tmp/setup-failed; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
         cp "$(command -v openshift-install)" /tmp
-        mkdir /tmp/artifacts/installer
+        mkdir ${ARTIFACT_DIR}/installer
 
         # We have to truncate cluster name to 14 chars, because there is a limitation in the install-config
         # Now it looks like "ci-op-rl6z646h-65230".
@@ -339,7 +332,7 @@ objects:
         LB_FIP=$(openstack floating ip create --description "${CLUSTER_NAME}-api-fip"  $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address')
 
         echo "Creating DNS record for api.$CLUSTER_NAME.$BASE_DOMAIN. -> $LB_FIP"
-        cat > /tmp/artifacts/installer/api-record.json <<EOF
+        cat > ${ARTIFACT_DIR}/installer/api-record.json <<EOF
         {
         "Comment": "Create the public OpenShift API record",
         "Changes": [{
@@ -354,18 +347,11 @@ objects:
         EOF
 
         export HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "shiftstack.devcluster.openshift.com" | python -c 'import json,sys;print json.load(sys.stdin)["HostedZones"][0]["Id"].split("/")[-1]')
-        aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file:///tmp/artifacts/installer/api-record.json
+        aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file://${ARTIFACT_DIR}/installer/api-record.json
 
-        cat > /tmp/artifacts/installer/install-config.yaml << EOF
+        cat > ${ARTIFACT_DIR}/installer/install-config.yaml << EOF
         apiVersion: v1beta4
         baseDomain: ${BASE_DOMAIN}
-        controlPlane:
-          name: master
-          platform:
-            openstack:
-              rootVolume:
-                size: ${OPENSTACK_MASTER_VOLUME_SIZE}
-                type: ${OPENSTACK_MASTER_VOLUME_TYPE}
         metadata:
           name: ${CLUSTER_NAME}
         platform:
@@ -382,36 +368,36 @@ objects:
 
         # Create a ramdisk for the etcd storage. This helps with disk latency
         # unpredictability in the OpenStack cloud used by the CI:
-        TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create ignition-configs --log-level=debug
+        TF_LOG=debug openshift-install --dir=${ARTIFACT_DIR}/installer create ignition-configs --log-level=debug
         python -c \
             'import json, sys; j = json.load(sys.stdin); j[u"systemd"] = {}; j[u"systemd"][u"units"] = [{u"contents": "[Unit]\nDescription=Mount etcd as a ramdisk\nBefore=local-fs.target\n[Mount]\n What=none\nWhere=/var/lib/etcd\nType=tmpfs\nOptions=size=2G\n[Install]\nWantedBy=local-fs.target", u"enabled": True, u"name":u"var-lib-etcd.mount"}]; json.dump(j, sys.stdout)' \
-            </tmp/artifacts/installer/master.ign \
-            >/tmp/artifacts/installer/master.ign.out
-        mv /tmp/artifacts/installer/master.ign.out /tmp/artifacts/installer/master.ign
+            <${ARTIFACT_DIR}/installer/master.ign \
+            >${ARTIFACT_DIR}/installer/master.ign.out
+        mv ${ARTIFACT_DIR}/installer/master.ign.out ${ARTIFACT_DIR}/installer/master.ign
 
 
         # What we're doing here is we generate manifests first and force that OpenShift SDN is configured. Kuryr is only
         # allowed when KURYR_ENABLED variable is set to "true".
-        TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create manifests --log-level=debug &
+        TF_LOG=debug openshift-install --dir=${ARTIFACT_DIR}/installer create manifests --log-level=debug &
         wait "$!"
 
-        sed -i '/^  channel:/d' /tmp/artifacts/installer/manifests/cvo-overrides.yaml
+        sed -i '/^  channel:/d' ${ARTIFACT_DIR}/installer/manifests/cvo-overrides.yaml
 
         if [[ "${KURYR_ENABLED:-false}" != "true" ]]; then
           if [[ "${CLUSTER_VARIANT:-sdn}" == "sdn" ]]; then
             echo "Forcing OpenShiftSDN by modifying manifests"
-            sed -i -e 's/networkType: .*$/networkType: OpenShiftSDN/g' /tmp/artifacts/installer/manifests/cluster-network-02-config.yml
+            sed -i -e 's/networkType: .*$/networkType: OpenShiftSDN/g' ${ARTIFACT_DIR}/installer/manifests/cluster-network-02-config.yml
           fi
           if [[ "${CLUSTER_VARIANT:-sdn}" == "ovn" ]]; then
             echo "Forcing OVNKubernetes by modifying manifests"
-            sed -i -e 's/networkType: .*$/networkType: OVNKubernetes/g' /tmp/artifacts/installer/manifests/cluster-network-02-config.yml
+            sed -i -e 's/networkType: .*$/networkType: OVNKubernetes/g' ${ARTIFACT_DIR}/installer/manifests/cluster-network-02-config.yml
           fi
         fi
-        TF_LOG=debug openshift-install --dir=/tmp/artifacts/installer create cluster --log-level=debug 2>&1 | grep --line-buffered -v password &
+        TF_LOG=debug openshift-install --dir=${ARTIFACT_DIR}/installer create cluster --log-level=debug 2>&1 | grep --line-buffered -v password &
         wait "$!"
 
         # Password for the cluster gets leaked in the installer logs and hence removing them.
-        sed -i 's/password: .*/password: REDACTED"/g' /tmp/artifacts/installer/.openshift_install.log
+        sed -i 's/password: .*/password: REDACTED"/g' ${ARTIFACT_DIR}/installer/.openshift_install.log
 
         INGRESS_PORT=$(openstack port list --format value -c Name | awk "/${CLUSTER_NAME}.*-ingress-port/ {print}")
         if [ -n "$INGRESS_PORT" ]; then
@@ -419,7 +405,7 @@ objects:
           # create a new floating ip tagged with CLUSTER_NAME so it can be deleted later
           APPS_FIP=$(openstack floating ip create --description "${CLUSTER_NAME}-ingress-fip" $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address' --port $INGRESS_PORT)
           echo "Creating DNS record for *.apps.$CLUSTER_NAME.$BASE_DOMAIN. -> $APPS_FIP"
-          cat > /tmp/artifacts/installer/ingress-record.json <<EOF
+          cat > ${ARTIFACT_DIR}/installer/ingress-record.json <<EOF
           {
           "Comment": "Create the public OpenShift Ingress record",
           "Changes": [{
@@ -432,7 +418,7 @@ objects:
                 }
           }]}
         EOF
-          aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file:///tmp/artifacts/installer/ingress-record.json
+          aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file://${ARTIFACT_DIR}/installer/ingress-record.json
         fi
 
     # Performs cleanup of all created resources
@@ -447,6 +433,8 @@ objects:
       - name: artifacts
         mountPath: /tmp/artifacts
       env:
+      - name: ARTIFACT_DIR
+        value: /tmp/artifacts
       - name: TYPE
         value: ${CLUSTER_TYPE}
       - name: CLUSTER_NAME
@@ -500,90 +488,81 @@ objects:
           export PATH=$PATH:/tmp/shared
 
           echo "Gathering artifacts ..."
-          mkdir -p /tmp/artifacts/pods /tmp/artifacts/nodes /tmp/artifacts/metrics /tmp/artifacts/bootstrap /tmp/artifacts/network
+          mkdir -p ${ARTIFACT_DIR}/pods ${ARTIFACT_DIR}/nodes ${ARTIFACT_DIR}/metrics ${ARTIFACT_DIR}/bootstrap ${ARTIFACT_DIR}/network
 
-          openstack server list | grep $CLUSTER_NAME >/tmp/artifacts/openstack_nodes.log
+          openstack server list | grep $CLUSTER_NAME >${ARTIFACT_DIR}/openstack_nodes.log
           for server in $(openstack server list -c Name -f value | grep $CLUSTER_NAME | sort); do
-              echo -e "\n$ openstack server show $server" >>/tmp/artifacts/openstack_nodes.log
-              openstack server show $server >>/tmp/artifacts/openstack_nodes.log
+              echo -e "\n$ openstack server show $server" >>${ARTIFACT_DIR}/openstack_nodes.log
+              openstack server show $server >>${ARTIFACT_DIR}/openstack_nodes.log
+              if [[ "$server" == *"bootstrap"* ]]; then
+                openstack console log show $server &>${ARTIFACT_DIR}/bootstrap/nova.log
+              else
+                openstack console log show $server &>${ARTIFACT_DIR}/nodes/console_${server}.log
+              fi
           done
-
-          # Get bootstrap nova logs
-          # NOTE(shadower): The server names are in the form
-          # `$CLUSTER_NAME-fmszv-bootstrap`. I could not find how to
-          # get the middle part (`fmszv`) (it's not in the shell
-          # environment here) so we'll list all the servers and look
-          # the bootstrap name up that way.
-          local BOOTSTRAP_NAME=$(openstack server list --format value --column Name | grep "${CLUSTER_NAME}-.*-bootstrap")
-          if [ -n "$BOOTSTRAP_NAME" ]; then
-              openstack console log show "$BOOTSTRAP_NAME" &>/tmp/artifacts/bootstrap/nova.log
-          fi
 
           oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' > /tmp/nodes
           oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces --template '{{ range .items }}{{ $name := .metadata.name }}{{ $ns := .metadata.namespace }}{{ range .spec.containers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ range .spec.initContainers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ end }}' > /tmp/containers
           oc --insecure-skip-tls-verify --request-timeout=5s get pods -l openshift.io/component=api --all-namespaces --template '{{ range .items }}-n {{ .metadata.namespace }} {{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/pods-api
 
-          queue /tmp/artifacts/config-resources.json oc --insecure-skip-tls-verify --request-timeout=5s get apiserver.config.openshift.io authentication.config.openshift.io build.config.openshift.io console.config.openshift.io dns.config.openshift.io featuregate.config.openshift.io image.config.openshift.io infrastructure.config.openshift.io ingress.config.openshift.io network.config.openshift.io oauth.config.openshift.io project.config.openshift.io scheduler.config.openshift.io -o json
-          queue /tmp/artifacts/apiservices.json oc --insecure-skip-tls-verify --request-timeout=5s get apiservices -o json
-          queue /tmp/artifacts/clusteroperators.json oc --insecure-skip-tls-verify --request-timeout=5s get clusteroperators -o json
-          queue /tmp/artifacts/clusterversion.json oc --insecure-skip-tls-verify --request-timeout=5s get clusterversion -o json
-          queue /tmp/artifacts/configmaps.json oc --insecure-skip-tls-verify --request-timeout=5s get configmaps --all-namespaces -o json
-          queue /tmp/artifacts/credentialsrequests.json oc --insecure-skip-tls-verify --request-timeout=5s get credentialsrequests --all-namespaces -o json
-          queue /tmp/artifacts/csr.json oc --insecure-skip-tls-verify --request-timeout=5s get csr -o json
-          queue /tmp/artifacts/endpoints.json oc --insecure-skip-tls-verify --request-timeout=5s get endpoints --all-namespaces -o json
-          FILTER=gzip queue /tmp/artifacts/deployments.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get deployments --all-namespaces -o json
-          FILTER=gzip queue /tmp/artifacts/daemonsets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get daemonsets --all-namespaces -o json
-          queue /tmp/artifacts/events.json oc --insecure-skip-tls-verify --request-timeout=5s get events --all-namespaces -o json
-          queue /tmp/artifacts/kubeapiserver.json oc --insecure-skip-tls-verify --request-timeout=5s get kubeapiserver -o json
-          queue /tmp/artifacts/kubecontrollermanager.json oc --insecure-skip-tls-verify --request-timeout=5s get kubecontrollermanager -o json
-          queue /tmp/artifacts/machineconfigpools.json oc --insecure-skip-tls-verify --request-timeout=5s get machineconfigpools -o json
-          queue /tmp/artifacts/machineconfigs.json oc --insecure-skip-tls-verify --request-timeout=5s get machineconfigs -o json
-          queue /tmp/artifacts/machinesets.json oc --insecure-skip-tls-verify --request-timeout=5s get machinesets -A -o json
-          queue /tmp/artifacts/machines.json oc --insecure-skip-tls-verify --request-timeout=5s get machines -A -o json
-          queue /tmp/artifacts/namespaces.json oc --insecure-skip-tls-verify --request-timeout=5s get namespaces -o json
-          queue /tmp/artifacts/nodes.json oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o json
-          queue /tmp/artifacts/openshiftapiserver.json oc --insecure-skip-tls-verify --request-timeout=5s get openshiftapiserver -o json
-          queue /tmp/artifacts/pods.json oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces -o json
-          queue /tmp/artifacts/persistentvolumes.json oc --insecure-skip-tls-verify --request-timeout=5s get persistentvolumes --all-namespaces -o json
-          queue /tmp/artifacts/persistentvolumeclaims.json oc --insecure-skip-tls-verify --request-timeout=5s get persistentvolumeclaims --all-namespaces -o json
-          FILTER=gzip queue /tmp/artifacts/replicasets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get replicasets --all-namespaces -o json
-          queue /tmp/artifacts/rolebindings.json oc --insecure-skip-tls-verify --request-timeout=5s get rolebindings --all-namespaces -o json
-          queue /tmp/artifacts/roles.json oc --insecure-skip-tls-verify --request-timeout=5s get roles --all-namespaces -o json
-          queue /tmp/artifacts/services.json oc --insecure-skip-tls-verify --request-timeout=5s get services --all-namespaces -o json
-          FILTER=gzip queue /tmp/artifacts/statefulsets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get statefulsets --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/config-resources.json oc --insecure-skip-tls-verify --request-timeout=5s get apiserver.config.openshift.io authentication.config.openshift.io build.config.openshift.io console.config.openshift.io dns.config.openshift.io featuregate.config.openshift.io image.config.openshift.io infrastructure.config.openshift.io ingress.config.openshift.io network.config.openshift.io oauth.config.openshift.io project.config.openshift.io scheduler.config.openshift.io -o json
+          queue ${ARTIFACT_DIR}/apiservices.json oc --insecure-skip-tls-verify --request-timeout=5s get apiservices -o json
+          queue ${ARTIFACT_DIR}/clusteroperators.json oc --insecure-skip-tls-verify --request-timeout=5s get clusteroperators -o json
+          queue ${ARTIFACT_DIR}/clusterversion.json oc --insecure-skip-tls-verify --request-timeout=5s get clusterversion -o json
+          queue ${ARTIFACT_DIR}/configmaps.json oc --insecure-skip-tls-verify --request-timeout=5s get configmaps --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/credentialsrequests.json oc --insecure-skip-tls-verify --request-timeout=5s get credentialsrequests --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/csr.json oc --insecure-skip-tls-verify --request-timeout=5s get csr -o json
+          queue ${ARTIFACT_DIR}/endpoints.json oc --insecure-skip-tls-verify --request-timeout=5s get endpoints --all-namespaces -o json
+          FILTER=gzip queue ${ARTIFACT_DIR}/deployments.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get deployments --all-namespaces -o json
+          FILTER=gzip queue ${ARTIFACT_DIR}/daemonsets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get daemonsets --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/events.json oc --insecure-skip-tls-verify --request-timeout=5s get events --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/kubeapiserver.json oc --insecure-skip-tls-verify --request-timeout=5s get kubeapiserver -o json
+          queue ${ARTIFACT_DIR}/kubecontrollermanager.json oc --insecure-skip-tls-verify --request-timeout=5s get kubecontrollermanager -o json
+          queue ${ARTIFACT_DIR}/machineconfigpools.json oc --insecure-skip-tls-verify --request-timeout=5s get machineconfigpools -o json
+          queue ${ARTIFACT_DIR}/machineconfigs.json oc --insecure-skip-tls-verify --request-timeout=5s get machineconfigs -o json
+          queue ${ARTIFACT_DIR}/machinesets.json oc --insecure-skip-tls-verify --request-timeout=5s get machinesets -A -o json
+          queue ${ARTIFACT_DIR}/machines.json oc --insecure-skip-tls-verify --request-timeout=5s get machines -A -o json
+          queue ${ARTIFACT_DIR}/namespaces.json oc --insecure-skip-tls-verify --request-timeout=5s get namespaces -o json
+          queue ${ARTIFACT_DIR}/nodes.json oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o json
+          queue ${ARTIFACT_DIR}/openshiftapiserver.json oc --insecure-skip-tls-verify --request-timeout=5s get openshiftapiserver -o json
+          queue ${ARTIFACT_DIR}/pods.json oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/persistentvolumes.json oc --insecure-skip-tls-verify --request-timeout=5s get persistentvolumes --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/persistentvolumeclaims.json oc --insecure-skip-tls-verify --request-timeout=5s get persistentvolumeclaims --all-namespaces -o json
+          FILTER=gzip queue ${ARTIFACT_DIR}/replicasets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get replicasets --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/rolebindings.json oc --insecure-skip-tls-verify --request-timeout=5s get rolebindings --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/roles.json oc --insecure-skip-tls-verify --request-timeout=5s get roles --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/services.json oc --insecure-skip-tls-verify --request-timeout=5s get services --all-namespaces -o json
+          FILTER=gzip queue ${ARTIFACT_DIR}/statefulsets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get statefulsets --all-namespaces -o json
 
-          FILTER=gzip queue /tmp/artifacts/openapi.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get --raw /openapi/v2
+          FILTER=gzip queue ${ARTIFACT_DIR}/openapi.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get --raw /openapi/v2
 
           # gather nodes first in parallel since they may contain the most relevant debugging info
           while IFS= read -r i; do
-            mkdir -p /tmp/artifacts/nodes/$i
-            queue /tmp/artifacts/nodes/$i/nova.log openstack console log show $i
-            queue /tmp/artifacts/nodes/$i/heap oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/debug/pprof/heap
+            mkdir -p ${ARTIFACT_DIR}/nodes/$i
+            queue ${ARTIFACT_DIR}/nodes/$i/heap oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/debug/pprof/heap
+            FILTER=gzip queue ${ARTIFACT_DIR}/nodes/$i/journal.gz oc --insecure-skip-tls-verify adm node-logs $i --unify=false
           done < /tmp/nodes
-
-          FILTER=gzip queue /tmp/artifacts/nodes/masters-journal.gz oc --insecure-skip-tls-verify adm node-logs --role=master --unify=false
-          FILTER=gzip queue /tmp/artifacts/nodes/workers-journal.gz oc --insecure-skip-tls-verify adm node-logs --role=worker --unify=false
 
           # Snapshot iptables-save on each node for debugging possible kube-proxy issues
           oc --insecure-skip-tls-verify get --request-timeout=20s -n openshift-sdn -l app=sdn pods --template '{{ range .items }}{{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/sdn-pods
           while IFS= read -r i; do
-            queue /tmp/artifacts/network/iptables-save-$i oc --insecure-skip-tls-verify rsh --timeout=20 -n openshift-sdn -c sdn $i iptables-save -c
+            queue ${ARTIFACT_DIR}/network/iptables-save-$i oc --insecure-skip-tls-verify rsh --timeout=20 -n openshift-sdn -c sdn $i iptables-save -c
           done < /tmp/sdn-pods
 
           while IFS= read -r i; do
             file="$( echo "$i" | cut -d ' ' -f 3 | tr -s ' ' '_' )"
-            queue /tmp/artifacts/metrics/${file}-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig'
-            queue /tmp/artifacts/metrics/${file}-controllers-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig'
+            queue ${ARTIFACT_DIR}/metrics/${file}-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig'
+            queue ${ARTIFACT_DIR}/metrics/${file}-controllers-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig'
           done < /tmp/pods-api
 
           while IFS= read -r i; do
             file="$( echo "$i" | cut -d ' ' -f 2,3,5 | tr -s ' ' '_' )"
-            FILTER=gzip queue /tmp/artifacts/pods/${file}.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s $i
-            FILTER=gzip queue /tmp/artifacts/pods/${file}_previous.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s -p $i
+            FILTER=gzip queue ${ARTIFACT_DIR}/pods/${file}.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s $i
+            FILTER=gzip queue ${ARTIFACT_DIR}/pods/${file}_previous.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s -p $i
           done < /tmp/containers
 
           echo "Snapshotting prometheus (may take 15s) ..."
-          queue /tmp/artifacts/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring prometheus-k8s-0 -- tar cvzf - -C /prometheus .
+          queue ${ARTIFACT_DIR}/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring prometheus-k8s-0 -- tar cvzf - -C /prometheus .
 
           # move private key to ~/.ssh/ so that installer can use it to gather logs
           mkdir -p ~/.ssh
@@ -591,27 +570,41 @@ objects:
           chmod 0600 ~/.ssh/id_rsa
 
           echo "Running must-gather..."
-          mkdir -p /tmp/artifacts/must-gather
-          queue /tmp/artifacts/must-gather/must-gather.log oc --insecure-skip-tls-verify adm must-gather --dest-dir /tmp/artifacts/must-gather
+          mkdir -p ${ARTIFACT_DIR}/must-gather
+          queue ${ARTIFACT_DIR}/must-gather/must-gather.log oc --insecure-skip-tls-verify adm must-gather --dest-dir ${ARTIFACT_DIR}/must-gather
 
           echo "Waiting for logs ..."
           wait
 
-          tar -czC /tmp/artifacts/must-gather -f /tmp/artifacts/must-gather.tar.gz . &&
-          rm -rf /tmp/artifacts/must-gather
+          # This is a temporary conversion of cluster operator status to JSON matching the upgrade - may be moved to code in the future
+          mkdir -p ${ARTIFACT_DIR}/junit
+          <${ARTIFACT_DIR}/clusteroperators.json jq -r 'def one(condition; t): t as $t | first([.[] | select(condition)] | map(.type=t)[]) // null; def msg: "Operator \(.type) (\(.reason)): \(.message)"; def xmlfailure: if .failure then "<failure message=\"\(.failure | @html)\">\(.failure | @html)</failure>" else "" end; def xmltest: "<testcase name=\"\(.name | @html)\">\( xmlfailure )</testcase>"; def withconditions: map({name: "operator install \(.metadata.name)"} + (.status.conditions | (one(.type=="Available" and .status!="True"; "unavailable") // one(.type=="Degraded" and .status=="True"; "degraded") // one(.type=="Progressing" and .status=="True"; "progressing") // null) | if . then {failure: .|msg} else null end)); .items | withconditions | "<testsuite name=\"Operator results\" tests=\"\( length )\" failures=\"\( [.[] | select(.failure)] | length )\">\n\( [.[] | xmltest] | join("\n"))\n</testsuite>"' > ${ARTIFACT_DIR}/junit/junit_install_status.xml
+
+          tar -czC ${ARTIFACT_DIR}/must-gather -f ${ARTIFACT_DIR}/must-gather.tar.gz . &&
+          rm -rf ${ARTIFACT_DIR}/must-gather
 
           echo "Removing entries from DNS ..."
           export HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "shiftstack.devcluster.openshift.com" | python -c 'import json,sys;print json.load(sys.stdin)["HostedZones"][0]["Id"].split("/")[-1]')
-          sed -e's/UPSERT/DELETE/g' /tmp/artifacts/installer/api-record.json > /tmp/artifacts/installer/delete-api-record.json
-          aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file:///tmp/artifacts/installer/delete-api-record.json
-          sed -e's/UPSERT/DELETE/g' /tmp/artifacts/installer/ingress-record.json > /tmp/artifacts/installer/delete-ingress-record.json
-          aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file:///tmp/artifacts/installer/delete-ingress-record.json
+          sed -e's/UPSERT/DELETE/g' ${ARTIFACT_DIR}/installer/api-record.json > ${ARTIFACT_DIR}/installer/delete-api-record.json
+          aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file://${ARTIFACT_DIR}/installer/delete-api-record.json
+          sed -e's/UPSERT/DELETE/g' ${ARTIFACT_DIR}/installer/ingress-record.json > ${ARTIFACT_DIR}/installer/delete-ingress-record.json
+          aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file://${ARTIFACT_DIR}/installer/delete-ingress-record.json
 
           echo "Deleting service VM FIP ..."
           openstack floating ip list --long -f csv -c Description -c "Floating IP Address" | grep $CLUSTER_NAME | cut -f1 -d "," | xargs openstack floating ip delete
 
           echo "Deprovisioning cluster ..."
-          openshift-install --dir /tmp/artifacts/installer --log-level=debug destroy cluster
+          openshift-install --dir ${ARTIFACT_DIR}/installer --log-level=debug destroy cluster
+
+          declare -ra to_be_deleted=(
+            '${ARTIFACT_DIR}/installer/auth'
+          )
+          for f in "${to_be_deleted[@]}"; do
+            if [ -e "$f" ]; then
+                echo "Deleting stale resource '${f}'..."
+                rm -rf "$f"
+            fi
+          done
         }
 
         # We have to truncate cluster name to 14 chars, because there is a limitation in the install-config

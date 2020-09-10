@@ -3,6 +3,10 @@ base_images:
     name: 4.7-priv
     namespace: ocp-private
     tag: base
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
 build_root:
   image_stream_tag:
     name: release
@@ -10,8 +14,11 @@ build_root:
     tag: golang-1.10
 canonical_go_repository: github.com/openshift/leader-elector
 images:
-- dockerfile_path: Dockerfile
-  from: base
+- from: base
+  inputs:
+    ocp_builder_rhel-8-golang-openshift-4.6:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-openshift-4.6
   to: leader-elector
 promotion:
   name: 4.7-priv

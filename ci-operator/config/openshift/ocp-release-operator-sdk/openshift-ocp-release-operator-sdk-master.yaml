@@ -1,26 +1,38 @@
 base_images:
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
   os:
-    name: ubi
+    name: builder
     namespace: ocp
-    tag: "8"
+    tag: rhel-8-base-openshift-4.6
   os-minimal:
-    name: ubi-minimal
+    name: builder
     namespace: ocp
-    tag: "8"
+    tag: rhel-8-base-openshift-4.6
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: rhel-8-release-openshift-4.6
 images:
 - dockerfile_path: ci/dockerfiles/builder.Dockerfile
   from: root
   to: osdk-builder
-- dockerfile_path: release/ansible/upstream.Dockerfile
+- dockerfile_path: release/ansible/Dockerfile.rhel8
   from: os
+  inputs:
+    ocp_builder_rhel-8-golang-openshift-4.6:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-openshift-4.6
   to: ansible-operator
-- dockerfile_path: release/helm/upstream.Dockerfile
+- dockerfile_path: release/helm/Dockerfile
   from: os-minimal
+  inputs:
+    ocp_builder_rhel-8-golang-openshift-4.6:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-openshift-4.6
   to: helm-operator
 - dockerfile_path: ci/dockerfiles/ansible-e2e.Dockerfile
   from: ansible-operator

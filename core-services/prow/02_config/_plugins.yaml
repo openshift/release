@@ -5,7 +5,6 @@ approve:
   repos:
   - openshift/ci-ns-ttl-controller
   - openshift/ci-search
-  - openshift/ci-secret-mirroring-controller
   - openshift/ci-tools
   - openshift/release
   - openshift/release-controller
@@ -70,11 +69,15 @@ approve:
 - commandHelpLink: https://go.k8s.io/bot-commands
   ignore_review_state: true
   repos:
-  - redhat-developer/build
   - redhat-developer/devconsole-api
   - redhat-developer/devconsole-operator
   - redhat-developer/git-service
   - redhat-developer/service-binding-operator
+  require_self_approval: true
+- commandHelpLink: https://go.k8s.io/bot-commands
+  ignore_review_state: true
+  repos:
+  - shipwright-io/build
   require_self_approval: true
 - commandHelpLink: https://go.k8s.io/bot-commands
   ignore_review_state: false
@@ -242,6 +245,7 @@ approve:
   require_self_approval: false
 - commandHelpLink: https://go.k8s.io/bot-commands
   repos:
+  - openshift-priv/assisted-test-infra
   - openshift/assisted-test-infra
   require_self_approval: false
 - commandHelpLink: https://go.k8s.io/bot-commands
@@ -251,6 +255,49 @@ approve:
 - commandHelpLink: https://go.k8s.io/bot-commands
   repos:
   - che-incubator/che-test-harness
+  require_self_approval: false
+- commandHelpLink: https://go.k8s.io/bot-commands
+  repos:
+  - openshift-priv/assisted-service
+  - openshift/assisted-service
+  require_self_approval: false
+- commandHelpLink: https://go.k8s.io/bot-commands
+  repos:
+  - openshift/assisted-installer
+  require_self_approval: false
+- commandHelpLink: https://go.k8s.io/bot-commands
+  repos:
+  - openshift-priv/csi-driver-projected-resource
+  - openshift/csi-driver-projected-resource
+  require_self_approval: false
+- commandHelpLink: https://go.k8s.io/bot-commands
+  lgtm_acts_as_approve: true
+  repos:
+  - openshift-priv/ocs-operator
+  - openshift/ocs-operator
+  require_self_approval: true
+- commandHelpLink: https://go.k8s.io/bot-commands
+  repos:
+  - openshift/assisted-installer-agent
+  require_self_approval: false
+- commandHelpLink: https://go.k8s.io/bot-commands
+  repos:
+  - openshift/assisted-ignition-generator
+  require_self_approval: false
+- commandHelpLink: ""
+  repos:
+  - ansible-collections/community.okd
+  - openshift-priv/community.okd
+  require_self_approval: false
+- commandHelpLink: https://go.k8s.io/bot-commands
+  ignore_review_state: true
+  repos:
+  - operator-framework/operator-lib
+  require_self_approval: true
+- commandHelpLink: ""
+  repos:
+  - openshift-priv/cluster-baremetal-operator
+  - openshift/cluster-baremetal-operator
   require_self_approval: false
 blunderbuss:
   max_request_count: 2
@@ -406,7 +453,7 @@ bugzilla:
               exclude_defaults: true
               is_open: true
               state_after_merge:
-                status: POST
+                status: MODIFIED
               state_after_validation:
                 status: POST
               valid_states:
@@ -415,17 +462,22 @@ bugzilla:
               - status: ON_DEV
               - status: POST
             master:
+              exclude_defaults: true
               target_release: OCS 4.6.0
             release-4.2:
+              exclude_defaults: true
               target_release: OCS 4.2.0
               validate_by_default: true
             release-4.3:
+              exclude_defaults: true
               target_release: OCS 4.3.0
               validate_by_default: true
             release-4.4:
+              exclude_defaults: true
               target_release: OCS 4.4.0
               validate_by_default: true
             release-4.5:
+              exclude_defaults: true
               target_release: OCS 4.5.0
               validate_by_default: true
     openshift-priv:
@@ -440,7 +492,7 @@ bugzilla:
               exclude_defaults: true
               is_open: true
               state_after_merge:
-                status: POST
+                status: MODIFIED
               state_after_validation:
                 status: POST
               valid_states:
@@ -449,17 +501,22 @@ bugzilla:
               - status: ON_DEV
               - status: POST
             master:
+              exclude_defaults: true
               target_release: OCS 4.6.0
             release-4.2:
+              exclude_defaults: true
               target_release: OCS 4.2.0
               validate_by_default: true
             release-4.3:
+              exclude_defaults: true
               target_release: OCS 4.3.0
               validate_by_default: true
             release-4.4:
+              exclude_defaults: true
               target_release: OCS 4.4.0
               validate_by_default: true
             release-4.5:
+              exclude_defaults: true
               target_release: OCS 4.5.0
               validate_by_default: true
 cat: {}
@@ -475,6 +532,16 @@ config_updater:
         - ci
       name: ci-operator-misc-configs
     ci-operator/config/**/*-hive-ocm-*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      name: ci-operator-misc-configs
+    ci-operator/config/**/*-ocp-ci-integration.yaml:
+      clusters:
+        app.ci:
+        - ci
+      name: ci-operator-misc-configs
+    ci-operator/config/**/*branch-openshift*.yaml:
       clusters:
         app.ci:
         - ci
@@ -624,6 +691,11 @@ config_updater:
         app.ci:
         - ci
       name: ci-operator-misc-configs
+    ci-operator/config/ansible-collections/community.okd/*-main.yaml:
+      clusters:
+        app.ci:
+        - ci
+      name: ci-operator-master-configs
     ci-operator/config/integr8ly/integreatly-operator/integr8ly-integreatly-operator-*-next-*.yaml:
       clusters:
         app.ci:
@@ -664,6 +736,11 @@ config_updater:
         app.ci:
         - ci
       name: ci-operator-misc-configs
+    ci-operator/config/operator-framework/*/*main*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      name: ci-operator-master-configs
     ci-operator/config/redhat-operator-ecosystem/playground/*-cvp-ocp-4.4.yaml:
       clusters:
         app.ci:
@@ -679,6 +756,14 @@ config_updater:
         app.ci:
         - ci
       name: ci-operator-4.6-configs
+    ci-operator/jobs/**/*-branch-openshift-*.yaml:
+      clusters:
+        api.ci:
+        - ci
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
     ci-operator/jobs/**/*-fcos-*.yaml:
       clusters:
         api.ci:
@@ -694,6 +779,11 @@ config_updater:
         app.ci:
         - ci
       gzip: true
+      name: job-config-misc
+    ci-operator/jobs/**/*-ocp-ci-integration*.yaml:
+      clusters:
+        app.ci:
+        - ci
       name: job-config-misc
     ci-operator/jobs/**/*enterprise-3.*.yaml:
       clusters:
@@ -951,6 +1041,14 @@ config_updater:
         - ci
       gzip: true
       name: job-config-misc
+    ci-operator/jobs/ansible-collections/community.okd/*-main-*.yaml:
+      clusters:
+        api.ci:
+        - ci
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-master
     ci-operator/jobs/integr8ly/integreatly-operator/integr8ly-integreatly-operator-*-next-*.yaml:
       clusters:
         api.ci:
@@ -1007,6 +1105,14 @@ config_updater:
         - ci
       gzip: true
       name: job-config-misc
+    ci-operator/jobs/operator-framework/*/*main*.yaml:
+      clusters:
+        api.ci:
+        - ci
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-master
     ci-operator/jobs/redhat-operator-ecosystem/playground/*-cvp-ocp-4.4.yaml:
       clusters:
         api.ci:
@@ -1038,17 +1144,6 @@ config_updater:
         app.ci:
         - ci
       name: step-registry
-    ci-operator/templates/cluster-launch-src.yaml:
-      clusters:
-        api.ci:
-        - ci
-        app.ci:
-        - ci
-        build01:
-        - ci
-        build02:
-        - ci
-      name: prow-job-cluster-launch-src
     ci-operator/templates/master-sidecar-3.yaml:
       clusters:
         api.ci:
@@ -1093,6 +1188,17 @@ config_updater:
         build02:
         - ci
       name: prow-job-master-sidecar-4.4
+    ci-operator/templates/master-sidecar-4.6.yaml:
+      clusters:
+        api.ci:
+        - ci
+        app.ci:
+        - ci
+        build01:
+        - ci
+        build02:
+        - ci
+      name: prow-job-master-sidecar-4.6
     ci-operator/templates/openshift/endurance/endurance-install.yaml:
       clusters:
         api.ci:
@@ -1266,6 +1372,8 @@ config_updater:
         - ci
         build02:
         - ci
+        vsphere:
+        - ci
       name: prow-job-cluster-launch-installer-upi-e2e
     ci-operator/templates/openshift/installer/cluster-launch-installer-upi-src.yaml:
       clusters:
@@ -1276,6 +1384,8 @@ config_updater:
         build01:
         - ci
         build02:
+        - ci
+        vsphere:
         - ci
       name: prow-job-cluster-launch-installer-upi-src
     ci-operator/templates/openshift/openshift-ansible/cluster-launch-e2e-openshift-ansible.yaml:
@@ -1322,6 +1432,17 @@ config_updater:
         build02:
         - ci
       name: prow-job-cluster-launch-e2e
+    ci-operator/templates/openshift/openshift-ansible/cluster-launch-src.yaml:
+      clusters:
+        api.ci:
+        - ci
+        app.ci:
+        - ci
+        build01:
+        - ci
+        build02:
+        - ci
+      name: prow-job-cluster-launch-src
     ci-operator/templates/openshift/openshift-ansible/cluster-scaleup-e2e-40.yaml:
       clusters:
         api.ci:
@@ -1493,6 +1614,11 @@ config_updater:
         - ci
       key: config.yaml
       name: publicize-config
+    core-services/ci-secret-bootstrap/_config.yaml:
+      clusters:
+        app.ci:
+        - ci
+      name: ci-secret-bootstrap
     core-services/image-mirroring/**/mapping_*:
       clusters:
         api.ci:
@@ -1591,6 +1717,20 @@ config_updater:
       name: sshd-config-z
 external_plugins:
   ComplianceAsCode/content:
+  - endpoint: http://refresh
+    events:
+    - issue_comment
+    name: refresh
+  - endpoint: http://cherrypick
+    events:
+    - issue_comment
+    - pull_request
+    name: cherrypick
+  - endpoint: http://needs-rebase
+    events:
+    - pull_request
+    name: needs-rebase
+  ansible-collections/community.okd:
   - endpoint: http://refresh
     events:
     - issue_comment
@@ -2041,6 +2181,12 @@ external_plugins:
     events:
     - pull_request
     name: needs-rebase
+  opendatahub-io/manifests:
+  - endpoint: http://needs-rebase
+    events:
+    - issue_comment
+    - pull_request
+    name: needs-rebase
   opendatahub-io/odh-manifests:
   - endpoint: http://needs-rebase
     events:
@@ -2148,6 +2294,10 @@ external_plugins:
     events:
     - pull_request
     name: needs-rebase
+  - endpoint: http://publicize
+    events:
+    - issue_comment
+    name: publicize
   openshift-psap/special-resource-operator:
   - endpoint: http://refresh
     events:
@@ -2191,15 +2341,6 @@ external_plugins:
     - issue_comment
     - pull_request
     name: cherrypick
-  - endpoint: http://needs-rebase
-    events:
-    - pull_request
-    name: needs-rebase
-  redhat-developer/build:
-  - endpoint: http://refresh
-    events:
-    - issue_comment
-    name: refresh
   - endpoint: http://needs-rebase
     events:
     - pull_request
@@ -2268,6 +2409,15 @@ external_plugins:
     events:
     - pull_request
     name: needs-rebase
+  shipwright-io/build:
+  - endpoint: http://refresh
+    events:
+    - issue_comment
+    name: refresh
+  - endpoint: http://needs-rebase
+    events:
+    - pull_request
+    name: needs-rebase
   tnozicka/openshift-acme:
   - endpoint: http://refresh
     events:
@@ -2314,11 +2464,15 @@ label:
   - tide/merge-method-merge
   - tide/merge-method-rebase
   - tide/merge-method-squash
+  - px-approved
+  - docs-approved
+  - qe-approved
 lgtm:
 - repos:
   - open-cluster-management
   review_acts_as_lgtm: true
 - repos:
+  - opendatahub-io/manifests
   - opendatahub-io/odh-manifests
   - opendatahub-io/opendatahub-operator
   review_acts_as_lgtm: true
@@ -2328,7 +2482,6 @@ lgtm:
   review_acts_as_lgtm: true
 - repos:
   - openshift/ci-ns-ttl-controller
-  - openshift/ci-secret-mirroring-controller
   - openshift/ci-tools
   - openshift/release
   - openshift/release-controller
@@ -2416,6 +2569,7 @@ lgtm:
   - openshift/egress-router-cni
   review_acts_as_lgtm: true
 - repos:
+  - openshift-priv/assisted-test-infra
   - openshift/assisted-test-infra
   review_acts_as_lgtm: true
 - repos:
@@ -2423,6 +2577,35 @@ lgtm:
   review_acts_as_lgtm: true
 - repos:
   - che-incubator/che-test-harness
+  review_acts_as_lgtm: true
+- repos:
+  - openshift-priv/assisted-service
+  - openshift/assisted-service
+  review_acts_as_lgtm: true
+- repos:
+  - openshift/assisted-installer
+  review_acts_as_lgtm: true
+- repos:
+  - openshift-priv/csi-driver-projected-resource
+  - openshift/csi-driver-projected-resource
+  review_acts_as_lgtm: true
+- repos:
+  - openshift-priv/ocs-operator
+  - openshift/ocs-operator
+  review_acts_as_lgtm: true
+- repos:
+  - openshift/assisted-installer-agent
+  review_acts_as_lgtm: true
+- repos:
+  - openshift/assisted-ignition-generator
+  review_acts_as_lgtm: true
+- repos:
+  - ansible-collections/community.okd
+  - openshift-priv/community.okd
+  review_acts_as_lgtm: true
+- repos:
+  - openshift-priv/cluster-baremetal-operator
+  - openshift/cluster-baremetal-operator
   review_acts_as_lgtm: true
 override:
   allow_top_level_owners: true
@@ -2442,6 +2625,32 @@ plugins:
   - trigger
   - verify-owners
   - wip
+  ansible-collections/community.okd:
+  - assign
+  - blunderbuss
+  - bugzilla
+  - cat
+  - dog
+  - heart
+  - golint
+  - goose
+  - help
+  - hold
+  - label
+  - lgtm
+  - lifecycle
+  - override
+  - pony
+  - retitle
+  - shrug
+  - sigmention
+  - skip
+  - trigger
+  - verify-owners
+  - owners-label
+  - wip
+  - yuks
+  - approve
   che-incubator/che-test-harness:
   - assign
   - blunderbuss
@@ -3191,6 +3400,10 @@ plugins:
   - trigger
   kubevirt/kubevirt:
   - trigger
+  kubevirt/kubevirt-ssp-operator:
+  - trigger
+  kubevirt/node-maintenance-operator:
+  - trigger
   monstorak/monstorak-operator:
   - assign
   - blunderbuss
@@ -3253,6 +3466,27 @@ plugins:
   - trigger
   - verify-owners
   - wip
+  opendatahub-io/manifests:
+  - approve
+  - assign
+  - blunderbuss
+  - golint
+  - heart
+  - help
+  - hold
+  - label
+  - lgtm
+  - lifecycle
+  - milestone
+  - milestonestatus
+  - owners-label
+  - override
+  - retitle
+  - shrug
+  - trigger
+  - verify-owners
+  - wip
+  - yuks
   opendatahub-io/odh-manifests:
   - approve
   - assign
@@ -3492,6 +3726,56 @@ plugins:
   - wip
   - yuks
   openshift-priv/apiserver-library-go:
+  - approve
+  - assign
+  - blunderbuss
+  - bugzilla
+  - cat
+  - dog
+  - golint
+  - goose
+  - heart
+  - help
+  - hold
+  - label
+  - lgtm
+  - lifecycle
+  - override
+  - owners-label
+  - pony
+  - retitle
+  - shrug
+  - sigmention
+  - skip
+  - verify-owners
+  - wip
+  - yuks
+  openshift-priv/assisted-service:
+  - approve
+  - assign
+  - blunderbuss
+  - bugzilla
+  - cat
+  - dog
+  - golint
+  - goose
+  - heart
+  - help
+  - hold
+  - label
+  - lgtm
+  - lifecycle
+  - override
+  - owners-label
+  - pony
+  - retitle
+  - shrug
+  - sigmention
+  - skip
+  - verify-owners
+  - wip
+  - yuks
+  openshift-priv/assisted-test-infra:
   - approve
   - assign
   - blunderbuss
@@ -4142,6 +4426,31 @@ plugins:
   - wip
   - yuks
   openshift-priv/cluster-autoscaler-operator:
+  - approve
+  - assign
+  - blunderbuss
+  - bugzilla
+  - cat
+  - dog
+  - golint
+  - goose
+  - heart
+  - help
+  - hold
+  - label
+  - lgtm
+  - lifecycle
+  - override
+  - owners-label
+  - pony
+  - retitle
+  - shrug
+  - sigmention
+  - skip
+  - verify-owners
+  - wip
+  - yuks
+  openshift-priv/cluster-baremetal-operator:
   - approve
   - assign
   - blunderbuss
@@ -4915,6 +5224,31 @@ plugins:
   - verify-owners
   - wip
   - yuks
+  openshift-priv/community.okd:
+  - approve
+  - assign
+  - blunderbuss
+  - bugzilla
+  - cat
+  - dog
+  - golint
+  - goose
+  - heart
+  - help
+  - hold
+  - label
+  - lgtm
+  - lifecycle
+  - override
+  - owners-label
+  - pony
+  - retitle
+  - shrug
+  - sigmention
+  - skip
+  - verify-owners
+  - wip
+  - yuks
   openshift-priv/compliance-operator:
   - approve
   - assign
@@ -5191,6 +5525,31 @@ plugins:
   - wip
   - yuks
   openshift-priv/csi-driver-nfs:
+  - approve
+  - assign
+  - blunderbuss
+  - bugzilla
+  - cat
+  - dog
+  - golint
+  - goose
+  - heart
+  - help
+  - hold
+  - label
+  - lgtm
+  - lifecycle
+  - override
+  - owners-label
+  - pony
+  - retitle
+  - shrug
+  - sigmention
+  - skip
+  - verify-owners
+  - wip
+  - yuks
+  openshift-priv/csi-driver-projected-resource:
   - approve
   - assign
   - blunderbuss
@@ -8181,6 +8540,30 @@ plugins:
   - verify-owners
   - wip
   - yuks
+  openshift-priv/pj-rehearse:
+  - assign
+  - blunderbuss
+  - bugzilla
+  - cat
+  - dog
+  - golint
+  - goose
+  - heart
+  - help
+  - hold
+  - label
+  - lgtm
+  - lifecycle
+  - override
+  - owners-label
+  - pony
+  - retitle
+  - shrug
+  - sigmention
+  - skip
+  - verify-owners
+  - wip
+  - yuks
   openshift-priv/presto:
   - approve
   - assign
@@ -8949,6 +9332,14 @@ plugins:
   - approve
   openshift/apiserver-library-go:
   - approve
+  openshift/assisted-ignition-generator:
+  - approve
+  openshift/assisted-installer:
+  - approve
+  openshift/assisted-installer-agent:
+  - approve
+  openshift/assisted-service:
+  - approve
   openshift/assisted-test-infra:
   - approve
   openshift/autoheal:
@@ -8971,6 +9362,8 @@ plugins:
   - approve
   openshift/baremetal-runtimecfg:
   - approve
+  openshift/boilerplate:
+  - approve
   openshift/bond-cni:
   - approve
   openshift/build-machinery-go:
@@ -8984,8 +9377,6 @@ plugins:
   openshift/ci-ns-ttl-controller:
   - approve
   openshift/ci-search:
-  - approve
-  openshift/ci-secret-mirroring-controller:
   - approve
   openshift/ci-tools:
   - approve
@@ -9028,6 +9419,8 @@ plugins:
   openshift/cluster-authentication-operator:
   - approve
   openshift/cluster-autoscaler-operator:
+  - approve
+  openshift/cluster-baremetal-operator:
   - approve
   openshift/cluster-bootstrap:
   - approve
@@ -9115,6 +9508,8 @@ plugins:
   openshift/csi-driver-manila-operator:
   - approve
   openshift/csi-driver-nfs:
+  - approve
+  openshift/csi-driver-projected-resource:
   - approve
   openshift/csi-driver-registrar:
   - approve
@@ -9278,6 +9673,8 @@ plugins:
   - approve
   openshift/metal3-smart-exporter:
   - approve
+  openshift/moactl:
+  - approve
   openshift/monitor-project-lifecycle:
   - approve
   openshift/multus-admission-controller:
@@ -9285,6 +9682,8 @@ plugins:
   openshift/multus-cni:
   - approve
   openshift/must-gather:
+  - approve
+  openshift/must-gather-operator:
   - approve
   openshift/network-metrics-daemon:
   - approve
@@ -9398,6 +9797,8 @@ plugins:
   - approve
   openshift/rhcos-tools:
   - approve
+  openshift/route-monitor-operator:
+  - approve
   openshift/route-override-cni:
   - approve
   openshift/router:
@@ -9463,7 +9864,6 @@ plugins:
   operator-framework:
   - assign
   - blunderbuss
-  - bugzilla
   - cat
   - dog
   - heart
@@ -9483,13 +9883,20 @@ plugins:
   - wip
   - yuks
   operator-framework/community-operators:
+  - bugzilla
+  - owners-label
+  operator-framework/operator-lib:
+  - approve
   - owners-label
   operator-framework/operator-lifecycle-manager:
   - approve
+  - bugzilla
   operator-framework/operator-marketplace:
   - approve
+  - bugzilla
   operator-framework/operator-registry:
   - approve
+  - bugzilla
   ostreedev/ostree:
   - approve
   - assign
@@ -9533,8 +9940,6 @@ plugins:
   - verify-owners
   - wip
   - yuks
-  redhat-developer/build:
-  - approve
   redhat-developer/devconsole-api:
   - approve
   redhat-developer/devconsole-operator:
@@ -9599,6 +10004,29 @@ plugins:
   - approve
   redhat-operator-ecosystem/release:
   - config-updater
+  - approve
+  shipwright-io:
+  - assign
+  - blunderbuss
+  - cat
+  - dog
+  - heart
+  - golint
+  - help
+  - hold
+  - label
+  - lgtm
+  - lifecycle
+  - override
+  - retitle
+  - shrug
+  - sigmention
+  - skip
+  - trigger
+  - verify-owners
+  - wip
+  - yuks
+  shipwright-io/build:
   - approve
   tnozicka/openshift-acme:
   - approve

@@ -7,6 +7,18 @@ base_images:
     name: test
     namespace: openshift-kni
     tag: dev-scripts
+  ocp_builder_golang-1.12:
+    name: builder
+    namespace: ocp
+    tag: golang-1.12
+  ocp_builder_golang-1.14:
+    name: builder
+    namespace: ocp
+    tag: golang-1.14
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
   openshift_release_golang-1.13:
     name: release
     namespace: openshift
@@ -18,12 +30,12 @@ build_root:
     namespace: openshift
     tag: golang-1.13
 images:
-- dockerfile_path: Dockerfile
+- dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    openshift_release_golang-1.13:
+    ocp_builder_rhel-8-golang-openshift-4.6:
       as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-openshift-4.6
   to: cluster-network-operator
 promotion:
   disabled: true
@@ -51,15 +63,15 @@ tests:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
 - as: e2e-gcp-ovn-upgrade
-  commands: CLUSTER_NETWORK_TYPE=OVNKubernetes TEST_SUITE=all run-upgrade-tests
-  openshift_installer:
-    cluster_profile: gcp
-    upgrade: true
-- as: e2e-gcp-upgrade
   commands: TEST_SUITE=all run-upgrade-tests
+  cron: '@yearly'
   openshift_installer:
     cluster_profile: gcp
     upgrade: true
+- as: e2e-upgrade
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-upgrade-gcp-loki
 - as: e2e-aws-sdn-single
   steps:
     cluster_profile: aws
@@ -86,6 +98,12 @@ tests:
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid
+- as: e2e-operator-with-custom-vxlan-port
+  steps:
+    cluster_profile: aws
+    test:
+    - ref: windows-e2e-operator-test-with-custom-vxlan-port
+    workflow: ipi-aws-ovn-hybrid-custom-vxlan-port
 - as: e2e-vsphere
   steps:
     cluster_profile: vsphere

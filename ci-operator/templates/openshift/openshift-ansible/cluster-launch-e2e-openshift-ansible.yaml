@@ -82,6 +82,8 @@ objects:
       - name: artifacts
         mountPath: /tmp/artifacts
       env:
+      - name: ARTIFACT_DIR
+        value: /tmp/artifacts
       - name: HOME
         value: /tmp/home
       - name: KUBECONFIG
@@ -139,7 +141,7 @@ objects:
         function run-tests() {
           set -x
           if which openshift-tests && [[ -n "${TEST_SUITE-}" ]]; then
-            openshift-tests run "${TEST_SUITE}" --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
+            openshift-tests run "${TEST_SUITE}" --provider "${TEST_PROVIDER:-}" -o ${ARTIFACT_DIR}/e2e.log --junit-dir ${ARTIFACT_DIR}/junit
             return 0
           fi
           # TODO: remove everything after this point once we fork templates by release - starting with 4.0
@@ -150,13 +152,13 @@ objects:
           if [[ -n "${TEST_FOCUS:-}" ]]; then
             ginkgo -v -noColor -nodes="${TEST_PARALLELISM:-30}" $( which extended.test ) -- \
               -ginkgo.focus="${TEST_FOCUS}" -ginkgo.skip="${TEST_SKIP:-"\\[local\\]"}" \
-              -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit \
+              -e2e-output-dir ${ARTIFACT_DIR} -report-dir ${ARTIFACT_DIR}/junit \
               -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
           fi
           if [[ -n "${TEST_FOCUS_SERIAL:-}" ]]; then
             ginkgo -v -noColor -nodes=1 $( which extended.test ) -- \
               -ginkgo.focus="${TEST_FOCUS_SERIAL}" -ginkgo.skip="${TEST_SKIP_SERIAL:-"\\[local\\]"}" \
-              -e2e-output-dir /tmp/artifacts -report-dir /tmp/artifacts/junit/serial \
+              -e2e-output-dir ${ARTIFACT_DIR} -report-dir ${ARTIFACT_DIR}/junit/serial \
               -test.timeout=2h ${PROVIDER_ARGS-} || rc=$?
           fi
           return ${rc:-0}
@@ -178,6 +180,8 @@ objects:
       - name: cluster-profile
         mountPath: /usr/local/e2e-aws-cluster-profile
       env:
+      - name: ARTIFACT_DIR
+        value: /tmp/artifacts
       - name: INSTANCE_PREFIX
         value: ${NAMESPACE}-${JOB_NAME_HASH}
       - name: TYPE
@@ -245,6 +249,8 @@ objects:
       - name: cluster-profile
         mountPath: /usr/local/e2e-aws-cluster-profile
       env:
+      - name: ARTIFACT_DIR
+        value: /tmp/artifacts
       - name: INSTANCE_PREFIX
         value: ${NAMESPACE}-${JOB_NAME_HASH}
       - name: TYPE
@@ -263,42 +269,42 @@ objects:
           touch /tmp/shared/exit
           echo "Gathering artifacts ..."
           export KUBECONFIG=/tmp/shared/admin.kubeconfig
-          mkdir -p /tmp/artifacts/pods /tmp/artifacts/nodes /tmp/artifacts/metrics
+          mkdir -p ${ARTIFACT_DIR}/pods ${ARTIFACT_DIR}/nodes ${ARTIFACT_DIR}/metrics
 
           oc --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' > /tmp/nodes
           oc --request-timeout=5s get pods --all-namespaces --template '{{ range .items }}{{ $name := .metadata.name }}{{ $ns := .metadata.namespace }}{{ range .spec.containers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ range .spec.initContainers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ end }}' > /tmp/containers
-          oc --request-timeout=5s get nodes -o json > /tmp/artifacts/nodes.json
-          oc --request-timeout=5s get events --all-namespaces -o json > /tmp/artifacts/events.json
+          oc --request-timeout=5s get nodes -o json > ${ARTIFACT_DIR}/nodes.json
+          oc --request-timeout=5s get events --all-namespaces -o json > ${ARTIFACT_DIR}/events.json
           oc --request-timeout=5s get pods -l openshift.io/component=api --all-namespaces --template '{{ range .items }}-n {{ .metadata.namespace }} {{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/pods-api
 
           # gather nodes first in parallel since they may contain the most relevant debugging info
           while IFS= read -r i; do
-            mkdir -p /tmp/artifacts/nodes/$i
+            mkdir -p ${ARTIFACT_DIR}/nodes/$i
             (
-            oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/messages | gzip -c > /tmp/artifacts/nodes/$i/messages.gz
+            oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/messages | gzip -c > ${ARTIFACT_DIR}/nodes/$i/messages.gz
             oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/journal | sed -e 's|.*href="\(.*\)".*|\1|;t;d' > /tmp/journals
             while IFS= read -r j; do
-              oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/journal/${j}system.journal | gzip -c > /tmp/artifacts/nodes/$i/journal.gz
+              oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/journal/${j}system.journal | gzip -c > ${ARTIFACT_DIR}/nodes/$i/journal.gz
             done < /tmp/journals
-            oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/metrics | gzip -c > /tmp/artifacts/metrics/node-$i.gz
-            oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/debug/pprof/heap > /tmp/artifacts/nodes/$i/heap
-            oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/secure | gzip -c > /tmp/artifacts/nodes/$i/secure.gz
-            oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/audit | gzip -c > /tmp/artifacts/nodes/$i/audit.gz
+            oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/metrics | gzip -c > ${ARTIFACT_DIR}/metrics/node-$i.gz
+            oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/debug/pprof/heap > ${ARTIFACT_DIR}/nodes/$i/heap
+            oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/secure | gzip -c > ${ARTIFACT_DIR}/nodes/$i/secure.gz
+            oc get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/logs/audit | gzip -c > ${ARTIFACT_DIR}/nodes/$i/audit.gz
             ) &
           done < /tmp/nodes
 
           while IFS= read -r i; do
             file="$( echo "$i" | cut -d ' ' -f 3 | tr -s ' ' '_' )"
-            oc exec $i -- /bin/bash -c 'oc get --raw /debug/pprof/heap --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig' > /tmp/artifacts/metrics/${file}-heap
-            oc exec $i -- /bin/bash -c 'oc get --raw /metrics --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig' | gzip -c > /tmp/artifacts/metrics/${file}-api.gz
-            oc exec $i -- /bin/bash -c 'oc get --raw /debug/pprof/heap --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig' > /tmp/artifacts/metrics/${file}-controllers-heap
-            oc exec $i -- /bin/bash -c 'oc get --raw /metrics --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig' | gzip -c > /tmp/artifacts/metrics/${file}-controllers.gz
+            oc exec $i -- /bin/bash -c 'oc get --raw /debug/pprof/heap --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig' > ${ARTIFACT_DIR}/metrics/${file}-heap
+            oc exec $i -- /bin/bash -c 'oc get --raw /metrics --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig' | gzip -c > ${ARTIFACT_DIR}/metrics/${file}-api.gz
+            oc exec $i -- /bin/bash -c 'oc get --raw /debug/pprof/heap --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig' > ${ARTIFACT_DIR}/metrics/${file}-controllers-heap
+            oc exec $i -- /bin/bash -c 'oc get --raw /metrics --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig' | gzip -c > ${ARTIFACT_DIR}/metrics/${file}-controllers.gz
           done < /tmp/pods-api
 
           while IFS= read -r i; do
             file="$( echo "$i" | cut -d ' ' -f 2,3,5 | tr -s ' ' '_' )"
-            oc logs --request-timeout=20s $i | gzip -c > /tmp/artifacts/pods/${file}.log.gz
-            oc logs --request-timeout=20s -p $i | gzip -c > /tmp/artifacts/pods/${file}_previous.log.gz
+            oc logs --request-timeout=20s $i | gzip -c > ${ARTIFACT_DIR}/pods/${file}.log.gz
+            oc logs --request-timeout=20s -p $i | gzip -c > ${ARTIFACT_DIR}/pods/${file}_previous.log.gz
           done < /tmp/containers
 
           echo "Waiting for node logs to finish ..."

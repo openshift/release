@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
-TFVARS_PATH=/var/run/secrets/ci.openshift.io/cluster-profile/secret.auto.tfvars
+TFVARS_PATH=/var/run/secrets/ci.openshift.io/cluster-profile/vmc.secret.auto.tfvars
 vsphere_user=$(grep -oP 'vsphere_user\s*=\s*"\K[^"]+' ${TFVARS_PATH})
 vsphere_password=$(grep -oP 'vsphere_password\s*=\s*"\K[^"]+' ${TFVARS_PATH})
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
@@ -21,7 +21,7 @@ controlPlane:
   platform:
     vsphere:
       osDisk:
-        diskSizeGB: 60
+        diskSizeGB: 120
 compute:
 - name: "worker"
   replicas: 3
@@ -31,16 +31,16 @@ compute:
       coresPerSocket: 1
       memoryMB: 16384
       osDisk:
-        diskSizeGB: 60
+        diskSizeGB: 120
 platform:
   vsphere:
-    cluster: devel
-    datacenter: dc1
-    defaultDatastore: vsanDatastore
-    network: VM Network
+    vcenter: "vcenter.sddc-44-236-21-251.vmwarevmc.com"
+    datacenter: SDDC-Datacenter
+    defaultDatastore: WorkloadDatastore
+    cluster: "Cluster-1"
+    network: "ci-segment"
     password: ${vsphere_password}
     username: ${vsphere_user}
-    vCenter: vcsa-ci.vmware.devcluster.openshift.com
     apiVIP: "${vips[0]}"
     ingressVIP: "${vips[1]}"
 EOF

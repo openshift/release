@@ -26,23 +26,41 @@ parameters:
   required: false
 - name: BASTION_SVC_IP
   required: true
-- name: BASTION_SVC_1_IP
+- name: BASTION_SVC_0_1_IP
   value: 127.0.0.1
   required: false
-- name: BASTION_SVC_2_IP
+- name: BASTION_SVC_0_2_IP
   value: 127.0.0.1
   required: false
-- name: BASTION_SVC_3_IP
+- name: BASTION_SVC_0_3_IP
   value: 127.0.0.1
   required: false
-- name: BASTION_SVC_4_IP
+- name: BASTION_SVC_0_4_IP
   value: 127.0.0.1
   required: false
-- name: BASTION_SVC
-  required: true
+- name: BASTION_SVC_1_0_IP
+  value: 127.0.0.1
+  required: false
+- name: BASTION_SVC_1_1_IP
+  value: 127.0.0.1
+  required: false
+- name: BASTION_SVC_1_2_IP
+  value: 127.0.0.1
+  required: false
+- name: BASTION_SVC_1_3_IP
+  value: 127.0.0.1
+  required: false
+- name: BASTION_SVC_1_4_IP
+  value: 127.0.0.1
+  required: false
 - name: REMOTE_LIBVIRT_HOSTNAME
   required: true
+- name: REMOTE_LIBVIRT_HOSTNAME_1
+  required: false
 - name: MULTIARCH_RELEASE_IMAGE_LATEST
+  required: true
+- name: USE_LEASE_CLIENT
+- name: LEASED_RESOURCE
   required: true
 
 objects:
@@ -113,7 +131,7 @@ objects:
       # we want to gather the teardown logs no matter what
       ci-operator.openshift.io/wait-for-container-artifacts: teardown
       ci-operator.openshift.io/save-container-logs: "true"
-      ci-operator.openshift.io/container-sub-tests: "lease,setup,test,teardown"
+      ci-operator.openshift.io/container-sub-tests: "setup,test,teardown"
   spec:
     restartPolicy: Never
     activeDeadlineSeconds: 21600
@@ -128,90 +146,6 @@ objects:
         secretName: ${JOB_NAME_SAFE}-cluster-profile
 
     containers:
-
-    - name: lease
-      image: registry.svc.ci.openshift.org/ci/boskoscli:latest
-      terminationMessagePolicy: FallbackToLogsOnError
-      resources:
-        requests:
-          cpu: 10m
-          memory: 10Mi
-        limits:
-          memory: 200Mi
-      volumeMounts:
-      - name: shared-tmp
-        mountPath: /tmp/shared
-      - name: cluster-profile
-        mountPath: /etc/openshift-installer
-      - name: artifacts
-        mountPath: /tmp/artifacts
-      env:
-      - name: ARCH
-      - name: CLUSTER_TYPE
-      - name: CLUSTER_NAME
-        value: ${NAMESPACE}-${JOB_NAME_HASH}
-      command:
-      - /bin/bash
-      - -c
-      - |
-        #!/bin/bash
-        set -euo pipefail
-
-        trap 'rc=$?; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi; if test "${rc}" -ne 0; then touch /tmp/shared/exit; fi; exit "${rc}"' EXIT
-
-        # hack for bazel
-        function boskosctl() {
-          /app/boskos/cmd/cli/app.binary "${@}"
-        }
-
-        function acquire_lease() {
-          if [[ "${ARCH}" != "s390x" && "${ARCH}" != "ppc64le" ]]; then
-            resource_name="${CLUSTER_TYPE}-00"
-            return
-          fi
-
-          resource="$( boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" acquire --type "${CLUSTER_TYPE}-quota-slice" --state "free" --target-state "leased" --timeout 150m )"
-          resource_name="$(echo "${resource}"|jq .name --raw-output)"
-
-          echo "[INFO] Lease acquired! at $(date --utc)"
-          echo "[INFO] Leased resource: ${resource}"
-          echo "[INFO] Sending heartbeats to retain the lease ${resource_name}"
-          boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" heartbeat --resource "${resource}" &
-          heartbeats_pid=$!
-        }
-
-        echo "[INFO] Acquiring a lease ..."
-        acquire_lease
-
-        # Save name of the env to be used as the base domain
-        cat > /tmp/shared/libvirt-lease.conf <<EOF
-        BASE_DOMAIN="${resource_name}"
-        EOF
-
-        touch /tmp/shared/leased
-
-        function release() {
-            if [[ "${ARCH}" != "s390x" && "${ARCH}" != "ppc64le" ]]; then
-              return
-            fi
-
-            echo "killing heartbeat process "${heartbeats_pid}" at $(date --utc)"
-            kill -9 "${heartbeats_pid}"
-            echo "[INFO] Releasing the lease on resouce ${resource_name}"
-            boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" release --name "${resource_name}" --target-state "free" || true
-        }
-
-        trap "release" EXIT
-        trap "release" TERM
-
-        while true; do
-          if [[ -f /tmp/shared/exit ]]; then
-            echo "Another process exited" 2>&1
-            exit 0
-          fi
-
-          sleep 15 & wait $!
-        done
 
     # Once the cluster is up, executes shared tests
     - name: test
@@ -327,14 +261,9 @@ objects:
         cp /tmp/cluster/ssh-privatekey ~/.ssh/kube_libvirt_rsa || true
         export KUBE_SSH_USER=core
 
-        # ensure lease is acquired
-        if [[ ! -f /tmp/shared/libvirt-lease.conf ]]; then
-          exit 1
-        fi
-
-        # ensure BASE_DOMAIN is set
-        source /tmp/shared/libvirt-lease.conf
-        if [[ -z "$BASE_DOMAIN" ]]; then
+        # ensure LEASED_RESOURCE is set
+        if [[ -z "${LEASED_RESOURCE}" ]]; then
+          echo "Failed to acquire lease"
           exit 1
         fi
 
@@ -356,12 +285,12 @@ objects:
         function run-upgrade-tests() {
           openshift-tests run-upgrade "${TEST_SUITE}" --to-image "${IMAGE:-${RELEASE_IMAGE_LATEST}}" \
             --options "${TEST_OPTIONS:-}" \
-            --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
+            --provider "${TEST_PROVIDER:-}" -o ${ARTIFACT_DIR}/e2e.log --junit-dir ${ARTIFACT_DIR}/junit
         }
 
         function run-tests() {
           openshift-tests run "${TEST_SUITE}" \
-            --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
+            --provider "${TEST_PROVIDER:-}" -o ${ARTIFACT_DIR}/e2e.log --junit-dir ${ARTIFACT_DIR}/junit
         }
 
         ${TEST_COMMAND}
@@ -378,6 +307,8 @@ objects:
       - name: artifacts
         mountPath: /tmp/artifacts
       env:
+      - name: ARTIFACT_DIR
+        value: /tmp/artifacts
       - name: CLUSTER_NAME
         value: ${NAMESPACE}-${JOB_NAME_HASH}
       - name: SSH_PRIV_KEY_PATH
@@ -404,10 +335,6 @@ objects:
         value: test
       - name: MIRROR_BASE
         value: registry.svc.ci.openshift.org/${NAMESPACE}/release
-      - name: REMOTE_LIBVIRT_URI
-        value: "qemu+tcp://${REMOTE_LIBVIRT_HOSTNAME}/system"
-      - name: BASTION_SVC
-        value: sshd.bastion-z.svc.cluster.local
       - name: MASTER_REPLICAS
         value: "3"
       - name: WORKER_REPLICAS
@@ -423,24 +350,9 @@ objects:
 
         trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/shared/setup-success; else touch /tmp/shared/exit; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-        # Wait until lease is acquired
-        while true; do
-          if [[ -f /tmp/shared/exit ]]; then
-            echo "Another process exited" 2>&1
-            exit 1
-          fi
-          if [[ -f /tmp/shared/leased ]]; then
-            echo "Lease acquired, installing..."
-
-            # Retrieve lease variables
-            source /tmp/shared/libvirt-lease.conf
-            break
-          fi
-          sleep 15 & wait
-        done
 
         cp "$(command -v openshift-install)" /tmp
-        mkdir /tmp/artifacts/installer
+        mkdir ${ARTIFACT_DIR}/installer
 
         if [[ -n "${INSTALL_INITIAL_RELEASE}" && -n "${RELEASE_IMAGE_INITIAL}" ]]; then
           echo "Installing from initial release ${RELEASE_IMAGE_INITIAL}"
@@ -460,24 +372,54 @@ objects:
 
         # declare environments to extract subnet
         declare -A SUBNETS
-        SUBNETS["${CLUSTER_TYPE}-00"]="126"
-        SUBNETS["${CLUSTER_TYPE}-01"]="1"
-        SUBNETS["${CLUSTER_TYPE}-02"]="2"
-        SUBNETS["${CLUSTER_TYPE}-03"]="3"
-        SUBNETS["${CLUSTER_TYPE}-04"]="4"
+        SUBNETS["${CLUSTER_TYPE}-0-0"]="126"
+        SUBNETS["${CLUSTER_TYPE}-0-1"]="1"
+        SUBNETS["${CLUSTER_TYPE}-0-2"]="2"
+        SUBNETS["${CLUSTER_TYPE}-0-3"]="3"
+        SUBNETS["${CLUSTER_TYPE}-0-4"]="4"
+        SUBNETS["${CLUSTER_TYPE}-1-0"]="126"
+        SUBNETS["${CLUSTER_TYPE}-1-1"]="1"
+        SUBNETS["${CLUSTER_TYPE}-1-2"]="2"
+        SUBNETS["${CLUSTER_TYPE}-1-3"]="3"
+        SUBNETS["${CLUSTER_TYPE}-1-4"]="4"
+
+        # ensure LEASED_RESOURCE is set
+        if [[ -z "${LEASED_RESOURCE}" ]]; then
+          echo "Failed to acquire lease"
+          exit 1
+        fi
 
         # get cluster subnet or default it to 126
-        cluster_subnet="${SUBNETS[$BASE_DOMAIN]}"
+        cluster_subnet="${SUBNETS[${LEASED_RESOURCE}]}"
         if [[ -z "$cluster_subnet" ]]; then
            cluster_subnet=126
         fi
 
+        declare -A LIBVIRT_HOSTS
+        LIBVIRT_HOSTS["${CLUSTER_TYPE}-0-0"]="${REMOTE_LIBVIRT_HOSTNAME}"
+        LIBVIRT_HOSTS["${CLUSTER_TYPE}-0-1"]="${REMOTE_LIBVIRT_HOSTNAME}"
+        LIBVIRT_HOSTS["${CLUSTER_TYPE}-0-2"]="${REMOTE_LIBVIRT_HOSTNAME}"
+        LIBVIRT_HOSTS["${CLUSTER_TYPE}-0-3"]="${REMOTE_LIBVIRT_HOSTNAME}"
+        LIBVIRT_HOSTS["${CLUSTER_TYPE}-0-4"]="${REMOTE_LIBVIRT_HOSTNAME}"
+        LIBVIRT_HOSTS["${CLUSTER_TYPE}-1-0"]="${REMOTE_LIBVIRT_HOSTNAME_1}"
+        LIBVIRT_HOSTS["${CLUSTER_TYPE}-1-1"]="${REMOTE_LIBVIRT_HOSTNAME_1}"
+        LIBVIRT_HOSTS["${CLUSTER_TYPE}-1-2"]="${REMOTE_LIBVIRT_HOSTNAME_1}"
+        LIBVIRT_HOSTS["${CLUSTER_TYPE}-1-3"]="${REMOTE_LIBVIRT_HOSTNAME_1}"
+        LIBVIRT_HOSTS["${CLUSTER_TYPE}-1-4"]="${REMOTE_LIBVIRT_HOSTNAME_1}"
+
+        # get cluster libvirt uri or default it the first host
+        remote_libvirt_uri="qemu+tcp://${LIBVIRT_HOSTS[${LEASED_RESOURCE}]}/system"
+        if [[ -z "$remote_libvirt_uri" ]]; then
+           remote_libvirt_uri="qemu+tcp://${REMOTE_LIBVIRT_HOSTNAME}/system"
+        fi
+        echo $remote_libvirt_uri
+
         if [[ "${ARCH}" = "s390x" || "${ARCH}" = "ppc64le" ]]; then
             master_type=null
             subnets="[]"
-            cat > /tmp/artifacts/installer/install-config.yaml << EOF
+            cat > ${ARTIFACT_DIR}/installer/install-config.yaml << EOF
         apiVersion: v1
-        baseDomain: ${BASE_DOMAIN}
+        baseDomain: ${LEASED_RESOURCE}
         metadata:
           name: ${CLUSTER_NAME}
         controlPlane:
@@ -500,7 +442,7 @@ objects:
           replicas: ${WORKER_REPLICAS}
         platform:
           libvirt:
-            URI: "${REMOTE_LIBVIRT_URI}"
+            URI: ${remote_libvirt_uri}
             network:
               if: "br${JOB_NAME_HASH}${BUILD_ID: -4}"
         pullSecret: >
@@ -516,50 +458,50 @@ objects:
 
         # Increase log verbosity and ensure it gets saved
         export TF_LOG=DEBUG
-        export TF_LOG_PATH=/tmp/artifacts/terraform.log
+        export TF_LOG_PATH=${ARTIFACT_DIR}/terraform.log
 
-        mock-nss.sh openshift-install create manifests --dir=/tmp/artifacts/installer
-        sed -i '/^  channel:/d' /tmp/artifacts/installer/manifests/cvo-overrides.yaml
-        
+        mock-nss.sh openshift-install create manifests --dir=${ARTIFACT_DIR}/installer
+        sed -i '/^  channel:/d' ${ARTIFACT_DIR}/installer/manifests/cvo-overrides.yaml
+
         # Bump the libvirt masters memory to 16GB
         export TF_VAR_libvirt_master_memory=16384
-        ls /tmp/artifacts/installer/openshift
+        ls ${ARTIFACT_DIR}/installer/openshift
         for ((i=0; i<$MASTER_REPLICAS; i++))
         do
-            yq write --inplace /tmp/artifacts/installer/openshift/99_openshift-cluster-api_master-machines-${i}.yaml spec.providerSpec.value[domainMemory] 16384
+            yq write --inplace ${ARTIFACT_DIR}/installer/openshift/99_openshift-cluster-api_master-machines-${i}.yaml spec.providerSpec.value[domainMemory] 16384
         done
-        
-        # Bump the libvirt workers memory to 8GB
-        yq write --inplace /tmp/artifacts/installer/openshift/99_openshift-cluster-api_worker-machineset-0.yaml spec.template.spec.providerSpec.value[domainMemory] 8192
-        
-        # Bump the libvirt workers disk to to 30GB
-        yq write --inplace /tmp/artifacts/installer/openshift/99_openshift-cluster-api_worker-machineset-0.yaml spec.template.spec.providerSpec.value.volume[volumeSize] 32212254720
 
-        mock-nss.sh openshift-install create cluster --dir=/tmp/artifacts/installer --log-level=debug || true &
+        # Bump the libvirt workers memory to 8GB
+        yq write --inplace ${ARTIFACT_DIR}/installer/openshift/99_openshift-cluster-api_worker-machineset-0.yaml spec.template.spec.providerSpec.value[domainMemory] 8192
+
+        # Bump the libvirt workers disk to to 30GB
+        yq write --inplace ${ARTIFACT_DIR}/installer/openshift/99_openshift-cluster-api_worker-machineset-0.yaml spec.template.spec.providerSpec.value.volume[volumeSize] 32212254720
+
+        mock-nss.sh openshift-install create cluster --dir=${ARTIFACT_DIR}/installer --log-level=debug || true &
         openshift_install="$!"
 
         # Password for the cluster gets leaked in the installer logs and hence removing them.
-        sed -i 's/password: .*/password: REDACTED"/g' /tmp/artifacts/installer/.openshift_install.log
+        sed -i 's/password: .*/password: REDACTED"/g' ${ARTIFACT_DIR}/installer/.openshift_install.log
 
         # While openshift-install is running...
         i=0
         while kill -0 $openshift_install 2> /dev/null; do
             sleep 60
             echo "Polling libvirt for network, attempt #$((++i))"
-            libvirt_network=$(mock-nss.sh virsh --connect "${REMOTE_LIBVIRT_URI}" net-list --name | grep "${NAMESPACE}-${JOB_NAME_HASH}" || true)
+            libvirt_network=$(mock-nss.sh virsh --connect "${remote_libvirt_uri}" net-list --name | grep "${NAMESPACE}-${JOB_NAME_HASH}" || true)
             if [[ -n "${libvirt_network}" ]]; then
-                cat > /tmp/artifacts/installer/worker-hostrecords.xml << EOF
+                cat > ${ARTIFACT_DIR}/installer/worker-hostrecords.xml << EOF
         <host ip='192.168.${cluster_subnet}.51'>
-          <hostname>alertmanager-main-openshift-monitoring.apps.${CLUSTER_NAME}.${BASE_DOMAIN}</hostname>
-          <hostname>console-openshift-console.apps.${CLUSTER_NAME}.${BASE_DOMAIN}</hostname>
-          <hostname>downloads-openshift-console.apps.${CLUSTER_NAME}.${BASE_DOMAIN}</hostname>
-          <hostname>grafana-openshift-monitoring.apps.${CLUSTER_NAME}.${BASE_DOMAIN}</hostname>
-          <hostname>oauth-openshift.apps.${CLUSTER_NAME}.${BASE_DOMAIN}</hostname>
-          <hostname>prometheus-k8s-openshift-monitoring.apps.${CLUSTER_NAME}.${BASE_DOMAIN}</hostname>
+          <hostname>alertmanager-main-openshift-monitoring.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
+          <hostname>console-openshift-console.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
+          <hostname>downloads-openshift-console.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
+          <hostname>grafana-openshift-monitoring.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
+          <hostname>oauth-openshift.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
+          <hostname>prometheus-k8s-openshift-monitoring.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
         </host>
         EOF
                 echo "Libvirt network found. Injecting worker DNS records."
-                mock-nss.sh virsh --connect "${REMOTE_LIBVIRT_URI}" net-update --network "${libvirt_network}" --command add-last --section dns-host --xml "$(< /tmp/artifacts/installer/worker-hostrecords.xml)"
+                mock-nss.sh virsh --connect "${remote_libvirt_uri}" net-update --network "${libvirt_network}" --command add-last --section dns-host --xml "$(< ${ARTIFACT_DIR}/installer/worker-hostrecords.xml)"
                 break
             fi
         done
@@ -567,7 +509,7 @@ objects:
         wait "${openshift_install}"
 
         # Add a step to wait for installation to complete, in case the cluster takes longer to create than the default time of 30 minutes.
-        mock-nss.sh openshift-install --dir=/tmp/artifacts/installer --log-level=debug wait-for install-complete 2>&1 &
+        mock-nss.sh openshift-install --dir=${ARTIFACT_DIR}/installer --log-level=debug wait-for install-complete 2>&1 &
         wait "$!"
     # Performs cleanup of all created resources
     - name: teardown
@@ -581,6 +523,8 @@ objects:
       - name: artifacts
         mountPath: /tmp/artifacts
       env:
+      - name: ARTIFACT_DIR
+        value: /tmp/artifacts
       - name: INSTANCE_PREFIX
         value: ${NAMESPACE}-${JOB_NAME_HASH}
       - name: KUBECONFIG
@@ -624,90 +568,90 @@ objects:
           export PATH=$PATH:/tmp/shared
 
           echo "Gathering artifacts ..."
-          mkdir -p /tmp/artifacts/pods /tmp/artifacts/nodes /tmp/artifacts/metrics /tmp/artifacts/bootstrap /tmp/artifacts/network
+          mkdir -p ${ARTIFACT_DIR}/pods ${ARTIFACT_DIR}/nodes ${ARTIFACT_DIR}/metrics ${ARTIFACT_DIR}/bootstrap ${ARTIFACT_DIR}/network
 
           oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' > /tmp/nodes
           oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.spec.providerID}{"\n"}{end}' | sed 's|.*/||' > /tmp/node-provider-IDs
           oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces --template '{{ range .items }}{{ $name := .metadata.name }}{{ $ns := .metadata.namespace }}{{ range .spec.containers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ range .spec.initContainers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ end }}' > /tmp/containers
           oc --insecure-skip-tls-verify --request-timeout=5s get pods -l openshift.io/component=api --all-namespaces --template '{{ range .items }}-n {{ .metadata.namespace }} {{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/pods-api
 
-          queue /tmp/artifacts/config-resources.json oc --insecure-skip-tls-verify --request-timeout=5s get apiserver.config.openshift.io authentication.config.openshift.io build.config.openshift.io console.config.openshift.io dns.config.openshift.io featuregate.config.openshift.io image.config.openshift.io infrastructure.config.openshift.io ingress.config.openshift.io network.config.openshift.io oauth.config.openshift.io project.config.openshift.io scheduler.config.openshift.io -o json
-          queue /tmp/artifacts/apiservices.json oc --insecure-skip-tls-verify --request-timeout=5s get apiservices -o json
-          queue /tmp/artifacts/clusteroperators.json oc --insecure-skip-tls-verify --request-timeout=5s get clusteroperators -o json
-          queue /tmp/artifacts/clusterversion.json oc --insecure-skip-tls-verify --request-timeout=5s get clusterversion -o json
-          queue /tmp/artifacts/configmaps.json oc --insecure-skip-tls-verify --request-timeout=5s get configmaps --all-namespaces -o json
-          queue /tmp/artifacts/credentialsrequests.json oc --insecure-skip-tls-verify --request-timeout=5s get credentialsrequests --all-namespaces -o json
-          queue /tmp/artifacts/csr.json oc --insecure-skip-tls-verify --request-timeout=5s get csr -o json
-          queue /tmp/artifacts/endpoints.json oc --insecure-skip-tls-verify --request-timeout=5s get endpoints --all-namespaces -o json
-          FILTER=gzip queue /tmp/artifacts/deployments.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get deployments --all-namespaces -o json
-          FILTER=gzip queue /tmp/artifacts/daemonsets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get daemonsets --all-namespaces -o json
-          queue /tmp/artifacts/events.json oc --insecure-skip-tls-verify --request-timeout=5s get events --all-namespaces -o json
-          queue /tmp/artifacts/kubeapiserver.json oc --insecure-skip-tls-verify --request-timeout=5s get kubeapiserver -o json
-          queue /tmp/artifacts/kubecontrollermanager.json oc --insecure-skip-tls-verify --request-timeout=5s get kubecontrollermanager -o json
-          queue /tmp/artifacts/machineconfigpools.json oc --insecure-skip-tls-verify --request-timeout=5s get machineconfigpools -o json
-          queue /tmp/artifacts/machineconfigs.json oc --insecure-skip-tls-verify --request-timeout=5s get machineconfigs -o json
-          queue /tmp/artifacts/machinesets.json oc --insecure-skip-tls-verify --request-timeout=5s get machinesets -A -o json
-          queue /tmp/artifacts/machines.json oc --insecure-skip-tls-verify --request-timeout=5s get machines -A -o json
-          queue /tmp/artifacts/namespaces.json oc --insecure-skip-tls-verify --request-timeout=5s get namespaces -o json
-          queue /tmp/artifacts/nodes.json oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o json
-          queue /tmp/artifacts/openshiftapiserver.json oc --insecure-skip-tls-verify --request-timeout=5s get openshiftapiserver -o json
-          queue /tmp/artifacts/pods.json oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces -o json
-          queue /tmp/artifacts/persistentvolumes.json oc --insecure-skip-tls-verify --request-timeout=5s get persistentvolumes --all-namespaces -o json
-          queue /tmp/artifacts/persistentvolumeclaims.json oc --insecure-skip-tls-verify --request-timeout=5s get persistentvolumeclaims --all-namespaces -o json
-          FILTER=gzip queue /tmp/artifacts/replicasets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get replicasets --all-namespaces -o json
-          queue /tmp/artifacts/rolebindings.json oc --insecure-skip-tls-verify --request-timeout=5s get rolebindings --all-namespaces -o json
-          queue /tmp/artifacts/roles.json oc --insecure-skip-tls-verify --request-timeout=5s get roles --all-namespaces -o json
-          queue /tmp/artifacts/services.json oc --insecure-skip-tls-verify --request-timeout=5s get services --all-namespaces -o json
-          FILTER=gzip queue /tmp/artifacts/statefulsets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get statefulsets --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/config-resources.json oc --insecure-skip-tls-verify --request-timeout=5s get apiserver.config.openshift.io authentication.config.openshift.io build.config.openshift.io console.config.openshift.io dns.config.openshift.io featuregate.config.openshift.io image.config.openshift.io infrastructure.config.openshift.io ingress.config.openshift.io network.config.openshift.io oauth.config.openshift.io project.config.openshift.io scheduler.config.openshift.io -o json
+          queue ${ARTIFACT_DIR}/apiservices.json oc --insecure-skip-tls-verify --request-timeout=5s get apiservices -o json
+          queue ${ARTIFACT_DIR}/clusteroperators.json oc --insecure-skip-tls-verify --request-timeout=5s get clusteroperators -o json
+          queue ${ARTIFACT_DIR}/clusterversion.json oc --insecure-skip-tls-verify --request-timeout=5s get clusterversion -o json
+          queue ${ARTIFACT_DIR}/configmaps.json oc --insecure-skip-tls-verify --request-timeout=5s get configmaps --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/credentialsrequests.json oc --insecure-skip-tls-verify --request-timeout=5s get credentialsrequests --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/csr.json oc --insecure-skip-tls-verify --request-timeout=5s get csr -o json
+          queue ${ARTIFACT_DIR}/endpoints.json oc --insecure-skip-tls-verify --request-timeout=5s get endpoints --all-namespaces -o json
+          FILTER=gzip queue ${ARTIFACT_DIR}/deployments.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get deployments --all-namespaces -o json
+          FILTER=gzip queue ${ARTIFACT_DIR}/daemonsets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get daemonsets --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/events.json oc --insecure-skip-tls-verify --request-timeout=5s get events --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/kubeapiserver.json oc --insecure-skip-tls-verify --request-timeout=5s get kubeapiserver -o json
+          queue ${ARTIFACT_DIR}/kubecontrollermanager.json oc --insecure-skip-tls-verify --request-timeout=5s get kubecontrollermanager -o json
+          queue ${ARTIFACT_DIR}/machineconfigpools.json oc --insecure-skip-tls-verify --request-timeout=5s get machineconfigpools -o json
+          queue ${ARTIFACT_DIR}/machineconfigs.json oc --insecure-skip-tls-verify --request-timeout=5s get machineconfigs -o json
+          queue ${ARTIFACT_DIR}/machinesets.json oc --insecure-skip-tls-verify --request-timeout=5s get machinesets -A -o json
+          queue ${ARTIFACT_DIR}/machines.json oc --insecure-skip-tls-verify --request-timeout=5s get machines -A -o json
+          queue ${ARTIFACT_DIR}/namespaces.json oc --insecure-skip-tls-verify --request-timeout=5s get namespaces -o json
+          queue ${ARTIFACT_DIR}/nodes.json oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o json
+          queue ${ARTIFACT_DIR}/openshiftapiserver.json oc --insecure-skip-tls-verify --request-timeout=5s get openshiftapiserver -o json
+          queue ${ARTIFACT_DIR}/pods.json oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/persistentvolumes.json oc --insecure-skip-tls-verify --request-timeout=5s get persistentvolumes --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/persistentvolumeclaims.json oc --insecure-skip-tls-verify --request-timeout=5s get persistentvolumeclaims --all-namespaces -o json
+          FILTER=gzip queue ${ARTIFACT_DIR}/replicasets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get replicasets --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/rolebindings.json oc --insecure-skip-tls-verify --request-timeout=5s get rolebindings --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/roles.json oc --insecure-skip-tls-verify --request-timeout=5s get roles --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/services.json oc --insecure-skip-tls-verify --request-timeout=5s get services --all-namespaces -o json
+          FILTER=gzip queue ${ARTIFACT_DIR}/statefulsets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get statefulsets --all-namespaces -o json
 
-          FILTER=gzip queue /tmp/artifacts/openapi.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get --raw /openapi/v2
+          FILTER=gzip queue ${ARTIFACT_DIR}/openapi.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get --raw /openapi/v2
 
           # gather nodes first in parallel since they may contain the most relevant debugging info
           while IFS= read -r i; do
-            mkdir -p /tmp/artifacts/nodes/$i
-            queue /tmp/artifacts/nodes/$i/heap oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/debug/pprof/heap
+            mkdir -p ${ARTIFACT_DIR}/nodes/$i
+            queue ${ARTIFACT_DIR}/nodes/$i/heap oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/debug/pprof/heap
           done < /tmp/nodes
 
           while IFS= read -r i; do
-            mkdir -p "/tmp/artifacts/nodes/${i}"
+            mkdir -p "${ARTIFACT_DIR}/nodes/${i}"
           done < /tmp/node-provider-IDs
 
-          FILTER=gzip queue /tmp/artifacts/nodes/masters-journal.gz oc --insecure-skip-tls-verify adm node-logs --role=master --unify=false
-          FILTER=gzip queue /tmp/artifacts/nodes/workers-journal.gz oc --insecure-skip-tls-verify adm node-logs --role=worker --unify=false
+          FILTER=gzip queue ${ARTIFACT_DIR}/nodes/masters-journal.gz oc --insecure-skip-tls-verify adm node-logs --role=master --unify=false
+          FILTER=gzip queue ${ARTIFACT_DIR}/nodes/workers-journal.gz oc --insecure-skip-tls-verify adm node-logs --role=worker --unify=false
 
           # Snapshot iptables-save on each node for debugging possible kube-proxy issues
           oc --insecure-skip-tls-verify get --request-timeout=20s -n openshift-sdn -l app=sdn pods --template '{{ range .items }}{{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/sdn-pods
           while IFS= read -r i; do
-            queue /tmp/artifacts/network/iptables-save-$i oc --insecure-skip-tls-verify rsh --timeout=20 -n openshift-sdn -c sdn $i iptables-save -c
+            queue ${ARTIFACT_DIR}/network/iptables-save-$i oc --insecure-skip-tls-verify rsh --timeout=20 -n openshift-sdn -c sdn $i iptables-save -c
           done < /tmp/sdn-pods
 
           while IFS= read -r i; do
             file="$( echo "$i" | cut -d ' ' -f 3 | tr -s ' ' '_' )"
-            queue /tmp/artifacts/metrics/${file}-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig'
-            queue /tmp/artifacts/metrics/${file}-controllers-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig'
+            queue ${ARTIFACT_DIR}/metrics/${file}-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig'
+            queue ${ARTIFACT_DIR}/metrics/${file}-controllers-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig'
           done < /tmp/pods-api
 
           while IFS= read -r i; do
             file="$( echo "$i" | cut -d ' ' -f 2,3,5 | tr -s ' ' '_' )"
-            FILTER=gzip queue /tmp/artifacts/pods/${file}.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s $i
-            FILTER=gzip queue /tmp/artifacts/pods/${file}_previous.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s -p $i
+            FILTER=gzip queue ${ARTIFACT_DIR}/pods/${file}.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s $i
+            FILTER=gzip queue ${ARTIFACT_DIR}/pods/${file}_previous.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s -p $i
           done < /tmp/containers
 
           echo "Snapshotting prometheus (may take 15s) ..."
-          queue /tmp/artifacts/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring prometheus-k8s-0 -- tar cvzf - -C /prometheus .
+          queue ${ARTIFACT_DIR}/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring prometheus-k8s-0 -- tar cvzf - -C /prometheus .
 
           echo "Running must-gather..."
-          mkdir -p /tmp/artifacts/must-gather
-          queue /tmp/artifacts/must-gather/must-gather.log oc --insecure-skip-tls-verify adm must-gather --dest-dir /tmp/artifacts/must-gather
+          mkdir -p ${ARTIFACT_DIR}/must-gather
+          queue ${ARTIFACT_DIR}/must-gather/must-gather.log oc --insecure-skip-tls-verify adm must-gather --dest-dir ${ARTIFACT_DIR}/must-gather
 
           echo "Waiting for logs ..."
           wait
 
-          tar -czC /tmp/artifacts/must-gather -f /tmp/artifacts/must-gather.tar.gz . &&
-          rm -rf /tmp/artifacts/must-gather
+          tar -czC ${ARTIFACT_DIR}/must-gather -f ${ARTIFACT_DIR}/must-gather.tar.gz . &&
+          rm -rf ${ARTIFACT_DIR}/must-gather
 
           echo "Deprovisioning cluster ..."
-          mock-nss.sh openshift-install --dir /tmp/artifacts/installer destroy cluster
+          mock-nss.sh openshift-install --dir ${ARTIFACT_DIR}/installer destroy cluster
         }
 
         trap 'teardown' EXIT
@@ -723,46 +667,92 @@ objects:
     - ip: "${BASTION_SVC_IP}"
       hostnames:
       - "${REMOTE_LIBVIRT_HOSTNAME}"
-      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-00"
-      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-00"
-      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-00"
-      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-00"
-      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-00"
-      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-00"
-      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-00"
-    - ip: "${BASTION_SVC_1_IP}"
+      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-0"
+      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-0"
+      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-0"
+      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-0"
+      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-0"
+      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-0"
+      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-0"
+    - ip: "${BASTION_SVC_0_1_IP}"
       hostnames:
-      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-01"
-      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-01"
-      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-01"
-      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-01"
-      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-01"
-      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-01"
-      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-01"
-    - ip: "${BASTION_SVC_2_IP}"
+      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-1"
+      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-1"
+      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-1"
+      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-1"
+      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-1"
+      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-1"
+      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-1"
+    - ip: "${BASTION_SVC_0_2_IP}"
       hostnames:
-      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-02"
-      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-02"
-      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-02"
-      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-02"
-      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-02"
-      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-02"
-      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-02"
-    - ip: "${BASTION_SVC_3_IP}"
+      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-2"
+      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-2"
+      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-2"
+      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-2"
+      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-2"
+      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-2"
+      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-2"
+    - ip: "${BASTION_SVC_0_3_IP}"
       hostnames:
-      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-03"
-      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-03"
-      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-03"
-      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-03"
-      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-03"
-      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-03"
-      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-03"
-    - ip: "${BASTION_SVC_4_IP}"
+      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-3"
+      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-3"
+      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-3"
+      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-3"
+      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-3"
+      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-3"
+      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-3"
+    - ip: "${BASTION_SVC_0_4_IP}"
       hostnames:
-      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-04"
-      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-04"
-      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-04"
-      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-04"
-      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-04"
-      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-04"
-      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-04"
+      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-4"
+      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-4"
+      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-4"
+      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-4"
+      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-4"
+      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-4"
+      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-4"
+    - ip: "${BASTION_SVC_1_0_IP}"
+      hostnames:
+      - "${REMOTE_LIBVIRT_HOSTNAME_1}"
+      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-0"
+      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-0"
+      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-0"
+      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-0"
+      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-0"
+      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-0"
+      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-0"
+    - ip: "${BASTION_SVC_1_1_IP}"
+      hostnames:
+      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-1"
+      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-1"
+      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-1"
+      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-1"
+      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-1"
+      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-1"
+      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-1"
+    - ip: "${BASTION_SVC_1_2_IP}"
+      hostnames:
+      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-2"
+      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-2"
+      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-2"
+      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-2"
+      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-2"
+      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-2"
+      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-2"
+    - ip: "${BASTION_SVC_1_3_IP}"
+      hostnames:
+      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-3"
+      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-3"
+      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-3"
+      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-3"
+      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-3"
+      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-3"
+      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-3"
+    - ip: "${BASTION_SVC_1_4_IP}"
+      hostnames:
+      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-4"
+      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-4"
+      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-4"
+      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-4"
+      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-4"
+      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-4"
+      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-4"

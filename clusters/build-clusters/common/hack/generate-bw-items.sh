@@ -11,11 +11,13 @@ set -o pipefail
 WORKDIR="$(mktemp -d)"
 readonly WORKDIR
 
-declare -a App_CI_SAArray=("config-updater" "deck" "plank" "sinker" "hook" "crier" "release-bot" "prow-controller-manager" "pj-rehearse")
-declare -a Build01_SAArray=("config-updater" "deck" "plank" "sinker" "hook" "crier" "dptp-controller-manager" "prow-controller-manager" "ci-operator")
+declare -a App_CI_SAArray=("config-updater" "deck" "sinker" "hook" "crier" "release-bot" "prow-controller-manager" "pj-rehearse")
+declare -a Build01_SAArray=("config-updater" "deck" "sinker" "hook" "crier" "dptp-controller-manager" "prow-controller-manager" "ci-operator")
 declare -a Build02_SAArray=("${Build01_SAArray[@]}")
+declare -a Vsphere_SAArray=("${Build01_SAArray[@]}")
+declare -a Api_CI_SAArray=("${Build01_SAArray[@]}")
 
-declare -a Context_Array=("app.ci" "build01" "build02")
+declare -a Context_Array=("app.ci" "api.ci" "build01" "build02" "vsphere")
 
 SED_COMMAND="sed"
 if [[ "$(uname -s)" == "Darwin" ]]; then
@@ -42,6 +44,8 @@ for ctx in ${Context_Array[@]}; do
   if [[ ${CONTEXT} == "app.ci" ]]; then SAArray=("${App_CI_SAArray[@]}"); fi
   if [[ ${CONTEXT} == "build01" ]]; then SAArray=("${Build01_SAArray[@]}"); fi
   if [[ ${CONTEXT} == "build02" ]]; then SAArray=("${Build02_SAArray[@]}"); fi
+  if [[ ${CONTEXT} == "vsphere" ]]; then SAArray=("${Vsphere_SAArray[@]}"); fi
+  if [[ ${CONTEXT} == "api.ci" ]]; then SAArray=("${Api_CI_SAArray[@]}"); fi
   for name in ${SAArray[@]}; do
     if ! generate_kubeconfig "${name}"; then
       echo "failed"

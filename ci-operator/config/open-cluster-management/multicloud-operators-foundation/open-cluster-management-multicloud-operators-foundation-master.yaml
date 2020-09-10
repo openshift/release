@@ -8,9 +8,13 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: golang-1.14
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  to: multicloud-manager
 promotion:
-  name: "4.5"
+  name: "2.1"
   namespace: open-cluster-management
 resources:
   '*':
@@ -39,15 +43,19 @@ tests:
     make verify-deps -k --warn-undefined-variables
   container:
     from: bin
-- artifact_dir: /tmp/artifacts
-  as: unit
+- as: unit
   commands: |
-    curl -L https://go.kubebuilder.io/dl/2.2.0/linux/amd64 | tar -xz
-    KUBEBUILDER_ASSETS="$(pwd)/kubebuilder_2.2.0_linux_amd64/bin"
-    export KUBEBUILDER_ASSETS
     make test --warn-undefined-variables
   container:
     from: test-bin
+- as: e2e
+  commands: |
+    KUBECTL=oc
+    FOUNDATION_IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:multicloud-manager}
+    export KUBECTL FOUNDATION_IMAGE_NAME
+    make test-e2e
+  openshift_installer_src:
+    cluster_profile: aws
 zz_generated_metadata:
   branch: master
   org: open-cluster-management

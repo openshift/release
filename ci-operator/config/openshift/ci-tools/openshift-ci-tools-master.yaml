@@ -1,8 +1,4 @@
 base_images:
-  centos8:
-    name: centos
-    namespace: origin
-    tag: "8"
   cli:
     name: "4.5"
     namespace: ocp
@@ -13,14 +9,14 @@ base_images:
     tag: installer
   os:
     name: centos
-    namespace: openshift
-    tag: "7"
+    namespace: origin
+    tag: "8"
 binary_build_commands: make production-install
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.14
+    tag: golang-1.15
 images:
 - context_dir: images/blocking-issue-creator/
   from: os
@@ -77,14 +73,6 @@ images:
       paths:
       - destination_dir: .
         source_path: /go/bin/sanitize-prow-jobs
-  to: determinize-prow-jobs
-- context_dir: images/sanitize-prow-jobs/
-  from: os
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/bin/sanitize-prow-jobs
   to: sanitize-prow-jobs
 - context_dir: images/pj-rehearse/
   from: os
@@ -111,7 +99,7 @@ images:
         source_path: /go/bin/config-brancher
   to: config-brancher
 - context_dir: images/dptp-controller-manager
-  from: centos8
+  from: os
   inputs:
     bin:
       paths:
@@ -119,7 +107,7 @@ images:
         source_path: /go/bin/dptp-controller-manager
   to: dptp-controller-manager
 - context_dir: images/autoconfigbrancher/
-  from: centos8
+  from: os
   inputs:
     bin:
       paths:
@@ -163,7 +151,7 @@ images:
         source_path: /go/bin/determinize-peribolos
   to: determinize-peribolos
 - dockerfile_path: images/ipi-deprovision/Dockerfile
-  from: centos8
+  from: os
   inputs:
     cli:
       paths:
@@ -259,7 +247,7 @@ images:
         source_path: /go/bin/group-auto-updater
   to: group-auto-updater
 - context_dir: images/private-org-sync/
-  from: centos8
+  from: os
   inputs:
     bin:
       paths:
@@ -267,7 +255,7 @@ images:
         source_path: /go/bin/private-org-sync
   to: private-org-sync
 - context_dir: images/ci-secret-bootstrap
-  from: centos8
+  from: os
   inputs:
     bin:
       paths:
@@ -275,7 +263,7 @@ images:
         source_path: /go/bin/ci-secret-bootstrap
   to: ci-secret-bootstrap
 - context_dir: images/ci-operator-config-mirror
-  from: centos8
+  from: os
   inputs:
     bin:
       paths:
@@ -283,7 +271,7 @@ images:
         source_path: /go/bin/ci-operator-config-mirror
   to: ci-operator-config-mirror
 - context_dir: images/private-prow-configs-mirror/
-  from: centos8
+  from: os
   inputs:
     bin:
       paths:
@@ -291,7 +279,7 @@ images:
         source_path: /go/bin/private-prow-configs-mirror
   to: private-prow-configs-mirror
 - context_dir: images/private-org-peribolos-sync/
-  from: centos8
+  from: os
   inputs:
     bin:
       paths:
@@ -299,7 +287,7 @@ images:
         source_path: /go/bin/private-org-peribolos-sync
   to: private-org-peribolos-sync
 - context_dir: images/autoperibolossync/
-  from: centos8
+  from: os
   inputs:
     bin:
       paths:
@@ -309,7 +297,7 @@ images:
         source_path: /go/bin/private-org-peribolos-sync
   to: auto-peribolos-sync
 - context_dir: images/registry-replacer/
-  from: centos8
+  from: os
   inputs:
     bin:
       paths:
@@ -325,7 +313,7 @@ images:
         source_path: /go/bin/autopublicizeconfig
   to: autopublicizeconfig
 - context_dir: images/generate-registry-metadata/
-  from: centos8
+  from: os
   inputs:
     bin:
       paths:
@@ -333,13 +321,21 @@ images:
         source_path: /go/bin/generate-registry-metadata
   to: generate-registry-metadata
 - context_dir: images/publicize/
-  from: centos8
+  from: os
   inputs:
     bin:
       paths:
       - destination_dir: .
         source_path: /go/bin/publicize
   to: publicize
+- context_dir: images/ocp-build-data-enforcer/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/ocp-build-data-enforcer
+  to: ocp-build-data-enforcer
 promotion:
   namespace: ci
   tag: latest
@@ -368,12 +364,15 @@ tests:
   steps:
     test:
     - as: e2e
-      commands: PULL_SECRET_DIR=/pull KUBECONFIG=/auth/kubeconfig make e2e
+      commands: IMPORT_SECRET_DIR=/import PULL_SECRET_DIR=/pull KUBECONFIG=/auth/kubeconfig make e2e
       credentials:
       - mount_path: /auth
         name: ci-operator
         namespace: test-credentials
       - mount_path: /pull
+        name: regcred
+        namespace: test-credentials
+      - mount_path: /import
         name: ci-pull-credentials
         namespace: test-credentials
       from: bin

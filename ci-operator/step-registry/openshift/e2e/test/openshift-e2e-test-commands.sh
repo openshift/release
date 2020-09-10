@@ -10,6 +10,10 @@ export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
 export HOME=/tmp/home
 export PATH=/usr/libexec/origin:$PATH
 
+if [[ -n "${TEST_CSI_DRIVER_MANIFEST}" ]]; then
+    export TEST_CSI_DRIVER_FILES=${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
+fi
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 mkdir -p "${HOME}"
@@ -62,7 +66,16 @@ if [[ "${CLUSTER_TYPE}" == gcp ]]; then
     popd
 fi
 
-openshift-tests "${TEST_COMMAND}" "${TEST_SUITE}" \
+if [[ -n "${TEST_OPTIONS}" ]]; then
+    export TEST_ARGS="--options=${TEST_OPTIONS}"
+fi
+
+if [[ "${TEST_COMMAND}" == "run-upgrade" && -n "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" ]]; then
+    # OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE is a pullspec of release:latest imagestreamtag
+    export TEST_ARGS="${TEST_ARGS:-} --to-image=${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
+fi
+
+openshift-tests "${TEST_COMMAND}" "${TEST_SUITE}" ${TEST_ARGS:-} \
     --provider "${TEST_PROVIDER}" \
     -o /tmp/artifacts/e2e.log \
     --junit-dir /tmp/artifacts/junit

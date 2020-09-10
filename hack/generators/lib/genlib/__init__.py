@@ -77,7 +77,7 @@ class GenDoc():
             raise IOError('Only expecting dict; received: ' + type(resource))
         if comment:
             self.add_comments(comment)
-        self.who[len(self.resources)] = f'{os.path.basename(caller.filename)}:{caller.lineno}'
+        self.who[len(self.resources)] = f'{os.path.basename(caller.filename)}'
         self.resources.append(resource)
 
     def append_all(self, resource_list, comment=None):

@@ -14,19 +14,16 @@ cd
 cat > packet-setup.yaml <<-EOF
 - name: setup Packet host
   hosts: localhost
+  collections:
+   - community.general
+  gather_facts: no
   vars:
     - cluster_type: "{{ lookup('env', 'CLUSTER_TYPE') }}"
     - slackhook_path: "{{ lookup('env', 'CLUSTER_PROFILE_DIR') }}"
-    - packet_hostname: "{{ packet_hostname_prefix }}-{{ ansible_date_time.iso8601_basic_short }}"
   vars_files:
     - "{{ lookup('env', 'CLUSTER_PROFILE_DIR') }}/.packet-kni-vars"
 
   tasks:
-
-  - name: Store Packet hostname in a file
-    copy:
-      dest: "{{ lookup('env', 'SHARED_DIR') }}/packet_hostname"
-      content: "packet_hostname: {{ packet_hostname }}"
 
   - name: check cluster type
     fail:
@@ -45,6 +42,7 @@ cat > packet-setup.yaml <<-EOF
         facility: any
         wait_for_public_IPv: 4
         state: active
+        tags: "{{ 'PR:', lookup('env', 'PULL_NUMBER'), 'Job name:', lookup('env', 'JOB_NAME'), 'Job id:', lookup('env', 'PROW_JOB_ID') }}"
       register: hosts
       no_log: true
     - name: wait for ssh
@@ -71,5 +69,5 @@ cat > packet-setup.yaml <<-EOF
     local_action: copy content="{{ hosts.devices[0].public_ipv4 }}" dest="{{ lookup('env', 'SHARED_DIR') }}/server-ip"
 EOF
 
-ansible-playbook packet-setup.yaml -e "packet_hostname_prefix=ipi-${NAMESPACE}-${JOB_NAME_HASH}"
+ansible-playbook packet-setup.yaml -e "packet_hostname=ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}"
 

@@ -27,6 +27,14 @@ base_images:
     name: builder
     namespace: ocp
     tag: golang-1.13
+  ocp_builder_golang-1.14:
+    name: builder
+    namespace: ocp
+    tag: golang-1.14
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
   tools:
     name: 4.6-priv
     namespace: ocp-private
@@ -36,22 +44,25 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: golang-1.14
 canonical_go_repository: k8s.io/kubernetes
 images:
 - dockerfile_path: openshift-hack/images/hyperkube/Dockerfile.rhel
   from: base
   inputs:
-    ocp_builder_golang-1.13:
+    ocp_builder_golang-1.14:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.14
+    ocp_builder_rhel-8-golang-openshift-4.6:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-openshift-4.6
   to: hyperkube
 - dockerfile_path: openshift-hack/images/tests/Dockerfile.rhel
   from: tools
   inputs:
-    ocp_builder_golang-1.13:
+    ocp_builder_golang-1.14:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.14
   to: kubernetes-tests
 - context_dir: openshift-hack/images/os/
   from: base
@@ -129,10 +140,6 @@ resources:
     requests:
       cpu: "4"
       memory: 8Gi
-  e2e-conformance-k8s:
-    requests:
-      cpu: "1"
-      memory: 300Mi
   hyperkube:
     requests:
       cpu: "3"
@@ -145,6 +152,10 @@ resources:
     requests:
       cpu: "6"
       memory: 14Gi
+  k8s-e2e-conformance-aws:
+    requests:
+      cpu: "1"
+      memory: 300Mi
   rpms:
     requests:
       cpu: "4"
@@ -194,14 +205,23 @@ tests:
     memory_backed_volume:
       size: 4Gi
 - artifact_dir: /tmp/artifacts
-  as: gcp-e2e-kubernetes
+  as: k8s-e2e-gcp
   steps:
     cluster_profile: gcp
     workflow: openshift-kubernetes-e2e-gcp
+- artifact_dir: /tmp/artifacts
+  as: k8s-e2e-gcp-serial
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-kubernetes-e2e-gcp-serial
+- as: e2e-aws
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-loki
 - as: e2e-gcp
   steps:
     cluster_profile: gcp
-    workflow: openshift-e2e-gcp
+    workflow: openshift-e2e-gcp-loki
 - as: e2e-aws-ovn
   steps:
     cluster_profile: aws
@@ -239,7 +259,7 @@ tests:
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer_upi:
     cluster_profile: vsphere
-- as: e2e-conformance-k8s
+- as: k8s-e2e-conformance-aws
   commands: openshift-hack/conformance-k8s.sh
   openshift_installer_src:
     cluster_profile: aws

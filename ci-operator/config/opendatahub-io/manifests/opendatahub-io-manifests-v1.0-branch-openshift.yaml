@@ -1,0 +1,46 @@
+base_images:
+  os:
+    name: centos
+    namespace: origin
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.14
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 200Mi
+tag_specification:
+  name: "4.4"
+  namespace: ocp
+tests:
+- as: unit-tests
+  commands: |
+    curl -O https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv3.2.3/kustomize_kustomize.v3.2.3_linux_amd64
+    mv kustomize_kustomize.v3.2.3_linux_amd64 kustomize
+    chmod +x kustomize
+    export PATH=`pwd`:$PATH
+    go mod vendor
+    cd tests
+    make test
+  container:
+    from: src
+- as: opendatahub-manifests-nightly
+  commands: |
+    curl -O https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv3.2.3/kustomize_kustomize.v3.2.3_linux_amd64
+    mv kustomize_kustomize.v3.2.3_linux_amd64 kustomize
+    chmod +x kustomize
+    export PATH=`pwd`:$PATH
+    go mod vendor
+    cd tests
+    make test
+  container:
+    from: src
+  cron: 30 0 * * *
+zz_generated_metadata:
+  branch: v1.0-branch-openshift
+  org: opendatahub-io
+  repo: manifests

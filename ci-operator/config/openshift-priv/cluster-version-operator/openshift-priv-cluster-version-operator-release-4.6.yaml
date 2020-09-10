@@ -3,6 +3,14 @@ base_images:
     name: 4.6-priv
     namespace: ocp-private
     tag: base
+  ocp_builder_golang-1.14:
+    name: builder
+    namespace: ocp
+    tag: golang-1.14
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
   openshift_release_golang-1.13:
     name: release
     namespace: openshift
@@ -18,11 +26,12 @@ build_root:
     tag: golang-1.13
 canonical_go_repository: github.com/openshift/cluster-version-operator
 images:
-- from: base
+- dockerfile_path: Dockerfile.rhel
+  from: base
   inputs:
-    openshift_release_golang-1.14:
+    ocp_builder_rhel-8-golang-openshift-4.6:
       as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.14
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-openshift-4.6
   to: cluster-version-operator
 promotion:
   disabled: true
@@ -50,10 +59,9 @@ tests:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
 - as: e2e-upgrade
-  commands: TEST_SUITE=all TEST_OPTIONS=abort-at=100 run-upgrade-tests
-  openshift_installer:
+  steps:
     cluster_profile: gcp
-    upgrade: true
+    workflow: openshift-upgrade-gcp-loki
 zz_generated_metadata:
   branch: release-4.6
   org: openshift-priv

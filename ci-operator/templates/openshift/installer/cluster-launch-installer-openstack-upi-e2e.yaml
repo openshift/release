@@ -40,7 +40,7 @@ parameters:
 - name: USE_LEASE_CLIENT
 - name: TMP_SHARED
   value: /tmp/shared
-- name: TMP_ARTIFACTS
+- name: ARTIFACT_DIR
   value: /tmp/artifacts
 - name: TMP_CLUSTER_PROFILE
   value: /tmp/cluster-profile
@@ -124,7 +124,7 @@ objects:
       terminationMessagePolicy: FallbackToLogsOnError
       volumeMounts:
       - name: artifacts
-        mountPath: ${TMP_ARTIFACTS}
+        mountPath: ${ARTIFACT_DIR}
       - name: shared-tmp
         mountPath: ${TMP_SHARED}
       - name: cluster-profile
@@ -167,12 +167,12 @@ objects:
         value: ${DO_NOT_CREATE_DNS_RECORD}
       - name: TMP_SHARED
         value: ${TMP_SHARED}
-      - name: TMP_ARTIFACTS
-        value: ${TMP_ARTIFACTS}
+      - name: ARTIFACT_DIR
+        value: ${ARTIFACT_DIR}
       - name: TMP_CLUSTER_PROFILE
         value: ${TMP_CLUSTER_PROFILE}
       - name: ASSETS_DIR
-        value: ${TMP_ARTIFACTS}/installer
+        value: ${ARTIFACT_DIR}/installer
       - name: OS_UPI_DIR
         value: /var/lib/openshift-install/upi/openstack
       - name: NETWORK_TYPE
@@ -250,7 +250,7 @@ objects:
         function check_early_failures() {
           # if the installer does not have the upi openstack directory no need to continue
           if [[ ! -d "${OS_UPI_DIR}" ]]; then
-              echo "FAILURE: ${OS_UPI_DIR} does not exists on the installer image"
+              echo "FAILURE: '${OS_UPI_DIR}' does not exist on the installer image"
               signal_early_failure
               exit 1
           fi
@@ -317,10 +317,6 @@ objects:
           cp "${SSH_PRIVATE_KEY_PATH}" ~/.ssh/id_rsa
           chmod 0600 ~/.ssh/id_rsa
 
-          #The following prepairs the playbooks being used depending on the release.
-          # for example, for release 4.4 the playbooks need to be renamed.
-          prepare_ansible_playbooks
-
           echo "OPENSTACK platform installer is using: ${IMAGE_OPENSTACK_INSTALLER} for testing"
         }
 
@@ -368,7 +364,7 @@ objects:
             aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file://${ASSETS_DIR}/api-record.json
 
             echo "Creating DNS record for *.apps.$CLUSTER_NAME.$BASE_DOMAIN. -> $INGRESS_FIP_IP"
-            cat > /tmp/artifacts/installer/ingress-record.json <<EOF
+            cat > ${ARTIFACT_DIR}/installer/ingress-record.json <<EOF
         {
         "Comment": "Create the public OpenShift Ingress record",
         "Changes": [{
@@ -381,7 +377,7 @@ objects:
             }
         }]}
         EOF
-            aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file:///tmp/artifacts/installer/ingress-record.json
+            aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file://${ARTIFACT_DIR}/installer/ingress-record.json
           else
             ssh ${DNSUSER}@${DNSSERVER} -o StrictHostKeyChecking=no -i ${SSH_PRIVATE_KEY_PATH} "rm -rf ~/cluster.conf"
             ssh ${DNSUSER}@${DNSSERVER} -o StrictHostKeyChecking=no -i ${SSH_PRIVATE_KEY_PATH} "echo address=/${BASE_DOMAIN}/${LB_FIP_IP} >> ~/cluster.conf"
@@ -393,9 +389,6 @@ objects:
 
         function create_install_config() {
           echo "Creating install_config.yaml"
-          # Create install-config.yaml.bkk to use as install-config.yaml because
-          # some of the next steps will delete the install-config.yaml thus we create a permanent one.
-          echo ${ASSETS_DIR}
           cat > ${ASSETS_DIR}/install-config.yaml << EOF
         apiVersion: v1
         baseDomain: ${BASE_DOMAIN}
@@ -431,10 +424,6 @@ objects:
         sshKey: |
           ${SSH_PUB_KEY}
         EOF
-        }
-
-        function backup_install_config() {
-          cp ${ASSETS_DIR}/install-config.yaml ${ASSETS_DIR}/install-config.yaml.bkk
         }
 
         function create_manifest_files() {
@@ -476,7 +465,8 @@ objects:
         with open(bootstrap_ign, 'r') as f:
             ignition = json.load(f)
 
-        files = ignition['storage'].get('files', [])
+        storage = ignition.get('storage', {})
+        files = storage.get('files', [])
 
         infra_id = os.environ.get('INFRA_ID', 'openshift').encode()
         hostname_b64 = base64.standard_b64encode(infra_id + b'-bootstrap\n').decode().strip()
@@ -485,10 +475,8 @@ objects:
             'path': '/etc/hostname',
             'mode': 420,
             'contents': {
-                'source': 'data:text/plain;charset=utf-8;base64,' + hostname_b64,
-                'verification': {}
-            },
-            'filesystem': 'root',
+                'source': 'data:text/plain;charset=utf-8;base64,' + hostname_b64
+            }
         })
 
         ca_cert_path = os.environ.get('OS_CACERT', '')
@@ -502,13 +490,12 @@ objects:
                 'path': '/opt/openshift/tls/cloud-ca-cert.pem',
                 'mode': 420,
                 'contents': {
-                    'source': 'data:text/plain;charset=utf-8;base64,' + ca_cert_b64,
-                    'verification': {}
-                },
-                'filesystem': 'root',
+                    'source': 'data:text/plain;charset=utf-8;base64,' + ca_cert_b64
+                }
             })
 
-        ignition['storage']['files'] = files;
+        storage['files'] = files
+        ignition['storage'] = storage
 
         with open(bootstrap_ign, 'w') as f:
             json.dump(ignition, f)
@@ -530,51 +517,44 @@ objects:
           export OPENSTACK_TOKEN=$(openstack token issue --format value -c id)
           cat > ${ASSETS_DIR}/$INFRA_ID-bootstrap-ignition.json << EOF
         {
-        "ignition": {
+          "ignition": {
             "config": {
-                "append": [
-                  {
-                    "source": "$GLANCE_IMAGE_URL",
-                    "verification": {},
-                    "httpHeaders": [
-                      {
-                         "name": "X-Auth-Token",
-                         "value": "$OPENSTACK_TOKEN"
-                      }
-                    ]
-                  }
-                ]
+              "merge": [
+                {
+                  "source": "$GLANCE_IMAGE_URL",
+                  "httpHeaders": [
+                    {
+                      "name": "X-Auth-Token",
+                      "value": "$OPENSTACK_TOKEN"
+                    }
+                  ]
+                }
+              ]
             },
-            "security": {},
-            "timeouts": {},
-            "version": "2.4.0"
-        },
-        "networkd": {},
-        "passwd": {},
-        "storage": {
-                  "files": [{
-                      "filesystem": "root",
-                      "path": "/etc/hostname",
-                      "mode": 420,
-                      "contents": { "source": "$HOSTNAME_CONFIG_DATA_URL" }
-                  }]
-        },
-        "systemd": {}
+          "version": "3.1.0"
+          },
+          "storage": {
+            "files": [{
+              "path": "/etc/hostname",
+              "mode": 420,
+              "contents": { "source": "$HOSTNAME_CONFIG_DATA_URL" }
+            }]
+          }
         }
         EOF
 
 
-          echo "$INFRA_ID-bootstrap-ignition.json"
-          cat ${ASSETS_DIR}/$INFRA_ID-bootstrap-ignition.json
           #create master.ign for each master
           MASTER_IGN_PATH=${ASSETS_DIR}/master.ign
           for index in $(seq 0 2); do
               MASTER_HOSTNAME="$INFRA_ID-master-$index\n"
               python -c "import base64, json, sys;
         ignition = json.load(sys.stdin);
-        files = ignition['storage'].get('files', []);
-        files.append({'path': '/etc/hostname', 'mode': 420, 'contents': {'source': 'data:text/plain;charset=utf-8;base64,' + base64.standard_b64encode(b'$MASTER_HOSTNAME').decode().strip(), 'verification': {}}, 'filesystem': 'root'});
-        ignition['storage']['files'] = files;
+        storage = ignition.get('storage', {});
+        files = storage.get('files', []);
+        files.append({'path': '/etc/hostname', 'mode': 420, 'contents': {'source': 'data:text/plain;charset=utf-8;base64,' + base64.standard_b64encode(b'$MASTER_HOSTNAME').decode().strip()}});
+        storage['files'] = files;
+        ignition['storage'] = storage
         json.dump(ignition, sys.stdout)
         " <$MASTER_IGN_PATH >"${ASSETS_DIR}/$INFRA_ID-master-$index-ignition.json"
           done
@@ -584,18 +564,18 @@ objects:
           correct_ip=$1
           lookup=$(nslookup $2)
           if [[ $? -eq 0 ]]; then
-            if [[ ${lookup} =~ "$1" ]]; then
+            if [[ ${lookup} == *"$1"* ]]; then
                echo $2 resolves to $1
                return 0
             fi
           fi
-          echo $2 does not resolv to $1
+          echo $2 does not resolve to $1
           return 1
         }
 
 
-        function verify_dns_resolvs() {
-          echo Verifying we can resolv api.$CLUSTER_NAME.$BASE_DOMAIN
+        function verify_dns_resolves() {
+          echo Verifying we can resolve api.$CLUSTER_NAME.$BASE_DOMAIN
           check_ip_resolves "${LB_FIP_IP}" "api.$CLUSTER_NAME.$BASE_DOMAIN"
           if [[ "$?" -ne "0" ]] ; then
                 echo dns verification failed!
@@ -607,55 +587,74 @@ objects:
           awk '/^\s+'$1':/ { print $2 }' "$OS_CLIENT_CONFIG_FILE" | sed -e 's/^"//' -e 's/"$//'
         }
 
+        # Copy the playbooks in the assets directory
         function prepare_ansible_playbooks() {
-          # The name of the playbooks changed between release 4.4 and 4.5
-          # we need to normalize the playbook names
+          cp "${OS_UPI_DIR}/common.yaml" "${ASSETS_DIR}"
+
+          # Playbook numbers were removed in in 4.5
           if [ -f "${OS_UPI_DIR}/01_security-groups.yaml" ]; then
-              cp ${OS_UPI_DIR}/01_security-groups.yaml ${OS_UPI_DIR}/security-groups.yaml
-              cp ${OS_UPI_DIR}/02_network.yaml ${OS_UPI_DIR}/network.yaml
-              cp ${OS_UPI_DIR}/03_bootstrap.yaml ${OS_UPI_DIR}/bootstrap.yaml
-              cp ${OS_UPI_DIR}/04_control-plane.yaml ${OS_UPI_DIR}/control-plane.yaml
-              cp ${OS_UPI_DIR}/05_compute-nodes.yaml ${OS_UPI_DIR}/compute-nodes.yaml
+            cp "${OS_UPI_DIR}/01_security-groups.yaml"      "${ASSETS_DIR}/security-groups.yaml"
+            cp "${OS_UPI_DIR}/02_network.yaml"              "${ASSETS_DIR}/network.yaml"
+            cp "${OS_UPI_DIR}/03_bootstrap.yaml"            "${ASSETS_DIR}/bootstrap.yaml"
+            cp "${OS_UPI_DIR}/04_control-plane.yaml"        "${ASSETS_DIR}/control-plane.yaml"
+            cp "${OS_UPI_DIR}/05_compute-nodes.yaml"        "${ASSETS_DIR}/compute-nodes.yaml"
 
-              cp ${OS_UPI_DIR}/down-01_security-groups.yaml ${OS_UPI_DIR}/down-security-groups.yaml
-              cp ${OS_UPI_DIR}/down-02_network.yaml ${OS_UPI_DIR}/down-network.yaml
-              cp ${OS_UPI_DIR}/down-03_bootstrap.yaml ${OS_UPI_DIR}/down-bootstrap.yaml
-              cp ${OS_UPI_DIR}/down-04_control-plane.yaml ${OS_UPI_DIR}/down-control-plane.yaml
-              cp ${OS_UPI_DIR}/down-05_compute-nodes.yaml ${OS_UPI_DIR}/down-compute-nodes.yaml
-              cp ${OS_UPI_DIR}/down-06_load-balancers.yaml ${OS_UPI_DIR}/down-load-balancers.yaml
+            cp "${OS_UPI_DIR}/down-01_security-groups.yaml" "${ASSETS_DIR}/down-security-groups.yaml"
+            cp "${OS_UPI_DIR}/down-02_network.yaml"         "${ASSETS_DIR}/down-network.yaml"
+            cp "${OS_UPI_DIR}/down-03_bootstrap.yaml"       "${ASSETS_DIR}/down-bootstrap.yaml"
+            cp "${OS_UPI_DIR}/down-04_control-plane.yaml"   "${ASSETS_DIR}/down-control-plane.yaml"
+            cp "${OS_UPI_DIR}/down-05_compute-nodes.yaml"   "${ASSETS_DIR}/down-compute-nodes.yaml"
+            cp "${OS_UPI_DIR}/down-06_load-balancers.yaml"  "${ASSETS_DIR}/down-load-balancers.yaml"
+          else
+            cp \
+              "${OS_UPI_DIR}/security-groups.yaml"      \
+              "${OS_UPI_DIR}/network.yaml"              \
+              "${OS_UPI_DIR}/bootstrap.yaml"            \
+              "${OS_UPI_DIR}/control-plane.yaml"        \
+              "${OS_UPI_DIR}/compute-nodes.yaml"        \
+                                                        \
+              "${OS_UPI_DIR}/down-security-groups.yaml" \
+              "${OS_UPI_DIR}/down-network.yaml"         \
+              "${OS_UPI_DIR}/down-bootstrap.yaml"       \
+              "${OS_UPI_DIR}/down-control-plane.yaml"   \
+              "${OS_UPI_DIR}/down-compute-nodes.yaml"   \
+              "${OS_UPI_DIR}/down-load-balancers.yaml"  \
+                                                        \
+              "${ASSETS_DIR}"
           fi
-        }
 
-        function prepare_ansible_playbooks_workspace() {
+          # down-containers.yaml was introduced in 4.6
+          if [ -f "${OS_UPI_DIR}/down-containers.yaml" ]; then
+            cp "${OS_UPI_DIR}/down-containers.yaml" "$ASSETS_DIR"
+          else
+            # If not present, create a valid empty playbook.
+          sed -n '/tasks/q;p' "${ASSETS_DIR}/network.yaml" > "${ASSETS_DIR}/down-containers.yaml"
+          fi
+
           OPENSTACK_REGION="$(get_clouds_param 'region_name')"
-          echo "OpenStack UPI directory: ${OS_UPI_DIR}"
-          #prepare inventory.yaml
-          cp ${OS_UPI_DIR}/inventory.yaml ${OS_UPI_DIR}/inventory.yaml.bkk
-          sed -i "s~os_subnet_range.*~os_subnet_range: \'${OS_SUBNET_RANGE}\'~g" ${OS_UPI_DIR}/inventory.yaml
-          sed -i "s/os_flavor_master.*/os_flavor_master: \'${OPENSTACK_FLAVOR}\'/g" ${OS_UPI_DIR}/inventory.yaml
-          sed -i "s/os_flavor_worker.*/os_flavor_worker: \'${OPENSTACK_FLAVOR}\'/g" ${OS_UPI_DIR}/inventory.yaml
-          sed -i "s/os_image_rhcos.*/os_image_rhcos: \'${RHCOS_GLANCE_IMAGE_NAME}\'/g" ${OS_UPI_DIR}/inventory.yaml
-          sed -i "s/os_external_network.*/os_external_network: \'${OPENSTACK_EXTERNAL_NETWORK}\'/g" ${OS_UPI_DIR}/inventory.yaml
-          sed -i "s/os_api_fip.*/os_api_fip: \'${LB_FIP_IP}\'/g" ${OS_UPI_DIR}/inventory.yaml
-          sed -i "s/os_ingress_fip.*/os_ingress_fip: \'${INGRESS_FIP_IP}\'/g" ${OS_UPI_DIR}/inventory.yaml
-          sed -i "s/os_region_name.*/os_region_name: \'${OPENSTACK_REGION}\'/g" ${OS_UPI_DIR}/inventory.yaml
-          sed -i "s/os_cp_nodes_number.*/os_cp_nodes_number: ${NUMBER_OF_MASTERS}/g" ${OS_UPI_DIR}/inventory.yaml
-          sed -i "s/os_compute_nodes_number.*/os_compute_nodes_number: ${NUMBER_OF_WORKERS}/g" ${OS_UPI_DIR}/inventory.yaml
-
-          # The metadata.json  and ignition json files needs to be in the same directory as playbooks
-          cp ${ASSETS_DIR}/*.json ${OS_UPI_DIR}/
-          cp ${ASSETS_DIR}/*.ign ${OS_UPI_DIR}/
+          sed "
+            0,/os_subnet_range.*/         {s||os_subnet_range: \'${OS_SUBNET_RANGE}\'|}                ;
+            0,/os_flavor_master.*/        {s||os_flavor_master: \'${OPENSTACK_FLAVOR}\'|}              ;
+            0,/os_flavor_worker.*/        {s||os_flavor_worker: \'${OPENSTACK_FLAVOR}\'|}              ;
+            0,/os_image_rhcos.*/          {s||os_image_rhcos: \'${RHCOS_GLANCE_IMAGE_NAME}\'|}         ;
+            0,/os_external_network.*/     {s||os_external_network: \'${OPENSTACK_EXTERNAL_NETWORK}\'|} ;
+            0,/os_api_fip.*/              {s||os_api_fip: \'${LB_FIP_IP}\'|}                           ;
+            0,/os_ingress_fip.*/          {s||os_ingress_fip: \'${INGRESS_FIP_IP}\'|}                  ;
+            0,/os_region_name.*/          {s||os_region_name: \'${OPENSTACK_REGION}\'|}                ;
+            0,/os_cp_nodes_number.*/      {s||os_cp_nodes_number: ${NUMBER_OF_MASTERS}|}               ;
+            0,/os_compute_nodes_number.*/ {s||os_compute_nodes_number: ${NUMBER_OF_WORKERS}|}          ;
+            " "${OS_UPI_DIR}/inventory.yaml" > "${ASSETS_DIR}/inventory.yaml"
         }
 
         function verify_playbooks_status() {
           # We first do a dry run with --list-tasks to catch any configuration errors right up front
           # before we start the full run.
-          ansible-playbook -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/security-groups.yaml" --list-tasks
-          ansible-playbook -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/network.yaml" --list-tasks
-          ansible-playbook -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/bootstrap.yaml" --list-tasks
-          ansible-playbook -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/control-plane.yaml" --list-tasks
-          ansible-playbook -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/compute-nodes.yaml" --list-tasks
-          echo "SUCCEFULLY verified all playbooks with --list-tasks flag"
+          ansible-playbook --list-tasks -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/security-groups.yaml"
+          ansible-playbook --list-tasks -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/network.yaml"
+          ansible-playbook --list-tasks -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/bootstrap.yaml"
+          ansible-playbook --list-tasks -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/control-plane.yaml"
+          ansible-playbook --list-tasks -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/compute-nodes.yaml"
+          echo "SUCCESSFULLY verified all playbooks with --list-tasks flag"
         }
 
 
@@ -676,13 +675,13 @@ objects:
 
         function run_bootstrap_playbooks() {
           #Security Groups
-          ansible-playbook -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/security-groups.yaml"
+          ansible-playbook -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/security-groups.yaml"
 
           #Network and Subnet
-          ansible-playbook -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/network.yaml"
+          ansible-playbook -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/network.yaml"
 
           #Bootstrap
-          ansible-playbook  -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/bootstrap.yaml"
+          ansible-playbook -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/bootstrap.yaml"
           get_bootstrap_fip > ${TMP_SHARED}/BOOTSTRAP_FIP
           export BOOTSTRAP_FIP=$(cat ${TMP_SHARED}/BOOTSTRAP_FIP)
           wait_for_bootstrap_at_port 6443
@@ -691,7 +690,7 @@ objects:
 
         function run_control_plane_playbooks() {
           #Control plane
-          ansible-playbook -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/control-plane.yaml"
+          ansible-playbook -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/control-plane.yaml"
         }
 
         function wait_for_control_plane() {
@@ -722,7 +721,7 @@ objects:
                 echo Gathering bootstrap logs
                 B_FIP=$(cat ${TMP_SHARED}/BOOTSTRAP_FIP)
                 ssh -i ${SSH_PRIVATE_KEY_PATH} -o "StrictHostKeyChecking no" core@${B_FIP} 'journalctl -b  -u release-image.service -u bootkube.service > bootstrap.log; tar -czf bootstrap.log.tgz bootstrap.log' || true
-                scp -i ${SSH_PRIVATE_KEY_PATH} -o "StrictHostKeyChecking no" core@${B_FIP}:~/bootstrap.log.tgz ${TMP_ARTIFACTS}/bootstrap/bootstrap.log.tgz || true
+                scp -i ${SSH_PRIVATE_KEY_PATH} -o "StrictHostKeyChecking no" core@${B_FIP}:~/bootstrap.log.tgz ${ARTIFACT_DIR}/bootstrap/bootstrap.log.tgz || true
             else
               echo Bootstrap fip no longer available. Unable to collect bootstrap logs
             fi
@@ -735,12 +734,12 @@ objects:
           echo "destroying bootstrap resources"
           gather_bootstrap_logs
           mv ${TMP_SHARED}/BOOTSTRAP_FIP ${TMP_SHARED}/BOOTSTRAP_FIP_logs_collected
-          ansible-playbook -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-bootstrap.yaml"
+          ansible-playbook -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-bootstrap.yaml"
           openstack image delete $GLANCE_SHIM_IMAGE_ID
         }
 
         function deploy_compute_nodes() {
-          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/compute-nodes.yaml"
+          ansible-playbook -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/compute-nodes.yaml"
         }
 
         function wait_for_compute_nodes() {
@@ -751,7 +750,7 @@ objects:
         function approve_csrs() {
           while true; do
             if [[ ! -f ${TMP_SHARED}/setup-complete ]]; then
-              oc get csr -o name | xargs oc adm certificate approve
+              oc get csr -o jsonpath='{.items[*].metadata.name}' | xargs --no-run-if-empty oc adm certificate approve
               sleep 15 & wait
               continue
             else
@@ -773,7 +772,7 @@ objects:
           wait "$!"
 
           # Password for the cluster gets leaked in the installer logs and hence removing them.
-          sed -i 's/password: .*/password: REDACTED"/g' /tmp/artifacts/installer/.openshift_install.log
+          sed -i 's/password: .*/password: REDACTED"/g' ${ARTIFACT_DIR}/installer/.openshift_install.log
         }
 
 
@@ -788,16 +787,15 @@ objects:
         create_ingress_fip
         create_dns_records
         create_install_config
-        backup_install_config
         create_manifest_files
         create_ignition_configs_and_jsons
         upload_rhcos_image
-        prepare_ansible_playbooks_workspace
+        prepare_ansible_playbooks
         verify_playbooks_status
         run_bootstrap_playbooks
         run_control_plane_playbooks
         wait_for_control_plane
-        verify_dns_resolvs
+        verify_dns_resolves
         wait_for_bootstrap_complete
         access_the_openshiftapi
         delete_bootstrap_resources
@@ -827,18 +825,18 @@ objects:
       - name: cluster-profile
         mountPath: ${TMP_CLUSTER_PROFILE}
       - name: artifacts
-        mountPath: ${TMP_ARTIFACTS}
+        mountPath: ${ARTIFACT_DIR}
       env:
       - name: OS_CLOUD
         value: ${OS_CLOUD}
       - name: OS_CLIENT_CONFIG_FILE
         value: ${TMP_CLUSTER_PROFILE}/clouds.yaml
       - name: KUBECONFIG
-        value: ${TMP_ARTIFACTS}/installer/auth/kubeconfig
+        value: /tmp/artifacts/installer/auth/kubeconfig
       - name: TMP_SHARED
         value: ${TMP_SHARED}
-      - name: TMP_ARTIFACTS
-        value: ${TMP_ARTIFACTS}
+      - name: ARTIFACT_DIR
+        value: ${ARTIFACT_DIR}
       - name: TMP_CLUSTER_PROFILE
         value: ${TMP_CLUSTER_PROFILE}
       - name: USER
@@ -928,12 +926,12 @@ objects:
         function run-upgrade-tests() {
           openshift-tests run-upgrade "${TEST_SUITE}" --to-image "${IMAGE:-${RELEASE_IMAGE_LATEST}}" \
             --options "${TEST_OPTIONS:-}" \
-            --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
+            --provider "${TEST_PROVIDER:-}" -o ${ARTIFACT_DIR}/e2e.log --junit-dir ${ARTIFACT_DIR}/junit
         }
 
         function run-tests() {
           openshift-tests run "${TEST_SUITE}" \
-            --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
+            --provider "${TEST_PROVIDER:-}" -o ${ARTIFACT_DIR}/e2e.log --junit-dir ${ARTIFACT_DIR}/junit
         }
 
         function run-minimal-tests() {
@@ -942,8 +940,8 @@ objects:
           # reliably.
           openshift-tests run openshift/conformance/parallel --dry-run |
             grep 'Smoke\|Early' |
-          openshift-tests run -o /tmp/artifacts/e2e.log \
-            --junit-dir /tmp/artifacts/junit -f -
+          openshift-tests run -o ${ARTIFACT_DIR}/e2e.log \
+            --junit-dir ${ARTIFACT_DIR}/junit -f -
           return 0
         }
 
@@ -969,7 +967,7 @@ objects:
       - name: cluster-profile
         mountPath: ${TMP_CLUSTER_PROFILE}
       - name: artifacts
-        mountPath: ${TMP_ARTIFACTS}
+        mountPath: ${ARTIFACT_DIR}
       env:
       - name: CLUSTER_TYPE
         value: ${CLUSTER_TYPE}
@@ -984,7 +982,7 @@ objects:
       - name: AWS_PROFILE
         value: openshift-ci-infra
       - name: KUBECONFIG
-        value: ${TMP_ARTIFACTS}/installer/auth/kubeconfig
+        value: /tmp/artifacts/installer/auth/kubeconfig
       - name: SSH_PRIVATE_KEY_PATH
         value: ${TMP_CLUSTER_PROFILE}/ssh-privatekey
       - name: OS_CLOUD
@@ -995,12 +993,12 @@ objects:
         value: ${DO_NOT_CREATE_DNS_RECORD}
       - name: TMP_SHARED
         value: ${TMP_SHARED}
-      - name: TMP_ARTIFACTS
-        value: ${TMP_ARTIFACTS}
+      - name: ARTIFACT_DIR
+        value: ${ARTIFACT_DIR}
       - name: TMP_CLUSTER_PROFILE
         value: ${TMP_CLUSTER_PROFILE}
       - name: ASSETS_DIR
-        value: ${TMP_ARTIFACTS}/installer
+        value: ${ARTIFACT_DIR}/installer
       - name: OS_UPI_DIR
         value: /var/lib/openshift-install/upi/openstack
       - name: USER
@@ -1050,10 +1048,10 @@ objects:
           if [ -f "${ASSETS_DIR}/proxyip" ]
           then
             proxy_ip="$(cat ${ASSETS_DIR}/proxyip)"
-            mkdir -p ${TMP_ARTIFACTS}/proxy
+            mkdir -p ${ARTIFACT_DIR}/proxy
             eval $(ssh-agent)
             ssh-add /etc/openshift-installer/ssh-privatekey
-            ssh -A -o PreferredAuthentications=publickey -o StrictHostKeyChecking=false -o UserKnownHostsFile=/dev/null core@${proxy_ip} 'journalctl -u squid' > ${TMP_ARTIFACTS}/proxy/squid.service
+            ssh -A -o PreferredAuthentications=publickey -o StrictHostKeyChecking=false -o UserKnownHostsFile=/dev/null core@${proxy_ip} 'journalctl -u squid' > ${ARTIFACT_DIR}/proxy/squid.service
 
           fi
         }
@@ -1068,31 +1066,24 @@ objects:
           echo "Teardown for ${CLUSTER_NAME}"
           touch ${TMP_SHARED}/exit
           export PATH=$PATH:${TMP_SHARED}
-          mkdir -p ${TMP_ARTIFACTS}/pods ${TMP_ARTIFACTS}/nodes ${TMP_ARTIFACTS}/metrics ${TMP_ARTIFACTS}/bootstrap ${TMP_ARTIFACTS}/network
-        }
-
-        function prepare_ansible_playbooks_workspace() {
-          # The metadata.json  and ignition json files needs to be in the same directory as playbooks
-          cp ${ASSETS_DIR}/*.json ${OS_UPI_DIR}/
-          cp ${ASSETS_DIR}/*.ign ${OS_UPI_DIR}/
+          mkdir -p ${ARTIFACT_DIR}/pods ${ARTIFACT_DIR}/nodes ${ARTIFACT_DIR}/metrics ${ARTIFACT_DIR}/bootstrap ${ARTIFACT_DIR}/network
         }
 
 
         function gather_openstack_information() {
           echo "Gathering openstack server list"
-          openstack server list | grep -e $CLUSTER_NAME >${TMP_ARTIFACTS}/openstack_nodes.log
+          openstack server list | grep -e $CLUSTER_NAME >${ARTIFACT_DIR}/openstack_nodes.log
 
           echo "Gathering openstack server details"
           for server in $(openstack server list -c Name -f value | grep -e $CLUSTER_NAME | sort); do
-              echo -e "\n$ openstack server show $server" >>${TMP_ARTIFACTS}/openstack_nodes.log
-              openstack server show $server >>${TMP_ARTIFACTS}/openstack_nodes.log
+              echo -e "\n$ openstack server show $server" >>${ARTIFACT_DIR}/openstack_nodes.log
+              openstack server show $server >>${ARTIFACT_DIR}/openstack_nodes.log
+              if [[ "$server" == *"bootstrap"* ]]; then
+                openstack console log show $server &>${ARTIFACT_DIR}/bootstrap/nova.log
+              else
+                openstack console log show $server &>${ARTIFACT_DIR}/nodes/console_${server}.log
+              fi
           done
-
-          echo "Gathering openstack server logs"
-          local BOOTSTRAP_NAME=$(openstack server list --format value --column Name | grep -e "${CLUSTER_NAME}-.*-bootstrap")
-          if [ -n "$BOOTSTRAP_NAME" ]; then
-             openstack console log show "$BOOTSTRAP_NAME" &>${TMP_ARTIFACTS}/bootstrap/nova.log
-          fi
 
           echo "Gathering openstack securitygroups"
           export INFRA_ID=$(sed -n 's|.*"infraID":"\([^"]*\)".*|\1|p' ${ASSETS_DIR}/metadata.json )
@@ -1100,8 +1091,8 @@ objects:
           os_sg_master="${INFRA_ID}-master"
           os_sg_worker="${INFRA_ID}-worker"
 
-          openstack security group rule list $os_sg_master &>${TMP_ARTIFACTS}/${INFRA_ID}-master-security-group
-          openstack security group rule list $os_sg_worker &>${TMP_ARTIFACTS}/${INFRA_ID}-worker-security-group
+          openstack security group rule list $os_sg_master &>${ARTIFACT_DIR}/${INFRA_ID}-master-security-group
+          openstack security group rule list $os_sg_worker &>${ARTIFACT_DIR}/${INFRA_ID}-worker-security-group
 
         }
 
@@ -1111,18 +1102,18 @@ objects:
                 echo we do know the bootstrap fip
                 B_FIP=$(cat ${TMP_SHARED}/BOOTSTRAP_FIP)
                 ssh -i ${SSH_PRIVATE_KEY_PATH} -o "StrictHostKeyChecking no" core@${B_FIP} 'journalctl -b  -u release-image.service -u bootkube.service > bootstrap.log; tar -czf bootstrap.log.tgz bootstrap.log'
-                scp -i ${SSH_PRIVATE_KEY_PATH} -o "StrictHostKeyChecking no" core@${B_FIP}:~/bootstrap.log.tgz ${TMP_ARTIFACTS}/bootstrap/
+                scp -i ${SSH_PRIVATE_KEY_PATH} -o "StrictHostKeyChecking no" core@${B_FIP}:~/bootstrap.log.tgz ${ARTIFACT_DIR}/bootstrap/
             fi
            echo finished gathering bootstrap logs
         }
 
         function gather_master_logs() {
-            echo "NO MASTER LOGS WERE COLLECTED
+            echo "NO MASTER LOGS WERE COLLECTED"
             # this still needs to be implementd.
         }
 
         function gather_compute_logs() {
-           echo "NO COMPUTE LOGS WERE COLLECTED
+           echo "NO COMPUTE LOGS WERE COLLECTED"
            # this still needs to be implemented
         }
 
@@ -1138,67 +1129,66 @@ objects:
           oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces --template '{{ range .items }}{{ $name := .metadata.name }}{{ $ns := .metadata.namespace }}{{ range .spec.containers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ range .spec.initContainers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ end }}' > /tmp/containers
           oc --insecure-skip-tls-verify --request-timeout=5s get pods -l openshift.io/component=api --all-namespaces --template '{{ range .items }}-n {{ .metadata.namespace }} {{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/pods-api
 
-          queue ${TMP_ARTIFACTS}/config-resources.json oc --insecure-skip-tls-verify --request-timeout=5s get apiserver.config.openshift.io authentication.config.openshift.io build.config.openshift.io console.config.openshift.io dns.config.openshift.io featuregate.config.openshift.io image.config.openshift.io infrastructure.config.openshift.io ingress.config.openshift.io network.config.openshift.io oauth.config.openshift.io project.config.openshift.io scheduler.config.openshift.io -o json
-          queue ${TMP_ARTIFACTS}/apiservices.json oc --insecure-skip-tls-verify --request-timeout=5s get apiservices -o json
-          queue ${TMP_ARTIFACTS}/clusteroperators.json oc --insecure-skip-tls-verify --request-timeout=5s get clusteroperators -o json
-          queue ${TMP_ARTIFACTS}/clusterversion.json oc --insecure-skip-tls-verify --request-timeout=5s get clusterversion -o json
-          queue ${TMP_ARTIFACTS}/configmaps.json oc --insecure-skip-tls-verify --request-timeout=5s get configmaps --all-namespaces -o json
-          queue ${TMP_ARTIFACTS}/credentialsrequests.json oc --insecure-skip-tls-verify --request-timeout=5s get credentialsrequests --all-namespaces -o json
-          queue ${TMP_ARTIFACTS}/csr.json oc --insecure-skip-tls-verify --request-timeout=5s get csr -o json
-          queue ${TMP_ARTIFACTS}/endpoints.json oc --insecure-skip-tls-verify --request-timeout=5s get endpoints --all-namespaces -o json
-          FILTER=gzip queue ${TMP_ARTIFACTS}/deployments.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get deployments --all-namespaces -o json
-          FILTER=gzip queue ${TMP_ARTIFACTS}/daemonsets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get daemonsets --all-namespaces -o json
-          queue ${TMP_ARTIFACTS}/events.json oc --insecure-skip-tls-verify --request-timeout=5s get events --all-namespaces -o json
-          queue ${TMP_ARTIFACTS}/kubeapiserver.json oc --insecure-skip-tls-verify --request-timeout=5s get kubeapiserver -o json
-          queue ${TMP_ARTIFACTS}/kubecontrollermanager.json oc --insecure-skip-tls-verify --request-timeout=5s get kubecontrollermanager -o json
-          queue ${TMP_ARTIFACTS}/machineconfigpools.json oc --insecure-skip-tls-verify --request-timeout=5s get machineconfigpools -o json
-          queue ${TMP_ARTIFACTS}/machineconfigs.json oc --insecure-skip-tls-verify --request-timeout=5s get machineconfigs -o json
-          queue ${TMP_ARTIFACTS}/machinesets.json oc --insecure-skip-tls-verify --request-timeout=5s get machinesets -A -o json
-          queue ${TMP_ARTIFACTS}/machines.json oc --insecure-skip-tls-verify --request-timeout=5s get machines -A -o json
-          queue ${TMP_ARTIFACTS}/namespaces.json oc --insecure-skip-tls-verify --request-timeout=5s get namespaces -o json
-          queue ${TMP_ARTIFACTS}/nodes.json oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o json
-          queue ${TMP_ARTIFACTS}/openshiftapiserver.json oc --insecure-skip-tls-verify --request-timeout=5s get openshiftapiserver -o json
-          queue ${TMP_ARTIFACTS}/pods.json oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces -o json
-          queue ${TMP_ARTIFACTS}/persistentvolumes.json oc --insecure-skip-tls-verify --request-timeout=5s get persistentvolumes --all-namespaces -o json
-          queue ${TMP_ARTIFACTS}/persistentvolumeclaims.json oc --insecure-skip-tls-verify --request-timeout=5s get persistentvolumeclaims --all-namespaces -o json
-          FILTER=gzip queue ${TMP_ARTIFACTS}/replicasets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get replicasets --all-namespaces -o json
-          queue ${TMP_ARTIFACTS}/rolebindings.json oc --insecure-skip-tls-verify --request-timeout=5s get rolebindings --all-namespaces -o json
-          queue ${TMP_ARTIFACTS}/roles.json oc --insecure-skip-tls-verify --request-timeout=5s get roles --all-namespaces -o json
-          queue ${TMP_ARTIFACTS}/services.json oc --insecure-skip-tls-verify --request-timeout=5s get services --all-namespaces -o json
-          FILTER=gzip queue ${TMP_ARTIFACTS}/statefulsets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get statefulsets --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/config-resources.json oc --insecure-skip-tls-verify --request-timeout=5s get apiserver.config.openshift.io authentication.config.openshift.io build.config.openshift.io console.config.openshift.io dns.config.openshift.io featuregate.config.openshift.io image.config.openshift.io infrastructure.config.openshift.io ingress.config.openshift.io network.config.openshift.io oauth.config.openshift.io project.config.openshift.io scheduler.config.openshift.io -o json
+          queue ${ARTIFACT_DIR}/apiservices.json oc --insecure-skip-tls-verify --request-timeout=5s get apiservices -o json
+          queue ${ARTIFACT_DIR}/clusteroperators.json oc --insecure-skip-tls-verify --request-timeout=5s get clusteroperators -o json
+          queue ${ARTIFACT_DIR}/clusterversion.json oc --insecure-skip-tls-verify --request-timeout=5s get clusterversion -o json
+          queue ${ARTIFACT_DIR}/configmaps.json oc --insecure-skip-tls-verify --request-timeout=5s get configmaps --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/credentialsrequests.json oc --insecure-skip-tls-verify --request-timeout=5s get credentialsrequests --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/csr.json oc --insecure-skip-tls-verify --request-timeout=5s get csr -o json
+          queue ${ARTIFACT_DIR}/endpoints.json oc --insecure-skip-tls-verify --request-timeout=5s get endpoints --all-namespaces -o json
+          FILTER=gzip queue ${ARTIFACT_DIR}/deployments.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get deployments --all-namespaces -o json
+          FILTER=gzip queue ${ARTIFACT_DIR}/daemonsets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get daemonsets --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/events.json oc --insecure-skip-tls-verify --request-timeout=5s get events --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/kubeapiserver.json oc --insecure-skip-tls-verify --request-timeout=5s get kubeapiserver -o json
+          queue ${ARTIFACT_DIR}/kubecontrollermanager.json oc --insecure-skip-tls-verify --request-timeout=5s get kubecontrollermanager -o json
+          queue ${ARTIFACT_DIR}/machineconfigpools.json oc --insecure-skip-tls-verify --request-timeout=5s get machineconfigpools -o json
+          queue ${ARTIFACT_DIR}/machineconfigs.json oc --insecure-skip-tls-verify --request-timeout=5s get machineconfigs -o json
+          queue ${ARTIFACT_DIR}/machinesets.json oc --insecure-skip-tls-verify --request-timeout=5s get machinesets -A -o json
+          queue ${ARTIFACT_DIR}/machines.json oc --insecure-skip-tls-verify --request-timeout=5s get machines -A -o json
+          queue ${ARTIFACT_DIR}/namespaces.json oc --insecure-skip-tls-verify --request-timeout=5s get namespaces -o json
+          queue ${ARTIFACT_DIR}/nodes.json oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o json
+          queue ${ARTIFACT_DIR}/openshiftapiserver.json oc --insecure-skip-tls-verify --request-timeout=5s get openshiftapiserver -o json
+          queue ${ARTIFACT_DIR}/pods.json oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/persistentvolumes.json oc --insecure-skip-tls-verify --request-timeout=5s get persistentvolumes --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/persistentvolumeclaims.json oc --insecure-skip-tls-verify --request-timeout=5s get persistentvolumeclaims --all-namespaces -o json
+          FILTER=gzip queue ${ARTIFACT_DIR}/replicasets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get replicasets --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/rolebindings.json oc --insecure-skip-tls-verify --request-timeout=5s get rolebindings --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/roles.json oc --insecure-skip-tls-verify --request-timeout=5s get roles --all-namespaces -o json
+          queue ${ARTIFACT_DIR}/services.json oc --insecure-skip-tls-verify --request-timeout=5s get services --all-namespaces -o json
+          FILTER=gzip queue ${ARTIFACT_DIR}/statefulsets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get statefulsets --all-namespaces -o json
 
-          FILTER=gzip queue ${TMP_ARTIFACTS}/openapi.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get --raw /openapi/v2
+          FILTER=gzip queue ${ARTIFACT_DIR}/openapi.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get --raw /openapi/v2
 
           # gather nodes first in parallel since they may contain the most relevant debugging info
           while IFS= read -r i; do
-            mkdir -p ${TMP_ARTIFACTS}/nodes/$i
-            queue ${TMP_ARTIFACTS}/nodes/$i/nova.log openstack console log show $i
-            queue ${TMP_ARTIFACTS}/nodes/$i/heap oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/debug/pprof/heap
+            mkdir -p ${ARTIFACT_DIR}/nodes/$i
+            queue ${ARTIFACT_DIR}/nodes/$i/heap oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/debug/pprof/heap
           done < /tmp/nodes
 
-          FILTER=gzip queue ${TMP_ARTIFACTS}/nodes/masters-journal.gz oc --insecure-skip-tls-verify adm node-logs --role=master --unify=false
-          FILTER=gzip queue ${TMP_ARTIFACTS}/nodes/workers-journal.gz oc --insecure-skip-tls-verify adm node-logs --role=worker --unify=false
+          FILTER=gzip queue ${ARTIFACT_DIR}/nodes/masters-journal.gz oc --insecure-skip-tls-verify adm node-logs --role=master --unify=false
+          FILTER=gzip queue ${ARTIFACT_DIR}/nodes/workers-journal.gz oc --insecure-skip-tls-verify adm node-logs --role=worker --unify=false
 
           # Snapshot iptables-save on each node for debugging possible kube-proxy issues
           oc --insecure-skip-tls-verify get --request-timeout=20s -n openshift-sdn -l app=sdn pods --template '{{ range .items }}{{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/sdn-pods
           while IFS= read -r i; do
-            queue ${TMP_ARTIFACTS}/network/iptables-save-$i oc --insecure-skip-tls-verify rsh --timeout=20 -n openshift-sdn -c sdn $i iptables-save -c
+            queue ${ARTIFACT_DIR}/network/iptables-save-$i oc --insecure-skip-tls-verify rsh --timeout=20 -n openshift-sdn -c sdn $i iptables-save -c
           done < /tmp/sdn-pods
 
           while IFS= read -r i; do
             file="$( echo "$i" | cut -d ' ' -f 3 | tr -s ' ' '_' )"
-            queue ${TMP_ARTIFACTS}/metrics/${file}-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig'
-            queue ${TMP_ARTIFACTS}/metrics/${file}-controllers-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig'
+            queue ${ARTIFACT_DIR}/metrics/${file}-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig'
+            queue ${ARTIFACT_DIR}/metrics/${file}-controllers-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig'
           done < /tmp/pods-api
 
           while IFS= read -r i; do
             file="$( echo "$i" | cut -d ' ' -f 2,3,5 | tr -s ' ' '_' )"
-            FILTER=gzip queue ${TMP_ARTIFACTS}/pods/${file}.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s $i
-            FILTER=gzip queue ${TMP_ARTIFACTS}/pods/${file}_previous.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s -p $i
+            FILTER=gzip queue ${ARTIFACT_DIR}/pods/${file}.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s $i
+            FILTER=gzip queue ${ARTIFACT_DIR}/pods/${file}_previous.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s -p $i
           done < /tmp/containers
 
           echo "Snapshotting prometheus (may take 15s) ..."
-          queue ${TMP_ARTIFACTS}/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring prometheus-k8s-0 -- tar cvzf - -C /prometheus .
+          queue ${ARTIFACT_DIR}/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring prometheus-k8s-0 -- tar cvzf - -C /prometheus .
 
           # move private key to ~/.ssh/ so that installer can use it to gather logs
           mkdir -p ~/.ssh
@@ -1206,11 +1196,14 @@ objects:
           chmod 0600 ~/.ssh/id_rsa
 
           echo "Running must-gather..."
-          mkdir -p ${TMP_ARTIFACTS}/must-gather
-          queue ${TMP_ARTIFACTS}/must-gather/must-gather.log oc --insecure-skip-tls-verify adm must-gather --dest-dir ${TMP_ARTIFACTS}/must-gather
+          mkdir -p ${ARTIFACT_DIR}/must-gather
+          queue ${ARTIFACT_DIR}/must-gather/must-gather.log oc --insecure-skip-tls-verify adm must-gather --dest-dir ${ARTIFACT_DIR}/must-gather
 
           echo "Waiting for logs ..."
           wait
+
+          tar -czC ${TMP_ARTIFACTS}/must-gather -f ${TMP_ARTIFACTS}/must-gather.tar.gz . &&
+          rm -rf ${TMP_ARTIFACTS}/must-gather
         }
 
 
@@ -1218,12 +1211,23 @@ objects:
           if [ -z "$DO_NOT_CREATE_DNS_RECORD" ]; then
             echo "Removing entries from DNS ..."
             export HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "shiftstack.devcluster.openshift.com" | python -c 'import json,sys;print json.load(sys.stdin)["HostedZones"][0]["Id"].split("/")[-1]')
-            sed -e's/UPSERT/DELETE/g' ${ASSETS_DIR}/api-record.json > ${ASSETS_DIR}/delete-api-record.json
-            sed -e's/Create/Delete/g' ${ASSETS_DIR}/api-record.json > ${ASSETS_DIR}/delete-api-record.json
-            aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file://${ASSETS_DIR}/delete-api-record.json
-            sed -e's/UPSERT/DELETE/g' ${ASSETS_DIR}/ingress-record.json > ${ASSETS_DIR}/delete-ingress-record.json
-            sed -e's/Create/Delete/g' ${ASSETS_DIR}/ingress-record.json > ${ASSETS_DIR}/delete-ingress-record.json
-            aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file://${ASSETS_DIR}/delete-ingress-record.json
+
+            sed '
+              s/UPSERT/DELETE/;
+              s/Create/Delete/;
+              ' "${ASSETS_DIR}/api-record.json" > "${ASSETS_DIR}/delete-api-record.json"
+            aws route53 change-resource-record-sets \
+              --hosted-zone-id "$HOSTED_ZONE_ID" \
+              --change-batch "file://${ASSETS_DIR}/delete-api-record.json"
+
+            sed '
+              s/UPSERT/DELETE/;
+              s/Create/Delete/;
+            ' "${ASSETS_DIR}/ingress-record.json" > "${ASSETS_DIR}/delete-ingress-record.json"
+            aws route53 change-resource-record-sets \
+              --hosted-zone-id "$HOSTED_ZONE_ID" \
+              --change-batch "file://${ASSETS_DIR}/delete-ingress-record.json"
+
           else
             echo "There are no DNS entries to remove"
           fi
@@ -1254,31 +1258,33 @@ objects:
         }
 
         function verify_teardown_playbooks() {
-          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-load-balancers.yaml" --list-tasks
-          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-compute-nodes.yaml" --list-tasks
-          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-control-plane.yaml" --list-tasks
-          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-bootstrap.yaml" --list-tasks
-          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-network.yaml" --list-tasks
-          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-security-groups.yaml" --list-tasks
-
-          # down-containers.yaml was introduced in 4.6
-          if [ -f "${OS_UPI_DIR}/down-containers.yaml" ]; then
-                ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-containers.yaml" --list-tasks
-          fi
+          ansible-playbook --list-tasks -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-load-balancers.yaml"
+          ansible-playbook --list-tasks -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-compute-nodes.yaml"
+          ansible-playbook --list-tasks -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-control-plane.yaml"
+          ansible-playbook --list-tasks -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-bootstrap.yaml"
+          ansible-playbook --list-tasks -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-network.yaml"
+          ansible-playbook --list-tasks -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-security-groups.yaml"
+          ansible-playbook --list-tasks -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-containers.yaml"
         }
 
         function run_teardown_playbooks() {
-          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-load-balancers.yaml"
-          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-compute-nodes.yaml"
-          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-control-plane.yaml"
-          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-bootstrap.yaml"
-          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-network.yaml"
-          ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-security-groups.yaml"
+          ansible-playbook -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-load-balancers.yaml"
+          ansible-playbook -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-compute-nodes.yaml"
+          ansible-playbook -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-control-plane.yaml"
+          ansible-playbook -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-bootstrap.yaml"
+          ansible-playbook -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-network.yaml"
+          ansible-playbook -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-security-groups.yaml"
+          ansible-playbook -i "${ASSETS_DIR}/inventory.yaml" "${ASSETS_DIR}/down-containers.yaml"
+        }
 
-          # down-containers.yaml was introduced in 4.6
-          if [ -f "${OS_UPI_DIR}/down-containers.yaml" ]; then
-                ansible-playbook -vvv -i "${OS_UPI_DIR}/inventory.yaml" "${OS_UPI_DIR}/down-containers.yaml" --list-tasks
-          fi
+        function delete_cluster_credentials() {
+          ignition_sponge="$(mktemp)"
+          jq '.ignition.config.merge[].httpHeaders[].value="REDACTED"' "${ASSETS_DIR}/${INFRA_ID}-bootstrap-ignition.json" > "$ignition_sponge"
+          mv "$ignition_sponge" "${ASSETS_DIR}/${INFRA_ID}-bootstrap-ignition.json"
+
+          rm -r \
+            ${ASSETS_DIR}/auth \
+            ${ASSETS_DIR}/bootstrap.ign
         }
 
         function destroy_cluster() {
@@ -1317,7 +1323,6 @@ objects:
           gather_bootstrap_logs
           exit_on_setup_early_failure
           collect_logs_from_proxy
-          prepare_ansible_playbooks_workspace
           gather_openstack_information
           gather_openshift_information
           remove_dns_entries
@@ -1328,12 +1333,9 @@ objects:
           verify_teardown_playbooks
           destroy_cluster
           run_teardown_playbooks
+          delete_cluster_credentials
           echo "Teardown completed succesfully"
         }
-
-
-
-
 
         #Teardown execution
         trap 'teardown' EXIT

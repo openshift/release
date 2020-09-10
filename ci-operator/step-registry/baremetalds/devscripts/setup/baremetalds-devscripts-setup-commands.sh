@@ -45,6 +45,7 @@ tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/dev-scripts.tar.gz"
 # Prepare configuration and run dev-scripts
 scp "${SSHOPTS[@]}" "${CLUSTER_PROFILE_DIR}/pull-secret" "root@${IP}:pull-secret"
 
+# Copy additional dev-script configuration provided by the the job, if present
 if [[ -e "${SHARED_DIR}/dev-scripts-additional-config" ]]
 then
   scp "${SSHOPTS[@]}" "${SHARED_DIR}/dev-scripts-additional-config" "root@${IP}:dev-scripts-additional-config"
@@ -86,13 +87,17 @@ curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.g
 echo "export OPENSHIFT_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}" >> /root/dev-scripts/config_root.sh
 echo "export ADDN_DNS=\$(awk '/nameserver/ { print \$2;exit; }' /etc/resolv.conf)" >> /root/dev-scripts/config_root.sh
 echo "export OPENSHIFT_CI=true" >> /root/dev-scripts/config_root.sh
-echo "export MIRROR_IMAGES=true" >> /root/dev-scripts/config_root.sh
 echo "export WORKER_MEMORY=16384" >> /root/dev-scripts/config_root.sh
 
 # FIXME(stbenjam): Temporary to work around ovn bug
 echo "export IP_STACK=v4" >> /root/dev-scripts/config_root.sh
 
-if [[ -e /root/dev-scripts-additional-config ]]
+# Inject PR additional configuration, if available
+if [[ -e /root/dev-scripts/dev-scripts-additional-config ]] 
+then
+  cat /root/dev-scripts/dev-scripts-additional-config >> /root/dev-scripts/config_root.sh
+# Inject job additional configuration, if available
+elif [[ -e /root/dev-scripts-additional-config ]]
 then
   cat /root/dev-scripts-additional-config >> /root/dev-scripts/config_root.sh
 fi

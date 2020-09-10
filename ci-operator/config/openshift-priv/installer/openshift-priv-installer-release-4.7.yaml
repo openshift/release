@@ -11,6 +11,10 @@ base_images:
     name: 4.1-priv
     namespace: ocp-private
     tag: cli
+  ocp_4.6_cli:
+    name: 4.7-priv
+    namespace: ocp-private
+    tag: cli
   ocp_builder_golang-1.13:
     name: builder
     namespace: ocp
@@ -19,6 +23,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: golang-1.14
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
   openshift_release_golang-1.13:
     name: release
     namespace: openshift
@@ -31,6 +39,10 @@ base_images:
     name: "4.2"
     namespace: origin
     tag: cli
+  rhel-7:
+    name: 4.7-priv
+    namespace: ocp-private
+    tag: base-7
 build_root:
   image_stream_tag:
     name: release
@@ -41,6 +53,9 @@ images:
 - dockerfile_path: images/installer/Dockerfile.ci
   from: base
   inputs:
+    ocp_builder_rhel-8-golang-openshift-4.6:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-openshift-4.6
     openshift_release_golang-1.14:
       as:
       - registry.svc.ci.openshift.org/openshift/release:golang-1.14
@@ -51,6 +66,9 @@ images:
     ocp_builder_golang-1.14:
       as:
       - registry.svc.ci.openshift.org/ocp/builder:golang-1.14
+    ocp_builder_rhel-8-golang-openshift-4.6:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-openshift-4.6
   to: installer-artifacts
 - dockerfile_path: images/libvirt/Dockerfile.ci
   from: base
@@ -60,17 +78,17 @@ images:
       - registry.svc.ci.openshift.org/openshift/release:golang-1.14
   to: libvirt-installer
 - dockerfile_path: images/installer/Dockerfile.upi.ci
-  from: base
+  from: rhel-7
   inputs:
-    ocp_4.1_cli:
+    ocp_4.6_cli:
       as:
-      - registry.svc.ci.openshift.org/ocp/4.1:cli
+      - registry.svc.ci.openshift.org/ocp/4.6:cli
     ocp_builder_golang-1.14:
       as:
       - registry.svc.ci.openshift.org/ocp/builder:golang-1.14
   to: upi-installer
 - dockerfile_path: images/openstack/Dockerfile.ci
-  from: base
+  from: rhel-7
   inputs:
     openshift_release_golang-1.14:
       as:
@@ -82,6 +100,9 @@ images:
 - dockerfile_path: images/baremetal/Dockerfile.ci
   from: base
   inputs:
+    ocp_builder_rhel-8-golang-openshift-4.6:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-openshift-4.6
     openshift_release_golang-1.14:
       as:
       - registry.svc.ci.openshift.org/openshift/release:golang-1.14
@@ -89,6 +110,9 @@ images:
 - dockerfile_path: images/installer/Dockerfile.ci
   from: base
   inputs:
+    ocp_builder_rhel-8-golang-openshift-4.6:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-openshift-4.6
     openshift_release_golang-1.14:
       as:
       - registry.svc.ci.openshift.org/openshift/release:golang-1.14
@@ -214,10 +238,10 @@ tests:
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer_upi:
     cluster_profile: azure4
-- as: e2e-aws-scaleup-rhel7
-  commands: TEST_SUITE=openshift/conformance/parallel run-tests
-  openshift_ansible_40:
-    cluster_profile: aws-centos-40
+- as: e2e-aws-workers-rhel7
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-workers-rhel7
 - as: e2e-aws-disruptive
   commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:

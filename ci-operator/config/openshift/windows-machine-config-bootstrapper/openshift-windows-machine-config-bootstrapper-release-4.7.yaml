@@ -7,7 +7,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: golang-1.14
 images:
 - dockerfile_path: Dockerfile.tools
   to: windows-machine-config-bootstrapper-tests
@@ -78,17 +78,14 @@ tests:
         export KUBE_SSH_KEY_PATH=${cluster_profile}/ssh-privatekey
 
         make run-wmcb-ci-e2e-test
+      dependencies:
+      - env: WMCB_IMAGE
+        name: windows-machine-config-bootstrapper-tests
       from: src
       resources:
         requests:
           cpu: 1000m
           memory: 600Mi
-    workflow: ipi-aws-ovn-hybrid
-- as: e2e-wsu
-  steps:
-    cluster_profile: aws
-    test:
-    - ref: windows-e2e-playbook-test
     workflow: ipi-aws-ovn-hybrid
 zz_generated_metadata:
   branch: release-4.7

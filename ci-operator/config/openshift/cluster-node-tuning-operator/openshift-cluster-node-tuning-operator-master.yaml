@@ -4,32 +4,36 @@ base_images:
     namespace: ocp
     tag: base
   ocp_4.6_base:
-    name: "4.6"
-    namespace: ocp
-    tag: base
-  ocp_builder_golang-1.13:
     name: builder
     namespace: ocp
-    tag: golang-1.13
+    tag: rhel-8-base-openshift-4.6
   ocp_builder_golang-1.14:
     name: builder
     namespace: ocp
-    tag: golang-1.14
+    tag: rhel-8-golang-openshift-4.6
+  ocp_builder_rhel-8-base-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-base-openshift-4.6
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.14
+    tag: rhel-8-release-openshift-4.6
 images:
-- dockerfile_path: Dockerfile.rhel7
-  from: base
+- dockerfile_path: Dockerfile.rhel8
+  from: ocp_4.6_base
   inputs:
-    ocp_4.6_base:
+    ocp_builder_rhel-8-base-openshift-4.6:
       as:
-      - registry.svc.ci.openshift.org/ocp/4.6:base
-    ocp_builder_golang-1.14:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-base-openshift-4.6
+    ocp_builder_rhel-8-golang-openshift-4.6:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.14
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-openshift-4.6
   to: cluster-node-tuning-operator
 promotion:
   name: "4.6"
@@ -55,6 +59,10 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
+- as: e2e-aws-operator
+  commands: make test-e2e
+  openshift_installer_src:
+    cluster_profile: aws
 - as: e2e-aws-upgrade
   commands: TEST_SUITE=all run-upgrade-tests
   openshift_installer:

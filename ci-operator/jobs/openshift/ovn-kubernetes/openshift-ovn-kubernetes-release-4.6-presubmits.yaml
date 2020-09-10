@@ -22,7 +22,6 @@ presubmits:
         - --kubeconfig=/etc/apici/kubeconfig
         - --lease-server-password-file=/etc/boskos/password
         - --lease-server-username=ci
-        - --lease-server=https://boskos-ci.svc.ci.openshift.org
         - --repo=ovn-kubernetes
         - --secret-dir=/usr/local/e2e-aws-ovn-cluster-profile
         - --target=e2e-aws-ovn
@@ -177,7 +176,6 @@ presubmits:
         - --kubeconfig=/etc/apici/kubeconfig
         - --lease-server-password-file=/etc/boskos/password
         - --lease-server-username=ci
-        - --lease-server=https://boskos-ci.svc.ci.openshift.org
         - --repo=ovn-kubernetes
         - --secret-dir=/usr/local/e2e-gcp-ovn-cluster-profile
         - --target=e2e-gcp-ovn
@@ -258,7 +256,6 @@ presubmits:
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-ovn-kubernetes-release-4.6-e2e-gcp-ovn-upgrade
     rerun_command: /test e2e-gcp-ovn-upgrade
@@ -266,6 +263,7 @@ presubmits:
       containers:
       - args:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --input-hash=$(JOB_NAME)
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
@@ -273,6 +271,15 @@ presubmits:
         - --target=e2e-gcp-ovn-upgrade
         command:
         - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: gcp
+        - name: CLUSTER_VARIANT
+          value: ovn
+        - name: JOB_NAME_SAFE
+          value: e2e-gcp-ovn-upgrade
+        - name: TEST_COMMAND
+          value: TEST_SUITE=all run-upgrade-tests
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -448,6 +455,69 @@ presubmits:
     branches:
     - release-4.6
     cluster: api.ci
+    context: ci/prow/e2e-operator-with-custom-vxlan-port
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ovn-kubernetes-release-4.6-e2e-operator-with-custom-vxlan-port
+    rerun_command: /test e2e-operator-with-custom-vxlan-port
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-password-file=/etc/boskos/password
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/usr/local/e2e-operator-with-custom-vxlan-port-cluster-profile
+        - --target=e2e-operator-with-custom-vxlan-port
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-operator-with-custom-vxlan-port-cluster-profile
+          name: cluster-profile
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-operator-with-custom-vxlan-port,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-4.6
+    cluster: api.ci
     context: ci/prow/e2e-ovn-hybrid-step-registry
     decorate: true
     decoration_config:
@@ -510,7 +580,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: vsphere
     context: ci/prow/e2e-vsphere
     decorate: true
     decoration_config:

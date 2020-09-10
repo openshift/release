@@ -1,4 +1,5 @@
 default: api.ci
+sshBastion: api.ci
 nonKubernetes: api.ci
 groups:
   "app.ci":
@@ -15,7 +16,7 @@ groups:
     - periodic-openshift-priv-group-update
   "build01":
     paths:
-    - openshift/origin/openshift-origin-master-presubmits\.yaml$
+    - openshift/ci-tools/.*-presubmits\.yaml$
     jobs:
     - periodic-build01-upgrade
     - periodic-ci-image-import-to-build01
@@ -1997,7 +1998,6 @@ groups:
     - pull-ci-openshift-managed-velero-operator-master-images
     - pull-ci-openshift-managed-velero-operator-master-test
     - pull-ci-openshift-managed-velero-operator-master-verify
-    - pull-ci-openshift-cincinnati-master-cargo-test
     - pull-ci-openshift-cincinnati-master-images
     - pull-ci-openshift-cincinnati-master-rustfmt-1.40.0
     - pull-ci-openshift-cincinnati-master-rustfmt-1.41.0
@@ -3185,12 +3185,84 @@ groups:
     - ".*-postsubmits.yaml$"
     - ".*openshift/release/.*-periodics.yaml$"
     - ".*-periodics.yaml$"
-    - ".*openshift-priv/.*-presubmits.yaml$"
     jobs:
     - pull-ci-openshift-release-master-build01-dry
     - pull-ci-openshift-release-master-core-dry
     - pull-ci-openshift-release-master-services-dry
     - periodic-acme-cert-issuer-for-build01
-  "build02":
+    # https://coreos.slack.com/archives/GB7NB0CUC/p1597048077405000
+    - pull-ci-openshift-cluster-image-registry-operator-master-e2e-ovirt
+    - pull-ci-openshift-machine-config-operator-master-e2e-ovirt
+    - pull-ci-openshift-machine-config-operator-release-4.7-e2e-ovirt
+    - pull-ci-openshift-machine-config-operator-release-4.6-e2e-ovirt
+    - pull-ci-openshift-machine-config-operator-release-4.4-e2e-ovirt
+    - pull-ci-openshift-machine-config-operator-release-4.5-e2e-ovirt
+    - pull-ci-openshift-installer-master-e2e-ovirt
+    - pull-ci-openshift-installer-release-4.4-e2e-ovirt
+    - pull-ci-openshift-installer-release-4.5-e2e-ovirt
+    - pull-ci-openshift-installer-release-4.6-e2e-ovirt
+    - pull-ci-openshift-installer-release-4.7-e2e-ovirt
+    - pull-ci-openshift-cluster-storage-operator-master-e2e-ovirt
+    - pull-ci-openshift-cluster-api-provider-ovirt-release-4.4-e2e-ovirt
+    - pull-ci-openshift-cluster-api-provider-ovirt-release-4.5-e2e-ovirt
+    - pull-ci-openshift-cluster-api-provider-ovirt-release-4.6-e2e-ovirt
+    - pull-ci-openshift-cluster-api-provider-ovirt-release-4.7-e2e-ovirt
+    - pull-ci-openshift-cincinnati-master-cargo-test
+  build02:
+    paths:
+    - ".*openshift/release/.*-presubmits.yaml$"
     jobs:
-    - periodic-ci-image-import-to-build02
+    - pull-ci-openshift-cluster-openshift-controller-manager-operator-release-4.3-e2e-aws-pthread-limit
+    - pull-ci-openshift-cluster-openshift-controller-manager-operator-release-4.3-e2e-aws-pthread-nolimit
+  vsphere:
+    jobs:
+    - pull-ci-openshift-installer-fcos-e2e-vsphere-upi
+    - pull-ci-openshift-installer-master-e2e-vsphere-upi
+    - pull-ci-openshift-installer-release-4.5-e2e-vsphere-upi
+    - pull-ci-openshift-installer-release-4.6-e2e-vsphere-upi
+    - pull-ci-openshift-installer-release-4.7-e2e-vsphere-upi
+    - pull-ci-openshift-machine-config-operator-master-e2e-vsphere-upi
+    - pull-ci-openshift-machine-config-operator-release-4.5-e2e-vsphere-upi
+    - pull-ci-openshift-machine-config-operator-release-4.6-e2e-vsphere-upi
+    - pull-ci-openshift-machine-config-operator-release-4.7-e2e-vsphere-upi
+    - periodic-ci-openshift-knative-serverless-operator-master-4.5-vsphere-e2e-vsphere-ocp-45-continuous
+    - pull-ci-openshift-cluster-image-registry-operator-master-e2e-vsphere
+    - pull-ci-openshift-cluster-image-registry-operator-master-e2e-vsphere-operator
+    - pull-ci-openshift-cluster-image-registry-operator-release-4.5-e2e-vsphere
+    - pull-ci-openshift-cluster-image-registry-operator-release-4.5-e2e-vsphere-operator
+    - pull-ci-openshift-cluster-image-registry-operator-release-4.6-e2e-vsphere
+    - pull-ci-openshift-cluster-image-registry-operator-release-4.6-e2e-vsphere-operator
+    - pull-ci-openshift-cluster-image-registry-operator-release-4.7-e2e-vsphere
+    - pull-ci-openshift-cluster-image-registry-operator-release-4.7-e2e-vsphere-operator
+    - pull-ci-openshift-cluster-network-operator-master-e2e-vsphere
+    - pull-ci-openshift-cluster-network-operator-release-4.6-e2e-vsphere
+    - pull-ci-openshift-cluster-network-operator-release-4.7-e2e-vsphere
+    - pull-ci-openshift-installer-fcos-e2e-vsphere
+    - pull-ci-openshift-installer-master-e2e-vsphere
+    - pull-ci-openshift-installer-release-4.5-e2e-vsphere
+    - pull-ci-openshift-installer-release-4.6-e2e-vsphere
+    - pull-ci-openshift-installer-release-4.7-e2e-vsphere
+    - pull-ci-openshift-kubernetes-master-e2e-vsphere
+    - pull-ci-openshift-kubernetes-release-4.6-e2e-vsphere
+    - pull-ci-openshift-kubernetes-release-4.7-e2e-vsphere
+    - pull-ci-openshift-machine-config-operator-master-e2e-vsphere
+    - pull-ci-openshift-machine-config-operator-release-4.5-e2e-vsphere
+    - pull-ci-openshift-machine-config-operator-release-4.6-e2e-vsphere
+    - pull-ci-openshift-machine-config-operator-release-4.7-e2e-vsphere
+    - pull-ci-openshift-origin-master-e2e-vsphere
+    - pull-ci-openshift-origin-release-4.5-e2e-vsphere
+    - pull-ci-openshift-origin-release-4.6-e2e-vsphere
+    - pull-ci-openshift-origin-release-4.7-e2e-vsphere
+    - pull-ci-openshift-ovn-kubernetes-master-e2e-vsphere
+    - pull-ci-openshift-ovn-kubernetes-release-4.6-e2e-vsphere
+    - pull-ci-openshift-ovn-kubernetes-release-4.7-e2e-vsphere
+    - periodic-ci-openshift-release-master-ocp-4.4-e2e-vsphere-upi
+    - periodic-ci-openshift-release-master-ocp-4.5-e2e-vsphere
+    - periodic-ci-openshift-release-master-ocp-4.5-e2e-vsphere-upi
+    - periodic-ci-openshift-release-master-ocp-4.6-e2e-vsphere
+    - periodic-ci-openshift-release-master-ocp-4.6-e2e-vsphere-upi
+    - periodic-ci-openshift-release-master-ocp-4.5-e2e-vsphere-upi-serial
+    - periodic-ci-openshift-release-master-ocp-4.4-e2e-vsphere-upi-serial
+    - periodic-ci-openshift-release-master-ocp-4.5-e2e-vsphere-serial
+    - periodic-ci-openshift-release-master-ocp-4.6-e2e-vsphere-serial
+    - periodic-ci-openshift-release-master-ocp-4.6-e2e-vsphere-upi-serial
