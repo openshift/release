@@ -4,13 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-if test ! -f "${KUBECONFIG}"
-then
-	echo "No kubeconfig, so no point in gathering loki logs."
-	exit 0
-fi
-
-cat << EOF > /tmp/loki-manifests
+cat >> "${SHARED_DIR}/manifest_loki.yml" << EOF
 ---
 apiVersion: v1
 kind: Namespace
@@ -43,19 +37,6 @@ subjects:
 - kind: ServiceAccount
   name: loki-promtail
   namespace: loki
-EOF
-
-set +o errexit
-oc apply -f /tmp/loki-manifests
-ecode=$?
-while [ ${ecode} -ne 0 ]; do
-  sleep 5s
-  oc apply -f /tmp/loki-manifests
-  ecode=$?
-done
-set -o errexit
-
-cat << 'EOF' > /tmp/loki-manifests
 ---
 {
    "apiVersion": "policy/v1beta1",
@@ -477,7 +458,7 @@ data:
                         "target_label": "container_name"
                     },
                     {
-                        "replacement": "/var/log/pods/*$1/*.log",
+                        "replacement": "/var/log/pods/*\$1/*.log",
                         "separator": "/",
                         "source_labels": [
                             "__meta_kubernetes_pod_uid",
@@ -564,7 +545,7 @@ data:
                         "target_label": "container_name"
                     },
                     {
-                        "replacement": "/var/log/pods/*$1/*.log",
+                        "replacement": "/var/log/pods/*\$1/*.log",
                         "separator": "/",
                         "source_labels": [
                             "__meta_kubernetes_pod_uid",
@@ -660,7 +641,7 @@ data:
                         "target_label": "container_name"
                     },
                     {
-                        "replacement": "/var/log/pods/*$1/*.log",
+                        "replacement": "/var/log/pods/*\$1/*.log",
                         "separator": "/",
                         "source_labels": [
                             "__meta_kubernetes_pod_uid",
@@ -758,7 +739,7 @@ data:
                         "target_label": "container_name"
                     },
                     {
-                        "replacement": "/var/log/pods/*$1/*.log",
+                        "replacement": "/var/log/pods/*\$1/*.log",
                         "separator": "/",
                         "source_labels": [
                             "__meta_kubernetes_pod_uid",
@@ -846,7 +827,7 @@ data:
                         "target_label": "container_name"
                     },
                     {
-                        "replacement": "/var/log/pods/*$1/*.log",
+                        "replacement": "/var/log/pods/*\$1/*.log",
                         "separator": "/",
                         "source_labels": [
                             "__meta_kubernetes_pod_annotation_kubernetes_io_config_mirror",
@@ -963,7 +944,7 @@ data:
                   "command": [
                      "sh",
                      "-c",
-                     "while [[ \"$(curl -s -o /dev/null -w ''%{http_code}'' http://loki-1.loki:3100/ready)\" != \"200\" ]]; do sleep 5s; done"
+                     "while [[ \"$(curl -s -o /dev/null -w ''%\{http_code\}'' http://loki-1.loki:3100/ready)\" != \"200\" ]]; do sleep 5s; done"
                   ],
                   "image": "curlimages/curl:7.69.1",
                   "name": "waitforloki"
@@ -1100,15 +1081,4 @@ data:
       "namespace": "loki"
    }
 }
-...
 EOF
-
-set +o errexit
-oc apply -f /tmp/loki-manifests
-ecode=$?
-while [ ${ecode} -ne 0 ]; do
-  sleep 5s
-  oc apply -f /tmp/loki-manifests
-  ecode=$?
-done
-set -o errexit
