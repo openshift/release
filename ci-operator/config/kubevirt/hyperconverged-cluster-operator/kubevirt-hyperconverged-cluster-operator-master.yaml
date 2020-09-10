@@ -3,6 +3,10 @@ base_images:
     name: "4.5"
     namespace: ocp
     tag: base
+  cli:
+    name: "4.5"
+    namespace: ocp
+    tag: cli
   operator-registry:
     name: "4.5"
     namespace: ocp
@@ -34,6 +38,14 @@ images:
 - dockerfile_path: deploy/Dockerfile.registry.upgrade-prev
   from: operator-registry-base
   to: hco-registry-upgrade-prev
+- dockerfile_path: deploy/Dockerfile.src.ci
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: hco-oc-bin-image
 operator:
   bundles:
   - context_dir: deploy/olm-catalog
@@ -76,10 +88,9 @@ tests:
     test:
     - as: e2e-test
       commands: |
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.6/linux/oc.tar.gz | tar -C /usr/bin -xzf -
         make deploy_cr
         make functest
-      from: src
+      from: hco-oc-bin-image
       resources:
         requests:
           cpu: 100m
