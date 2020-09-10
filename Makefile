@@ -1,6 +1,6 @@
 SHELL=/usr/bin/env bash -o errexit
 
-.PHONY: help check check-core check-services dry-core core dry-services services all
+.PHONY: help check check-boskos check-core check-services dry-core core dry-services services all
 
 CONTAINER_ENGINE ?= docker
 
@@ -9,8 +9,12 @@ help:
 
 all: core services
 
-check: check-core check-services
+check: check-core check-services check-boskos
 	@echo "Service config check: PASS"
+
+check-boskos:
+	hack/validate-boskos.sh
+	@echo "Boskos config check: PASS"
 
 check-core:
 	core-services/_hack/validate-core-services.sh core-services
@@ -38,6 +42,7 @@ services:
 update:
 	$(MAKE) jobs
 	$(MAKE) ci-operator-config
+	$(MAKE) boskos-config
 	$(MAKE) prow-config
 	$(MAKE) registry-metadata
 
@@ -58,6 +63,10 @@ ci-operator-config:
 registry-metadata:
 	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/generate-registry-metadata:latest
 	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/ci-operator/step-registry:/ci-operator/step-registry:z" registry.svc.ci.openshift.org/ci/generate-registry-metadata:latest --registry /ci-operator/step-registry
+
+boskos-config:
+	cd core-services/prow/02_config && ./generate-boskos.py
+.PHONY: boskos-config
 
 prow-config:
 	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/determinize-prow-config:latest
