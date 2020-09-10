@@ -89,7 +89,7 @@ echo "export WORKER_MEMORY=16384" >> /root/dev-scripts/config_root.sh
 echo "export IP_STACK=v4" >> /root/dev-scripts/config_root.sh
 
 # Inject PR additional configuration, if available
-if [[ -e /root/dev-scripts/dev-scripts-additional-config ]] 
+if [[ -e /root/dev-scripts/dev-scripts-additional-config ]]
 then
   cat /root/dev-scripts/dev-scripts-additional-config >> /root/dev-scripts/config_root.sh
 # Inject job additional configuration, if available
@@ -103,10 +103,3 @@ echo 'export KUBECONFIG=/root/dev-scripts/ocp/ostest/auth/kubeconfig' >> /root/.
 timeout -s 9 105m make
 
 EOF
-
-
-
-
-
-
-
