@@ -5,6 +5,81 @@ presubmits:
     branches:
     - master
     cluster: api.ci
+    context: ci/prow/3.11-chectl-e2e
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: "3.11"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-che-incubator-chectl-master-3.11-chectl-e2e
+    rerun_command: /test 3.11-chectl-e2e
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/usr/local/chectl-e2e-cluster-profile
+        - --target=chectl-e2e
+        - --template=/usr/local/chectl-e2e
+        - --variant=3.11
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: gcp
+        - name: JOB_NAME_SAFE
+          value: chectl-e2e
+        - name: RPM_REPO_OPENSHIFT_ORIGIN
+          value: https://rpms.svc.ci.openshift.org/openshift-origin-v3.11/
+        - name: TEST_COMMAND
+          value: |
+            oc new-project che
+            .ci/cico_chectl_openshift.sh
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/chectl-e2e-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/chectl-e2e
+          name: job-definition
+          subPath: cluster-launch-src.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - configMap:
+          name: prow-job-cluster-launch-src
+        name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )3.11-chectl-e2e,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: api.ci
     context: ci/prow/v4-chectl-e2e
     decorate: true
     decoration_config:
