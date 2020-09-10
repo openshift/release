@@ -257,11 +257,11 @@ ci-secret-bootstrap:
 
 ci-secret-generator:
 	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/ci-secret-generator:latest
-	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/core-services/ci-secret-generator/_config.yaml:/_config.yaml:z" \
+	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/core-services/ci-secret-generator/_config.yaml:/_config.yaml:z" -v "$(CURDIR)/core-services/ci-secret-bootstrap/_config.yaml:/_bootstrap_config.yaml:z" \
 		-v "$(kubeconfig_path):/_kubeconfig:z" \
 		-v "$(bw_password_path):/_bw_password:z" \
 		registry.svc.ci.openshift.org/ci/ci-secret-generator:latest \
-		--bw-password-path=/_bw_password --bw-user $(kerberos_id)@redhat.com --config=/_config.yaml --kubeconfig=/_kubeconfig --dry-run=$(dry_run) --cluster=$(cluster)
+		--bw-password-path=/_bw_password --bw-user $(kerberos_id)@redhat.com --config=/_config.yaml --bootstrap-config=/_bootstrap_config.yaml --kubeconfig=/_kubeconfig --dry-run=$(dry_run)
 .PHONY: ci-secret-generator
 
 verify-app-ci:
