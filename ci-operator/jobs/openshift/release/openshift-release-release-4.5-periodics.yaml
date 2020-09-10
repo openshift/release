@@ -470,7 +470,7 @@ periodics:
   labels:
     job-release: "4.5"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: promote-release-openshift-okd-machine-os-content-e2e-aws-4.5
+  name: promote-release-openshift-okd-machine-os-content-e2e-gcp-4.5
   spec:
     containers:
     - args:
@@ -480,9 +480,9 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --secret-dir=/usr/local/e2e-aws-cluster-profile
+      - --secret-dir=/usr/local/e2e-gcp-cluster-profile
       - --secret-dir=/usr/local/pull-secret
-      - --template=/usr/local/e2e-aws
+      - --template=/usr/local/e2e-gcp
       command:
       - /bin/bash
       - -c
@@ -643,7 +643,7 @@ periodics:
         # debug output
         oc describe -n ${namespace} istag/pipeline:machine-os-content
         # run tests
-        ci-operator $@ --target=e2e-aws --promote --namespace=${namespace}
+        ci-operator $@ --target=e2e-gcp --promote --namespace=${namespace}
       env:
       - name: TAG_NS
         value: origin
@@ -654,7 +654,7 @@ periodics:
       - name: TAG_SOURCE
         value: $(TAG):$(BRANCH)
       - name: CLUSTER_TYPE
-        value: aws
+        value: gcp
       - name: CONFIG_SPEC
         value: |
           tag_specification:
@@ -689,12 +689,12 @@ periodics:
                 cpu: 100m
                 memory: 200Mi
           tests:
-          - as: e2e-aws
+          - as: e2e-gcp
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
             openshift_installer:
-              cluster_profile: aws
+              cluster_profile: gcp
       - name: JOB_NAME_SAFE
-        value: e2e-aws
+        value: e2e-gcp
       - name: TEST_COMMAND
         value: TEST_SUITE=openshift/conformance/parallel run-tests
       image: ci-operator:latest
@@ -710,9 +710,9 @@ periodics:
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
-      - mountPath: /usr/local/e2e-aws-cluster-profile
+      - mountPath: /usr/local/e2e-gcp-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/e2e-aws
+      - mountPath: /usr/local/e2e-gcp
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
       - mountPath: /etc/pull-secret
@@ -738,7 +738,7 @@ periodics:
       projected:
         sources:
         - secret:
-            name: cluster-secrets-aws
+            name: cluster-secrets-gcp
     - configMap:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
