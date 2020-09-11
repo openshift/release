@@ -12,6 +12,38 @@ def add_art_publish(gendoc):
         }
     })
 
+    gendoc.append({
+        'apiVersion': 'authorization.openshift.io/v1',
+        'kind': 'Role',
+        'metadata': {
+            'name': 'art-manage-art-equivalent-buildconfigs',
+            'namespace': 'ci'
+        },
+        'rules': [{
+            'apiGroups': ['build.openshift.io'],
+            'resources': ['buildconfigs', 'builds'],
+            'verbs': ['create', 'get', 'list', 'watch', 'update', 'patch']
+        }]
+    }, comment='Allow ART to create buildconfigs to manifest ART equivalent images for upstream CI')
+
+    gendoc.append({
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
+        'kind': 'RoleBinding',
+        'metadata': {
+            'name': 'art-manage-art-equivalent-buildconfigs',
+            'namespace': 'ci'
+        },
+        'roleRef': {
+            'kind': 'Role',
+            'name': 'art-manage-art-equivalent-buildconfigs'
+        },
+        'subjects': [{
+            'kind': 'ServiceAccount',
+            'name': 'art-publish',
+            'namespace': 'ocp'
+        }]
+    }, comment='Allow ART to create buildconfigs to manifest ART equivalent images for upstream CI')
+
     for private in (False, True):
         for arch in config.arches:
 
