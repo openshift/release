@@ -38,6 +38,23 @@ tests:
       commands: |
         set -euo pipefail
 
+        # FIXME: transfer into Dockerfile for ci
+        # apparently we have no write access to /usr(/local)/bin, so we put it into working directory
+        (
+            mkdir bin/
+            cd bin/
+            curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar -C . -xzf -
+            chmod +x oc
+            ln -s oc kubectl
+        ) || exit 1
+        export PATH="$(pwd)/bin:${PATH}"
+        if ! command -V oc; then
+            exit 1
+        fi
+        if ! command -V kubectl; then
+            exit 1
+        fi
+
         release_base_url="https://gcsweb.apps.ovirt.org/gcs/kubevirt-prow/devel/nightly/release/kubevirt/kubevirt"
         release_date=$(curl -L "${release_base_url}/latest")
         release_url="${release_base_url}/${release_date}"
