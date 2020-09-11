@@ -4,6 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+export LOKI_VERSION="1.3.0"
+
 cat >> "${SHARED_DIR}/manifest_loki-ns.yml" << EOF
 apiVersion: v1
 kind: Namespace
@@ -158,7 +160,7 @@ metadata:
     app.kubernetes.io/instance: loki
     app.kubernetes.io/name: loki
     app.kubernetes.io/part-of: loki
-    app.kubernetes.io/version: 1.3.0
+    app.kubernetes.io/version: ${LOKI_VERSION}
   name: loki
   namespace: loki
 spec:
@@ -207,12 +209,12 @@ spec:
         app.kubernetes.io/instance: loki
         app.kubernetes.io/name: loki
         app.kubernetes.io/part-of: loki
-        app.kubernetes.io/version: 1.3.0
+        app.kubernetes.io/version: ${LOKI_VERSION}
     spec:
       containers:
       - args:
         - "-config.file=/etc/loki/loki.yaml"
-        image: grafana/loki:v1.3.0
+        image: grafana/loki:v${LOKI_VERSION}
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
@@ -583,7 +585,7 @@ spec:
         app.kubernetes.io/instance: loki-promtail
         app.kubernetes.io/name: promtail
         app.kubernetes.io/part-of: loki
-        app.kubernetes.io/version: 1.3.0
+        app.kubernetes.io/version: ${LOKI_VERSION}
     spec:
       containers:
       - args:
@@ -593,7 +595,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
-        image: grafana/promtail:v1.3.0
+        image: grafana/promtail:v${LOKI_VERSION}
         imagePullPolicy: IfNotPresent
         name: promtail
         ports:
