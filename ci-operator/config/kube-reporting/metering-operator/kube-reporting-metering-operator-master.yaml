@@ -106,11 +106,11 @@ tests:
     from: src
 - as: metering-e2e-aws
   steps:
-    cluster_profile: aws
     test:
     - as: e2e
       commands: |
-        set -x
+        set -xu
+        echo "Index image: ${OO_INDEX}"
         METERING_ANSIBLE_OPERATOR_INDEX_IMAGE=${OO_INDEX} TEST_ENABLE_MACHINE_AUTOSCALING="true" TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/e2e EXTRA_TEST_FLAGS="-run TestManualMeteringInstall" make e2e
       dependencies:
       - env: OO_INDEX
@@ -120,7 +120,6 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: ipi-aws
 - as: metering-upgrade-aws
   commands: |
     set -x
