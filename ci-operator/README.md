@@ -6,6 +6,7 @@ ci-operator and is intended for component developers who want to add tests to
 their CI process.
 
 To begin setting up a CI jobs for a new repository, run `make new-repo`.
+(Makefile is one level up `../`)
 
 After editing the files under this directory, make sure to run the generator to
 ensure that your changes are compliant to our conventions and pass the CI tests
@@ -14,6 +15,9 @@ that will run when you submit your changes as a PR:
 ```
 make jobs
 ```
+
+By default `CONTAINER_ENGINE` is set to `docker`, if preferred you can install
+`podman-docker` or simply define the variable to the desired engine.  
 
 Pre-submit tests on this repository will ensure that a run of
 the latest generator does not error on proposed configuration changes and also
