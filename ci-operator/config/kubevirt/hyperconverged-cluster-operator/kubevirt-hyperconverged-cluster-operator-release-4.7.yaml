@@ -3,6 +3,10 @@ base_images:
     name: "4.5"
     namespace: ocp
     tag: base
+  cli:
+    name: "4.5"
+    namespace: ocp
+    tag: cli
   operator-registry:
     name: "4.5"
     namespace: ocp
@@ -34,6 +38,21 @@ images:
 - dockerfile_path: deploy/Dockerfile.registry.upgrade-prev
   from: operator-registry-base
   to: hco-registry-upgrade-prev
+- dockerfile_path: deploy/Dockerfile.src.ci
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: hco-oc-bin-image
+operator:
+  bundles:
+  - context_dir: deploy/olm-catalog
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/kubevirt/hyperconverged-cluster-operator@sha256:d015b58b0ed77fb20eab5cf5c4d530b3eebcba03fc75e571b1ec56dace9cb254
+    with: hyperconverged-cluster-operator
 promotion:
   additional_images:
     hyperconverged-cluster-operator-tests: src
@@ -58,6 +77,44 @@ tests:
     make start && make functest
   openshift_installer_src:
     cluster_profile: aws
+- as: hco-e2e-image-index-aws
+  steps:
+    cluster_profile: aws
+    env:
+      OO_CHANNEL: 1.2.0
+      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
+      OO_PACKAGE: kubevirt-hyperconverged
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e-test
+      commands: |
+        KVM_EMULATION=true make deploy_cr
+        make functest
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
+- as: hco-e2e-image-index-gcp
+  steps:
+    cluster_profile: gcp
+    env:
+      OO_CHANNEL: 1.2.0
+      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
+      OO_PACKAGE: kubevirt-hyperconverged
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e-test
+      commands: |
+        make deploy_cr
+        make functest
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-gcp
 - as: hco-e2e-upgrade-aws
   commands: |
     RELEASE_DELTA=1 make upgrade-test
