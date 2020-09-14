@@ -77,6 +77,25 @@ tests:
     make start && make functest
   openshift_installer_src:
     cluster_profile: aws
+- as: hco-e2e-image-index-aws
+  steps:
+    cluster_profile: aws
+    env:
+      OO_CHANNEL: 1.2.0
+      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
+      OO_PACKAGE: kubevirt-hyperconverged
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e-test
+      commands: |
+        KVM_EMULATION=true make deploy_cr
+        make functest
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
 - as: hco-e2e-image-index-gcp
   steps:
     cluster_profile: gcp

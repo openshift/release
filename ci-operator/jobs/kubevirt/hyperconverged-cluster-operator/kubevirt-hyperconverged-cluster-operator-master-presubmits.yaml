@@ -206,6 +206,69 @@ presubmits:
     branches:
     - master
     cluster: api.ci
+    context: ci/prow/hco-e2e-image-index-aws
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-kubevirt-hyperconverged-cluster-operator-master-hco-e2e-image-index-aws
+    rerun_command: /test hco-e2e-image-index-aws
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-password-file=/etc/boskos/password
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/usr/local/hco-e2e-image-index-aws-cluster-profile
+        - --target=hco-e2e-image-index-aws
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/hco-e2e-image-index-aws-cluster-profile
+          name: cluster-profile
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - name: pull-secret
+        secret:
+          secretName: regcred
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )hco-e2e-image-index-aws,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: api.ci
     context: ci/prow/hco-e2e-image-index-gcp
     decorate: true
     decoration_config:
