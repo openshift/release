@@ -121,10 +121,7 @@ def validate_names(path, data):
                 if job["agent"] != "kubernetes":
                     continue
 
-                if not "command" in job["spec"]["containers"][0].keys():
-                    continue
-
-                if job["spec"]["containers"][0]["command"][0] != "ci-operator":
+                if (not "command" in job["spec"]["containers"][0].keys()) or (job["spec"]["containers"][0]["command"][0] != "ci-operator"):
                     continue
 
                 if ("labels" in job) and ("ci-operator.openshift.io/semantics-ignored" in job["labels"]) and job["labels"]["ci-operator.openshift.io/semantics-ignored"] == "true":
@@ -146,6 +143,10 @@ def validate_names(path, data):
 
                 if not targets:
                     print("[WARNING] {}: ci-operator job {} should call a target".format(path, job["name"]))
+                    continue
+                if ("labels" in job) and ("ci.openshift.io/release-type" in job["labels"]):
+                    print("[ERROR] {}: in job {} \"ci.openshift.io/release-type\" annotation has been deprecated. Specify release-type in release/core-services/testgrid-config-generator/_allow-list.yaml to override defaults".format(path, job["name"]))
+                    out = False
                     continue
 
                 branch = "master"
