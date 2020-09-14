@@ -35,6 +35,8 @@ REGION="$(jq -r .aws.region "${SHARED_DIR}/metadata.json")"
 cat "${TMPDIR}/node-provider-IDs.txt" | sort | uniq | while read -r INSTANCE_ID
 do
 	echo "Gathering console logs for ${INSTANCE_ID}"
-	aws --region "${REGION}" ec2 get-console-output --instance-id "${INSTANCE_ID}" --output text > "${ARTIFACT_DIR}/${INSTANCE_ID}" &
+	aws --region "${REGION}" ec2 get-console-output --instance-id "${INSTANCE_ID}" --output text > "${ARTIFACT_DIR}/${INSTANCE_ID}-console" &
+	wait "$!"
+	aws --region "${REGION}" ec2 describe-instances --instance-id "${INSTANCE_ID}" --output json > "${ARTIFACT_DIR}/${INSTANCE_ID}-status.json" &
 	wait "$!"
 done
