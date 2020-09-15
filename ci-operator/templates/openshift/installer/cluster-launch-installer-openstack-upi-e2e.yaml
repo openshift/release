@@ -360,7 +360,7 @@ objects:
               }
         }]}
         EOF
-            export HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "shiftstack.devcluster.openshift.com" | python -c 'import json,sys;print json.load(sys.stdin)["HostedZones"][0]["Id"].split("/")[-1]')
+            export HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "shiftstack.devcluster.openshift.com" | python -c 'import json,sys;print(json.load(sys.stdin)["HostedZones"][0]["Id"].split("/")[-1])')
             aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file://${ASSETS_DIR}/api-record.json
 
             echo "Creating DNS record for *.apps.$CLUSTER_NAME.$BASE_DOMAIN. -> $INGRESS_FIP_IP"
@@ -1210,7 +1210,7 @@ objects:
         function remove_dns_entries() {
           if [ -z "$DO_NOT_CREATE_DNS_RECORD" ]; then
             echo "Removing entries from DNS ..."
-            export HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "shiftstack.devcluster.openshift.com" | python -c 'import json,sys;print json.load(sys.stdin)["HostedZones"][0]["Id"].split("/")[-1]')
+            export HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "shiftstack.devcluster.openshift.com" | python -c 'import json,sys;print(json.load(sys.stdin)["HostedZones"][0]["Id"].split("/")[-1])')
 
             sed '
               s/UPSERT/DELETE/;
