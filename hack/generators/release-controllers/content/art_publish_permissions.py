@@ -12,7 +12,7 @@ def add_art_publish(gendoc):
         }
     })
 
-    gendoc.append({
+    gendoc.append_all([{
         'apiVersion': 'authorization.openshift.io/v1',
         'kind': 'Role',
         'metadata': {
@@ -20,13 +20,11 @@ def add_art_publish(gendoc):
             'namespace': 'ci'
         },
         'rules': [{
-            'apiGroups': ['build.openshift.io'],
-            'resources': ['buildconfigs', 'builds'],
+            'apiGroups': ['build.openshift.io', 'apps', 'extensions'],
+            'resources': ['buildconfigs', 'builds', 'daemonsets'],
             'verbs': ['create', 'get', 'list', 'watch', 'update', 'patch']
         }]
-    }, comment='Allow ART to create buildconfigs to manifest ART equivalent images for upstream CI')
-
-    gendoc.append({
+    }, {
         'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'RoleBinding',
         'metadata': {
@@ -42,7 +40,9 @@ def add_art_publish(gendoc):
             'name': 'art-publish',
             'namespace': 'ocp'
         }]
-    }, comment='Allow ART to create buildconfigs to manifest ART equivalent images for upstream CI')
+    }], comment='''Allow ART to create buildconfigs to manifest ART equivalent images for upstream CI.
+Also permit the creation of daemonsets to ensure kubelet does not gc builder images from nodes (bug
+in 3.11).''')
 
     for private in (False, True):
         for arch in config.arches:
