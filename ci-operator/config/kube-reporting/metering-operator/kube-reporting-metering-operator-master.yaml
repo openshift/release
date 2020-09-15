@@ -122,15 +122,22 @@ tests:
           memory: 200Mi
     workflow: ipi-aws
 - as: metering-upgrade-aws
-  commands: |
-    set -x
-    # Increase the size of the machines so that there are machines large enough
-    # to run Presto, and the full metering stack.
-    kubectl -n openshift-machine-api get machinesets -o name | grep worker | cut -d/ -f2 | xargs -I{} kubectl -n openshift-machine-api scale machineset {} --replicas 3
-
-    TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/upgrade EXTRA_TEST_FLAGS="-run TestMeteringUpgrades" make e2e
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: e2e
+      commands: |
+        set -x
+        METERING_ANSIBLE_OPERATOR_INDEX_IMAGE=${OO_INDEX} TEST_ENABLE_MACHINE_AUTOSCALING="true" TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/upgrade make upgrade
+      dependencies:
+      - env: OO_INDEX
+        name: ci-index
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
 - as: metering-periodic-aws
   commands: |
     set -x
