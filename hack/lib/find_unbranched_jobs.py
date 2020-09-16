@@ -1,3 +1,4 @@
+from __future__ import print_function;
 import json, sys, yaml;
 
 def duplicate_branch_check(jobs):
@@ -12,16 +13,16 @@ def duplicate_branch_check(jobs):
       if job['name'].startswith(name):
         other = by_name[name]
         if 'branches' not in job:
-          print "error: job %s is set to cover all branches and overlaps with job %s" % (job['name'], other['name'])
+          print("error: job %s is set to cover all branches and overlaps with job %s" % (job['name'], other['name']))
           count += 1
           continue
         if 'branches' not in other:
-          print "error: job %s is set to cover all branches and overlaps with job %s" % (other['name'], job['name'])
+          print("error: job %s is set to cover all branches and overlaps with job %s" % (other['name'], job['name']))
           count += 1
           continue
         shared = list(set(job['branches']) & set(other['branches']))
         if len(shared) > 0:
-          print "error: job %s has branch overlap with job %s: %s" % (other['name'], job['name'], shared)
+          print("error: job %s has branch overlap with job %s: %s" % (other['name'], job['name'], shared))
           count += 1
           continue
   return count
