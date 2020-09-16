@@ -17,5 +17,9 @@ ENV LC_ALL "en_US.UTF-8"
 
 ENV LD_LIBRARY_PATH "$LD_LIBRARY_PATH:/usr/local/lib"
 
+RUN python3 -m venv ~/.venv
+ENV VIRTUAL_ENV "$HOME/.venv"
+ENV PATH "$VIRTUAL_ENV/bin:$PATH"
+
 RUN pip3 install pyyaml
 RUN pip3 install pylint
