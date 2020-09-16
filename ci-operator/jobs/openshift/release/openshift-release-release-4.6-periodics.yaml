@@ -813,32 +813,39 @@ periodics:
               COPY --from=artifacts /srv/repo/*.rpm /tmp/rpms/
               COPY --from=machine_config_operator_rpms /srv/repo/*.rpm /tmp/rpms/
               RUN set -exuo pipefail && \\
-                  EXTENSION_RPMS=(           \\
-                    attr                     \\
-                    glusterfs                \\
-                    glusterfs-client-xlators \\
-                    glusterfs-fuse           \\
-                    glusterfs-libs           \\
-                    psmisc                   \\
-                    NetworkManager-ovs       \\
-                    openvswitch              \\
-                    dpdk                     \\
-                    gdbm-libs                \\
-                    libxcrypt-compat         \\
-                    unbound-libs             \\
-                    python3-libs             \\
-                    libdrm                   \\
-                    libmspack                \\
-                    libpciaccess             \\
-                    pciutils                 \\
-                    pciutils-libs            \\
-                    python3-libs             \\
-                    open-vm-tools            \\
-                    xmlsec1                  \\
-                    xmlsec1-openssl          \\
-                    libxslt                  \\
-                    libtool-ltdl             \\
-                  )                       && \\
+                  EXTENSION_RPMS=(             \\
+                    attr                       \\
+                    glusterfs                  \\
+                    glusterfs-client-xlators   \\
+                    glusterfs-fuse             \\
+                    glusterfs-libs             \\
+                    psmisc                     \\
+                    NetworkManager-ovs         \\
+                    openvswitch                \\
+                    dpdk                       \\
+                    gdbm-libs                  \\
+                    libxcrypt-compat           \\
+                    unbound-libs               \\
+                    python3-libs               \\
+                    libdrm                     \\
+                    libmspack                  \\
+                    libpciaccess               \\
+                    pciutils                   \\
+                    pciutils-libs              \\
+                    hwdata                     \\
+                    python3-libs               \\
+                    python3-pip                \\
+                    python3                    \\
+                    python-unversioned-command \\
+                    python-pip-wheel           \\
+                    python3-setuptools         \\
+                    python-setuptools-wheel    \\
+                    open-vm-tools              \\
+                    xmlsec1                    \\
+                    xmlsec1-openssl            \\
+                    libxslt                    \\
+                    libtool-ltdl               \\
+                  )                         && \\
                   CRIO_RPMS=(                \\
                     cri-o                    \\
                     cri-tools                \\
@@ -852,7 +859,7 @@ periodics:
                   source /tmp/os-release && \\
                   dnf clean all && \\
                   mkdir -p /extensions/okd && \\
-                  yumdownloader --archlist=x86_64 --disablerepo='*' --destdir=/extensions/okd --enablerepo=fedora --enablerepo=updates --enablerepo=updates-testing \${EXTENSION_RPMS[*]} && \\
+                  yumdownloader --archlist=x86_64 --archlist=noarch --disablerepo='*' --destdir=/extensions/okd --enablerepo=fedora --enablerepo=updates --enablerepo=updates-testing \${EXTENSION_RPMS[*]} && \\
                   createrepo_c --no-database /extensions && \\
                   mkdir /tmp/working && \\
                   pushd /tmp/working && \\
