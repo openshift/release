@@ -21,7 +21,7 @@ def add_art_publish(gendoc):
         },
         'rules': [{
             'apiGroups': ['build.openshift.io', 'apps', 'extensions'],
-            'resources': ['buildconfigs', 'builds', 'daemonsets'],
+            'resources': ['buildconfigs', 'buildconfigs/instantiate', 'builds', 'daemonsets'],
             'verbs': ['create', 'get', 'list', 'watch', 'update', 'patch']
         }]
     }, {
