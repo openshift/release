@@ -1,8 +1,33 @@
 default: api.ci
-sshBastion: api.ci
-nonKubernetes: api.ci
 groups:
-  "app.ci":
+  api.ci:
+    jobs:
+    - pull-ci-openshift-release-master-build01-dry
+    - pull-ci-openshift-release-master-core-dry
+    - pull-ci-openshift-release-master-services-dry
+    - periodic-acme-cert-issuer-for-build01
+    - pull-ci-openshift-cluster-image-registry-operator-master-e2e-ovirt
+    - pull-ci-openshift-machine-config-operator-master-e2e-ovirt
+    - pull-ci-openshift-machine-config-operator-release-4.7-e2e-ovirt
+    - pull-ci-openshift-machine-config-operator-release-4.6-e2e-ovirt
+    - pull-ci-openshift-machine-config-operator-release-4.4-e2e-ovirt
+    - pull-ci-openshift-machine-config-operator-release-4.5-e2e-ovirt
+    - pull-ci-openshift-installer-master-e2e-ovirt
+    - pull-ci-openshift-installer-release-4.4-e2e-ovirt
+    - pull-ci-openshift-installer-release-4.5-e2e-ovirt
+    - pull-ci-openshift-installer-release-4.6-e2e-ovirt
+    - pull-ci-openshift-installer-release-4.7-e2e-ovirt
+    - pull-ci-openshift-cluster-storage-operator-master-e2e-ovirt
+    - pull-ci-openshift-cluster-api-provider-ovirt-release-4.4-e2e-ovirt
+    - pull-ci-openshift-cluster-api-provider-ovirt-release-4.5-e2e-ovirt
+    - pull-ci-openshift-cluster-api-provider-ovirt-release-4.6-e2e-ovirt
+    - pull-ci-openshift-cluster-api-provider-ovirt-release-4.7-e2e-ovirt
+    - pull-ci-openshift-cincinnati-master-cargo-test
+    paths:
+    - .*-postsubmits.yaml$
+    - .*openshift/release/.*-periodics.yaml$
+    - .*-periodics.yaml$
+  app.ci:
     jobs:
     - periodic-ci-secret-bootstrap
     - branch-ci-openshift-release-master-app-ci-apply
@@ -15,20 +40,11 @@ groups:
     - branch-ci-openshift-config-master-group-update
     - periodic-openshift-priv-group-update
     - branch-ci-openshift-release-master-config-change-trigger
-  "build01":
-    paths:
-    - openshift/ci-tools/.*-presubmits\.yaml$
-    - openshift/console/.*-presubmits\.yaml$
-    - openshift/origin/.*-presubmits\.yaml$
-    - openshift/machine-config-operator/.*-presubmits\.yaml$
-    - openshift/cluster-network-operator/.*-presubmits\.yaml$
+  build01:
     jobs:
     - periodic-build01-upgrade
     - periodic-ci-image-import-to-build01
     - pull-ci-openshift-config-master-format
-    #those are non-e2e jobs and we have been running them on build01 since OCP 4.3
-    #This group and the other groups with volume, are only useful in the migration process because we do not want to migrate all jobs together
-    #Once the migration is done, those jobs could be running on any cluster
     - pull-ci-openshift-psap-special-resource-operator-release-4.6-images
     - pull-ci-openshift-psap-special-resource-operator-release-4.6-unit
     - pull-ci-openshift-psap-special-resource-operator-release-4.6-verify
@@ -2281,7 +2297,6 @@ groups:
     - pull-ci-openshift-origin-release-4.2-verify
     - pull-ci-openshift-origin-release-3.11-images
     - pull-ci-openshift-origin-release-3.11-integration
-    # - pull-ci-openshift-origin-release-3.11-unit
     - pull-ci-openshift-origin-release-3.11-verify
     - pull-ci-openshift-origin-release-4.1-cmd
     - pull-ci-openshift-origin-release-4.1-images
@@ -3185,42 +3200,20 @@ groups:
     - pull-ci-redhat-developer-helm-release-next-images
     - pull-ci-redhat-developer-helm-release-next-lint
     - pull-ci-redhat-developer-helm-release-next-unit
-  "api.ci":
     paths:
-    - ".*-postsubmits.yaml$"
-    - ".*openshift/release/.*-periodics.yaml$"
-    - ".*-periodics.yaml$"
-    jobs:
-    - pull-ci-openshift-release-master-build01-dry
-    - pull-ci-openshift-release-master-core-dry
-    - pull-ci-openshift-release-master-services-dry
-    - periodic-acme-cert-issuer-for-build01
-    # https://coreos.slack.com/archives/GB7NB0CUC/p1597048077405000
-    - pull-ci-openshift-cluster-image-registry-operator-master-e2e-ovirt
-    - pull-ci-openshift-machine-config-operator-master-e2e-ovirt
-    - pull-ci-openshift-machine-config-operator-release-4.7-e2e-ovirt
-    - pull-ci-openshift-machine-config-operator-release-4.6-e2e-ovirt
-    - pull-ci-openshift-machine-config-operator-release-4.4-e2e-ovirt
-    - pull-ci-openshift-machine-config-operator-release-4.5-e2e-ovirt
-    - pull-ci-openshift-installer-master-e2e-ovirt
-    - pull-ci-openshift-installer-release-4.4-e2e-ovirt
-    - pull-ci-openshift-installer-release-4.5-e2e-ovirt
-    - pull-ci-openshift-installer-release-4.6-e2e-ovirt
-    - pull-ci-openshift-installer-release-4.7-e2e-ovirt
-    - pull-ci-openshift-cluster-storage-operator-master-e2e-ovirt
-    - pull-ci-openshift-cluster-api-provider-ovirt-release-4.4-e2e-ovirt
-    - pull-ci-openshift-cluster-api-provider-ovirt-release-4.5-e2e-ovirt
-    - pull-ci-openshift-cluster-api-provider-ovirt-release-4.6-e2e-ovirt
-    - pull-ci-openshift-cluster-api-provider-ovirt-release-4.7-e2e-ovirt
-    - pull-ci-openshift-cincinnati-master-cargo-test
+    - openshift/ci-tools/.*-presubmits\.yaml$
+    - openshift/console/.*-presubmits\.yaml$
+    - openshift/origin/.*-presubmits\.yaml$
+    - openshift/machine-config-operator/.*-presubmits\.yaml$
+    - openshift/cluster-network-operator/.*-presubmits\.yaml$
   build02:
-    paths:
-    - ".*openshift/release/.*-presubmits.yaml$"
-    - ".*crio/crio/.*-presubmits.yaml$"
-    - ".*openshift/installer/.*-presubmits.yaml$"
     jobs:
     - pull-ci-openshift-cluster-openshift-controller-manager-operator-release-4.3-e2e-aws-pthread-limit
     - pull-ci-openshift-cluster-openshift-controller-manager-operator-release-4.3-e2e-aws-pthread-nolimit
+    paths:
+    - .*openshift/release/.*-presubmits.yaml$
+    - .*crio/crio/.*-presubmits.yaml$
+    - .*openshift/installer/.*-presubmits.yaml$
   vsphere:
     jobs:
     - pull-ci-openshift-installer-fcos-e2e-vsphere-upi
@@ -3273,3 +3266,5 @@ groups:
     - periodic-ci-openshift-release-master-ocp-4.5-e2e-vsphere-serial
     - periodic-ci-openshift-release-master-ocp-4.6-e2e-vsphere-serial
     - periodic-ci-openshift-release-master-ocp-4.6-e2e-vsphere-upi-serial
+nonKubernetes: api.ci
+sshBastion: api.ci
