@@ -601,32 +601,39 @@ periodics:
               COPY --from=artifacts /srv/repo/*.rpm /tmp/rpms/
               COPY --from=machine_config_operator_rpms /srv/repo/*.rpm /tmp/rpms/
               RUN set -exuo pipefail && \\
-                  EXTENSION_RPMS=(           \\
-                    attr                     \\
-                    glusterfs                \\
-                    glusterfs-client-xlators \\
-                    glusterfs-fuse           \\
-                    glusterfs-libs           \\
-                    psmisc                   \\
-                    NetworkManager-ovs       \\
-                    openvswitch              \\
-                    dpdk                     \\
-                    gdbm-libs                \\
-                    libxcrypt-compat         \\
-                    unbound-libs             \\
-                    python3-libs             \\
-                    libdrm                   \\
-                    libmspack                \\
-                    libpciaccess             \\
-                    pciutils                 \\
-                    pciutils-libs            \\
-                    python3-libs             \\
-                    open-vm-tools            \\
-                    xmlsec1                  \\
-                    xmlsec1-openssl          \\
-                    libxslt                  \\
-                    libtool-ltdl             \\
-                  )                       && \\
+                  EXTENSION_RPMS=(             \\
+                    attr                       \\
+                    glusterfs                  \\
+                    glusterfs-client-xlators   \\
+                    glusterfs-fuse             \\
+                    glusterfs-libs             \\
+                    psmisc                     \\
+                    NetworkManager-ovs         \\
+                    openvswitch                \\
+                    dpdk                       \\
+                    gdbm-libs                  \\
+                    libxcrypt-compat           \\
+                    unbound-libs               \\
+                    python3-libs               \\
+                    libdrm                     \\
+                    libmspack                  \\
+                    libpciaccess               \\
+                    pciutils                   \\
+                    pciutils-libs              \\
+                    hwdata                     \\
+                    python3-libs               \\
+                    python3-pip                \\
+                    python3                    \\
+                    python-unversioned-command \\
+                    python-pip-wheel           \\
+                    python3-setuptools         \\
+                    python-setuptools-wheel    \\
+                    open-vm-tools              \\
+                    xmlsec1                    \\
+                    xmlsec1-openssl            \\
+                    libxslt                    \\
+                    libtool-ltdl               \\
+                  )                         && \\
                   CRIO_RPMS=(                \\
                     cri-o                    \\
                     cri-tools                \\
@@ -646,7 +653,7 @@ periodics:
                   pushd /tmp/working && \\
                     sed -i 's/enabled=0/enabled=1/g' /etc/yum.repos.d/fedora-updates-testing-modular.repo && \\
                     dnf module enable -y cri-o:\${CRIO_VERSION} && \\
-                    yumdownloader --archlist=x86_64 --disablerepo='*' --destdir=/tmp/rpms --enablerepo=updates-testing-modular \${CRIO_RPMS[*]} && \\
+                    yumdownloader --archlist=x86_64 --archlist=noarch --disablerepo='*' --destdir=/tmp/rpms --enablerepo=updates-testing-modular \${CRIO_RPMS[*]} && \\
                     for i in \$(find /tmp/rpms/ -iname *.rpm); do echo "Extracting \$i ..."; rpm2cpio \$i | cpio -div; done && \\
                     rm -rf etc/localtime && \\
                     ln -s ../usr/share/zoneinfo/UTC etc/localtime && \\
