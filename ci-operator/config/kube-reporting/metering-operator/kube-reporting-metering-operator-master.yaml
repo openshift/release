@@ -111,6 +111,10 @@ tests:
     - as: e2e
       commands: |
         set -x
+        # Patch the default MachineSet instance size (typically m5.large) to m5.xlarge post-install
+        # as the metering stack is resource hungry.
+        kubectl -n openshift-machine-api get machinesets --no-headers | awk '{ print $1 }' | xargs -I{} kubectl -n openshift-machine-api patch machineset {} --type json -p '[{"op": "replace", "path": "/spec/template/spec/providerSpec/value/instanceType", "value": "m5.xlarge"}]'
+
         METERING_ANSIBLE_OPERATOR_INDEX_IMAGE=${OO_INDEX} TEST_ENABLE_MACHINE_AUTOSCALING="true" TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/e2e EXTRA_TEST_FLAGS="-run TestManualMeteringInstall" make e2e
       dependencies:
       - env: OO_INDEX
@@ -128,6 +132,11 @@ tests:
     - as: e2e
       commands: |
         set -x
+
+        # Patch the default MachineSet instance size (typically m5.large) to m5.xlarge post-install
+        # as the metering stack is resource hungry.
+        kubectl -n openshift-machine-api get machinesets --no-headers | awk '{ print $1 }' | xargs -I{} kubectl -n openshift-machine-api patch machineset {} --type json -p '[{"op": "replace", "path": "/spec/template/spec/providerSpec/value/instanceType", "value": "m5.xlarge"}]'
+
         METERING_ANSIBLE_OPERATOR_INDEX_IMAGE=${OO_INDEX} TEST_ENABLE_MACHINE_AUTOSCALING="true" TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/upgrade make e2e-upgrade
       dependencies:
       - env: OO_INDEX
