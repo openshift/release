@@ -7,6 +7,10 @@ base_images:
     name: "4.7"
     namespace: ocp
     tag: must-gather
+  ocp_builder_rhel-7-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-7-golang-openshift-4.6
   ocp_builder_rhel-8-golang-openshift-4.6:
     name: builder
     namespace: ocp
@@ -33,9 +37,9 @@ images:
 - dockerfile_path: images/cli/Dockerfile.rhel
   from: base
   inputs:
-    openshift_release_golang-1.14:
+    ocp_builder_rhel-7-golang-openshift-4.6:
       as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.14
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-7-golang-openshift-4.6
   to: cli
 - context_dir: images/tools
   from: cli
@@ -43,16 +47,16 @@ images:
 - dockerfile_path: images/cli/Dockerfile.rhel
   from: tests-base
   inputs:
-    openshift_release_golang-1.14:
+    ocp_builder_rhel-7-golang-openshift-4.6:
       as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.14
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-7-golang-openshift-4.6
   to: tests
 - dockerfile_path: images/cli/Dockerfile.rhel
   from: must-gather-base
   inputs:
-    openshift_release_golang-1.14:
+    ocp_builder_rhel-7-golang-openshift-4.6:
       as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.14
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-7-golang-openshift-4.6
   to: must-gather
 - context_dir: images/deployer
   dockerfile_path: Dockerfile.rhel
@@ -61,12 +65,9 @@ images:
 - dockerfile_path: images/cli-artifacts/Dockerfile.rhel
   from: cli
   inputs:
-    ocp_builder_rhel-8-golang-openshift-4.6:
+    ocp_builder_rhel-7-golang-openshift-4.6:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-openshift-4.6
-    openshift_release_golang-1.14:
-      as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.14
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-7-golang-openshift-4.6
   to: cli-artifacts
 - context_dir: images/recycler/
   dockerfile_path: Dockerfile.rhel
