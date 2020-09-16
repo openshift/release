@@ -53,38 +53,63 @@ items:
           args:
           - |
             #!/bin/bash
-            cat <<END >>/tmp/serve.py
-            import time, threading, socket, SocketServer, BaseHTTPServer, SimpleHTTPServer
-
+            if which python3 2> /dev/null; then
+              # If python3 is available, use it
+              cat <<END >>/tmp/serve.py
+            import time, threading, socket, socketserver, http, http.server
             # Create socket
             addr = ('', 8080)
             sock = socket.socket (socket.AF_INET, socket.SOCK_STREAM)
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             sock.bind(addr)
             sock.listen(5)
-
             # Launch multiple listeners as threads
             class Thread(threading.Thread):
-            	def __init__(self, i):
-            		threading.Thread.__init__(self)
-            		self.i = i
-            		self.daemon = True
-            		self.start()
-
-            	def run(self):
-            		httpd = BaseHTTPServer.HTTPServer(addr, SimpleHTTPServer.SimpleHTTPRequestHandler, False)
-
-            		# Prevent the HTTP server from re-binding every handler.
-            		# https://stackoverflow.com/questions/46210672/
-            		httpd.socket = sock
-            		httpd.server_bind = self.server_close = lambda self: None
-
-            		httpd.serve_forever()
-
+              def __init__(self, i):
+                threading.Thread.__init__(self)
+                self.i = i
+                self.daemon = True
+                self.start()
+              def run(self):
+                with socketserver.TCPServer(addr, http.server.SimpleHTTPRequestHandler, False) as httpd:
+                  # Prevent the HTTP server from re-binding every handler.
+                  # https://stackoverflow.com/questions/46210672/
+                  httpd.socket = sock
+                  httpd.server_bind = self.server_close = lambda self: None
+                  httpd.serve_forever()
             [Thread(i) for i in range(100)]
             time.sleep(9e9)
             END
-            python /tmp/serve.py
+              python3 /tmp/serve.py
+            else
+              # Else, fallback to python2
+              cat <<END >>/tmp/serve.py
+            import time, threading, socket, SocketServer, BaseHTTPServer, SimpleHTTPServer
+            # Create socket
+            addr = ('', 8080)
+            sock = socket.socket (socket.AF_INET, socket.SOCK_STREAM)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            sock.bind(addr)
+            sock.listen(5)
+            # Launch multiple listeners as threads
+            class Thread(threading.Thread):
+              def __init__(self, i):
+                threading.Thread.__init__(self)
+                self.i = i
+                self.daemon = True
+                self.start()
+              def run(self):
+                httpd = BaseHTTPServer.HTTPServer(addr, SimpleHTTPServer.SimpleHTTPRequestHandler, False)
+                # Prevent the HTTP server from re-binding every handler.
+                # https://stackoverflow.com/questions/46210672/
+                httpd.socket = sock
+                httpd.server_bind = self.server_close = lambda self: None
+                httpd.serve_forever()
+            [Thread(i) for i in range(100)]
+            time.sleep(9e9)
+            END
+              python /tmp/serve.py
+            fi
           ports:
           - containerPort: 8080
             protocol: TCP
