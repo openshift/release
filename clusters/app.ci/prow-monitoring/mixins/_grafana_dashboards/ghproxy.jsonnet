@@ -226,6 +226,7 @@ dashboard.new(
         datasource='prometheus',
         legend_alignAsTable=true,
         legend_rightSide=true,
+        stack=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
         'sum(rate(github_request_duration_count[${range}]) * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login)) by (status)',
@@ -243,6 +244,7 @@ dashboard.new(
         datasource='prometheus',
         legend_alignAsTable=true,
         legend_rightSide=true,
+        stack=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
         'sum(rate(github_request_duration_count{status="${status}"}[${range}]) * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login)) by (path)',
