@@ -51,6 +51,12 @@ cat > prep.yaml <<-'EOF'
     set_fact:
       release_version: "{{ oc_get.stdout | regex_search('^\\d+\\.\\d+') }}"
 
+  # Hack until https://issues.redhat.com/browse/DPTP-1521
+  - name: Override release_version if invalid cluster version found
+    set_fact:
+      release_version: "4.6"
+    when: release_version == "0.0"
+
   - name: Wait for host connection to ensure SSH has started
     wait_for_connection:
       timeout: 600
