@@ -95,12 +95,13 @@ def platform_stripped_workflows(repo_config, step_registry):
     return _stripped
 
 
-def yield_interesting_jobs(repo_config, balanceable_workflows):
-    for _jobs in repo_config.values():
-        for _job, _steps in _jobs.items():
-            _stripped_workflow = platform_stripped_workflow(workflow=_steps['workflow'], platform=_steps['platform'])
-            if _stripped_workflow in balanceable_workflows:
-                yield _job
+def yield_interesting_jobs(job_steps, balanceable_workflows):
+    for _job, _steps in job_steps.items():
+        _stripped_workflow = platform_stripped_workflow(workflow=_steps['workflow'], platform=_steps['platform'])
+        if 'cluster-version-operator' in _job:
+            print(_job, _stripped_workflow, balanceable_workflows, _stripped_workflow in balanceable_workflows)
+        if _stripped_workflow in balanceable_workflows:
+            yield _job
 
 
 def cluster_profile_platform(cluster_profile):
@@ -164,7 +165,7 @@ if __name__ == '__main__':
         print('workflows which need alternative platforms to support balancing:')
         for _workflow in sorted(fixed_workflows):
             print('  {}'.format(list(_stripped_workflows[_workflow].values())[0]))
-    _interesting_jobs = set(yield_interesting_jobs(repo_config=_repo_config, balanceable_workflows=_balanceable_workflows))
+    _interesting_jobs = set(yield_interesting_jobs(job_steps=_job_steps, balanceable_workflows=_balanceable_workflows))
     _counts = get_prow_job_counts(uri='https://prow.svc.ci.openshift.org/prowjobs.js', interesting_jobs=_interesting_jobs)
     _platform_specific_repositories = {
         'openshift/cloud-credential-operator',
