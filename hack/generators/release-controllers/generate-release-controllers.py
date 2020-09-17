@@ -113,17 +113,7 @@ def run(git_clone_dir):
     with genlib.GenDoc(path_rc_release_resources.joinpath('admin_deploy-ocp-publish-art.yaml'), context=config) as gendoc:
         content.add_art_publish(gendoc)
 
-    with genlib.GenDoc(path_rc_build_configs.joinpath(f'ci-builder-images.yaml')) as gendoc_builders:
-        with genlib.GenDoc(path_rc_build_configs.joinpath(f'ci-release-images.yaml')) as gendoc_release:
-            with genlib.GenDoc(path_rc_build_configs.joinpath(f'ci-base-images.yaml')) as gendoc_base:
-                for major_minor in releases_4x:
-                    major, minor = major_minor.split('.')
-                    content.add_golang_builders(gendoc_builders, clone_dir=git_clone_dir, major=major, minor=minor)
-                    content.add_golang_release_builders(gendoc_release, clone_dir=git_clone_dir, major=major, minor=minor)
-                    content.add_base_image_builders(gendoc_base, clone_dir=git_clone_dir, major=major, minor=minor)
-
     for major_minor in releases_4x:
-        major, minor = major_minor.split('.')
         with genlib.GenDoc(path_rc_release_resources.joinpath(f'rpms-ocp-{major_minor}.yaml'), context) as gendoc:
             content.add_rpm_mirror_service(gendoc, git_clone_dir, major_minor)
 
