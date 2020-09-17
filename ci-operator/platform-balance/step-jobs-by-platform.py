@@ -35,15 +35,37 @@ def load_config(directory):
     return _repo_config
 
 
-def platform_stripped_workflows(repo_config):
+def load_step_registry(directory):
+    _step_registry = {}
+    for _basedir, _, _filenames in os.walk(directory):
+        for _filename in _filenames:
+            if not _filename.endswith('.yaml'):
+                continue
+            _path = os.path.join(_basedir, _filename)
+            try:
+                with open(_path, 'r') as f:
+                    _config = yaml.safe_load(f)
+            except:
+                print('failed to load YAML from {}'.format(_path))
+                raise
+            if 'workflow' in _config:
+                if 'workflows' not in _step_registry:
+                    _step_registry['workflows'] = {}
+                _step_registry['workflows'][_config['workflow']['as']] = _config['workflow']
+    return _step_registry
+
+
+def platform_stripped_workflows(repo_config, step_registry):
     _unstrippable = {}
     _stripped = {}
+    _platforms = set()
     for _jobs in repo_config.values():
         for _job, _steps in _jobs.items():
             if 'workflow' not in _steps:
                 raise KeyError('no workflow in {}: {}'.format(_job, _steps))
             if 'platform' not in _steps:
                 raise KeyError('no workflow in {}: {}'.format(_job, _steps))
+            _platforms.add(_steps['platform'])
             _stripped_workflow = platform_stripped_workflow(workflow=_steps['workflow'], platform=_steps['platform'])
             if not _stripped_workflow:
                 if _steps['workflow'] not in _unstrippable:
@@ -55,6 +77,12 @@ def platform_stripped_workflows(repo_config):
             if _stripped_workflow not in _stripped:
                 _stripped[_stripped_workflow] = {}
             _stripped[_stripped_workflow][_steps['platform']] = _steps['workflow']
+    for _stripped_workflow, _alternatives in _stripped.items():
+        for _platform in _platforms:
+            if _platform not in _alternatives:
+                _alternative_workflow = _stripped_workflow.replace('PLATFORM', _platform)
+                if _alternative_workflow in step_registry.get('workflows', {}):
+                    _alternatives[_platform] = _alternative_workflow
     if _unstrippable:
         print('unable to determine platform-agnostic workflows for:')
         for _workflow, _platforms in sorted(_unstrippable.items()):
@@ -128,7 +156,8 @@ if __name__ == '__main__':
             platforms.add(_steps['platform'])
             _job_steps[_job] = _steps
             _job_org_repos[_job] = _org_repo
-    _stripped_workflows = platform_stripped_workflows(repo_config=_repo_config)
+    _step_registry = load_step_registry(directory=os.path.join('ci-operator', 'step-registry'))
+    _stripped_workflows = platform_stripped_workflows(repo_config=_repo_config, step_registry=_step_registry)
     _balanceable_workflows = {workflow for workflow, platforms in _stripped_workflows.items() if len(platforms) > 1}
     fixed_workflows = set(_stripped_workflows.keys()) - _balanceable_workflows
     if fixed_workflows:
