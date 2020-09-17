@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: BuildConfig
+metadata:
+  name: rhel-8-golang-1.15-openshift-4.6-build-root
+  namespace: ci
+spec:
+  failedBuildsHistoryLimit: 2
+  successfulBuildsHistoryLimit: 2
+  output:
+    to:
+      kind: ImageStreamTag
+      name: builder:rhel-8-golang-1.15-openshift-4.6-build-root
+      namespace: ocp
+  source:
+    dockerfile: |
+      FROM unexisting-to-be-sure-it-is-replaced as registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
+      RUN set -euxo pipefail && \
+        f=$( mktemp ) && \
+        curl -L https://github.com/protocolbuffers/protobuf/releases/download/v3.0.0/protoc-3.0.0-linux-x86_64.zip > "${f}" && \
+        mkdir -p /opt/google/protobuf && \
+        unzip "${f}" -d /opt/google/protobuf
+      ENV PATH=/opt/google/protobuf/bin:${PATH}
+      RUN set -euxo pipefail && \
+        which protoc && protoc --version && \
+        [ "$( protoc --version )" = "libprotoc 3.0.0" ]
+  strategy:
+    dockerStrategy:
+      from:
+        kind: ImageStreamTag
+        name: builder:rhel-8-golang-1.15-openshift-4.6
+        namespace: ocp
+      imageOptimizationPolicy: SkipLayers
+  triggers:
+  - type: ConfigChange
+  - type: ImageChange
