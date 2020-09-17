@@ -1,14 +1,14 @@
 base_images:
   base:
-    name: "4.5"
+    name: "4.6"
     namespace: ocp
     tag: base
   cli:
-    name: "4.5"
+    name: "4.6"
     namespace: ocp
     tag: cli
   operator-registry:
-    name: "4.5"
+    name: "4.6"
     namespace: ocp
     tag: operator-registry
 binary_build_commands: make install
@@ -78,6 +78,25 @@ tests:
     make start && make functest
   openshift_installer_src:
     cluster_profile: aws
+- as: hco-e2e-image-index-azure
+  steps:
+    cluster_profile: azure4
+    env:
+      OO_CHANNEL: 1.2.0
+      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
+      OO_PACKAGE: kubevirt-hyperconverged
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e-test
+      commands: |
+        make deploy_cr
+        make functest
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-azure
 - as: hco-e2e-image-index-aws
   steps:
     cluster_profile: aws
