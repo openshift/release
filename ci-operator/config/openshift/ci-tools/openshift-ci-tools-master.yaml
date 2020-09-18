@@ -1,4 +1,8 @@
 base_images:
+  boskos:
+    name: boskos
+    namespace: ci
+    tag: latest
   cli:
     name: "4.5"
     namespace: ocp
@@ -366,6 +370,14 @@ images:
       - destination_dir: .
         source_path: /go/bin/ocp-build-data-enforcer
   to: ocp-build-data-enforcer
+- context_dir: test/images/e2e-bin/
+  from: bin
+  inputs:
+    boskos:
+      paths:
+      - destination_dir: boskos/
+        source_path: /app
+  to: e2e-bin
 promotion:
   namespace: ci
   tag: latest
@@ -405,7 +417,7 @@ tests:
       - mount_path: /import
         name: ci-pull-credentials
         namespace: test-credentials
-      from: bin
+      from: e2e-bin
       resources:
         requests:
           cpu: 100m
