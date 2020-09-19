@@ -14,7 +14,6 @@ items:
   spec:
     port:
       targetPort: 8888
-    path: /slack-bot
     tls:
       insecureEdgeTerminationPolicy: Redirect
       termination: edge
@@ -37,6 +36,7 @@ items:
     ports:
     - name: main
       port: 8888
+      targetPort: 8888
     - name: metrics
       port: 9090
       protocol: TCP
@@ -65,10 +65,11 @@ items:
         serviceAccountName: slack-bot
         containers:
         - name: slack-bot
-          image: registry.svc.ci.openshift.org/ci/slack-bot:latest
+          image: slack-bot
           args:
           - --slack-token-path=/etc/slack/oauth_token
           - --slack-signing-secret-path=/etc/slack/signing_secret
+          - --log-level=debug
           ports:
             - name: main
               containerPort: 8888
