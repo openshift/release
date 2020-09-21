@@ -227,6 +227,9 @@ Outputs:
   ProxyPrivateIp:
     Description: The proxy node private IP address.
     Value: !GetAtt ProxyInstance.PrivateIp
+  ProxyPublicIp:
+    Description: The proxy node public IP address.
+    Value: !GetAtt ProxyInstance.PublicIp
 EOF
 }
 
@@ -370,13 +373,15 @@ echo "Instance ${INSTANCE_ID}"
 # append to proxy instance ID to "${SHARED_DIR}/aws-instance-ids.txt"
 echo "${INSTANCE_ID}" >> "${SHARED_DIR}/aws-instance-ids.txt"
 
-PROXY_IP="$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${PROXY_NAME}-proxy" \
+PRIVATE_PROXY_IP="$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${PROXY_NAME}-proxy" \
   --query 'Stacks[].Outputs[?OutputKey == `ProxyPrivateIp`].OutputValue' --output text)"
+PUBLIC_PROXY_IP="$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${PROXY_NAME}-proxy" \
+  --query 'Stacks[].Outputs[?OutputKey == `ProxyPublicIp`].OutputValue' --output text)"
 
 # echo proxy IP to ${SHARED_DIR}/proxyip
-echo "${PROXY_IP}" >> "${SHARED_DIR}/proxyip"
+echo "${PUBLIC_PROXY_IP}" >> "${SHARED_DIR}/proxyip"
 
-PROXY_URL="http://${PROXY_NAME}:${PASSWORD}@${PROXY_IP}:3128/"
+PROXY_URL="http://${PROXY_NAME}:${PASSWORD}@${PRIVATE_PROXY_IP}:3128/"
 # due to https://bugzilla.redhat.com/show_bug.cgi?id=1750650 we don't use a tls end point for squid
 
 cat >> "${CONFIG}" << EOF
