@@ -13,16 +13,21 @@ build_root:
     namespace: openshift
     tag: golang-1.14
 images:
-- dockerfile_path: bundle.Dockerfile
-  from: base
-  to: jenkins-operator-bundle
-- dockerfile_path: index.Dockerfile.ci.base
+- dockerfile_path: openshift-ci/index.Dockerfile.ci.base
   from: operator-registry
   to: jenkins-operator-index-base
-- dockerfile_path: index.Dockerfile.ci.intermediate
+- dockerfile_path: openshift-ci/index.Dockerfile.ci.intermediate
   from: jenkins-operator-index-base
   to: jenkins-operator-index-intermediate
-- dockerfile_path: index.Dockerfile.ci
+- dockerfile_path: openshift-ci/bundle.Dockerfile.ci
+  from: base
+  inputs:
+    jenkins-operator-index-intermediate:
+      paths:
+      - destination_dir: manifests
+        source_path: /tmp/manifests
+  to: jenkins-operator-bundle
+- dockerfile_path: openshift-ci/index.Dockerfile.ci
   from: jenkins-operator-index-intermediate
   inputs:
     jenkins-operator-index-intermediate:
