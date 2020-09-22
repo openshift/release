@@ -286,7 +286,7 @@ objects:
         cd /tmp/output
 
         function run-upgrade-tests() {
-          openshift-tests run-upgrade "${TEST_SUITE}" --to-image "${IMAGE:-${RELEASE_IMAGE_LATEST}}" \
+          openshift-tests run-upgrade "${TEST_SUITE}" --to-image "registry.svc.ci.openshift.org/ovirt/ovirt-release:latest" \
             --options "${TEST_OPTIONS:-}" \
             --provider "${TEST_PROVIDER:-}" -o ${ARTIFACT_DIR}/e2e.log --junit-dir ${ARTIFACT_DIR}/junit
         }
@@ -503,11 +503,6 @@ objects:
 
         #change the masters igntion , to use tempfs for etcd IOPS optimization
         TF_LOG=debug openshift-install --dir=${ARTIFACT_DIR}/installer create ignition-configs --log-level=debug
-        python -c \
-            'import json, sys; j = json.load(sys.stdin); j[u"systemd"] = {}; j[u"systemd"][u"units"] = [{u"contents": "[Unit]\nDescription=Mount etcd as a ramdisk\nBefore=local-fs.target\n[Mount]\n What=none\nWhere=/var/lib/etcd\nType=tmpfs\nOptions=size=2G\n[Install]\nWantedBy=local-fs.target", u"enabled": True, u"name":u"var-lib-etcd.mount"}]; json.dump(j, sys.stdout)' \
-            <${ARTIFACT_DIR}/installer/master.ign \
-            >${ARTIFACT_DIR}/installer/master.ign.out
-        mv ${ARTIFACT_DIR}/installer/master.ign.out ${ARTIFACT_DIR}/installer/master.ign
 
         # What we're doing here is we generate manifests first and force that OpenShift SDN is configured.
         TF_LOG=debug openshift-install --dir=${ARTIFACT_DIR}/installer create manifests --log-level=debug &
