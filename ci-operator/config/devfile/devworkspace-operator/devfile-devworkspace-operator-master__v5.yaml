@@ -28,6 +28,14 @@ tests:
     test:
     - as: devworkspaces-operator-e2e
       commands: |
+        trap 'Catch_Finish $?' EXIT SIGINT
+
+        # Catch the finish of the job and write logs in artifacts.
+        function Catch_Finish() {
+            # grab devworkspace-controller namespace events after running e2e
+            getCheClusterLogs
+        }
+
         export PATH=$PATH:/tmp/bin
         mkdir /tmp/bin
         curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.5/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
@@ -38,6 +46,7 @@ tests:
         # ENV used by PROW ci
         export CI="openshift"
         export ARTIFACTS_DIR="/tmp/artifacts"
+        export NAMESPACE="devworkspace-controller"
 
         # Component is defined in Openshift CI job configuration. See: https://github.com/openshift/release/blob/master/ci-operator/config/devfile/devworkspace-operator/devfile-devworkspace-operator-master__v4.yaml#L8
         export CI_COMPONENT="devworkspace-operator"
@@ -60,6 +69,23 @@ tests:
                 cp operator-sdk-${OPERATOR_SDK_VERSION}-x86_64-linux-gnu $GOPATH/bin/operator-sdk && \
                 rm operator-sdk-${OPERATOR_SDK_VERSION}-x86_64-linux-gnu
         fi
+
+        # Function to get all logs and events from Che deployments
+        function getCheClusterLogs() {
+          mkdir -p ${ARTIFACTS_DIR}/che-logs
+          cd ${ARTIFACTS_DIR}/che-logs
+          for POD in $(oc get pods -o name -n ${NAMESPACE}); do
+            for CONTAINER in $(oc get -n ${NAMESPACE} ${POD} -o jsonpath="{.spec.containers[*].name}"); do
+              echo ""
+              echo "<=========================Getting logs from $POD==================================>"
+              echo ""
+              oc logs ${POD} -c ${CONTAINER} -n ${NAMESPACE} | tee $(echo ${POD}-${CONTAINER}.log | sed 's|pod/||g')
+            done
+          done
+          echo "======== oc get events ========"
+          oc get events -n ${NAMESPACE}| tee get_events.log
+        }
+
 
         # For some reason go on PROW force usage vendor folder
         # This workaround is here until we don't figure out cause
