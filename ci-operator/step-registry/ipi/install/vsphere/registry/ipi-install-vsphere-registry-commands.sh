@@ -14,16 +14,16 @@ echo "$(date -u --rfc-3339=seconds) - Wait for the imageregistry operator to see
 sleep 30
 
 echo "$(date -u --rfc-3339=seconds) - Wait for the imageregistry operator to go available..."
-oc wait --for=condition=Available=True clusteroperators.config.openshift.io --timeout=10m --all
+oc wait --all --for=condition=Available=True clusteroperators.config.openshift.io --timeout=10m
 
 echo "$(date -u --rfc-3339=seconds) - Wait for the imageregistry to rollout..."
-oc wait --for=condition=Progressing=False clusteroperators.config.openshift.io --timeout=30m --all
+oc wait --all --for=condition=Progressing=False clusteroperators.config.openshift.io --timeout=30m
 
 echo "$(date -u --rfc-3339=seconds) - Wait until imageregistry config changes are observed by kube-apiserver..."
 sleep 60
 
 echo "$(date -u --rfc-3339=seconds) - Waits for kube-apiserver to finish rolling out..."
-oc wait --for=condition=Progressing=False clusteroperators.config.openshift.io --timeout=30m --all
+oc wait --all --for=condition=Progressing=False clusteroperators.config.openshift.io --timeout=30m
 
-oc wait --for=condition=Degraded=False clusteroperators.config.openshift.io --timeout=1m --all
+oc wait --all --for=condition=Degraded=False clusteroperators.config.openshift.io --timeout=1m
 
