@@ -384,8 +384,12 @@ echo "${PUBLIC_PROXY_IP}" >> "${SHARED_DIR}/proxyip"
 PROXY_URL="http://${PROXY_NAME}:${PASSWORD}@${PRIVATE_PROXY_IP}:3128/"
 # due to https://bugzilla.redhat.com/show_bug.cgi?id=1750650 we don't use a tls end point for squid
 
+# Set the ELB domain to no-proxy so that router e2e tests work
+NO_PROXY=".${REGION}.elb.amazonaws.com"
+
 cat >> "${CONFIG}" << EOF
 proxy:
   httpsProxy: ${PROXY_URL}
   httpProxy: ${PROXY_URL}
+  noProxy: ${NO_PROXY}
 EOF
