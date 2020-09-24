@@ -47,7 +47,7 @@ presubmits:
           secretName: apici-ci-operator-credentials
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
     trigger: (?m)^/test( | .* )artifacts,?($|\s.*)
   - agent: kubernetes
     always_run: false
@@ -109,7 +109,7 @@ presubmits:
               name: cluster-secrets-aws
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -174,7 +174,7 @@ presubmits:
               name: cluster-secrets-aws
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -253,7 +253,7 @@ presubmits:
         name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -345,7 +345,7 @@ presubmits:
         name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
@@ -409,7 +409,7 @@ presubmits:
               name: cluster-secrets-aws
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -509,7 +509,7 @@ presubmits:
         name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
@@ -574,7 +574,7 @@ presubmits:
               name: cluster-secrets-aws
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -638,7 +638,7 @@ presubmits:
               name: cluster-secrets-aws
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -703,7 +703,7 @@ presubmits:
               name: cluster-secrets-azure4
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -770,7 +770,7 @@ presubmits:
               name: cluster-profile-gcp
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -836,26 +836,109 @@ presubmits:
               name: cluster-profile-gcp
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-gcp,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - master
+    cluster: build01
+    context: ci/prow/e2e-openstack
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-kubernetes-master-e2e-openstack
+    optional: true
+    rerun_command: /test e2e-openstack
+    spec:
+      containers:
+      - args:
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
+        - --repo=kubernetes
+        - --secret-dir=/usr/local/e2e-openstack-cluster-profile
+        - --target=e2e-openstack
+        - --template=/usr/local/e2e-openstack
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: openstack
+        - name: JOB_NAME_SAFE
+          value: e2e-openstack
+        - name: TEST_COMMAND
+          value: run-minimal-tests
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-openstack-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/e2e-openstack
+          name: job-definition
+          subPath: cluster-launch-installer-openstack-e2e.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-openstack
+      - configMap:
+          name: prow-job-cluster-launch-installer-openstack-e2e
+        name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: regcred
+    trigger: (?m)^/test( | .* )e2e-openstack,?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - master
     cluster: build01
-    context: ci/prow/e2e-gcp-upgrade
+    context: ci/prow/e2e-upgrade
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-kubernetes-master-e2e-gcp-upgrade
+    name: pull-ci-openshift-kubernetes-master-e2e-upgrade
     path_alias: k8s.io/kubernetes
-    rerun_command: /test e2e-gcp-upgrade
+    rerun_command: /test e2e-upgrade
     spec:
       containers:
       - args:
@@ -863,8 +946,8 @@ presubmits:
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/e2e-gcp-upgrade-cluster-profile
-        - --target=e2e-gcp-upgrade
+        - --secret-dir=/usr/local/e2e-upgrade-cluster-profile
+        - --target=e2e-upgrade
         command:
         - ci-operator
         image: ci-operator:latest
@@ -877,7 +960,7 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-gcp-upgrade-cluster-profile
+        - mountPath: /usr/local/e2e-upgrade-cluster-profile
           name: cluster-profile
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -902,11 +985,11 @@ presubmits:
               name: cluster-profile-gcp
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-gcp-upgrade,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-upgrade,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -981,7 +1064,7 @@ presubmits:
         name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -1029,7 +1112,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -1075,7 +1158,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -1154,7 +1237,7 @@ presubmits:
         name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -1220,7 +1303,7 @@ presubmits:
               name: cluster-profile-gcp
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -1238,7 +1321,6 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kubernetes-master-k8s-e2e-gcp-serial
-    optional: true
     path_alias: k8s.io/kubernetes
     rerun_command: /test k8s-e2e-gcp-serial
     spec:
@@ -1287,7 +1369,7 @@ presubmits:
               name: cluster-profile-gcp
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -1333,7 +1415,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -1379,7 +1461,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -1425,7 +1507,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
