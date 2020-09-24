@@ -50,14 +50,16 @@ images:
 promotion:
   name: openshift-serverless-nightly
   namespace: openshift
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.5"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: "4.5"
-  namespace: ocp
 tests:
 - as: operator-e2e-aws-ocp-45
   steps:
@@ -66,6 +68,11 @@ tests:
     test:
     - as: operator-e2e
       commands: make test-e2e
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
       from: serverless-operator-src
       resources:
         requests:
@@ -79,6 +86,11 @@ tests:
     test:
     - as: serverless-e2e
       commands: make test-upstream-e2e-no-upgrade
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
       from: serverless-operator-src
       resources:
         requests:
@@ -92,6 +104,11 @@ tests:
     test:
     - as: serverless-e2e
       commands: make install-mesh test-all-e2e
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
       from: serverless-operator-src
       resources:
         requests:
@@ -105,6 +122,11 @@ tests:
     test:
     - as: serverless-e2e
       commands: make test-upgrade
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
       from: serverless-operator-src
       resources:
         requests:
