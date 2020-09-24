@@ -106,7 +106,7 @@ metadata:
   namespace: $OO_INSTALL_NAMESPACE
 spec:
   name: $OO_PACKAGE
-  channel: $OO_CHANNEL
+  channel: "$OO_CHANNEL"
   source: $CATSRC
   sourceNamespace: $OO_INSTALL_NAMESPACE
 EOF
