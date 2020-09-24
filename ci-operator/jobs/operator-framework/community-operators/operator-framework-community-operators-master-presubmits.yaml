@@ -5,15 +5,15 @@ presubmits:
     branches:
     - master
     cluster: build01
-    context: ci/prow/ansible
+    context: ci/prow/cli-test
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-operator-framework-community-operators-master-ansible
-    rerun_command: /test ansible
+    name: pull-ci-operator-framework-community-operators-master-cli-test
+    rerun_command: /test cli-test
     spec:
       containers:
       - args:
@@ -21,20 +21,19 @@ presubmits:
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/ansible-cluster-profile
-        - --target=ansible
-        - --template=/usr/local/ansible
+        - --secret-dir=/usr/local/cli-test-cluster-profile
+        - --target=cli-test
+        - --template=/usr/local/cli-test
         command:
         - ci-operator
         env:
         - name: CLUSTER_TYPE
           value: aws
         - name: JOB_NAME_SAFE
-          value: ansible
+          value: cli-test
         - name: TEST_COMMAND
           value: |
             oc get pods --all-namespaces
-            test-commands.sh
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -45,9 +44,9 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/ansible-cluster-profile
+        - mountPath: /usr/local/cli-test-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/ansible
+        - mountPath: /usr/local/cli-test
           name: job-definition
           subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
@@ -78,4 +77,84 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ansible,?($|\s.*)
+    trigger: (?m)^/test( | .* )cli-test,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build01
+    context: ci/prow/src-test
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-operator-framework-community-operators-master-src-test
+    rerun_command: /test src-test
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-password-file=/etc/boskos/password
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/usr/local/src-test-cluster-profile
+        - --target=src-test
+        - --template=/usr/local/src-test
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: JOB_NAME_SAFE
+          value: src-test
+        - name: TEST_COMMAND
+          value: |
+            export
+            mount
+            ansible --version
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/src-test-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/src-test
+          name: job-definition
+          subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-src
+        name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )src-test,?($|\s.*)
