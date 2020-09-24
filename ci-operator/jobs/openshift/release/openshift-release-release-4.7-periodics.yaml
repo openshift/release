@@ -645,6 +645,8 @@ periodics:
                   ostree --repo=/srv/repo checkout "${ostree_ref}" --subpath /usr/etc/yum.repos.d --user-mode /etc/yum.repos.d && \\
                   ostree --repo=/srv/repo cat "${ostree_ref}" /usr/lib/os-release > /tmp/os-release && \\
                   source /tmp/os-release && \\
+                  sed -i 's/enabled=0/enabled=1/g' /etc/yum.repos.d/fedora-updates-testing-modular.repo && \\
+                  rpm-ostree db list --repo /srv/repo "${ostree_ref}" > /tmp/packages && \\
                   dnf clean all && \\
                   mkdir -p /extensions/okd && \\
                   yumdownloader --archlist=x86_64 --disablerepo='*' --destdir=/extensions/okd --enablerepo=fedora --enablerepo=updates --enablerepo=updates-testing \${EXTENSION_RPMS[*]} && \\
@@ -664,7 +666,6 @@ periodics:
 
               FROM scratch
               COPY --from=build /srv/ /srv/
-              COPY --from=build /extensions/ /extensions/
               LABEL version=${build_id} \\
                     id-artifacts=${origin_artifacts_id} \\
                     id-machine-config-operator-rpms=${origin_machine_config_operator_rpms_id} \\
