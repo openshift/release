@@ -65,7 +65,6 @@ read -d '#' INCL << EOF
 [sig-api-machinery] Garbage collector should keep the rc around until all its pods are deleted if the deleteOptions says so
 [sig-api-machinery] ResourceQuota should verify ResourceQuota with best effort scope.
 [sig-api-machinery] Garbage collector should not delete dependents that have both valid owner and owner that's waiting for dependents to be deleted
-[k8s.io] Container Runtime blackbox test on terminated container should report termination
 [sig-apps] CronJob [Top Level] [sig-apps] CronJob should delete failed finished jobs with limit of one job 
 [sig-apps] CronJob [Top Level] [sig-apps] CronJob should delete successful finished jobs with limit of one successful job 
 [sig-apps] CronJob [Top Level] [sig-apps] CronJob should not emit unexpected warnings 
@@ -116,26 +115,6 @@ read -d '#' INCL << EOF
 [sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] [Top Level] [sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] should perform rolling updates and roll backs of template modifications 
 [sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] [Top Level] [sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] should perform rolling updates and roll backs of template modifications with PVCs 
 [sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] [Top Level] [sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] should provide basic identity 
-[sig-instrumentation] Events API should delete a collection of events
-[sig-instrumentation] Events API should ensure that an event can be fetched, patched, deleted, and listed
-[sig-instrumentation] MetricsGrabber should grab all metrics from API server. 
-[sig-instrumentation] MetricsGrabber should grab all metrics from a ControllerManager. 
-[sig-instrumentation] MetricsGrabber should grab all metrics from a Kubelet. 
-[sig-instrumentation] MetricsGrabber should grab all metrics from a Scheduler. 
-[sig-instrumentation] Prometheus when installed on the cluster should have a AlertmanagerReceiversNotConfigured alert in firing state 
-[sig-instrumentation] Prometheus when installed on the cluster should have important platform topology metrics 
-[sig-instrumentation] Prometheus when installed on the cluster should have non-Pod host cAdvisor metrics 
-[sig-instrumentation] Prometheus when installed on the cluster should provide named network metrics 
-[sig-instrumentation] Prometheus when installed on the cluster should report telemetry if a cloud.openshift.com token is present 
-[sig-instrumentation] Prometheus when installed on the cluster shouldn't have failing rules evaluation 
-[sig-instrumentation] Prometheus when installed on the cluster when using openshift-sdn should be able to get the sdn ovs flows 
-[sig-instrumentation][Late] Alerts should have a Watchdog alert in firing state the entire cluster run 
-[sig-instrumentation][Late] Alerts shouldn't exceed the 500 series limit of total series sent via telemetry from each cluster 
-[sig-instrumentation][Late] Alerts shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured 
-[sig-arch][Early] Managed cluster should start all core operators
-[sig-cluster-lifecycle][Feature:Machines][Early] Managed cluster should have same number of Machines and Nodes
-[sig-node]
-[Late]
 #
 EOF
 
