@@ -250,6 +250,33 @@ presubmits:
             cpu: 10m
     trigger: (?m)^/test( | .* )ci-operator-registry,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - master
+    cluster: build02
+    context: ci/prow/ci-testgrid-allow-list
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-ci-testgrid-allow-list
+    rerun_command: /test ci-testgrid-allow-list
+    run_if_changed: ^core-services/testgrid-config-generator/_allow-list.yaml$
+    spec:
+      containers:
+      - args:
+        - --validate=true
+        - --allow-list
+        - ./core-services/testgrid-config-generator/_allow-list.yaml
+        command:
+        - testgrid-config-generator
+        image: testgrid-config-generator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )ci-testgrid-allow-list,?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - master
@@ -276,7 +303,7 @@ presubmits:
         - mismatched-tide-lenient
         command:
         - /checkconfig
-        image: gcr.io/k8s-prow/checkconfig:v20200921-becd8c9356
+        image: gcr.io/k8s-prow/checkconfig:v20200923-b85a4037a5
         imagePullPolicy: Always
         name: ""
         resources:
@@ -376,7 +403,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -722,7 +749,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator

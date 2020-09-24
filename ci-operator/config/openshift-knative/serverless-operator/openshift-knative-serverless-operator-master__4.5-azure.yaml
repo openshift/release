@@ -15,6 +15,14 @@ base_images:
     name: knative-v0.15.2
     namespace: openshift
     tag: knative-serving-src
+  openshift_knative-v0.16.0_knative-eventing-src:
+    name: knative-v0.16.0
+    namespace: openshift
+    tag: knative-eventing-src
+  openshift_knative-v0.16.0_knative-serving-src:
+    name: knative-v0.16.0
+    namespace: openshift
+    tag: knative-serving-src
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
@@ -26,12 +34,12 @@ images:
       paths:
       - destination_dir: .
         source_path: /usr/bin/oc
-    openshift_knative-v0.15.2_knative-eventing-src:
+    openshift_knative-v0.16.0_knative-eventing-src:
       as:
-      - registry.svc.ci.openshift.org/openshift/knative-v0.15.2:knative-eventing-src
-    openshift_knative-v0.15.2_knative-serving-src:
+      - registry.svc.ci.openshift.org/openshift/knative-v0.16.0:knative-eventing-src
+    openshift_knative-v0.16.0_knative-serving-src:
       as:
-      - registry.svc.ci.openshift.org/openshift/knative-v0.15.2:knative-serving-src
+      - registry.svc.ci.openshift.org/openshift/knative-v0.16.0:knative-serving-src
   to: serverless-operator-src
 - context_dir: serving/ingress
   from: base
@@ -39,6 +47,11 @@ images:
 - context_dir: knative-operator
   from: base
   to: knative-operator
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.5"
 resources:
   '*':
     limits:
@@ -46,9 +59,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: "4.5"
-  namespace: ocp
 tests:
 - as: e2e-azure-ocp-45-continuous
   cron: 0 0 * * 0
@@ -57,6 +67,11 @@ tests:
     test:
     - as: serverless-e2e
       commands: make install-mesh test-all-e2e
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
       from: serverless-operator-src
       resources:
         requests:

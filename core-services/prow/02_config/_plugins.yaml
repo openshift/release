@@ -26,6 +26,7 @@ approve:
   - openshift-priv/cluster-api-provider-gcp
   - openshift-priv/cluster-api-provider-kubemark
   - openshift-priv/cluster-api-provider-libvirt
+  - openshift-priv/cluster-api-provider-openstack
   - openshift-priv/cluster-autoscaler-operator
   - openshift-priv/cluster-machine-approver
   - openshift-priv/kubernetes-autoscaler
@@ -37,6 +38,7 @@ approve:
   - openshift/cluster-api-provider-gcp
   - openshift/cluster-api-provider-kubemark
   - openshift/cluster-api-provider-libvirt
+  - openshift/cluster-api-provider-openstack
   - openshift/cluster-autoscaler-operator
   - openshift/cluster-machine-approver
   - openshift/kubernetes-autoscaler
@@ -84,6 +86,7 @@ approve:
   lgtm_acts_as_approve: true
   repos:
   - shipwright-io/build
+  - shipwright-io/website
   require_self_approval: true
 - commandHelpLink: https://go.k8s.io/bot-commands
   ignore_review_state: false
@@ -252,7 +255,11 @@ approve:
   require_self_approval: false
 - commandHelpLink: https://go.k8s.io/bot-commands
   repos:
+  - openshift-priv/assisted-service
   - openshift-priv/assisted-test-infra
+  - openshift/assisted-installer
+  - openshift/assisted-installer-agent
+  - openshift/assisted-service
   - openshift/assisted-test-infra
   require_self_approval: false
 - commandHelpLink: https://go.k8s.io/bot-commands
@@ -265,15 +272,6 @@ approve:
   require_self_approval: false
 - commandHelpLink: https://go.k8s.io/bot-commands
   repos:
-  - openshift-priv/assisted-service
-  - openshift/assisted-service
-  require_self_approval: false
-- commandHelpLink: https://go.k8s.io/bot-commands
-  repos:
-  - openshift/assisted-installer
-  require_self_approval: false
-- commandHelpLink: https://go.k8s.io/bot-commands
-  repos:
   - openshift-priv/csi-driver-projected-resource
   - openshift/csi-driver-projected-resource
   require_self_approval: false
@@ -283,14 +281,6 @@ approve:
   - openshift-priv/ocs-operator
   - openshift/ocs-operator
   require_self_approval: true
-- commandHelpLink: https://go.k8s.io/bot-commands
-  repos:
-  - openshift/assisted-installer-agent
-  require_self_approval: false
-- commandHelpLink: https://go.k8s.io/bot-commands
-  repos:
-  - openshift/assisted-ignition-generator
-  require_self_approval: false
 - commandHelpLink: ""
   repos:
   - ansible-collections/community.okd
@@ -323,6 +313,8 @@ bugzilla:
       - resolution: ERRATA
         status: CLOSED
       is_open: true
+      state_after_close:
+        status: NEW
       state_after_merge:
         status: MODIFIED
       state_after_validation:
@@ -341,6 +333,8 @@ bugzilla:
       - qe_staff
       exclude_defaults: true
       is_open: true
+      state_after_close:
+        status: NEW
       state_after_merge:
         status: MODIFIED
       state_after_validation:
@@ -358,6 +352,8 @@ bugzilla:
       - qe_staff
       exclude_defaults: true
       is_open: true
+      state_after_close:
+        status: NEW
       state_after_merge:
         status: MODIFIED
       state_after_validation:
@@ -406,6 +402,8 @@ bugzilla:
       - qe_staff
       exclude_defaults: true
       is_open: true
+      state_after_close:
+        status: NEW
       state_after_merge:
         status: MODIFIED
       state_after_validation:
@@ -459,6 +457,8 @@ bugzilla:
               - qe_staff
               exclude_defaults: true
               is_open: true
+              state_after_close:
+                status: NEW
               state_after_merge:
                 status: MODIFIED
               state_after_validation:
@@ -498,6 +498,8 @@ bugzilla:
               - qe_staff
               exclude_defaults: true
               is_open: true
+              state_after_close:
+                status: NEW
               state_after_merge:
                 status: MODIFIED
               state_after_validation:
@@ -2526,6 +2528,15 @@ external_plugins:
     events:
     - pull_request
     name: needs-rebase
+  shipwright-io/website:
+  - endpoint: http://refresh
+    events:
+    - issue_comment
+    name: refresh
+  - endpoint: http://needs-rebase
+    events:
+    - pull_request
+    name: needs-rebase
   tnozicka/openshift-acme:
   - endpoint: http://refresh
     events:
@@ -2677,7 +2688,11 @@ lgtm:
   - openshift/egress-router-cni
   review_acts_as_lgtm: true
 - repos:
+  - openshift-priv/assisted-service
   - openshift-priv/assisted-test-infra
+  - openshift/assisted-installer
+  - openshift/assisted-installer-agent
+  - openshift/assisted-service
   - openshift/assisted-test-infra
   review_acts_as_lgtm: true
 - repos:
@@ -2685,13 +2700,6 @@ lgtm:
   review_acts_as_lgtm: true
 - repos:
   - che-incubator/che-test-harness
-  review_acts_as_lgtm: true
-- repos:
-  - openshift-priv/assisted-service
-  - openshift/assisted-service
-  review_acts_as_lgtm: true
-- repos:
-  - openshift/assisted-installer
   review_acts_as_lgtm: true
 - repos:
   - openshift-priv/csi-driver-projected-resource
@@ -2702,18 +2710,8 @@ lgtm:
   - openshift/ocs-operator
   review_acts_as_lgtm: true
 - repos:
-  - openshift/assisted-installer-agent
-  review_acts_as_lgtm: true
-- repos:
-  - openshift/assisted-ignition-generator
-  review_acts_as_lgtm: true
-- repos:
   - ansible-collections/community.okd
   - openshift-priv/community.okd
-  review_acts_as_lgtm: true
-- repos:
-  - openshift-priv/cluster-baremetal-operator
-  - openshift/cluster-baremetal-operator
   review_acts_as_lgtm: true
 override:
   allow_top_level_owners: true
@@ -9482,8 +9480,6 @@ plugins:
   - approve
   openshift/apiserver-library-go:
   - approve
-  openshift/assisted-ignition-generator:
-  - approve
   openshift/assisted-installer:
   - approve
   openshift/assisted-installer-agent:
@@ -10185,6 +10181,8 @@ plugins:
   - wip
   - yuks
   shipwright-io/build:
+  - approve
+  shipwright-io/website:
   - approve
   tnozicka/openshift-acme:
   - approve
