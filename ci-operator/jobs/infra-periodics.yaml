@@ -692,21 +692,13 @@ periodics:
     containers:
     - args:
       - --config-dir=core-services
+      - --config-dir=clusters/build-clusters/common
       - --confirm=true
+      - --kubeconfig=/etc/build-farm-credentials/kubeconfig
       - --as=
       command:
       - applyconfig
       env:
-      - name: build01_build01_reg_auth_value
-        valueFrom:
-          secretKeyRef:
-            key: build01_build01_reg_auth_value.txt
-            name: build-farm-credentials
-      - name: build01_build02_reg_auth_value
-        valueFrom:
-          secretKeyRef:
-            key: build01_build02_reg_auth_value.txt
-            name: build-farm-credentials
       - name: build01_ci_reg_auth_value
         valueFrom:
           secretKeyRef:
@@ -723,7 +715,18 @@ periodics:
       resources:
         requests:
           cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/build-farm-credentials
+        name: build-farm-credentials
+        readOnly: true
     serviceAccountName: config-updater
+    volumes:
+    - name: build-farm-credentials
+      secret:
+        items:
+        - key: sa.config-updater.api.ci.config
+          path: kubeconfig
+        secretName: build-farm-credentials
 - agent: kubernetes
   cluster: app.ci
   decorate: true
@@ -738,6 +741,7 @@ periodics:
     - args:
       - --config-dir=services
       - --confirm=true
+      - --kubeconfig=/etc/build-farm-credentials/kubeconfig
       - --as=
       command:
       - applyconfig
@@ -747,7 +751,18 @@ periodics:
       resources:
         requests:
           cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/build-farm-credentials
+        name: build-farm-credentials
+        readOnly: true
     serviceAccountName: config-updater
+    volumes:
+    - name: build-farm-credentials
+      secret:
+        items:
+        - key: sa.config-updater.api.ci.config
+          path: kubeconfig
+        secretName: build-farm-credentials
 - agent: kubernetes
   cluster: app.ci
   decorate: true
