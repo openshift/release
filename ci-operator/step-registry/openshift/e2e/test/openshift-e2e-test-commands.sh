@@ -67,12 +67,20 @@ if [[ "${CLUSTER_TYPE}" == gcp ]]; then
 fi
 
 if [[ -n "${TEST_OPTIONS}" ]]; then
-    export TEST_ARGS="--options=${TEST_OPTIONS}"
+    TEST_ARGS="--options=${TEST_OPTIONS}"
 fi
 
 if [[ "${TEST_COMMAND}" == "run-upgrade" && -n "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" ]]; then
     # OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE is a pullspec of release:latest imagestreamtag
-    export TEST_ARGS="${TEST_ARGS:-} --to-image=${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
+    TEST_ARGS="${TEST_ARGS:-} --to-image=${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
+fi
+
+if [[ -n "${TEST_SKIPS}" ]]; then
+    TESTS="$(openshift-tests "${TEST_COMMAND}" --dry-run "${TEST_SUITE}")"
+    echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests
+    echo "Skipping tests:"
+    echo "${TESTS}" | grep "${TEST_SKIPS}"
+    TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
 fi
 
 openshift-tests "${TEST_COMMAND}" "${TEST_SUITE}" ${TEST_ARGS:-} \
