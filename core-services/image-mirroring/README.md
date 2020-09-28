@@ -21,6 +21,8 @@ If the image is promoted to a new namespace, e.g., `openshift-new-production`,
 * In [roles.yaml](../../cluster/ci/config/prow/openshift/ci-operator/roles.yaml), add role `image-tagger` and rolebinding `image-tagger-ci-operator` for `openshift-new-production`.
 * The admin of the namespace should allow the SA in the mirroring job defined below to access the images with `oc image mirror`, e.g., [admin_openshift-kni_list.yaml](admin_openshift-kni_list.yaml) which makes the images open to the public.
 
+*Note*: If required, it is also possible to set this up in a way that doesn't require public image pull acecss to the namespace.
+
 
 Check if the image is built successfully:
 
