@@ -25,9 +25,17 @@ tests:
     cluster_profile: aws
 - as: src-test
   commands: |
-    ansible-playbook -vv -i localhost, deploy-olm-operator-openshift-upstream.yml -e ansible_connection=local -e package_name=aqua -e csv_name=aqua-operator.v1.0.2.clusterserviceversion.yaml
     export
     mount
+    ansible --version
+    podman --version || true
+    export PATH=$PATH:/tmp/bin || true
+    mkdir /tmp/bin
+    curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.5/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
+    chmod ug+x /tmp/bin/oc
+    /tmp/bin/oc get pods --all-namespaces || true
+    podman pull quay.io/openshift-community-operators/eclipse-che:v7.18.2
+    false
   openshift_installer_src:
     cluster_profile: aws
 zz_generated_metadata:
