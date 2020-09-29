@@ -44,6 +44,11 @@ export MUST_GATHER_PATH=/tmp/artifacts/must-gather
 make gather
 tar -czC "/tmp/artifacts/must-gather" -f "/tmp/artifacts/must-gather-\$HOSTNAME.tar.gz" .
 
+# Get audit-logs
+export MUST_GATHER_PATH=/tmp/artifacts/audit-logs
+make gather_audit_logs
+tar -czC "/tmp/artifacts/audit-logs" -f "/tmp/artifacts/audit-logs-\$HOSTNAME.tar.gz" .
+
 # Get sosreport including sar data
 sosreport --ticket-number "\$HOSTNAME" --batch -o sar,filesys,networkmanager,virsh,libvirt,kvm --tmp-dir /tmp/artifacts
 
