@@ -17,11 +17,20 @@ tag_specification:
   name: "4.6"
   namespace: ocp
 tests:
+- as: free-test
+  commands: |
+    export PATH=$PATH:/tmp/operator-test/bin
+    mkdir -p /tmp/operator-test/bin
+    curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.6/linux/oc.tar.gz | tar xvzf - -C /tmp/operator-test/bin oc
+    chmod ug+x /tmp/operator-test/bin/oc
+    oc get pods --all-namespaces
+  openshift_installer_src:
+    cluster_profile: aws
 - as: cli-test
   commands: |
     export PATH=$PATH:/tmp/operator-test/bin
     mkdir -p /tmp/operator-test/bin
-    curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.5/linux/oc.tar.gz | tar xvzf - -C /tmp/operator-test/bin oc
+    curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.6/linux/oc.tar.gz | tar xvzf - -C /tmp/operator-test/bin oc
     chmod ug+x /tmp/operator-test/bin/oc
     oc run index-from-public --image=quay.io/openshift-community-operators/catalog:latest
     oc get pods --all-namespaces
@@ -31,7 +40,7 @@ tests:
   commands: |
     export PATH=$PATH:/tmp/operator-test/bin
     mkdir -p /tmp/operator-test/bin
-    curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.5/linux/oc.tar.gz | tar xvzf - -C /tmp/operator-test/bin oc
+    curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.6/linux/oc.tar.gz | tar xvzf - -C /tmp/operator-test/bin oc
     chmod ug+x /tmp/operator-test/bin/oc
     cd /playbooks
     ansible-playbook -vv -i localhost, deploy-olm-operator-openshift-upstream.yml -e ansible_connection=local -e package_name=aqua -e csv_name=aqua-operator.v1.0.2.clusterserviceversion.yaml
