@@ -35,7 +35,7 @@ presubmits:
           value: |
             export PATH=$PATH:/tmp/operator-test/bin
             mkdir -p /tmp/operator-test/bin
-            curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.5/linux/oc.tar.gz | tar xvzf - -C /tmp/operator-test/bin oc
+            curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.6/linux/oc.tar.gz | tar xvzf - -C /tmp/operator-test/bin oc
             chmod ug+x /tmp/operator-test/bin/oc
             oc run index-from-public --image=quay.io/openshift-community-operators/catalog:latest
             oc get pods --all-namespaces
@@ -88,6 +88,88 @@ presubmits:
     branches:
     - master
     cluster: build01
+    context: ci/prow/free-test
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-operator-framework-community-operators-master-free-test
+    rerun_command: /test free-test
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-password-file=/etc/boskos/password
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/usr/local/free-test-cluster-profile
+        - --target=free-test
+        - --template=/usr/local/free-test
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: JOB_NAME_SAFE
+          value: free-test
+        - name: TEST_COMMAND
+          value: |
+            export PATH=$PATH:/tmp/operator-test/bin
+            mkdir -p /tmp/operator-test/bin
+            curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.6/linux/oc.tar.gz | tar xvzf - -C /tmp/operator-test/bin oc
+            chmod ug+x /tmp/operator-test/bin/oc
+            oc get pods --all-namespaces
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/free-test-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/free-test
+          name: job-definition
+          subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-src
+        name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )free-test,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build01
     context: ci/prow/src-test
     decorate: true
     decoration_config:
@@ -118,7 +200,7 @@ presubmits:
           value: |
             export PATH=$PATH:/tmp/operator-test/bin
             mkdir -p /tmp/operator-test/bin
-            curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.5/linux/oc.tar.gz | tar xvzf - -C /tmp/operator-test/bin oc
+            curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.6/linux/oc.tar.gz | tar xvzf - -C /tmp/operator-test/bin oc
             chmod ug+x /tmp/operator-test/bin/oc
             cd /playbooks
             ansible-playbook -vv -i localhost, deploy-olm-operator-openshift-upstream.yml -e ansible_connection=local -e package_name=aqua -e csv_name=aqua-operator.v1.0.2.clusterserviceversion.yaml
