@@ -852,6 +852,30 @@ objects:
         EOF
         fi
 
+        if has_variant "rt-debug"; then
+          cat > ${manifests}/realtime-worker-machine-config.yml << EOF
+        apiVersion: machineconfiguration.openshift.io/v1
+        kind: MachineConfig
+        metadata:
+          labels:
+            machineconfiguration.openshift.io/role: worker
+          name: realtime-worker
+        spec:
+          kernelType: realtime
+        EOF
+          cat > ${manifests}/worker-kernel-debug-machine-config.yml << EOF
+        apiVersion: machineconfiguration.openshift.io/v1
+        kind: MachineConfig
+        metadata:
+          labels:
+            machineconfiguration.openshift.io/role: worker
+          name: kernel-debug
+        spec:
+          kernelArguments:
+          - 'debug'
+        EOF
+        fi
+
         if has_variant "multisocket"; then
           # TODO: waiting for https://issues.redhat.com/browse/GRPA-1895
           cat > ${manifests}/multisocket-machine-config.yml << EOF
