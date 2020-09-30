@@ -1,7 +1,7 @@
 kind: List
 apiVersion: v1
 items:
-- apiVersion: v1
+- apiVersion: route.openshift.io/v1
   kind: Route
   metadata:
     namespace: ci
@@ -60,6 +60,18 @@ items:
           app: prow
           component: hook
       spec:
+        affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                  - key: component
+                    operator: In
+                    values:
+                    - hook
+                topologyKey: "kubernetes.io/hostname"
         serviceAccountName: hook
         containers:
         - name: hook
