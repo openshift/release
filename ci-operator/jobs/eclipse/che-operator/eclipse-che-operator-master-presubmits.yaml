@@ -103,17 +103,9 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/che-operator-olm-latest-changes-tests-cluster-profile
         - --target=che-operator-olm-latest-changes-tests
-        - --template=/usr/local/che-operator-olm-latest-changes-tests
         - --variant=v5
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: che-operator-olm-latest-changes-tests
-        - name: TEST_COMMAND
-          value: .ci/cico_olm_openshift.sh
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -126,9 +118,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/che-operator-olm-latest-changes-tests-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/che-operator-olm-latest-changes-tests
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -148,9 +137,6 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -163,7 +149,7 @@ presubmits:
     branches:
     - master
     cluster: build01
-    context: ci/prow/v5-che-operator-update
+    context: ci/prow/v5-images
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -171,28 +157,18 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       ci-operator.openshift.io/variant: v5
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-eclipse-che-operator-master-v5-che-operator-update
-    rerun_command: /test v5-che-operator-update
+    name: pull-ci-eclipse-che-operator-master-v5-images
+    rerun_command: /test v5-images
     spec:
       containers:
       - args:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/che-operator-update-cluster-profile
-        - --target=che-operator-update
-        - --template=/usr/local/che-operator-update
+        - --target=[images]
         - --variant=v5
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: che-operator-update
-        - name: TEST_COMMAND
-          value: .ci/cico_updates_openshift.sh
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -200,14 +176,6 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/che-operator-update-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/che-operator-update
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -216,24 +184,10 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: password
-            path: password
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )v5-che-operator-update,?($|\s.*)
+    trigger: (?m)^/test( | .* )v5-images,?($|\s.*)

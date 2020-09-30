@@ -3,13 +3,12 @@ base_images:
     name: "4.5"
     namespace: ocp
     tag: cli
-  cli-jq:
-    name: cli-jq
-    namespace: ocp
-    tag: latest
 build_root:
   project_image:
     dockerfile_path: .ci/openshift-ci/Dockerfile
+images:
+- dockerfile_path: Dockerfile
+  to: che-operator-image
 resources:
   '*':
     limits:
@@ -21,14 +20,27 @@ tag_specification:
   name: "4.5"
   namespace: ocp
 tests:
-- as: che-operator-update
-  commands: .ci/cico_updates_openshift.sh
-  openshift_installer_src:
-    cluster_profile: aws
 - as: che-operator-olm-latest-changes-tests
-  commands: .ci/cico_olm_openshift.sh
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: che-operator-olm-latest-changes-tests
+      commands: |
+        export PATH=$PATH:/tmp/bin
+        mkdir /tmp/bin
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.5/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
+        chmod ug+x /tmp/bin/oc
+        echo ${CHE-OPERATOR-IMAGE}
+        /bin/bash .ci/cico_olm_openshift.sh
+      dependencies:
+      - env: CHE-OPERATOR-IMAGE
+        name: che-operator-image
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: eclipse
