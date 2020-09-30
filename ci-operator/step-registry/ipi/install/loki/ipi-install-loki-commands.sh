@@ -131,6 +131,7 @@ stringData:
       enforce_metric_name: false
       reject_old_samples: true
       reject_old_samples_max_age: 168h
+      max_entries_limit_per_query: 0
     schema_config:
       configs:
       - from: '2018-04-15'
