@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export LOKI_VERSION="1.3.0"
+export LOKI_VERSION="1.6.1"
 
 cat >> "${SHARED_DIR}/manifest_loki-ns.yml" << EOF
 apiVersion: v1
@@ -214,7 +214,7 @@ spec:
       containers:
       - args:
         - "-config.file=/etc/loki/loki.yaml"
-        image: grafana/loki:v${LOKI_VERSION}
+        image: grafana/loki:${LOKI_VERSION}
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
@@ -595,7 +595,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
-        image: grafana/promtail:v${LOKI_VERSION}
+        image: grafana/promtail:${LOKI_VERSION}
         imagePullPolicy: IfNotPresent
         name: promtail
         ports:
