@@ -58,6 +58,7 @@ images:
 operator:
   bundles:
   - dockerfile_path: openshift-ci/Dockerfile.bundle.ci
+  - dockerfile_path: openshift-ci/Dockerfile.bundle-4.5.ci
   substitutions:
   - pullspec: REPLACE_IMAGE
     with: performance-addon-operator
@@ -90,7 +91,7 @@ tests:
       OO_TARGET_NAMESPACES: '!install'
     test:
     - as: e2e-test
-      commands: make functests
+      commands: CLUSTER=mcp-only make cluster-deploy && make functests
       from: pao-src-oc
       resources:
         requests:
@@ -98,9 +99,22 @@ tests:
           memory: 200Mi
     workflow: optional-operators-ci-gcp
 - as: e2e-gcp-operator-upgrade
-  commands: make operator-upgrade-tests
-  openshift_installer_src:
+  steps:
     cluster_profile: gcp
+    env:
+      OO_CHANNEL: "4.5"
+      OO_INSTALL_NAMESPACE: openshift-performance-addon
+      OO_PACKAGE: performance-addon-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e-test
+      commands: hack/ci-run-upgrade-test.sh
+      from: pao-src-oc
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-gcp
 zz_generated_metadata:
   branch: master
   org: openshift-kni
