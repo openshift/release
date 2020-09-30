@@ -316,7 +316,7 @@ data:
       kubernetes_sd_configs:
       - role: pod
       pipeline_stages:
-      - docker: {}
+      - cri: {}
       relabel_configs:
       - source_labels:
         - __meta_kubernetes_pod_label_name
@@ -359,7 +359,7 @@ data:
       kubernetes_sd_configs:
       - role: pod
       pipeline_stages:
-      - docker: {}
+      - cri: {}
       relabel_configs:
       - action: drop
         regex: ".+"
@@ -406,7 +406,7 @@ data:
       kubernetes_sd_configs:
       - role: pod
       pipeline_stages:
-      - docker: {}
+      - cri: {}
       relabel_configs:
       - action: drop
         regex: ".+"
@@ -459,7 +459,7 @@ data:
       kubernetes_sd_configs:
       - role: pod
       pipeline_stages:
-      - docker: {}
+      - cri: {}
       relabel_configs:
       - action: drop
         regex: ".+"
@@ -514,7 +514,7 @@ data:
       kubernetes_sd_configs:
       - role: pod
       pipeline_stages:
-      - docker: {}
+      - cri: {}
       relabel_configs:
       - action: drop
         regex: ''
