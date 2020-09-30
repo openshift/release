@@ -292,18 +292,18 @@ data:
   promtail.yaml: |-
     clients:
     - backoff_config:
-        maxbackoff: 5s
-        maxretries: 20
-        minbackoff: 100ms
+        max_period: 5s
+        max_retries: 20
+        min_period: 100ms
       batchsize: 102400
       batchwait: 1s
       external_labels: {}
       timeout: 10s
       url: http://loki-0.loki:3100/loki/api/v1/push
     - backoff_config:
-        maxbackoff: 5s
-        maxretries: 20
-        minbackoff: 100ms
+        max_period: 5s
+        max_retries: 20
+        min_period: 100ms
       batchsize: 102400
       batchwait: 1s
       external_labels: {}
