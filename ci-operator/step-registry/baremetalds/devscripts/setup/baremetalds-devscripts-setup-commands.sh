@@ -45,6 +45,19 @@ tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/dev-scripts.tar.gz"
 # Prepare configuration and run dev-scripts
 scp "${SSHOPTS[@]}" "${CLUSTER_PROFILE_DIR}/pull-secret" "root@${IP}:pull-secret"
 
+# Additional mechanism to inject dev-scripts additional variables directly 
+# from a multistage step configuration.
+# Backward compatible with the previous approach based on creating the
+# dev-scripts-additional-config file from a multistage step command
+if [[ -n "${DEVSCRIPTS_CONFIG:-}" ]]; then
+  readarray -t config <<< "${DEVSCRIPTS_CONFIG}"
+  for var in "${config[@]}"; do
+    if [[ ! -z "${var}" ]]; then 
+      echo "export ${var}" >> "${SHARED_DIR}/dev-scripts-additional-config"
+    fi
+  done
+fi
+
 # Copy additional dev-script configuration provided by the the job, if present
 if [[ -e "${SHARED_DIR}/dev-scripts-additional-config" ]]
 then
