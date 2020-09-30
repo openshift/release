@@ -8,36 +8,31 @@ build_root:
     dockerfile_path: scripts/ci/Dockerfile.ci-operator
 resources:
   '*':
-    limits:
-      memory: 4Gi
     requests:
-      cpu: 100m
-      memory: 200Mi
+      cpu: 1000m
+      memory: 4Gi
 tag_specification:
   name: "4.6"
   namespace: ocp
 tests:
-- as: free-test
+- as: free-test1
   commands: |
-    export PATH=$PATH:/tmp/operator-test/bin
-    mkdir -p /tmp/operator-test/bin
-    curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.6/linux/oc.tar.gz | tar xvzf - -C /tmp/operator-test/bin oc
-    chmod ug+x /tmp/operator-test/bin/oc
-    oc get pods --all-namespaces
+    echo
   openshift_installer_src:
     cluster_profile: aws
-- as: cli-test
+- as: free-test2
   commands: |
-    export PATH=$PATH:/tmp/operator-test/bin
-    mkdir -p /tmp/operator-test/bin
-    curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.6/linux/oc.tar.gz | tar xvzf - -C /tmp/operator-test/bin oc
-    chmod ug+x /tmp/operator-test/bin/oc
-    oc create namespace jozi
-    oc run index-from-public --image=quay.io/openshift-community-operators/catalog:latest -n jozi
-    sleep 30
-    oc get pods -n jozi
-    sleep 160
-    oc get pods -n jozi
+    echo
+  openshift_installer_src:
+    cluster_profile: aws
+- as: free-test3
+  commands: |
+    echo
+  openshift_installer_src:
+    cluster_profile: aws
+- as: free-test4
+  commands: |
+    echo
   openshift_installer_src:
     cluster_profile: aws
 - as: src-test
