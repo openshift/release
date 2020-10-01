@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export LOKI_VERSION="1.3.0"
+export LOKI_VERSION="1.6.1"
 
 cat >> "${SHARED_DIR}/manifest_loki-ns.yml" << EOF
 apiVersion: v1
@@ -131,6 +131,7 @@ stringData:
       enforce_metric_name: false
       reject_old_samples: true
       reject_old_samples_max_age: 168h
+      max_entries_limit_per_query: 0
     schema_config:
       configs:
       - from: '2018-04-15'
@@ -214,7 +215,7 @@ spec:
       containers:
       - args:
         - "-config.file=/etc/loki/loki.yaml"
-        image: grafana/loki:v${LOKI_VERSION}
+        image: grafana/loki:${LOKI_VERSION}
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
@@ -292,18 +293,18 @@ data:
   promtail.yaml: |-
     clients:
     - backoff_config:
-        maxbackoff: 5s
-        maxretries: 20
-        minbackoff: 100ms
+        max_period: 5s
+        max_retries: 20
+        min_period: 100ms
       batchsize: 102400
       batchwait: 1s
       external_labels: {}
       timeout: 10s
       url: http://loki-0.loki:3100/loki/api/v1/push
     - backoff_config:
-        maxbackoff: 5s
-        maxretries: 20
-        minbackoff: 100ms
+        max_period: 5s
+        max_retries: 20
+        min_period: 100ms
       batchsize: 102400
       batchwait: 1s
       external_labels: {}
@@ -316,7 +317,7 @@ data:
       kubernetes_sd_configs:
       - role: pod
       pipeline_stages:
-      - docker: {}
+      - cri: {}
       relabel_configs:
       - source_labels:
         - __meta_kubernetes_pod_label_name
@@ -359,7 +360,7 @@ data:
       kubernetes_sd_configs:
       - role: pod
       pipeline_stages:
-      - docker: {}
+      - cri: {}
       relabel_configs:
       - action: drop
         regex: ".+"
@@ -406,7 +407,7 @@ data:
       kubernetes_sd_configs:
       - role: pod
       pipeline_stages:
-      - docker: {}
+      - cri: {}
       relabel_configs:
       - action: drop
         regex: ".+"
@@ -459,7 +460,7 @@ data:
       kubernetes_sd_configs:
       - role: pod
       pipeline_stages:
-      - docker: {}
+      - cri: {}
       relabel_configs:
       - action: drop
         regex: ".+"
@@ -514,7 +515,7 @@ data:
       kubernetes_sd_configs:
       - role: pod
       pipeline_stages:
-      - docker: {}
+      - cri: {}
       relabel_configs:
       - action: drop
         regex: ''
@@ -595,7 +596,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
-        image: grafana/promtail:v${LOKI_VERSION}
+        image: grafana/promtail:${LOKI_VERSION}
         imagePullPolicy: IfNotPresent
         name: promtail
         ports:
