@@ -1,0 +1,24 @@
+workflow:
+  as: openshift-e2e-openstack-fipless
+  steps:
+    pre:
+      - ref: ipi-conf-openstack
+      - ref: openstack-conf-createmachinesubnet
+      - ref: openstack-conf-generateconfig
+      - ref: openstack-conf-createartifacts
+      #- chain: ipi-install
+    test:
+      #- ref: openshift-e2e-test
+    post:
+      #- chain: ipi-openstack-post
+      - ref: openstack-deprovision-deletemachinesubnet
+    env:
+      OPENSTACK_EXTERNAL_NETWORK: "external"
+      OS_CLOUD: "openstack-cloud"
+      OPENSTACK_COMPUTE_FLAVOR: "m1.s2.xlarge"
+      CONFIG_API_VERSION: "v1beta4"
+      CONFIG_TYPE: "fipless"
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+  documentation: |-
+    The openshift-e2e-openstack-fipless workflow executes the common
+    end-to-end test suite on OpenShift fipless intallation on OpenStack.

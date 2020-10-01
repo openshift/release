@@ -6,12 +6,13 @@ set -o pipefail
 
 #Read necessary variables
 CLUSTER_NAME=$(<"${SHARED_DIR}"/CLUSTER_NAME)
-LB_FIP_IP=$(<"${SHARED_DIR}"/LB_FIP_IP)
+
 
 PULL_SECRET=$(<"${CLUSTER_PROFILE_DIR}"/pull-secret)
 SSH_PUB_KEY=$(<"${CLUSTER_PROFILE_DIR}"/ssh-publickey)
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
+
 if [[ "${CONFIG_TYPE}" == "minimal" ]]; then
 cat > "${CONFIG}" << EOF
 apiVersion: ${CONFIG_API_VERSION}
@@ -23,12 +24,35 @@ platform:
     cloud:            ${OS_CLOUD}
     externalNetwork:  ${OPENSTACK_EXTERNAL_NETWORK}
     computeFlavor:    ${OPENSTACK_COMPUTE_FLAVOR}
-    lbFloatingIP:     ${LB_FIP_IP}
+    lbFloatingIP:     $(<"${SHARED_DIR}"/LB_FIP_IP)
 pullSecret: >
   ${PULL_SECRET}
 sshKey: |
   ${SSH_PUB_KEY}
 EOF
+
+elif [[ "${CONFIG_TYPE}" == "fipless" ]]; then
+cat > "${CONFIG}" << EOF
+apiVersion: ${CONFIG_API_VERSION}
+baseDomain: ${BASE_DOMAIN}
+metadata:
+  name: ${CLUSTER_NAME}
+networking:
+  machineNetwork:
+  - cidr: $(<"${SHARED_DIR}"/MACHINESSUBNET_SUBNET_RANGE)
+
+platform:
+  openstack:
+    cloud:            ${OS_CLOUD}
+    machinesSubnet:    $(<"${SHARED_DIR}"/MACHINESSUBNET_SUBNET_ID)
+    computeFlavor:    ${OPENSTACK_COMPUTE_FLAVOR}
+pullSecret: >
+  ${PULL_SECRET}
+sshKey: |
+  ${SSH_PUB_KEY}
+EOF
+
+
 else
     echo "NO valid install config type specified. Please check  CONFIG_TYPE"
     exit 1
