@@ -29,7 +29,7 @@ if ! diff -Naupr -I '^[[:space:]]*#.*' "${workdir}/jobs" "${jobs_dir}"> "${workd
 ERROR: This check enforces Prow Job configuration YAML file format (ordering,
 ERROR: linebreaks, indentation) to be consistent over the whole repository. We have
 ERROR: automation in place that manipulates these configs and consistent formatting
-ERORR helps reviewing the changes the automation does.
+ERROR: helps reviewing the changes the automation does.
 
 ERROR: Run the following command to re-format the Prow jobs:
 ERROR: $ make jobs

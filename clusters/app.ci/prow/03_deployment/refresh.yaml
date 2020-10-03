@@ -37,7 +37,7 @@ items:
       spec:
         containers:
         - name: refresh
-          image: gcr.io/k8s-prow/refresh:v20200904-8d0a527a58
+          image: gcr.io/k8s-prow/refresh:v20201002-9b61c96506
           args:
           - --github-token-path=/etc/github/oauth
           - --hmac-secret-file=/etc/webhook/hmac
@@ -60,6 +60,16 @@ items:
             requests:
               memory: "250Mi"
               cpu: "50m"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 20
+            periodSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz/ready
+              port: 8081
         volumes:
         - name: hmac
           secret:

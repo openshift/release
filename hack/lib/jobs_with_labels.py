@@ -1,3 +1,4 @@
+from __future__ import print_function;
 import json, sys, yaml, os, fnmatch, re;
 
 basename = os.path.basename(sys.argv[1])
@@ -18,7 +19,7 @@ for dirpath, dirnames, filenames in os.walk(dir):
       if len(sys.argv) > 4:
         jobs = list(filter(lambda x: 'labels' in x and sys.argv[4] in x['labels'], jobs))
       for job in jobs:
-        print job['name']
+        print(job['name'])
         count += 1
 
 if count == 0:

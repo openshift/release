@@ -173,6 +173,68 @@ Resources:
     Properties:
       SubnetId: !Ref PrivateSubnet3
       RouteTableId: !Ref PrivateRouteTable3
+  HTTPSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: HTTPS Security Group
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 443
+        ToPort: 443
+        CidrIp: !Ref VpcCidr
+      VpcId: !Ref VPC
+  EC2Endpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal: '*'
+          Action:
+          - '*'
+          Resource:
+          - '*'
+      PrivateDnsEnabled: "true"
+      SecurityGroupIds:
+      - !Ref HTTPSSecurityGroup
+      ServiceName: !Join
+      - ''
+      - - com.amazonaws.
+        - !Ref 'AWS::Region'
+        - .ec2
+      SubnetIds:
+      - !Ref PublicSubnet
+      - !If [DoAz2, !Ref PublicSubnet2, !Ref "AWS::NoValue"]
+      - !If [DoAz3, !Ref PublicSubnet3, !Ref "AWS::NoValue"]
+      VpcEndpointType: Interface
+      VpcId: !Ref VPC
+  ELBEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal: '*'
+          Action:
+          - '*'
+          Resource:
+          - '*'
+      PrivateDnsEnabled: "true"
+      SecurityGroupIds:
+      - !Ref HTTPSSecurityGroup
+      ServiceName: !Join
+      - ''
+      - - com.amazonaws.
+        - !Ref 'AWS::Region'
+        - .elasticloadbalancing
+      SubnetIds:
+      - !Ref PublicSubnet
+      - !If [DoAz2, !Ref PublicSubnet2, !Ref "AWS::NoValue"]
+      - !If [DoAz3, !Ref PublicSubnet3, !Ref "AWS::NoValue"]
+      VpcEndpointType: Interface
+      VpcId: !Ref VPC
   S3Endpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:

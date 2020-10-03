@@ -7,6 +7,10 @@ base_images:
     name: test
     namespace: openshift-kni
     tag: dev-scripts
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
   openshift_release_golang-1.14:
     name: release
     namespace: openshift
@@ -19,9 +23,12 @@ build_root:
 canonical_go_repository: github.com/openshift/cluster-baremetal-operator
 images:
 - from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
   to: cluster-baremetal-operator
 promotion:
-  disabled: true
   name: 4.6-priv
   namespace: ocp-private
 resources:
@@ -51,6 +58,17 @@ tests:
   commands: make vet
   container:
     from: src
+- as: generate-check
+  commands: make generate-check
+  container:
+    from: src
+- as: e2e-metal-ipi
+  steps:
+    cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        ENABLE_CBO_TEST=true
+    workflow: baremetalds-e2e
 zz_generated_metadata:
   branch: release-4.6
   org: openshift-priv

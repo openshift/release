@@ -1,7 +1,7 @@
 kind: List
 apiVersion: v1
 items:
-- apiVersion: v1
+- apiVersion: route.openshift.io/v1
   kind: Route
   metadata:
     namespace: ci
@@ -60,10 +60,22 @@ items:
           app: prow
           component: hook
       spec:
+        affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                  - key: component
+                    operator: In
+                    values:
+                    - hook
+                topologyKey: "kubernetes.io/hostname"
         serviceAccountName: hook
         containers:
         - name: hook
-          image: gcr.io/k8s-prow/hook:v20200904-8d0a527a58
+          image: gcr.io/k8s-prow/hook:v20201002-9b61c96506
           args:
           - --config-path=/etc/config/config.yaml
           - --github-token-path=/etc/github/oauth
@@ -142,6 +154,16 @@ items:
             requests:
               memory: "3Gi"
               cpu: "200m"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 20
+            periodSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz/ready
+              port: 8081
         volumes:
         - name: hmac
           secret:

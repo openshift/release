@@ -20,19 +20,10 @@ periodics:
       - --lease-server-password-file=/etc/boskos/password
       - --report-password-file=/etc/report/password.txt
       - --report-username=ci
-      - --secret-dir=/secrets/test-harness-secrets
       - --secret-dir=/usr/local/performance-tests-cluster-profile
       - --target=performance-tests
-      - --template=/usr/local/performance-tests
       command:
       - ci-operator
-      env:
-      - name: CLUSTER_TYPE
-        value: aws
-      - name: JOB_NAME_SAFE
-        value: performance-tests
-      - name: TEST_COMMAND
-        value: .ci/ci-eclipse-che-perf.sh
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -45,17 +36,11 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/performance-tests-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/performance-tests
-        name: job-definition
-        subPath: cluster-launch-installer-src.yaml
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
       - mountPath: /etc/report
         name: result-aggregator
-        readOnly: true
-      - mountPath: /secrets/test-harness-secrets
-        name: test-harness-secrets
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -70,15 +55,9 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
-    - configMap:
-        name: prow-job-cluster-launch-installer-src
-      name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - name: test-harness-secrets
-      secret:
-        secretName: test-harness-secrets

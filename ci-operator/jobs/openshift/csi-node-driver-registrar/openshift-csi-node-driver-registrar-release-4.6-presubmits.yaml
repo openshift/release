@@ -4,7 +4,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/e2e-aws-csi
     decorate: true
     decoration_config:
@@ -59,7 +59,7 @@ presubmits:
               name: cluster-secrets-aws
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -68,7 +68,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/e2e-ovirt
     decorate: true
     decoration_config:
@@ -86,6 +86,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
         - --repo=csi-node-driver-registrar
+        - --secret-dir=/etc/boskos
         - --secret-dir=/usr/local/e2e-ovirt-cluster-profile
         - --target=e2e-ovirt
         - --template=/usr/local/e2e-ovirt
@@ -111,6 +112,9 @@ presubmits:
         - mountPath: /etc/apici
           name: apici-ci-operator-credentials
           readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /usr/local/e2e-ovirt-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/e2e-ovirt
@@ -127,6 +131,12 @@ presubmits:
           - key: sa.ci-operator.apici.config
             path: kubeconfig
           secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -141,7 +151,7 @@ presubmits:
         name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
     trigger: (?m)^/test( | .* )e2e-ovirt,?($|\s.*)
   - agent: kubernetes
     always_run: true
@@ -165,6 +175,7 @@ presubmits:
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --target=[images]
+        - --target=[release:latest]
         command:
         - ci-operator
         image: ci-operator:latest
@@ -184,7 +195,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -230,7 +241,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator

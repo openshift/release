@@ -55,15 +55,25 @@ objects:
             name: gcsweb-private-tls
           - mountPath: /etc/proxy/secrets
             name: session-secret
-        - image: gcr.io/k8s-prow/gcsweb:v20200904-8d0a527a58
+        - image: gcr.io/k8s-prow/gcsweb:v20201002-9b61c96506
           name: gcsweb-private
           args:
           - "-b"
           - "origin-ci-private"
-          - --oauth-token-file=/etc/token/oauth
+          - --gcs-credentials-file=/etc/sa/credentials.json
           volumeMounts:
-          - mountPath: /etc/token
-            name: oauth
+          - mountPath: /etc/sa
+            name: gcs-credentials-file
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds:
+            periodSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz/ready
+              port: 8081
         volumes:
         - name: gcsweb-private-tls
           secret:
@@ -71,7 +81,7 @@ objects:
         - name: session-secret
           secret:
             secretName: gcsweb-private-session-secret
-        - name: oauth
+        - name: gcs-credentials-file
           secret:
             secretName: openshift-private-viewer
 - apiVersion: v1

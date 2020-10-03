@@ -346,7 +346,7 @@ objects:
         }]}
         EOF
 
-        export HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "shiftstack.devcluster.openshift.com" | python -c 'import json,sys;print json.load(sys.stdin)["HostedZones"][0]["Id"].split("/")[-1]')
+        export HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "shiftstack.devcluster.openshift.com" | python -c 'import json,sys;print(json.load(sys.stdin)["HostedZones"][0]["Id"].split("/")[-1])')
         aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file://${ARTIFACT_DIR}/installer/api-record.json
 
         cat > ${ARTIFACT_DIR}/installer/install-config.yaml << EOF
@@ -584,7 +584,7 @@ objects:
           rm -rf ${ARTIFACT_DIR}/must-gather
 
           echo "Removing entries from DNS ..."
-          export HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "shiftstack.devcluster.openshift.com" | python -c 'import json,sys;print json.load(sys.stdin)["HostedZones"][0]["Id"].split("/")[-1]')
+          export HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "shiftstack.devcluster.openshift.com" | python -c 'import json,sys;print(json.load(sys.stdin)["HostedZones"][0]["Id"].split("/")[-1])')
           sed -e's/UPSERT/DELETE/g' ${ARTIFACT_DIR}/installer/api-record.json > ${ARTIFACT_DIR}/installer/delete-api-record.json
           aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file://${ARTIFACT_DIR}/installer/delete-api-record.json
           sed -e's/UPSERT/DELETE/g' ${ARTIFACT_DIR}/installer/ingress-record.json > ${ARTIFACT_DIR}/installer/delete-ingress-record.json

@@ -61,7 +61,7 @@ items:
       spec:
         containers:
         - name: ghproxy
-          image: gcr.io/k8s-prow/ghproxy:v20200904-8d0a527a58
+          image: gcr.io/k8s-prow/ghproxy:v20201002-9b61c96506
           imagePullPolicy: Always
           args:
           - --cache-dir=/cache
@@ -79,6 +79,16 @@ items:
             requests:
               memory: "250Mi"
               cpu: "100m"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 20
+            periodSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz/ready
+              port: 8081
         volumes:
         - name: cache
           persistentVolumeClaim:

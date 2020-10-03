@@ -42,7 +42,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: app.ci
     context: ci/build-farm/build01-dry
     decorate: true
     labels:
@@ -174,7 +174,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/ci-operator-config
     decorate: true
     labels:
@@ -199,7 +199,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/ci-operator-config-metadata
     decorate: true
     labels:
@@ -223,7 +223,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/ci-operator-registry
     decorate: true
     labels:
@@ -250,10 +250,37 @@ presubmits:
             cpu: 10m
     trigger: (?m)^/test( | .* )ci-operator-registry,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - master
+    cluster: build01
+    context: ci/prow/ci-testgrid-allow-list
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-ci-testgrid-allow-list
+    rerun_command: /test ci-testgrid-allow-list
+    run_if_changed: ^core-services/testgrid-config-generator/_allow-list.yaml$
+    spec:
+      containers:
+      - args:
+        - --validate=true
+        - --allow-list
+        - ./core-services/testgrid-config-generator/_allow-list.yaml
+        command:
+        - testgrid-config-generator
+        image: testgrid-config-generator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )ci-testgrid-allow-list,?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/config
     decorate: true
     labels:
@@ -276,7 +303,7 @@ presubmits:
         - mismatched-tide-lenient
         command:
         - /checkconfig
-        image: gcr.io/k8s-prow/checkconfig:v20200904-8d0a527a58
+        image: gcr.io/k8s-prow/checkconfig:v20201002-9b61c96506
         imagePullPolicy: Always
         name: ""
         resources:
@@ -287,7 +314,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: app.ci
     context: ci/prow/core-dry
     decorate: true
     labels:
@@ -299,6 +326,10 @@ presubmits:
       - args:
         - --config-dir
         - core-services
+        - --config-dir
+        - clusters/build-clusters/common
+        - --kubeconfig
+        - /etc/build-farm-credentials/kubeconfig
         - --as=
         command:
         - applyconfig
@@ -319,7 +350,18 @@ presubmits:
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
       serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.api.ci.config
+            path: kubeconfig
+          secretName: build-farm-credentials
     trigger: (?m)^/test( | .* )core-dry,?($|\s.*)
   - agent: kubernetes
     always_run: true
@@ -361,7 +403,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -370,7 +412,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/correctly-sharded-config
     decorate: true
     labels:
@@ -394,7 +436,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/generated-config
     decorate: true
     labels:
@@ -418,7 +460,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/generated-dashboards
     decorate: true
     labels:
@@ -442,7 +484,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/ordered-prow-config
     decorate: true
     labels:
@@ -466,7 +508,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/owners
     decorate: true
     labels:
@@ -491,7 +533,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/pj-rehearse
     decorate: true
     extra_refs:
@@ -534,7 +576,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/prow-config
     decorate: true
     labels:
@@ -558,7 +600,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/prow-config-filenames
     decorate: true
     labels:
@@ -583,7 +625,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/prow-config-semantics
     decorate: true
     labels:
@@ -607,7 +649,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/release-controller-config
     decorate: true
     labels:
@@ -631,7 +673,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: app.ci
     context: ci/prow/services-dry
     decorate: true
     labels:
@@ -643,6 +685,8 @@ presubmits:
       - args:
         - --config-dir
         - services
+        - --kubeconfig
+        - /etc/build-farm-credentials/kubeconfig
         - --as=
         command:
         - applyconfig
@@ -652,7 +696,18 @@ presubmits:
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
       serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.api.ci.config
+            path: kubeconfig
+          secretName: build-farm-credentials
     trigger: (?m)^/test( | .* )services-dry,?($|\s.*)
   - agent: kubernetes
     always_run: true
@@ -694,7 +749,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -703,7 +758,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/step-registry-metadata
     decorate: true
     labels:
@@ -727,7 +782,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/step-registry-shellcheck
     decorate: true
     labels:
@@ -802,7 +857,7 @@ presubmits:
     always_run: false
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/pylint
     decorate: true
     labels:
@@ -826,3 +881,31 @@ presubmits:
           requests:
             cpu: 10m
     trigger: (?m)^/test( | .* )pylint,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build01
+    context: ci/prow/yamllint
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-yamllint
+    rerun_command: /test yamllint
+    spec:
+      containers:
+      - args:
+        - -c
+        - services/yamllint/_yamllint.conf
+        - ci-operator/jobs
+        - clusters
+        - core-services
+        command:
+        - yamllint
+        image: quay.io/kubermatic/yamllint:0.1
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )yamllint,?($|\s.*)

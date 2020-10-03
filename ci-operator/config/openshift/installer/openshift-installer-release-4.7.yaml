@@ -23,6 +23,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: golang-1.14
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
   ocp_builder_rhel-8-golang-openshift-4.6:
     name: builder
     namespace: ocp
@@ -39,6 +43,10 @@ base_images:
     name: "4.2"
     namespace: origin
     tag: cli
+  origin_4.6_cli:
+    name: "4.6"
+    namespace: origin
+    tag: cli
   rhel-7:
     name: "4.7"
     namespace: ocp
@@ -52,9 +60,9 @@ images:
 - dockerfile_path: images/installer/Dockerfile.ci
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-openshift-4.6:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-openshift-4.6
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
     openshift_release_golang-1.14:
       as:
       - registry.svc.ci.openshift.org/openshift/release:golang-1.14
@@ -65,9 +73,9 @@ images:
     ocp_builder_golang-1.14:
       as:
       - registry.svc.ci.openshift.org/ocp/builder:golang-1.14
-    ocp_builder_rhel-8-golang-openshift-4.6:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-openshift-4.6
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
   to: installer-artifacts
 - dockerfile_path: images/libvirt/Dockerfile.ci
   from: base
@@ -87,21 +95,21 @@ images:
       - registry.svc.ci.openshift.org/ocp/builder:golang-1.14
   to: upi-installer
 - dockerfile_path: images/openstack/Dockerfile.ci
-  from: rhel-7
+  from: base
   inputs:
     openshift_release_golang-1.14:
       as:
       - registry.svc.ci.openshift.org/openshift/release:golang-1.14
-    origin_4.2_cli:
+    origin_4.6_cli:
       as:
-      - registry.svc.ci.openshift.org/origin/4.2:cli
+      - registry.svc.ci.openshift.org/origin/4.6:cli
   to: openstack-installer
 - dockerfile_path: images/baremetal/Dockerfile.ci
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-openshift-4.6:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-openshift-4.6
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
     openshift_release_golang-1.14:
       as:
       - registry.svc.ci.openshift.org/openshift/release:golang-1.14
@@ -109,14 +117,15 @@ images:
 - dockerfile_path: images/installer/Dockerfile.ci
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-openshift-4.6:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-openshift-4.6
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
     openshift_release_golang-1.14:
       as:
       - registry.svc.ci.openshift.org/openshift/release:golang-1.14
   to: ovirt-installer
 promotion:
+  disabled: true
   name: "4.7"
   namespace: ocp
 resources:
@@ -265,7 +274,7 @@ tests:
 - as: e2e-crc
   steps:
     cluster_profile: gcp
-    workflow: openshift-e2e-crc
+    workflow: openshift-e2e-gcp-crc
 zz_generated_metadata:
   branch: release-4.7
   org: openshift

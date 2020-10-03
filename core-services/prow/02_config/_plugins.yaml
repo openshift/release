@@ -26,6 +26,7 @@ approve:
   - openshift-priv/cluster-api-provider-gcp
   - openshift-priv/cluster-api-provider-kubemark
   - openshift-priv/cluster-api-provider-libvirt
+  - openshift-priv/cluster-api-provider-openstack
   - openshift-priv/cluster-autoscaler-operator
   - openshift-priv/cluster-machine-approver
   - openshift-priv/kubernetes-autoscaler
@@ -37,6 +38,7 @@ approve:
   - openshift/cluster-api-provider-gcp
   - openshift/cluster-api-provider-kubemark
   - openshift/cluster-api-provider-libvirt
+  - openshift/cluster-api-provider-openstack
   - openshift/cluster-autoscaler-operator
   - openshift/cluster-machine-approver
   - openshift/kubernetes-autoscaler
@@ -77,7 +79,14 @@ approve:
 - commandHelpLink: https://go.k8s.io/bot-commands
   ignore_review_state: true
   repos:
+  - redhat-developer/kam
+  require_self_approval: false
+- commandHelpLink: https://go.k8s.io/bot-commands
+  ignore_review_state: true
+  lgtm_acts_as_approve: true
+  repos:
   - shipwright-io/build
+  - shipwright-io/website
   require_self_approval: true
 - commandHelpLink: https://go.k8s.io/bot-commands
   ignore_review_state: false
@@ -121,6 +130,7 @@ approve:
 - commandHelpLink: https://go.k8s.io/bot-commands
   lgtm_acts_as_approve: true
   repos:
+  - coreos/bootupd
   - coreos/rpm-ostree
   require_self_approval: false
 - commandHelpLink: https://go.k8s.io/bot-commands
@@ -174,8 +184,10 @@ approve:
 - commandHelpLink: https://go.k8s.io/bot-commands
   repos:
   - openshift-priv/openshift-tests
+  - openshift-priv/openshift-tests-private
   - openshift/openshift-tests
-  require_self_approval: false
+  - openshift/openshift-tests-private
+  require_self_approval: true
 - commandHelpLink: https://go.k8s.io/bot-commands
   repos:
   - openshift-priv/csi-driver-nfs
@@ -218,11 +230,6 @@ approve:
   require_self_approval: false
 - commandHelpLink: https://go.k8s.io/bot-commands
   repos:
-  - openshift-priv/openshift-tests-private
-  - openshift/openshift-tests-private
-  require_self_approval: false
-- commandHelpLink: https://go.k8s.io/bot-commands
-  repos:
   - open-cluster-management/registration-operator
   require_self_approval: false
 - commandHelpLink: https://go.k8s.io/bot-commands
@@ -245,7 +252,11 @@ approve:
   require_self_approval: false
 - commandHelpLink: https://go.k8s.io/bot-commands
   repos:
+  - openshift-priv/assisted-service
   - openshift-priv/assisted-test-infra
+  - openshift/assisted-installer
+  - openshift/assisted-installer-agent
+  - openshift/assisted-service
   - openshift/assisted-test-infra
   require_self_approval: false
 - commandHelpLink: https://go.k8s.io/bot-commands
@@ -258,17 +269,13 @@ approve:
   require_self_approval: false
 - commandHelpLink: https://go.k8s.io/bot-commands
   repos:
-  - openshift-priv/assisted-service
-  - openshift/assisted-service
-  require_self_approval: false
-- commandHelpLink: https://go.k8s.io/bot-commands
-  repos:
-  - openshift/assisted-installer
-  require_self_approval: false
-- commandHelpLink: https://go.k8s.io/bot-commands
-  repos:
   - openshift-priv/csi-driver-projected-resource
   - openshift/csi-driver-projected-resource
+  require_self_approval: false
+- commandHelpLink: https://go.k8s.io/bot-commands
+  repos:
+  - openshift-priv/redhat-subscription-injection-webhook
+  - openshift/redhat-subscription-injection-webhook
   require_self_approval: false
 - commandHelpLink: https://go.k8s.io/bot-commands
   lgtm_acts_as_approve: true
@@ -276,14 +283,6 @@ approve:
   - openshift-priv/ocs-operator
   - openshift/ocs-operator
   require_self_approval: true
-- commandHelpLink: https://go.k8s.io/bot-commands
-  repos:
-  - openshift/assisted-installer-agent
-  require_self_approval: false
-- commandHelpLink: https://go.k8s.io/bot-commands
-  repos:
-  - openshift/assisted-ignition-generator
-  require_self_approval: false
 - commandHelpLink: ""
   repos:
   - ansible-collections/community.okd
@@ -298,6 +297,11 @@ approve:
   repos:
   - openshift-priv/cluster-baremetal-operator
   - openshift/cluster-baremetal-operator
+  require_self_approval: false
+- commandHelpLink: ""
+  repos:
+  - openshift-priv/openstack-cinder-csi-driver-operator
+  - openshift/openstack-cinder-csi-driver-operator
   require_self_approval: false
 blunderbuss:
   max_request_count: 2
@@ -316,6 +320,8 @@ bugzilla:
       - resolution: ERRATA
         status: CLOSED
       is_open: true
+      state_after_close:
+        status: NEW
       state_after_merge:
         status: MODIFIED
       state_after_validation:
@@ -334,11 +340,13 @@ bugzilla:
       - qe_staff
       exclude_defaults: true
       is_open: true
+      state_after_close:
+        status: NEW
       state_after_merge:
         status: MODIFIED
       state_after_validation:
         status: POST
-      target_release: 4.6.0
+      target_release: 4.7.0
       valid_states:
       - status: NEW
       - status: ASSIGNED
@@ -351,6 +359,8 @@ bugzilla:
       - qe_staff
       exclude_defaults: true
       is_open: true
+      state_after_close:
+        status: NEW
       state_after_merge:
         status: MODIFIED
       state_after_validation:
@@ -392,6 +402,14 @@ bugzilla:
       - 4.6.z
       target_release: 4.5.z
       validate_by_default: true
+    openshift-4.6:
+      dependent_bug_states:
+      - status: MODIFIED
+      - status: VERIFIED
+      dependent_bug_target_releases:
+      - 4.7.0
+      target_release: 4.6.0
+      validate_by_default: true
     release-3.11:
       add_external_link: true
       allowed_groups:
@@ -399,6 +417,8 @@ bugzilla:
       - qe_staff
       exclude_defaults: true
       is_open: true
+      state_after_close:
+        status: NEW
       state_after_merge:
         status: MODIFIED
       state_after_validation:
@@ -440,6 +460,14 @@ bugzilla:
       - 4.6.z
       target_release: 4.5.z
       validate_by_default: true
+    release-4.6:
+      dependent_bug_states:
+      - status: MODIFIED
+      - status: VERIFIED
+      dependent_bug_target_releases:
+      - 4.7.0
+      target_release: 4.6.0
+      validate_by_default: true
   orgs:
     openshift:
       repos:
@@ -452,6 +480,8 @@ bugzilla:
               - qe_staff
               exclude_defaults: true
               is_open: true
+              state_after_close:
+                status: NEW
               state_after_merge:
                 status: MODIFIED
               state_after_validation:
@@ -480,6 +510,20 @@ bugzilla:
               exclude_defaults: true
               target_release: OCS 4.5.0
               validate_by_default: true
+        openshift-tests:
+          branches:
+            '*':
+              allowed_groups:
+              - redhat
+              - qe_staff
+              validate_by_default: false
+        openshift-tests-private:
+          branches:
+            '*':
+              allowed_groups:
+              - redhat
+              - qe_staff
+              validate_by_default: false
     openshift-priv:
       repos:
         ocs-operator:
@@ -491,6 +535,8 @@ bugzilla:
               - qe_staff
               exclude_defaults: true
               is_open: true
+              state_after_close:
+                status: NEW
               state_after_merge:
                 status: MODIFIED
               state_after_validation:
@@ -519,6 +565,20 @@ bugzilla:
               exclude_defaults: true
               target_release: OCS 4.5.0
               validate_by_default: true
+        openshift-tests:
+          branches:
+            '*':
+              allowed_groups:
+              - redhat
+              - qe_staff
+              validate_by_default: false
+        openshift-tests-private:
+          branches:
+            '*':
+              allowed_groups:
+              - redhat
+              - qe_staff
+              validate_by_default: false
 cat: {}
 cherry_pick_unapproved:
   branchregexp: ^release-.*$
@@ -696,6 +756,11 @@ config_updater:
         app.ci:
         - ci
       name: ci-operator-master-configs
+    ci-operator/config/eclipse/che-operator/*-7*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      name: ci-operator-misc-configs
     ci-operator/config/integr8ly/integreatly-operator/integr8ly-integreatly-operator-*-next-*.yaml:
       clusters:
         app.ci:
@@ -1049,6 +1114,13 @@ config_updater:
         - ci
       gzip: true
       name: job-config-master
+    ci-operator/jobs/eclipse/che-operator/*-7*.yaml:
+      clusters:
+        api.ci:
+        - ci
+        app.ci:
+        - ci
+      name: job-config-misc
     ci-operator/jobs/integr8ly/integreatly-operator/integr8ly-integreatly-operator-*-next-*.yaml:
       clusters:
         api.ci:
@@ -1154,6 +1226,8 @@ config_updater:
         - ci
         build02:
         - ci
+        vsphere:
+        - ci
       name: prow-job-master-sidecar-3
     ci-operator/templates/master-sidecar-4.2.yaml:
       clusters:
@@ -1164,6 +1238,8 @@ config_updater:
         build01:
         - ci
         build02:
+        - ci
+        vsphere:
         - ci
       name: prow-job-master-sidecar-4.2
     ci-operator/templates/master-sidecar-4.3.yaml:
@@ -1176,6 +1252,8 @@ config_updater:
         - ci
         build02:
         - ci
+        vsphere:
+        - ci
       name: prow-job-master-sidecar-4.3
     ci-operator/templates/master-sidecar-4.4.yaml:
       clusters:
@@ -1186,6 +1264,8 @@ config_updater:
         build01:
         - ci
         build02:
+        - ci
+        vsphere:
         - ci
       name: prow-job-master-sidecar-4.4
     ci-operator/templates/master-sidecar-4.6.yaml:
@@ -1198,6 +1278,8 @@ config_updater:
         - ci
         build02:
         - ci
+        vsphere:
+        - ci
       name: prow-job-master-sidecar-4.6
     ci-operator/templates/openshift/endurance/endurance-install.yaml:
       clusters:
@@ -1208,6 +1290,8 @@ config_updater:
         build01:
         - ci
         build02:
+        - ci
+        vsphere:
         - ci
       name: prow-job-endurance-install
     ci-operator/templates/openshift/endurance/endurance-test.yaml:
@@ -1220,6 +1304,8 @@ config_updater:
         - ci
         build02:
         - ci
+        vsphere:
+        - ci
       name: prow-job-endurance-test
     ci-operator/templates/openshift/installer/cluster-launch-installer-console.yaml:
       clusters:
@@ -1230,6 +1316,8 @@ config_updater:
         build01:
         - ci
         build02:
+        - ci
+        vsphere:
         - ci
       name: prow-job-cluster-launch-installer-console
     ci-operator/templates/openshift/installer/cluster-launch-installer-custom-test-image.yaml:
@@ -1242,6 +1330,8 @@ config_updater:
         - ci
         build02:
         - ci
+        vsphere:
+        - ci
       name: prow-job-cluster-launch-installer-custom-test-image
     ci-operator/templates/openshift/installer/cluster-launch-installer-e2e.yaml:
       clusters:
@@ -1252,6 +1342,8 @@ config_updater:
         build01:
         - ci
         build02:
+        - ci
+        vsphere:
         - ci
       name: prow-job-cluster-launch-installer-e2e
     ci-operator/templates/openshift/installer/cluster-launch-installer-gcp-nested-virt-custom-test-image.yaml:
@@ -1264,6 +1356,8 @@ config_updater:
         - ci
         build02:
         - ci
+        vsphere:
+        - ci
       name: prow-job-cluster-launch-installer-gcp-nested-virt-custom-test-image
     ci-operator/templates/openshift/installer/cluster-launch-installer-libvirt-e2e.yaml:
       clusters:
@@ -1274,6 +1368,8 @@ config_updater:
         build01:
         - ci
         build02:
+        - ci
+        vsphere:
         - ci
       name: prow-job-cluster-launch-installer-libvirt-e2e
     ci-operator/templates/openshift/installer/cluster-launch-installer-metal-e2e.yaml:
@@ -1286,6 +1382,8 @@ config_updater:
         - ci
         build02:
         - ci
+        vsphere:
+        - ci
       name: prow-job-cluster-launch-installer-metal-e2e
     ci-operator/templates/openshift/installer/cluster-launch-installer-nested-virt-tests.yaml:
       clusters:
@@ -1296,6 +1394,8 @@ config_updater:
         build01:
         - ci
         build02:
+        - ci
+        vsphere:
         - ci
       name: prow-job-cluster-launch-installer-nested-virt-tests
     ci-operator/templates/openshift/installer/cluster-launch-installer-openstack-e2e-ppc64le.yaml:
@@ -1308,6 +1408,8 @@ config_updater:
         - ci
         build02:
         - ci
+        vsphere:
+        - ci
       name: prow-job-cluster-launch-installer-openstack-e2e-ppc64le
     ci-operator/templates/openshift/installer/cluster-launch-installer-openstack-e2e.yaml:
       clusters:
@@ -1318,6 +1420,8 @@ config_updater:
         build01:
         - ci
         build02:
+        - ci
+        vsphere:
         - ci
       name: prow-job-cluster-launch-installer-openstack-e2e
     ci-operator/templates/openshift/installer/cluster-launch-installer-openstack-upi-e2e.yaml:
@@ -1330,6 +1434,8 @@ config_updater:
         - ci
         build02:
         - ci
+        vsphere:
+        - ci
       name: prow-job-cluster-launch-installer-openstack-upi-e2e
     ci-operator/templates/openshift/installer/cluster-launch-installer-ovirt-e2e.yaml:
       clusters:
@@ -1340,6 +1446,8 @@ config_updater:
         build01:
         - ci
         build02:
+        - ci
+        vsphere:
         - ci
       name: prow-job-cluster-launch-installer-ovirt-e2e
     ci-operator/templates/openshift/installer/cluster-launch-installer-remote-libvirt-e2e.yaml:
@@ -1352,6 +1460,8 @@ config_updater:
         - ci
         build02:
         - ci
+        vsphere:
+        - ci
       name: prow-job-cluster-launch-installer-remote-libvirt-e2e
     ci-operator/templates/openshift/installer/cluster-launch-installer-src.yaml:
       clusters:
@@ -1360,6 +1470,8 @@ config_updater:
         build01:
         - ci
         build02:
+        - ci
+        vsphere:
         - ci
       name: prow-job-cluster-launch-installer-src
     ci-operator/templates/openshift/installer/cluster-launch-installer-upi-e2e.yaml:
@@ -1398,6 +1510,8 @@ config_updater:
         - ci
         build02:
         - ci
+        vsphere:
+        - ci
       name: prow-job-cluster-launch-e2e-openshift-ansible
     ci-operator/templates/openshift/openshift-ansible/cluster-launch-e2e-openshift-jenkins.yaml:
       clusters:
@@ -1408,6 +1522,8 @@ config_updater:
         build01:
         - ci
         build02:
+        - ci
+        vsphere:
         - ci
       name: prow-job-cluster-launch-e2e-openshift-jenkins
     ci-operator/templates/openshift/openshift-ansible/cluster-launch-e2e-upgrade.yaml:
@@ -1420,6 +1536,8 @@ config_updater:
         - ci
         build02:
         - ci
+        vsphere:
+        - ci
       name: prow-job-cluster-launch-e2e-upgrade
     ci-operator/templates/openshift/openshift-ansible/cluster-launch-e2e.yaml:
       clusters:
@@ -1430,6 +1548,8 @@ config_updater:
         build01:
         - ci
         build02:
+        - ci
+        vsphere:
         - ci
       name: prow-job-cluster-launch-e2e
     ci-operator/templates/openshift/openshift-ansible/cluster-launch-src.yaml:
@@ -1442,6 +1562,8 @@ config_updater:
         - ci
         build02:
         - ci
+        vsphere:
+        - ci
       name: prow-job-cluster-launch-src
     ci-operator/templates/openshift/openshift-ansible/cluster-scaleup-e2e-40.yaml:
       clusters:
@@ -1452,6 +1574,8 @@ config_updater:
         build01:
         - ci
         build02:
+        - ci
+        vsphere:
         - ci
       name: prow-job-cluster-scaleup-e2e-40
     ci-operator/templates/openshift/openshift-azure/rbac.yaml:
@@ -1464,6 +1588,8 @@ config_updater:
         - ci
         build02:
         - ci
+        vsphere:
+        - ci
       name: prow-job-rbac-azure
     cluster/test-deploy/aws-4.0/*:
       clusters:
@@ -1474,6 +1600,8 @@ config_updater:
         build01:
         - ci
         build02:
+        - ci
+        vsphere:
         - ci
       name: cluster-profile-aws-centos-40
     cluster/test-deploy/aws-atomic/*:
@@ -1486,6 +1614,8 @@ config_updater:
         - ci
         build02:
         - ci
+        vsphere:
+        - ci
       name: cluster-profile-aws-atomic
     cluster/test-deploy/aws-centos/*:
       clusters:
@@ -1496,6 +1626,8 @@ config_updater:
         build01:
         - ci
         build02:
+        - ci
+        vsphere:
         - ci
       name: cluster-profile-aws-centos
     cluster/test-deploy/aws-gluster/*:
@@ -1508,6 +1640,8 @@ config_updater:
         - ci
         build02:
         - ci
+        vsphere:
+        - ci
       name: cluster-profile-aws-gluster
     cluster/test-deploy/gcp-4.0/*:
       clusters:
@@ -1518,6 +1652,8 @@ config_updater:
         build01:
         - ci
         build02:
+        - ci
+        vsphere:
         - ci
       name: cluster-profile-gcp-40
     cluster/test-deploy/gcp-crio/*:
@@ -1530,6 +1666,8 @@ config_updater:
         - ci
         build02:
         - ci
+        vsphere:
+        - ci
       name: cluster-profile-gcp-crio
     cluster/test-deploy/gcp-ha-static/*:
       clusters:
@@ -1540,6 +1678,8 @@ config_updater:
         build01:
         - ci
         build02:
+        - ci
+        vsphere:
         - ci
       name: cluster-profile-gcp-ha-static
     cluster/test-deploy/gcp-ha/*:
@@ -1552,6 +1692,8 @@ config_updater:
         - ci
         build02:
         - ci
+        vsphere:
+        - ci
       name: cluster-profile-gcp-ha
     cluster/test-deploy/gcp-logging/*:
       clusters:
@@ -1562,6 +1704,8 @@ config_updater:
         build01:
         - ci
         build02:
+        - ci
+        vsphere:
         - ci
       name: cluster-profile-gcp-logging
     cluster/test-deploy/gcp/*:
@@ -1574,6 +1718,8 @@ config_updater:
         - ci
         build02:
         - ci
+        vsphere:
+        - ci
       name: cluster-profile-gcp
     cluster/test-deploy/ovirt/*:
       clusters:
@@ -1585,6 +1731,8 @@ config_updater:
         - ci
         build02:
         - ci
+        vsphere:
+        - ci
       name: cluster-profile-ovirt
     cluster/test-deploy/packet/*:
       clusters:
@@ -1595,6 +1743,8 @@ config_updater:
         build01:
         - ci
         build02:
+        - ci
+        vsphere:
         - ci
       name: cluster-profile-packet
     clusters/app.ci/prow-monitoring/_dashboards.yaml:
@@ -1638,10 +1788,8 @@ config_updater:
       clusters:
         api.ci:
         - ci
-        - release-controller-test
         app.ci:
         - ci
-        - release-controller-test
       key: config.yaml
       name: config
     core-services/prow/02_config/_labels.yaml:
@@ -1893,6 +2041,20 @@ external_plugins:
     - pull_request
     name: needs-rebase
   containers/podman:
+  - endpoint: http://needs-rebase
+    events:
+    - pull_request
+    name: needs-rebase
+  coreos/bootupd:
+  - endpoint: http://refresh
+    events:
+    - issue_comment
+    name: refresh
+  - endpoint: http://cherrypick
+    events:
+    - issue_comment
+    - pull_request
+    name: cherrypick
   - endpoint: http://needs-rebase
     events:
     - pull_request
@@ -2363,6 +2525,24 @@ external_plugins:
     events:
     - pull_request
     name: needs-rebase
+  redhat-developer/jenkins-operator-bundle:
+  - endpoint: http://refresh
+    events:
+    - issue_comment
+    name: refresh
+  - endpoint: http://needs-rebase
+    events:
+    - pull_request
+    name: needs-rebase
+  redhat-developer/kam:
+  - endpoint: http://refresh
+    events:
+    - issue_comment
+    name: refresh
+  - endpoint: http://needs-rebase
+    events:
+    - pull_request
+    name: needs-rebase
   redhat-developer/openshift-jenkins-operator:
   - endpoint: http://refresh
     events:
@@ -2410,6 +2590,15 @@ external_plugins:
     - pull_request
     name: needs-rebase
   shipwright-io/build:
+  - endpoint: http://refresh
+    events:
+    - issue_comment
+    name: refresh
+  - endpoint: http://needs-rebase
+    events:
+    - pull_request
+    name: needs-rebase
+  shipwright-io/website:
   - endpoint: http://refresh
     events:
     - issue_comment
@@ -2524,10 +2713,6 @@ lgtm:
   - openshift/csi-driver-nfs
   review_acts_as_lgtm: true
 - repos:
-  - openshift-priv/windows-machine-config-operator
-  - openshift/windows-machine-config-operator
-  review_acts_as_lgtm: true
-- repos:
   - openshift-priv/csi-driver-manila-operator
   - openshift/csi-driver-manila-operator
   review_acts_as_lgtm: true
@@ -2569,7 +2754,11 @@ lgtm:
   - openshift/egress-router-cni
   review_acts_as_lgtm: true
 - repos:
+  - openshift-priv/assisted-service
   - openshift-priv/assisted-test-infra
+  - openshift/assisted-installer
+  - openshift/assisted-installer-agent
+  - openshift/assisted-service
   - openshift/assisted-test-infra
   review_acts_as_lgtm: true
 - repos:
@@ -2579,33 +2768,24 @@ lgtm:
   - che-incubator/che-test-harness
   review_acts_as_lgtm: true
 - repos:
-  - openshift-priv/assisted-service
-  - openshift/assisted-service
-  review_acts_as_lgtm: true
-- repos:
-  - openshift/assisted-installer
-  review_acts_as_lgtm: true
-- repos:
   - openshift-priv/csi-driver-projected-resource
   - openshift/csi-driver-projected-resource
+  review_acts_as_lgtm: true
+- repos:
+  - openshift-priv/redhat-subscription-injection-webhook
+  - openshift/redhat-subscription-injection-webhook
   review_acts_as_lgtm: true
 - repos:
   - openshift-priv/ocs-operator
   - openshift/ocs-operator
   review_acts_as_lgtm: true
 - repos:
-  - openshift/assisted-installer-agent
-  review_acts_as_lgtm: true
-- repos:
-  - openshift/assisted-ignition-generator
-  review_acts_as_lgtm: true
-- repos:
   - ansible-collections/community.okd
   - openshift-priv/community.okd
   review_acts_as_lgtm: true
 - repos:
-  - openshift-priv/cluster-baremetal-operator
-  - openshift/cluster-baremetal-operator
+  - openshift-priv/openstack-cinder-csi-driver-operator
+  - openshift/openstack-cinder-csi-driver-operator
   review_acts_as_lgtm: true
 override:
   allow_top_level_owners: true
@@ -2905,7 +3085,6 @@ plugins:
   containers/buildah:
   - approve
   - assign
-  - blunderbuss
   - cat
   - dog
   - heart
@@ -2927,7 +3106,6 @@ plugins:
   containers/common:
   - approve
   - assign
-  - blunderbuss
   - cat
   - dog
   - heart
@@ -2949,7 +3127,6 @@ plugins:
   containers/conmon:
   - approve
   - assign
-  - blunderbuss
   - cat
   - dog
   - heart
@@ -2971,7 +3148,6 @@ plugins:
   containers/dnsname:
   - approve
   - assign
-  - blunderbuss
   - cat
   - dog
   - heart
@@ -2991,6 +3167,27 @@ plugins:
   - wip
   - yuks
   containers/podman:
+  - approve
+  - assign
+  - cat
+  - dog
+  - heart
+  - golint
+  - help
+  - hold
+  - label
+  - lgtm
+  - lifecycle
+  - override
+  - retitle
+  - shrug
+  - sigmention
+  - skip
+  - trigger
+  - verify-owners
+  - wip
+  - yuks
+  coreos/bootupd:
   - approve
   - assign
   - blunderbuss
@@ -5799,6 +5996,31 @@ plugins:
   - verify-owners
   - wip
   - yuks
+  openshift-priv/debug-network:
+  - approve
+  - assign
+  - blunderbuss
+  - bugzilla
+  - cat
+  - dog
+  - golint
+  - goose
+  - heart
+  - help
+  - hold
+  - label
+  - lgtm
+  - lifecycle
+  - override
+  - owners-label
+  - pony
+  - retitle
+  - shrug
+  - sigmention
+  - skip
+  - verify-owners
+  - wip
+  - yuks
   openshift-priv/dedicated-admin-operator:
   - approve
   - assign
@@ -8278,6 +8500,31 @@ plugins:
   - verify-owners
   - wip
   - yuks
+  openshift-priv/openstack-cinder-csi-driver-operator:
+  - approve
+  - assign
+  - blunderbuss
+  - bugzilla
+  - cat
+  - dog
+  - golint
+  - goose
+  - heart
+  - help
+  - hold
+  - label
+  - lgtm
+  - lifecycle
+  - override
+  - owners-label
+  - pony
+  - retitle
+  - shrug
+  - sigmention
+  - skip
+  - verify-owners
+  - wip
+  - yuks
   openshift-priv/operator-lifecycle-manager:
   - approve
   - assign
@@ -8735,6 +8982,31 @@ plugins:
   - wip
   - yuks
   openshift-priv/rbac-permissions-operator:
+  - approve
+  - assign
+  - blunderbuss
+  - bugzilla
+  - cat
+  - dog
+  - golint
+  - goose
+  - heart
+  - help
+  - hold
+  - label
+  - lgtm
+  - lifecycle
+  - override
+  - owners-label
+  - pony
+  - retitle
+  - shrug
+  - sigmention
+  - skip
+  - verify-owners
+  - wip
+  - yuks
+  openshift-priv/redhat-subscription-injection-webhook:
   - approve
   - assign
   - blunderbuss
@@ -9332,8 +9604,6 @@ plugins:
   - approve
   openshift/apiserver-library-go:
   - approve
-  openshift/assisted-ignition-generator:
-  - approve
   openshift/assisted-installer:
   - approve
   openshift/assisted-installer-agent:
@@ -9533,6 +9803,8 @@ plugins:
   - approve
   openshift/deadmanssnitch-operator:
   - approve
+  openshift/debug-network:
+  - approve
   openshift/dedicated-admin-operator:
   - approve
   openshift/docker-distribution:
@@ -9562,6 +9834,8 @@ plugins:
   openshift/grafana:
   - approve
   openshift/hive:
+  - approve
+  openshift/hive-team:
   - approve
   openshift/hypershift-toolkit:
   - approve
@@ -9661,8 +9935,6 @@ plugins:
   - approve
   openshift/managed-prometheus-exporter-ebs-iops-reporter:
   - approve
-  openshift/managed-prometheus-exporter-machine-api:
-  - approve
   openshift/managed-prometheus-exporter-stuck-ebs-vols:
   - approve
   openshift/managed-upgrade-operator:
@@ -9744,6 +10016,8 @@ plugins:
   - approve
   openshift/openshift-tuned:
   - approve
+  openshift/openstack-cinder-csi-driver-operator:
+  - approve
   openshift/origin:
   - approve
   openshift/origin-aggregated-logging:
@@ -9790,6 +10064,8 @@ plugins:
   - approve
   openshift/rbac-permissions-operator:
   - approve
+  openshift/redhat-subscription-injection-webhook:
+  - approve
   openshift/release:
   - config-updater
   - approve
@@ -9818,6 +10094,8 @@ plugins:
   openshift/source-to-image:
   - approve
   openshift/splunk-forwarder-operator:
+  - approve
+  openshift/sre-ssh-proxy-container:
   - approve
   openshift/sriov-cni:
   - approve
@@ -9950,6 +10228,13 @@ plugins:
   - approve
   redhat-developer/jenkins-operator:
   - approve
+  redhat-developer/jenkins-operator-bundle:
+  - approve
+  redhat-developer/kam:
+  - approve
+  - goose
+  - pony
+  - owners-label
   redhat-developer/openshift-jenkins-operator:
   - approve
   redhat-developer/service-binding-operator:
@@ -10027,6 +10312,8 @@ plugins:
   - wip
   - yuks
   shipwright-io/build:
+  - approve
+  shipwright-io/website:
   - approve
   tnozicka/openshift-acme:
   - approve

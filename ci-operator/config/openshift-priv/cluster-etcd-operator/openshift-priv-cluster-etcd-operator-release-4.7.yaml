@@ -11,6 +11,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: golang-1.13
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
   ocp_builder_rhel-8-golang-openshift-4.6:
     name: builder
     namespace: ocp
@@ -26,11 +30,12 @@ images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-openshift-4.6:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-openshift-4.6
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
   to: cluster-etcd-operator
 promotion:
+  disabled: true
   name: 4.7-priv
   namespace: ocp-private
 resources:
@@ -64,10 +69,9 @@ tests:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-loki
 - as: e2e-upgrade
-  commands: TEST_SUITE=all run-upgrade-tests
-  openshift_installer:
+  steps:
     cluster_profile: gcp
-    upgrade: true
+    workflow: openshift-upgrade-gcp-loki
 - as: e2e-disruptive
   commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
@@ -94,6 +98,10 @@ tests:
   steps:
     cluster_profile: packet
     workflow: baremetalds-e2e
+- as: e2e-metal-assisted
+  steps:
+    cluster_profile: packet
+    workflow: baremetalds-assisted
 zz_generated_metadata:
   branch: release-4.7
   org: openshift-priv

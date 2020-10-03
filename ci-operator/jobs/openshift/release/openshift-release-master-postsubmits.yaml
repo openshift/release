@@ -38,7 +38,7 @@ postsubmits:
   - agent: kubernetes
     branches:
     - master
-    cluster: api.ci
+    cluster: app.ci
     decorate: true
     labels:
       ci.openshift.io/role: infra
@@ -209,7 +209,7 @@ postsubmits:
   - agent: kubernetes
     branches:
     - ^master$
-    cluster: api.ci
+    cluster: app.ci
     decorate: true
     max_concurrency: 1
     name: branch-ci-openshift-release-master-config-change-trigger
@@ -263,7 +263,7 @@ postsubmits:
   - agent: kubernetes
     branches:
     - ^master$
-    cluster: api.ci
+    cluster: app.ci
     decorate: true
     labels:
       ci.openshift.io/role: infra
@@ -273,7 +273,9 @@ postsubmits:
       containers:
       - args:
         - --config-dir=core-services
+        - --config-dir=clusters/build-clusters/common
         - --confirm=true
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
         - --as=
         command:
         - applyconfig
@@ -294,7 +296,18 @@ postsubmits:
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
       serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.api.ci.config
+            path: kubeconfig
+          secretName: build-farm-credentials
   - agent: kubernetes
     branches:
     - ^master$
@@ -319,7 +332,7 @@ postsubmits:
         - --debug
         command:
         - /app/label_sync/app.binary
-        image: gcr.io/k8s-prow/label_sync:v20200904-8d0a527a58
+        image: gcr.io/k8s-prow/label_sync:v20201002-9b61c96506
         imagePullPolicy: Always
         name: ""
         resources:
@@ -356,7 +369,7 @@ postsubmits:
   - agent: kubernetes
     branches:
     - ^master$
-    cluster: api.ci
+    cluster: app.ci
     decorate: true
     max_concurrency: 1
     name: branch-ci-openshift-release-master-services-apply
@@ -365,6 +378,7 @@ postsubmits:
       - args:
         - --config-dir=services
         - --confirm=true
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
         - --as=
         command:
         - applyconfig
@@ -374,4 +388,15 @@ postsubmits:
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
       serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.api.ci.config
+            path: kubeconfig
+          secretName: build-farm-credentials

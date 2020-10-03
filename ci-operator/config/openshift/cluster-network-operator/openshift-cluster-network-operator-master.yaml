@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "4.6"
+    name: "4.7"
     namespace: ocp
     tag: base
   dev-scripts:
@@ -15,6 +15,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: golang-1.14
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
   ocp_builder_rhel-8-golang-openshift-4.6:
     name: builder
     namespace: ocp
@@ -33,12 +37,12 @@ images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-openshift-4.6:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-openshift-4.6
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
   to: cluster-network-operator
 promotion:
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 resources:
   '*':
@@ -46,7 +50,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 tests:
 - as: unit
@@ -103,11 +107,11 @@ tests:
     test:
     - ref: windows-e2e-operator-test-with-custom-vxlan-port
     workflow: ipi-aws-ovn-hybrid-custom-vxlan-port
-- as: e2e-vsphere
+- as: e2e-vsphere-ovn
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere-ovn
-- as: e2e-azure
+- as: e2e-azure-ovn
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-ovn

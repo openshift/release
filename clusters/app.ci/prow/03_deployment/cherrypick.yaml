@@ -37,7 +37,7 @@ items:
       spec:
         containers:
         - name: cherrypick
-          image: gcr.io/k8s-prow/cherrypicker:v20200904-8d0a527a58
+          image: gcr.io/k8s-prow/cherrypicker:v20201002-9b61c96506
           args:
           - --dry-run=false
           ports:
@@ -56,6 +56,16 @@ items:
             requests:
               memory: "300Mi"
               cpu: "50m"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 20
+            periodSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz/ready
+              port: 8081
         volumes:
         - name: hmac
           secret:

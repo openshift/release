@@ -1,8 +1,4 @@
 base_images:
-  buildroot:
-    name: cincinnati-build-root
-    namespace: cincinnati-ci
-    tag: buildroot
   centos:
     name: centos
     namespace: ci
@@ -50,14 +46,14 @@ resources:
       cpu: "3"
       memory: 5Gi
 tag_specification:
-  name: "4.4"
+  name: "4.5"
   namespace: ocp
 tests:
 - as: cargo-test
   steps:
-    test:
-    - as: cargo-test
-      commands: dist/cargo_test.sh
+    pre:
+    - as: prepare-credentials
+      commands: env CINCINNATI_CI_DOCKERJSON_PATH="${SHARED_DIR}/${CINCINNATI_CI_DOCKERJSON_FILE}" CINCINNATI_CI_PUBLIC_DOCKERJSON_PATH="${SHARED_DIR}/${CINCINNATI_CI_PUBLIC_DOCKERJSON_FILE}" dist/prepare_ci_credentials.sh
       credentials:
       - mount_path: /usr/local/ci-secrets/cincinnati-secrets-cincinnati-credentials
         name: cincinnati-secrets-cincinnati-credentials
@@ -71,6 +67,31 @@ tests:
       env:
       - default: /usr/local/ci-secrets/cincinnati-secrets-cincinnati-credentials/registry_credentials_docker.json
         name: CINCINNATI_TEST_CREDENTIALS_PATH
+      - default: /usr/local/ci-secrets/ci-image-sa-dockercfg/.dockercfg
+        name: CINCINNATI_CI_DOCKERCFG_PATH
+      - default: /usr/local/ci-secrets/public-ci-image-sa-dockercfg/.dockercfg
+        name: CINCINNATI_CI_PUBLIC_DOCKERCFG_PATH
+      - default: ci-image-sa-dockerjson
+        name: CINCINNATI_CI_DOCKERJSON_FILE
+      - default: public-ci-image-sa-dockerjson
+        name: CINCINNATI_CI_PUBLIC_DOCKERJSON_FILE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    test:
+    - as: cargo-test
+      commands: env CINCINNATI_CI_DOCKERJSON_PATH="${SHARED_DIR}/${CINCINNATI_CI_DOCKERJSON_FILE}" CINCINNATI_TEST_CREDENTIALS_PATH="${SHARED_DIR}/${CINCINNATI_TEST_CREDENTIALS_FILE}" dist/cargo_test.sh
+      credentials:
+      - mount_path: /usr/local/ci-secrets/cincinnati-secrets-cincinnati-credentials
+        name: cincinnati-secrets-cincinnati-credentials
+        namespace: test-credentials
+      env:
+      - default: ci-image-sa-dockerjson
+        name: CINCINNATI_CI_DOCKERJSON_FILE
+      - default: ci-image-sa-dockerjson
+        name: CINCINNATI_TEST_CREDENTIALS_FILE
       - default: /usr/local/ci-secrets/cincinnati-secrets-cincinnati-credentials/quay_api_access_token.key
         name: CINCINNATI_TEST_QUAY_API_TOKEN_PATH
       - default: /usr/local/ci-secrets/cincinnati-secrets-cincinnati-credentials/github_token.key
@@ -88,12 +109,18 @@ tests:
   commands: dist/prow_rustfmt.sh 1.46.0
   container:
     from: src
-- artifact_dir: /tmp/artifacts
-  as: e2e
-  commands: env ARTIFACTS_DIR=/tmp/artifacts bash hack/e2e.sh
-  openshift_installer_custom_test_image:
+- as: e2e
+  steps:
     cluster_profile: aws
-    from: pipeline:e2e-test
+    test:
+    - as: openshift-e2e-test
+      commands: bash hack/e2e.sh
+      from: e2e-test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: master
   org: openshift

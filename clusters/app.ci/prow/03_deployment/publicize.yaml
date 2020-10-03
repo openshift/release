@@ -54,7 +54,7 @@ items:
           volumeMounts:
           - name: config
             mountPath: /etc/config
-            readOnly: true            
+            readOnly: true
           - name: hmac
             mountPath: /etc/webhook
             readOnly: true
@@ -67,10 +67,20 @@ items:
             requests:
               memory: "300Mi"
               cpu: "50m"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 20
+            periodSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz/ready
+              port: 8081
         volumes:
         - name: config
           configMap:
-            name: publicize-config          
+            name: publicize-config
         - name: hmac
           secret:
             secretName: github-webhook-credentials

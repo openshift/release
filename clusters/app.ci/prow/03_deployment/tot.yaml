@@ -53,7 +53,7 @@ items:
       spec:
         containers:
         - name: tot
-          image: gcr.io/k8s-prow/tot:v20200904-8d0a527a58
+          image: gcr.io/k8s-prow/tot:v20201002-9b61c96506
           args:
           - --config-path=/etc/config/config.yaml
           - --fallback=true
@@ -102,6 +102,16 @@ items:
             requests:
               memory: "250Mi"
               cpu: "20m"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 20
+            periodSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz/ready
+              port: 8081
         volumes:
         - name: tot-volume
           persistentVolumeClaim:
