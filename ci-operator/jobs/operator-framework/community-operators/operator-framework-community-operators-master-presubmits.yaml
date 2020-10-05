@@ -190,6 +190,10 @@ presubmits:
         - name: TEST_COMMAND
           value: |
             echo
+            echo "git log"
+            git --no-pager log --oneline|head
+            echo
+            echo "finished:)"
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -268,6 +272,10 @@ presubmits:
         - name: TEST_COMMAND
           value: |
             echo
+            echo "git log"
+            GIT_PAGER="cut -c 1-${COLUMNS-80}" git --no-pager log --oneline|head
+            echo
+            echo "finished:)"
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -345,6 +353,13 @@ presubmits:
           value: src-test
         - name: TEST_COMMAND
           value: |
+            echo "Need to clone default branch, cloning..."
+            mkdir -p /tmp/oper
+            cd /tmp/oper
+            git clone https://github.com/operator-framework/community-operators.git
+            cd community-operators
+            ls
+
             export PATH=$PATH:/tmp/operator-test/bin
             mkdir -p /tmp/operator-test/bin
             curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.6/linux/oc.tar.gz | tar xvzf - -C /tmp/operator-test/bin oc
@@ -353,7 +368,7 @@ presubmits:
 
             #detection start
 
-            TARGET_PATH='community-operators'
+            TARGET_PATH='/go/src/github.com/operator-framework/community-operators/community-operators'
             cd "$TARGET_PATH"
             pwd
             #TODO: check
@@ -395,6 +410,10 @@ presubmits:
             mkdir -p /tmp/playbooks2
             cd /tmp/playbooks2
             ansible-pull -vv -U https://github.com/J0zi/operator-test-playbooks -C RHO-716-deploy-on-openshift -vv -i localhost, deploy-olm-operator-openshift-upstream.yml -e ansible_connection=local -e package_name=$OP_NAME -e csv_name=$CSV_FILE
+            echo "Variable summary:"
+            echo "OP_NAME=$OP_NAME"
+            echo "OP_VER=$OP_VER"
+            echo "CSV_FILE=$CSV_FILE"
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
