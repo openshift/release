@@ -31,6 +31,10 @@ base_images:
     name: knative-v0.17.3
     namespace: openshift
     tag: knative-serving-src
+  upi-installer:
+    name: "4.5"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
@@ -66,7 +70,7 @@ releases:
 resources:
   '*':
     limits:
-      memory: 4Gi
+      memory: 6Gi
     requests:
       cpu: 100m
       memory: 200Mi
@@ -74,10 +78,10 @@ tests:
 - as: e2e-gcp-ocp-45-continuous
   cron: 0 0 * * 0
   steps:
-    cluster_profile: aws
+    cluster_profile: gcp
     test:
     - as: serverless-e2e
-      commands: make install-mesh test-all-e2e
+      commands: make install-mesh test-e2e
       dependencies:
       - env: KNATIVE_OPENSHIFT_INGRESS
         name: knative-openshift-ingress
@@ -87,10 +91,12 @@ tests:
         name: openshift-knative-operator
       from: serverless-operator-src
       resources:
+        limits:
+          memory: 6Gi
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: openshift-e2e-aws
+    workflow: openshift-e2e-gcp
 zz_generated_metadata:
   branch: master
   org: openshift-knative
