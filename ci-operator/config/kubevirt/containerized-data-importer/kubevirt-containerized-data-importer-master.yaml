@@ -1,0 +1,112 @@
+base_images:
+  base:
+    name: "4.4"
+    namespace: ocp
+    tag: base
+  cdi-builder:
+    name: kubevirt-cdi-builder
+    namespace: ci
+    tag: 0.0.8
+build_root:
+  image_stream_tag:
+    name: kubevirt-cdi-builder
+    namespace: ci
+    tag: 0.0.8
+images:
+- dockerfile_path: hack/ci/Dockerfile.ci
+  from: cdi-builder
+  to: cdi-test
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.4"
+  namespace: ocp
+tests:
+- as: e2e-periodic-azure-nested-virt
+  steps:
+    cluster_profile: azure4
+    test:
+    - artifact_dir: /go/src/kubevirt.io/kubevirt/_out/exported-artifacts
+      as: functional-tests
+      commands: |
+        set -euo pipefail
+        touch ${ARTIFACT_DIR}/started
+
+        release_base_url="https://gcsweb.apps.ovirt.org/gcs/kubevirt-prow/devel/nightly/release/kubevirt/kubevirt"
+        release_date=$(curl -L "${release_base_url}/latest")
+        release_url="${release_base_url}/${release_date}"
+        commit=$(curl -L "${release_url}/commit")
+
+        export DOCKER_PREFIX='kubevirtnightlybuilds'
+        DOCKER_TAG="${release_date}_$(echo ${commit} | cut -c 1-9)"
+        export DOCKER_TAG
+
+        echo "deploying kubevirt from nightly build"
+        kubectl create -f "${release_url}/kubevirt-operator.yaml"
+        kubectl create -f "${release_url}/kubevirt-cr.yaml"
+        touch ${ARTIFACT_DIR}/kubevirt_deployed
+
+        echo "Deploying test infrastructure"
+        for testinfra_file in $(curl -L "${release_url}/testing/" | grep -oE 'https://[^"]*\.yaml'); do
+            kubectl create -f ${testinfra_file}
+        done
+        touch ${ARTIFACT_DIR}/test_infra_deployed
+
+        echo "Cleaning CDI"
+        export KUBEVIRT_PROVIDER=external
+        cluster-sync/clean.sh
+
+        echo "Deploying Nightly CDI"
+        mkdir -p /tmp/manifests/testing
+        cat _out/manifests/release/cdi-cr.yaml | sed s/registry:5000/kubevirt/g > /tmp/manifests/cdi-cr.yaml
+        cat _out/manifests/release/cdi-operator.yaml | sed s/registry:5000/kubevirt/g > /tmp/manifests/cdi-operator.yaml
+
+        TEST_MANIFESTS="bad-webserver.yaml file-host.yaml imageio.yaml registry-host.yaml"
+
+        kubectl create -f /tmp/manifests/cdi-operator.yaml
+        kubectl create -f /tmp/manifests/cdi-cr.yaml
+
+        for manifest in $TEST_MANIFESTS; do
+          cat _out/manifests/$manifest | sed s/registry:5000/kubevirt/g > /tmp/manifests/$manifest
+          kubectl create -f /tmp/manifests/$manifest
+        done
+
+        touch ${ARTIFACT_DIR}/cdi_deployed
+
+        set +e
+        kubectl wait -n kubevirt kv kubevirt --for condition=Available --timeout 15m
+        return_code=$?
+        set -e
+        if [ ${return_code} -ne 0 ]; then
+            echo "Dumping KubeVirt state"
+            hack/dump.sh
+            exit ${return_code}
+        fi
+
+        #export KUBEVIRT_PROVIDER=external
+        #DOCKER=0 DOCKER_PREFIX="$cluster_ip:$registry_port" cluster-sync/sync-os-ci.sh
+
+        kubectl get pods -A > ${ARTIFACT_DIR}/pods.txt
+        kubectl describe pods -n cdi > ${ARTIFACT_DIR}/cdi-pods.txt
+
+        touch ${ARTIFACT_DIR}/starting tests
+        echo "testing"
+        mkdir -p "$ARTIFACT_DIR"
+        export KUBECTL=/usr/bin/kubectl
+        # FUNC_TEST_ARGS='--ginkgo.focus=tests/datavolume_test.go --ginkgo.regexScansFilePath --ginkgo.noColor --ginkgo.succinct -ginkgo.slowSpecThreshold=60 --junit-output='"${ARTIFACT_DIR}"'/junit.functest.xml' ./hack/build/run-functional-tests.sh ./tests/... | tee ${ARTIFACT_DIR}/test-output.txt
+        touch ${ARTIFACT_DIR}/tests_done
+      from: cdi-test
+      resources:
+        requests:
+          cpu: 200m
+          memory: 1Gi
+    workflow: ipi-azure
+zz_generated_metadata:
+  branch: master
+  org: kubevirt
+  repo: containerized-data-importer
