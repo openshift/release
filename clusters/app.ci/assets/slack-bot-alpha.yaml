@@ -38,6 +38,10 @@ items:
       port: 9090
       protocol: TCP
       targetPort: 9090
+    - name: mitmproxy-web
+      port: 2244
+      protocol: TCP
+      targetPort: 2244
     type: ClusterIP
 - apiVersion: apps/v1
   kind: Deployment
@@ -49,7 +53,7 @@ items:
     annotations:
       image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"slack-bot-alpha:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"slack-bot-alpha\")].image"}]'
   spec:
-    replicas: 2
+    replicas: 1
     revisionHistoryLimit: 2
     selector:
       matchLabels:
@@ -69,6 +73,11 @@ items:
           - --jira-username=skuznets
           - --jira-password-path=/etc/jira/password
           - --log-level=trace
+          env:
+            - name: HTTP_PROXY
+              value: "localhost:7777"
+            - name: HTTPS_PROXY
+              value: "localhost:7777"
           ports:
             - name: main
               containerPort: 8888
@@ -85,11 +94,33 @@ items:
             requests:
               memory: "250Mi"
               cpu: "100m"
-          # for tcpdump
-          securityContext:
-            capabilities:
-              add:
-              - "NET_ADMIN"
+        - args:
+          - mitmweb
+          image: gcr.io/soluble-oss/kubetap-mitmproxy:latest
+          imagePullPolicy: Always
+          name: mitmproxy
+          ports:
+          - containerPort: 7777
+            name: mitmproxy-listen
+            protocol: TCP
+          - containerPort: 2244
+            name: mitmproxy-web
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /
+              port: 2244
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            successThreshold: 3
+            timeoutSeconds: 5
+          volumeMounts:
+          - mountPath: /home/mitmproxy/config/
+            name: mitmproxy-config
+          - mountPath: /home/mitmproxy/.mitmproxy
+            name: mitmproxy-data
         volumes:
         - name: slack
           secret:
@@ -97,3 +128,22 @@ items:
         - name: jira
           secret:
             secretName: jira-credentials-dptp-bot
+        - configMap:
+            defaultMode: 420
+            name: mitmproxy-config
+          name: mitmproxy-config
+        - emptyDir: {}
+          name: mitmproxy-data
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: mitmproxy-config
+    namespace: ci
+  data:
+    config.yaml: |-
+      listen_port: 7777
+      ssl_insecure: true
+      web_port: 2244
+      web_host: 0.0.0.0
+      web_open_browser: false
+      mode: reverse:https://127.0.0.1:8888
