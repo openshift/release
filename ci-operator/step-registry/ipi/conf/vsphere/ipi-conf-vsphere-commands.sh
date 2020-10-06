@@ -4,6 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# ensure LEASED_RESOURCE is set
+if [[ -z "${LEASED_RESOURCE}" ]]; then
+  echo "Failed to acquire lease"
+  exit 1
+fi
+
 CONFIG="${SHARED_DIR}/install-config.yaml"
 TFVARS_PATH=/var/run/secrets/ci.openshift.io/cluster-profile/vmc.secret.auto.tfvars
 vsphere_user=$(grep -oP 'vsphere_user\s*=\s*"\K[^"]+' ${TFVARS_PATH})
@@ -38,7 +44,7 @@ platform:
     datacenter: SDDC-Datacenter
     defaultDatastore: WorkloadDatastore
     cluster: "Cluster-1"
-    network: "ci-segment"
+    network: "${LEASED_RESOURCE}"
     password: ${vsphere_password}
     username: ${vsphere_user}
     apiVIP: "${vips[0]}"
