@@ -15,6 +15,9 @@ mock-nss.sh
 cp "${CLUSTER_PROFILE_DIR}"/ssh-privatekey "${HOME}"/.ssh/google_compute_engine
 chmod 0600 "${HOME}"/.ssh/google_compute_engine
 cp "${CLUSTER_PROFILE_DIR}"/ssh-publickey "${HOME}"/.ssh/google_compute_engine.pub
+echo 'ServerAliveInterval 30' | tee -a "${HOME}"/.ssh/config
+echo 'ServerAliveCountMax 1200' | tee -a "${HOME}"/.ssh/config
+chmod 0600 "${HOME}"/.ssh/config
 
 # Copy pull secret to user home
 cp "${CLUSTER_PROFILE_DIR}"/pull-secret "${HOME}"/pull-secret
