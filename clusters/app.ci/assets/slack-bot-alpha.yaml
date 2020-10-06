@@ -56,15 +56,58 @@ items:
         serviceAccountName: slack-bot-alpha
         containers:
         - name: slack-bot-alpha
-          image: centos:8
+          image: registry.svc.ci.openshift.org/ci/sshd:latest
           command:
-          - /usr/bin/sleep
+          - /usr/sbin/sshd
           args:
-          - 365d
+          - -D
+          - -e
+          - -f/config/sshd_config
           ports:
             - name: main
               containerPort: 8888
+            - name: ssh
+              containerPort: 2222
+          volumeMounts:
+          - name: authorized-keys
+            mountPath: /keys/authorized
+            readOnly: true
+          - name: host-keys
+            mountPath: /keys/host/
+            readOnly: true
+          - name: config
+            mountPath: /config/
+            readOnly: true
           resources:
             requests:
               memory: "10Mi"
               cpu: "100m"
+        volumes:
+        - name: authorized-keys
+          secret:
+            secretName: sshd-slack-bot-alpha-authorized-keys
+        - name: host-keys
+          secret:
+            secretName: sshd-slack-bot-alpha-host-keys
+        - name: config
+          configMap:
+            name: sshd-config
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: sshd-config
+    namespace: ci
+  data:
+    sshd_config: |
+      AuthorizedKeysFile /keys/authorized/authorized_keys
+      HostKey /keys/host/ssh_host_rsa_key
+      HostKey /keys/host/ssh_host_dsa_key
+      HostKey /keys/host/ssh_host_ecdsa_key
+      HostKey /keys/host/ssh_host_ed25519_key
+      PasswordAuthentication no
+      PermitTunnel yes
+      PidFile /tmp/ssh.pid
+      Port 2222
+      StrictModes no
+      GatewayPorts yes
+
