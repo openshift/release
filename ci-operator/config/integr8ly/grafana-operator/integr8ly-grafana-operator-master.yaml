@@ -1,0 +1,50 @@
+base_images:
+  os:
+    name: alpine
+    namespace: alpine
+    tag: "3.8"
+binary_build_commands: unset GOFLAGS && make code/compile COMPILE_TARGET="./build/_output/bin/grafana-operator" GO111MODULE=on
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+  - dockerfile_path: build/Dockerfile
+    from: os
+    inputs:
+      bin:
+        paths:
+          - destination_dir: .
+            source_path: /go/src/github.com/integr8ly/grafana-operator/build
+    to: grafana-operator
+promotion:
+  name: grafana-operator
+  namespace: integr8ly
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.7"
+  namespace: ocp
+tests:
+  - as: unit
+    commands: unset GOFLAGS && make test/unit
+    container:
+      from: src
+  - as: format
+    commands: unset GOFLAGS && make code/check
+    container:
+      from: src
+  - as: e2e
+    commands: unset GOFLAGS && make test/e2e
+    openshift_installer_src:
+      cluster_profile: aws
+zz_generated_metadata:
+  branch: master
+  org: integr8ly
+  repo: grafana-operator
