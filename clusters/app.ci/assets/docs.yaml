@@ -1,0 +1,58 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  namespace: ci
+  name: ci-docs
+  annotations:
+    description: |-
+      Temporary route until all docs from the step registry are migrated to the ci-docs. At that point
+      we will delete this route and use the docs.ci.openshift.org Ingress instead.
+spec:
+  host: ci-docs-ci.apps.ci.l2s4.p1.openshiftapps.com
+  port:
+    targetPort: 8080
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: edge
+  to:
+    kind: Service
+    name: ci-docs
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: ci
+  name: ci-docs
+spec:
+  selector:
+    app: ci-docs
+  ports:
+  - port: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ci
+  name: ci-docs
+  labels:
+    app: ci-docs
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"ci-docs:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"ci-docs\")].image"}]'
+spec:
+  replicas: 2
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: ci-docs
+  template:
+    metadata:
+      labels:
+        app: ci-docs
+    spec:
+      containers:
+      - name: ci-docs
+        image: ci-docs
+        resources:
+          requests:
+            memory: "250Mi"
+            cpu: "100m"
