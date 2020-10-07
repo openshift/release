@@ -1,12 +1,9 @@
+binary_build_commands: cd graph-data.rs && cargo install --path .
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.12
-images:
-- context_dir: graph-data.rs
-  dockerfile_path: Dockerfile
-  to: e2e
+    name: cincinnati-build-root
+    namespace: cincinnati-ci
+    tag: buildroot
 resources:
   '*':
     requests:
@@ -17,10 +14,10 @@ tests:
   commands: hack/graph-util.py --verbose debug push-to-quay
   container:
     from: src
-- as: metadata-verification
-  commands: /usr/local/bin/cincinnati-graph-data
+- as: e2e
+  commands: cd graph-data.rs && /root/.cargo/bin/cincinnati-graph-data
   container:
-    from: e2e
+    from: bin
 zz_generated_metadata:
   branch: master
   org: openshift
