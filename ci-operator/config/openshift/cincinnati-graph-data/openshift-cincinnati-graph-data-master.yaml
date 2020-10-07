@@ -3,6 +3,10 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.12
+images:
+- context_dir: graph-data.rs
+  dockerfile_path: Dockerfile
+  to: e2e
 resources:
   '*':
     requests:
@@ -13,6 +17,10 @@ tests:
   commands: hack/graph-util.py --verbose debug push-to-quay
   container:
     from: src
+- as: e2e
+  commands: /usr/local/bin/cincinnati-graph-data
+  container:
+    from: e2e
 zz_generated_metadata:
   branch: master
   org: openshift
