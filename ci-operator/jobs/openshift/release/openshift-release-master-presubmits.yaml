@@ -42,6 +42,28 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: build01
+    context: ci/prow/boskos-config
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-boskos-config
+    rerun_command: /test boskos-config
+    spec:
+      containers:
+      - command:
+        - hack/validate-boskos.sh
+        image: registry.svc.ci.openshift.org/ci/python-validation
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )boskos-config,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
     cluster: app.ci
     context: ci/build-farm/build01-dry
     decorate: true
