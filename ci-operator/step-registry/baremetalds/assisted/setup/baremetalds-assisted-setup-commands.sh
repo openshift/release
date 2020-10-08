@@ -72,6 +72,7 @@ cd "\${REPO_DIR}"
 
 set +x
 echo "export PULL_SECRET='\$(cat /root/pull-secret)'" >> /root/config
+echo "export OPENSHIFT_INSTALL_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}" >> /root/config
 set -x
 
 curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar -C /usr/bin -xzf -

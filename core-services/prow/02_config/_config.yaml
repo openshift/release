@@ -79,19 +79,23 @@ branch-protection:
     openshift:
       repos:
         assisted-installer:
+          protect: true
           required_status_checks:
             contexts:
             - continuous-integration/jenkins/pr-merge
         assisted-installer-agent:
+          protect: true
           required_status_checks:
             contexts:
             - continuous-integration/jenkins/pr-merge
         assisted-service:
+          protect: true
           required_status_checks:
             contexts:
             - ci.ext.devshift.net PR build
             - continuous-integration/jenkins/pr-merge
         assisted-test-infra:
+          protect: true
           required_status_checks:
             contexts:
             - continuous-integration/jenkins/pr-merge
@@ -217,8 +221,6 @@ branch-protection:
           required_status_checks:
             contexts:
             - ci.ext.devshift.net PR build
-        ocs-operator:
-          protect: false
         odo:
           protect: false
         openshift-azure:
@@ -286,11 +288,13 @@ branch-protection:
     openshift-priv:
       repos:
         assisted-service:
+          protect: true
           required_status_checks:
             contexts:
             - ci.ext.devshift.net PR build
             - continuous-integration/jenkins/pr-merge
         assisted-test-infra:
+          protect: true
           required_status_checks:
             contexts:
             - continuous-integration/jenkins/pr-merge
@@ -315,8 +319,6 @@ branch-protection:
             teams:
             - team-jenkins
             users: null
-        ocs-operator:
-          protect: false
     openshift-s2i:
       repos:
         s2i-wildfly:
@@ -505,10 +507,10 @@ plank:
             memory: 250Mi
       timeout: 4h0m0s
       utility_images:
-        clonerefs: gcr.io/k8s-prow/clonerefs:v20201001-87ea1a726b
-        entrypoint: gcr.io/k8s-prow/entrypoint:v20201001-87ea1a726b
-        initupload: gcr.io/k8s-prow/initupload:v20201001-87ea1a726b
-        sidecar: gcr.io/k8s-prow/sidecar:v20201001-87ea1a726b
+        clonerefs: gcr.io/k8s-prow/clonerefs:v20201007-b54c51c3a4
+        entrypoint: gcr.io/k8s-prow/entrypoint:v20201007-b54c51c3a4
+        initupload: gcr.io/k8s-prow/initupload:v20201007-b54c51c3a4
+        sidecar: gcr.io/k8s-prow/sidecar:v20201007-b54c51c3a4
     openshift-priv:
       gcs_configuration:
         bucket: origin-ci-private
@@ -608,6 +610,8 @@ tide:
     openshift-priv/cluster-api: rebase
     openshift-priv/cluster-api-provider-azure: rebase
     openshift-priv/dev-scripts: squash
+    openshift-priv/gatekeeper: squash
+    openshift-priv/gatekeeper-operator: squash
     openshift-priv/jenkins-client-plugin: rebase
     openshift-priv/jenkins-openshift-login-plugin: rebase
     openshift-priv/jenkins-sync-plugin: rebase
@@ -616,7 +620,9 @@ tide:
     openshift-priv/openshift-tests-private: squash
     openshift-priv/special-resource-operator: squash
     openshift-priv/template-service-broker-operator: squash
+    openshift-psap/ci-artifacts: squash
     openshift-psap/special-resource-operator: squash
+    openshift-psap/wireguard-worker: squash
     openshift/ansible-service-broker: squash
     openshift/assisted-installer: squash
     openshift/assisted-installer-agent: squash
@@ -692,14 +698,6 @@ tide:
     - release-4.5
     - release-4.6
     - release-4.7
-    - openshift-4.0
-    - openshift-4.1
-    - openshift-4.2
-    - openshift-4.3
-    - openshift-4.4
-    - openshift-4.5
-    - openshift-4.6
-    - openshift-4.7
     labels:
     - lgtm
     - approved
@@ -741,15 +739,7 @@ tide:
     - release-4.3
     - release-4.4
     - release-4.5
-    - release-4.6
     - release-4.7
-    - openshift-4.1
-    - openshift-4.2
-    - openshift-4.3
-    - openshift-4.4
-    - openshift-4.5
-    - openshift-4.6
-    - openshift-4.7
     labels:
     - lgtm
     - approved
@@ -764,11 +754,12 @@ tide:
     - openshift-priv/kubernetes
     - openshift/kubernetes
   - includedBranches:
-    - master
+    - release-4.6
     labels:
     - lgtm
     - approved
     - bugzilla/valid-bug
+    - group-lead-approved
     missingLabels:
     - needs-rebase
     - do-not-merge/hold
@@ -787,14 +778,6 @@ tide:
     - release-4.5
     - release-4.6
     - release-4.7
-    - openshift-4.1
-    - openshift-4.2
-    - openshift-4.3
-    - openshift-4.4
-    - openshift-4.5
-    - openshift-4.6
-    - openshift-4.7
-    - master
     labels:
     - lgtm
     - approved
@@ -813,14 +796,12 @@ tide:
     - release-4.3
     - release-4.4
     - release-4.5
-    - release-4.6
     - release-4.7
     - openshift-4.1
     - openshift-4.2
     - openshift-4.3
     - openshift-4.4
     - openshift-4.5
-    - openshift-4.6
     - openshift-4.7
     labels:
     - lgtm
@@ -850,6 +831,7 @@ tide:
     - openshift-priv/baremetal-operator
     - openshift-priv/baremetal-runtimecfg
     - openshift-priv/builder
+    - openshift-priv/cincinnati-operator
     - openshift-priv/client-go
     - openshift-priv/cloud-credential-operator
     - openshift-priv/cloud-provider-openstack
@@ -859,6 +841,7 @@ tide:
     - openshift-priv/cluster-api-provider-baremetal
     - openshift-priv/cluster-api-provider-gcp
     - openshift-priv/cluster-api-provider-kubemark
+    - openshift-priv/cluster-api-provider-kubevirt
     - openshift-priv/cluster-api-provider-libvirt
     - openshift-priv/cluster-api-provider-openstack
     - openshift-priv/cluster-api-provider-ovirt
@@ -1004,6 +987,8 @@ tide:
     - openshift/baremetal-operator
     - openshift/baremetal-runtimecfg
     - openshift/builder
+    - openshift/cincinnati
+    - openshift/cincinnati-operator
     - openshift/client-go
     - openshift/cloud-credential-operator
     - openshift/cloud-provider-openstack
@@ -1013,6 +998,7 @@ tide:
     - openshift/cluster-api-provider-baremetal
     - openshift/cluster-api-provider-gcp
     - openshift/cluster-api-provider-kubemark
+    - openshift/cluster-api-provider-kubevirt
     - openshift/cluster-api-provider-libvirt
     - openshift/cluster-api-provider-openstack
     - openshift/cluster-api-provider-ovirt
@@ -1115,7 +1101,6 @@ tide:
     - openshift/openshift-state-metrics
     - openshift/openshift-tuned
     - openshift/openstack-cinder-csi-driver-operator
-    - openshift/origin
     - openshift/origin-aggregated-logging
     - openshift/ovirt-csi-driver
     - openshift/ovirt-csi-driver-operator
@@ -1145,11 +1130,13 @@ tide:
     - operator-framework/operator-marketplace
     - operator-framework/operator-registry
   - includedBranches:
-    - master
+    - release-4.6
+    - openshift-4.6
     labels:
     - lgtm
     - approved
     - bugzilla/valid-bug
+    - group-lead-approved
     missingLabels:
     - needs-rebase
     - do-not-merge/hold
@@ -1172,6 +1159,7 @@ tide:
     - openshift-priv/baremetal-operator
     - openshift-priv/baremetal-runtimecfg
     - openshift-priv/builder
+    - openshift-priv/cincinnati-operator
     - openshift-priv/client-go
     - openshift-priv/cloud-credential-operator
     - openshift-priv/cloud-provider-openstack
@@ -1181,6 +1169,7 @@ tide:
     - openshift-priv/cluster-api-provider-baremetal
     - openshift-priv/cluster-api-provider-gcp
     - openshift-priv/cluster-api-provider-kubemark
+    - openshift-priv/cluster-api-provider-kubevirt
     - openshift-priv/cluster-api-provider-libvirt
     - openshift-priv/cluster-api-provider-openstack
     - openshift-priv/cluster-api-provider-ovirt
@@ -1327,6 +1316,8 @@ tide:
     - openshift/baremetal-operator
     - openshift/baremetal-runtimecfg
     - openshift/builder
+    - openshift/cincinnati
+    - openshift/cincinnati-operator
     - openshift/client-go
     - openshift/cloud-credential-operator
     - openshift/cloud-provider-openstack
@@ -1336,6 +1327,7 @@ tide:
     - openshift/cluster-api-provider-baremetal
     - openshift/cluster-api-provider-gcp
     - openshift/cluster-api-provider-kubemark
+    - openshift/cluster-api-provider-kubevirt
     - openshift/cluster-api-provider-libvirt
     - openshift/cluster-api-provider-openstack
     - openshift/cluster-api-provider-ovirt
@@ -1438,7 +1430,6 @@ tide:
     - openshift/openshift-state-metrics
     - openshift/openshift-tuned
     - openshift/openstack-cinder-csi-driver-operator
-    - openshift/origin
     - openshift/origin-aggregated-logging
     - openshift/ovirt-csi-driver
     - openshift/ovirt-csi-driver-operator
@@ -1467,49 +1458,6 @@ tide:
     - operator-framework/operator-lifecycle-manager
     - operator-framework/operator-marketplace
     - operator-framework/operator-registry
-  - includedBranches:
-    - release-4.0
-    - release-4.1
-    - release-4.2
-    - release-4.3
-    - release-4.4
-    - release-4.5
-    - release-4.6
-    - release-4.7
-    - openshift-4.1
-    labels:
-    - lgtm
-    - bugzilla/valid-bug
-    - cherry-pick-approved
-    missingLabels:
-    - needs-rebase
-    - do-not-merge/hold
-    - do-not-merge/work-in-progress
-    - do-not-merge/invalid-owners-file
-    - bugzilla/invalid-bug
-    repos:
-    - openshift-priv/cluster-capacity
-    - openshift-priv/containernetworking-plugins
-    - openshift-priv/coredns
-    - openshift-priv/descheduler
-    - openshift-priv/linuxptp-daemon
-    - openshift-priv/multus-admission-controller
-    - openshift-priv/ocp-release-operator-sdk
-    - openshift-priv/ptp-operator
-    - openshift-priv/service-ca-operator
-    - openshift-priv/sriov-cni
-    - openshift-priv/sriov-dp-admission-controller
-    - openshift-priv/sriov-network-device-plugin
-    - openshift-priv/sriov-network-operator
-    - openshift/cluster-capacity
-    - openshift/containernetworking-plugins
-    - openshift/coredns
-    - openshift/descheduler
-    - openshift/linuxptp-daemon
-    - openshift/multus-admission-controller
-    - openshift/ocp-release-operator-sdk
-    - openshift/ptp-operator
-    - openshift/service-ca-operator
   - excludedBranches:
     - release-3.11
     - release-4.0
@@ -1529,89 +1477,6 @@ tide:
     - openshift-4.7
     - feature-es6x
     - feature-prom-connector
-    labels:
-    - lgtm
-    - approved
-    missingLabels:
-    - needs-rebase
-    - do-not-merge/hold
-    - do-not-merge/work-in-progress
-    - do-not-merge/invalid-owners-file
-    - bugzilla/invalid-bug
-    repos:
-    - ansible-collections/community.okd
-    - openshift-priv/assisted-service
-    - openshift-priv/assisted-test-infra
-    - openshift-priv/bond-cni
-    - openshift-priv/cluster-api
-    - openshift-priv/community.okd
-    - openshift-priv/containernetworking-plugins
-    - openshift-priv/crd-schema-gen
-    - openshift-priv/csi-driver-projected-resource
-    - openshift-priv/jenkins-client-plugin
-    - openshift-priv/jenkins-openshift-login-plugin
-    - openshift-priv/jenkins-sync-plugin
-    - openshift-priv/kubefed
-    - openshift-priv/kubefed-operator
-    - openshift-priv/kubernetes-metrics-server
-    - openshift-priv/multus-admission-controller
-    - openshift-priv/network-metrics-daemon
-    - openshift-priv/ocp-release-operator-sdk
-    - openshift-priv/redhat-subscription-injection-webhook
-    - openshift-s2i/s2i-wildfly
-    - openshift/assisted-installer
-    - openshift/assisted-installer-agent
-    - openshift/assisted-service
-    - openshift/assisted-test-infra
-    - openshift/autoheal
-    - openshift/bond-cni
-    - openshift/cluster-api
-    - openshift/config
-    - openshift/containernetworking-plugins
-    - openshift/crd-schema-gen
-    - openshift/csi-driver-projected-resource
-    - openshift/external-dns
-    - openshift/imagebuilder
-    - openshift/jenkins-client-plugin
-    - openshift/jenkins-openshift-login-plugin
-    - openshift/jenkins-plugin
-    - openshift/jenkins-sync-plugin
-    - openshift/kubefed
-    - openshift/kubefed-operator
-    - openshift/kubernetes-metrics-server
-    - openshift/monitor-project-lifecycle
-    - openshift/multus-admission-controller
-    - openshift/network-metrics-daemon
-    - openshift/ocp-release-operator-sdk
-    - openshift/odo
-    - openshift/odo-init-image
-    - openshift/online-console-extensions
-    - openshift/online-hibernation
-    - openshift/origin-branding
-    - openshift/pod-checkpointer-operator
-    - openshift/prometheus-client_golang
-    - openshift/redhat-subscription-injection-webhook
-    - openshift/rhcos-tools
-  - excludedBranches:
-    - release-3.11
-    - release-4.0
-    - release-4.1
-    - release-4.2
-    - release-4.3
-    - release-4.4
-    - release-4.5
-    - release-4.6
-    - release-4.7
-    - openshift-4.1
-    - openshift-4.2
-    - openshift-4.3
-    - openshift-4.4
-    - openshift-4.5
-    - openshift-4.6
-    - openshift-4.7
-    - feature-es6x
-    - feature-prom-connector
-    - master
     labels:
     - lgtm
     - approved
@@ -1637,6 +1502,7 @@ tide:
     - openshift-priv/baremetal-operator
     - openshift-priv/baremetal-runtimecfg
     - openshift-priv/builder
+    - openshift-priv/cincinnati-operator
     - openshift-priv/client-go
     - openshift-priv/cloud-credential-operator
     - openshift-priv/cloud-provider-openstack
@@ -1646,6 +1512,7 @@ tide:
     - openshift-priv/cluster-api-provider-baremetal
     - openshift-priv/cluster-api-provider-gcp
     - openshift-priv/cluster-api-provider-kubemark
+    - openshift-priv/cluster-api-provider-kubevirt
     - openshift-priv/cluster-api-provider-libvirt
     - openshift-priv/cluster-api-provider-openstack
     - openshift-priv/cluster-api-provider-ovirt
@@ -1791,6 +1658,8 @@ tide:
     - openshift/baremetal-operator
     - openshift/baremetal-runtimecfg
     - openshift/builder
+    - openshift/cincinnati
+    - openshift/cincinnati-operator
     - openshift/client-go
     - openshift/cloud-credential-operator
     - openshift/cloud-provider-openstack
@@ -1800,6 +1669,7 @@ tide:
     - openshift/cluster-api-provider-baremetal
     - openshift/cluster-api-provider-gcp
     - openshift/cluster-api-provider-kubemark
+    - openshift/cluster-api-provider-kubevirt
     - openshift/cluster-api-provider-libvirt
     - openshift/cluster-api-provider-openstack
     - openshift/cluster-api-provider-ovirt
@@ -1902,7 +1772,6 @@ tide:
     - openshift/openshift-state-metrics
     - openshift/openshift-tuned
     - openshift/openstack-cinder-csi-driver-operator
-    - openshift/origin
     - openshift/origin-aggregated-logging
     - openshift/ovirt-csi-driver
     - openshift/ovirt-csi-driver-operator
@@ -1931,6 +1800,220 @@ tide:
     - operator-framework/operator-lifecycle-manager
     - operator-framework/operator-marketplace
     - operator-framework/operator-registry
+  - includedBranches:
+    - release-4.0
+    - release-4.1
+    - release-4.2
+    - release-4.3
+    - release-4.4
+    - release-4.5
+    - release-4.7
+    - openshift-4.1
+    - openshift-4.2
+    - openshift-4.3
+    - openshift-4.4
+    - openshift-4.5
+    - openshift-4.7
+    labels:
+    - lgtm
+    - bugzilla/valid-bug
+    - cherry-pick-approved
+    missingLabels:
+    - needs-rebase
+    - do-not-merge/hold
+    - do-not-merge/work-in-progress
+    - do-not-merge/invalid-owners-file
+    - bugzilla/invalid-bug
+    repos:
+    - openshift-priv/cluster-capacity
+    - openshift-priv/containernetworking-plugins
+    - openshift-priv/coredns
+    - openshift-priv/descheduler
+    - openshift-priv/linuxptp-daemon
+    - openshift-priv/multus-admission-controller
+    - openshift-priv/ocp-release-operator-sdk
+    - openshift-priv/ptp-operator
+    - openshift-priv/service-ca-operator
+    - openshift-priv/sriov-cni
+    - openshift-priv/sriov-dp-admission-controller
+    - openshift-priv/sriov-network-device-plugin
+    - openshift-priv/sriov-network-operator
+    - openshift/cluster-capacity
+    - openshift/containernetworking-plugins
+    - openshift/coredns
+    - openshift/descheduler
+    - openshift/linuxptp-daemon
+    - openshift/multus-admission-controller
+    - openshift/ocp-release-operator-sdk
+    - openshift/ptp-operator
+    - openshift/service-ca-operator
+  - excludedBranches:
+    - release-4.0
+    - release-4.1
+    - release-4.2
+    - release-4.3
+    - release-4.4
+    - release-4.5
+    - release-4.6
+    - release-4.7
+    - openshift-4.1
+    - openshift-4.2
+    - openshift-4.3
+    - openshift-4.4
+    - openshift-4.5
+    - openshift-4.6
+    - openshift-4.7
+    labels:
+    - lgtm
+    missingLabels:
+    - needs-rebase
+    - do-not-merge/hold
+    - do-not-merge/work-in-progress
+    - do-not-merge/invalid-owners-file
+    - bugzilla/invalid-bug
+    repos:
+    - openshift-priv/cluster-capacity
+    - openshift-priv/coredns
+    - openshift-priv/descheduler
+    - openshift-priv/linuxptp-daemon
+    - openshift-priv/ptp-operator
+    - openshift-priv/service-ca-operator
+    - openshift-priv/sriov-cni
+    - openshift-priv/sriov-dp-admission-controller
+    - openshift-priv/sriov-network-device-plugin
+    - openshift-priv/sriov-network-operator
+    - openshift/cluster-capacity
+    - openshift/coredns
+    - openshift/descheduler
+    - openshift/linuxptp-daemon
+    - openshift/openshift-restclient-java
+    - openshift/origin-metrics
+    - openshift/origin-web-console
+    - openshift/origin-web-console-server
+    - openshift/ptp-operator
+    - openshift/redhat-release-coreos
+    - openshift/service-ca-operator
+  - includedBranches:
+    - release-4.6
+    - openshift-4.6
+    labels:
+    - lgtm
+    - bugzilla/valid-bug
+    - group-lead-approved
+    missingLabels:
+    - needs-rebase
+    - do-not-merge/hold
+    - do-not-merge/work-in-progress
+    - do-not-merge/invalid-owners-file
+    - bugzilla/invalid-bug
+    repos:
+    - openshift-priv/cluster-capacity
+    - openshift-priv/coredns
+    - openshift-priv/descheduler
+    - openshift-priv/linuxptp-daemon
+    - openshift-priv/ptp-operator
+    - openshift-priv/service-ca-operator
+    - openshift-priv/sriov-cni
+    - openshift-priv/sriov-dp-admission-controller
+    - openshift-priv/sriov-network-device-plugin
+    - openshift-priv/sriov-network-operator
+    - openshift/cluster-capacity
+    - openshift/coredns
+    - openshift/descheduler
+    - openshift/linuxptp-daemon
+    - openshift/openshift-restclient-java
+    - openshift/origin-metrics
+    - openshift/origin-web-console
+    - openshift/origin-web-console-server
+    - openshift/ptp-operator
+    - openshift/redhat-release-coreos
+    - openshift/service-ca-operator
+  - excludedBranches:
+    - release-3.11
+    - release-4.0
+    - release-4.1
+    - release-4.2
+    - release-4.3
+    - release-4.4
+    - release-4.5
+    - release-4.6
+    - release-4.7
+    - openshift-4.1
+    - openshift-4.2
+    - openshift-4.3
+    - openshift-4.4
+    - openshift-4.5
+    - openshift-4.6
+    - openshift-4.7
+    - feature-es6x
+    - feature-prom-connector
+    labels:
+    - lgtm
+    - approved
+    missingLabels:
+    - needs-rebase
+    - do-not-merge/hold
+    - do-not-merge/work-in-progress
+    - do-not-merge/invalid-owners-file
+    - bugzilla/invalid-bug
+    repos:
+    - ansible-collections/community.okd
+    - openshift-priv/assisted-service
+    - openshift-priv/assisted-test-infra
+    - openshift-priv/bond-cni
+    - openshift-priv/cluster-api
+    - openshift-priv/community.okd
+    - openshift-priv/containernetworking-plugins
+    - openshift-priv/crd-schema-gen
+    - openshift-priv/csi-driver-projected-resource
+    - openshift-priv/gatekeeper
+    - openshift-priv/gatekeeper-operator
+    - openshift-priv/jenkins-client-plugin
+    - openshift-priv/jenkins-openshift-login-plugin
+    - openshift-priv/jenkins-sync-plugin
+    - openshift-priv/kubefed
+    - openshift-priv/kubefed-operator
+    - openshift-priv/kubernetes-metrics-server
+    - openshift-priv/multus-admission-controller
+    - openshift-priv/network-metrics-daemon
+    - openshift-priv/ocp-release-operator-sdk
+    - openshift-priv/redhat-subscription-injection-webhook
+    - openshift-s2i/s2i-wildfly
+    - openshift/assisted-installer
+    - openshift/assisted-installer-agent
+    - openshift/assisted-service
+    - openshift/assisted-test-infra
+    - openshift/autoheal
+    - openshift/bond-cni
+    - openshift/cluster-api
+    - openshift/config
+    - openshift/containernetworking-plugins
+    - openshift/crd-schema-gen
+    - openshift/csi-driver-projected-resource
+    - openshift/external-dns
+    - openshift/gatekeeper
+    - openshift/gatekeeper-operator
+    - openshift/imagebuilder
+    - openshift/jenkins-client-plugin
+    - openshift/jenkins-openshift-login-plugin
+    - openshift/jenkins-plugin
+    - openshift/jenkins-sync-plugin
+    - openshift/kubefed
+    - openshift/kubefed-operator
+    - openshift/kubernetes-metrics-server
+    - openshift/monitor-project-lifecycle
+    - openshift/multus-admission-controller
+    - openshift/network-metrics-daemon
+    - openshift/ocp-release-operator-sdk
+    - openshift/odo
+    - openshift/odo-init-image
+    - openshift/online-console-extensions
+    - openshift/online-hibernation
+    - openshift/origin-branding
+    - openshift/pod-checkpointer-operator
+    - openshift/prometheus-client_golang
+    - openshift/redhat-subscription-injection-webhook
+    - openshift/rhcos-tools
   - includedBranches:
     - release-3.11
     - feature-es6x
@@ -1973,7 +2056,6 @@ tide:
     - openshift/kuryr-kubernetes
     - openshift/machine-config-operator
     - openshift/openshift-ansible
-    - openshift/origin
     - openshift/origin-aggregated-logging
     - openshift/prometheus-operator
   - includedBranches:
@@ -2006,80 +2088,6 @@ tide:
     - openshift/enterprise-images
     - openshift/online-registration
     - openshift/ose
-  - excludedBranches:
-    - release-4.0
-    - release-4.1
-    - release-4.2
-    - release-4.3
-    - release-4.4
-    - release-4.5
-    - release-4.6
-    - release-4.7
-    - openshift-4.1
-    - master
-    labels:
-    - lgtm
-    missingLabels:
-    - needs-rebase
-    - do-not-merge/hold
-    - do-not-merge/work-in-progress
-    - do-not-merge/invalid-owners-file
-    - bugzilla/invalid-bug
-    repos:
-    - openshift-priv/cluster-capacity
-    - openshift-priv/coredns
-    - openshift-priv/descheduler
-    - openshift-priv/linuxptp-daemon
-    - openshift-priv/ptp-operator
-    - openshift-priv/service-ca-operator
-    - openshift-priv/sriov-cni
-    - openshift-priv/sriov-dp-admission-controller
-    - openshift-priv/sriov-network-device-plugin
-    - openshift-priv/sriov-network-operator
-    - openshift/cluster-capacity
-    - openshift/coredns
-    - openshift/descheduler
-    - openshift/linuxptp-daemon
-    - openshift/openshift-restclient-java
-    - openshift/origin-metrics
-    - openshift/origin-web-console
-    - openshift/origin-web-console-server
-    - openshift/ptp-operator
-    - openshift/redhat-release-coreos
-    - openshift/service-ca-operator
-  - includedBranches:
-    - master
-    labels:
-    - lgtm
-    - bugzilla/valid-bug
-    missingLabels:
-    - needs-rebase
-    - do-not-merge/hold
-    - do-not-merge/work-in-progress
-    - do-not-merge/invalid-owners-file
-    - bugzilla/invalid-bug
-    repos:
-    - openshift-priv/cluster-capacity
-    - openshift-priv/coredns
-    - openshift-priv/descheduler
-    - openshift-priv/linuxptp-daemon
-    - openshift-priv/ptp-operator
-    - openshift-priv/service-ca-operator
-    - openshift-priv/sriov-cni
-    - openshift-priv/sriov-dp-admission-controller
-    - openshift-priv/sriov-network-device-plugin
-    - openshift-priv/sriov-network-operator
-    - openshift/cluster-capacity
-    - openshift/coredns
-    - openshift/descheduler
-    - openshift/linuxptp-daemon
-    - openshift/openshift-restclient-java
-    - openshift/origin-metrics
-    - openshift/origin-web-console
-    - openshift/origin-web-console-server
-    - openshift/ptp-operator
-    - openshift/redhat-release-coreos
-    - openshift/service-ca-operator
   - labels:
     - lgtm
     - approved
@@ -2234,7 +2242,9 @@ tide:
     - bugzilla/invalid-bug
     repos:
     - openshift-priv/special-resource-operator
+    - openshift-psap/ci-artifacts
     - openshift-psap/special-resource-operator
+    - openshift-psap/wireguard-worker
   - labels:
     - lgtm
     - approved
@@ -2308,7 +2318,6 @@ tide:
     - openshift-kni/cnf-features-deploy
     - openshift-kni/performance-addon-operators
     - openshift-priv/build-machinery-go
-    - openshift-priv/cincinnati-operator
     - openshift-priv/cluster-baremetal-operator
     - openshift-priv/csi-driver-manila-operator
     - openshift-priv/debug-network
@@ -2317,13 +2326,12 @@ tide:
     - openshift-priv/windows-machine-config-operator
     - openshift/build-machinery-go
     - openshift/ci-chat-bot
+    - openshift/ci-docs
     - openshift/ci-ns-ttl-controller
     - openshift/ci-search
     - openshift/ci-tools
     - openshift/ci-vm-operator
-    - openshift/cincinnati
     - openshift/cincinnati-graph-data
-    - openshift/cincinnati-operator
     - openshift/cluster-baremetal-operator
     - openshift/config
     - openshift/csi-driver-manila-operator
@@ -2459,6 +2467,62 @@ tide:
     - do-not-merge/invalid-owners-file
     repos:
     - operator-framework/operator-lib
+  - includedBranches:
+    - release-4.0
+    - release-4.1
+    - release-4.2
+    - release-4.3
+    - release-4.4
+    - release-4.5
+    labels:
+    - lgtm
+    - approved
+    - bugzilla/valid-bug
+    - cherry-pick-approved
+    missingLabels:
+    - needs-rebase
+    - do-not-merge/hold
+    - do-not-merge/work-in-progress
+    - do-not-merge/invalid-owners-file
+    - bugzilla/invalid-bug
+    repos:
+    - openshift-priv/origin
+    - openshift/origin
+  - includedBranches:
+    - release-4.6
+    labels:
+    - lgtm
+    - approved
+    - group-lead-approved
+    missingLabels:
+    - needs-rebase
+    - do-not-merge/hold
+    - do-not-merge/work-in-progress
+    - do-not-merge/invalid-owners-file
+    - bugzilla/invalid-bug
+    repos:
+    - openshift-priv/origin
+    - openshift/origin
+  - excludedBranches:
+    - release-4.0
+    - release-4.1
+    - release-4.2
+    - release-4.3
+    - release-4.4
+    - release-4.5
+    - release-4.6
+    labels:
+    - lgtm
+    - approved
+    missingLabels:
+    - needs-rebase
+    - do-not-merge/hold
+    - do-not-merge/work-in-progress
+    - do-not-merge/invalid-owners-file
+    - bugzilla/invalid-bug
+    repos:
+    - openshift-priv/origin
+    - openshift/origin
   rebase_label: tide/merge-method-rebase
   squash_label: tide/merge-method-squash
   status_update_period: 1m0s

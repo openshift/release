@@ -29,6 +29,7 @@ images:
       - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
   to: cluster-baremetal-operator
 promotion:
+  disabled: true
   name: 4.7-priv
   namespace: ocp-private
 resources:
@@ -62,6 +63,13 @@ tests:
   commands: make generate-check
   container:
     from: src
+- as: e2e-metal-ipi
+  steps:
+    cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        ENABLE_CBO_TEST=true
+    workflow: baremetalds-e2e
 zz_generated_metadata:
   branch: release-4.7
   org: openshift-priv

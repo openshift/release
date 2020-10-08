@@ -33,9 +33,9 @@ periodics:
 
         # if the source and destination are identical, do nothing
         from=$( oc get istag -n "${TAG_NS}" "${TAG_SOURCE}" -o template='{{ .image.metadata.name }}' )
-        to=$( oc get istag --ignore-not-found -n ocp "${TAG}:${BRANCH}" -o template='{{ .image.metadata.name }}' )
+        to=$( oc get istag --ignore-not-found -n ocp "${BRANCH}:${TAG}" -o template='{{ .image.metadata.name }}' )
         if [[ "${from}" == "${to}" ]]; then
-          echo "info: ${TAG_NS}/${TAG_SOURCE} matches ocp/${TAG}:${BRANCH}"
+          echo "info: ${TAG_NS}/${TAG_SOURCE} matches ocp/${BRANCH}:${TAG}"
           exit 0
         fi
         echo "Will promote ${from}, current is ${to}"
@@ -49,12 +49,6 @@ periodics:
 
         # verify the tests pass
         ci-operator $@
-
-        # also tag the image into the art-latest stream
-        oc tag "${to_quay}" "ocp/${BRANCH}-art-latest:${TAG}"
-
-        # also tag the image into the private art-latest stream
-        oc tag "${to_quay}" "ocp-priv/${BRANCH}-art-latest-priv:${TAG}"
 
         # also tag the image into the ocp private stream
         oc tag "${to_quay}" "ocp-private/${BRANCH}-priv:${TAG}"
@@ -199,12 +193,6 @@ periodics:
         fi
 
         # TODO: Enable e2e testing when arch specific CI is available
-
-        # Tag the image into the art-latest stream for the arch
-        oc tag "${to_quay}" "ocp-${ARCH}/${BRANCH}-art-latest-${ARCH}:${TAG}"
-
-        # Tag the image into the private art-latest stream for the arch
-        oc tag "${to_quay}" "ocp-${ARCH}-priv/${BRANCH}-art-latest-${ARCH}-priv:${TAG}"
       env:
       - name: TAG_NS
         value: rhcos
@@ -347,12 +335,6 @@ periodics:
         fi
 
         # TODO: Enable e2e testing when arch specific CI is available
-
-        # Tag the image into the art-latest stream for the arch
-        oc tag "${to_quay}" "ocp-${ARCH}/${BRANCH}-art-latest-${ARCH}:${TAG}"
-
-        # Tag the image into the private art-latest stream for the arch
-        oc tag "${to_quay}" "ocp-${ARCH}-priv/${BRANCH}-art-latest-${ARCH}-priv:${TAG}"
       env:
       - name: TAG_NS
         value: rhcos
@@ -5317,8 +5299,6 @@ periodics:
 - agent: kubernetes
   cluster: api.ci
   decorate: true
-  decoration_config:
-    timeout: 6h0m0s
   interval: 24h
   labels:
     job-env: aws
@@ -5406,7 +5386,6 @@ periodics:
           - as: e2e-$(CLUSTER_TYPE)-upgrade
             commands: |
               TEST_SUITE=all IMAGE=RELEASE_IMAGES run-upgrade-tests
-              TEST_SUITE=openshift/conformance/parallel run-tests
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
               upgrade: true
@@ -6352,7 +6331,7 @@ periodics:
         secretName: build-farm-credentials
 - agent: kubernetes
   cluster: api.ci
-  cron: 0 2,14 * * *
+  cron: 0 0,8,16 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -6482,7 +6461,7 @@ periodics:
         secretName: ci-pull-credentials
 - agent: kubernetes
   cluster: api.ci
-  cron: 0 0,12 * * *
+  cron: 0 4,12,20 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
