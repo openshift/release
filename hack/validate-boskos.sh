@@ -10,8 +10,9 @@ set -o pipefail
 base_dir=.
 
 cd "${base_dir}/core-services/prow/02_config"
+ORIGINAL="$(cat _boskos.yaml)"
 ./generate-boskos.py
-DIFF="$(git diff)"
+DIFF="$(diff -u <(echo "${ORIGINAL}") _boskos.yaml || true)"
 if test -n "${DIFF}"
 then
 	cat << EOF
