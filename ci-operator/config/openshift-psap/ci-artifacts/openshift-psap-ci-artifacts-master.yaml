@@ -12,13 +12,31 @@ images:
 - dockerfile_path: build/Dockerfile
   from: base_centos
   to: ci-artifacts
+promotion:
+  name: "4.7"
+  namespace: ocp
 resources:
   '*':
     limits:
-      memory: 4Gi
+      memory: 2Gi
     requests:
-      cpu: 100m
-      memory: 200Mi
+      cpu: 2000m
+      memory: 2Gi
+tests:
+- as: gpu-operator-e2e
+  cron: 0 */23 * * *
+  optional: true
+  steps:
+    cluster_profile: aws
+    test:
+    - as: e2e
+      commands: run gpu-ci
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: openshift-psap
