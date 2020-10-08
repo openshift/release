@@ -34,10 +34,6 @@ items:
     - name: main
       port: 8888
       targetPort: 8888
-    - name: metrics
-      port: 9090
-      protocol: TCP
-      targetPort: 9090
     type: ClusterIP
 - apiVersion: apps/v1
   kind: Deployment
@@ -46,10 +42,8 @@ items:
     name: slack-bot-alpha
     labels:
       app: slack-bot-alpha
-    annotations:
-      image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"slack-bot-alpha:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"slack-bot-alpha\")].image"}]'
   spec:
-    replicas: 2
+    replicas: 1
     revisionHistoryLimit: 2
     selector:
       matchLabels:
@@ -62,38 +56,57 @@ items:
         serviceAccountName: slack-bot-alpha
         containers:
         - name: slack-bot-alpha
-          image: slack-bot-alpha
+          image: registry.svc.ci.openshift.org/ci/sshd:latest
+          command:
+          - /usr/sbin/sshd
           args:
-          - --slack-token-path=/etc/slack/oauth_token
-          - --slack-signing-secret-path=/etc/slack/signing_secret
-          - --jira-username=skuznets
-          - --jira-password-path=/etc/jira/password
-          - --log-level=trace
+          - -D
+          - -e
+          - -f/config/sshd_config
           ports:
             - name: main
               containerPort: 8888
-            - name: metrics
-              containerPort: 9090
+            - name: ssh
+              containerPort: 2222
           volumeMounts:
-          - name: slack
-            mountPath: /etc/slack
+          - name: authorized-keys
+            mountPath: /keys/authorized
             readOnly: true
-          - name: jira
-            mountPath: /etc/jira
+          - name: host-keys
+            mountPath: /keys/host/
+            readOnly: true
+          - name: config
+            mountPath: /config/
             readOnly: true
           resources:
             requests:
-              memory: "250Mi"
+              memory: "10Mi"
               cpu: "100m"
-          # for tcpdump
-          securityContext:
-            capabilities:
-              add:
-              - "NET_ADMIN"
         volumes:
-        - name: slack
+        - name: authorized-keys
           secret:
-            secretName: slack-credentials-dptp-bot-alpha
-        - name: jira
+            secretName: sshd-slack-bot-alpha-authorized-keys
+        - name: host-keys
           secret:
-            secretName: jira-credentials-dptp-bot
+            secretName: sshd-slack-bot-alpha-host-keys
+        - name: config
+          configMap:
+            name: sshd-config
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: sshd-config
+    namespace: ci
+  data:
+    sshd_config: |
+      AuthorizedKeysFile /keys/authorized/authorized_keys
+      HostKey /keys/host/ssh_host_rsa_key
+      HostKey /keys/host/ssh_host_dsa_key
+      HostKey /keys/host/ssh_host_ecdsa_key
+      HostKey /keys/host/ssh_host_ed25519_key
+      PasswordAuthentication no
+      PermitTunnel yes
+      PidFile /tmp/ssh.pid
+      Port 2222
+      StrictModes no
+      GatewayPorts yes

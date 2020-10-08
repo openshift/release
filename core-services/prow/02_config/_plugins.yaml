@@ -3,6 +3,7 @@ approve:
   ignore_review_state: false
   lgtm_acts_as_approve: true
   repos:
+  - openshift/ci-docs
   - openshift/ci-ns-ttl-controller
   - openshift/ci-search
   - openshift/ci-tools
@@ -266,6 +267,9 @@ approve:
 - commandHelpLink: https://go.k8s.io/bot-commands
   repos:
   - che-incubator/che-test-harness
+- commandHelpLink: https://go.k8s.io/bot-commands
+  repos:
+  - kata-containers/runtime
   require_self_approval: false
 - commandHelpLink: https://go.k8s.io/bot-commands
   repos:
@@ -302,6 +306,16 @@ approve:
   repos:
   - openshift-priv/openstack-cinder-csi-driver-operator
   - openshift/openstack-cinder-csi-driver-operator
+  require_self_approval: false
+- commandHelpLink: ""
+  repos:
+  - kubevirt/must-gather
+  - openshift-priv/must-gather
+  require_self_approval: false
+- commandHelpLink: ""
+  repos:
+  - kubevirt/must-gather
+  - openshift-priv/must-gather
   require_self_approval: false
 blunderbuss:
   max_request_count: 2
@@ -346,7 +360,7 @@ bugzilla:
         status: MODIFIED
       state_after_validation:
         status: POST
-      target_release: 4.6.0
+      target_release: 4.7.0
       valid_states:
       - status: NEW
       - status: ASSIGNED
@@ -402,6 +416,14 @@ bugzilla:
       - 4.6.z
       target_release: 4.5.z
       validate_by_default: true
+    openshift-4.6:
+      dependent_bug_states:
+      - status: MODIFIED
+      - status: VERIFIED
+      dependent_bug_target_releases:
+      - 4.7.0
+      target_release: 4.6.0
+      validate_by_default: true
     release-3.11:
       add_external_link: true
       allowed_groups:
@@ -451,6 +473,14 @@ bugzilla:
       - 4.6.0
       - 4.6.z
       target_release: 4.5.z
+      validate_by_default: true
+    release-4.6:
+      dependent_bug_states:
+      - status: MODIFIED
+      - status: VERIFIED
+      dependent_bug_target_releases:
+      - 4.7.0
+      target_release: 4.6.0
       validate_by_default: true
   orgs:
     openshift:
@@ -635,6 +665,11 @@ config_updater:
         app.ci:
         - ci
       name: ci-operator-4.7-configs
+    ci-operator/config/**/*openshift-4.8*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      name: ci-operator-4.8-configs
     ci-operator/config/**/*openshift-v4*.yaml:
       clusters:
         app.ci:
@@ -700,6 +735,11 @@ config_updater:
         app.ci:
         - ci
       name: ci-operator-4.7-configs
+    ci-operator/config/**/*release-4.8*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      name: ci-operator-4.8-configs
     ci-operator/config/**/*release-next*.yaml:
       clusters:
         app.ci:
@@ -922,6 +962,14 @@ config_updater:
         - ci
       gzip: true
       name: job-config-4.7
+    ci-operator/jobs/**/*openshift-4.8*.yaml:
+      clusters:
+        api.ci:
+        - ci
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-4.8
     ci-operator/jobs/**/*openshift-v4*.yaml:
       clusters:
         api.ci:
@@ -1026,6 +1074,14 @@ config_updater:
         - ci
       gzip: true
       name: job-config-4.7
+    ci-operator/jobs/**/*release-4.8*.yaml:
+      clusters:
+        api.ci:
+        - ci
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-4.8
     ci-operator/jobs/**/*release-next*.yaml:
       clusters:
         api.ci:
@@ -1772,10 +1828,8 @@ config_updater:
       clusters:
         api.ci:
         - ci
-        - release-controller-test
         app.ci:
         - ci
-        - release-controller-test
       key: config.yaml
       name: config
     core-services/prow/02_config/_labels.yaml:
@@ -2250,6 +2304,20 @@ external_plugins:
     events:
     - pull_request
     name: needs-rebase
+  kata-containers/runtime:
+  - endpoint: http://refresh
+    events:
+    - issue_comment
+    name: refresh
+  - endpoint: http://cherrypick
+    events:
+    - issue_comment
+    - pull_request
+    name: cherrypick
+  - endpoint: http://needs-rebase
+    events:
+    - pull_request
+    name: needs-rebase
   kiegroup/kie-cloud-operator:
   - endpoint: http://refresh
     events:
@@ -2260,6 +2328,20 @@ external_plugins:
     - pull_request
     name: needs-rebase
   kube-reporting:
+  - endpoint: http://refresh
+    events:
+    - issue_comment
+    name: refresh
+  - endpoint: http://cherrypick
+    events:
+    - issue_comment
+    - pull_request
+    name: cherrypick
+  - endpoint: http://needs-rebase
+    events:
+    - pull_request
+    name: needs-rebase
+  kubevirt/must-gather:
   - endpoint: http://refresh
     events:
     - issue_comment
@@ -2446,7 +2528,35 @@ external_plugins:
     events:
     - issue_comment
     name: publicize
+  openshift-psap/ci-artifacts:
+  - endpoint: http://refresh
+    events:
+    - issue_comment
+    name: refresh
+  - endpoint: http://cherrypick
+    events:
+    - issue_comment
+    - pull_request
+    name: cherrypick
+  - endpoint: http://needs-rebase
+    events:
+    - pull_request
+    name: needs-rebase
   openshift-psap/special-resource-operator:
+  - endpoint: http://refresh
+    events:
+    - issue_comment
+    name: refresh
+  - endpoint: http://cherrypick
+    events:
+    - issue_comment
+    - pull_request
+    name: cherrypick
+  - endpoint: http://needs-rebase
+    events:
+    - pull_request
+    name: needs-rebase
+  openshift-psap/wireguard-worker:
   - endpoint: http://refresh
     events:
     - issue_comment
@@ -2656,6 +2766,7 @@ lgtm:
   - openshift/odo-init-image
   review_acts_as_lgtm: true
 - repos:
+  - openshift/ci-docs
   - openshift/ci-ns-ttl-controller
   - openshift/ci-tools
   - openshift/release
@@ -2752,6 +2863,8 @@ lgtm:
   review_acts_as_lgtm: true
 - repos:
   - che-incubator/che-test-harness
+- repos:
+  - kata-containers/runtime
   review_acts_as_lgtm: true
 - repos:
   - openshift-priv/csi-driver-projected-resource
@@ -2772,6 +2885,14 @@ lgtm:
 - repos:
   - openshift-priv/openstack-cinder-csi-driver-operator
   - openshift/openstack-cinder-csi-driver-operator
+  review_acts_as_lgtm: true
+- repos:
+  - kubevirt/must-gather
+  - openshift-priv/must-gather
+  review_acts_as_lgtm: true
+- repos:
+  - kubevirt/must-gather
+  - openshift-priv/must-gather
   review_acts_as_lgtm: true
 override:
   allow_top_level_owners: true
@@ -3522,6 +3643,32 @@ plugins:
   - wip
   - yuks
   - approve
+  kata-containers/runtime:
+  - assign
+  - blunderbuss
+  - bugzilla
+  - cat
+  - dog
+  - heart
+  - golint
+  - goose
+  - help
+  - hold
+  - label
+  - lgtm
+  - lifecycle
+  - override
+  - pony
+  - retitle
+  - shrug
+  - sigmention
+  - skip
+  - trigger
+  - verify-owners
+  - owners-label
+  - wip
+  - yuks
+  - approve
   kiegroup/kie-cloud-operator:
   - approve
   - assign
@@ -3585,6 +3732,32 @@ plugins:
   - trigger
   kubevirt/kubevirt-ssp-operator:
   - trigger
+  kubevirt/must-gather:
+  - assign
+  - blunderbuss
+  - bugzilla
+  - cat
+  - dog
+  - heart
+  - golint
+  - goose
+  - help
+  - hold
+  - label
+  - lgtm
+  - lifecycle
+  - override
+  - pony
+  - retitle
+  - shrug
+  - sigmention
+  - skip
+  - trigger
+  - verify-owners
+  - owners-label
+  - wip
+  - yuks
+  - approve
   kubevirt/node-maintenance-operator:
   - trigger
   monstorak/monstorak-operator:
@@ -4484,6 +4657,31 @@ plugins:
   - wip
   - yuks
   openshift-priv/cluster-api-provider-kubemark:
+  - approve
+  - assign
+  - blunderbuss
+  - bugzilla
+  - cat
+  - dog
+  - golint
+  - goose
+  - heart
+  - help
+  - hold
+  - label
+  - lgtm
+  - lifecycle
+  - override
+  - owners-label
+  - pony
+  - retitle
+  - shrug
+  - sigmention
+  - skip
+  - verify-owners
+  - wip
+  - yuks
+  openshift-priv/cluster-api-provider-kubevirt:
   - approve
   - assign
   - blunderbuss
@@ -6206,6 +6404,56 @@ plugins:
   - wip
   - yuks
   openshift-priv/file-integrity-operator:
+  - approve
+  - assign
+  - blunderbuss
+  - bugzilla
+  - cat
+  - dog
+  - golint
+  - goose
+  - heart
+  - help
+  - hold
+  - label
+  - lgtm
+  - lifecycle
+  - override
+  - owners-label
+  - pony
+  - retitle
+  - shrug
+  - sigmention
+  - skip
+  - verify-owners
+  - wip
+  - yuks
+  openshift-priv/gatekeeper:
+  - approve
+  - assign
+  - blunderbuss
+  - bugzilla
+  - cat
+  - dog
+  - golint
+  - goose
+  - heart
+  - help
+  - hold
+  - label
+  - lgtm
+  - lifecycle
+  - override
+  - owners-label
+  - pony
+  - retitle
+  - shrug
+  - sigmention
+  - skip
+  - verify-owners
+  - wip
+  - yuks
+  openshift-priv/gatekeeper-operator:
   - approve
   - assign
   - blunderbuss
@@ -9541,7 +9789,59 @@ plugins:
   - verify-owners
   - wip
   - yuks
+  openshift-psap/ci-artifacts:
+  - approve
+  - assign
+  - blunderbuss
+  - bugzilla
+  - cat
+  - dog
+  - heart
+  - golint
+  - goose
+  - help
+  - hold
+  - label
+  - lgtm
+  - lifecycle
+  - override
+  - owners-label
+  - pony
+  - retitle
+  - shrug
+  - sigmention
+  - skip
+  - trigger
+  - verify-owners
+  - wip
+  - yuks
   openshift-psap/special-resource-operator:
+  - approve
+  - assign
+  - blunderbuss
+  - bugzilla
+  - cat
+  - dog
+  - heart
+  - golint
+  - goose
+  - help
+  - hold
+  - label
+  - lgtm
+  - lifecycle
+  - override
+  - owners-label
+  - pony
+  - retitle
+  - shrug
+  - sigmention
+  - skip
+  - trigger
+  - verify-owners
+  - wip
+  - yuks
+  openshift-psap/wireguard-worker:
   - approve
   - assign
   - blunderbuss
@@ -9630,6 +9930,8 @@ plugins:
   - approve
   openshift/ci-chat-bot:
   - approve
+  openshift/ci-docs:
+  - approve
   openshift/ci-ns-ttl-controller:
   - approve
   openshift/ci-search:
@@ -9665,6 +9967,8 @@ plugins:
   openshift/cluster-api-provider-gcp:
   - approve
   openshift/cluster-api-provider-kubemark:
+  - approve
+  openshift/cluster-api-provider-kubevirt:
   - approve
   openshift/cluster-api-provider-libvirt:
   - approve
@@ -9814,6 +10118,10 @@ plugins:
   openshift/federation-v2-operator:
   - approve
   openshift/file-integrity-operator:
+  - approve
+  openshift/gatekeeper:
+  - approve
+  openshift/gatekeeper-operator:
   - approve
   openshift/gcp-project-operator:
   - approve
