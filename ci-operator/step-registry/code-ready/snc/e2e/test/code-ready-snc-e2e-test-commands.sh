@@ -44,8 +44,8 @@ function run-tests() {
   # Remove all the failed Pods
   oc delete pods --field-selector=status.phase=Failed -A
 
-  # Wait till all the pods are either running or completed or in terminating state
-  while oc get pod --no-headers --all-namespaces | grep -v Running | grep -v Completed | grep -v Terminating; do
+  # Wait till all the pods are either running or pending or completed or in terminating state
+  while oc get pod --no-headers --all-namespaces | grep -v Running | grep -v Completed | grep -v Terminating | grep -v Pending; do
      sleep 2
   done
 
