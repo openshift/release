@@ -1,0 +1,24 @@
+ref:
+  as: ipi-openstack-osuosl-install
+  #@TBD from: libvirt-installer
+  from: openstack-installer
+  grace_period: 10800s
+  commands: ipi-openstack-osuosl-install-commands.sh
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+  env:
+    - name: MASTER_REPLICAS
+      default: '3'
+  credentials:
+  - namespace: test-credentials
+    name: cluster-secrets-osuosl-clouds
+    mount_path: /etc/openstack
+  dependencies:
+  - name: "release:latest"
+    env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+  - name: "release:latest"
+    env: RELEASE_IMAGE_LATEST
+  documentation: |-
+    The IPI install step runs the OpenShift Installer in order to bring up an OpenShift cluster, using the provided cluster profile to choose a target IaaS platform. Anything that needs to be configured using manifests should generate them before this step and put them in the SHARED_DIR with the filename manifest_(manifest_name).yml so that this step can pull in the manifest in.
