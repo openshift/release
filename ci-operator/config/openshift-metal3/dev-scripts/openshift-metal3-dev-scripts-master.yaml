@@ -34,14 +34,12 @@ tests:
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-ironic
   steps:
-    env:
-      LOCAL_IMAGES: |
-        IRONIC_LOCAL_IMAGE=https://github.com/openshift/ironic-image
-        IRONIC_DOCKERFILE=Dockerfile.ocp
-        IRONIC_PR=104
     test:
     - as: build-local-ci-images
       commands: |
+        export IRONIC_LOCAL_IMAGE=https://github.com/openshift/ironic-image
+        export IRONIC_DOCKERFILE=Dockerfile.ocp
+        export IRONIC_PR=104
         readarray -t config <<< "${LOCAL_IMAGES}"
         for IMAGE_VAR in $(echo "${config[@]}" | grep "_LOCAL_IMAGE=" | grep -o "^[^=]*") ; do
             IMAGE=${!IMAGE_VAR}
@@ -66,9 +64,6 @@ tests:
                 ls -ll
             fi
         done
-      env:
-      - default: ""
-        name: LOCAL_IMAGES
       from: dev-scripts
       resources:
         requests:
