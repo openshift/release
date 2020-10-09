@@ -1,8 +1,5 @@
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.13
+  from_repository: true
 resources:
   '*':
     limits:
@@ -17,6 +14,16 @@ tests:
     make coverage
   container:
     from: src
+  secret:
+    mount_path: /tmp/secret
+    name: must-gather-operator-codecov-token
+- as: publish-coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  postsubmit: true
   secret:
     mount_path: /tmp/secret
     name: must-gather-operator-codecov-token
