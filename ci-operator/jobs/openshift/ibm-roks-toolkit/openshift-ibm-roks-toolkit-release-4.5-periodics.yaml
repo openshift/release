@@ -1,0 +1,60 @@
+periodics:
+- agent: kubernetes
+  cluster: api.ci
+  decorate: true
+  decoration_config:
+    timeout: 10h0m0s
+  extra_refs:
+  - base_ref: release-4.5
+    org: openshift
+    repo: ibm-roks-toolkit
+  interval: 12h
+  name: openshift-ibm-roks-toolkit-release-4.5-create-cluster-periodics
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --repo=ibm-roks-toolkit
+      - --secret-dir=/usr/ibm-gate-test-secrets/
+      - --target=create-cluster
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /usr/ibm-gate-test-secrets/
+        name: ibm-gate-test-secrets
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/sentry-dsn
+        name: sentry-dsn
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: ibm-gate-test-secrets
+      secret:
+        secretName: ibm-gate-test-secrets
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: sentry-dsn
+      secret:
+        secretName: sentry-dsn
