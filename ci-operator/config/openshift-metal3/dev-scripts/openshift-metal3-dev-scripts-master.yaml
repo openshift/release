@@ -37,33 +37,15 @@ tests:
     test:
     - as: build-local-ci-images
       commands: |
-        export IRONIC_LOCAL_IMAGE=https://github.com/openshift/ironic-image
-        export IRONIC_DOCKERFILE=Dockerfile.ocp
-        export IRONIC_PR=104
-        readarray -t config <<< "${LOCAL_IMAGES}"
-        for IMAGE_VAR in $(echo "${config[@]}" | grep "_LOCAL_IMAGE=" | grep -o "^[^=]*") ; do
-            IMAGE=${!IMAGE_VAR}
-            if [[ "$IMAGE" =~ "://" ]] ; then
-                REPOPATH=~/${IMAGE##*/}
-                # Clone to ~ if not there already
-                [ -e "$REPOPATH" ] || git clone $IMAGE $REPOPATH
-                cd $REPOPATH
-                export $IMAGE_VAR=${IMAGE##*/}
-                IMAGE_DOCKERFILE_NAME=${IMAGE_VAR/_LOCAL_IMAGE}_DOCKERFILE
-                IMAGE_DOCKERFILE=${!IMAGE_DOCKERFILE_NAME:-Dockerfile}
-                # If we set a specific PR number for the image, we can test it locally
-                IMAGE_PR_VAR=${IMAGE_VAR/_LOCAL_IMAGE}_PR
-                IMAGE_PR=${!IMAGE_PR_VAR:-}
-                if [[ -n ${IMAGE_PR:-} ]]; then
-                        git fetch origin pull/${IMAGE_PR}/head:pr${IMAGE_PR}
-                        git checkout pr${IMAGE_PR}
-                fi
-                sudo podman build -t ${!IMAGE_VAR}:latest -f $IMAGE_DOCKERFILE .
-                sudo podman save --output ${!IMAGE_VAR}.tar ${!IMAGE_VAR}
-                gzip ${!IMAGE_VAR}.tar
-                ls -ll
-            fi
-        done
+        git clone https://github.com/openshift/ironic-image
+        cd ironic-image
+        git fetch origin pull/104/head:pr104
+        git checkout pr104
+
+        sudo podman build -t ironic-image:latest -f Dockerfile.ocp .
+        sudo podman save --output ironic-image.tar ironic-image:latest
+        gzip ironic-image.tar
+        ls -ll
       from: dev-scripts
       resources:
         requests:
