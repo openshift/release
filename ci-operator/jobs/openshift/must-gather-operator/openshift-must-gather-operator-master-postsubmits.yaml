@@ -5,20 +5,18 @@ postsubmits:
     - ^master$
     cluster: api.ci
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: branch-ci-openshift-must-gather-operator-master-coverage
+      ci-operator.openshift.io/prowgen-controlled: "true"
+    max_concurrency: 1
+    name: branch-ci-openshift-must-gather-operator-master-publish-coverage
     spec:
       containers:
       - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
         - --secret-dir=/secrets/must-gather-operator-codecov-token
-        - --target=coverage
+        - --target=publish-coverage
         command:
         - ci-operator
         image: ci-operator:latest
@@ -28,26 +26,23 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
         - mountPath: /secrets/must-gather-operator-codecov-token
           name: must-gather-operator-codecov-token
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
       - name: must-gather-operator-codecov-token
         secret:
           secretName: must-gather-operator-codecov-token
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
