@@ -5,7 +5,7 @@ import yaml
 
 CONFIG = {
     'aws-quota-slice': {
-        'default': 150,
+        'default': 110,
     },
     'azure4-quota-slice': {
         'default': 30,
