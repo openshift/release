@@ -68,18 +68,29 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
-- as: e2e-metal-ipi
+- as: e2e-metal-ipi-ovn-ipv6
   steps:
     cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
-- as: e2e-metal-ipi-router
+- as: e2e-metal-ipi-ovn-dualstack
   steps:
     cluster_profile: packet
-    pre:
-    - ref: baremetalds-packet-setup
-    - ref: ipi-install-rbac
-    - ref: baremetalds-devscripts-conf-dualstack
-    - ref: baremetalds-devscripts-setup
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+    workflow: baremetalds-e2e
+- as: e2e-metal-ipi-ovn-router
+  steps:
+    cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
     test:
     - as: baremetalds-e2e-conf-router
       commands: |
