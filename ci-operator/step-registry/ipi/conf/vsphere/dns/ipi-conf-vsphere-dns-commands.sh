@@ -26,6 +26,8 @@ hosted_zone_id="$(aws route53 list-hosted-zones-by-name \
             --output text)"
 echo "${hosted_zone_id}" > "${SHARED_DIR}/hosted-zone.txt"
 
+# api-int record is needed just for Windows nodes
+# TODO: Remove the api-int entry in future
 echo "Creating DNS records..."
 cat > "${SHARED_DIR}"/dns-create.json <<EOF
 {
@@ -41,6 +43,14 @@ cat > "${SHARED_DIR}"/dns-create.json <<EOF
     },{
     "Action": "UPSERT",
     "ResourceRecordSet": {
+      "Name": "api-int.$cluster_domain.",
+      "Type": "A",
+      "TTL": 60,
+      "ResourceRecords": [{"Value": "${vips[0]}"}]
+      }
+    },{
+    "Action": "UPSERT",
+    "ResourceRecordSet": {
       "Name": "*.apps.$cluster_domain.",
       "Type": "A",
       "TTL": 60,
@@ -49,6 +59,8 @@ cat > "${SHARED_DIR}"/dns-create.json <<EOF
 }]}
 EOF
 
+# api-int record is needed for Windows nodes
+# TODO: Remove the api-int entry in future
 echo "Creating batch file to destroy DNS records"
 
 cat > "${SHARED_DIR}"/dns-delete.json <<EOF
@@ -58,6 +70,14 @@ cat > "${SHARED_DIR}"/dns-delete.json <<EOF
     "Action": "DELETE",
     "ResourceRecordSet": {
       "Name": "api.$cluster_domain.",
+      "Type": "A",
+      "TTL": 60,
+      "ResourceRecords": [{"Value": "${vips[0]}"}]
+      }
+    },{
+    "Action": "DELETE",
+    "ResourceRecordSet": {
+      "Name": "api-int.$cluster_domain.",
       "Type": "A",
       "TTL": 60,
       "ResourceRecords": [{"Value": "${vips[0]}"}]
