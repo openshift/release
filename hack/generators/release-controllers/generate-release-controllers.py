@@ -73,9 +73,9 @@ class Context:
 
 def run(git_clone_dir):
     releases_4x = []
-    for name in glob.glob(f'{git_clone_dir}/ci-operator/config/openshift/origin/openshift-origin-release-4.*.yaml'):
-        bn = os.path.splitext(os.path.basename(name))[0]  # e.g. openshift-origin-release-4.4
-        major_minor = bn.split('-')[-1]  # 4.4
+    for name in glob.glob(f'{git_clone_dir}/ci-operator/jobs/openshift/release/openshift-release-release-4.*-periodics.yaml'):
+        bn = os.path.splitext(os.path.basename(name))[0]  # e.g. openshift-release-release-4.4-periodics
+        major_minor = bn.split('-')[-2]  # 4.4
         releases_4x.append(major_minor)
 
     path_base = pathlib.Path(git_clone_dir)
@@ -114,7 +114,7 @@ def run(git_clone_dir):
         content.add_art_publish(gendoc)
 
     for major_minor in releases_4x:
-        with genlib.GenDoc(path_rc_release_resources.joinpath(f'rpms-ocp-{major_minor}.yaml'), context) as gendoc:
+        with genlib.GenDoc(path_rc_release_resources.joinpath(f'rpms-ocp-{major_minor}.yaml'), context=config) as gendoc:
             content.add_rpm_mirror_service(gendoc, git_clone_dir, major_minor)
 
         # If there is an annotation defined for the public release controller, use it as a template
