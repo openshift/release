@@ -33,9 +33,10 @@ export PATH=/home/packer:$PATH
 mkdir -p /tmp/artifacts
 
 function run-tests() {
-  BUNDLE_VERSION=4.6.0-ci
+  BUNDLE_VERSION=candidate
 
   export OPENSHIFT_PULL_SECRET_PATH="${HOME}"/pull-secret
+  # This will allow us to fetch oc binary from http://mirror.openshift.com/pub/openshift-v4/clients/ocp/candidate/
   export OPENSHIFT_VERSION="${BUNDLE_VERSION}"
 
   # clone the snc repo
