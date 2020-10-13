@@ -15,28 +15,18 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-openshift-4.6
-  openshift_release_golang-1.13:
-    name: release
-    namespace: openshift
-    tag: golang-1.13
-  openshift_release_golang-1.14:
-    name: release
-    namespace: openshift
-    tag: golang-1.14
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.14
-canonical_go_repository: github.com/openshift/kube-rbac-proxy
+  project_image:
+    dockerfile_path: base.Dockerfile
+canonical_go_repository: github.com/operator-framework/operator-lifecycle-manager
 images:
-- dockerfile_path: Dockerfile.ocp
+- dockerfile_path: Dockerfile
   from: base
   inputs:
     ocp_builder_rhel-8-golang-1.15-openshift-4.7:
       as:
       - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
-  to: kube-rbac-proxy
+  to: operator-lifecycle-manager
 promotion:
   disabled: true
   name: 4.7-priv
@@ -50,11 +40,33 @@ tag_specification:
   name: 4.7-priv
   namespace: ocp-private
 tests:
-- as: e2e-aws
+- as: verify
+  commands: make verify
+  container:
+    from: src
+- as: unit
+  commands: make unit
+  container:
+    from: src
+- as: e2e-gcp
   steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
+- as: e2e-aws-olm
+  commands: JUNIT_DIRECTORY=$(ARTIFACT_DIR) make e2e
+  openshift_installer_src:
     cluster_profile: aws
-    workflow: openshift-e2e-aws
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-console-olm
+  commands: ./test-prow-e2e.sh olmFull
+  openshift_installer_custom_test_image:
+    cluster_profile: aws
+    from: stable:console-tests
+- as: e2e-upgrade
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-upgrade-gcp-loki
 zz_generated_metadata:
   branch: release-4.7
   org: openshift-priv
-  repo: kube-rbac-proxy
+  repo: operator-lifecycle-manager
