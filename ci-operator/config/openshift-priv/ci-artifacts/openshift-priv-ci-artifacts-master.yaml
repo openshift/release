@@ -1,0 +1,47 @@
+base_images:
+  base:
+    name: 4.7-priv
+    namespace: ocp-private
+    tag: base
+  base_centos:
+    name: centos
+    namespace: openshift
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+canonical_go_repository: github.com/openshift-psap/ci-artifacts
+images:
+- dockerfile_path: build/Dockerfile
+  from: base
+  to: ci-artifacts
+promotion:
+  name: 4.7-priv
+  namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 2Gi
+    requests:
+      cpu: 2000m
+      memory: 2Gi
+tests:
+- as: gpu-operator-e2e
+  cron: 0 */23 * * *
+  steps:
+    cluster_profile: aws
+    test:
+    - as: e2e
+      commands: run gpu-ci
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: master
+  org: openshift-priv
+  repo: ci-artifacts

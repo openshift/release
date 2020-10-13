@@ -1,0 +1,72 @@
+base_images:
+  base:
+    name: 4.8-priv
+    namespace: ocp-private
+    tag: base
+  ocp_builder_golang-1.13:
+    name: builder
+    namespace: ocp
+    tag: golang-1.13
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
+  openshift_release_golang-1.13:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+binary_build_commands: make
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+canonical_go_repository: github.com/kubernetes-sigs/aws-ebs-csi-driver
+images:
+- dockerfile_path: Dockerfile.openshift.rhel7
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
+  to: aws-ebs-csi-driver
+promotion:
+  name: 4.8-priv
+  namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: 4.8-priv
+  namespace: ocp-private
+tests:
+- as: verify
+  commands: |
+    # Set $HOME for golangci-lint cache
+    HOME=/tmp make verify
+  container:
+    from: src
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: |
+    make test
+  container:
+    from: src
+- as: e2e-aws-csi
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-csi
+zz_generated_metadata:
+  branch: release-4.8
+  org: openshift-priv
+  repo: aws-ebs-csi-driver
