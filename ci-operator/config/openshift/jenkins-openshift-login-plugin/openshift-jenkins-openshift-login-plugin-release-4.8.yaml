@@ -1,0 +1,41 @@
+base_images:
+  original_jenkins:
+    name: "4.8"
+    namespace: ocp
+    tag: jenkins
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+images:
+- dockerfile_path: Dockerfile
+  from: original_jenkins
+  inputs:
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/jenkins-openshift-login-plugin/.
+  to: jenkins
+promotion:
+  excluded_images:
+  - jenkins
+  name: "4.8"
+  namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.8"
+  namespace: ocp
+tests:
+- as: e2e-aws-jenkins
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-jenkins
+zz_generated_metadata:
+  branch: release-4.8
+  org: openshift
+  repo: jenkins-openshift-login-plugin

@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "4.7"
+    name: "4.8"
     namespace: ocp
     tag: base
   ocp_builder_rhel-8-golang-1.15-openshift-4.6:
@@ -15,30 +15,25 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-openshift-4.6
-  openshift_release_golang-1.13:
-    name: release
-    namespace: openshift
-    tag: golang-1.13
-  openshift_release_golang-1.14:
-    name: release
-    namespace: openshift
-    tag: golang-1.14
+binary_build_commands: make build
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.14
+    tag: golang-1.15
 images:
-- dockerfile_path: Dockerfile.ocp
+- dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
     ocp_builder_rhel-8-golang-1.15-openshift-4.7:
       as:
       - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
-  to: kube-rbac-proxy
+  to: aws-ebs-csi-driver-operator
+- dockerfile_path: Dockerfile.test
+  from: src
+  to: aws-ebs-csi-driver-operator-test
 promotion:
-  disabled: true
-  name: "4.7"
+  name: "4.8"
   namespace: ocp
 resources:
   '*':
@@ -46,14 +41,28 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.7"
+  name: "4.8"
   namespace: ocp
 tests:
-- as: e2e-aws
-  steps:
+- as: verify
+  commands: |
+    make verify
+  container:
+    from: src
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: |
+    mkdir -p /tmp/artifacts
+    make test-unit JUNITFILE=/tmp/artifacts/junit_report.xml
+  container:
+    from: src
+- as: e2e-operator
+  commands: |
+    make test-e2e ARTIFACT_DIR=/tmp/artifacts
+  openshift_installer_custom_test_image:
     cluster_profile: aws
-    workflow: openshift-e2e-aws
+    from: stable:aws-ebs-csi-driver-operator-test
 zz_generated_metadata:
-  branch: release-4.7
+  branch: release-4.8
   org: openshift
-  repo: kube-rbac-proxy
+  repo: aws-ebs-csi-driver-operator

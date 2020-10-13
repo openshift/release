@@ -1,0 +1,43 @@
+base_images:
+  base:
+    name: "4.8"
+    namespace: ocp
+    tag: base
+  openshift_release_golang-1.13:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+binary_build_commands: make build WHAT=cmd/extended-platform-tests
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- dockerfile_path: Dockerfile.rhel
+  from: base
+  inputs:
+    openshift_release_golang-1.13:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.13
+  to: extended-platform-tests
+promotion:
+  name: "4.8"
+  namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.8"
+  namespace: ocp
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-4.8
+  org: openshift
+  repo: openshift-tests
