@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: 4.7-priv
+    name: 4.8-priv
     namespace: ocp-private
     tag: base
   ocp_builder_rhel-8-golang-1.15-openshift-4.6:
@@ -28,18 +28,17 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.14
-canonical_go_repository: github.com/openshift/kube-rbac-proxy
+canonical_go_repository: github.com/openshift/cluster-monitoring-operator
 images:
-- dockerfile_path: Dockerfile.ocp
+- dockerfile_path: Dockerfile
   from: base
   inputs:
     ocp_builder_rhel-8-golang-1.15-openshift-4.7:
       as:
       - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
-  to: kube-rbac-proxy
+  to: cluster-monitoring-operator
 promotion:
-  disabled: true
-  name: 4.7-priv
+  name: 4.8-priv
   namespace: ocp-private
 resources:
   '*':
@@ -47,14 +46,34 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: 4.7-priv
+  name: 4.8-priv
   namespace: ocp-private
 tests:
-- as: e2e-aws
+- as: generate
+  commands: make generate && git diff --exit-code
+  container:
+    from: src
+- as: vendor
+  commands: make vendor && git diff --exit-code
+  container:
+    from: src
+- as: unit
+  commands: make test-unit
+  container:
+    from: src
+- as: e2e
   steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
+- as: e2e-aws-operator
+  commands: make test-e2e
+  openshift_installer_src:
     cluster_profile: aws
-    workflow: openshift-e2e-aws
+- as: e2e-upgrade
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-upgrade-gcp-loki
 zz_generated_metadata:
-  branch: release-4.7
+  branch: release-4.8
   org: openshift-priv
-  repo: kube-rbac-proxy
+  repo: cluster-monitoring-operator

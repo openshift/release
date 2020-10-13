@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: 4.7-priv
+    name: 4.8-priv
     namespace: ocp-private
     tag: base
   ocp_builder_rhel-8-golang-1.15-openshift-4.6:
@@ -19,27 +19,22 @@ base_images:
     name: release
     namespace: openshift
     tag: golang-1.13
-  openshift_release_golang-1.14:
-    name: release
-    namespace: openshift
-    tag: golang-1.14
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.14
-canonical_go_repository: github.com/openshift/kube-rbac-proxy
+    tag: golang-1.13
+canonical_go_repository: github.com/openshift/cluster-nfd-operator
 images:
-- dockerfile_path: Dockerfile.ocp
+- dockerfile_path: Dockerfile
   from: base
   inputs:
     ocp_builder_rhel-8-golang-1.15-openshift-4.7:
       as:
       - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
-  to: kube-rbac-proxy
+  to: cluster-nfd-operator
 promotion:
-  disabled: true
-  name: 4.7-priv
+  name: 4.8-priv
   namespace: ocp-private
 resources:
   '*':
@@ -47,14 +42,26 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: 4.7-priv
+  name: 4.8-priv
   namespace: ocp-private
 tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
+- as: verify
+  commands: make verify
+  container:
+    from: src
 - as: e2e-aws
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
+- as: e2e-upgrade
+  steps:
+    cluster_profile: aws
+    workflow: openshift-upgrade-aws-loki
 zz_generated_metadata:
-  branch: release-4.7
+  branch: release-4.8
   org: openshift-priv
-  repo: kube-rbac-proxy
+  repo: cluster-nfd-operator
