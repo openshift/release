@@ -20,10 +20,10 @@ metadata:
   name: ${CLUSTER_NAME}
 platform:
   openstack:
+    apiFloatingIP:    ${LB_FIP_IP}
     cloud:            ${OS_CLOUD}
-    externalNetwork:  ${OPENSTACK_EXTERNAL_NETWORK}
     computeFlavor:    ${OPENSTACK_COMPUTE_FLAVOR}
-    lbFloatingIP:     ${LB_FIP_IP}
+    externalNetwork:  ${OPENSTACK_EXTERNAL_NETWORK}
 pullSecret: >
   ${PULL_SECRET}
 sshKey: |
