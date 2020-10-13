@@ -6,12 +6,12 @@ periodics:
   decoration_config:
     skip_cloning: true
   extra_refs:
-  - base_ref: release-4.7
+  - base_ref: release-4.8
     org: kube-reporting
     repo: metering-operator
   labels:
-    ci-operator.openshift.io/prowgen-controlled: 'true'
-    pj-rehearse.openshift.io/can-be-rehearsed: 'true'
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-kube-reporting-metering-operator-release-4.8-metering-periodic-aws
   reporter_config:
     slack:
@@ -20,10 +20,7 @@ periodics:
       - success
       - failure
       - error
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
+      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}} :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -42,16 +39,13 @@ periodics:
       - name: JOB_NAME_SAFE
         value: metering-periodic-aws
       - name: TEST_COMMAND
-        value: 'set -x
+        value: |
+          set -x
 
-
-          make e2e EXTRA_TEST_FLAGS="-run TestManualMeteringInstall" TEST_ENABLE_MACHINE_AUTOSCALING="true"
-          TEST_RUN_ALL_INSTALL_TESTS="true" TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/e2e
-
-          '
+          make e2e EXTRA_TEST_FLAGS="-run TestManualMeteringInstall" TEST_ENABLE_MACHINE_AUTOSCALING="true" TEST_RUN_ALL_INSTALL_TESTS="true" TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/e2e
       image: ci-operator:latest
       imagePullPolicy: Always
-      name: ''
+      name: ""
       resources:
         requests:
           cpu: 10m
