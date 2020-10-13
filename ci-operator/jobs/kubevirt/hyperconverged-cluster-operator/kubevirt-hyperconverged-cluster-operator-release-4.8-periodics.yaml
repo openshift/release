@@ -6,12 +6,12 @@ periodics:
   decoration_config:
     skip_cloning: true
   extra_refs:
-  - base_ref: release-4.7
+  - base_ref: release-4.8
     org: kubevirt
     repo: hyperconverged-cluster-operator
   labels:
-    ci-operator.openshift.io/prowgen-controlled: 'true'
-    pj-rehearse.openshift.io/can-be-rehearsed: 'true'
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-kubevirt-hyperconverged-cluster-operator-release-4.8-hco-e2e-deploy-nightly-master-aws
   spec:
     containers:
@@ -31,24 +31,16 @@ periodics:
       - name: JOB_NAME_SAFE
         value: hco-e2e-deploy-nightly-master-aws
       - name: TEST_COMMAND
-        value: 'latest_build=$(curl -sL https://storage.googleapis.com/kubevirt-prow/devel/nightly/release/kubevirt/hyperconverged-cluster-operator/latest)
-
+        value: |
+          latest_build=$(curl -sL https://storage.googleapis.com/kubevirt-prow/devel/nightly/release/kubevirt/hyperconverged-cluster-operator/latest)
           latest_bundle=$(curl -sL https://storage.googleapis.com/kubevirt-prow/devel/nightly/release/kubevirt/hyperconverged-cluster-operator/${latest_build}/hco-bundle-image)
-
           sed -i "s#image:.*#image: ${latest_bundle}#" deploy/kustomize/image_registry/catalog_source.yaml
-
           sed -i "s#15m#30m#g" ./deploy/kustomize/deploy_kustomize.sh
-
-          CONTENT_ONLY=false MARKETPLACE_MODE=false ./deploy/kustomize/deploy_kustomize.sh
-          ||
-
-          oc adm must-gather --image=quay.io/kubevirt/must-gather:latest --dest-dir=/tmp/artifacts
-          --timeout=10
-
-          '
+          CONTENT_ONLY=false MARKETPLACE_MODE=false ./deploy/kustomize/deploy_kustomize.sh ||
+          oc adm must-gather --image=quay.io/kubevirt/must-gather:latest --dest-dir=/tmp/artifacts --timeout=10
       image: ci-operator:latest
       imagePullPolicy: Always
-      name: ''
+      name: ""
       resources:
         requests:
           cpu: 10m
