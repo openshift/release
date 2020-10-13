@@ -1,8 +1,12 @@
 base_images:
   base:
-    name: "4.7"
+    name: "4.8"
     namespace: ocp
     tag: base
+  ocp_builder_golang-1.14:
+    name: builder
+    namespace: ocp
+    tag: golang-1.14
   ocp_builder_rhel-8-golang-1.15-openshift-4.6:
     name: builder
     namespace: ocp
@@ -27,18 +31,17 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.14
+    tag: golang-1.13
 images:
-- dockerfile_path: Dockerfile.ocp
+- dockerfile_path: Dockerfile.rhel
   from: base
   inputs:
     ocp_builder_rhel-8-golang-1.15-openshift-4.7:
       as:
       - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
-  to: kube-rbac-proxy
+  to: cluster-version-operator
 promotion:
-  disabled: true
-  name: "4.7"
+  name: "4.8"
   namespace: ocp
 resources:
   '*':
@@ -46,14 +49,26 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.7"
+  name: "4.8"
   namespace: ocp
 tests:
-- as: e2e-aws
+- as: gofmt
+  commands: go fmt ./... && git diff --exit-code
+  container:
+    from: src
+- as: unit
+  commands: go test ./...
+  container:
+    from: src
+- as: e2e
   steps:
-    cluster_profile: aws
-    workflow: openshift-e2e-aws
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
+- as: e2e-upgrade
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-upgrade-gcp-loki
 zz_generated_metadata:
-  branch: release-4.7
+  branch: release-4.8
   org: openshift
-  repo: kube-rbac-proxy
+  repo: cluster-version-operator
