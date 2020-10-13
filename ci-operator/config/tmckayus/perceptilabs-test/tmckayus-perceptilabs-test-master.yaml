@@ -1,8 +1,22 @@
+base_images:
+  os:
+    name: centos
+    namespace: origin
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.14
+images:
+- dockerfile_path: Dockerfile.ci
+  from: os
+  to: perceptilabs-tests
 releases:
   latest:
     release:
       channel: stable
-      version: "4.5"
+      version: "4.3"
 resources:
   '*':
     requests:
@@ -13,20 +27,18 @@ tests:
   cron: 0 0 * * *
   steps:
     cluster_profile: aws
-    env:
-      CHANNEL: "4.5"
-      INSTALL_NAMESAPCE: somewhere
-      PACKAGE: percetilabs
-      TARGET_NAMESPACES: 1,2,3
     test:
     - as: e2e
-      commands: test.sh
-      from: src
+      commands: |
+        echo "perceptilabs-operator-package stable" > operator-list
+        ./setup.sh -o operator-list
+        ./run.sh -p -i
+      from: perceptilabs-tests
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: operatorhub
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: tmckayus
