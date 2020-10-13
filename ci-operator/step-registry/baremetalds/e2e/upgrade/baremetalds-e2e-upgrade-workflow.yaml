@@ -10,12 +10,15 @@ workflow:
       - ref: baremetalds-e2e-conf
       - ref: baremetalds-e2e-test
       - ref: baremetalds-e2e-upgrade-upgrade
-      - ref: openshift-e2e-test
-      # - ref: baremetalds-e2e-upgrade-test
+      - ref: baremetalds-e2e-test
     post:
     - ref: baremetalds-devscripts-gather
-    # - ref: baremetalds-packet-teardown
+    - ref: baremetalds-packet-teardown
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: "release:initial"
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: "release:latest"   
     env:
-      TEST_SUITE: "all"
+      DEVSCRIPTS_CONFIG: |
+        OPENSHIFT_RELEASE_IMAGE: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
   documentation: |-
-    This workflow executes the common end-to-end test suite on a cluster provisioned by running dev-scripts on a packet server.
+    This workflow executes an upgrade and then executes the common end-to-end test suite on a cluster provisioned by running dev-scripts on a packet server.
