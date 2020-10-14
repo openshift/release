@@ -31,17 +31,21 @@ capabilities=$(oc rsh fedora-pod capsh --print)
 echo "capabilities are ${capabilities}"
 
 # get the capabilities MCs available
-mcCaps=$(oc get mc/99-worker-generated-crio-capabilities -o name; true)
+workerMC=$(oc get mc/99-worker-generated-crio-capabilities -o name; true)
+masterMC=$(oc get mc/99-master-generated-crio-capabilities -o name; true)
 # for debug purposes only
-echo "mc caps is ${mcCaps}"
-if [[ "${mcCaps}" == "" ]]; then
+echo "mc caps is ${workerMC} and ${masterMC}"
+# Since we are only deleting the worker caps MC for the test, the master caps MC should
+# exist. If it does, this means we have the capabilities patch so we should go ahead and
+# check the capabilities.
+if [[ "${workerMC}" == "" ]] && [[ "${masterMC}" != "" ]]; then
     if [[ "${capabilities}" == *"net_raw"* ]]; then
-        echo "No capabilities MCs were found, but the restricted scc still has NET_RAW enabled"
+        echo "No worker capabilities MCs were found, but the restricted scc still has NET_RAW enabled"
         exit 1
     fi
-else
+elif [[ "${workerMC}" != "" ]]; then
     if [[ "${capabilities}" != *"net_raw"* ]]; then
-        echo "Capabilities MC was found, but the restricted scc does not have NET_RAW enabled"
+        echo "Worker capabilities MC was found, but the restricted scc does not have NET_RAW enabled"
         exit 1
     fi
 fi
