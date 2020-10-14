@@ -34,8 +34,9 @@ tests:
   cron: 2 7 * * *
   steps:
     cluster_profile: azure4
-    test:
-    - as: kata-e2e-test
+    pre:
+    - chain: ipi-azure-pre
+    - as: kata-containers-e2e-pre
       commands: |
         # TODO: Currently the oc binary isn't available in the test container,
         # so remove this when it is fixed in the multistage test machinery.
@@ -55,13 +56,20 @@ tests:
         fi
         KATA_WORKDIR=/go/src/github.com/kata-containers/tests
         cd $KATA_WORKDIR
-        .ci/openshift-ci/test.sh
+        source ".ci/lib.sh"
+        oc version || die "Test cluster is unreachable"
+        info "Install and configure kata into the test cluster"
+        .ci/openshift-ci/cluster/install_kata.sh || die "Failed to install kata-containers"
+        export tests_repo="$KATA_WORKDIR"
+        source integration/openshift/lib.sh
+        configure_cluster || die "Failed to configure the cluster"
+        #.ci/openshift-ci/test.sh
       from: pipeline:bin
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: ipi-azure
+    workflow: openshift-e2e-azure
 zz_generated_metadata:
   branch: master
   org: kata-containers
