@@ -34,13 +34,14 @@ tests:
   cron: 2 7 * * *
   steps:
     cluster_profile: azure4
-    test:
-    - as: kata-containers-e2e-test
+    pre:
+    - chain: ipi-azure-pre
+    - as: kata-containers-e2e-pre
       commands: |
+        sleep 7200
         KATA_WORKDIR=/go/src/github.com/kata-containers/tests
         LOCAL_SHARED_DIR=${KATA_WORKDIR}/shared_dir
         mkdir -p $LOCAL_SHARED_DIR
-        cd $KATA_WORKDIR
         # TODO: Currently the oc binary isn't available in the test container,
         # so remove this when it is fixed in the multistage test machinery.
         if ! command -V oc; then
@@ -55,27 +56,22 @@ tests:
         export KUBECONFIG=${LOCAL_SHARED_DIR}/kubeconfig
         # TODO: The ipi-azure test step does not export AZURE_AUTH_LOCATION
         # which causes openshift-tests to fail.
-        export AZURE_AUTH_LOCATION=${LOCAL_SHARED_DIR}/metadata.json
-        # The test script will clone the origin repository in order to build
-        # the openshift-tests binary. However an origin (empty) folder can be
-        # left behind when the current container image was created, so the
-        # test script is going to fail.
-        [ -d "/go/src/github.com/openshift/origin" ] && rm -rf "/go/src/github.com/openshift/origin"
-        # To build the openshift-tests binary it is required Go 1.14.4 or greater.
-        curl -OL https://storage.googleapis.com/golang/go1.14.4.linux-amd64.tar.gz
-        tar -C $LOCAL_SHARED_DIR -xzf go1.14.4.linux-amd64.tar.gz
-        export PATH=${LOCAL_SHARED_DIR}/go/bin:$PATH
-        export GOROOT=${LOCAL_SHARED_DIR}/go
-        # Overwrite the default tests directories otherwise it will use /var and
-        # end up failing (read-only directory).
-        export KATA_TESTS_BASEDIR="${KATA_WORKDIR}/_output/tests"
-        .ci/openshift-ci/test.sh
+        cd $KATA_WORKDIR
+        source ".ci/lib.sh"
+        oc version || die "Test cluster is unreachable"
+        info "Install and configure kata into the test cluster"
+        .ci/openshift-ci/cluster/install_kata.sh || die "Failed to install kata-containers"
+        export tests_repo="$KATA_WORKDIR"
+        source integration/openshift/lib.sh
+        configure_cluster || die "Failed to configure the cluster"
+        info "Run a smoke test to check the installation"
+        .ci/openshift-ci/run_smoke_test.sh
       from: pipeline:bin
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: ipi-azure
+    workflow: openshift-e2e-azure
 zz_generated_metadata:
   branch: master
   org: kata-containers
