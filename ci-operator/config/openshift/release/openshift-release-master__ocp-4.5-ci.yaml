@@ -1,3 +1,8 @@
+base_images:
+  openstack-installer:
+    name: "4.5"
+    namespace: ocp
+    tag: openstack-installer
 releases:
   initial:
     release:
@@ -7,6 +12,11 @@ releases:
     candidate:
       product: ocp
       stream: ci
+      version: "4.5"
+  release-ppc64le:
+    release:
+      architecture: ppc64le
+      channel: stable
       version: "4.5"
 resources:
   '*':
@@ -21,6 +31,21 @@ tests:
     env:
       TEST_OPTIONS: ""
     workflow: openshift-upgrade-aws
+- as: e2e-openstack-osuosl-ipi
+  cron: 0 8,20 * * *
+  steps:
+    cluster_profile: openstack-osuosl
+    test:
+    - as: e2e
+      commands: |-
+        #!/bin/bash
+        e2e-tests # as built by go test -c
+      from: repo-tests
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 2Gi
+    workflow: openshift-e2e-openstack-osuosl-ipi
 zz_generated_metadata:
   branch: master
   org: openshift
