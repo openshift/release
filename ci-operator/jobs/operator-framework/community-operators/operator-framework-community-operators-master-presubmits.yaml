@@ -22,20 +22,11 @@ presubmits:
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
+        - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/deploy-operator-on-openshift-cluster-profile
         - --target=deploy-operator-on-openshift
-        - --template=/usr/local/deploy-operator-on-openshift
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: deploy-operator-on-openshift
-        - name: TEST_COMMAND
-          value: |
-            ls
-            scripts/ci/openshift-deploy.sh
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -46,11 +37,11 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
         - mountPath: /usr/local/deploy-operator-on-openshift-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/deploy-operator-on-openshift
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -65,14 +56,14 @@ presubmits:
           - key: password
             path: password
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
           - secret:
               name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
