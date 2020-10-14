@@ -67,7 +67,13 @@ for typeName, data in sorted(CONFIG.items()):
     else:
         resource['names'] = []
         for name, count in sorted(data.items()):
-            resource['names'].extend([name]*count)
+            if '--' in name:
+                raise ValueError('double-dashes are used internally, so {!r} is invalid'.format(name))
+            if count > 1:
+                width = len(str(count-1))
+                resource['names'].extend(['{name}--{i:0>{width}}'.format(name=name, i=i, width=width) for i in range(count)])
+            else:
+                resource['names'].append(name)
     config['resources'].append(resource)
 
 with open('_boskos.yaml', 'w') as f:
