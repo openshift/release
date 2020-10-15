@@ -27,8 +27,10 @@ clean:
 install:
 	jb install
 
-validate-latest: clean install all
-	@echo "Generating sinker.json ..."
+upgrade:
+	jb update
+
+validate: clean install all
 	git diff --exit-code ./
 
 .PHONY : generate-k8s-dashboards
