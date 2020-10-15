@@ -300,7 +300,6 @@ presubmits:
       ci-operator.openshift.io/variant: "4.5"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-knative-serverless-operator-master-4.5-upstream-e2e-aws-ocp-45
-    optional: true
     rerun_command: /test 4.5-upstream-e2e-aws-ocp-45
     spec:
       containers:
@@ -359,6 +358,150 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )4.5-upstream-e2e-aws-ocp-45,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build01
+    context: ci/prow/4.5-upstream-eventing-e2e-aws-ocp-45
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: "4.5"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-serverless-operator-master-4.5-upstream-eventing-e2e-aws-ocp-45
+    rerun_command: /test 4.5-upstream-eventing-e2e-aws-ocp-45
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-password-file=/etc/boskos/password
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/upstream-eventing-e2e-aws-ocp-45-cluster-profile
+        - --target=upstream-eventing-e2e-aws-ocp-45
+        - --variant=4.5
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/upstream-eventing-e2e-aws-ocp-45-cluster-profile
+          name: cluster-profile
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.5-upstream-eventing-e2e-aws-ocp-45,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build01
+    context: ci/prow/4.5-upstream-serving-e2e-aws-ocp-45
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: "4.5"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-serverless-operator-master-4.5-upstream-serving-e2e-aws-ocp-45
+    rerun_command: /test 4.5-upstream-serving-e2e-aws-ocp-45
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-password-file=/etc/boskos/password
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/upstream-serving-e2e-aws-ocp-45-cluster-profile
+        - --target=upstream-serving-e2e-aws-ocp-45
+        - --variant=4.5
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/upstream-serving-e2e-aws-ocp-45-cluster-profile
+          name: cluster-profile
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.5-upstream-serving-e2e-aws-ocp-45,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -601,11 +744,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )4.6-upgrade-tests-aws-ocp-46,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build01
-    context: ci/prow/4.6-upstream-e2e-aws-ocp-46
+    context: ci/prow/4.6-upstream-e2e-aws-ocp-45
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -614,8 +757,8 @@ presubmits:
       ci-operator.openshift.io/variant: "4.6"
       job-release: "4.6"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-serverless-operator-master-4.6-upstream-e2e-aws-ocp-46
-    rerun_command: /test 4.6-upstream-e2e-aws-ocp-46
+    name: pull-ci-openshift-knative-serverless-operator-master-4.6-upstream-e2e-aws-ocp-45
+    rerun_command: /test 4.6-upstream-e2e-aws-ocp-45
     spec:
       containers:
       - args:
@@ -624,8 +767,8 @@ presubmits:
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/upstream-e2e-aws-ocp-46-cluster-profile
-        - --target=upstream-e2e-aws-ocp-46
+        - --secret-dir=/usr/local/upstream-e2e-aws-ocp-45-cluster-profile
+        - --target=upstream-e2e-aws-ocp-45
         - --variant=4.6
         command:
         - ci-operator
@@ -642,7 +785,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/upstream-e2e-aws-ocp-46-cluster-profile
+        - mountPath: /usr/local/upstream-e2e-aws-ocp-45-cluster-profile
           name: cluster-profile
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -672,7 +815,153 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.6-upstream-e2e-aws-ocp-46,?($|\s.*)
+    trigger: (?m)^/test( | .* )4.6-upstream-e2e-aws-ocp-45,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build01
+    context: ci/prow/4.6-upstream-eventing-e2e-aws-ocp-45
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: "4.6"
+      job-release: "4.6"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-serverless-operator-master-4.6-upstream-eventing-e2e-aws-ocp-45
+    rerun_command: /test 4.6-upstream-eventing-e2e-aws-ocp-45
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-password-file=/etc/boskos/password
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/upstream-eventing-e2e-aws-ocp-45-cluster-profile
+        - --target=upstream-eventing-e2e-aws-ocp-45
+        - --variant=4.6
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/upstream-eventing-e2e-aws-ocp-45-cluster-profile
+          name: cluster-profile
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.6-upstream-eventing-e2e-aws-ocp-45,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build01
+    context: ci/prow/4.6-upstream-serving-e2e-aws-ocp-45
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: "4.6"
+      job-release: "4.6"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-serverless-operator-master-4.6-upstream-serving-e2e-aws-ocp-45
+    rerun_command: /test 4.6-upstream-serving-e2e-aws-ocp-45
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-password-file=/etc/boskos/password
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/upstream-serving-e2e-aws-ocp-45-cluster-profile
+        - --target=upstream-serving-e2e-aws-ocp-45
+        - --variant=4.6
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/upstream-serving-e2e-aws-ocp-45-cluster-profile
+          name: cluster-profile
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.6-upstream-serving-e2e-aws-ocp-45,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
