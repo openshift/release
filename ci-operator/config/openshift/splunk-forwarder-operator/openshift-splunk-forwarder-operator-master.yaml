@@ -1,12 +1,8 @@
 base_images:
   base:
-    name: "4.4"
+    name: ubi-minimal
     namespace: ocp
-    tag: base
-  openshift_release_golang-1.12:
-    name: release
-    namespace: openshift
-    tag: golang-1.12
+    tag: "8"
 build_root:
   image_stream_tag:
     name: release
@@ -15,14 +11,12 @@ build_root:
 images:
 - dockerfile_path: build/Dockerfile
   from: base
-  inputs:
-    openshift_release_golang-1.12:
-      as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.12
   to: splunk-forwarder-operator
 - dockerfile_path: containers/forwarder/Dockerfile
+  from: base
   to: splunk-forwarder
 - dockerfile_path: containers/heavy_forwarder/Dockerfile
+  from: base
   to: splunk-heavyforwarder
 resources:
   '*':
