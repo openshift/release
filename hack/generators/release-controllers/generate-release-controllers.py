@@ -130,6 +130,7 @@ def run(git_clone_dir, bump=False):
 
             with genlib.GenDoc(config.paths.path_rc_deployments.joinpath(f'deploy-{context.is_namespace}-controller.yaml'), context) as gendoc:
                 content.add_osd_rc_deployments(gendoc)
+                content.add_osd_files_cache_service_account_resources(gendoc)
                 content.add_osd_files_cache_resources(gendoc)
 
             with genlib.GenDoc(config.paths.path_rc_release_resources.joinpath(f'admin_config_updater_rbac{context.suffix}.yaml'), context) as gendoc:
