@@ -5,13 +5,23 @@ import yaml
 
 CONFIG = {
     'aws-quota-slice': {
-        'default': 150,
+        # Wild guesses.  We'll see when we hit quota issues
+        'us-east-1': 50,
+        'us-east-2': 50,
+        'us-west-1': 50,
+        'us-west-2': 50,
     },
     'azure4-quota-slice': {
-        'default': 30,
+        # Cannot create more than 50 public IP addresses for this subscription in this region.
+        # and each cluster needs three of public IPs: https://docs.openshift.com/container-platform/4.5/installing/installing_azure/installing-azure-account.html#installation-azure-limits_installing-azure-account
+        'centralus': 16,
+        # Wild guesses.  We'll see when we hit quota issues
+        'eastus1': 10,
+        'eastus2': 10,
+        'westus': 10
     },
     'gcp-quota-slice': {
-        'default': 120,
+        'us-east1': 120,
     },
     'libvirt-s390x-quota-slice': {},
     'libvirt-ppc64le-quota-slice': {},
@@ -67,7 +77,13 @@ for typeName, data in sorted(CONFIG.items()):
     else:
         resource['names'] = []
         for name, count in sorted(data.items()):
-            resource['names'].extend([name]*count)
+            if '--' in name:
+                raise ValueError('double-dashes are used internally, so {!r} is invalid'.format(name))
+            if count > 1:
+                width = len(str(count-1))
+                resource['names'].extend(['{name}--{i:0>{width}}'.format(name=name, i=i, width=width) for i in range(count)])
+            else:
+                resource['names'].append(name)
     config['resources'].append(resource)
 
 with open('_boskos.yaml', 'w') as f:
