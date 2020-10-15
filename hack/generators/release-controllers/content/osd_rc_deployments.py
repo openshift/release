@@ -183,7 +183,7 @@ def _add_osd_rc_deployment(gendoc):
                                         *extra_rc_args,
                                         '--prow-config=/etc/config/config.yaml',
                                         '--job-config=/etc/job-config',
-                                        f'--artifacts={context.hostname_artifacts}.{context.config.rc_release_domain}',
+                                        f'--artifacts={context.fc_url}',
                                         '--listen=' + ('127.0.0.1:8080' if context.private else ':8080'),
                                         f'--prow-namespace={context.config.rc_deployment_namespace}',
                                         '--non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig',

@@ -33,7 +33,7 @@ used by a release controller. Create a service and a route to this public instan
                 'namespace': context.jobs_namespace
             },
             'spec': {
-                'host': f'openshift-release-artifacts{context.suffix}.svc.ci.openshift.org',
+                'host': context.fc_url,
                 'tls': {
                     'insecureEdgeTerminationPolicy': 'Redirect',
                     'termination': 'Edge'
@@ -100,7 +100,7 @@ used by a release controller. Create a service and a route to this public instan
                 'namespace': context.jobs_namespace,
             },
             'spec': {
-                'host': f'openshift-release-artifacts{context.suffix}.svc.ci.openshift.org',
+                'host': context.fc_url,
                 'tls': {
                     'insecureEdgeTerminationPolicy': 'Redirect',
                     'termination': 'Reencrypt'
