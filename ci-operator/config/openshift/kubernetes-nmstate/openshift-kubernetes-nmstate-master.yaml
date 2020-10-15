@@ -1,8 +1,21 @@
+base_images:
+  base:
+    name: "4.7"
+    namespace: ocp
+    tag: base
+  dev-scripts:
+    name: test
+    namespace: openshift-kni
+    tag: dev-scripts
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: rhel-8-release-golang-1.15-openshift-4.7
 promotion:
   name: "4.7"
   namespace: ocp
@@ -21,6 +34,31 @@ tests:
   commands: make test/unit
   container:
     from: src
+- as: e2e-metal-ipi-kubernetes-nmstate
+  steps:
+    cluster_profile: packet
+    env:
+      IMAGE_BUILDER: podman
+    pre:
+    - ref: baremetalds-packet-setup
+    - ref: ipi-install-rbac
+    - ref: baremetalds-devscripts-setup
+    test:
+    - as: baremetalds-e2e-conf-kubernetes-nmstate
+      commands: make cluster-sync-operator
+      from: src
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    - as: baremetalds-e2e-test-kubernetes-nmstate
+      commands: make test-e2e-operator
+      from: src
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    workflow: baremetalds-e2e
 zz_generated_metadata:
   branch: master
   org: openshift
