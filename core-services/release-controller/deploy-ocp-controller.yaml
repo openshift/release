@@ -125,39 +125,3 @@ spec:
     component: release-controller-ocp-redirect
   sessionAffinity: None
   type: ClusterIP
----
-#---------------------------------------------------------------------------------
-# redirect_and_files_cache_resources.py added the following resource
-#---------------------------------------------------------------------------------
-
-# The release controller creates a files cache stateful set in each ci-release namespace
-# used by a release controller. Create a service and a route to this public instance.
-apiVersion: v1
-kind: Service
-metadata:
-  name: files-cache
-  namespace: ci-release
-spec:
-  ports:
-  - port: 80
-    targetPort: 8080
-  selector:
-    app: files-cache
----
-#---------------------------------------------------------------------------------
-# redirect_and_files_cache_resources.py added the following resource
-#---------------------------------------------------------------------------------
-
-apiVersion: v1
-kind: Route
-metadata:
-  name: files-cache
-  namespace: ci-release
-spec:
-  host: openshift-release-artifacts.svc.ci.openshift.org
-  tls:
-    insecureEdgeTerminationPolicy: Redirect
-    termination: Edge
-  to:
-    kind: Service
-    name: files-cache
