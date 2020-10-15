@@ -128,3 +128,6 @@ kill ${ocpordforwardpid}
 
 tar -czf "${ARTIFACT_DIR}/loki-container-logs/loki-container-logs.tar.gz" -C /tmp/ loki-container-logs
 tar -tf "${ARTIFACT_DIR}/loki-container-logs/loki-container-logs.tar.gz"
+
+echo "Backup loki index and chunks ..."
+queue ${ARTIFACT_DIR}/loki-container-logs/loki-data.tar.gz oc --insecure-skip-tls-verify exec -n loki loki-0 -- tar cvzf - -C /data .
