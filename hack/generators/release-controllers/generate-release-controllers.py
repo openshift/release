@@ -83,17 +83,6 @@ class Config:
 
         return suffix
 
-    def get_url_prefix(self, arch, private):
-        prefix = arch
-
-        if arch == 'x86_64':
-            prefix = 'amd64'
-
-        if private:
-            prefix += '-priv'
-
-        return prefix
-
 
 class Context:
     def __init__(self, config, arch, private):
@@ -112,9 +101,17 @@ class Context:
         self.rc_route_name = f'release-controller-{self.is_namespace}'
         self.rc_service_name = self.rc_route_name
 
-        # This is the new URL pattern for services that are running on the app.ci cluster
-        self.rc_url = f'{config.get_url_prefix(arch, private)}.ocp.releases.ci.openshift.org'
-        self.fc_url = f'{config.get_url_prefix(arch, private)}.ocp.releases-artifacts.ci.openshift.org'
+        # Routes on the api.ci cluster
+        # release-controller
+        self.rc_api_url = f'{self.rc_hostname}.{self.config.rc_release_domain}'
+        # files-cache
+        self.fc_api_url = f'{self.hostname_artifacts}.{self.config.rc_release_domain}'
+
+        # Routes on the app.ci cluster
+        # release-controller
+        self.rc_app_url = f'{self.rc_hostname}.{self.config.rc_deployment_domain}'
+        # files-cache
+        self.fc_app_url = f'{self.hostname_artifacts}.{self.config.rc_deployment_domain}'
 
 
 def run(git_clone_dir, bump=False):
@@ -130,6 +127,7 @@ def run(git_clone_dir, bump=False):
 
             with genlib.GenDoc(config.paths.path_rc_deployments.joinpath(f'deploy-{context.is_namespace}-controller.yaml'), context) as gendoc:
                 content.add_osd_rc_deployments(gendoc)
+                content.add_osd_files_cache_service_account_resources(gendoc)
                 content.add_osd_files_cache_resources(gendoc)
 
             with genlib.GenDoc(config.paths.path_rc_release_resources.joinpath(f'admin_config_updater_rbac{context.suffix}.yaml'), context) as gendoc:

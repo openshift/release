@@ -63,8 +63,7 @@ the cluster.  This imagestream is used as a commandline parameter to the release
     gendoc.append({
         'apiVersion': 'v1',
         'data': {
-            'default.conf': 'server {\n  listen 8080;\n  return 302 https://%s.%s$request_uri;\n}\n' % (
-                context.rc_hostname, context.config.rc_deployment_domain)
+            'default.conf': 'server {\n  listen 8080;\n  return 302 https://%s$request_uri;\n}\n' % context.rc_app_url
         },
         'kind': 'ConfigMap',
         'metadata': {
@@ -175,7 +174,7 @@ def _add_files_cache_redirect_resources(gendoc):
             'namespace': context.jobs_namespace
         },
         'spec': {
-            'host': f'{context.hostname_artifacts}.{context.config.rc_release_domain}',
+            'host': f'{context.fc_api_url}',
             'tls': {
                 'insecureEdgeTerminationPolicy': 'Redirect',
                 'termination': 'Edge'
@@ -190,8 +189,7 @@ def _add_files_cache_redirect_resources(gendoc):
     gendoc.append({
         'apiVersion': 'v1',
         'data': {
-            'default.conf': 'server {\n  listen 8080;\n  return 302 https://%s$request_uri;\n}\n' % (
-                context.fc_url)
+            'default.conf': 'server {\n  listen 8080;\n  return 302 https://%s$request_uri;\n}\n' % context.fc_app_url
         },
         'kind': 'ConfigMap',
         'metadata': {
