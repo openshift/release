@@ -203,3 +203,41 @@ spec:
       - configMap:
           name: plugins
         name: plugins
+---
+#---------------------------------------------------------------------------------
+# osd_files_cache_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+# Resources required to deploy resources for the files-cache on
+# the app.ci clusters.
+# The release controller creates a files cache stateful set in each ci-release namespace
+# used by a release controller. Create a service and a route to this public instance.
+apiVersion: v1
+kind: Service
+metadata:
+  name: files-cache
+  namespace: ci-release
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: files-cache
+---
+#---------------------------------------------------------------------------------
+# osd_files_cache_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Route
+metadata:
+  name: files-cache
+  namespace: ci-release
+spec:
+  host: openshift-release-artifacts.svc.ci.openshift.org
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: Edge
+  to:
+    kind: Service
+    name: files-cache
