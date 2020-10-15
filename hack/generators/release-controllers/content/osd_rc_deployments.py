@@ -278,7 +278,7 @@ def _add_osd_rc_deployment(gendoc):
                             'name': 'release-controller-kubeconfigs',
                             'secret': {
                                 'items': [{
-                                    'key': f'sa.release-controller-{context.is_namespace}.api.ci.config',
+                                    'key': f'sa.release-controller-{context.is_namespace}.app.ci.config',
                                     'path': 'kubeconfig'
                                 }],
                                 'secretName': 'release-controller-kubeconfigs'
