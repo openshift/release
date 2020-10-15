@@ -18,6 +18,9 @@ if [[ "${DELETE_MC}" == "true" ]]; then
     oc delete mc 99-worker-generated-crio-capabilities
     # need to wait for the changes to roll out
     # for debug purposes only
+    # The status of the mcp worker doesn't immediately change
+    # to updating, it takes a few seconds, hence the sleep here.
+    sleep 1m
     echo "waiting for the changes to roll out"
     oc wait --for=condition=Updating=false mcp/worker --timeout=600s
     echo "done waiting"
@@ -27,14 +30,10 @@ fi
 oc run fedora-pod --image fedora --restart Never --command -- sleep 1000
 oc wait --for=condition=Ready pod/fedora-pod --timeout=300s
 capabilities=$(oc rsh fedora-pod capsh --print)
-# for debug purposes only, will remove once tests are passing
-echo "capabilities are ${capabilities}"
 
 # get the capabilities MCs available
 workerMC=$(oc get mc/99-worker-generated-crio-capabilities -o name; true)
 masterMC=$(oc get mc/99-master-generated-crio-capabilities -o name; true)
-# for debug purposes only
-echo "mc caps is ${workerMC} and ${masterMC}"
 # Since we are only deleting the worker caps MC for the test, the master caps MC should
 # exist. If it does, this means we have the capabilities patch so we should go ahead and
 # check the capabilities.
