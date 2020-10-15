@@ -5,23 +5,13 @@ import yaml
 
 CONFIG = {
     'aws-quota-slice': {
-        # Wild guesses.  We'll see when we hit quota issues
-        'us-east-1': 50,
-        'us-east-2': 50,
-        'us-west-1': 50,
-        'us-west-2': 50,
+        'default': 150,
     },
     'azure4-quota-slice': {
-        # Cannot create more than 50 public IP addresses for this subscription in this region.
-        # and each cluster needs three of public IPs: https://docs.openshift.com/container-platform/4.5/installing/installing_azure/installing-azure-account.html#installation-azure-limits_installing-azure-account
-        'centralus': 16,
-        # Wild guesses.  We'll see when we hit quota issues
-        'eastus1': 10,
-        'eastus2': 10,
-        'westus': 10
+        'default': 30,
     },
     'gcp-quota-slice': {
-        'us-east1': 120,
+        'default': 120,
     },
     'libvirt-s390x-quota-slice': {},
     'libvirt-ppc64le-quota-slice': {},
