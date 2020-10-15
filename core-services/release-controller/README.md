@@ -61,7 +61,7 @@ To abort/remove a release tag:
 
 To get RPMs into the build system, OpenShift uses base images that have an injected `.repo` file pointing to an in-cluster proxy that has permissions to pull from the correct OCP RPM repos for each release.
 
-These proxies (one per core configuration) run from the `ocp` namespace and have the DNS names in cluster `base-4-Y.ocp.svc` on port 80. Each proxy performs authentication to https://mirror.openshift.com/enterprise/reposync/* to access mirrors of the content repos from Red Hat Brew. When image builds within OpenShift CI try to install RPMs, they are using these mirrors exclusively (so that no RPMs that aren't part of the official builds can be consumed).
+These proxies (one per core configuration) run from the `ocp` namespace and have the DNS names in cluster `base-4-Y.ocp.svc` (rhel7) and `base-4-Y-rhel8.ocp.svc` (rhel8) on port 80. Each proxy performs authentication to https://mirror.openshift.com/enterprise/reposync/* to access mirrors of the content repos from Red Hat Brew. When image builds within OpenShift CI try to install RPMs, they are using these mirrors exclusively (so that no RPMs that aren't part of the official builds can be consumed).
 
 See `rpms-ocp-*.yaml` for the definition of each proxy service, `ocp-*.repo` for each set of mirrored repos, and the root `Makefile` in the repo for the script that creates the Makefiles.
 
