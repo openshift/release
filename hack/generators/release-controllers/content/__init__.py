@@ -2,6 +2,7 @@
 
 from .osd_rc_deployments import add_osd_rc_deployments
 from .osd_rc_rbac import add_osd_rc_service_account_resources
+from .osd_files_cache_resources import add_osd_files_cache_resources
 from .art_publish_permissions import add_art_publish
 from .art_namespaces_config_updater import add_art_namespace_config_updater_rbac
 from .art_namespaces_rbac import add_imagestream_namespace_rbac
