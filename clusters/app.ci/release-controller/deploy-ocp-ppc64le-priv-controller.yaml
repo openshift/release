@@ -100,7 +100,7 @@ spec:
         - --release-namespace=ocp-ppc64le-priv
         - --prow-config=/etc/config/config.yaml
         - --job-config=/etc/job-config
-        - --artifacts=ppc64le-priv.ocp.releases-artifacts.ci.openshift.org
+        - --artifacts=openshift-release-artifacts-ppc64le-priv.apps.ci.l2s4.p1.openshiftapps.com
         - --listen=127.0.0.1:8080
         - --prow-namespace=ci
         - --non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig
@@ -242,6 +242,52 @@ spec:
         name: plugins
 ---
 #---------------------------------------------------------------------------------
+# osd_files_cache_rbac.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  annotations:
+    serviceaccounts.openshift.io/oauth-redirectreference.files-cache-oauth-proxy: '{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"files-cache-oauth-proxy"}}'
+  name: files-cache-oauth
+  namespace: ci-release-ppc64le-priv
+---
+#---------------------------------------------------------------------------------
+# osd_files_cache_rbac.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: files-cache-oauth-ppc64le-priv
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: files-cache-oauth-priv
+subjects:
+- kind: ServiceAccount
+  name: files-cache-oauth
+  namespace: ci-release-ppc64le-priv
+---
+#---------------------------------------------------------------------------------
+# osd_files_cache_rbac.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: release-controller-jobs-binding
+  namespace: ocp-ppc64le-priv
+roleRef:
+  kind: ClusterRole
+  name: edit
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: ci-release-ppc64le-priv
+---
+#---------------------------------------------------------------------------------
 # osd_files_cache_resources.py added the following resource
 #---------------------------------------------------------------------------------
 
@@ -290,7 +336,7 @@ metadata:
   name: files-cache-oauth-proxy
   namespace: ci-release-ppc64le-priv
 spec:
-  host: ppc64le-priv.ocp.releases-artifacts.ci.openshift.org
+  host: openshift-release-artifacts-ppc64le-priv.apps.ci.l2s4.p1.openshiftapps.com
   tls:
     insecureEdgeTerminationPolicy: Redirect
     termination: Reencrypt

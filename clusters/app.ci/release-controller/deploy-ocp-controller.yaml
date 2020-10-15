@@ -69,7 +69,7 @@ spec:
         - --publish-namespace=origin
         - --prow-config=/etc/config/config.yaml
         - --job-config=/etc/job-config
-        - --artifacts=amd64.ocp.releases-artifacts.ci.openshift.org
+        - --artifacts=openshift-release-artifacts.apps.ci.l2s4.p1.openshiftapps.com
         - --listen=:8080
         - --prow-namespace=ci
         - --non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig
@@ -205,6 +205,23 @@ spec:
         name: plugins
 ---
 #---------------------------------------------------------------------------------
+# osd_files_cache_rbac.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: release-controller-jobs-binding
+  namespace: ocp
+roleRef:
+  kind: ClusterRole
+  name: edit
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: ci-release
+---
+#---------------------------------------------------------------------------------
 # osd_files_cache_resources.py added the following resource
 #---------------------------------------------------------------------------------
 
@@ -234,7 +251,7 @@ metadata:
   name: files-cache
   namespace: ci-release
 spec:
-  host: amd64.ocp.releases-artifacts.ci.openshift.org
+  host: openshift-release-artifacts.apps.ci.l2s4.p1.openshiftapps.com
   tls:
     insecureEdgeTerminationPolicy: Redirect
     termination: Edge
