@@ -5,7 +5,7 @@
 
 
 #---------------------------------------------------------------------------------
-# redirect_and_files_cache_resources.py added the following resource
+# redirect_resources.py added the following resource
 #---------------------------------------------------------------------------------
 
 # Bootstrap the environment for the amd64 tests image.  The caches require an amd64 "tests" image to execute on
@@ -30,7 +30,7 @@ spec:
       type: Source
 ---
 #---------------------------------------------------------------------------------
-# redirect_and_files_cache_resources.py added the following resource
+# redirect_resources.py added the following resource
 #---------------------------------------------------------------------------------
 
 apiVersion: v1
@@ -48,7 +48,7 @@ spec:
     name: release-controller-ocp-ppc64le-priv-redirect
 ---
 #---------------------------------------------------------------------------------
-# redirect_and_files_cache_resources.py added the following resource
+# redirect_resources.py added the following resource
 #---------------------------------------------------------------------------------
 
 apiVersion: v1
@@ -61,7 +61,7 @@ metadata:
   namespace: ci
 ---
 #---------------------------------------------------------------------------------
-# redirect_and_files_cache_resources.py added the following resource
+# redirect_resources.py added the following resource
 #---------------------------------------------------------------------------------
 
 apiVersion: apps/v1
@@ -104,7 +104,7 @@ spec:
         name: config
 ---
 #---------------------------------------------------------------------------------
-# redirect_and_files_cache_resources.py added the following resource
+# redirect_resources.py added the following resource
 #---------------------------------------------------------------------------------
 
 apiVersion: v1
@@ -123,5 +123,102 @@ spec:
     targetPort: 8080
   selector:
     component: release-controller-ocp-ppc64le-priv-redirect
+  sessionAffinity: None
+  type: ClusterIP
+---
+#---------------------------------------------------------------------------------
+# redirect_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Route
+metadata:
+  name: release-controller-files-cache-ocp-ppc64le-priv
+  namespace: ci-release-ppc64le-priv
+spec:
+  host: openshift-release-artifacts-ppc64le-priv.svc.ci.openshift.org
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: Edge
+  to:
+    kind: Service
+    name: release-controller-files-cache-ocp-ppc64le-priv-redirect
+---
+#---------------------------------------------------------------------------------
+# redirect_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: v1
+data:
+  default.conf: "server {\n  listen 8080;\n  return 302 https://ppc64le-priv.ocp.releases-artifacts.ci.openshift.org$request_uri;\n\
+    }\n"
+kind: ConfigMap
+metadata:
+  name: release-controller-files-cache-ocp-ppc64le-priv-redirect-config
+  namespace: ci-release-ppc64le-priv
+---
+#---------------------------------------------------------------------------------
+# redirect_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: release-controller-files-cache-ocp-ppc64le-priv-redirect
+  name: release-controller-files-cache-ocp-ppc64le-priv-redirect
+  namespace: ci-release-ppc64le-priv
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      component: release-controller-files-cache-ocp-ppc64le-priv-redirect
+  template:
+    metadata:
+      labels:
+        app: prow
+        component: release-controller-files-cache-ocp-ppc64le-priv-redirect
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: component
+                operator: In
+                values:
+                - release-controller-files-cache-ocp-ppc64le-priv-redirect
+            topologyKey: kubernetes.io/hostname
+      containers:
+      - image: nginxinc/nginx-unprivileged:1.17
+        name: nginx
+        volumeMounts:
+        - mountPath: /etc/nginx/conf.d
+          name: config
+      volumes:
+      - configMap:
+          name: release-controller-files-cache-ocp-ppc64le-priv-redirect-config
+        name: config
+---
+#---------------------------------------------------------------------------------
+# redirect_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: prow
+    component: release-controller-files-cache-ocp-ppc64le-priv-redirect
+  name: release-controller-files-cache-ocp-ppc64le-priv-redirect
+  namespace: ci-release-ppc64le-priv
+spec:
+  ports:
+  - name: main
+    port: 80
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    component: release-controller-files-cache-ocp-ppc64le-priv-redirect
   sessionAffinity: None
   type: ClusterIP
