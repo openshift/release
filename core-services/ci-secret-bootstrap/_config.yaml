@@ -1625,17 +1625,114 @@ secret_configs:
         namespace: test-credentials
         name: ci-pull-credentials-pack
         type: kubernetes.io/dockerconfigjson
-  # This secret stores the tokens of the SA which has permissions to push images to the CI central registry
-  # We will remove the one for api.ci after migrating the registry to app.ci
+  # This secret contains a docker config which has the permissions to pull the images from local registry
+  # and push the images to the ci central registry.
   - from:
-      token_image-pusher_api.ci_reg_auth_value.txt:
-        bw_item: build_farm
-        attachment: token_image-pusher_api.ci_reg_auth_value.txt
-      token_image-pusher_app.ci_reg_auth_value.txt:
-        bw_item: build_farm
-        attachment: token_image-pusher_app.ci_reg_auth_value.txt
+      .dockerconfigjson:
+        dockerconfigJSON:
+        - bw_item: build_farm
+          registry_url: docker-registry.default.svc.cluster.local:5000
+          auth_bw_attachment: token_image-pusher_api.ci_reg_auth_value.txt
+        - bw_item: build_farm
+          registry_url: docker-registry.default.svc:5000
+          auth_bw_attachment: token_image-pusher_api.ci_reg_auth_value.txt
+        - bw_item: build_farm
+          registry_url: registry.svc.ci.openshift.org
+          auth_bw_attachment: token_image-pusher_api.ci_reg_auth_value.txt
+        - bw_item: build_farm
+          registry_url: registry.ci.openshift.org
+          auth_bw_attachment: token_image-pusher_app.ci_reg_auth_value.txt
     to:
-      - cluster_groups:
-        - build_farm
+      - cluster: api.ci
         namespace: ci
-        name: ci-central-registry-push-tokens
+        name: registry-push-credentials-ci-central
+        type: kubernetes.io/dockerconfigjson
+  - from:
+      .dockerconfigjson:
+        dockerconfigJSON:
+        - bw_item: build_farm
+          registry_url: image-registry.openshift-image-registry.svc.cluster.local:5000
+          auth_bw_attachment: token_image-pusher_app.ci_reg_auth_value.txt
+        - bw_item: build_farm
+          registry_url: image-registry.openshift-image-registry.svc:5000
+          auth_bw_attachment: token_image-pusher_app.ci_reg_auth_value.txt
+        - bw_item: build_farm
+          registry_url: registry.svc.ci.openshift.org
+          auth_bw_attachment: token_image-pusher_api.ci_reg_auth_value.txt
+        - bw_item: build_farm
+          registry_url: registry.ci.openshift.org
+          auth_bw_attachment: token_image-pusher_app.ci_reg_auth_value.txt
+    to:
+      - cluster: app.ci
+        namespace: ci
+        name: registry-push-credentials-ci-central
+        type: kubernetes.io/dockerconfigjson
+  - from:
+      .dockerconfigjson:
+        dockerconfigJSON:
+        - bw_item: build_farm
+          registry_url: image-registry.openshift-image-registry.svc.cluster.local:5000
+          auth_bw_attachment: build01_build01_reg_auth_value.txt
+        - bw_item: build_farm
+          registry_url: image-registry.openshift-image-registry.svc:5000
+          auth_bw_attachment: build01_build01_reg_auth_value.txt
+        - bw_item: build_farm
+          registry_url: registry.build01.ci.openshift.org
+          auth_bw_attachment: build01_build01_reg_auth_value.txt
+        - bw_item: build_farm
+          registry_url: registry.svc.ci.openshift.org
+          auth_bw_attachment: token_image-pusher_api.ci_reg_auth_value.txt
+        - bw_item: build_farm
+          registry_url: registry.ci.openshift.org
+          auth_bw_attachment: token_image-pusher_app.ci_reg_auth_value.txt
+    to:
+      - cluster: build01
+        namespace: ci
+        name: registry-push-credentials-ci-central
+        type: kubernetes.io/dockerconfigjson
+  - from:
+      .dockerconfigjson:
+        dockerconfigJSON:
+        - bw_item: build_farm
+          registry_url: image-registry.openshift-image-registry.svc.cluster.local:5000
+          auth_bw_attachment: build01_build02_reg_auth_value.txt
+        - bw_item: build_farm
+          registry_url: image-registry.openshift-image-registry.svc:5000
+          auth_bw_attachment: build01_build02_reg_auth_value.txt
+        - bw_item: build_farm
+          registry_url: registry.build02.ci.openshift.org
+          auth_bw_attachment: build01_build02_reg_auth_value.txt
+        - bw_item: build_farm
+          registry_url: registry.svc.ci.openshift.org
+          auth_bw_attachment: token_image-pusher_api.ci_reg_auth_value.txt
+        - bw_item: build_farm
+          registry_url: registry.ci.openshift.org
+          auth_bw_attachment: token_image-pusher_app.ci_reg_auth_value.txt
+    to:
+      - cluster: build02
+        namespace: ci
+        name: registry-push-credentials-ci-central
+        type: kubernetes.io/dockerconfigjson
+  - from:
+      .dockerconfigjson:
+        dockerconfigJSON:
+        - bw_item: build_farm
+          registry_url: image-registry.openshift-image-registry.svc.cluster.local:5000
+          auth_bw_attachment: build01_vsphere_reg_auth_value.txt
+        - bw_item: build_farm
+          registry_url: image-registry.openshift-image-registry.svc:5000
+          auth_bw_attachment: build01_vsphere_reg_auth_value.txt
+        - bw_item: build_farm
+          registry_url: registry.apps.build01-us-west-2.vmc.ci.openshift.org
+          auth_bw_attachment: build01_vsphere_reg_auth_value.txt
+        - bw_item: build_farm
+          registry_url: registry.svc.ci.openshift.org
+          auth_bw_attachment: token_image-pusher_api.ci_reg_auth_value.txt
+        - bw_item: build_farm
+          registry_url: registry.ci.openshift.org
+          auth_bw_attachment: token_image-pusher_app.ci_reg_auth_value.txt
+    to:
+      - cluster: vsphere
+        namespace: ci
+        name: registry-push-credentials-ci-central
+        type: kubernetes.io/dockerconfigjson
