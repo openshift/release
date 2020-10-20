@@ -1,24 +1,10 @@
-base_images:
-  base:
-    name: "4.4"
-    namespace: ocp
-    tag: base
-  openshift_release_golang-1.13:
-    name: release
-    namespace: openshift
-    tag: golang-1.13
 build_root:
-  project_image:
-    context_dir: config/
-    dockerfile_path: Dockerfile
+  from_repository: true
 images:
 - context_dir: config/
   dockerfile_path: Dockerfile
-  from: openshift_release_golang-1.13
+  from: src
   to: boilerplate
-promotion:
-  name: boilerplate
-  namespace: openshift
 resources:
   '*':
     limits:
@@ -30,7 +16,7 @@ tests:
 - as: pr-check
   commands: make pr-check
   container:
-    from: src
+    from: boilerplate
 zz_generated_metadata:
   branch: master
   org: openshift
