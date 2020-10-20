@@ -5851,7 +5851,7 @@ periodics:
         value: "4.4"
       - name: CLUSTER_TYPE
         value: aws
-      - name: CONFIG_SPEC
+      - name: UNRESOLVED_CONFIG
         value: |
           tag_specification:
             name: "$(BRANCH)"
@@ -5865,10 +5865,9 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-$(CLUSTER_TYPE)-upgrade
-            commands: TEST_SUITE=all run-upgrade-tests
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
+              workflow: openshift-upgrade-$(CLUSTER_TYPE)-loki
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -6092,7 +6091,7 @@ periodics:
 
         initial=$(ARTIFACTS)/release-initial.json
         latest=$(ARTIFACTS)/release-latest.json
-        if ! curl -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.4.0-0.nightly/latest > ${initial}; then
+        if ! curl -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.4.0-0.nightly/latest --data-urlencode 'rel=1' > ${initial}; then
           echo "error: Could not find a 4.4 nightly version"
           exit 1
         fi
@@ -6122,7 +6121,7 @@ periodics:
         value: "4.4"
       - name: CLUSTER_TYPE
         value: aws
-      - name: CONFIG_SPEC
+      - name: UNRESOLVED_CONFIG
         value: |
           tag_specification:
             name: "$(BRANCH)"
@@ -6136,10 +6135,9 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-$(CLUSTER_TYPE)-upgrade
-            commands: TEST_SUITE=all run-upgrade-tests
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
+              workflow: openshift-upgrade-$(CLUSTER_TYPE)-loki
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -6620,7 +6618,7 @@ periodics:
         value: "4.4"
       - name: CLUSTER_TYPE
         value: gcp
-      - name: CONFIG_SPEC
+      - name: UNRESOLVED_CONFIG
         value: |
           tag_specification:
             name: "$(BRANCH)"
@@ -6634,10 +6632,9 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-$(CLUSTER_TYPE)-upgrade
-            commands: TEST_SUITE=all run-upgrade-tests
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
+              workflow: "openshift-upgrade-$(CLUSTER_TYPE)-loki"
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
