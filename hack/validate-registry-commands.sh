@@ -10,4 +10,4 @@ if [[ ! -d "${base_dir}" ]]; then
   exit 1
 fi
 
-find "${base_dir}/ci-operator/step-registry" -name "*.sh" -print0 | xargs -0 -n1 shellcheck -S warning
+find "${base_dir}/ci-operator/step-registry" -name "*.sh" -print0 | xargs -0 -n1 shellcheck
