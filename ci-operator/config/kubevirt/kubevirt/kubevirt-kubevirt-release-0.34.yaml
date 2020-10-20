@@ -3,20 +3,12 @@ base_images:
     name: "4.6"
     namespace: ocp
     tag: base
-  kubevirt-builder:
-    name: kubevirt-builder
-    namespace: ci
-    tag: 30-5.8.1
 build_root:
   image_stream_tag:
-    name: kubevirt-builder
-    namespace: ci
-    tag: 30-5.8.1
+    name: release
+    namespace: openshift
+    tag: golang-1.13
 canonical_go_repository: kubevirt.io/kubevirt
-images:
-- dockerfile_path: hack/ci/Dockerfile.ci
-  from: kubevirt-builder
-  to: kubevirt-test
 resources:
   '*':
     limits:
@@ -29,12 +21,12 @@ tag_specification:
   namespace: ocp
 tests:
 - artifact_dir: /go/src/kubevirt.io/kubevirt/_out/exported-artifacts
-  as: e2e-periodic-azure-nested-virt
+  as: e2e-periodic
   cron: 2 3 * * *
   steps:
     cluster_profile: azure4
     test:
-    - as: kubevirt-e2e-azure
+    - as: azure
       commands: |
         set -euo pipefail
 
@@ -55,7 +47,11 @@ tests:
 
         DOCKER_PREFIX='kubevirt'
         export DOCKER_PREFIX
-        DOCKER_TAG="v0.33.0"
+        DOCKER_TAG=$(
+          curl --fail -s https://api.github.com/repos/kubevirt/kubevirt/releases |
+                  jq -r '(.[].tag_name | select( test("-(rc|alpha|beta)") | not ) )' |
+                  sort -rV | grep 'v0.34' | head -1
+        )
         export DOCKER_TAG
 
         echo "downloading test binary"
@@ -88,15 +84,7 @@ tests:
             curl -L ${testinfra_file} | oc create -f -
         done
 
-        set +e
         oc wait -n kubevirt kv kubevirt --for condition=Available --timeout 15m
-        return_code=$?
-        set -e
-        if [ ${return_code} -ne 0 ]; then
-            echo "Dumping KubeVirt state"
-            hack/dump.sh
-            exit ${return_code}
-        fi
 
         echo "testing"
         mkdir -p "$ARTIFACT_DIR"
@@ -104,13 +92,13 @@ tests:
         export ARTIFACTS=${ARTIFACT_DIR}
 
         tests.test -v=5 -kubeconfig=${KUBECONFIG} -container-tag=${DOCKER_TAG} -container-tag-alt= -container-prefix=${DOCKER_PREFIX} -image-prefix-alt=-kv -oc-path=${SHARED_BIN_DIR}/oc -kubectl-path=${SHARED_BIN_DIR}/kubectl -gocli-path=$(pwd)/cluster-up/cli.sh -test.timeout 420m -ginkgo.noColor -ginkgo.succinct -ginkgo.slowSpecThreshold=60 '-ginkgo.focus=\[crit:high\]' '-ginkgo.skip=(Slirp\sNetworking)|(with\sCPU\sspec)|(with\sTX\soffload\sdisabled)|(with\scni\sflannel\sand\sptp\splugin\sinterface)|(with\sovs-cni\splugin)|(test_id:1752)|(SRIOV)|(with\sEFI)|(Operator)|(GPU)|(DataVolume\sIntegration)|(test_id:3468)|(test_id:3466)|(test_id:1015)|(rfe_id:393)|(test_id:1631)|(rfe_id:2919)|(test_id:3139)' -junit-output=${ARTIFACT_DIR}/junit.functest.xml -installed-namespace=kubevirt -previous-release-tag= -previous-release-registry=index.docker.io/kubevirt -deploy-testing-infra=false
-      from: kubevirt-test
+      from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-azure
 zz_generated_metadata:
-  branch: release-0.33
+  branch: release-0.34
   org: kubevirt
   repo: kubevirt
