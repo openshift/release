@@ -37,12 +37,13 @@ function prepare_next_steps() {
 trap 'prepare_next_steps' EXIT
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-if [[ -z "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" ]]; then
-  echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE is an empty string, exiting"
+if [[ -z "$OPENSHIFT_INSTALL_RELEASE_IMAGE" ]]; then
+  echo "OPENSHIFT_INSTALL_RELEASE_IMAGE is an empty string, exiting"
   exit 1
 fi
 
-echo "Installing from release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+echo "Installing from release ${OPENSHIFT_INSTALL_RELEASE_IMAGE}"
+export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${OPENSHIFT_INSTALL_RELEASE_IMAGE}"
 export SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 export PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
 export OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME}/${BUILD_ID}

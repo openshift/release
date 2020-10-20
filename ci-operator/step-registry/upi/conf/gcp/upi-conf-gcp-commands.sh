@@ -8,11 +8,11 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 export HOME=/tmp
 
-if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
-  echo "RELEASE_IMAGE_LATEST is an empty string, exiting"
+if [[ -z "$OPENSHIFT_INSTALL_RELEASE_IMAGE" ]]; then
+  echo "OPENSHIFT_INSTALL_RELEASE_IMAGE is an empty string, exiting"
   exit 1
 fi
-export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_LATEST}"
+export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${OPENSHIFT_INSTALL_RELEASE_IMAGE}"
 
 # Ensure ignition assets are configured with the correct invoker to track CI jobs.
 export OPENSHIFT_INSTALL_INVOKER="openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID}"
