@@ -90,6 +90,28 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-aws
+- as: operator-e2e-with-kafka-aws-ocp-46
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws
+    test:
+    - as: operator-e2e
+      commands: make test-e2e-with-kafka
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
+      - env: OPENSHIFT_KNATIVE_OPERATOR
+        name: openshift-knative-operator
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws
 - as: upstream-e2e-aws-ocp-46
   steps:
     allow_skip_on_success: true
