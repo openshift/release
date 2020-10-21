@@ -48,6 +48,8 @@ aws)
     ;;
 azure4) export TEST_PROVIDER=azure;;
 vsphere) export TEST_PROVIDER=vsphere;;
+openstack) export TEST_PROVIDER='{"type":"openstack"}';;
+openstack-vexxhost) export TEST_PROVIDER='{"type":"openstack"}';;
 *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
 esac
 
