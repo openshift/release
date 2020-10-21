@@ -34,7 +34,7 @@ SSHOPTS=(-o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsF
 
 function getlogs() {
   echo "### Downloading logs..."
-  scp "${SSHOPTS[@]}" "root@${IP}:/tmp/artifacts/*" "${ARTIFACT_DIR}"
+  scp -r "${SSHOPTS[@]}" "root@${IP}:/tmp/artifacts/" "${ARTIFACT_DIR}"
 }
 
 # Gather logs regardless of what happens after this
