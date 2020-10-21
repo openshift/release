@@ -93,6 +93,11 @@ def add_rpm_mirror_service(gendoc, clone_dir, major_minor):
                                     'mountPath': '/tmp/cache',
                                     'name': 'cache'
                                 }],
+                            'resources': {
+                                'requests': {
+                                    'memory': "500Mi"
+                                },
+                            },
                             'workingDir': '/tmp/repos'
                         }],
                         'volumes': [
