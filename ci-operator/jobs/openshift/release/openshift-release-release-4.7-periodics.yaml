@@ -4699,8 +4699,8 @@ periodics:
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
       - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
-      - --target=e2e-$(CLUSTER_TYPE)-upgrade
+      - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-aws-cluster-profile
+      - --target=e2e-$(CLUSTER_TYPE)-upgrade-all
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       command:
@@ -4770,7 +4770,13 @@ periodics:
           - as: e2e-$(CLUSTER_TYPE)-upgrade
             commands: |
               TEST_SUITE=all IMAGE=RELEASE_IMAGES run-upgrade-tests
-              TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: e2e-$(CLUSTER_TYPE)-upgrade-all
+            commands: |
+              TEST_SUITE=all IMAGE=RELEASE_IMAGES run-upgrade-tests
+              TEST_SUITE=openshift/conformance run-tests
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
               upgrade: true
@@ -4791,7 +4797,7 @@ periodics:
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
-      - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
+      - mountPath: /usr/local/e2e-aws-upgrade-all-cluster-profile
         name: cluster-profile
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
