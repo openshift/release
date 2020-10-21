@@ -42,10 +42,11 @@ trap getlogs EXIT
 
 echo "### Gathering logs..."
 timeout -s 9 15m ssh "${SSHOPTS[@]}" "root@${IP}" bash - <<EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
-cd /home/assisted
+printenv
+export HOME=/home/assisted
+cd $HOME
 
 source /root/config
-
 make download_all_logs LOGS_DEST=/tmp/artifacts REMOTE_SERVICE_URL='$(minikube service assisted-service --url)'
 
 EOF
