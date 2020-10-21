@@ -1,24 +1,23 @@
-presubmits:
+postsubmits:
   open-cluster-management/console:
   - agent: kubernetes
-    always_run: true
     branches:
-    - release-2.1
-    cluster: build01
-    context: ci/prow/images
+    - ^prow-experiment$
+    cluster: api.ci
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/is-promotion: "true"
       ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-open-cluster-management-console-release-2.1-images
-    rerun_command: /test images
+    max_concurrency: 1
+    name: branch-ci-open-cluster-management-console-prow-experiment-images
     spec:
       containers:
       - args:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --promote
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --target=[images]
@@ -51,4 +50,3 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
