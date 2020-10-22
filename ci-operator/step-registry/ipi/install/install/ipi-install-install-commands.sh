@@ -60,5 +60,6 @@ sed 's/password: .*/password: REDACTED/' "${dir}/.openshift_install.log" >"${ART
 cp \
     -t "${SHARED_DIR}" \
     "${dir}/auth/kubeconfig" \
+    "${dir}/auth/kubeadmin-password" \
     "${dir}/metadata.json"
 exit "$ret"
