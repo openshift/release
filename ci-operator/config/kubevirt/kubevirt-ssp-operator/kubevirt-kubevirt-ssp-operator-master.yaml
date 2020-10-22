@@ -23,9 +23,31 @@ tag_specification:
   namespace: ocp
 tests:
 - as: e2e-functests
-  commands: export OC=oc V=5 && make ocp-ci-deploy && make functests
-  openshift_installer_src:
+  steps:
     cluster_profile: gcp
+    test:
+    - as: e2e-functests
+      commands: |
+        echo "Downloading oc binary"
+          # FIXME: transfer into Dockerfile for ci
+          export SHARED_BIN_DIR="${SHARED_DIR}/bin/"
+          (
+              # create directory
+              mkdir "${SHARED_BIN_DIR}"
+              cd "${SHARED_BIN_DIR}"
+      
+              # Download oc binary
+              curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar -C . -xzf -
+              chmod +x oc
+              ln -s oc kubectl
+          ) || exit 1  
+        export OC=oc V=5 && make ocp-ci-deploy && make functests
+      from: src
+      resources:
+        requests:
+          cpu: 200m
+          memory: 400Mi
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: master
   org: kubevirt
