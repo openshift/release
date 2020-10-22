@@ -51,6 +51,22 @@
     - release-controller-ocp-ppc64le-priv
     - release-controller-ocp-s390x
     - release-controller-ocp-s390x-priv
+- item_name: build_farm
+  attachments:
+  - cmd: |-
+      oc --context $(cluster) get secrets --namespace ci -o json | jq '.items[] | select(.type=="kubernetes.io/dockercfg") | select(.metadata.annotations["kubernetes.io/service-account.name"]=="image-puller") | .data[".dockercfg"]' --raw-output | base64 --decode | jq '.["image-registry.openshift-image-registry.svc:5000"].auth' --raw-output | tr -d '\n'
+    name: token_image-puller_$(cluster)_reg_auth_value.txt
+  params:
+    cluster:
+    - app.ci
+    - build01
+    - build02
+    - vsphere
+- item_name: build_farm
+  attachments:
+  - cmd: |-
+      oc --context api.ci get secrets --namespace ci -o json | jq '.items[] | select(.type=="kubernetes.io/dockercfg") | select(.metadata.annotations["kubernetes.io/service-account.name"]=="image-puller") | .data[".dockercfg"]' --raw-output | base64 --decode | jq '.["docker-registry.default.svc:5000"].auth' --raw-output | tr -d '\n'
+    name: token_image-puller_ci_reg_auth_value.txt
 - item_name: jenkins-ci-provisioner
   attachments:
   - cmd: gcloud iam service-accounts keys create /dev/stdout --iam-account do-not-delete-ci-provisioner@openshift-gce-devel-ci.iam.gserviceaccount.com
