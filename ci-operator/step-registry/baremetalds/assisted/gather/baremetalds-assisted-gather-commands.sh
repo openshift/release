@@ -34,7 +34,7 @@ SSHOPTS=(-o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsF
 
 function getlogs() {
   echo "### Downloading logs..."
-  scp "${SSHOPTS[@]}" "root@${IP}:/tmp/artifacts/*" "${ARTIFACT_DIR}"
+  scp -r "${SSHOPTS[@]}" "root@${IP}:/tmp/artifacts/*" "${ARTIFACT_DIR}"
 }
 
 # Gather logs regardless of what happens after this
@@ -42,10 +42,14 @@ trap getlogs EXIT
 
 echo "### Gathering logs..."
 timeout -s 9 15m ssh "${SSHOPTS[@]}" "root@${IP}" bash - <<EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
+
+set -xeuo pipefail
+
 cd /home/assisted
 
 source /root/config
 
-make download_all_logs LOGS_DEST=/tmp/artifacts REMOTE_SERVICE_URL='$(minikube service assisted-service --url)'
+# Get assisted logs
+make download_all_logs LOGS_DEST=/tmp/artifacts REMOTE_SERVICE_URL=\$(KUBECONFIG=\${HOME}/.kube/config minikube service assisted-service -n assisted-installer --url)
 
 EOF
