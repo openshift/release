@@ -1,0 +1,62 @@
+base_images:
+  ansible:
+    name: "4.7"
+    namespace: ocp
+    tag: ansible
+  base:
+    name: "4.7"
+    namespace: ocp
+    tag: base
+  dev-scripts:
+    name: test
+    namespace: openshift-kni
+    tag: dev-scripts
+  upi-installer:
+    name: "4.7"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  initial:
+    prerelease:
+      product: ocp
+      version_bounds:
+        lower: 4.6.0
+        upper: 4.7.0-0
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.7"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-upgrade-from-46
+  cron: '@every 48h'
+  steps:
+    cluster_profile: aws
+    workflow: openshift-upgrade-aws-loki
+- as: e2e-aws-upgrade-from-46-rollback
+  cron: '@every 24h'
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_OPTIONS: abort-at=99
+    workflow: openshift-upgrade-aws-loki
+- as: e2e-gcp-upgrade-from-46
+  cron: '@every 6h'
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-upgrade-gcp-loki
+- as: e2e-azure-upgrade-from-46
+  cron: '@every 6h'
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-upgrade-azure-loki
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: release
+  variant: origin-4.7-upgrades
