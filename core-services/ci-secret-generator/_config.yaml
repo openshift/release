@@ -71,3 +71,19 @@
   attachments:
   - cmd: gcloud iam service-accounts keys create /dev/stdout --iam-account do-not-delete-ci-provisioner@openshift-gce-devel-ci.iam.gserviceaccount.com
     name: credentials.json
+- item_name: build_farm
+  attachments:
+  - cmd: |-
+      oc --context $(cluster) get secrets --namespace ci -o json | jq '.items[] | select(.type=="kubernetes.io/dockercfg") | select(.metadata.annotations["kubernetes.io/service-account.name"]=="image-pusher") | .data[".dockercfg"]' --raw-output | base64 --decode | jq '.["docker-registry.default.svc:5000"].auth' --raw-output | tr -d '\n'
+    name: token_image-pusher_$(cluster)_reg_auth_value.txt
+  params:
+    cluster:
+    - api.ci
+- item_name: build_farm
+  attachments:
+  - cmd: |-
+      oc --context $(cluster) get secrets --namespace ci -o json | jq '.items[] | select(.type=="kubernetes.io/dockercfg") | select(.metadata.annotations["kubernetes.io/service-account.name"]=="image-pusher") | .data[".dockercfg"]' --raw-output | base64 --decode | jq '.["image-registry.openshift-image-registry.svc:5000"].auth' --raw-output | tr -d '\n'
+    name: token_image-pusher_$(cluster)_reg_auth_value.txt
+  params:
+    cluster:
+    - app.ci
