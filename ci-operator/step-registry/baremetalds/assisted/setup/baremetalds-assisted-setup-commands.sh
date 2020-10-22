@@ -86,7 +86,6 @@ echo "export KUBECONFIG=\${REPO_DIR}/build/kubeconfig" >> /root/.bashrc
 
 source /root/config
 
-printenv
 timeout -s 9 105m make
 
 EOF
