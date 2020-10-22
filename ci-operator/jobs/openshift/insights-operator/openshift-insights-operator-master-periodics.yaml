@@ -12,7 +12,7 @@ periodics:
   labels:
     ci-operator.openshift.io/prowgen-controlled: "true"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-insights-operator-master-insights-operator-e2e-smoke-tests-periodic
+  name: periodic-ci-openshift-insights-operator-master-insights-operator-e2e-tests-periodic
   spec:
     containers:
     - args:
@@ -20,18 +20,18 @@ periodics:
       - --lease-server-password-file=/etc/boskos/password
       - --report-password-file=/etc/report/password.txt
       - --report-username=ci
-      - --secret-dir=/usr/local/insights-operator-e2e-smoke-tests-periodic-cluster-profile
-      - --target=insights-operator-e2e-smoke-tests-periodic
-      - --template=/usr/local/insights-operator-e2e-smoke-tests-periodic
+      - --secret-dir=/usr/local/insights-operator-e2e-tests-periodic-cluster-profile
+      - --target=insights-operator-e2e-tests-periodic
+      - --template=/usr/local/insights-operator-e2e-tests-periodic
       command:
       - ci-operator
       env:
       - name: CLUSTER_TYPE
         value: aws
       - name: JOB_NAME_SAFE
-        value: insights-operator-e2e-smoke-tests-periodic
+        value: insights-operator-e2e-tests-periodic
       - name: TEST_COMMAND
-        value: go test ./test/integration -v -run TestUploadNotDelayedAfterStart
+        value: make test-e2e
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -42,9 +42,9 @@ periodics:
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
-      - mountPath: /usr/local/insights-operator-e2e-smoke-tests-periodic-cluster-profile
+      - mountPath: /usr/local/insights-operator-e2e-tests-periodic-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/insights-operator-e2e-smoke-tests-periodic
+      - mountPath: /usr/local/insights-operator-e2e-tests-periodic
         name: job-definition
         subPath: cluster-launch-installer-src.yaml
       - mountPath: /etc/pull-secret
