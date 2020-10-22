@@ -14,5 +14,5 @@ export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 echo "Releasing IP addresses from IPAM server..."
 for i in {0..1}
 do
-    curl "http://139.178.89.254/api/removeHost.php?apiapp=address&apitoken=${ipam_token}&host=${cluster_name}-$i"
+    curl "http://ipam.vmc.ci.openshift.org/api/removeHost.php?apiapp=address&apitoken=${ipam_token}&host=${cluster_name}-$i"
 done
