@@ -1,10 +1,10 @@
 base_images:
   base:
-    name: "4.5"
+    name: "4.6"
     namespace: ocp
     tag: base
   cli:
-    name: "4.5"
+    name: "4.6"
     namespace: ocp
     tag: cli
   openshift_knative-v0.15.2_knative-eventing-src:
@@ -36,7 +36,7 @@ base_images:
     namespace: openshift
     tag: knative-serving-src
   upi-installer:
-    name: "4.5"
+    name: "4.6"
     namespace: ocp
     tag: upi-installer
 build_root:
@@ -71,9 +71,10 @@ images:
   to: openshift-knative-operator
 releases:
   latest:
-    release:
-      channel: stable
-      version: "4.5"
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.6"
 resources:
   '*':
     limits:
@@ -82,13 +83,13 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-vsphere-ocp-45-continuous
+- as: e2e-gcp-ocp-46-continuous
   cron: 0 0 * * 0
   steps:
-    cluster_profile: vsphere
+    cluster_profile: gcp
     test:
     - as: serverless-e2e
-      commands: make install-mesh test-e2e
+      commands: make install-mesh test-e2e-with-kafka
       dependencies:
       - env: KNATIVE_OPENSHIFT_INGRESS
         name: knative-openshift-ingress
@@ -103,9 +104,9 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: openshift-e2e-vsphere-upi
+    workflow: openshift-e2e-gcp
 zz_generated_metadata:
   branch: master
   org: openshift-knative
   repo: serverless-operator
-  variant: 4.5-vsphere
+  variant: 4.6-gcp
