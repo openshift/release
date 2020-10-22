@@ -27,3 +27,41 @@ subjects:
 - kind: Group
   apiGroup: rbac.authorization.k8s.io
   name: brew-registry-pullsecret-admins
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: brew-registry-pullsecret
+  name: secret-reader
+rules:
+- apiGroups: 
+  - ""
+  #
+  # at the HTTP level, the name of the resource for accessing Secret
+  # objects is "secrets"
+  resources:
+  - "secrets"
+  verbs: 
+  - "get"
+  - "watch"
+  - "list"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+#
+# This role binding allows "ci-operator" to read secrets in the "brew-registry-pullsecret" namespace.
+# You need to already have a Role named "secret-reader".
+kind: RoleBinding
+metadata:
+  name: read-secrets
+  #
+  # The namespace of the RoleBinding determines where the permissions are granted.
+  # This only grants permissions within the "brew-registry-pullsecret" namespace.
+  namespace: brew-registry-pullsecret
+subjects:
+- kind: ServiceAccount
+  name: ci-operator
+  namespace: ci
+roleRef:
+  kind: Role
+  name: secret-reader
+  apiGroup: rbac.authorization.k8s.io
