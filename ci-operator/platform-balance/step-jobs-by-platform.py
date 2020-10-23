@@ -149,7 +149,7 @@ def print_counts(counts, job_steps, job_org_repos, stripped_workflows, platform_
 
 def pivot_platform(jobs, from_platform, to_platform, stripped_workflows, job_files):
     for _, _alternatives in stripped_workflows.items():
-        if from_platform not in _alternatives or to_platform not in _alternatives:
+        if from_platform not in _alternatives or (to_platform not in _alternatives and to_platform != 'agnostic'):
             continue
         for _job, _steps in jobs.items():
             if from_platform in _job:  # not balanceable
@@ -167,8 +167,16 @@ def pivot_platform(jobs, from_platform, to_platform, stripped_workflows, job_fil
             for _test in _config['tests']:
                 _job_name = 'pull-ci-{org}-{repo}-{branch}-{test_as}'.format(test_as=_test['as'], **_config['zz_generated_metadata'])
                 if _job_name == _job:
-                    _test['steps']['workflow'] = _alternatives[to_platform]
-                    _test['steps']['cluster_profile'] = to_platform
+                    if to_platform == 'agnostic':
+                        _test['as'] = {
+                            'e2e': 'e2e-agnostic',
+                            'e2e-cmd': 'e2e-agnostic-cmd',
+                            'e2e-operator': 'e2e-agnositc-operator',
+                            'e2e-upgrade': 'e2e-agnostic-upgrade',
+                        }[_test['as']]
+                    else:
+                        _test['steps']['workflow'] = _alternatives[to_platform]
+                        _test['steps']['cluster_profile'] = to_platform
             with open(job_files[_job], 'w') as f:
                 yaml.safe_dump(_config, f, default_flow_style=False)
 
@@ -209,4 +217,4 @@ if __name__ == '__main__':
         'openshift/windows-machine-config-bootstrapper',
     }
     print_counts(counts=_counts, job_steps=_job_steps, job_org_repos=_job_org_repos, stripped_workflows=_stripped_workflows, platform_specific_repositories=_platform_specific_repositories)
-    #pivot_platform(jobs={_job: _job_steps[_job] for _job in _interesting_jobs}, from_platform='gcp', to_platform='aws', stripped_workflows=_stripped_workflows, job_files=_job_files)
+    #pivot_platform(jobs={_job: _job_steps[_job] for _job in _interesting_jobs}, from_platform='gcp', to_platform='agnostic', stripped_workflows=_stripped_workflows, job_files=_job_files)
