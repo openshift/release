@@ -53,8 +53,16 @@ tests:
           cp -f $KUBECONFIG .
           export KUBECONFIG=$(pwd)/kubeconfig
         fi
+        # The test script will clone the origin repository in order to build
+        # the openshift-tests binary. However an origin (empty) folder can be
+        # left behind when the current container image was created, so the
+        # test script is going to fail.
+        [ -d "/go/src/github.com/openshift/origin" ] && rm -rf "/go/src/github.com/openshift/origin"
         KATA_WORKDIR=/go/src/github.com/kata-containers/tests
         cd $KATA_WORKDIR
+        # Overwrite the default tests directories otherwise it will use /var and
+        # end up failing (read-only directory).
+        export KATA_TESTS_BASEDIR="${KATA_WORKDIR}/_output/tests"
         .ci/openshift-ci/test.sh
       from: pipeline:bin
       resources:
