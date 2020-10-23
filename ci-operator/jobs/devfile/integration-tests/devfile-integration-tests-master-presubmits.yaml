@@ -1,7 +1,7 @@
 presubmits:
   devfile/integration-tests:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - master
     cluster: build01
@@ -82,22 +82,24 @@ presubmits:
     branches:
     - master
     cluster: build01
-    context: ci/prow/unit
+    context: ci/prow/v5-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: v5
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-devfile-integration-tests-master-unit
-    rerun_command: /test unit
+    name: pull-ci-devfile-integration-tests-master-v5-images
+    rerun_command: /test v5-images
     spec:
       containers:
       - args:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --target=unit
+        - --target=[images]
+        - --variant=v5
         command:
         - ci-operator
         image: ci-operator:latest
@@ -121,4 +123,87 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )unit,?($|\s.*)
+    trigger: (?m)^/test( | .* )v5-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build01
+    context: ci/prow/v5-integration-tests-e2e
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: v5
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-devfile-integration-tests-master-v5-integration-tests-e2e
+    rerun_command: /test v5-integration-tests-e2e
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-password-file=/etc/boskos/password
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/usr/local/integration-tests-e2e-cluster-profile
+        - --target=integration-tests-e2e
+        - --template=/usr/local/integration-tests-e2e
+        - --variant=v5
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: JOB_NAME_SAFE
+          value: integration-tests-e2e
+        - name: TEST_COMMAND
+          value: |
+            export PATH=$PATH:/tmp/bin
+            mkdir /tmp/bin
+            curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.5/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
+            chmod ug+x /tmp/bin/oc
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/integration-tests-e2e-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/integration-tests-e2e
+          name: job-definition
+          subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-src
+        name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )v5-integration-tests-e2e,?($|\s.*)
