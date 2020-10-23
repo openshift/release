@@ -171,9 +171,12 @@ Use [generate-bw-items.sh](./hack/generate-bw-items.sh) to generate those files,
 
 Use [ci-secret-bootstrap](../../../core-services/ci-secret-bootstrap/README.md).
 
-## OpenShift Image Registry: Manual
+## OpenShift Image Registry: 
 
-* Expose registry service: see [readme](../openshift-image-registry/README.md). We need to run the command only once.
+It is automated by config-updater:
+
+* customized URL
+* `replicas=3`
 
 ## OpenShift-Monitoring
 
