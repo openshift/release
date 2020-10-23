@@ -1,0 +1,65 @@
+{
+  "hide": true,
+  "name":"4.8.0-0.ci",
+  "to": "release",
+  "message": "This release contains CI image builds of all code in release-4.8 (master) branches, and is updated each time someone merges.",
+  "mirrorPrefix": "4.8",
+  "expires":"12h",
+  "maxUnreadyReleases": 1,
+  "minCreationIntervalSeconds": 7200,
+  "pullSecretName": "source",
+  "publish":{
+    "mirror-to-origin":{
+      "imageStreamRef":{
+        "namespace": "origin",
+        "name": "4.8",
+        "excludeTags": [
+          "machine-os-content",
+          "machine-config-operator",
+          "machine-config-operator-rpms",
+          "installer",
+          "installer-artifacts",
+          "baremetal-installer",
+          "openstack-installer",
+          "upi-installer",
+          "libvirt-installer",
+          "baremetal-machine-controllers",
+          "baremetal-operator",
+          "sig-storage-local-static-provisioner",
+          "ironic",
+          "ironic-inspector",
+          "ironic-ipa-downloader",
+          "ironic-machine-os-downloader",
+          "ironic-static-ip-manager",
+          "cluster-samples-operator",
+          "operator-marketplace"
+        ]
+      }
+    },
+    "tag":{"tagRef":{"name":"4.8-ci"}}
+  },
+  "verify":{
+    "gcp":{
+      "prowJob":{"name":"release-openshift-origin-installer-e2e-gcp-4.8"}
+    },
+    "upgrade-minor":{
+      "upgrade":true,
+      "upgradeFrom": "PreviousMinor",
+      "optional":false,
+      "prowJob":{"name":"release-openshift-origin-installer-e2e-aws-upgrade"}
+    }
+  },
+  "periodic":{
+    "upgrade-aws-minor":{
+      "interval":"6h",
+      "upgrade":true,
+      "upgradeFrom": "PreviousMinor",
+      "prowJob":{"name":"release-openshift-origin-installer-e2e-aws-upgrade-4.7-stable-to-4.8-ci"}
+    },
+    "upgrade-gcp":{
+      "interval":"6h",
+      "upgrade":true,
+      "prowJob":{"name":"release-openshift-origin-installer-e2e-gcp-upgrade-4.8"}
+    }
+  }
+}
