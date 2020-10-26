@@ -19,7 +19,7 @@ do
   args=$(jq -n \
             --arg hostn "$cluster_name-$i" \
             --arg token "$ipam_token" \
-            '{network: "172.31.252.0", hostname: $hostn, ipam: "139.178.89.254", ipam_token: $token}')
+            '{network: "172.31.252.0", hostname: $hostn, ipam: "ipam.vmc.ci.openshift.org", ipam_token: $token}')
 
   vip_json=$(echo "$args" | bash <(curl -s https://raw.githubusercontent.com/openshift/installer/master/upi/vsphere/ipam/cidr_to_ip.sh))
   vips[$i]=$(echo "$vip_json" | jq -r .ip_address )
