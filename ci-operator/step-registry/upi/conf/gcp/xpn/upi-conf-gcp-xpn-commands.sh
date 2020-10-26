@@ -28,8 +28,8 @@ HOST_PROJECT="openshift-dev-installer"
 CLUSTER_NETWORK="https://www.googleapis.com/compute/v1/projects/openshift-dev-installer/global/networks/installer-shared-vpc"
 CONTROL_SUBNET="https://www.googleapis.com/compute/v1/projects/openshift-dev-installer/regions/us-east1/subnetworks/installer-shared-vpc-subnet-1"
 COMPUTE_SUBNET="https://www.googleapis.com/compute/v1/projects/openshift-dev-installer/regions/us-east1/subnetworks/installer-shared-vpc-subnet-2"
-COMPUTE_SERVICE_ACCOUNT="do-not-delelete-ci-xpn@openshift-gce-devel-ci.iam.gserviceaccount.com"
-CONTROL_SERVICE_ACCOUNT="do-not-delelete-ci-xpn@openshift-gce-devel-ci.iam.gserviceaccount.com"
+COMPUTE_SERVICE_ACCOUNT="do-not-delete-ci-xpn@openshift-gce-devel-ci.iam.gserviceaccount.com"
+CONTROL_SERVICE_ACCOUNT="do-not-delete-ci-xpn@openshift-gce-devel-ci.iam.gserviceaccount.com"
 PRIVATE_ZONE_NAME="ci-op-xpn-private-zone"
 
 cat > "${SHARED_DIR}/xpn.json" << EOF
