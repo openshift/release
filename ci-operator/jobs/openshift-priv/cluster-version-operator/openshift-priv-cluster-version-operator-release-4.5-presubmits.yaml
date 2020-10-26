@@ -78,8 +78,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.5
-    cluster: build02
-    context: ci/prow/e2e-upgrade
+    context: ci/prow/e2e-agnostic-upgrade
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -87,9 +86,9 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-cluster-version-operator-release-4.5-e2e-upgrade
+    name: pull-ci-openshift-priv-cluster-version-operator-release-4.5-e2e-agnostic-upgrade
     path_alias: github.com/openshift/cluster-version-operator
-    rerun_command: /test e2e-upgrade
+    rerun_command: /test e2e-agnostic-upgrade
     spec:
       containers:
       - args:
@@ -98,8 +97,8 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/e2e-upgrade-cluster-profile
-        - --target=e2e-upgrade
+        - --secret-dir=/usr/local/e2e-agnostic-upgrade-cluster-profile
+        - --target=e2e-agnostic-upgrade
         command:
         - ci-operator
         image: ci-operator:latest
@@ -112,7 +111,7 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-upgrade-cluster-profile
+        - mountPath: /usr/local/e2e-agnostic-upgrade-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
@@ -147,7 +146,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-upgrade,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-agnostic-upgrade,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
