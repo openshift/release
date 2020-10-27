@@ -12,13 +12,25 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-integration
-  commands: |
+  steps:
+    cluster_profile: aws
+    test:
+    - as: devworkspaces-operator-e2e
+      commands: |
         export PATH=$PATH:/tmp/bin
         mkdir /tmp/bin
         curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.5/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
         chmod ug+x /tmp/bin/oc
-  openshift_installer_src:
-    cluster_profile: aws
+        /bin/bash .ci/openshift_e2e.sh
+      dependencies:
+      - env: DEVWORKSPACE_OPERATOR
+        name: devworkspace-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: devfile

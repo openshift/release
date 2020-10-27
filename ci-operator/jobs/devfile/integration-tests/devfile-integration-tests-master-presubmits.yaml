@@ -4,7 +4,6 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build01
     context: ci/prow/e2e-integration
     decorate: true
     decoration_config:
@@ -23,20 +22,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-integration-cluster-profile
         - --target=e2e-integration
-        - --template=/usr/local/e2e-integration
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: e2e-integration
-        - name: TEST_COMMAND
-          value: |
-            export PATH=$PATH:/tmp/bin
-            mkdir /tmp/bin
-            curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.5/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
-            chmod ug+x /tmp/bin/oc
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -49,9 +36,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-integration-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-integration
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -71,9 +55,6 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
