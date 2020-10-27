@@ -1,0 +1,90 @@
+base_images:
+  base:
+    name: "4.4"
+    namespace: ocp
+    tag: base
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+canonical_go_repository: kubevirt.io/kubevirt
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.4"
+  namespace: ocp
+tests:
+- artifact_dir: /go/src/kubevirt.io/kubevirt/_out/exported-artifacts
+  as: e2e-nested-virt
+  cron: 2 3 * * *
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: nightly-build-azure4
+      commands: |
+        set -euo pipefail
+
+        echo "Downloading oc binary"
+        # FIXME: transfer into Dockerfile for ci
+        export SHARED_BIN_DIR="${SHARED_DIR}/bin/"
+        (
+            # create directory
+            mkdir "${SHARED_BIN_DIR}"
+            cd "${SHARED_BIN_DIR}"
+
+            # Download oc binary
+            curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar -C . -xzf -
+            chmod +x oc
+            ln -s oc kubectl
+        ) || exit 1
+        export PATH="${SHARED_BIN_DIR}:${PATH}"
+
+        release_base_url="https://gcsweb.apps.ovirt.org/gcs/kubevirt-prow/devel/nightly/release/kubevirt/kubevirt"
+        release_date=$(curl -L "${release_base_url}/latest")
+        release_url="${release_base_url}/${release_date}"
+        commit=$(curl -L "${release_url}/commit")
+
+        export DOCKER_PREFIX='kubevirtnightlybuilds'
+        DOCKER_TAG="${release_date}_$(echo ${commit} | cut -c 1-9)"
+        export DOCKER_TAG
+
+        echo "Downloading kubevirt tests binary from nightly build"
+        (
+            cd "${SHARED_BIN_DIR}"
+            curl -L -o tests.test "${release_url}/testing/tests.test"
+            chmod +x tests.test
+        ) || exit 1
+
+        echo "Deploying kubevirt from nightly build"
+        oc create -f "${release_url}/kubevirt-operator.yaml"
+        oc create -f "${release_url}/kubevirt-cr.yaml"
+
+        echo "Deploying test infrastructure"
+        for testinfra_file in $(curl -L "${release_url}/testing/" | grep -oE 'https://[^"]*\.yaml'); do
+            oc create -f ${testinfra_file}
+        done
+
+        echo "Waiting for KubeVirt to get ready"
+        oc wait -n kubevirt kv kubevirt --for condition=Available --timeout 15m
+
+        echo "Running tests"
+        mkdir -p $ARTIFACT_DIR
+        # '-ginkgo.skip=(Slirp\sNetworking)|(with\sCPU\sspec)|(with\sTX\soffload\sdisabled)|(with\scni\sflannel\sand\sptp\splugin\sinterface)|(with\sovs-cni\splugin)|(test_id:1752)|(SRIOV)|(with\sEFI)|(Operator)|(GPU)|(DataVolume\sIntegration)|(test_id:3468)|(test_id:3466)|(test_id:1015)|(rfe_id:393)|(test_id:1631)'
+        tests.test -v=5 -kubeconfig=${KUBECONFIG} -container-tag=${DOCKER_TAG} -container-tag-alt= -container-prefix=${DOCKER_PREFIX} -image-prefix-alt=-kv -oc-path=${SHARED_BIN_DIR}/oc -kubectl-path=${SHARED_BIN_DIR}/kubectl -gocli-path=$(pwd)/cluster-up/cli.sh -test.timeout 420m -ginkgo.noColor -ginkgo.succinct -ginkgo.slowSpecThreshold=60 '-ginkgo.focus=\[rfe_id:273\]\[crit:high\]'  -junit-output=${ARTIFACT_DIR}/junit.functest.xml -installed-namespace=kubevirt -previous-release-tag= -previous-release-registry=index.docker.io/kubevirt -deploy-testing-infra=false
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-azure
+zz_generated_metadata:
+  branch: master
+  org: kubevirt
+  repo: kubevirt
+  variant: "4.4"
