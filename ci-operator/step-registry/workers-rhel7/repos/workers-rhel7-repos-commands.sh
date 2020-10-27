@@ -69,35 +69,6 @@ cat > prep.yaml <<-'EOF'
     copy:
       src: rhel-7-server-rpms-4.X.repo
       dest: /etc/yum.repos.d/
-
-  # Temporary pre-release kernel install until RHEL 7.9 GA
-  - name: Get current kernel version
-    command: uname -r
-    register: kernel_version
-
-  - name: Test current kernel version
-    debug:
-      msg: "Kernel is old"
-    when: kernel_version.stdout is version('3.10.0-1148', 'lt')
-
-  - when: kernel_version.stdout is version('3.10.0-1148', 'lt')
-    block:
-    - name: Download pre-release kernel
-      get_url:
-        url: https://mirror.openshift.com/enterprise/other/openshift-ansible/rteague/x86_64/kernel-3.10.0-1148.el7.x86_64.rpm
-        dest: /tmp/kernel-3.10.0-1148.el7.x86_64.rpm
-        client_cert: /var/lib/yum/ops-mirror.pem
-      register: result
-      until: result is succeeded
-
-    - name: Install pre-release kernel
-      yum:
-        name: /tmp/kernel-3.10.0-1148.el7.x86_64.rpm
-        state: present
-      async: 3600
-      poll: 30
-      register: result
-      until: result is succeeded
 EOF
 
 cat > rhel-7-server-ose-4.X-devel-rpms.repo.j2 <<-'EOF'
