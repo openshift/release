@@ -51,3 +51,49 @@ postsubmits:
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
+  - agent: kubernetes
+    branches:
+    - ^master$
+    cluster: api.ci
+    decorate: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+    max_concurrency: 1
+    name: branch-ci-openshift-configure-alertmanager-operator-master-publish-coverage
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/secrets/configure-alertmanager-operator-codecov-token
+        - --target=publish-coverage
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/configure-alertmanager-operator-codecov-token
+          name: configure-alertmanager-operator-codecov-token
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: configure-alertmanager-operator-codecov-token
+        secret:
+          secretName: configure-alertmanager-operator-codecov-token
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
