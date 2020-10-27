@@ -30,29 +30,32 @@ tag_specification:
   namespace: ocp
 tests:
 - artifact_dir: /go/src/github.com/kata-containers/tests/_output/tests/openshift-e2e
-  as: e2e-periodic-azure-nested-virt
+  as: kata-e2e-periodic-azure
   cron: 2 7 * * *
   steps:
     cluster_profile: azure4
     test:
-    - as: kata-e2e-test
+    - as: kata-e2e-test-debug
       commands: |
         # TODO: Currently the oc binary isn't available in the test container,
         # so remove this when it is fixed in the multistage test machinery.
+        sleep 7200
         if ! command -V oc; then
-          mkdir bin
-          cd bin
-          curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.5/linux/oc.tar.gz | tar -C . -xzf -
-          chmod +x oc
-          ln -s oc kubectl
-          export PATH="$(pwd):${PATH}"
+          curl https://mirror.openshift.com/pub/openshift-v4/clients/ocp/4.5.0/openshift-client-linux.tar.gz | tar -C . -xzf -
+          mkdir -p /usr/local/bin
+          cp -f oc kubectl /usr/local/bin
+          export PATH="${PATH}:/usr/local/bin"
         fi
         # TODO: Also on multistage test the shared directory is currently
         # read-only, so some oc commands might fail to read the kubeconfig file.
-        if [ -n "$KUBECONFIG" ]; then
-          cp -f $KUBECONFIG .
-          export KUBECONFIG=$(pwd)/kubeconfig
-        fi
+        #if [ -n "$KUBECONFIG" ]; then
+        #  cp -f $KUBECONFIG .
+        #  export KUBECONFIG=$(pwd)/kubeconfig
+        #fi
+        # Debug
+        env
+        ls -l ${CLUSTER_PROFILE_DIR}
+        ls -l ${SHARED_DIR}
         # The test script will clone the origin repository in order to build
         # the openshift-tests binary. However an origin (empty) folder can be
         # left behind when the current container image was created, so the
@@ -64,6 +67,7 @@ tests:
         # end up failing (read-only directory).
         export KATA_TESTS_BASEDIR="${KATA_WORKDIR}/_output/tests"
         .ci/openshift-ci/test.sh
+        sleep 7200
       from: pipeline:bin
       resources:
         requests:
