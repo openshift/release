@@ -29,6 +29,12 @@ IP=$(cat "${SHARED_DIR}/server-ip")
 
 SSHOPTS=(-o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -i "${CLUSTER_PROFILE_DIR}/.packet-kni-ssh-privatekey")
 
+collect_artifacts() {
+    echo "### Fetching results"
+    ssh "${SSHOPTS[@]}" "root@${IP}" tar -czf - /tmp/artifacts | tar -C "${ARTIFACT_DIR}" -xzf -
+}
+trap collect_artifacts EXIT
+
 # Copy test binaries on packet server
 echo "### Copying test binaries"
 scp "${SSHOPTS[@]}" /usr/bin/openshift-tests /usr/bin/kubectl "root@${IP}:/usr/local/bin"
@@ -81,9 +87,6 @@ else
 fi
 
 rv=$?
-
-echo "### Fetching results"
-ssh "${SSHOPTS[@]}" "root@${IP}" tar -czf - /tmp/artifacts | tar -C "${ARTIFACT_DIR}" -xzf -
 
 set -e
 echo "### Done! (${rv})"
