@@ -18,8 +18,10 @@ presubmits:
       containers:
       - args:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
+        - --secret-dir=/usr/local/e2e-kubevirt-cluster-profile
         - --target=e2e-kubevirt
         command:
         - ci-operator
@@ -30,6 +32,11 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-kubevirt-cluster-profile
+          name: cluster-profile
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -38,6 +45,19 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
