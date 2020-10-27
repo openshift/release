@@ -50,8 +50,9 @@ tests:
         # TODO: Also on multistage test the shared directory is currently
         # read-only, so some oc commands might fail to read the kubeconfig file.
         if [ -n "$KUBECONFIG" ]; then
-          cp -f $KUBECONFIG .
-          export KUBECONFIG=$(pwd)/kubeconfig
+          mkdir shared_dir
+          cp -f ${SHARED_DIR}/* ./shared_dir
+          export KUBECONFIG=$(pwd)/shared_dir/kubeconfig
         fi
         # The test script will clone the origin repository in order to build
         # the openshift-tests binary. However an origin (empty) folder can be
@@ -64,6 +65,7 @@ tests:
         # end up failing (read-only directory).
         export KATA_TESTS_BASEDIR="${KATA_WORKDIR}/_output/tests"
         .ci/openshift-ci/test.sh
+        sleep 3600
       from: pipeline:bin
       resources:
         requests:
