@@ -51,6 +51,31 @@ presubmits:
     rerun_command: /test boskos-config
     spec:
       containers:
+      - args:
+        - --config
+        - core-services/prow/02_config/_boskos.yaml
+        command:
+        - /app
+        image: gcr.io/k8s-staging-boskos/checkconfig:v20201028-a0e5815
+        imagePullPolicy: IfNotPresent
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )boskos-config,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build02
+    context: ci/prow/boskos-config-generation
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-boskos-config-generation
+    rerun_command: /test boskos-config-generation
+    spec:
+      containers:
       - command:
         - hack/validate-boskos.sh
         image: registry.svc.ci.openshift.org/ci/python-validation
@@ -59,7 +84,7 @@ presubmits:
         resources:
           requests:
             cpu: 10m
-    trigger: (?m)^/test( | .* )boskos-config,?($|\s.*)
+    trigger: (?m)^/test( | .* )boskos-config-generation,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
