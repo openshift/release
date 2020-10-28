@@ -1,10 +1,8 @@
-base_images:
-  temporarily_needed_to_make_this_image_appear_in_all_build_clusters_see_jira_dptp_1640:
-    name: boilerplate
-    namespace: openshift
-    tag: image-v0.1.1
 build_root:
   from_repository: true
+images:
+- dockerfile_path: build/Dockerfile
+  to: unused
 resources:
   '*':
     limits:
@@ -33,24 +31,15 @@ tests:
     mount_path: /tmp/secret
     name: must-gather-operator-codecov-token
 - as: lint
-  commands: |
-    set -x
-    go mod download
-    make gocheck
+  commands: make lint
   container:
     from: src
-- as: build
-  commands: |
-    set -x
-    go mod download
-    make gobuild
+- as: test
+  commands: make test
   container:
     from: src
-- as: unit
-  commands: |
-    set -x
-    go mod download
-    make test
+- as: validate
+  commands: make validate
   container:
     from: src
 zz_generated_metadata:
