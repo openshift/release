@@ -1,27 +1,25 @@
-presubmits:
+postsubmits:
   openshift/route-monitor-operator:
   - agent: kubernetes
-    always_run: true
     branches:
-    - master
-    cluster: build02
-    context: ci/prow/images
+    - ^master$
+    cluster: api.ci
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/is-promotion: "true"
       ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-route-monitor-operator-master-images
-    rerun_command: /test images
+    max_concurrency: 1
+    name: branch-ci-openshift-route-monitor-operator-master-images
     spec:
       containers:
       - args:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --promote
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --target=[images]
-        - --target=[release:latest]
         command:
         - ci-operator
         image: ci-operator:latest
@@ -34,6 +32,9 @@ presubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
+        - mountPath: /etc/push-secret
+          name: push-secret
+          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
@@ -42,7 +43,9 @@ presubmits:
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
+      - name: push-secret
+        secret:
+          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
