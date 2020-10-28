@@ -1,24 +1,14 @@
 base_images:
-  base:
-    name: "4.7"
-    namespace: ocp
-    tag: base
-  openshift_release_golang-1.13:
-    name: release
+  temporarily_needed_to_make_this_image_appear_in_all_build_clusters_see_jira_dptp_1640:
+    name: boilerplate
     namespace: openshift
-    tag: golang-1.13
+    tag: image-v0.2.0
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.13
+  from_repository: true
 images:
 - dockerfile_path: build/Dockerfile
-  from: base
-  to: osd-metrics-exporter
-promotion:
-  name: "4.7"
-  namespace: ocp
+  from: src
+  to: unused
 resources:
   '*':
     limits:
@@ -26,12 +16,36 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: "4.7"
-  namespace: ocp
 tests:
-- as: unit
+- as: coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  secret:
+    mount_path: /tmp/secret
+    name: osd-metrics-exporter-codecov-token
+- as: publish-coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: osd-metrics-exporter-codecov-token
+- as: lint
+  commands: make lint
+  container:
+    from: src
+- as: test
   commands: make test
+  container:
+    from: src
+- as: validate
+  commands: make validate
   container:
     from: src
 zz_generated_metadata:
