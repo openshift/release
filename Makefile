@@ -265,12 +265,15 @@ ci-secret-bootstrap:
 
 ci-secret-generator:
 	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/ci-secret-generator:latest
-	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/core-services/ci-secret-generator/_config.yaml:/_config.yaml:z" -v "$(CURDIR)/core-services/ci-secret-bootstrap/_config.yaml:/_bootstrap_config.yaml:z" \
-		-v "$(kubeconfig_path):/_kubeconfig:z" \
-		-v "$(bw_password_path):/_bw_password:z" \
-		-e KUBECONFIG=_kubeconfig \
-		registry.svc.ci.openshift.org/ci/ci-secret-generator:latest \
-		--bw-password-path=/_bw_password --bw-user $(kerberos_id)@redhat.com --config=/_config.yaml --bootstrap-config=/_bootstrap_config.yaml --dry-run=$(dry_run)
+	@# This needs a bunch of stuff from the host for auth so just copy it there
+	$(eval ID = $(shell $(CONTAINER_ENGINE) create registry.svc.ci.openshift.org/ci/ci-secret-generator))
+	$(CONTAINER_ENGINE) cp $(ID):/usr/bin/ci-secret-generator /tmp/secret-generator
+	$(CONTAINER_ENGINE) rm $(ID)
+	/tmp/secret-generator --bw-password-path=$(bw_password_path) --bw-user $(kerberos_id)@redhat.com \
+		--config=$(CURDIR)/core-services/ci-secret-generator/_config.yaml \
+		--bootstrap-config=$(CURDIR)/core-services/ci-secret-bootstrap/_config.yaml \
+		--dry-run=$(dry_run)
+	rm /tmp/secret-generator
 .PHONY: ci-secret-generator
 
 verify-app-ci:
