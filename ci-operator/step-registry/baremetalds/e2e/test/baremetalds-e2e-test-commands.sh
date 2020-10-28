@@ -48,15 +48,18 @@ if [[ "$RUN_UPGRADE_TEST" == true ]]; then
     # In case of a timeout we don't get the trace log of this script
     # Let's verify that the we started the upgrade process
     touch "${ARTIFACT_DIR}/upgrade_started"
-    ssh \
-        "${SSHOPTS[@]}" \
-        "root@${IP}" \
-        openshift-tests \
-        run-upgrade \
-        --to-image "$OPENSHIFT_UPGRADE_RELEASE_IMAGE" \
-        -o /tmp/artifacts/e2e-upgrade.log \
-        --junit-dir /tmp/artifacts/junit-upgrade \
-        all
+    timeout \
+    --kill-after 10m \
+    120m \
+        ssh \
+            "${SSHOPTS[@]}" \
+            "root@${IP}" \
+            openshift-tests \
+            run-upgrade \
+            --to-image "$OPENSHIFT_UPGRADE_RELEASE_IMAGE" \
+            -o /tmp/artifacts/e2e-upgrade.log \
+            --junit-dir /tmp/artifacts/junit-upgrade \
+            all
 else
     if [[ -s "${SHARED_DIR}/test-list" ]]; then
         echo "### Copying test-list file"
