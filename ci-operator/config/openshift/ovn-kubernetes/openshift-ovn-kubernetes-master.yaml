@@ -3,6 +3,10 @@ base_images:
     name: "4.7"
     namespace: ocp
     tag: base
+  centos:
+    name: centos
+    namespace: ci
+    tag: "7"
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -31,7 +35,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: golang-1.15
 images:
 - from: base
   inputs:
@@ -42,6 +46,12 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
   to: ovn-kubernetes
+- dockerfile_path: Dockerfile.utest
+  inputs:
+    base:
+      as:
+      - registry.centos.org/centos/centos:7
+  to: podman
 promotion:
   name: "4.7"
   namespace: ocp
@@ -115,6 +125,27 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-upgrade-gcp
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: |
+    cd go-controller
+    make test
+  container:
+    from: podman
+- artifact_dir: /tmp/artifacts
+  as: lint
+  commands: |
+    cd go-controller
+    make lint
+  container:
+    from: podman
+- artifact_dir: /tmp/artifacts
+  as: gofmt
+  commands: |
+    cd go-controller
+    make gofmt
+  container:
+    from: podman
 zz_generated_metadata:
   branch: master
   org: openshift
