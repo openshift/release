@@ -3,6 +3,10 @@ base_images:
     name: "4.11"
     namespace: ocp
     tag: base
+  centos:
+    name: centos
+    namespace: ci
+    tag: "7"
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -16,7 +20,10 @@ base_images:
     namespace: ocp
     tag: rhel-8-golang-1.17-openshift-4.10
 build_root:
-  from_repository: true
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
 images:
 - from: base
   inputs:
@@ -27,6 +34,12 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: ovn-kubernetes
+- dockerfile_path: Dockerfile.utest
+  inputs:
+    base:
+      as:
+      - registry.centos.org/centos/centos:7
+  to: podman
 promotion:
   name: "4.11"
   namespace: ocp
@@ -133,6 +146,24 @@ tests:
     env:
       GATEWAY_MODE: local
     workflow: openshift-e2e-aws-ovn-local-to-shared-gateway-mode-migration
+- as: unit
+  commands: |
+    cd go-controller
+    make test
+  container:
+    from: podman
+- as: lint
+  commands: |
+    cd go-controller
+    make lint
+  container:
+    from: podman
+- as: gofmt
+  commands: |
+    cd go-controller
+    make gofmt
+  container:
+    from: podman
 zz_generated_metadata:
   branch: master
   org: openshift
