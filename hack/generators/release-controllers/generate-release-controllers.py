@@ -113,6 +113,9 @@ def run(git_clone_dir):
     with genlib.GenDoc(path_rc_release_resources.joinpath('admin_deploy-ocp-publish-art.yaml'), context=config) as gendoc:
         content.add_art_publish(gendoc)
 
+    with genlib.GenDoc(path_rc_release_resources.joinpath(f'rpms-ocp-3.11.yaml'), context=config) as gendoc:
+        content.add_rpm_mirror_service(gendoc, git_clone_dir, '3.11')
+
     for major_minor in releases_4x:
         with genlib.GenDoc(path_rc_release_resources.joinpath(f'rpms-ocp-{major_minor}.yaml'), context=config) as gendoc:
             content.add_rpm_mirror_service(gendoc, git_clone_dir, major_minor)
