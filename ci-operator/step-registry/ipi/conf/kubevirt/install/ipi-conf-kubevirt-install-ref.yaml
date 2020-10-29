@@ -1,24 +1,20 @@
 ref:
   as: ipi-conf-kubevirt-install
-  from_image:
-    namespace: origin
-    name: centos
-    tag: '8'
+  from: installer
   commands: ipi-conf-kubevirt-install-commands.sh
   resources:
     requests:
-      cpu: 10m
-      memory: 100Mi
+      cpu: 1000m
+      memory: 2Gi
   dependencies:
     - name: "release:latest"
       env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
     - name: "release:latest"
       env: RELEASE_IMAGE_LATEST
-#  env:
-#    - name: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
-#      default: ""
-#      default: "docker.io/kubevirtplatformipi/ocp-release-dev:kubevirt-provider-tag-4.7-1"
-#    - name: CLUSTER_TYPE
-#      default: "kubevirt"
+  env:
+    - name: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+      default: "docker.io/kubevirtplatformipi/ocp-release-dev:kubevirt-provider-tag-4.7-1"
+    - name: CLUSTER_TYPE
+      default: "kubevirt"
   documentation: |-
-    The IPI configure step generates the generic portions of the install-config.yaml file based on optional input files.
+    The IPI install step runs the OpenShift Installer in order to bring up an OpenShift cluster, using the provided cluster profile to choose a target IaaS platform. Anything that needs to be configured using manifests should generate them before this step and put them in the SHARED_DIR with the filename manifest_(manifest_name).yml so that this step can pull in the manifest in.

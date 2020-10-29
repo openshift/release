@@ -42,7 +42,7 @@ cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
 echo "**** 3 "
 ls
 
-sleep 2h
+#sleep 2h
 
 openshift-install --dir="${dir}" create manifests &
 wait "$!"
