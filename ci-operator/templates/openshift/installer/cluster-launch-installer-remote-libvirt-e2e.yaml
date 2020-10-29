@@ -664,8 +664,11 @@ objects:
         trap 'teardown' EXIT
         trap 'jobs -p | xargs -r kill; exit 0' TERM
 
-        for i in $(seq 1 220); do
-          if [[ -f /tmp/shared/exit ]]; then
+        TRIES=0
+        while (( ${TRIES} <= 240 ))
+        do
+          (( TRIES += 1 ))
+          if [[ -f /tmp/shared/exit && -f /tmp/shared/debug ]]; then
             exit 0
           fi
           sleep 60 & wait
