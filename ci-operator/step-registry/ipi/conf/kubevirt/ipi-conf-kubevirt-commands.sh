@@ -18,22 +18,6 @@ KUBEVIRT_VOLUME_ACCESS_MODE=ReadWriteMany
 
 cat >> "${CONFIG}" << EOF
 baseDomain: ${KUBEVIRT_BASE_DOMAIN}
-controlPlane:
-- name: master
-  platform:
-    kubevirt:
-      cpu: 8
-      memory: 16G
-      storageSize: 35Gi
-  replicas: 3
-compute:
-- name: worker
-  platform:
-    kubevirt:
-      cpu: 4
-      memory: 10G
-      storageSize: 35Gi
-  replicas: 3
 platform:
   kubevirt:
     # TODO this section is WIP - see the installer PR
