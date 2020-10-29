@@ -2,8 +2,6 @@ SHELL=/usr/bin/env bash -o errexit
 
 .PHONY: help check check-boskos check-core check-services dry-core core dry-services services all
 
-CONTAINER_ENGINE ?= docker
-
 help:
 	@echo "Run 'make all' to update configuration against the current KUBECONFIG"
 
@@ -51,40 +49,40 @@ release-controllers:
 .PHONY: release-controllers
 
 jobs:
-	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest
-	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR):/go/src/github.com/openshift/release:z" -e GOPATH=/go registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest --from-release-repo --to-release-repo
-	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/sanitize-prow-jobs:latest
-	$(CONTAINER_ENGINE) run --rm --ulimit nofile=16384:16384 -v "$(CURDIR)/ci-operator/jobs:/ci-operator/jobs:z" -v "$(CURDIR)/core-services/sanitize-prow-jobs:/core-services/sanitize-prow-jobs:z" registry.svc.ci.openshift.org/ci/sanitize-prow-jobs:latest --prow-jobs-dir /ci-operator/jobs --config-path /core-services/sanitize-prow-jobs/_config.yaml
+	docker pull registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest
+	docker run --rm -v "$(CURDIR):/go/src/github.com/openshift/release:z" -e GOPATH=/go registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest --from-release-repo --to-release-repo
+	docker pull registry.svc.ci.openshift.org/ci/sanitize-prow-jobs:latest
+	docker run --rm --ulimit nofile=16384:16384 -v "$(CURDIR)/ci-operator/jobs:/ci-operator/jobs:z" -v "$(CURDIR)/core-services/sanitize-prow-jobs:/core-services/sanitize-prow-jobs:z" registry.svc.ci.openshift.org/ci/sanitize-prow-jobs:latest --prow-jobs-dir /ci-operator/jobs --config-path /core-services/sanitize-prow-jobs/_config.yaml
 
 ci-operator-config:
-	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/determinize-ci-operator:latest
-	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/ci-operator/config:/ci-operator/config:z" registry.svc.ci.openshift.org/ci/determinize-ci-operator:latest --config-dir /ci-operator/config --confirm
+	docker pull registry.svc.ci.openshift.org/ci/determinize-ci-operator:latest
+	docker run --rm -v "$(CURDIR)/ci-operator/config:/ci-operator/config:z" registry.svc.ci.openshift.org/ci/determinize-ci-operator:latest --config-dir /ci-operator/config --confirm
 
 registry-metadata:
-	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/generate-registry-metadata:latest
-	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/ci-operator/step-registry:/ci-operator/step-registry:z" registry.svc.ci.openshift.org/ci/generate-registry-metadata:latest --registry /ci-operator/step-registry
+	docker pull registry.svc.ci.openshift.org/ci/generate-registry-metadata:latest
+	docker run --rm -v "$(CURDIR)/ci-operator/step-registry:/ci-operator/step-registry:z" registry.svc.ci.openshift.org/ci/generate-registry-metadata:latest --registry /ci-operator/step-registry
 
 boskos-config:
 	cd core-services/prow/02_config && ./generate-boskos.py
 .PHONY: boskos-config
 
 prow-config:
-	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/determinize-prow-config:latest
-	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/core-services/prow/02_config:/config:z" registry.svc.ci.openshift.org/ci/determinize-prow-config:latest --prow-config-dir /config
+	docker pull registry.svc.ci.openshift.org/ci/determinize-prow-config:latest
+	docker run --rm -v "$(CURDIR)/core-services/prow/02_config:/config:z" registry.svc.ci.openshift.org/ci/determinize-prow-config:latest --prow-config-dir /config
 
 branch-cut:
-	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/config-brancher:latest
-	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/ci-operator:/ci-operator:z" registry.svc.ci.openshift.org/ci/config-brancher:latest --config-dir /ci-operator/config --org=$(ORG) --repo=$(REPO) --current-release=4.3 --future-release=4.4 --bump-release=4.4 --confirm
+	docker pull registry.svc.ci.openshift.org/ci/config-brancher:latest
+	docker run --rm -v "$(CURDIR)/ci-operator:/ci-operator:z" registry.svc.ci.openshift.org/ci/config-brancher:latest --config-dir /ci-operator/config --org=$(ORG) --repo=$(REPO) --current-release=4.3 --future-release=4.4 --bump-release=4.4 --confirm
 	$(MAKE) update
 
 new-repo:
-	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/repo-init:latest
-	$(CONTAINER_ENGINE) run --rm -it -v "$(CURDIR):/release:z" registry.svc.ci.openshift.org/ci/repo-init:latest --release-repo /release
+	docker pull registry.svc.ci.openshift.org/ci/repo-init:latest
+	docker run --rm -it -v "$(CURDIR):/release:z" registry.svc.ci.openshift.org/ci/repo-init:latest --release-repo /release
 	$(MAKE) update
 
 validate-step-registry:
-	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/ci-operator-configresolver:latest
-	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/core-services/prow/02_config:/prow:z" -v "$(CURDIR)/ci-operator/config:/config:z" -v "$(CURDIR)/ci-operator/step-registry:/step-registry:z" registry.svc.ci.openshift.org/ci/ci-operator-configresolver:latest --config /config --registry /step-registry --prow-config /prow/_config.yaml --validate-only
+	docker pull registry.svc.ci.openshift.org/ci/ci-operator-configresolver:latest
+	docker run --rm -v "$(CURDIR)/core-services/prow/02_config:/prow:z" -v "$(CURDIR)/ci-operator/config:/config:z" -v "$(CURDIR)/ci-operator/step-registry:/step-registry:z" registry.svc.ci.openshift.org/ci/ci-operator-configresolver:latest --config /config --registry /step-registry --prow-config /prow/_config.yaml --validate-only
 
 # LEGACY TARGETS
 # You should not need to add new targets here.
@@ -255,8 +253,8 @@ kubeconfig_path ?= $(HOME)/.kube/config
 # echo -n "bw_password" > /tmp/bw_password
 # make kerberos_id=<your_kerberos_id> cluster=app.ci ci-secret-bootstrap
 ci-secret-bootstrap:
-	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/ci-secret-bootstrap:latest
-	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/core-services/ci-secret-bootstrap/_config.yaml:/_config.yaml:z" \
+	docker pull registry.svc.ci.openshift.org/ci/ci-secret-bootstrap:latest
+	docker run --rm -v "$(CURDIR)/core-services/ci-secret-bootstrap/_config.yaml:/_config.yaml:z" \
 		-v "$(kubeconfig_path):/_kubeconfig:z" \
 		-v "$(bw_password_path):/_bw_password:z" \
 		registry.svc.ci.openshift.org/ci/ci-secret-bootstrap:latest \
@@ -264,11 +262,11 @@ ci-secret-bootstrap:
 .PHONY: ci-secret-bootstrap
 
 ci-secret-generator:
-	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/ci-secret-generator:latest
+	docker pull registry.svc.ci.openshift.org/ci/ci-secret-generator:latest
 	@# This needs a bunch of stuff from the host for auth so just copy it there
-	$(eval ID = $(shell $(CONTAINER_ENGINE) create registry.svc.ci.openshift.org/ci/ci-secret-generator))
-	$(CONTAINER_ENGINE) cp $(ID):/usr/bin/ci-secret-generator /tmp/secret-generator
-	$(CONTAINER_ENGINE) rm $(ID)
+	$(eval ID = $(shell docker create registry.svc.ci.openshift.org/ci/ci-secret-generator))
+	docker cp $(ID):/usr/bin/ci-secret-generator /tmp/secret-generator
+	docker rm $(ID)
 	/tmp/secret-generator --bw-password-path=$(bw_password_path) --bw-user $(kerberos_id)@redhat.com \
 		--config=$(CURDIR)/core-services/ci-secret-generator/_config.yaml \
 		--bootstrap-config=$(CURDIR)/core-services/ci-secret-bootstrap/_config.yaml \
@@ -280,6 +278,6 @@ verify-app-ci:
 	true
 
 mixins:
-	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/dashboards-validation:latest
-	$(CONTAINER_ENGINE) run --user=$(UID) --rm -v "$(CURDIR):/release:z" registry.svc.ci.openshift.org/ci/dashboards-validation:latest make -C /release/clusters/app.ci/prow-monitoring/mixins install all
+	docker pull registry.svc.ci.openshift.org/ci/dashboards-validation:latest
+	docker run --user=$(UID) --rm -v "$(CURDIR):/release:z" registry.svc.ci.openshift.org/ci/dashboards-validation:latest make -C /release/clusters/app.ci/prow-monitoring/mixins install all
 .PHONY: mixins
