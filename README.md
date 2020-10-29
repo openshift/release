@@ -7,7 +7,7 @@ OCP.
 ## CI Workflow Configuration
 
 To setup a CI workflow for a new repository, use `make new-repo`. See the
-[Contributing CI Configuration to the openshift/release Repository](https://steps.ci.openshift.org/help/release)
+[Contributing CI Configuration to the openshift/release Repository](https://docs.ci.openshift.org/docs/how-tos/contributing-openshift-release/)
 document for detailed information about how to contribute to this repository.
 
 Configuration files for CI workflows live under [`ci-operator/`](./ci-operator/)
@@ -18,7 +18,7 @@ and are split into the following categories:
  - [`ci-operator/jobs`](./ci-operator/jobs/) contains configuration for `prow`,
    detailing job triggers. In almost all cases, this configuration is
    generated automatically from the `ci-operator` config. For manual edits, see
-   [this section](https://steps.ci.openshift.org/help/release#component-jobs)
+   [this section](https://docs.ci.openshift.org/docs/how-tos/contributing-openshift-release/#component-ci-configuration)
    of the contribution document and the [upstream configuration document](https://github.com/kubernetes/test-infra/blob/master/prow/README.md#how-to-add-new-jobs). Prefer the `ci-operator` config whenever possible.
  - [`ci-operator/step-registry`](./ci-operator/step-registry/) contains the
    registry of reusable test steps and workflows. See the documentation for
