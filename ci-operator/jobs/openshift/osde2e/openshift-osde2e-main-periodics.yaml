@@ -156,7 +156,7 @@ periodics:
         secretName: osde2e-credentials
 - agent: kubernetes
   cluster: api.ci
-  cron: 0 */4 * * *
+  cron: 0 */8 * * *
   decorate: true
   labels:
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -199,7 +199,7 @@ periodics:
         secretName: osde2e-credentials
 - agent: kubernetes
   cluster: api.ci
-  cron: 0 */4 * * *
+  cron: 0 */8 * * *
   decorate: true
   extra_refs:
   - base_ref: main
@@ -246,7 +246,7 @@ periodics:
         secretName: osde2e-credentials
 - agent: kubernetes
   cluster: api.ci
-  cron: 0 */4 * * *
+  cron: 0 */8 * * *
   decorate: true
   extra_refs:
   - base_ref: main
@@ -293,7 +293,7 @@ periodics:
         secretName: osde2e-credentials
 - agent: kubernetes
   cluster: api.ci
-  cron: 0 */4 * * *
+  cron: 0 */8 * * *
   decorate: true
   extra_refs:
   - base_ref: main
@@ -340,7 +340,7 @@ periodics:
         secretName: osde2e-credentials
 - agent: kubernetes
   cluster: api.ci
-  cron: 0 */4 * * *
+  cron: 0 */8 * * *
   decorate: true
   extra_refs:
   - base_ref: main
@@ -1369,7 +1369,7 @@ periodics:
     repo: osde2e
   labels:
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-stage-aws-e2e-next
+  name: osde2e-stage-aws-e2e-next-z
   spec:
     containers:
     - args:
@@ -1381,12 +1381,57 @@ periodics:
       command:
       - /osde2e
       env:
-      - name: USE_LATEST_VERSION_FOR_INSTALL
-        value: "true"
       - name: SECRET_LOCATIONS
         value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
       - name: CONFIGS
-        value: aws,stage,e2e-suite
+        value: aws,stage,e2e-suite,latest-z-from-prod-default
+      image: quay.io/app-sre/osde2e
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/osde2e-common
+        name: osde2e-common
+        readOnly: true
+      - mountPath: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: osde2e-common
+      secret:
+        secretName: osde2e-common
+    - name: osde2e-credentials
+      secret:
+        secretName: osde2e-credentials
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 */4 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: osde2e
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: osde2e-stage-aws-e2e-next-y
+  spec:
+    containers:
+    - args:
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
+      command:
+      - /osde2e
+      env:
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - name: CONFIGS
+        value: aws,stage,e2e-suite,latest-y-from-prod-default
       image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
@@ -2097,61 +2142,6 @@ periodics:
     repo: osde2e
   labels:
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-int-moa-e2e-upgrade-to-osd-default-nightly
-  spec:
-    containers:
-    - args:
-      - test
-      - --secret-locations
-      - $(SECRET_LOCATIONS)
-      - --configs
-      - $(CONFIGS)
-      command:
-      - /osde2e
-      env:
-      - name: MOA_ENV
-        value: int
-      - name: SECRET_LOCATIONS
-        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-moa-integration
-      - name: CONFIGS
-        value: moa,e2e-suite,upgrade-nightly-release-for-prod-default,region-random
-      image: quay.io/app-sre/osde2e
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /usr/local/osde2e-common
-        name: osde2e-common
-        readOnly: true
-      - mountPath: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        readOnly: true
-      - mountPath: /usr/local/osde2e-moa-integration
-        name: osde2e-moa-integration
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: osde2e-common
-      secret:
-        secretName: osde2e-common
-    - name: osde2e-credentials
-      secret:
-        secretName: osde2e-credentials
-    - name: osde2e-moa-integration
-      secret:
-        secretName: osde2e-moa-integration
-- agent: kubernetes
-  cluster: api.ci
-  cron: 0 */8 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: main
-    org: openshift
-    repo: osde2e
-  labels:
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: osde2e-int-moa-e2e-osd-default-plus-one-nightly
   spec:
     containers:
@@ -2170,61 +2160,6 @@ periodics:
         value: /usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-moa-integration
       - name: CONFIGS
         value: moa,e2e-suite,one-release-from-prod-default,region-random
-      image: quay.io/app-sre/osde2e
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /usr/local/osde2e-common
-        name: osde2e-common
-        readOnly: true
-      - mountPath: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        readOnly: true
-      - mountPath: /usr/local/osde2e-moa-integration
-        name: osde2e-moa-integration
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: osde2e-common
-      secret:
-        secretName: osde2e-common
-    - name: osde2e-credentials
-      secret:
-        secretName: osde2e-credentials
-    - name: osde2e-moa-integration
-      secret:
-        secretName: osde2e-moa-integration
-- agent: kubernetes
-  cluster: api.ci
-  cron: 0 */8 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: main
-    org: openshift
-    repo: osde2e
-  labels:
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-int-moa-e2e-upgrade-to-osd-default-plus-one-nightly
-  spec:
-    containers:
-    - args:
-      - test
-      - --secret-locations
-      - $(SECRET_LOCATIONS)
-      - --configs
-      - $(CONFIGS)
-      command:
-      - /osde2e
-      env:
-      - name: MOA_ENV
-        value: int
-      - name: SECRET_LOCATIONS
-        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-moa-integration
-      - name: CONFIGS
-        value: moa,e2e-suite,upgrade-one-release-from-prod-default,region-random
       image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
@@ -2413,7 +2348,7 @@ periodics:
     repo: osde2e
   labels:
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-stage-gcp-e2e-next
+  name: osde2e-stage-gcp-e2e-upgrade-default-next-z
   spec:
     containers:
     - args:
@@ -2425,12 +2360,108 @@ periodics:
       command:
       - /osde2e
       env:
-      - name: USE_LATEST_VERSION_FOR_INSTALL
+      - name: UPGRADE_TO_CIS_IF_POSSIBLE
+        value: "true"
+      - name: ONLY_UPGRADE_TO_Z_RELEASES
         value: "true"
       - name: SECRET_LOCATIONS
         value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
       - name: CONFIGS
         value: gcp,stage,e2e-suite
+      image: quay.io/app-sre/osde2e
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/osde2e-common
+        name: osde2e-common
+        readOnly: true
+      - mountPath: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: osde2e-common
+      secret:
+        secretName: osde2e-common
+    - name: osde2e-credentials
+      secret:
+        secretName: osde2e-credentials
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 */8 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: osde2e
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: osde2e-stage-gcp-e2e-next-y
+  spec:
+    containers:
+    - args:
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
+      command:
+      - /osde2e
+      env:
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - name: CONFIGS
+        value: gcp,stage,e2e-suite,latest-y-from-prod-default
+      image: quay.io/app-sre/osde2e
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/osde2e-common
+        name: osde2e-common
+        readOnly: true
+      - mountPath: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: osde2e-common
+      secret:
+        secretName: osde2e-common
+    - name: osde2e-credentials
+      secret:
+        secretName: osde2e-credentials
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 */8 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: osde2e
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: osde2e-stage-gcp-e2e-next-z
+  spec:
+    containers:
+    - args:
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
+      command:
+      - /osde2e
+      env:
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      - name: CONFIGS
+        value: gcp,stage,e2e-suite,latest-z-from-prod-default
       image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
@@ -2564,7 +2595,7 @@ periodics:
     repo: osde2e
   labels:
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-stage-moa-e2e-upgrade-default-next
+  name: osde2e-stage-moa-e2e-next-y
   spec:
     containers:
     - args:
@@ -2578,12 +2609,10 @@ periodics:
       env:
       - name: MOA_ENV
         value: stage
-      - name: UPGRADE_TO_CIS_IF_POSSIBLE
-        value: "true"
       - name: SECRET_LOCATIONS
         value: /usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-moa-staging
       - name: CONFIGS
-        value: moa,e2e-suite,region-random
+        value: moa,e2e-suite,region-random,latest-y-from-prod-default
       image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
@@ -2621,7 +2650,7 @@ periodics:
     repo: osde2e
   labels:
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-stage-moa-e2e-next
+  name: osde2e-stage-moa-e2e-next-z
   spec:
     containers:
     - args:
@@ -2635,12 +2664,10 @@ periodics:
       env:
       - name: MOA_ENV
         value: stage
-      - name: USE_LATEST_VERSION_FOR_INSTALL
-        value: "true"
       - name: SECRET_LOCATIONS
         value: /usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-moa-staging
       - name: CONFIGS
-        value: moa,e2e-suite,region-random
+        value: moa,e2e-suite,region-random,latest-z-from-prod-default
       image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
@@ -2884,63 +2911,6 @@ periodics:
       env:
       - name: MOA_ENV
         value: prod
-      - name: SECRET_LOCATIONS
-        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-moa-production
-      - name: CONFIGS
-        value: moa,e2e-suite,region-random
-      image: quay.io/app-sre/osde2e
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /usr/local/osde2e-common
-        name: osde2e-common
-        readOnly: true
-      - mountPath: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        readOnly: true
-      - mountPath: /usr/local/osde2e-moa-production
-        name: osde2e-moa-production
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: osde2e-common
-      secret:
-        secretName: osde2e-common
-    - name: osde2e-credentials
-      secret:
-        secretName: osde2e-credentials
-    - name: osde2e-moa-production
-      secret:
-        secretName: osde2e-moa-production
-- agent: kubernetes
-  cluster: api.ci
-  cron: 0 */8 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: main
-    org: openshift
-    repo: osde2e
-  labels:
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-prod-moa-e2e-upgrade-default-next
-  spec:
-    containers:
-    - args:
-      - test
-      - --secret-locations
-      - $(SECRET_LOCATIONS)
-      - --configs
-      - $(CONFIGS)
-      command:
-      - /osde2e
-      env:
-      - name: MOA_ENV
-        value: prod
-      - name: UPGRADE_TO_CIS_IF_POSSIBLE
-        value: "true"
       - name: SECRET_LOCATIONS
         value: /usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-moa-production
       - name: CONFIGS
