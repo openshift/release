@@ -9,6 +9,10 @@ build_root:
     namespace: openshift
     tag: golang-1.13
 canonical_go_repository: kubevirt.io/kubevirt
+images:
+- dockerfile_path: hack/ci/Dockerfile.ci
+  from: src
+  to: e2e-test
 resources:
   '*':
     limits:
@@ -28,66 +32,11 @@ tests:
     test:
     - as: azure
       commands: |
-        set -euo pipefail
-
-        echo "downloading oc binary"
-        # FIXME: transfer into Dockerfile for ci
-        export SHARED_BIN_DIR="${SHARED_DIR}/bin/"
-        (
-            # create directory
-            mkdir "${SHARED_BIN_DIR}"
-            cd "${SHARED_BIN_DIR}"
-
-            # Download oc binary
-            curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar -C . -xzf -
-            chmod +x oc
-            ln -s oc kubectl
-        ) || exit 1
-        export PATH="${SHARED_BIN_DIR}:${PATH}"
-
-        DOCKER_PREFIX='kubevirt'
-        export DOCKER_PREFIX
-        DOCKER_TAG=$(
-          curl --fail -s https://api.github.com/repos/kubevirt/kubevirt/releases |
-                  jq -r '(.[].tag_name | select( test("-(rc|alpha|beta)") | not ) )' |
-                  sort -rV | grep 'v0.34' | head -1
-        )
-        export DOCKER_TAG
-
-        echo "Downloading kubevirt tests binary from release ${DOCKER_TAG}"
-        curl -Lo "${SHARED_BIN_DIR}/tests.test" "https://github.com/kubevirt/kubevirt/releases/download/${DOCKER_TAG}/tests.test"
-        chmod +x "${SHARED_BIN_DIR}/tests.test"
-
-        echo "Checking binaries"
-        binaries=(oc kubectl tests.test)
-        for binary in ${binaries[@]}; do
-            if ! command -V $binary; then
-                exit 1
-            fi
-        done
-
-        echo "Deploying kubevirt from release ${DOCKER_TAG}"
-        tagged_release_url="https://github.com/kubevirt/kubevirt/releases/download/${DOCKER_TAG}"
-        curl -L "${tagged_release_url}/kubevirt-operator.yaml" | oc create -f -
-        curl -L "${tagged_release_url}/kubevirt-cr.yaml" | oc create -f -
-
-        echo "Deploying test infrastructure"
-        testing_infra_url="https://gcsweb.apps.ovirt.org/gcs/kubevirt-prow/devel/release/kubevirt/kubevirt/${DOCKER_TAG}/manifests/testing/"
-        for testinfra_file in $(curl -L "${testing_infra_url}" | grep -oE 'https://[^"]*\.yaml'); do
-            curl -L ${testinfra_file} | oc create -f -
-        done
-
-        echo "Waiting for KubeVirt to get ready"
-        oc wait -n kubevirt kv kubevirt --for condition=Available --timeout 15m
-
-        echo "Running tests"
-        mkdir -p "$ARTIFACT_DIR"
-        # required to be set for test binary
-        export ARTIFACTS=${ARTIFACT_DIR}
-
-        #  '-ginkgo.skip=(Slirp\sNetworking)|(with\sCPU\sspec)|(with\sTX\soffload\sdisabled)|(with\scni\sflannel\sand\sptp\splugin\sinterface)|(with\sovs-cni\splugin)|(test_id:1752)|(SRIOV)|(with\sEFI)|(Operator)|(GPU)|(DataVolume\sIntegration)|(test_id:3468)|(test_id:3466)|(test_id:1015)|(rfe_id:393)|(test_id:1631)|(rfe_id:2919)|(test_id:3139)'
-        tests.test -v=5 -kubeconfig=${KUBECONFIG} -container-tag=${DOCKER_TAG} -container-tag-alt= -container-prefix=${DOCKER_PREFIX} -image-prefix-alt=-kv -oc-path=${SHARED_BIN_DIR}/oc -kubectl-path=${SHARED_BIN_DIR}/kubectl -gocli-path=$(pwd)/cluster-up/cli.sh -test.timeout 420m -ginkgo.noColor -ginkgo.succinct -ginkgo.slowSpecThreshold=60 '-ginkgo.focus=\[rfe_id:273\]\[crit:high\]' -junit-output=${ARTIFACT_DIR}/junit.functest.xml -installed-namespace=kubevirt -previous-release-tag= -previous-release-registry=index.docker.io/kubevirt -deploy-testing-infra=false
-      from: src
+        release="$(/get-release-tag-for-xy.sh '0.34')"
+        export DOCKER_TAG="$release"
+        /deploy-release.sh "$release"
+        /test.sh
+      from: e2e-test
       resources:
         requests:
           cpu: 100m
