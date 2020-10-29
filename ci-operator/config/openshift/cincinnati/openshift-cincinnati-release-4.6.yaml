@@ -8,12 +8,10 @@ base_images:
     namespace: openshift
     tag: golang-1.13
 build_root:
-  image_stream_tag:
-    name: cincinnati-build-root-release-4.6
-    namespace: cincinnati-ci
-    tag: buildroot
+  project_image:
+    dockerfile_path: dist/Dockerfile.build/Dockerfile
 images:
-- dockerfile_path: dist/openshift-release/Dockerfile.builder
+- dockerfile_path: dist/Dockerfile.build/Dockerfile
   from: centos
   to: buildroot
 - dockerfile_path: dist/Dockerfile.deploy/Dockerfile
@@ -52,13 +50,6 @@ tests:
 - as: cargo-test
   steps:
     pre:
-    - as: ensure-vendoring
-      commands: dist/vendor.sh && git diff --quiet
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
     - as: prepare-credentials
       commands: env CINCINNATI_CI_DOCKERJSON_PATH="${SHARED_DIR}/${CINCINNATI_CI_DOCKERJSON_FILE}" CINCINNATI_CI_PUBLIC_DOCKERJSON_PATH="${SHARED_DIR}/${CINCINNATI_CI_PUBLIC_DOCKERJSON_FILE}" dist/prepare_ci_credentials.sh
       credentials:
