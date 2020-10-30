@@ -1,8 +1,3 @@
-base_images:
-  base:
-    name: ubi-minimal
-    namespace: ocp
-    tag: "8"
 build_root:
   image_stream_tag:
     name: release
@@ -10,10 +5,9 @@ build_root:
     tag: golang-1.14
 images:
 - dockerfile_path: Dockerfile
-  from: base
   to: observatorium
 promotion:
-  name: "2.1"
+  name: observatorium
   namespace: open-cluster-management
 resources:
   '*':
@@ -25,17 +19,13 @@ resources:
 tag_specification:
   name: "4.4"
   namespace: ocp
+test_binary_build_commands: "true"
 tests:
-- as: build
-  commands: |
-    true
-  container:
-    from: bin
 - as: lint
   commands: |
     make lint --always-make
   container:
-    from: bin
+    from: src
 - as: test
   commands: |
     make test --always-make
