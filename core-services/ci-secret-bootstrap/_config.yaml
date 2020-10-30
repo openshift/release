@@ -1753,18 +1753,6 @@ secret_configs:
       - cluster: app.ci
         namespace: ci
         name: jira-credentials-dptp-bot
-  # This is going to be used by secret/registry-pull-credentials on api.ci only.
-  # The OCP 4 clusters in our build farm have this pull secret already on secret/pull-secret in openshift-config.
-  # We can remove this after deprecating api.ci.
-  # The secret is on app.ci because the applyconfig job for api.ci is there.
-  - from:
-      pull-token:
-        bw_item: quay.io
-        field: pull-token
-    to:
-      - cluster: app.ci
-        namespace: ci
-        name: quay-io-pull-credentials
   # This secret contains a docker config which has the permissions to pull the images from local registry
   # and push the images to the ci central registry.
   - from:
@@ -1895,4 +1883,144 @@ secret_configs:
       - cluster: vsphere
         namespace: test-credentials
         name: registry-push-credentials-ci-central
+        type: kubernetes.io/dockerconfigjson
+  # This secret contains the pull secrets for api.ci cluster and the local registry.
+  # It is used to pull images
+  #  * by image client: Before the registry-replacer (https://github.com/openshift/ci-tools/tree/master/cmd/registry-replacer)
+  #    replaces the direct reference of the images in api.ci,
+  #    OpenShift uses the pull secrets either in openshift-config/pull-secret (the global one) or the ones
+  #    with kubernetes.io/dockerconfigjson type in current namespace to pull images from the remote registry.
+  #    The global one is maintained by cluster admins and it is not ensured to contain a valid auth entry for api.ci,
+  #    so we maintain this one in the ci namespace and ci-operator will copy it over to the testing namespace.
+  #  * by the build pods created by ci-operator: https://bugzilla.redhat.com/show_bug.cgi?id=1861546
+  #  * (only apply to api.ci) by image client: for the image jobs generated with releases stanza, we need to access the images
+  #    from the release payload and they are in quay.io/openshift-release-dev/...
+  - from:
+      .dockerconfigjson:
+        dockerconfigJSON:
+        - bw_item: quay.io
+          registry_url: quay.io
+          auth_bw_attachment: pull-token
+        - bw_item: build_farm
+          registry_url: docker-registry.default.svc:5000
+          auth_bw_attachment: token_image-puller_ci_reg_auth_value.txt
+        - bw_item: build_farm
+          registry_url: registry.svc.ci.openshift.org
+          auth_bw_attachment: token_image-puller_ci_reg_auth_value.txt
+        - bw_item: build_farm
+          registry_url: registry.ci.openshift.org
+          auth_bw_attachment: token_image-puller_app.ci_reg_auth_value.txt
+    to:
+      - cluster: api.ci
+        namespace: ci
+        name: registry-pull-credentials
+        type: kubernetes.io/dockerconfigjson
+      - cluster: api.ci
+        namespace: test-credentials
+        name: registry-pull-credentials
+        type: kubernetes.io/dockerconfigjson
+  - from:
+      .dockerconfigjson:
+        dockerconfigJSON:
+        - bw_item: build_farm
+          registry_url: image-registry.openshift-image-registry.svc.cluster.local:5000
+          auth_bw_attachment: token_image-puller_app.ci_reg_auth_value.txt
+        - bw_item: build_farm
+          registry_url: image-registry.openshift-image-registry.svc:5000
+          auth_bw_attachment: token_image-puller_app.ci_reg_auth_value.txt
+        - bw_item: build_farm
+          registry_url: registry.svc.ci.openshift.org
+          auth_bw_attachment: token_image-puller_ci_reg_auth_value.txt
+        - bw_item: build_farm
+          registry_url: registry.ci.openshift.org
+          auth_bw_attachment: token_image-puller_app.ci_reg_auth_value.txt
+    to:
+      - cluster: app.ci
+        namespace: ci
+        name: registry-pull-credentials
+        type: kubernetes.io/dockerconfigjson
+      - cluster: app.ci
+        namespace: test-credentials
+        name: registry-pull-credentials
+        type: kubernetes.io/dockerconfigjson
+  - from:
+      .dockerconfigjson:
+        dockerconfigJSON:
+        - bw_item: build_farm
+          registry_url: image-registry.openshift-image-registry.svc.cluster.local:5000
+          auth_bw_attachment: token_image-puller_build01_reg_auth_value.txt
+        - bw_item: build_farm
+          registry_url: image-registry.openshift-image-registry.svc:5000
+          auth_bw_attachment: token_image-puller_build01_reg_auth_value.txt
+        - bw_item: build_farm
+          registry_url: registry.build01.ci.openshift.org
+          auth_bw_attachment: token_image-puller_build01_reg_auth_value.txt
+        - bw_item: build_farm
+          registry_url: registry.svc.ci.openshift.org
+          auth_bw_attachment: token_image-puller_ci_reg_auth_value.txt
+        - bw_item: build_farm
+          registry_url: registry.ci.openshift.org
+          auth_bw_attachment: token_image-puller_app.ci_reg_auth_value.txt
+    to:
+      - cluster: build01
+        namespace: ci
+        name: registry-pull-credentials
+        type: kubernetes.io/dockerconfigjson
+      - cluster: build01
+        namespace: test-credentials
+        name: registry-pull-credentials
+        type: kubernetes.io/dockerconfigjson
+  - from:
+      .dockerconfigjson:
+        dockerconfigJSON:
+        - bw_item: build_farm
+          registry_url: image-registry.openshift-image-registry.svc.cluster.local:5000
+          auth_bw_attachment: token_image-puller_build02_reg_auth_value.txt
+        - bw_item: build_farm
+          registry_url: image-registry.openshift-image-registry.svc:5000
+          auth_bw_attachment: token_image-puller_build02_reg_auth_value.txt
+        - bw_item: build_farm
+          registry_url: registry.build02.ci.openshift.org
+          auth_bw_attachment: token_image-puller_build02_reg_auth_value.txt
+        - bw_item: build_farm
+          registry_url: registry.svc.ci.openshift.org
+          auth_bw_attachment: token_image-puller_ci_reg_auth_value.txt
+        - bw_item: build_farm
+          registry_url: registry.ci.openshift.org
+          auth_bw_attachment: token_image-puller_app.ci_reg_auth_value.txt
+    to:
+      - cluster: build02
+        namespace: ci
+        name: registry-pull-credentials
+        type: kubernetes.io/dockerconfigjson
+      - cluster: build02
+        namespace: test-credentials
+        name: registry-pull-credentials
+        type: kubernetes.io/dockerconfigjson
+  - from:
+      .dockerconfigjson:
+        dockerconfigJSON:
+        - bw_item: build_farm
+          registry_url: image-registry.openshift-image-registry.svc.cluster.local:5000
+          auth_bw_attachment: token_image-puller_vsphere_reg_auth_value.txt
+        - bw_item: build_farm
+          registry_url: image-registry.openshift-image-registry.svc:5000
+          auth_bw_attachment: token_image-puller_vsphere_reg_auth_value.txt
+        - bw_item: build_farm
+          registry_url: registry.apps.build01-us-west-2.vmc.ci.openshift.org
+          auth_bw_attachment: token_image-puller_vsphere_reg_auth_value.txt
+        - bw_item: build_farm
+          registry_url: registry.svc.ci.openshift.org
+          auth_bw_attachment: token_image-puller_ci_reg_auth_value.txt
+        - bw_item: build_farm
+          registry_url: registry.ci.openshift.org
+          auth_bw_attachment: token_image-puller_app.ci_reg_auth_value.txt
+    to:
+      - cluster: vsphere
+        namespace: ci
+        name: registry-pull-credentials
+        type: kubernetes.io/dockerconfigjson
+      - cluster: vsphere
+        namespace: test-credentials
+        name: registry-pull-credentials
         type: kubernetes.io/dockerconfigjson
