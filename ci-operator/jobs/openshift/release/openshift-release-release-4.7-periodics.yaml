@@ -757,6 +757,215 @@ periodics:
         secretName: ci-pull-credentials
 - agent: kubernetes
   cluster: api.ci
+  cron: 0 4,16 * * *
+  decorate: true
+  labels:
+    dptp.openshift.io/ssh-bastion: "true"
+    job-env: remote-libvirt
+    job-release: "4.7"
+    job-test: e2e
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: release-openshift-origin-installer-e2e-remote-libvirt-s390x-4.7
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --secret-dir=/usr/local/e2e-remote-libvirt-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-remote-libvirt
+      - --template=/usr/local/e2e-remote-libvirt
+      command:
+      - ci-operator
+      env:
+      - name: ARCH
+        value: s390x
+      - name: BASTION_SVC_0_1_IP
+        value: 172.30.60.61
+      - name: BASTION_SVC_0_2_IP
+        value: 172.30.135.156
+      - name: BASTION_SVC_0_3_IP
+        value: 172.30.63.176
+      - name: BASTION_SVC_0_4_IP
+        value: 172.30.62.128
+      - name: BASTION_SVC_1_0_IP
+        value: 172.30.28.119
+      - name: BASTION_SVC_1_1_IP
+        value: 172.30.227.115
+      - name: BASTION_SVC_1_2_IP
+        value: 172.30.210.45
+      - name: BASTION_SVC_1_3_IP
+        value: 172.30.198.47
+      - name: BASTION_SVC_1_4_IP
+        value: 172.30.220.83
+      - name: BASTION_SVC_IP
+        value: 172.30.20.161
+      - name: BRANCH
+        value: "4.7"
+      - name: CLUSTER_TYPE
+        value: libvirt-s390x
+      - name: CONFIG_SPEC
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)-all
+            commands: $(TEST_COMMAND)
+            openshift_installer:
+              cluster_profile:"$(CLUSTER_TYPE)"
+      - name: JOB_NAME_SAFE
+        value: e2e-remote-libvirt
+      - name: MULTIARCH_RELEASE_IMAGE_LATEST
+        value: registry.svc.ci.openshift.org/ocp-s390x/release-s390x:4.7
+      - name: RELEASE_IMAGE_LATEST
+        value: registry.svc.ci.openshift.org/ocp/release:4.7
+      - name: REMOTE_LIBVIRT_HOSTNAME
+        value: ocponz
+      - name: REMOTE_LIBVIRT_HOSTNAME_1
+        value: ocponz2
+      - name: TEST_COMMAND
+        value: |
+          # these tests are not able to run in CI due to
+          # missing test image dependencies.  They must be
+          # run manually
+          cat > invert_excluded.py <<EOSCRIPT
+          #!/usr/libexec/platform-python
+          import sys
+          all_tests = set()
+          excluded_tests = set()
+          for l in sys.stdin.readlines():
+            all_tests.add(l.strip())
+          with open(sys.argv[1], "r") as f:
+            for l in f.readlines():
+              excluded_tests.add(l.strip())
+            test_suite = all_tests - excluded_tests
+            for t in test_suite:
+             print(t)
+             EOSCRIPT
+             chmod +x invert_excluded.py
+             cat > excluded_tests <<EOEXCLUDE
+               "[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] listing mutating webhooks should work [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+               "[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] listing validating webhooks should work [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+               "[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] patching/updating a mutating webhook should work [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+               "[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should be able to deny attaching pod [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+               "[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should be able to deny custom resource creation, update and deletion [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+               "[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should deny crd creation [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+               "[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should honor timeout [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+               "[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should mutate configmap [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+               "[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should mutate custom resource [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+               "[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should mutate custom resource with different stored version [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+               "[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should mutate custom resource with pruning [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+               "[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should mutate pod and apply defaults after mutation [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+               "[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should not be able to mutate or prevent deletion of webhook configuration objects [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+               "[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should unconditionally reject operations on fail closed webhook [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+               "[sig-api-machinery] CustomResourceConversionWebhook [Privileged:ClusterAdmin] should be able to convert a non homogeneous list of CRs [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+               "[sig-api-machinery] CustomResourceConversionWebhook [Privileged:ClusterAdmin] should be able to convert from CR v1 to CR v2 [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+               "[sig-apps][Feature:DeploymentConfig] deploymentconfigs when tagging images should successfully tag the deployed image [Suite:openshift/conformance/parallel]"
+               "[sig-auth][Feature:LDAP] LDAP IDP should authenticate against an ldap server [Suite:openshift/conformance/parallel]"
+               "[sig-auth][Feature:LDAP] LDAP should start an OpenLDAP test server [Suite:openshift/conformance/parallel]"
+               "[sig-auth][Feature:ProjectAPI]  TestProjectWatch should succeed [Suite:openshift/conformance/parallel]"
+               "[sig-auth][Feature:ProjectAPI]  TestScopedProjectAccess should succeed [Suite:openshift/conformance/parallel]"
+               "[sig-builds][Feature:Builds] Multi-stage image builds  should succeed [Suite:openshift/conformance/parallel]"
+               "[sig-builds][Feature:Builds] Optimized image builds  should succeed [Suite:openshift/conformance/parallel]"
+               "[sig-builds][Feature:Builds] build can reference a cluster service with a build being created from new-build should be able to run a build that references a cluster service [Suite:openshift/conformance/parallel]"
+               "[sig-builds][Feature:Builds] build have source revision metadata started build should contain source revision information [Suite:openshift/conformance/parallel]"
+               "[sig-builds][Feature:Builds] build with empty source  started build should build even with an empty source in build config [Suite:openshift/conformance/parallel]"
+               "[sig-builds][Feature:Builds] build without output image  building from templates should create an image from a S2i template without an output image reference defined [Suite:openshift/conformance/parallel]"
+               "[sig-builds][Feature:Builds] custom build with buildah  being created from new-build should complete build with custom builder image [Suite:openshift/conformance/parallel]"
+               "[sig-builds][Feature:Builds] result image should have proper labels set S2I build from a template should create a image from \"test-s2i-build.json\" template with proper Docker labels [Suite:openshift/conformance/parallel]"
+               "[sig-builds][Feature:Builds] s2i build with a quota  Building from a template should create an s2i build with a quota and run it [Suite:openshift/conformance/parallel]"
+               "[sig-builds][Feature:Builds] s2i build with a root user image should create a root build and pass with a privileged SCC [Suite:openshift/conformance/parallel]"
+               "[sig-builds][Feature:Builds][timing] capture build stages and durations should record build stages and durations for s2i [Suite:openshift/conformance/parallel]"
+               "[sig-builds][Feature:Builds][valueFrom] process valueFrom in build strategy environment variables should successfully resolve valueFrom in s2i build environment variables [Suite:openshift/conformance/parallel]"
+               "[sig-cli] Kubectl client Kubectl server-side dry-run should check if kubectl can dry-run update Pods [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+               "[sig-cli] Kubectl client Simple pod should return command exit codes [Suite:openshift/conformance/parallel] [Suite:k8s]"
+               "[sig-cli] oc adm must-gather runs successfully [Suite:openshift/conformance/parallel]"
+               "[sig-cli] oc adm new-project [Suite:openshift/conformance/parallel]"
+               "[sig-cli] oc rsh rsh specific flags should work well when access to a remote shell [Suite:openshift/conformance/parallel]"
+               "[sig-devex][Feature:Templates] templateinstance readiness test  should report ready soon after all annotated objects are ready [Suite:openshift/conformance/parallel]"
+               "[sig-instrumentation] Prometheus when installed on the cluster shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured [Early] [Suite:openshift/conformance/parallel]"
+               "[sig-network] Networking should provide Internet connection for containers [Feature:Networking-IPv4] [Skipped:azure] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+               "[sig-network] multicast when using one of the plugins 'redhat/openshift-ovs-multitenant, redhat/openshift-ovs-networkpolicy' should allow multicast traffic in namespaces where it is enabled [Suite:openshift/conformance/parallel]"
+               "[sig-network][Feature:Router] The HAProxy router should expose prometheus metrics for a route [Suite:openshift/conformance/parallel]"
+               "[sig-network][Feature:Router] The HAProxy router should override the route host for overridden domains with a custom value [Suite:openshift/conformance/parallel]"
+               "[sig-network][Feature:Router] The HAProxy router should override the route host with a custom value [Suite:openshift/conformance/parallel]"
+               "[sig-network][Feature:Router] The HAProxy router should run even if it has no access to update status [Suite:openshift/conformance/parallel]"
+               "[sig-network][Feature:Router] The HAProxy router should serve a route that points to two services and respect weights [Suite:openshift/conformance/parallel]"
+               "[sig-network][Feature:Router] The HAProxy router should serve routes that were created from an ingress [Suite:openshift/conformance/parallel]"
+               "[sig-network][Feature:Router] The HAProxy router should serve the correct routes when scoped to a single namespace and label set [Suite:openshift/conformance/parallel]"
+               "[sig-operator] an end user can use OLM can subscribe to the operator [Suite:openshift/conformance/parallel]"
+               "[sig-storage] Dynamic Provisioning [k8s.io] GlusterDynamicProvisioner should create and delete persistent volumes [fast] [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"  
+            EOEXCLUDE
+            export PATH=/usr/libexec/origin:$PATH
+            openshift-tests run openshift/conformance/parallel --dry-run | ./invert_excluded.py excluded_tests > test-suite.txt
+            TEST_SUITE="--file=test-suite.txt" run-tests
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/e2e-remote-libvirt-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/e2e-remote-libvirt
+        name: job-definition
+        subPath: cluster-launch-installer-remote-libvirt-e2e.yaml
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-metal
+    - configMap:
+        name: prow-job-cluster-launch-installer-remote-libvirt-e2e
+      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
+  cluster: api.ci
   decorate: true
   interval: 48h
   labels:
