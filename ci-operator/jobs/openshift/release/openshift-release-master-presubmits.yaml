@@ -748,6 +748,32 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: build02
+    context: ci/prow/secret-generator-config-valid
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-secret-generator-config-valid
+    rerun_command: /test secret-generator-config-valid
+    spec:
+      containers:
+      - args:
+        - --config=core-services/ci-secret-generator/_config.yaml
+        - --bootstrap-config=core-services/ci-secret-bootstrap/_config.yaml
+        - --validate-only=true
+        command:
+        - /usr/bin/ci-secret-generator
+        image: ci-secret-generator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )secret-generator-config-valid,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
     cluster: app.ci
     context: ci/prow/services-dry
     decorate: true
