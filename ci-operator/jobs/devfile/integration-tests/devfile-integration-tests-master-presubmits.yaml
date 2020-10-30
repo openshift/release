@@ -1,7 +1,7 @@
 presubmits:
   devfile/integration-tests:
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build01
@@ -14,7 +14,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-devfile-integration-tests-master-e2e-integration
     rerun_command: /test e2e-integration
-    skip_report: true
     spec:
       containers:
       - args:
@@ -24,8 +23,16 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-integration-cluster-profile
         - --target=e2e-integration
+        - --template=/usr/local/e2e-integration
         command:
         - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: JOB_NAME_SAFE
+          value: e2e-integration
+        - name: TEST_COMMAND
+          value: oc adm policy add-role-to-user --help
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -38,6 +45,9 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-integration-cluster-profile
           name: cluster-profile
+        - mountPath: /usr/local/e2e-integration
+          name: job-definition
+          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -57,6 +67,9 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-src
+        name: job-definition
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
