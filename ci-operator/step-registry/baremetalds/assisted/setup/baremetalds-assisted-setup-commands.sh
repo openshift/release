@@ -77,9 +77,9 @@ set -x
 
 curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar -C /usr/bin -xzf -
 
-if [[ -e /root/dev-scripts-additional-config ]]
+if [[ -e /root/assisted-additional-config ]]
 then
-  cat /root/dev-scripts-additional-config >> /root/config
+  cat /root/assisted-additional-config >> /root/config
 fi
 
 echo "export KUBECONFIG=\${REPO_DIR}/build/kubeconfig" >> /root/.bashrc
