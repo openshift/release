@@ -5,22 +5,18 @@ postsubmits:
     - ^main$
     cluster: build02
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
-      ci-operator.openshift.io/is-promotion: "true"
       ci-operator.openshift.io/prowgen-controlled: "true"
     max_concurrency: 1
-    name: branch-ci-openshift-osd-metrics-exporter-main-images
+    name: branch-ci-openshift-osd-metrics-exporter-main-publish-coverage
     spec:
       containers:
       - args:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
-        - --promote
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --target=[images]
+        - --secret-dir=/secrets/osd-metrics-exporter-codecov-token
+        - --target=publish-coverage
         command:
         - ci-operator
         image: ci-operator:latest
@@ -30,23 +26,23 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/osd-metrics-exporter-codecov-token
+          name: osd-metrics-exporter-codecov-token
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
-          readOnly: true
-        - mountPath: /etc/push-secret
-          name: push-secret
           readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: osd-metrics-exporter-codecov-token
+        secret:
+          secretName: osd-metrics-exporter-codecov-token
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
-      - name: push-secret
-        secret:
-          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
