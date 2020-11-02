@@ -704,7 +704,7 @@ periodics:
 
         # populate the base_sha in job spec so we don't build something different
         origin_artifacts_id="$( oc get istag -n ${TAG_NS} ${BRANCH}:artifacts --template '{{ .image.metadata.name }}' )"
-        origin_machine_config_operator_rpms_id="$( oc get istag -n ${TAG_NS} ${BRANCH}:machine-config-operator-rpms --template '{{ .image.metadata.name }}' )"
+        origin_machine_config_operator_id="$( oc get istag -n ${TAG_NS} ${BRANCH}:machine-config-operator --template '{{ .image.metadata.name }}' )"
         # export JOB_SPEC="$( echo "${JOB_SPEC}" | jq -r ".extra_refs[0].base_sha = \"${origin_commit_id}\"" )"
 
         # fetch fcos release info and check whether we've already built this image
@@ -737,27 +737,25 @@ periodics:
           build_semver+="0"
         fi
 
-
         # compare the latest image we have built against the potential candidate
-        latest="$( oc get istag -n origin ${BRANCH}:${TAG} --template '{{ index .image.dockerImageMetadata.Config.Labels "version" }} {{ index .image.dockerImageMetadata.Config.Labels "id-artifacts" }} {{ index .image.dockerImageMetadata.Config.Labels "id-machine-config-operator-rpms" }}' )"
-        candidate="${build_id} ${origin_artifacts_id} ${origin_machine_config_operator_rpms_id}"
+        latest="$( oc get istag -n ${TAG_NS} ${BRANCH}:${TAG} -o jsonpath='{.metadata.annotations.release\.openshift\.io\/version} {.metadata.annotations.release\.openshift\.io\/id-artifacts} {.metadata.annotations.release\.openshift\.io\/id-machine-config-operator}' )"
+        candidate="${build_id} ${origin_artifacts_id} ${origin_machine_config_operator_id}"
         echo "Comparing existing '$latest' against latest '$candidate'"
         if [[ "${latest}" == "${candidate}" ]]; then
           echo "No build necessary, content is up to date"
           exit 0
         fi
 
-        curl -L https://github.com/mikefarah/yq/releases/download/2.4.0/yq_linux_amd64 2>/dev/null >/tmp/bin/yq
-        chmod ug+x $HOME/bin/yq
-
+        # create namespace and craft a release image without the machine-os-content
         namespace="ci-op-$( echo "${JOB_NAME}-${BUILD_ID}" | md5sum -t | cut -c 1-8 )"
-        echo
-        echo "--- Building machine-os-content for ${build_id} in namespace ${namespace}"
-        oc registry login >/dev/null
+        oc registry login > /dev/null
+        oc new-project ${namespace} > /dev/null
+        oc policy add-role-to-group system:image-puller -n ${namespace} system:unauthenticated system:authenticated
 
-        # run build to do the image imports
+        # initial import
         ci-operator $@ --target=[images] --namespace=${namespace}
 
+        # force build from https://github.com/openshift/okd-machine-os master
         function build {
           oc -n ${namespace} create -f $1 >/dev/null
           while true; do
@@ -774,7 +772,6 @@ periodics:
           done
         }
 
-        # build an FCoS machine-os-content from the ostree tar, the artifacts rpms, and the latest MCD and cri-o
         cat <<EOF > ${dir}/build.yaml
         kind: Build
         apiVersion: build.openshift.io/v1
@@ -786,86 +783,10 @@ periodics:
               kind: ImageStreamTag
               name: pipeline:machine-os-content
           source:
-            dockerfile: |
-              FROM registry.svc.ci.openshift.org/${TAG_NS}/${BRANCH}@${origin_artifacts_id} AS artifacts
-              FROM registry.svc.ci.openshift.org/${TAG_NS}/${BRANCH}@${origin_machine_config_operator_rpms_id} AS machine_config_operator_rpms
-
-              FROM quay.io/coreos-assembler/coreos-assembler:latest AS build
-              USER 0
-              COPY --from=artifacts /srv/repo/*.rpm /tmp/rpms/
-              COPY --from=machine_config_operator_rpms /srv/repo/*.rpm /tmp/rpms/
-              RUN set -exuo pipefail && \\
-                  EXTENSION_RPMS=(             \\
-                    attr                       \\
-                    glusterfs                  \\
-                    glusterfs-client-xlators   \\
-                    glusterfs-fuse             \\
-                    glusterfs-libs             \\
-                    psmisc                     \\
-                    NetworkManager-ovs         \\
-                    openvswitch                \\
-                    dpdk                       \\
-                    gdbm-libs                  \\
-                    libxcrypt-compat           \\
-                    unbound-libs               \\
-                    python3-libs               \\
-                    libdrm                     \\
-                    libmspack                  \\
-                    libpciaccess               \\
-                    pciutils                   \\
-                    pciutils-libs              \\
-                    hwdata                     \\
-                    python3-libs               \\
-                    python3-pip                \\
-                    python3                    \\
-                    python-unversioned-command \\
-                    python-pip-wheel           \\
-                    python3-setuptools         \\
-                    python-setuptools-wheel    \\
-                    open-vm-tools              \\
-                    xmlsec1                    \\
-                    xmlsec1-openssl            \\
-                    libxslt                    \\
-                    libtool-ltdl               \\
-                  )                         && \\
-                  CRIO_RPMS=(                \\
-                    cri-o                    \\
-                    cri-tools                \\
-                  )                       && \\
-                  CRIO_VERSION="1.18"     && \\
-                  mkdir /srv/repo && \\
-                  curl -L "${tar_url}" | tar xf - -C /srv/repo/ --no-same-owner && \\
-                  rm -rf /etc/yum.repos.d && \\
-                  ostree --repo=/srv/repo checkout "${ostree_ref}" --subpath /usr/etc/yum.repos.d --user-mode /etc/yum.repos.d && \\
-                  ostree --repo=/srv/repo cat "${ostree_ref}" /usr/lib/os-release > /tmp/os-release && \\
-                  source /tmp/os-release && \\
-                  dnf clean all && \\
-                  mkdir -p /extensions/okd && \\
-                  yumdownloader --archlist=x86_64 --archlist=noarch --disablerepo='*' --destdir=/extensions/okd --enablerepo=fedora --enablerepo=updates --enablerepo=updates-testing \${EXTENSION_RPMS[*]} && \\
-                  createrepo_c --no-database /extensions && \\
-                  mkdir /tmp/working && \\
-                  pushd /tmp/working && \\
-                    sed -i 's/enabled=0/enabled=1/g' /etc/yum.repos.d/fedora-updates-testing-modular.repo && \\
-                    dnf module enable -y cri-o:\${CRIO_VERSION} && \\
-                    yumdownloader --archlist=x86_64 --disablerepo='*' --destdir=/tmp/rpms --enablerepo=updates-testing-modular \${CRIO_RPMS[*]} && \\
-                    for i in \$(find /tmp/rpms/ -iname *.rpm); do echo "Extracting \$i ..."; rpm2cpio \$i | cpio -div; done && \\
-                    rm -rf etc/localtime && \\
-                    ln -s ../usr/share/zoneinfo/UTC etc/localtime && \\
-                    mv etc usr/ && \\
-                  popd && \\
-                  rm -rf /tmp/working/etc/yum.repos.d && \\
-                  coreos-assembler dev-overlay --repo /srv/repo --rev "${ostree_ref}" --add-tree /tmp/working --output-ref "${ostree_ref}"
-
-              FROM scratch
-              COPY --from=build /srv/ /srv/
-              COPY --from=build /extensions/ /extensions/
-              LABEL version=${build_id} \\
-                    id-artifacts=${origin_artifacts_id} \\
-                    id-machine-config-operator-rpms=${origin_machine_config_operator_rpms_id} \\
-                    "io.openshift.build.versions=machine-os=${build_semver}" \\
-                    "io.openshift.build.version-display-names=machine-os=Fedora CoreOS"
-              ENTRYPOINT ["/noentry"]
-
+            type: Git
+            git:
+              uri: 'https://github.com/openshift/okd-machine-os'
+              ref: release-${BRANCH}
           strategy:
             dockerStrategy:
             type: Docker
@@ -875,8 +796,14 @@ periodics:
 
         # debug output
         oc describe -n ${namespace} istag/pipeline:machine-os-content
-        # run tests
-        ci-operator $@ --target=e2e-gcp --promote --namespace=${namespace}
+
+        # run promotion test
+        ci-operator $@ --promote --namespace=${namespace}
+
+        # annotate promoted machine-os-content
+        oc annotate istag -n ${TAG_NS} ${BRANCH}:${TAG} "release.openshift.io/version=${build_id}" --overwrite
+        oc annotate istag -n ${TAG_NS} ${BRANCH}:${TAG} "release.openshift.io/id-artifacts=${origin_artifacts_id}" --overwrite
+        oc annotate istag -n ${TAG_NS} ${BRANCH}:${TAG} "release.openshift.io/id-machine-config-operator=${origin_machine_config_operator_id}" --overwrite
       env:
       - name: TAG_NS
         value: origin
