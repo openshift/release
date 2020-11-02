@@ -73,7 +73,7 @@ cd "\${REPO_DIR}"
 set +x
 echo "export PULL_SECRET='\$(cat /root/pull-secret)'" >> /root/config
 echo "export OPENSHIFT_INSTALL_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}" >> /root/config
-echo "export PUBLIC_CONTAINER_REGISTRIES="quay.io,$(echo ${RELEASE_IMAGE_LATEST} | cut -d'/' -f1)" >> /root/config
+echo "export PUBLIC_CONTAINER_REGISTRIES=quay.io,$(echo ${RELEASE_IMAGE_LATEST} | cut -d'/' -f1)" >> /root/config
 set -x
 
 curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar -C /usr/bin -xzf -
