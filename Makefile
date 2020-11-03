@@ -283,3 +283,13 @@ mixins:
 	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/dashboards-validation:latest
 	$(CONTAINER_ENGINE) run --user=$(UID) --rm -v "$(CURDIR):/release:z" registry.svc.ci.openshift.org/ci/dashboards-validation:latest make -C /release/clusters/app.ci/prow-monitoring/mixins install all
 .PHONY: mixins
+
+# Runs e2e secrets generation and sync to clusters.
+#
+# Example:
+# First execute the following
+# echo -n "bw_password" > /tmp/bw_password
+# make kerberos_id=<your_kerberos_id> secrets
+secrets:
+	hack/secrets.sh $(kerberos_id) $(kubeconfig_path) $(bw_password_path)
+.PHONY: secrets
