@@ -5,6 +5,141 @@ presubmits:
     branches:
     - release-4.7
     cluster: build02
+    context: ci/prow/e2e-gcp-ovn-upgrade
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      job-env: gcp
+      job-release: "4.7"
+      job-test: e2e
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-origin-installer-e2e-gcp-ovn-upgrade-4.6-stable-to-4.7-ci
+    rerun_command: /test e2e-gcp-ovn-upgrade
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --artifact-dir=$(ARTIFACTS)
+        - --give-pr-author-access-to-namespace=true
+        - --kubeconfig=/etc/apici/kubeconfig
+        - --lease-server-password-file=/etc/boskos/password
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --lease-server-username=ci
+        - --secret-dir=/usr/local/pull-secret
+        - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
+        - --target=e2e-$(CLUSTER_TYPE)-upgrade
+        - --input-hash=$(BUILD_ID)
+        - --input-hash=$(JOB_NAME)
+        command:
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -euo pipefail
+          initial=$(ARTIFACTS)/release-initial.json
+          latest=$(ARTIFACTS)/release-latest.json
+          if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest --data-urlencode 'in=>4.6.0-0 <4.7.0-0' > ${initial}; then
+            echo "error: Could not find a stable version"
+            exit 1
+          fi
+          if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.7.0-0.ci/latest > ${latest}; then
+            echo "error: Could not find newest version"
+            exit 1
+          fi
+          from=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${initial}" )
+          to=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${latest}" )
+          export RELEASE_IMAGE_INITIAL=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${initial}" )
+          export RELEASE_IMAGE_LATEST=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${latest}" )
+          # prow doesn't allow init containers or a second container
+          export PATH=$PATH:/tmp/bin
+          mkdir /tmp/bin
+          curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.6/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
+          chmod ug+x /tmp/bin/oc
+          # annotate the information about this job so that the release controller adds it to the upgrade graph
+          oc --kubeconfig /etc/appci/sa.release-bot.app.ci.config annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
+          ci-operator $@
+        - ""
+        env:
+        - name: BRANCH
+          value: "4.6"
+        - name: CLUSTER_TYPE
+          value: gcp
+        - name: CLUSTER_VARIANT
+          value: ovn
+        - name: CONFIG_SPEC
+          value: |
+            tag_specification:
+              name: "$(BRANCH)"
+              namespace: ocp
+            resources:
+              '*':
+                limits:
+                  memory: 4Gi
+                requests:
+                  cpu: 100m
+                  memory: 200Mi
+            tests:
+            - as: e2e-$(CLUSTER_TYPE)-upgrade
+              commands: TEST_SUITE=all run-upgrade-tests
+              openshift_installer:
+                cluster_profile: "$(CLUSTER_TYPE)"
+                upgrade: true
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/apici
+          name: apici-ci-operator-credentials
+          readOnly: true
+        - mountPath: /etc/appci
+          name: appci-release-bot-credentials
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-gcp-upgrade-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/pull-secret
+          name: release-pull-secret
+      serviceAccountName: ci-operator
+      volumes:
+      - name: apici-ci-operator-credentials
+        secret:
+          items:
+          - key: sa.ci-operator.apici.config
+            path: kubeconfig
+          secretName: apici-ci-operator-credentials
+      - name: appci-release-bot-credentials
+        secret:
+          items:
+          - key: sa.release-bot.app.ci.config
+            path: sa.release-bot.app.ci.config
+          secretName: build-farm-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: release-pull-secret
+        secret:
+          secretName: ci-pull-credentials
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-4.7
+    cluster: build02
     context: ci/prow/e2e-aws-ovn
     decorate: true
     decoration_config:
