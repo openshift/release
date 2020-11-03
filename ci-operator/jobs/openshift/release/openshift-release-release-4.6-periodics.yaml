@@ -664,7 +664,7 @@ periodics:
   labels:
     job-release: "4.6"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: promote-release-openshift-okd-machine-os-content-e2e-gcp-4.6
+  name: promote-release-openshift-okd-machine-os-content-e2e-aws-4.6
   spec:
     containers:
     - args:
@@ -674,9 +674,9 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --secret-dir=/usr/local/e2e-gcp-cluster-profile
+      - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --secret-dir=/usr/local/pull-secret
-      - --template=/usr/local/e2e-gcp
+      - --template=/usr/local/e2e-aws
       command:
       - /bin/bash
       - -c
@@ -814,7 +814,7 @@ periodics:
       - name: TAG_SOURCE
         value: $(TAG):$(BRANCH)
       - name: CLUSTER_TYPE
-        value: gcp
+        value: aws
       - name: CONFIG_SPEC
         value: |
           tag_specification:
@@ -849,12 +849,12 @@ periodics:
                 cpu: 100m
                 memory: 200Mi
           tests:
-          - as: e2e-gcp
+          - as: e2e-aws
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
             openshift_installer:
-              cluster_profile: gcp
+              cluster_profile: aws
       - name: JOB_NAME_SAFE
-        value: e2e-gcp
+        value: e2e-aws
       - name: TEST_COMMAND
         value: TEST_SUITE=openshift/conformance/parallel run-tests
       image: ci-operator:latest
@@ -870,9 +870,9 @@ periodics:
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
-      - mountPath: /usr/local/e2e-gcp-cluster-profile
+      - mountPath: /usr/local/e2e-aws-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/e2e-gcp
+      - mountPath: /usr/local/e2e-aws
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
       - mountPath: /etc/pull-secret
@@ -898,7 +898,7 @@ periodics:
       projected:
         sources:
         - secret:
-            name: cluster-secrets-gcp
+            name: cluster-secrets-aws
     - configMap:
         name: prow-job-cluster-launch-installer-e2e
       name: job-definition
