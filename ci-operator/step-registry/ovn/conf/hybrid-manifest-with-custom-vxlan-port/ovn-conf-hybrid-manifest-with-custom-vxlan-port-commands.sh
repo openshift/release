@@ -22,7 +22,7 @@ spec:
     type: OVNKubernetes
     ovnKubernetesConfig:
       hybridOverlayConfig:
-        hybridOverlayVXLANPort: 9789
+        hybridOverlayVXLANPort: 4800
         hybridClusterNetwork:
         - cidr: 10.132.0.0/14
           hostPrefix: 23
