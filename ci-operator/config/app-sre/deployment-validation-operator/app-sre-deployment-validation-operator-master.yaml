@@ -1,11 +1,8 @@
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.13
-promotion:
-  name: "4.7"
-  namespace: ocp
+  from_repository: true
+images:
+- dockerfile_path: build/Dockerfile
+  to: unused
 resources:
   '*':
     limits:
@@ -13,12 +10,36 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: "4.7"
-  namespace: ocp
 tests:
+- as: coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  secret:
+    mount_path: /tmp/secret
+    name: deployment-validation-operator-codecov-token
+- as: publish-coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: deployment-validation-operator-codecov-token
 - as: lint
   commands: make lint
+  container:
+    from: src
+- as: test
+  commands: make test
+  container:
+    from: src
+- as: validate
+  commands: make validate
   container:
     from: src
 zz_generated_metadata:
