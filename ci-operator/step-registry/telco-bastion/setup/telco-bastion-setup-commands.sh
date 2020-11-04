@@ -14,24 +14,25 @@ cat << EOF > ~/inventory
 sshd.bastion-telco ansible_ssh_user=tester ansible_ssh_common_args="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" ansible_ssh_private_key_file=/var/run/ssh-pass
 EOF
 
-# We will switch to kcli in the near future
 cat << EOF > ~/ocp-install.yml
 ---
-- name: Prepare to run ansible-ipi-install playbook
+- name: Grab and run kcli to install openshift cluster
   hosts: all
   tasks:
   - name: Clone repo
     git:
-      repo: https://github.com/openshift-kni/baremetal-deploy.git
-      dest: "~/baremetal-deploy"
+      repo: https://github.com/karamb/kcli-openshift4-baremetal.git
+      dest: "~/kcli-openshift4-baremetal"
       version: master
       force: yes
     retries: 5
+  - name: Remove last run
+    shell: kcli delete plan --yes upstream_ci
   - name: Run deployment
-    shell: ansible-playbook -i /home/tester/inventory playbook.yml
+    shell: kcli create plan --paramfile /home/tester/kcli_parameters.yml upstream_ci --wait
     args:
-      chdir: ~/baremetal-deploy/ansible-ipi-install
-  - name: Run playbook to copy kubeconfig from provisionhost vm to bastion vm
+      chdir: ~/kcli-openshift4-baremetal
+  - name: Run playbook to copy kubeconfig from installer vm to bastion vm
     shell: ansible-playbook -i /home/tester/inventory /home/tester/kubeconfig.yml
 EOF
 
@@ -42,7 +43,7 @@ cat << EOF > ~/fetch-kubeconfig.yml
   tasks:
   - name: Grab the kubeconfig
     fetch:
-      src: /home/kni/.kube/config
+      src: /home/tester/.kube/config
       dest: $SHARED_DIR/kubeconfig
       flat: yes
   - name: Modify local copy of kubeconfig
@@ -55,5 +56,3 @@ EOF
 
 ansible-playbook -i ~/inventory ~/ocp-install.yml
 ansible-playbook -i ~/inventory ~/fetch-kubeconfig.yml
-# Login to tunnelled cluster
-oc login -u system:admin

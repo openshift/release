@@ -11,15 +11,15 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-openshift-4.6
-  openshift_release_golang-1.12:
+  openshift_release_golang-1.15:
     name: release
     namespace: openshift
-    tag: golang-1.12
+    tag: golang-1.15
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.12
+    tag: golang-1.15
 images:
 - dockerfile_path: Dockerfile
   from: base
@@ -41,8 +41,9 @@ tag_specification:
   name: "4.7"
   namespace: ocp
 tests:
-- as: unit
-  commands: make test
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=/tmp/artifacts/es-proxy-logs ARTIFACT_DIR=/tmp/artifacts/es-proxy-artifacts make test
   container:
     from: src
 - as: cluster-logging-operator-e2e

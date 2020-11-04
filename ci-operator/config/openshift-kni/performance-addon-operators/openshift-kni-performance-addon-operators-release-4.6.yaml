@@ -3,10 +3,10 @@ base_images:
     name: "4.6"
     namespace: ocp
     tag: cli
-  operator-registry:
-    name: "4.6"
-    namespace: ocp
-    tag: operator-registry
+  opm-builder:
+    name: opm-builder
+    namespace: ci
+    tag: v1.14.3
   os:
     name: ubi
     namespace: ocp
@@ -28,24 +28,26 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/openshift-kni/performance-addon-operators/build/_output/bin/performance-addon-operators
   to: performance-addon-operator
-- dockerfile_path: openshift-ci/Dockerfile.registry.intermediate
-  from: operator-registry
-  to: operator-registry-base
-- dockerfile_path: openshift-ci/Dockerfile.registry.build
-  from: operator-registry-base
-  to: performance-addon-operator-registry
-- dockerfile_path: openshift-ci/Dockerfile.registry.upstream.dev
-  from: operator-registry-base
-  to: performance-addon-operator-registry-upstream
 - dockerfile_path: openshift-ci/Dockerfile.must-gather
   from: os-min8
   to: performance-addon-operator-must-gather
-- dockerfile_path: openshift-ci/Dockerfile.bundle.ci
+- dockerfile_path: openshift-ci/Dockerfile.index-gen.ci
+  from: opm-builder
+  to: performance-addon-operator-index-gen
+- dockerfile_path: openshift-ci/Dockerfile.index.ci
+  from: opm-builder
+  inputs:
+    performance-addon-operator-index-gen:
+      paths:
+      - destination_dir: .
+        source_path: /database/index.db
+  to: performance-addon-operator-index
+- dockerfile_path: openshift-ci/Dockerfile.bundle.upstream.dev
   inputs:
     bin:
       paths:
       - destination_dir: .
-        source_path: /go/src/github.com/openshift-kni/performance-addon-operators/build/_output/manifests
+        source_path: /go/src/github.com/openshift-kni/performance-addon-operators/build
   to: performance-addon-operator-bundle
 - dockerfile_path: openshift-ci/Dockerfile.src.ci
   from: src
@@ -64,8 +66,8 @@ operator:
     with: performance-addon-operator
 promotion:
   excluded_images:
-  - operator-registry-base
-  - performance-addon-operator-registry
+  - performance-addon-operator-index-gen
+  - pao-src-oc
   name: performance-addon-operator-4.6
   namespace: openshift-kni
 resources:

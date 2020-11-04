@@ -1,76 +1,48 @@
 base_images:
-  base-os-8:
+  ocp_builder_rhel-8-base-openshift:
     name: builder
     namespace: ocp
-    tag: rhel-8-base-openshift-4.6
-  builder:
+    tag: rhel-8-base-openshift
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
     name: builder
     namespace: ocp
-    tag: golang-1.13
-  ocp_builder_golang-1.10:
-    name: builder
-    namespace: ocp
-    tag: golang-1.10
-  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.15-openshift-4.6
-  ocp_builder_rhel-8-golang-openshift-4.6:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-openshift-4.6
-  os-7:
-    name: ubi
-    namespace: ocp
-    tag: "7"
+    tag: rhel-8-golang-1.15-openshift-4.7
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.13
 images:
-- context_dir: base/
+- context_dir: base
   dockerfile_path: Dockerfile.rhel
-  from: base-os-7
-  to: base-7
-- context_dir: base/
-  dockerfile_path: Dockerfile.rhel
-  from: base-os-8
-  to: base-8
-- dockerfile_path: pod/Dockerfile.rhel
-  from: os-7
   inputs:
-    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    ocp_builder_rhel-8-base-openshift:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-base-openshift
+  to: base
+- dockerfile_path: pod/Dockerfile.rhel
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
   to: pod
 - context_dir: egress/router
-  from: base-8
+  from: base
   to: egress-router
 - context_dir: egress/http-proxy
-  from: base-8
+  from: base
   to: egress-http-proxy
 - context_dir: egress/dns-proxy
-  from: base-8
+  from: base
   to: egress-dns-proxy
 - context_dir: ipfailover/keepalived
-  from: base-8
+  from: base
   to: keepalived-ipfailover
 promotion:
-  additional_images:
-    base: base-8
-    base-7: base-7
-    base-8: base-8
   disabled: true
   name: "4.7"
   namespace: ocp
-raw_steps:
-- pipeline_image_cache_step:
-    commands: |
-      rm -rf /etc/yum.repos.d/*
-      curl http://base-4-7.ocp.svc > /etc/yum.repos.d/content.repo
-    from: os-7
-    to: base-os-7
 resources:
   '*':
     requests:

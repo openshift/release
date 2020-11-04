@@ -41,9 +41,9 @@ tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted.tar.gz"
 # Prepare configuration and run
 scp "${SSHOPTS[@]}" "${CLUSTER_PROFILE_DIR}/pull-secret" "root@${IP}:pull-secret"
 
-if [[ -e "${SHARED_DIR}/additional-config" ]]
+if [[ -e "${SHARED_DIR}/assisted-additional-config" ]]
 then
-  scp "${SSHOPTS[@]}" "${SHARED_DIR}/additional-config" "root@${IP}:additional-config"
+  scp "${SSHOPTS[@]}" "${SHARED_DIR}/assisted-additional-config" "root@${IP}:assisted-additional-config"
 fi
 
 timeout -s 9 175m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
@@ -73,13 +73,14 @@ cd "\${REPO_DIR}"
 set +x
 echo "export PULL_SECRET='\$(cat /root/pull-secret)'" >> /root/config
 echo "export OPENSHIFT_INSTALL_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}" >> /root/config
+echo "export PUBLIC_CONTAINER_REGISTRIES=quay.io,\$(echo ${RELEASE_IMAGE_LATEST} | cut -d'/' -f1)" >> /root/config
 set -x
 
 curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar -C /usr/bin -xzf -
 
-if [[ -e /root/dev-scripts-additional-config ]]
+if [[ -e /root/assisted-additional-config ]]
 then
-  cat /root/dev-scripts-additional-config >> /root/config
+  cat /root/assisted-additional-config >> /root/config
 fi
 
 echo "export KUBECONFIG=\${REPO_DIR}/build/kubeconfig" >> /root/.bashrc
