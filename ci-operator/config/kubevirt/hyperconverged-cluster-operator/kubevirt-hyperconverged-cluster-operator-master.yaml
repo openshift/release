@@ -142,30 +142,65 @@ tests:
           memory: 200Mi
     workflow: optional-operators-ci-gcp
 - as: hco-e2e-upgrade-aws
-  commands: |
-    RELEASE_DELTA=1 make upgrade-test
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: RELEASE_DELTA=1 make upgrade-test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: hco-e2e-upgrade-prev-aws
-  commands: |
-    RELEASE_DELTA=2 PREV=true make upgrade-test
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: RELEASE_DELTA=2 PREV=true make upgrade-test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: hco-e2e-azure
-  commands: |
-    make start && make functest
-  openshift_installer_src:
+  steps:
     cluster_profile: azure4
+    test:
+    - as: test
+      cli: latest
+      commands: make start && make functest
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-azure
 - as: hco-e2e-upgrade-azure
-  commands: |
-    RELEASE_DELTA=1 make upgrade-test
-  openshift_installer_src:
+  steps:
     cluster_profile: azure4
+    test:
+    - as: test
+      cli: latest
+      commands: RELEASE_DELTA=1 make upgrade-test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-azure
 - as: hco-e2e-upgrade-prev-azure
-  commands: |
-    RELEASE_DELTA=2 PREV=true make upgrade-test
-  openshift_installer_src:
+  steps:
     cluster_profile: azure4
+    test:
+    - as: test
+      cli: latest
+      commands: RELEASE_DELTA=2 PREV=true make upgrade-test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-azure
 - artifact_dir: /tmp/artifacts
   as: hco-e2e-deploy-nightly-master-aws
   commands: |
