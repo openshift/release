@@ -1,5 +1,4 @@
-#!/bin/bash
-
+#!/bin/bash -x
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -43,8 +42,18 @@ echo "**** 3 "
 ls
 
 #sleep 2h
+echo "curl from dropbox"
+curl -k -L https://www.dropbox.com/s/vwkw15z7a47pwlt/openshift-install?dl=0 -o openshift-install-binary
+#OPENSHIFT_INSTALL_BINARY=$(curl -k -L https://www.dropbox.com/s/vwkw15z7a47pwlt/openshift-install?dl=0)
 
-openshift-install --dir="${dir}" create manifests &
+
+echo "chmod"
+chmod +x openshift-install-binary
+
+echo "run create manifest"
+openshift-install-binary --dir="${dir}" create manifests &
+#openshift-install --dir="${dir}" create manifests &
+
 wait "$!"
 
 sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
