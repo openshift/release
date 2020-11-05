@@ -268,6 +268,12 @@ rules:
   - get
   - watch
   - list
+- apiGroups:
+  - 'config.openshift.io'
+  resources:
+  - 'clusterversions'
+  verbs:
+  - 'get'
 EOF
 cat >> "${SHARED_DIR}/manifest_promtail-clusterrolebinding.yml" << EOF
 apiVersion: rbac.authorization.k8s.io/v1
@@ -291,8 +297,8 @@ metadata:
   namespace: loki
 data:
   promtail.yaml: |-
-    clients:
-    - backoff_config:
+    client:
+      backoff_config:
         max_period: 5s
         max_retries: 20
         min_period: 100ms
@@ -300,16 +306,7 @@ data:
       batchwait: 1s
       external_labels: {}
       timeout: 10s
-      url: http://loki-0.loki:3100/loki/api/v1/push
-    - backoff_config:
-        max_period: 5s
-        max_retries: 20
-        min_period: 100ms
-      batchsize: 102400
-      batchwait: 1s
-      external_labels: {}
-      timeout: 10s
-      url: http://loki-1.loki:3100/loki/api/v1/push
+      url: http://loki.loki.svc.cluster.local:3100/loki/api/v1/push
     positions:
       filename: "/run/promtail/positions.yaml"
     scrape_configs:
@@ -589,8 +586,13 @@ spec:
         app.kubernetes.io/version: ${LOKI_VERSION}
     spec:
       containers:
-      - args:
-        - "-config.file=/etc/promtail/promtail.yaml"
+      - command:
+        - sh
+        - -c
+        - |
+          promtail \
+            -client.external-labels=_id=\$(cat /tmp/shared/cluster-id),host=\$(HOSTNAME) \
+            -config.file=/etc/promtail/promtail.yaml
         env:
         - name: HOSTNAME
           valueFrom:
@@ -627,14 +629,25 @@ spec:
         - mountPath: "/var/log/pods"
           name: pods
           readOnly: true
+        - mountPath: "/tmp/shared"
+          name: shared-data
       initContainers:
       - command:
         - sh
         - "-c"
-        - while [[ "\$(curl -s -o /dev/null -w '%{http_code}' http://loki-1.loki:3100/ready)"
+        - while [[ "\$(curl -s -o /dev/null -w '%{http_code}' http://loki.loki.svc.cluster.local:3100/ready)"
           != "200" ]]; do sleep 5s; done
         image: curlimages/curl:7.69.1
         name: waitforloki
+      - command:
+        - sh
+        - "-c"
+        - oc get clusterversion/version -o=jsonpath='{.spec.clusterID}' > /tmp/shared/cluster-id
+        volumeMounts:
+          - mountPath: "/tmp/shared"
+            name: shared-data
+        image: quay.io/openshift/origin-cli:4.6.0
+        name: fetch-cluster-id
       serviceAccountName: loki-promtail
       tolerations:
       - effect: NoSchedule
@@ -653,6 +666,8 @@ spec:
       - hostPath:
           path: "/var/log/pods"
         name: pods
+      - emptyDir: {}
+        name: shared-data
   updateStrategy:
     type: RollingUpdate
 EOF
