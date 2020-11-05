@@ -1,0 +1,35 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.14
+images:
+- dockerfile_path: Dockerfile
+  to: observatorium-operator
+promotion:
+  name: observatorium-operator
+  namespace: open-cluster-management
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 100m
+      memory: 1Gi
+tag_specification:
+  name: "4.4"
+  namespace: ocp
+test_binary_build_commands: "true"
+tests:
+- as: test
+  commands: |
+    ./tests/e2e.sh kind
+    ./tests/e2e.sh deploy-operator
+    ./tests/e2e.sh test --tls
+    ./tests/e2e.sh delete-cr
+  container:
+    from: test-bin
+zz_generated_metadata:
+  branch: release-2.1
+  org: open-cluster-management
+  repo: observatorium-operator
