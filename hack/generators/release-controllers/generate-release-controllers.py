@@ -9,8 +9,10 @@
 # All non-static methods in contexts
 # pylint: disable=R0201
 
-# Allow TOOD
+# Allow TODO
 # pylint: disable=W0511
+# Turn off too many statements
+# pylint: disable=R0915
 
 import logging
 import sys
@@ -18,6 +20,10 @@ import pathlib
 import glob
 import os
 import json
+import yaml
+
+from content import Context
+from content import Config
 
 # Change python path so we can import genlib
 sys.path.append(str(pathlib.Path(__file__).absolute().parent.parent.joinpath('lib')))
@@ -29,49 +35,15 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger()
 
 
-class Config:
-
-    def __init__(self, releases_4x):
-        self.rc_deployment_domain = 'apps.ci.l2s4.p1.openshiftapps.com'
-        self.rc_release_domain = 'svc.ci.openshift.org'
-        self.rc_deployment_namespace = 'ci'
-        self.arches = ('x86_64', 's390x', 'ppc64le')
-        self.releases_4x = releases_4x
-
-    def get_arch_suffix(self, arch):
-        suffix = ''
-        if arch not in ('amd64', 'x86_64'):
-            suffix += f'-{arch}'
-        return suffix
-
-    def get_suffix(self, arch, private):
-        suffix = self.get_arch_suffix(arch)
-
-        if private:
-            suffix += '-priv'
-
-        return suffix
-
-
-class Context:
-    def __init__(self, config, arch, private):
-        self.config = config
-        self.arch = arch
-        self.private = private
-
-        self.suffix = config.get_suffix(arch, private)
-        self.jobs_namespace = f'ci-release{self.suffix}'
-        self.rc_hostname = f'openshift-release{self.suffix}'
-        self.hostname_artifacts = f'openshift-release-artifacts{self.suffix}'
-        self.secret_name_tls = f'release-controller{self.suffix}-tls'
-        self.is_namespace = f'ocp{self.suffix}'
-        self.rc_serviceaccount_name = f'release-controller-{self.is_namespace}'
-
-        self.rc_route_name = f'release-controller-{self.is_namespace}'
-        self.rc_service_name = self.rc_route_name
-
-
 def run(git_clone_dir):
+
+    def str_presenter(dumper, data):
+        if len(data.splitlines()) > 1:  # check for multiline string
+            return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='|')
+        return dumper.represent_scalar('tag:yaml.org,2002:str', data)
+
+    yaml.add_representer(str, str_presenter)
+
     releases_4x = []
     for name in glob.glob(f'{git_clone_dir}/ci-operator/jobs/openshift/release/openshift-release-release-4.*-periodics.yaml'):
         bn = os.path.splitext(os.path.basename(name))[0]  # e.g. openshift-release-release-4.4-periodics
@@ -88,6 +60,8 @@ def run(git_clone_dir):
     path_rc_annotations = path_rc_release_resources.joinpath('_releases')
     path_priv_rc_annotations = path_rc_annotations.joinpath('priv')  # location where priv release controller annotations are generated
     path_priv_rc_annotations.mkdir(exist_ok=True)
+
+    path_release_controller_config_jobs = path_base.joinpath('ci-operator/jobs/openshift/release-controller-config')
 
     releases_4x.sort()  # Glob does provide any guarantees on ordering, so force an order by sorting.
     config = Config(releases_4x)
@@ -117,6 +91,7 @@ def run(git_clone_dir):
         content.add_rpm_mirror_service(gendoc, git_clone_dir, '3.11')
 
     for major_minor in releases_4x:
+        major, minor = major_minor.split('.')
         with genlib.GenDoc(path_rc_release_resources.joinpath(f'rpms-ocp-{major_minor}.yaml'), context=config) as gendoc:
             content.add_rpm_mirror_service(gendoc, git_clone_dir, major_minor)
 
@@ -145,6 +120,9 @@ def run(git_clone_dir):
 
             with path_priv_rc_annotations.joinpath(annotation_filename).open(mode='w+', encoding='utf-8') as f:
                 json.dump(priv_annotation, f, sort_keys=True, indent=4)
+
+            with genlib.GenDoc(path_release_controller_config_jobs.joinpath(f'openshift-release-controller-config-release-{major_minor}-periodics.yaml')) as gendoc:
+                content.add_machine_os_content_promoter(gendoc, config, major, minor)
 
 
 if __name__ == '__main__':
