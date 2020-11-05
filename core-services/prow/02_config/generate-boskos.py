@@ -31,9 +31,7 @@ CONFIG = {
     'packet-quota-slice': {
         'default': 20,
     },
-    'vsphere-quota-slice': {
-        'default': 10,
-    },
+    'vsphere-quota-slice': {},
 }
 
 for i in range(2):
@@ -52,6 +50,9 @@ for i in range(4):
 
 for i in range(10, 18):
     CONFIG['ovirt-quota-slice']['ovirt-{}'.format(i)] = 1
+
+for i in range(0,15):
+    CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 config = {
     'resources': [],
