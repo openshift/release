@@ -73,7 +73,7 @@ function gather_bootstrap_and_fail() {
     GATHER_BOOTSTRAP_ARGS+=('--master' "${control_plane_0_ip}" '--master' "${control_plane_1_ip}" '--master' "${control_plane_2_ip}")
 
     set -e
-    openshift-install --dir=/tmp/artifacts/installer gather bootstrap --key "${SSH_PRIVATE_KEY_PATH}" "${GATHER_BOOTSTRAP_ARGS[@]}"
+    openshift-install --dir=/tmp/artifacts/installer gather bootstrap --key "${SSH_PRIV_KEY_PATH}" "${GATHER_BOOTSTRAP_ARGS[@]}"
 
   return 1
 }
