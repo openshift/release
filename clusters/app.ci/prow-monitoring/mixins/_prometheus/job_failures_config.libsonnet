@@ -4,10 +4,7 @@
       'periodic-openshift-library-import': {
         receiver: 'openshift-library',
       },
-      'endurance-cluster-maintenance-aws-4.5': {
-        receiver: 'endurance-cluster',
-      },
-      'endurance-cluster-maintenance-aws-4.4': {
+      'endurance-cluster-maintenance-aws-4.6': {
         receiver: 'endurance-cluster',
       },
       'periodic-ci-openshift-kni-cnf-features-deploy-master-cnf-e2e-gcp-periodic': {
