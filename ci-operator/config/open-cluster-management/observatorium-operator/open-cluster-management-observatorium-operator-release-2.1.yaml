@@ -7,7 +7,7 @@ images:
 - dockerfile_path: Dockerfile
   to: observatorium-operator
 promotion:
-  name: observatorium-operator
+  name: "2.1"
   namespace: open-cluster-management
 resources:
   '*':
@@ -17,18 +17,53 @@ resources:
       cpu: 100m
       memory: 1Gi
 tag_specification:
-  name: "4.4"
+  name: "4.6"
   namespace: ocp
 test_binary_build_commands: "true"
 tests:
-- as: test
-  commands: |
-    ./tests/e2e.sh kind
-    ./tests/e2e.sh deploy-operator
-    ./tests/e2e.sh test --tls
-    ./tests/e2e.sh delete-cr
-  container:
-    from: test-bin
+- as: e2e-test
+  steps:
+    cluster_profile: aws
+    test:
+    - as: deploy-operator
+      cli: latest
+      commands: |
+        ./tests/e2e.sh deploy-operator
+      env:
+      - name: KUBECTL
+        default: oc
+      - name: OPERATOR_IMAGE_NAME
+        default: ${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:observatorium-operator}
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: run-test
+      cli: latest
+      commands: |
+        ./tests/e2e.sh run_test
+      env:
+      - name: KUBECTL
+        default: oc
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: delete-cr
+      cli: latest
+      commands: |
+        ./tests/e2e.sh delete_cr
+      env:
+      - name: KUBECTL
+        default: oc
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: release-2.1
   org: open-cluster-management
