@@ -3,6 +3,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-base-openshift-4.6
+  base_centos:
+    name: centos
+    namespace: openshift
+    tag: "7"
 build_root:
   image_stream_tag:
     name: release
@@ -12,6 +16,9 @@ images:
 - dockerfile_path: Dockerfile
   from: base
   to: console
+- dockerfile_path: frontend/packages/kubevirt-plugin/integration-tests/Dockerfile
+  from: base_centos
+  to: kubevirt-test
 promotion:
   additional_images:
     console-tests: src
@@ -75,7 +82,7 @@ tests:
     ./test-prow-e2e.sh kubevirt-gating
   openshift_installer_custom_test_image:
     cluster_profile: azure4
-    from: pipeline:src
+    from: stable:kubevirt-test
 zz_generated_metadata:
   branch: master
   org: openshift
