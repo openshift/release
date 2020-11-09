@@ -96,23 +96,12 @@ test_binary_build_commands: make build/operator-sdk-dev-x86_64-linux-gnu
 tests:
 - as: unit
   commands: |
-    mkdir -p $GOPATH/src/github.com/operator-framework/operator-sdk
-    cp -r ./* $GOPATH/src/github.com/operator-framework/operator-sdk/
-    cd $GOPATH/src/github.com/operator-framework/operator-sdk
-    rm -rf vendor/github.com/operator-framework/operator-sdk
-    make test/unit
+    make test-unit
   container:
     from: src
 - as: sanity
   commands: |
-    export GO111MODULE=on
-    export GOFLAGS=-mod=vendor
-    mkdir -p $GOPATH/src/github.com/operator-framework/operator-sdk
-    cp -r ./* $GOPATH/src/github.com/operator-framework/operator-sdk/
-    cd $GOPATH/src/github.com/operator-framework/operator-sdk
-    go vet ./...
-    ./hack/check_license.sh
-    ./hack/check_error_log_msg_format.sh
+    make test-sanity
   container:
     from: src
 - as: e2e-aws-ansible
