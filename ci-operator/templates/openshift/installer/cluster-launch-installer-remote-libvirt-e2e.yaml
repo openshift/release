@@ -182,8 +182,8 @@ objects:
 
         export PATH=/usr/libexec/origin:$PATH
 
-        trap 'touch /tmp/shared/exit' EXIT
-        trap 'jobs -p | xargs -r kill; exit 0' TERM
+        trap 'touch /tmp/shared/test-exit' EXIT
+        trap 'jobs -p | xargs -r kill || true; exit 0' TERM
 
         function patch_image_specs() {
           cat <<EOF >samples-patch.yaml
@@ -235,6 +235,10 @@ objects:
 
         # wait for the API to come up
         while true; do
+          if [[ -f /tmp/shared/setup-failed ]]; then
+            echo "Setup reported a failure, do not report test failure" 2>&1
+            exit 0
+          fi
           if [[ -f /tmp/shared/exit ]]; then
             echo "Another process exited" 2>&1
             exit 1
@@ -547,6 +551,8 @@ objects:
       - -c
       - |
         #!/bin/bash
+        set -eo pipefail
+
         function queue() {
           local TARGET="${1}"
           shift
@@ -661,11 +667,11 @@ objects:
           mock-nss.sh openshift-install --dir ${ARTIFACT_DIR}/installer destroy cluster
         }
 
-        trap 'teardown' EXIT
-        trap 'jobs -p | xargs -r kill; exit 0' TERM
+        trap 'teardown; touch /tmp/shared/teardown-exit; exit 0' EXIT
+        trap 'jobs -p | xargs -r kill || true; touch /tmp/shared/teardown-exit; exit 0' TERM
 
         for i in $(seq 1 220); do
-          if [[ -f /tmp/shared/exit ]]; then
+          if [[ -f /tmp/shared/exit ]] || [[ -f /tmp/shared/test-exit ]]; then
             exit 0
           fi
           sleep 60 & wait
