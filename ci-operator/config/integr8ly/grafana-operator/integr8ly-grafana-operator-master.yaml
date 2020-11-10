@@ -39,9 +39,17 @@ tests:
   container:
     from: src
 - as: e2e
-  commands: unset GOFLAGS && make test/e2e
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: unset GOFLAGS && make test/e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: integr8ly

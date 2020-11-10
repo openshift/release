@@ -63,11 +63,19 @@ tests:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
 - as: e2e-operator
-  commands: |
-    mkdir -p /tmp/artifacts
-    make test-e2e JUNITFILE=/tmp/artifacts/junit_report.xml
-  openshift_installer_src:
+  steps:
     cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        mkdir -p /tmp/artifacts
+        make test-e2e JUNITFILE=/tmp/artifacts/junit_report.xml
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
 - as: e2e-agnostic-upgrade
   steps:
     cluster_profile: gcp
@@ -80,11 +88,19 @@ tests:
     from: stable:console-tests
 - artifact_dir: /tmp/artifacts
   as: e2e-operator-encryption
-  commands: |
-    mkdir -p /tmp/artifacts
-    make test-e2e-encryption JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
-  openshift_installer_src:
+  steps:
     cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        mkdir -p /tmp/artifacts
+        make test-e2e-encryption JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: master
   org: openshift

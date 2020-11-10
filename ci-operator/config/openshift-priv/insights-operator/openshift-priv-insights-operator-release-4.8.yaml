@@ -58,14 +58,30 @@ tests:
     cluster_profile: gcp
     upgrade: true
 - as: insights-operator-e2e-tests
-  commands: make test-e2e
-  openshift_installer_src:
+  steps:
     cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
 - as: insights-operator-e2e-tests-periodic
-  commands: make test-e2e
   cron: 0 0 * * *
-  openshift_installer_src:
+  steps:
     cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: release-4.8
   org: openshift-priv

@@ -23,16 +23,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/benchmark-cluster-profile
         - --target=benchmark
-        - --template=/usr/local/benchmark
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: benchmark
-        - name: TEST_COMMAND
-          value: make test-benchmark
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -45,9 +37,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/benchmark-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/benchmark
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -67,9 +56,6 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials

@@ -57,9 +57,17 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-serial
 - as: e2e-aws-operator
-  commands: make e2e-job
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e-job
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - artifact_dir: /tmp/artifacts
   as: e2e-aws-console-olm
   commands: ./test-prow-e2e.sh olmFull
