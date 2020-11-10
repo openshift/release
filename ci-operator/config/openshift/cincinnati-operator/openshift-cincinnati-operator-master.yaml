@@ -15,6 +15,8 @@ images:
 - dockerfile_path: dev/Dockerfile
   from: base
   to: cincinnati-graph-data-container
+operator:
+  bundles:
 promotion:
   excluded_images:
   - cincinnati-operator
@@ -47,6 +49,22 @@ tests:
         name: stable:cincinnati-operator
       - env: GRAPH_DATA_IMAGE
         name: stable:cincinnati-graph-data-container
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-gcp
+- as: operator-bundle-e2e
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: e2e-index-test
+      cli: initial
+      commands: make unit-test
+      dependencies:
+      - env: INDEX_IMAGE
+        name: ci-index
       from: src
       resources:
         requests:
