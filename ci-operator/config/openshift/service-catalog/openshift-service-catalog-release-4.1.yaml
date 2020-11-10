@@ -41,9 +41,17 @@ tests:
     from: test-bin
 - artifact_dir: /tmp/artifacts
   as: e2e-aws-operator
-  commands: make build-e2e && hack/create-subscription.sh && hack/run-e2e.sh
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make build-e2e && hack/create-subscription.sh && hack/run-e2e.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-4.1
   org: openshift

@@ -23,9 +23,17 @@ tag_specification:
   namespace: ocp
 tests:
 - as: e2e-functests
-  commands: export OC=oc V=5 && make ocp-ci-deploy && make functests
-  openshift_installer_src:
+  steps:
     cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: export OC=oc V=5 && make ocp-ci-deploy && make functests
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: master
   org: kubevirt

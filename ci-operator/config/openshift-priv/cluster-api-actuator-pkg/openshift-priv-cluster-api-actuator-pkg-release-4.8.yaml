@@ -36,21 +36,53 @@ tests:
   container:
     from: src
 - as: e2e-aws-operator
-  commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: e2e-aws-operator-tech-preview
-  commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-tech-preview
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-tech-preview
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: e2e-azure-operator
-  commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
-  openshift_installer_src:
+  steps:
     cluster_profile: azure4
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-azure
 - as: e2e-gcp-operator
-  commands: JUNIT_DIR=${ARTIFACT_DIR} make -C /go/src/github.com/openshift/cluster-api-actuator-pkg test-e2e
-  openshift_installer_src:
+  steps:
     cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make -C /go/src/github.com/openshift/cluster-api-actuator-pkg test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: release-4.8
   org: openshift-priv

@@ -13,20 +13,36 @@ tag_specification:
   namespace: ocp
 tests:
 - as: e2e-test-cron
-  commands: |
-    set -euo pipefail
-    echo "Running CNV product test"
-    ./bootstrap.sh
   cron: 0 */6 * * *
-  openshift_installer_src:
+  steps:
     cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        set -euo pipefail
+        echo "Running CNV product test"
+        ./bootstrap.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
 - as: e2e-test-presubmit
-  commands: |
-    set -euo pipefail
-    echo "Running CNV product test"
-    ./bootstrap.sh
-  openshift_installer_src:
+  steps:
     cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        set -euo pipefail
+        echo "Running CNV product test"
+        ./bootstrap.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: master
   org: openshift-cnv

@@ -234,18 +234,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-operator-cluster-profile
         - --target=e2e-operator
-        - --template=/usr/local/e2e-operator
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: gcp
-        - name: JOB_NAME_SAFE
-          value: e2e-operator
-        - name: TEST_COMMAND
-          value: |
-            mkdir -p /tmp/artifacts
-            make test-e2e JUNITFILE=/tmp/artifacts/junit_report.xml
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -258,9 +248,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-operator-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-operator
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -282,9 +269,6 @@ presubmits:
               name: cluster-secrets-gcp
           - configMap:
               name: cluster-profile-gcp
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -315,18 +299,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-operator-encryption-cluster-profile
         - --target=e2e-operator-encryption
-        - --template=/usr/local/e2e-operator-encryption
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: gcp
-        - name: JOB_NAME_SAFE
-          value: e2e-operator-encryption
-        - name: TEST_COMMAND
-          value: |
-            mkdir -p /tmp/artifacts
-            make test-e2e-encryption JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -339,9 +313,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-operator-encryption-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-operator-encryption
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -363,9 +334,6 @@ presubmits:
               name: cluster-secrets-gcp
           - configMap:
               name: cluster-profile-gcp
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials

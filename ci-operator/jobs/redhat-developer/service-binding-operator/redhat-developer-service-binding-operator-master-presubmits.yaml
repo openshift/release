@@ -24,17 +24,9 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/acceptance-cluster-profile
         - --target=acceptance
-        - --template=/usr/local/acceptance
         - --variant=4.5
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: acceptance
-        - name: TEST_COMMAND
-          value: VERBOSE=2 make -k test-acceptance test-acceptance-artifacts
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -47,9 +39,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/acceptance-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/acceptance
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -69,9 +58,6 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
