@@ -27,7 +27,7 @@ def _add_osd_rc_service(gendoc):
     annotations = {}
     context = gendoc.context
 
-    if context.private and context.rc_service_name != 'release-controller-ocp-priv':
+    if context.private:
         annotations['service.alpha.openshift.io/serving-cert-secret-name'] = context.secret_name_tls
 
     gendoc.append({
