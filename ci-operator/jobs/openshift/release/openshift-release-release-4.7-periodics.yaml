@@ -464,7 +464,6 @@ periodics:
       - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-gcp-cluster-profile
       - --secret-dir=/usr/local/pull-secret
-      - --template=/usr/local/e2e-gcp
       command:
       - /bin/bash
       - -c
@@ -603,7 +602,7 @@ periodics:
         value: $(TAG):$(BRANCH)
       - name: CLUSTER_TYPE
         value: gcp
-      - name: CONFIG_SPEC
+      - name: UNRESOLVED_CONFIG
         value: |
           tag_specification:
             name: "$(BRANCH)"
@@ -611,24 +610,11 @@ periodics:
           promotion:
             name: "$(BRANCH)"
             namespace: origin
-            additional_images:
-              $(TAG): $(TAG)
           build_root:
             image_stream_tag:
               name: release
               namespace: openshift
               tag: golang-1.13
-          base_images:
-            $(TAG):
-              name: $(TAG)
-              namespace: origin
-              tag: "4.7"
-          raw_steps:
-          - output_image_tag_step:
-              from: $(TAG)
-              to:
-                name: stable
-                tag: $(TAG)
           resources:
             '*':
               limits:
@@ -638,9 +624,9 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-gcp
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
+            steps:
               cluster_profile: gcp
+              workflow: openshift-e2e-gcp
       - name: JOB_NAME_SAFE
         value: e2e-gcp
       - name: TEST_COMMAND
