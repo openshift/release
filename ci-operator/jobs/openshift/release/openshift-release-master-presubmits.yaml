@@ -459,6 +459,30 @@ presubmits:
     branches:
     - master
     cluster: build02
+    context: ci/prow/deprecate-templates
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-deprecate-templates
+    rerun_command: /test deprecate-templates
+    spec:
+      containers:
+      - args:
+        - ./
+        command:
+        - hack/validate-template-deprecation.sh
+        image: registry.svc.ci.openshift.org/ci/template-deprecator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )deprecate-templates,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build02
     context: ci/prow/generated-config
     decorate: true
     labels:

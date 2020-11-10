@@ -45,6 +45,11 @@ update:
 	$(MAKE) boskos-config
 	$(MAKE) prow-config
 	$(MAKE) registry-metadata
+	$(MAKE) template-allowlist
+
+template-allowlist:
+	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/template-deprecator:latest
+	$(CONTAINER_ENGINE) run --rm -v  "$(CURDIR):/release:z" registry.svc.ci.openshift.org/ci/template-deprecator:latest --prow-jobs-dir /release/ci-operator/jobs --prow-config-path /release/core-services/prow/02_config/_config.yaml --prow-plugin-config-path /release/core-services/prow/02_config/_plugins.yaml --allowlist-path /release/core-services/template-deprecation/_allowlist.yaml
 
 release-controllers:
 	./hack/generators/release-controllers/generate-release-controllers.py .
