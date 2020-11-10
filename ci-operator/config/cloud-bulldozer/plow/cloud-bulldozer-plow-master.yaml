@@ -14,12 +14,20 @@ tag_specification:
 tests:
 - artifact_dir: /tmp/artifacts
   as: etcd-azure-perf-test-daily
-  commands: |
-    TEST_OUTPUT_PATH=/tmp/artifacts/etcd-azure-perf-test-daily.log
-    workloads/etcd-perf/run_etcd_tests_fromgit.sh >> ${TEST_OUTPUT_PATH}
   cron: 0 0 * * *
-  openshift_installer_src:
+  steps:
     cluster_profile: azure4
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        TEST_OUTPUT_PATH=/tmp/artifacts/etcd-azure-perf-test-daily.log
+        workloads/etcd-perf/run_etcd_tests_fromgit.sh >> ${TEST_OUTPUT_PATH}
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-azure
 zz_generated_metadata:
   branch: master
   org: cloud-bulldozer

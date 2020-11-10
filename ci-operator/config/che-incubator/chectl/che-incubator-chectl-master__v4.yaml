@@ -18,11 +18,19 @@ tag_specification:
   namespace: ocp
 tests:
 - as: chectl-e2e
-  commands: |
-    oc new-project che
-    .ci/cico_chectl_openshift.sh
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        oc new-project che
+        .ci/cico_chectl_openshift.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: che-incubator

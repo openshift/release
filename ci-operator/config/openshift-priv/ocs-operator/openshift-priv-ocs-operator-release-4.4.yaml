@@ -83,15 +83,31 @@ tests:
   container:
     from: src
 - as: ocs-operator-e2e-aws
-  commands: |
-    make functest
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make functest
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: red-hat-storage-ocs-ci-e2e-aws
-  commands: |
-    export REDHAT_OCS_CI_FORCE_TOOL_POD_INSTALL="true" && make cluster-deploy && make red-hat-storage-ocs-ci
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export REDHAT_OCS_CI_FORCE_TOOL_POD_INSTALL="true" && make cluster-deploy && make red-hat-storage-ocs-ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-4.4
   org: openshift-priv

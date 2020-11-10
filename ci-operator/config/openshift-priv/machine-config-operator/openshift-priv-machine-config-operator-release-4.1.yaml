@@ -75,9 +75,17 @@ tests:
   container:
     from: src
 - as: e2e-aws-op
-  commands: make test-e2e
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: e2e-aws-upgrade
   commands: TEST_SUITE=all run-upgrade-tests
   openshift_installer:
