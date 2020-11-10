@@ -1,0 +1,42 @@
+base_images:
+  os:
+    name: centos
+    namespace: origin
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- context_dir: tests/
+  dockerfile_path: Dockerfile
+  from: os
+  to: odh-manifests-tests
+resources:
+  '*':
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+tag_specification:
+  name: "4.5"
+  namespace: ocp
+tests:
+- as: odh-manifests-e2e-nightly-45
+  cron: 30 0 * * *
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: e2e
+      commands: $HOME/peak/installandtest.sh
+      from: odh-manifests-tests
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 2Gi
+    workflow: ipi-gcp
+zz_generated_metadata:
+  branch: master
+  org: opendatahub-io
+  repo: odh-manifests
+  variant: "45"
