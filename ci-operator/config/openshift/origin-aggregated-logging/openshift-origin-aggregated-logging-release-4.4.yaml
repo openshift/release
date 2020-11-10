@@ -67,17 +67,33 @@ tests:
   container:
     from: logging-test-unit
 - as: full-integ-aws
-  commands: |
-    . openshift/ci-operator/build-image/setup-logging-for-e2e.sh
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        . openshift/ci-operator/build-image/setup-logging-for-e2e.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: upgrade-full-integ-aws
-  commands: |
-    OPENSHIFT_BUILD_NAMESPACE= IMAGE_FORMAT= USE_CUSTOM_IMAGES=true hack/deploy-logging.sh
-    export LOGGING_DEPLOY_MODE=upgrade
-    . openshift/ci-operator/build-image/setup-logging-for-e2e.sh
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        OPENSHIFT_BUILD_NAMESPACE= IMAGE_FORMAT= USE_CUSTOM_IMAGES=true hack/deploy-logging.sh
+        export LOGGING_DEPLOY_MODE=upgrade
+        . openshift/ci-operator/build-image/setup-logging-for-e2e.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-4.4
   org: openshift

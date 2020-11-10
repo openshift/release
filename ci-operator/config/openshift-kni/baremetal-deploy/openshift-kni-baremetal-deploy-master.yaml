@@ -17,22 +17,46 @@ tag_specification:
   namespace: ocp
 tests:
 - as: sctp-e2e-aws
-  commands: cd features && export FEATURES=sctp && make deploy && make functests
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: cd features && export FEATURES=sctp && make deploy && make functests
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: performance-e2e-aws
-  commands: cd features && source hack/test_env.sh && export FEATURES="mcp performance" && make deploy && make functests
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: cd features && source hack/test_env.sh && export FEATURES="mcp performance" && make deploy && make functests
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: features-unit-tests
   commands: cd features && make unittests
   container:
     from: src
 - as: e2e-aws
-  commands: cd features && source hack/test_env.sh && make deploy && make functests
   cron: '* */8 * * *'
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: cd features && source hack/test_env.sh && make deploy && make functests
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: openshift-kni

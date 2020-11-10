@@ -23,21 +23,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-cluster-wide-cluster-profile
         - --target=e2e-cluster-wide
-        - --template=/usr/local/e2e-cluster-wide
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: e2e-cluster-wide
-        - name: TEST_COMMAND
-          value: |
-            CONTROLLER_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:controller}
-            EXPOSER_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:exposer}
-            export CONTROLLER_IMAGE EXPOSER_IMAGE
-            ./hack/ci-deploy.sh cluster-wide
-            make ci-test-e2e-cluster-wide E2E_JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -50,9 +37,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-cluster-wide-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-cluster-wide
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -72,9 +56,6 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -105,21 +86,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-single-namespace-cluster-profile
         - --target=e2e-single-namespace
-        - --template=/usr/local/e2e-single-namespace
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: e2e-single-namespace
-        - name: TEST_COMMAND
-          value: |
-            CONTROLLER_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:controller}
-            EXPOSER_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:exposer}
-            export CONTROLLER_IMAGE EXPOSER_IMAGE
-            ./hack/ci-deploy.sh single-namespace
-            make ci-test-e2e-single-namespace E2E_JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -132,9 +100,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-single-namespace-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-single-namespace
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -154,9 +119,6 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -187,21 +149,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-specific-namespaces-cluster-profile
         - --target=e2e-specific-namespaces
-        - --template=/usr/local/e2e-specific-namespaces
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: e2e-specific-namespaces
-        - name: TEST_COMMAND
-          value: |
-            CONTROLLER_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:controller}
-            EXPOSER_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:exposer}
-            export CONTROLLER_IMAGE EXPOSER_IMAGE
-            ./hack/ci-deploy.sh specific-namespaces
-            make ci-test-e2e-specific-namespaces E2E_JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -214,9 +163,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-specific-namespaces-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-specific-namespaces
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -236,9 +182,6 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials

@@ -102,16 +102,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-aws-olm-cluster-profile
         - --target=e2e-aws-olm
-        - --template=/usr/local/e2e-aws-olm
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: e2e-aws-olm
-        - name: TEST_COMMAND
-          value: JUNIT_DIRECTORY=$(ARTIFACT_DIR) make e2e
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -124,9 +116,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-aws-olm-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-aws-olm
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -146,9 +135,6 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials

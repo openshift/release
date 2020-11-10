@@ -47,9 +47,17 @@ tests:
   container:
     from: src
 - as: e2e-gcp-op
-  commands: make test-e2e
-  openshift_installer_src:
+  steps:
     cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
 - as: e2e-gcp-upgrade
   commands: TEST_SUITE=all run-upgrade-tests
   openshift_installer:

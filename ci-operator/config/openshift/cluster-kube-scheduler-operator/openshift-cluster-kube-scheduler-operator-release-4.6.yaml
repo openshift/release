@@ -55,9 +55,17 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-loki
 - as: e2e-aws-operator
-  commands: make e2e
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: verify
   commands: |
     make verify -k --warn-undefined-variables

@@ -50,13 +50,21 @@ tests:
   container:
     from: test-bin
 - as: e2e
-  commands: |
-    KUBECTL=oc
-    FOUNDATION_IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:multicloud-manager}
-    export KUBECTL FOUNDATION_IMAGE_NAME
-    make test-e2e
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        KUBECTL=oc
+        FOUNDATION_IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:multicloud-manager}
+        export KUBECTL FOUNDATION_IMAGE_NAME
+        make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-2.2
   org: open-cluster-management
