@@ -1,0 +1,45 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: cert-issuer
+    route.openshift.io/termination: "reencrypt"
+  name: release-controller-priv
+  namespace: ci
+spec:
+  tls:
+    #release-controller-priv-tls has been used already for the service to store internal certs
+    #https://github.com/openshift/release/blob/057272546cb7e86030d7c32cec3e67c657872ffa/clusters/app.ci/release-controller/deploy-ocp-priv-controller.yaml#L35
+    - secretName: release-controller-private-tls
+      hosts:
+        - amd64.ocp.internal.releases.ci.openshift.org
+        - ppc64le.ocp.internal.releases.ci.openshift.org
+        - s390x.ocp.internal.releases.ci.openshift.org
+  rules:
+  - host: amd64.ocp.internal.releases.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: release-controller-ocp-priv
+            port:
+              number: 443
+        pathType: ImplementationSpecific
+  - host: ppc64le.ocp.internal.releases.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: release-controller-ocp-ppc64le-priv
+            port:
+              number: 443
+        pathType: ImplementationSpecific
+  - host: s390x.ocp.internal.releases.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: release-controller-ocp-s390x-priv
+            port:
+              number: 443
+        pathType: ImplementationSpecific
