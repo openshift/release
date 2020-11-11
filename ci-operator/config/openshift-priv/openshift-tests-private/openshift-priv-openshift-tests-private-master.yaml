@@ -20,8 +20,14 @@ images:
         source_path: /usr/bin/oc
   to: oc-bin-image
 promotion:
-  name: 4.7-priv
+  name: ginkgo-test-priv
   namespace: ocp-private
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.7"
 resources:
   '*':
     limits:
@@ -37,9 +43,6 @@ resources:
     requests:
       cpu: "4"
       memory: 4Gi
-tag_specification:
-  name: 4.7-priv
-  namespace: ocp-private
 test_binary_build_commands: make test
 tests:
 - as: e2e-aws
@@ -54,6 +57,11 @@ tests:
           cpu: "2"
           memory: 4Gi
     workflow: ipi-aws
+- as: sanity
+  commands: make nightly-test
+  container:
+    from: oc-bin-image
+  cron: 0 */8 * * *
 zz_generated_metadata:
   branch: master
   org: openshift-priv
