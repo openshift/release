@@ -18,15 +18,6 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 mkdir -p "${HOME}"
 
-# Override the upstream docker.io registry due to issues with rate limiting
-# https://bugzilla.redhat.com/show_bug.cgi?id=1895107
-# sjenning: TODO: use of personal repo is temporary; should find long term location for these mirrored images
-export KUBE_TEST_REPO_LIST=${HOME}/repo_list.yaml
-cat <<EOF > ${KUBE_TEST_REPO_LIST}
-dockerLibraryRegistry: quay.io/sjenning
-dockerGluster: quay.io/sjenning
-EOF
-
 # if the cluster profile included an insights secret, install it to the cluster to
 # report support data from the support-operator
 if [[ -f "${CLUSTER_PROFILE_DIR}/insights-live.yaml" ]]; then
