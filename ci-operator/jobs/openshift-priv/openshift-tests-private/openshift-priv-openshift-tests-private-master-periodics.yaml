@@ -1,0 +1,55 @@
+periodics:
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 */8 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift-priv
+    path_alias: github.com/openshift/openshift-tests-private
+    repo: openshift-tests-private
+  hidden: true
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    job-release: "4.7"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-priv-openshift-tests-private-master-sanity
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --oauth-token-path=/usr/local/github-credentials/oauth
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --target=sanity
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/github-credentials
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: github-credentials-openshift-ci-robot-private-git-cloner
+      secret:
+        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
