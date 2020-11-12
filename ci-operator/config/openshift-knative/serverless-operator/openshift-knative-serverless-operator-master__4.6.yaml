@@ -129,7 +129,29 @@ tests:
     cluster_profile: aws
     test:
     - as: serverless-e2e
-      commands: make test-all-e2e
+      commands: make test-e2e test-upstream-e2e-no-upgrade
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
+      - env: OPENSHIFT_KNATIVE_OPERATOR
+        name: openshift-knative-operator
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws
+- as: upgrade-tests-aws-ocp-46-continuous
+  cron: 0 */12 * * 1-5
+  steps:
+    cluster_profile: aws
+    test:
+    - as: serverless-e2e
+      commands: make test-upgrade
       dependencies:
       - env: KNATIVE_OPENSHIFT_INGRESS
         name: knative-openshift-ingress
