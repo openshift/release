@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "4.5"
+    name: "4.6"
     namespace: ocp
     tag: base
 binary_build_commands: .ci/openshift-ci/build.sh
@@ -26,7 +26,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.5"
+  name: "4.6"
   namespace: ocp
 tests:
 - artifact_dir: /go/src/github.com/kata-containers/tests/_output/tests/openshift-e2e
@@ -44,7 +44,7 @@ tests:
         # TODO: Currently the oc binary isn't available in the test container,
         # so remove this when it is fixed in the multistage test machinery.
         if ! command -V oc; then
-          curl https://mirror.openshift.com/pub/openshift-v4/clients/ocp/4.5.0/openshift-client-linux.tar.gz | tar -C . -xzf -
+          curl https://mirror.openshift.com/pub/openshift-v4/clients/ocp/4.6.0/openshift-client-linux.tar.gz | tar -C . -xzf -
           mkdir -p ${LOCAL_SHARED_DIR}/bin
           cp -f oc kubectl ${LOCAL_SHARED_DIR}/bin
           export PATH="${PATH}:${LOCAL_SHARED_DIR}/bin"
@@ -61,6 +61,11 @@ tests:
         # left behind when the current container image was created, so the
         # test script is going to fail.
         [ -d "/go/src/github.com/openshift/origin" ] && rm -rf "/go/src/github.com/openshift/origin"
+        # To build the openshift-tests binary it is required Go 1.14.4 or greater.
+        curl -OL https://storage.googleapis.com/golang/go1.14.4.linux-amd64.tar.gz
+        tar -C $LOCAL_SHARED_DIR -xzf go1.14.4.linux-amd64.tar.gz
+        export PATH=${LOCAL_SHARED_DIR}/go/bin:$PATH
+        export GOROOT=${LOCAL_SHARED_DIR}/go
         # Overwrite the default tests directories otherwise it will use /var and
         # end up failing (read-only directory).
         export KATA_TESTS_BASEDIR="${KATA_WORKDIR}/_output/tests"
