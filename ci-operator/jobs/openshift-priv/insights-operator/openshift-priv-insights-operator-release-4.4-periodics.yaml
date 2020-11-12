@@ -25,8 +25,16 @@ periodics:
       - --report-username=ci
       - --secret-dir=/usr/local/insights-operator-e2e-tests-periodic-cluster-profile
       - --target=insights-operator-e2e-tests-periodic
+      - --template=/usr/local/insights-operator-e2e-tests-periodic
       command:
       - ci-operator
+      env:
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: JOB_NAME_SAFE
+        value: insights-operator-e2e-tests-periodic
+      - name: TEST_COMMAND
+        value: make test-e2e
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -42,6 +50,9 @@ periodics:
       - mountPath: /usr/local/github-credentials
         name: github-credentials-openshift-ci-robot-private-git-cloner
         readOnly: true
+      - mountPath: /usr/local/insights-operator-e2e-tests-periodic
+        name: job-definition
+        subPath: cluster-launch-installer-src.yaml
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
@@ -64,6 +75,9 @@ periodics:
     - name: github-credentials-openshift-ci-robot-private-git-cloner
       secret:
         secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - configMap:
+        name: prow-job-cluster-launch-installer-src
+      name: job-definition
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
