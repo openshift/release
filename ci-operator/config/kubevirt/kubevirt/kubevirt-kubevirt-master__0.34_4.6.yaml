@@ -9,10 +9,6 @@ build_root:
     namespace: openshift
     tag: golang-1.13
 canonical_go_repository: kubevirt.io/kubevirt
-images:
-- dockerfile_path: hack/ci/Dockerfile.ci
-  from: src
-  to: e2e-test
 resources:
   '*':
     limits:
@@ -30,9 +26,14 @@ tests:
   steps:
     cluster_profile: azure4
     test:
-    - as: azure
-      commands: /entrypoint.sh test_kubevirt_release '0.34'
-      from: e2e-test
+    - as: test
+      cli: latest
+      commands: |
+        export DOCKER_PREFIX='kubevirt'
+        export KUBEVIRT_TESTS_FOCUS='-ginkgo.focus=\[rfe_id:273\]\[crit:high\]'
+        export BIN_DIR="$(pwd)/_out" && mkdir -p "${BIN_DIR}"
+        ./hack/ci/entrypoint.sh test_kubevirt_release '0.34'
+      from: src
       resources:
         requests:
           cpu: 100m
