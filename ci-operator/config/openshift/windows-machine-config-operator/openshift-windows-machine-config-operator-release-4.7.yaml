@@ -4,6 +4,13 @@ build_root:
 images:
 - dockerfile_path: build/Dockerfile.ci
   to: windows-machine-config-operator-test
+operator:
+  bundles:
+  - context_dir: .
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: REPLACE_IMAGE
+    with: windows-machine-config-operator-test
 promotion:
   disabled: true
   name: "4.7"
@@ -34,27 +41,47 @@ tests:
 - as: aws-e2e-operator
   steps:
     cluster_profile: aws
+    env:
+      OO_CHANNEL: 0.0.0
+      OO_INSTALL_NAMESPACE: openshift-windows-machine-config-operator
+      OO_PACKAGE: windows-machine-config-operator
+      OO_TARGET_NAMESPACES: '!install'
     test:
     - ref: windows-e2e-operator-test
-    workflow: ipi-aws-ovn-hybrid
+    workflow: optional-operators-ci-aws-ovn-hybrid
 - as: azure-e2e-operator
   steps:
     cluster_profile: azure4
+    env:
+      OO_CHANNEL: 0.0.0
+      OO_INSTALL_NAMESPACE: openshift-windows-machine-config-operator
+      OO_PACKAGE: windows-machine-config-operator
+      OO_TARGET_NAMESPACES: '!install'
     test:
     - ref: windows-e2e-operator-test
-    workflow: ipi-azure-ovn-hybrid
+    workflow: optional-operators-ci-azure-ovn-hybrid
 - as: aws-e2e-operator-with-custom-vxlan-port
   steps:
     cluster_profile: aws
+    env:
+      OO_CHANNEL: 0.0.0
+      OO_INSTALL_NAMESPACE: openshift-windows-machine-config-operator
+      OO_PACKAGE: windows-machine-config-operator
+      OO_TARGET_NAMESPACES: '!install'
     test:
     - ref: windows-e2e-operator-test-with-custom-vxlan-port
-    workflow: ipi-aws-ovn-hybrid-custom-vxlan-port
+    workflow: optional-operators-ci-aws-ovn-hybrid-custom-vxlan-port
 - as: vsphere-e2e-operator
   steps:
     cluster_profile: vsphere
+    env:
+      OO_CHANNEL: 0.0.0
+      OO_INSTALL_NAMESPACE: openshift-windows-machine-config-operator
+      OO_PACKAGE: windows-machine-config-operator
+      OO_TARGET_NAMESPACES: '!install'
     test:
     - ref: windows-e2e-operator-test-with-custom-vxlan-port
-    workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
+    workflow: optional-operators-ci-vsphere-ovn-hybrid
 zz_generated_metadata:
   branch: release-4.7
   org: openshift
