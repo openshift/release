@@ -696,7 +696,7 @@ periodics:
         chmod ug+x $HOME/bin/oc $HOME/bin/jq
 
         # guard against starting if no okd stream exists yet
-        if ! oc get istag -n origin ${BRANCH}:${TAG}; then
+        if ! oc get istag -n ${TAG_NS} ${BRANCH}:${TAG}; then
           echo "No build possible, no image stream"
           exit 0
         fi
@@ -737,7 +737,7 @@ periodics:
         fi
 
         # compare the latest image we have built against the potential candidate
-        latest="$( oc get istag -n ${TAG_NS} ${BRANCH}:${TAG} -o jsonpath='{.metadata.annotations.release\.openshift\.io\/version} {.metadata.annotations.release\.openshift\.io\/id-artifacts} {.metadata.annotations.release\.openshift\.io\/id-machine-config-operator}' )"
+        latest="$( oc get istag -n ${TAG_NS} ${BRANCH}:${TAG} --template '{{ index .image.dockerImageMetadata.Config.Labels "version" }} {{ index .image.dockerImageMetadata.Config.Labels "id-artifacts" }} {{ index .image.dockerImageMetadata.Config.Labels "id-machine-config-operator-rpms" }}' )"
         candidate="${build_id} ${origin_artifacts_id} ${origin_machine_config_operator_id}"
         echo "Comparing existing '$latest' against latest '$candidate'"
         if [[ "${latest}" == "${candidate}" ]]; then
@@ -781,6 +781,17 @@ periodics:
             to:
               kind: ImageStreamTag
               name: pipeline:machine-os-content
+            imageLabels:
+              - name: "version"
+                value: "${build_id}"
+              - name: "id-artifacts"
+                value: "${origin_artifacts_id}"
+              - name: "id-machine-config-operator-rpms"
+                value: "${origin_machine_config_operator_id}"
+              - name: "io.openshift.build.versions"
+                value: "machine-os=${build_semver}"
+              - name: "io.openshift.build.version-display-names"
+                value: "machine-os=Fedora CoreOS"
           source:
             type: Git
             git:
@@ -798,11 +809,6 @@ periodics:
 
         # run promotion test
         ci-operator $@ --promote --namespace=${namespace}
-
-        # annotate promoted machine-os-content
-        oc annotate istag -n ${TAG_NS} ${BRANCH}:${TAG} "release.openshift.io/version=${build_id}" --overwrite
-        oc annotate istag -n ${TAG_NS} ${BRANCH}:${TAG} "release.openshift.io/id-artifacts=${origin_artifacts_id}" --overwrite
-        oc annotate istag -n ${TAG_NS} ${BRANCH}:${TAG} "release.openshift.io/id-machine-config-operator=${origin_machine_config_operator_id}" --overwrite
       env:
       - name: TAG_NS
         value: origin
@@ -822,6 +828,8 @@ periodics:
           promotion:
             name: "$(BRANCH)"
             namespace: origin
+            additional_images:
+              $(TAG): $(TAG)
           build_root:
             image_stream_tag:
               name: release
