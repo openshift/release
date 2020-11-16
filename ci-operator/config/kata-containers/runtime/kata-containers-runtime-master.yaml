@@ -66,6 +66,10 @@ tests:
         tar -C $LOCAL_SHARED_DIR -xzf go1.14.4.linux-amd64.tar.gz
         export PATH=${LOCAL_SHARED_DIR}/go/bin:$PATH
         export GOROOT=${LOCAL_SHARED_DIR}/go
+        sed -i 's/"4.5"/"4.6"/g' /go/src/github.com/kata-containers/runtime/versions.yaml
+        sed -i "s/filter_patterns=(/filter_patterns=(\n\t'\\\[NodeConformance\\\]'/" ./integration/openshift/e2e/gen_test_cases.sh
+        sed -i 's/set -o nounset//' ./integration/openshift/e2e/gen_test_cases.sh
+        ./integration/openshift/e2e/gen_test_cases.sh
         # Overwrite the default tests directories otherwise it will use /var and
         # end up failing (read-only directory).
         export KATA_TESTS_BASEDIR="${KATA_WORKDIR}/_output/tests"
