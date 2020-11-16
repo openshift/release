@@ -1,0 +1,31 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+promotion:
+  name: "4.7"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.7"
+  namespace: ocp
+tests:
+- as: e2e-aws
+  commands: TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer:
+    cluster_profile: aws
+- as: e2e-gitops-operator
+  commands: make test-e2e
+  openshift_installer_src:
+    cluster_profile: aws
+zz_generated_metadata:
+  branch: master
+  org: redhat-developer
+  repo: gitops-operator
