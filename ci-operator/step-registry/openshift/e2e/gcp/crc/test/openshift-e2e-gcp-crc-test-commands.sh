@@ -33,10 +33,11 @@ export PATH=/home/packer:$PATH
 mkdir -p /tmp/artifacts
 
 function run-tests() {
-  BUNDLE_VERSION=4.6.0-ci
+  export MIRROR="https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp-dev-preview/"
 
   export OPENSHIFT_PULL_SECRET_PATH="${HOME}"/pull-secret
-  export OPENSHIFT_VERSION="${BUNDLE_VERSION}"
+  export OPENSHIFT_VERSION="$(curl -L "${MIRROR}"/latest/release.txt | sed -n 's/^ *Version: *//p')"
+  BUNDLE_VERSION=${OPENSHIFT_VERSION}
 
   # clone the snc repo
   git clone https://github.com/code-ready/snc.git
