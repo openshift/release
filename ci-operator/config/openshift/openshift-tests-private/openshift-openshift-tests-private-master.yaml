@@ -57,10 +57,18 @@ tests:
           memory: 4Gi
     workflow: ipi-aws
 - as: sanity
-  commands: ARTIFACT_DIR=/tmp/artifacts  make nightly-test
-  container:
-    from: oc-bin-image
   cron: 0 */8 * * *
+  steps:
+    cluster_profile: aws
+    test:
+    - as: periodic-e2e-test
+      commands: make nightly-test
+      from: oc-bin-image
+      resources:
+        requests:
+          cpu: "2"
+          memory: 4Gi
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: openshift
