@@ -1,30 +1,17 @@
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.13
-promotion:
-  name: "4.7"
-  namespace: ocp
+  project_image:
+    dockerfile_path: openshift-ci/build-root/Dockerfile
 resources:
   '*':
-    limits:
-      memory: 4Gi
     requests:
-      cpu: 100m
-      memory: 200Mi
-tag_specification:
-  name: "4.7"
-  namespace: ocp
+      cpu: "2"
+      memory: 4Gi
 tests:
-- as: e2e-aws
-  commands: TEST_SUITE=openshift/conformance/parallel run-tests
-  openshift_installer:
-    cluster_profile: aws
-- as: e2e-gitops-operator
-  commands: make test-e2e
-  openshift_installer_src:
-    cluster_profile: aws
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: echo "Call unit test script"
+  container:
+    from: src
 zz_generated_metadata:
   branch: master
   org: redhat-developer
