@@ -33,10 +33,11 @@ export PATH=/home/packer:$PATH
 mkdir -p /tmp/artifacts
 
 function run-tests() {
-  BUNDLE_VERSION=4.6.0-ci
+  export MIRROR="https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp-dev-preview/"
 
   export OPENSHIFT_PULL_SECRET_PATH="${HOME}"/pull-secret
-  export OPENSHIFT_VERSION="${BUNDLE_VERSION}"
+  export OPENSHIFT_VERSION="$(curl -L "${MIRROR}"/latest/release.txt | sed -n 's/^ *Version: *//p')"
+  BUNDLE_VERSION=${OPENSHIFT_VERSION}
 
   # clone the snc repo
   git clone https://github.com/code-ready/snc.git
@@ -79,7 +80,7 @@ function run-tests() {
   # clone the crc repo
   git clone https://github.com/code-ready/crc.git
   pushd crc
-  make BUNDLE_VERSION="${BUNDLE_VERSION}" OC_VERSION=4.5.2 cross
+  make BUNDLE_VERSION="${BUNDLE_VERSION}" cross
   export PULL_SECRET_FILE=--pull-secret-file="${HOME}"/pull-secret
   export BUNDLE_LOCATION=--bundle-location="${HOME}"/snc/crc_libvirt_"${BUNDLE_VERSION}".crcbundle
   export CRC_BINARY=--crc-binary="${HOME}"/crc/out/linux-amd64
