@@ -22,6 +22,14 @@ build_root:
     namespace: openshift
     tag: golang-1.15
 images:
+- context_dir: images/template-deprecator/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/template-deprecator
+  to: template-deprecator
 - context_dir: images/blocking-issue-creator/
   from: os
   inputs:
@@ -137,6 +145,10 @@ images:
         source_path: /go/bin/ci-operator-config-mirror
       - destination_dir: .
         source_path: /go/bin/private-prow-configs-mirror
+      - destination_dir: .
+        source_path: /go/bin/template-deprecator
+      - destination_dir: .
+        source_path: /go/bin/determinize-prow-config
   to: auto-config-brancher
 - context_dir: images/autotestgridgenerator/
   from: os
@@ -389,22 +401,22 @@ resources:
 tests:
 - artifact_dir: /tmp/artifacts
   as: unit
-  commands: ARTIFACT_DIR=/tmp/artifacts make test TESTFLAGS='-count=25'
+  commands: make test TESTFLAGS='-count=25'
   container:
     from: src
 - artifact_dir: /tmp/artifacts
   as: codegen
-  commands: ARTIFACT_DIR=/tmp/artifacts make verify-gen
+  commands: make verify-gen
   container:
     from: src
 - artifact_dir: /tmp/artifacts
   as: format
-  commands: ARTIFACT_DIR=/tmp/artifacts make format
+  commands: make format
   container:
     from: src
 - artifact_dir: /tmp/artifacts
   as: integration
-  commands: ARTIFACT_DIR=/tmp/artifacts make integration
+  commands: make integration
   container:
     from: bin
 - as: e2e
@@ -432,12 +444,12 @@ tests:
           memory: 200Mi
 - artifact_dir: /tmp/artifacts
   as: breaking-changes
-  commands: ARTIFACT_DIR=/tmp/artifacts make check-breaking-changes
+  commands: make check-breaking-changes
   container:
     from: bin
 - artifact_dir: /tmp/artifacts
   as: validate-vendor
-  commands: ARTIFACT_DIR=/tmp/artifacts make validate-vendor
+  commands: make validate-vendor
   container:
     from: src
 zz_generated_metadata:

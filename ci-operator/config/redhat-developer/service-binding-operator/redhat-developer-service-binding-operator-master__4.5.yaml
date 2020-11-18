@@ -28,19 +28,43 @@ tests:
     mount_path: /usr/local/redhat-developer-service-binding-operator-codecov-token
     name: redhat-developer-service-binding-operator-codecov-token
 - as: acceptance
-  commands: VERBOSE=2 make -k test-acceptance test-acceptance-artifacts
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: VERBOSE=2 make -k test-acceptance test-acceptance-artifacts
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: dev-release
-  commands: make dev-release
   cron: 0 */6 * * *
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make dev-release
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: validate-release
-  commands: make validate-release
   cron: 0 */2 * * *
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make validate-release
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: redhat-developer

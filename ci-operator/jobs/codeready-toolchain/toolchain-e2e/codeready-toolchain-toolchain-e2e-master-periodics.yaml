@@ -22,16 +22,8 @@ periodics:
       - --report-username=ci
       - --secret-dir=/usr/local/perf-cluster-profile
       - --target=perf
-      - --template=/usr/local/perf
       command:
       - ci-operator
-      env:
-      - name: CLUSTER_TYPE
-        value: aws
-      - name: JOB_NAME_SAFE
-        value: perf
-      - name: TEST_COMMAND
-        value: ARTIFACT_DIR=${ARTIFACT_DIR} make test-perf
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -44,9 +36,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/perf-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/perf
-        name: job-definition
-        subPath: cluster-launch-installer-src.yaml
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
@@ -66,9 +55,6 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
-    - configMap:
-        name: prow-job-cluster-launch-installer-src
-      name: job-definition
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials

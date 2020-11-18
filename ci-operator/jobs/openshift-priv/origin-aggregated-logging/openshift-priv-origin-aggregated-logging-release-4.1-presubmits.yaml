@@ -26,17 +26,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/full-integ-aws-cluster-profile
         - --target=full-integ-aws
-        - --template=/usr/local/full-integ-aws
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: full-integ-aws
-        - name: TEST_COMMAND
-          value: |
-            . openshift/ci-operator/build-image/setup-logging-for-e2e.sh
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -52,9 +43,6 @@ presubmits:
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
-        - mountPath: /usr/local/full-integ-aws
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -77,9 +65,6 @@ presubmits:
       - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials

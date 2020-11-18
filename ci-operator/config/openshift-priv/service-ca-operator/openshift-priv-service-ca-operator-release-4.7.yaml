@@ -15,6 +15,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
   ocp_builder_rhel-8-golang-openshift-4.6:
     name: builder
     namespace: ocp
@@ -30,9 +34,9 @@ images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
   to: service-ca-operator
 promotion:
   disabled: true
@@ -48,11 +52,11 @@ tag_specification:
   namespace: ocp-private
 tests:
 - as: unit
-  commands: ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1 make test-unit
+  commands: JUNIT_REPORT=1 make test-unit
   container:
     from: src
 - as: verify
-  commands: ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1 make verify
+  commands: JUNIT_REPORT=1 make verify
   container:
     from: src
 - as: verify-deps
@@ -65,9 +69,17 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws
 - as: e2e-aws-operator
-  commands: make test-e2e
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: e2e-aws-upgrade
   commands: TEST_SUITE=all run-upgrade-tests
   openshift_installer:

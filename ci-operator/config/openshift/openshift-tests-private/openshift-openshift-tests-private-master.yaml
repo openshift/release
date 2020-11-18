@@ -3,7 +3,7 @@ base_images:
     name: "4.7"
     namespace: ocp
     tag: cli
-binary_build_commands: make build
+binary_build_commands: make all
 build_root:
   image_stream_tag:
     name: release
@@ -19,8 +19,14 @@ images:
         source_path: /usr/bin/oc
   to: oc-bin-image
 promotion:
-  name: "4.7"
+  name: ginkgo-test
   namespace: ocp
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.7"
 resources:
   '*':
     limits:
@@ -36,17 +42,31 @@ resources:
     requests:
       cpu: "4"
       memory: 4Gi
-tag_specification:
-  name: "4.7"
-  namespace: ocp
 test_binary_build_commands: make test
 tests:
+- as: title-check
+  commands: make name-check
+  container:
+    from: src
 - as: e2e-aws
   steps:
     cluster_profile: aws
     test:
     - as: e2e-test
       commands: ./bin/extended-platform-tests run openshift/conformance/parallel --run "High-24829"
+      from: oc-bin-image
+      resources:
+        requests:
+          cpu: "2"
+          memory: 4Gi
+    workflow: ipi-aws
+- as: sanity
+  cron: 0 */8 * * *
+  steps:
+    cluster_profile: aws
+    test:
+    - as: periodic-e2e-test
+      commands: make nightly-test
       from: oc-bin-image
       resources:
         requests:

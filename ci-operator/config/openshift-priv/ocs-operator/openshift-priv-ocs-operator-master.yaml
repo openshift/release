@@ -13,8 +13,10 @@ base_images:
     tag: "7"
 binary_build_commands: make build
 build_root:
-  project_image:
-    dockerfile_path: openshift-ci/Dockerfile.tools
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.15-openshift-4.6
 canonical_go_repository: github.com/openshift/ocs-operator
 images:
 - dockerfile_path: openshift-ci/Dockerfile.deploy
@@ -92,7 +94,7 @@ tests:
     from: src
 - as: ocs-operator-ci
   commands: |
-    make ocs-operator-ci
+    export GOFLAGS=''; make ocs-operator-ci
   container:
     from: src
 - as: ocs-operator-bundle-e2e-aws
@@ -106,7 +108,7 @@ tests:
     test:
     - as: tests
       commands: |
-        make functest
+        export GOFLAGS=''; make functest
       from: src
       resources:
         requests:
@@ -114,10 +116,18 @@ tests:
           memory: 200Mi
     workflow: optional-operators-ci-aws
 - as: red-hat-storage-ocs-ci-e2e-aws
-  commands: |
-    export REDHAT_OCS_CI_FORCE_TOOL_POD_INSTALL="true" && make cluster-deploy && make red-hat-storage-ocs-ci
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export REDHAT_OCS_CI_FORCE_TOOL_POD_INSTALL="true" && make cluster-deploy && make red-hat-storage-ocs-ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: openshift-priv
