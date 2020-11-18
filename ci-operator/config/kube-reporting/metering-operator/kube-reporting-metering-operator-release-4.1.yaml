@@ -55,15 +55,23 @@ tests:
   container:
     from: src
 - as: metering-e2e-aws
-  commands: |
-    set -x
-    # Increase the size of the machines so that there are machines large enough
-    # to run Presto, and the full metering stack.
-    kubectl -n openshift-machine-api get machinesets -o name | grep worker | cut -d/ -f2 | xargs -I{} kubectl -n openshift-machine-api scale machineset {} --replicas 3
-    TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/integration make integration
-    TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/e2e make e2e
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        set -x
+        # Increase the size of the machines so that there are machines large enough
+        # to run Presto, and the full metering stack.
+        kubectl -n openshift-machine-api get machinesets -o name | grep worker | cut -d/ -f2 | xargs -I{} kubectl -n openshift-machine-api scale machineset {} --replicas 3
+        TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/integration make integration
+        TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/e2e make e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-4.1
   org: kube-reporting

@@ -11,6 +11,72 @@ periodics:
     repo: odh-manifests
   labels:
     ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: "45"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-opendatahub-io-odh-manifests-master-45-odh-manifests-e2e-nightly-45
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/usr/local/odh-manifests-e2e-nightly-45-cluster-profile
+      - --target=odh-manifests-e2e-nightly-45
+      - --variant=45
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/odh-manifests-e2e-nightly-45-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-gcp
+        - configMap:
+            name: cluster-profile-gcp
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: api.ci
+  cron: 30 0 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: opendatahub-io
+    repo: odh-manifests
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-opendatahub-io-odh-manifests-master-odh-manifests-e2e-nightly
   spec:

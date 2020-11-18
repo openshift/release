@@ -135,6 +135,7 @@ objects:
         }
 
         lease_type="${CLUSTER_TYPE}-quota-slice"
+        job_resources_path="/etc/openshift-installer/job_resources.json"
 
         echo "[INFO] Acquiring a lease ..."
         resource="$( boskosctl --server-url ${LEASE_SERVER} --username ${LEASE_SERVER_USERNAME} --password-file /etc/boskos/password --owner-name "${CLUSTER_NAME}" acquire --type "${lease_type}" --state "free" --target-state "leased" --timeout 150m )"
@@ -154,18 +155,16 @@ objects:
           heartbeats_conformance_pid=$!
         fi
 
-        ovirt_engine_template_name="$(extract_leases_info ovirt_engine_template_name ${lease_path})"
         if [ "${LEASE_TYPE}" == "conformance" ]; then
-          worker_cpu="8"
-          worker_mem="16384"
-          master_cpu="8"
-          master_mem="16384"
+          worker_cpu="$(extract_leases_info conformance_worker_cpu ${job_resources_path})"
+          worker_mem="$(extract_leases_info conformance_worker_mem ${job_resources_path})"
+          master_cpu="$(extract_leases_info conformance_master_cpu ${job_resources_path})"
+          master_mem="$(extract_leases_info conformance_master_mem ${job_resources_path})"
         else
-          worker_cpu="4"
-          worker_mem="9000"
-          master_cpu="4"
-          master_mem="9000"
-          ovirt_engine_template_name="${ovirt_engine_template_name}-8G"
+          worker_cpu="$(extract_leases_info minimal_worker_cpu ${job_resources_path})"
+          worker_mem="$(extract_leases_info minimal_worker_mem ${job_resources_path})"
+          master_cpu="$(extract_leases_info minimal_master_cpu ${job_resources_path})"
+          master_mem="$(extract_leases_info minimal_master_mem ${job_resources_path})"
         fi
 
         #Saving parameters for the env
@@ -179,7 +178,6 @@ objects:
         MASTER_MEM="${master_mem}"
         OCP_CLUSTER="$(extract_leases_info cluster_name ${lease_path})"
         OVIRT_ENGINE_NETWORK="$(extract_leases_info ovirt_network_name ${lease_path})"
-        OVIRT_ENGINE_TEMPLATE_NAME="${ovirt_engine_template_name}"
         EOF
 
         touch /tmp/shared/leased

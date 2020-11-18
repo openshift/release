@@ -22,16 +22,8 @@ periodics:
       - --report-username=ci
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --target=e2e-aws
-      - --template=/usr/local/e2e-aws
       command:
       - ci-operator
-      env:
-      - name: CLUSTER_TYPE
-        value: aws
-      - name: JOB_NAME_SAFE
-        value: e2e-aws
-      - name: TEST_COMMAND
-        value: cd features && source hack/test_env.sh && make deploy && make functests
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -44,9 +36,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-aws-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/e2e-aws
-        name: job-definition
-        subPath: cluster-launch-installer-src.yaml
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
@@ -66,9 +55,6 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
-    - configMap:
-        name: prow-job-cluster-launch-installer-src
-      name: job-definition
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials

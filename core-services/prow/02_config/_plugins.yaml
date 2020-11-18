@@ -192,6 +192,10 @@ approve:
   require_self_approval: true
 - commandHelpLink: https://go.k8s.io/bot-commands
   repos:
+  - jianzhangbjz/learn-operator
+  require_self_approval: true
+- commandHelpLink: https://go.k8s.io/bot-commands
+  repos:
   - openshift-priv/csi-driver-nfs
   - openshift/csi-driver-nfs
   require_self_approval: false
@@ -240,8 +244,7 @@ approve:
   require_self_approval: false
 - commandHelpLink: https://go.k8s.io/bot-commands
   repos:
-  - devfile/devworkspace-operator
-  - devfile/integration-tests
+  - devfile
   require_self_approval: false
 - commandHelpLink: https://go.k8s.io/bot-commands
   repos:
@@ -251,6 +254,7 @@ approve:
 - commandHelpLink: https://go.k8s.io/bot-commands
   repos:
   - code-ready/snc
+  - openshift-priv/egress-router-cni
   - openshift/egress-router-cni
   require_self_approval: false
 - commandHelpLink: https://go.k8s.io/bot-commands
@@ -342,6 +346,15 @@ approve:
   - openshift-priv/gcp-pd-csi-driver
   - openshift/gcp-pd-csi-driver
   require_self_approval: false
+- commandHelpLink: ""
+  repos:
+  - openshift-priv/egress-router-cni
+  - openshift/egress-router-cni
+  require_self_approval: false
+- commandHelpLink: ""
+  repos:
+  - app-sre/deployment-validation-operator
+  require_self_approval: false
 blunderbuss:
   max_request_count: 2
   request_count: 2
@@ -370,6 +383,8 @@ bugzilla:
       - status: ASSIGNED
       - status: ON_DEV
       - status: POST
+    community-4.6:
+      validate_by_default: false
     fcos:
       validate_by_default: false
     master:
@@ -544,9 +559,6 @@ bugzilla:
               target_release: OCS 4.5.0
               validate_by_default: true
             release-4.6:
-              dependent_bug_states: []
-              dependent_bug_target_releases: []
-              exclude_defaults: true
               target_release: OCS 4.6.0
               validate_by_default: true
         openshift-tests:
@@ -605,9 +617,6 @@ bugzilla:
               target_release: OCS 4.5.0
               validate_by_default: true
             release-4.6:
-              dependent_bug_states: []
-              dependent_bug_target_releases: []
-              exclude_defaults: true
               target_release: OCS 4.6.0
               validate_by_default: true
         openshift-tests:
@@ -807,6 +816,11 @@ config_updater:
         - ci
       name: ci-operator-misc-configs
     ci-operator/config/**/tektoncd-pipeline-operator/openshift-tektoncd-pipeline-operator-v*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      name: ci-operator-misc-configs
+    ci-operator/config/**/windows-machine-config-operator/*-community-*.yaml:
       clusters:
         app.ci:
         - ci
@@ -1198,6 +1212,14 @@ config_updater:
         - ci
       gzip: true
       name: job-config-misc
+    ci-operator/jobs/**/windows-machine-config-operator/*-community-*.yaml:
+      clusters:
+        api.ci:
+        - ci
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
     ci-operator/jobs/eclipse/che-operator/*-7*.yaml:
       clusters:
         api.ci:
@@ -1399,19 +1421,6 @@ config_updater:
         vsphere:
         - ci
       name: prow-job-endurance-test
-    ci-operator/templates/openshift/installer/cluster-launch-installer-console.yaml:
-      clusters:
-        api.ci:
-        - ci
-        app.ci:
-        - ci
-        build01:
-        - ci
-        build02:
-        - ci
-        vsphere:
-        - ci
-      name: prow-job-cluster-launch-installer-console
     ci-operator/templates/openshift/installer/cluster-launch-installer-custom-test-image.yaml:
       clusters:
         api.ci:
@@ -1984,6 +1993,20 @@ external_plugins:
     events:
     - pull_request
     name: needs-rebase
+  app-sre/deployment-validation-operator:
+  - endpoint: http://refresh
+    events:
+    - issue_comment
+    name: refresh
+  - endpoint: http://cherrypick
+    events:
+    - issue_comment
+    - pull_request
+    name: cherrypick
+  - endpoint: http://needs-rebase
+    events:
+    - pull_request
+    name: needs-rebase
   che-incubator/che-test-harness:
   - endpoint: http://refresh
     events:
@@ -2193,21 +2216,7 @@ external_plugins:
     events:
     - pull_request
     name: needs-rebase
-  devfile/devworkspace-operator:
-  - endpoint: http://refresh
-    events:
-    - issue_comment
-    name: refresh
-  - endpoint: http://cherrypick
-    events:
-    - issue_comment
-    - pull_request
-    name: cherrypick
-  - endpoint: http://needs-rebase
-    events:
-    - pull_request
-    name: needs-rebase
-  devfile/integration-tests:
+  devfile:
   - endpoint: http://refresh
     events:
     - issue_comment
@@ -2371,6 +2380,20 @@ external_plugins:
     - pull_request
     name: needs-rebase
   integr8ly/workload-web-app:
+  - endpoint: http://refresh
+    events:
+    - issue_comment
+    name: refresh
+  - endpoint: http://cherrypick
+    events:
+    - issue_comment
+    - pull_request
+    name: cherrypick
+  - endpoint: http://needs-rebase
+    events:
+    - pull_request
+    name: needs-rebase
+  jianzhangbjz/learn-operator:
   - endpoint: http://refresh
     events:
     - issue_comment
@@ -2832,6 +2855,7 @@ label:
   - px-approved
   - docs-approved
   - qe-approved
+  - downstream-change-needed
 lgtm:
 - repos:
   - opendatahub-io/manifests
@@ -2883,6 +2907,9 @@ lgtm:
   - openshift/openshift-tests-private
   review_acts_as_lgtm: true
 - repos:
+  - jianzhangbjz/learn-operator
+  review_acts_as_lgtm: true
+- repos:
   - openshift-priv/csi-driver-nfs
   - openshift/csi-driver-nfs
   review_acts_as_lgtm: true
@@ -2920,7 +2947,7 @@ lgtm:
   - eclipse/che-operator
   review_acts_as_lgtm: true
 - repos:
-  - devfile/devworkspace-operator
+  - devfile
   review_acts_as_lgtm: true
 - repos:
   - code-ready/crc
@@ -2928,6 +2955,7 @@ lgtm:
   review_acts_as_lgtm: true
 - repos:
   - code-ready/snc
+  - openshift-priv/egress-router-cni
   - openshift/egress-router-cni
   review_acts_as_lgtm: true
 - repos:
@@ -2988,6 +3016,13 @@ lgtm:
   - openshift-priv/gcp-pd-csi-driver
   - openshift/gcp-pd-csi-driver
   review_acts_as_lgtm: true
+- repos:
+  - openshift-priv/egress-router-cni
+  - openshift/egress-router-cni
+  review_acts_as_lgtm: true
+- repos:
+  - app-sre/deployment-validation-operator
+  review_acts_as_lgtm: true
 override:
   allow_top_level_owners: true
 owners:
@@ -3017,6 +3052,33 @@ plugins:
   - goose
   - help
   - hold
+  - label
+  - lgtm
+  - lifecycle
+  - override
+  - pony
+  - retitle
+  - shrug
+  - sigmention
+  - skip
+  - trigger
+  - verify-owners
+  - owners-label
+  - wip
+  - yuks
+  - approve
+  app-sre/deployment-validation-operator:
+  - assign
+  - blunderbuss
+  - bugzilla
+  - cat
+  - dog
+  - heart
+  - golint
+  - goose
+  - help
+  - hold
+  - jira
   - label
   - lgtm
   - lifecycle
@@ -3476,7 +3538,7 @@ plugins:
   - verify-owners
   - wip
   - yuks
-  devfile/devworkspace-operator:
+  devfile:
   - assign
   - blunderbuss
   - bugzilla
@@ -3487,33 +3549,6 @@ plugins:
   - goose
   - help
   - hold
-  - label
-  - lgtm
-  - lifecycle
-  - override
-  - pony
-  - retitle
-  - shrug
-  - sigmention
-  - skip
-  - trigger
-  - verify-owners
-  - owners-label
-  - wip
-  - yuks
-  - approve
-  devfile/integration-tests:
-  - assign
-  - blunderbuss
-  - bugzilla
-  - cat
-  - dog
-  - heart
-  - golint
-  - goose
-  - help
-  - hold
-  - jira
   - label
   - lgtm
   - lifecycle
@@ -3788,6 +3823,27 @@ plugins:
   - wip
   - yuks
   - approve
+  jianzhangbjz/learn-operator:
+  - assign
+  - blunderbuss
+  - cat
+  - dog
+  - heart
+  - golint
+  - help
+  - hold
+  - label
+  - lgtm
+  - lifecycle
+  - override
+  - shrug
+  - sigmention
+  - skip
+  - trigger
+  - verify-owners
+  - wip
+  - yuks
+  - approve
   kata-containers/runtime:
   - assign
   - blunderbuss
@@ -3875,8 +3931,7 @@ plugins:
   - trigger
   kubevirt/hyperconverged-cluster-operator:
   - trigger
-  kubevirt/kubevirt:
-  - trigger
+  kubevirt/kubevirt: null
   kubevirt/kubevirt-ssp-operator:
   - trigger
   kubevirt/must-gather:
@@ -4362,6 +4417,8 @@ plugins:
   openshift-priv/csi-operator:
   - approve
   openshift-priv/debug-network:
+  - approve
+  openshift-priv/egress-router-cni:
   - approve
   openshift-priv/elasticsearch-operator:
   - approve

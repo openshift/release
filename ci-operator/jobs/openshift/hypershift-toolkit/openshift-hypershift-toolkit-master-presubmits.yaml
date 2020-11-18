@@ -70,16 +70,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/kube-conformance-aws-cluster-profile
         - --target=kube-conformance-aws
-        - --template=/usr/local/kube-conformance-aws
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: kube-conformance-aws
-        - name: TEST_COMMAND
-          value: contrib/hack/e2e-kube-conformance.sh
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -92,9 +84,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/kube-conformance-aws-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/kube-conformance-aws
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -114,9 +103,6 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials

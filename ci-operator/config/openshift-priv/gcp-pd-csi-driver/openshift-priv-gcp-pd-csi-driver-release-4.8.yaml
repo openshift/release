@@ -1,9 +1,26 @@
+base_images:
+  base:
+    name: 4.8-priv
+    namespace: ocp-private
+    tag: base
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.15
 canonical_go_repository: sigs.k8s.io/gcp-compute-persistent-disk-csi-driver
+images:
+- dockerfile_path: Dockerfile.openshift
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
+  to: gcp-pd-csi-driver
 promotion:
   name: 4.8-priv
   namespace: ocp-private

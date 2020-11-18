@@ -14,13 +14,23 @@ release_definition_path = 'core-services/release-controller/_releases'
 job_definitions_path = 'ci-operator/jobs/openshift/release'
 
 
+def raise_on_duplicates(ordered_pairs):
+    d = {}
+    for k, v in ordered_pairs:
+        if k in d:
+            raise ValueError("Duplicate key: %r for value: %r" % (k, v))
+        else:
+            d[k] = v
+    return d
+
+
 def read_release_definitions(path):
     definitions = {}
     with os.scandir(path) as entries:
         for entry in entries:
             if entry.is_file():
                 with open(entry, 'r') as release:
-                    definitions.update({entry.name: json.load(release)})
+                    definitions.update({entry.name: json.load(release, object_pairs_hook=raise_on_duplicates)})
     return definitions
 
 

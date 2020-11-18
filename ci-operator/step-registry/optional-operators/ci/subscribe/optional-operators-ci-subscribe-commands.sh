@@ -37,7 +37,7 @@ else
     echo "OO_INSTALL_NAMESPACE is '$OO_INSTALL_NAMESPACE'"
 fi
 
-if [[ -n $NS_NAMESTANZA ]]; then
+if [[ -n "${NS_NAMESTANZA:-}" ]]; then
     OO_INSTALL_NAMESPACE=$(
         oc create -f - -o jsonpath='{.metadata.name}' <<EOF
 apiVersion: v1

@@ -35,7 +35,7 @@ presubmits:
         - name: JOB_NAME_SAFE
           value: cluster-logging-operator-e2e
         - name: TEST_COMMAND
-          value: FAKE_HOME_DIR=/tmp/home LOG_DIR=/tmp/artifacts/logging-logs ARTIFACT_DIR=/tmp/artifacts/logging-artifacts make test-e2e-olm
+          value: FAKE_HOME_DIR=/tmp/home LOG_DIR=/tmp/artifacts/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts make test-e2e-olm
         - name: TEST_IMAGESTREAM_TAG
           value: stable:cluster-logging-operator-e2e
         image: ci-operator:latest
@@ -114,16 +114,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-operator-cluster-profile
         - --target=e2e-operator
-        - --template=/usr/local/e2e-operator
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: e2e-operator
-        - name: TEST_COMMAND
-          value: make test-e2e-olm
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -139,9 +131,6 @@ presubmits:
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
-        - mountPath: /usr/local/e2e-operator
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -164,9 +153,6 @@ presubmits:
       - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -200,16 +186,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-upgrade-44-45-cluster-profile
         - --target=e2e-upgrade-44-45
-        - --template=/usr/local/e2e-upgrade-44-45
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: e2e-upgrade-44-45
-        - name: TEST_COMMAND
-          value: hack/testing-olm-upgrade/test-020-olm-upgrade-4.4-4.5.sh
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -225,9 +203,6 @@ presubmits:
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
-        - mountPath: /usr/local/e2e-upgrade-44-45
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -250,9 +225,6 @@ presubmits:
       - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials

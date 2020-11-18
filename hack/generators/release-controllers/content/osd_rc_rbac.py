@@ -1,6 +1,10 @@
 def add_osd_rc_service_account_resources(gendoc):
     config = gendoc.context
-    sa_annotations = {}
+    sa_annotations = {
+        'serviceaccounts.openshift.io/oauth-redirecturi.ocp-priv-ingress': 'https://amd64.ocp.internal.releases.ci.openshift.org',
+        'serviceaccounts.openshift.io/oauth-redirecturi.ocp-ppc64le-priv-ingress': 'https://ppc64le.ocp.internal.releases.ci.openshift.org',
+        'serviceaccounts.openshift.io/oauth-redirecturi.ocp-s390x-priv-ingress': 'https://s390x.ocp.internal.releases.ci.openshift.org',
+    }
     for arch in config.arches:
         arch_priv_suffix = config.get_suffix(arch, private=True)
         sa_annotations[

@@ -23,16 +23,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-aws-ansible-cluster-profile
         - --target=e2e-aws-ansible
-        - --template=/usr/local/e2e-aws-ansible
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: e2e-aws-ansible
-        - name: TEST_COMMAND
-          value: make test/e2e/ansible2
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -45,9 +37,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-aws-ansible-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-aws-ansible
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -67,9 +56,6 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials

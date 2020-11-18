@@ -38,7 +38,7 @@ resources:
       cpu: 100m
       memory: 250Mi
 tag_specification:
-  name: "4.5"
+  name: "4.6"
   namespace: ocp
 tests:
 - as: build
@@ -50,14 +50,30 @@ tests:
   container:
     from: src
 - as: e2e
-  commands: make test-e2e
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: perf
-  commands: ARTIFACT_DIR=${ARTIFACT_DIR} make test-perf
   cron: 0 0 ? * *
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: ARTIFACT_DIR=${ARTIFACT_DIR} make test-perf
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: codeready-toolchain
