@@ -45,9 +45,6 @@ set +e
 # Test upgrade for workflows that requested it
 if [[ "$RUN_UPGRADE_TEST" == true ]]; then
     echo "### Running Upgrade tests"
-    # In case of a timeout we don't get the trace log of this script
-    # Let's verify that the we started the upgrade process
-    touch "${ARTIFACT_DIR}/upgrade_started"
     timeout \
     --kill-after 10m \
     120m \
