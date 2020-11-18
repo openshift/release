@@ -27,6 +27,26 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: e2e-z-upi
+  cron: '@yearly'
+  steps:
+    env:
+      http_proxy: http://204.90.115.167:8080
+      https_proxy: http://204.90.115.167:8080
+    test:
+    - as: test-proxy
+      commands: |
+        curl -v --insecure https://api.test.rhcert.linux.dfw.ibm.com
+      env:
+      - documentation: proxy to the Z environment
+        name: http_proxy
+      - documentation: proxy to the Z environment
+        name: https_proxy
+      from: base
+      resources:
+        requests:
+          cpu: 10m
+          memory: 10Mi
 - as: e2e-metal-ipi
   cron: 0 0 1 1 *
   steps:
