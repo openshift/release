@@ -56,7 +56,7 @@ def main():
                 failed = True
                 continue
             with open(path) as f:
-                data = yaml.load(f)
+                data = yaml.load(f, Loader=yaml.SafeLoader)
             if not validate(CONTENT_CHECKS, path, data):
                 failed = True
 
