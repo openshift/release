@@ -6,22 +6,30 @@ set -o pipefail
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
-KUBEVIRT_BASE_DOMAIN="testci.tenant1.dev.openshift.com"
-KUBEVIRT_API_VIP=10.123.124.15
-KUBEVIRT_INGRESS_VIP=10.123.124.20
+KUBEVIRT_BASE_DOMAIN="ci.ocpcnv.ovirt.org"
+KUBEVIRT_API_VIP=10.123.124.10
+KUBEVIRT_INGRESS_VIP=10.123.124.11
 KUBEVIRT_CIDR="10.123.124.0/24"
-KUBEVIRT_NAMESPACE=tenantcluster
+CLUSTER_NETWORK_CIDR="10.128.0.0/14"
+KUBEVIRT_NAMESPACE=ipi-ci
+KUBEVIRT_TENANT_CLUSTER_NAME=t1
 KUBEVIRT_NETWORK_NAME=mynet
-KUBEVIRT_TENANT_STORAGE_CLASS_NAME=standard
 KUBEVIRT_VOLUME_ACCESS_MODE=ReadWriteOnce
 
 cat >> "${CONFIG}" << EOF
+apiVersion: v1
 baseDomain: ${KUBEVIRT_BASE_DOMAIN}
 metadata:
-  name: ${KUBEVIRT_NAMESPACE}
+  name: ${KUBEVIRT_TENANT_CLUSTER_NAME}
 networking:
+  clusterNetwork:
+  - cidr: ${CLUSTER_NETWORK_CIDR}
+    hostPrefix: 23
   machineNetwork:
   - cidr: ${KUBEVIRT_CIDR}
+  networkType: OpenShiftSDN
+  serviceNetwork:
+  - 172.30.0.0/16
 platform:
   kubevirt:
     # TODO this section is WIP - see the installer PR
@@ -29,6 +37,7 @@ platform:
     apiVIP: ${KUBEVIRT_API_VIP}
     namespace: ${KUBEVIRT_NAMESPACE}
     networkName: ${KUBEVIRT_NETWORK_NAME}
-    storageClass: ${KUBEVIRT_TENANT_STORAGE_CLASS_NAME}
     persistentVolumeAccessMode: ${KUBEVIRT_VOLUME_ACCESS_MODE}
 EOF
+cat "${CONFIG}"
+echo "**************"
