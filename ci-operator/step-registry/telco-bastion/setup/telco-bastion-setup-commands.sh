@@ -9,9 +9,12 @@ echo "************ telco-bastion setup command ************"
 # TODO: Remove once OpenShift CI will be upgraded to 4.2 (see https://access.redhat.com/articles/4859371)
 ~/fix_uid.sh
 
+# Workaround 777 perms on secret ssh password file
+SSH_PASS=$(cat /var/run/ssh-pass/password)
+
 cat << EOF > ~/inventory
 [all]
-sshd.bastion-telco ansible_ssh_user=tester ansible_ssh_common_args="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" ansible_ssh_private_key_file=/var/run/ssh-pass
+sshd.bastion-telco ansible_ssh_user=tester ansible_ssh_common_args="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" ansible_password=$SSH_PASS
 EOF
 
 cat << EOF > ~/ocp-install.yml
@@ -21,7 +24,7 @@ cat << EOF > ~/ocp-install.yml
   tasks:
   - name: Clone repo
     git:
-      repo: https://github.com/karamb/kcli-openshift4-baremetal.git
+      repo: https://github.com/karmab/kcli-openshift4-baremetal.git
       dest: "~/kcli-openshift4-baremetal"
       version: master
       force: yes
@@ -29,13 +32,12 @@ cat << EOF > ~/ocp-install.yml
   - name: Remove last run
     shell: kcli delete plan --yes upstream_ci
   - name: Run deployment
-    shell: kcli create plan --paramfile /home/tester/kcli_parameters.yml upstream_ci --wait
+    shell: timeout 2h kcli create plan --paramfile /home/tester/kcli_parameters.yml upstream_ci --wait
     args:
       chdir: ~/kcli-openshift4-baremetal
   - name: Run playbook to copy kubeconfig from installer vm to bastion vm
     shell: ansible-playbook -i /home/tester/inventory /home/tester/kubeconfig.yml
 EOF
-
 cat << EOF > ~/fetch-kubeconfig.yml
 ---
 - name: Fetch kubeconfig for cluster
@@ -49,7 +51,7 @@ cat << EOF > ~/fetch-kubeconfig.yml
   - name: Modify local copy of kubeconfig
     lineinfile:
       path: $SHARED_DIR/kubeconfig
-      regexp: '    server:'
+      regexp: '    server: https://127.0.0.1:6443'
       line: "    server: https://sshd.bastion-telco:6443"
     delegate_to: localhost
 EOF
