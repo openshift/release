@@ -38,6 +38,13 @@ images:
       as:
       - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
   to: helm-operator
+- dockerfile_path: release/sdk/Dockerfile
+  from: os-minimal
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
+  to: operator-sdk
 - dockerfile_path: ci/dockerfiles/ansible-e2e.Dockerfile
   from: ansible-operator
   inputs:
@@ -83,6 +90,12 @@ tests:
     from: src
 - as: sanity
   commands: |
+    echo "Debug statements"
+    pwd
+    id
+    echo "setting environment"
+    export GOCACHE=/tmp
+    echo "running make test-sanity"
     make test-sanity
   container:
     from: src
