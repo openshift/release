@@ -34,11 +34,13 @@ echo "*****3"
 dir=/tmp/installer
 mkdir "${dir}/"
 cp "${SHARED_DIR}/install-config.yaml" "${dir}/"
-cp "${SHARED_DIR}/kubeconfig_file" "${dir}/"
+cat ${dir}/install-config.yaml
+#cp "${SHARED_DIR}/kubeconfig_file" "${dir}/"
 
 echo "*****4"
-#export KUBECONFIG="${dir}/kubeconfig_file"
 KUBECONFIG=/tmp/secrets/kubeconfig-infra-cluster
+cat /tmp/secrets/kubeconfig-infra-cluster
+#export KUBECONFIG="${dir}/kubeconfig_file"
 
 echo "*****5"
 # move private key to ~/.ssh/ so that installer can use it to gather logs on
