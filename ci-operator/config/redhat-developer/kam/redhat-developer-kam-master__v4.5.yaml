@@ -32,9 +32,17 @@ tests:
     - as: integration-e2e-steps
       commands: scripts/openshiftci-presubmit-all-tests.sh
       credentials:
-      - mount_path: /var/run/kam-data
-        name: kam-user-secret
+      - mount_path: /var/run/kam-data/user-secret
+        name: kam-github-secret
         namespace: test-credentials
+      - mount_path: /var/run/kam-data/docker-conf
+        name: kam-quay-docker-conf-secret
+        namespace: test-credentials
+      env:
+      - default: /var/run/kam-data/user-secret/secret.txt
+        name: KAM_GITHUB_TOKEN
+      - default: /var/run/kam-data/docker-conf/kam-bot-kambot-auth.json
+        name: KAM_QUAY_DOCKER_CONF_SECRET
       from: oc-bin-image
       resources:
         requests:
