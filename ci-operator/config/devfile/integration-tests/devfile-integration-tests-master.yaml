@@ -1,8 +1,4 @@
-base_images:
-  cli:
-    name: "4.5"
-    namespace: ocp
-    tag: cli
+binary_build_commands: make bin
 build_root:
   image_stream_tag:
     name: release
@@ -10,26 +6,15 @@ build_root:
     tag: golang-1.13
 resources:
   '*':
-    limits:
-      memory: 4Gi
     requests:
-      cpu: 100m
-      memory: 200Mi
-tag_specification:
-  name: "4.5"
-  namespace: ocp
+      cpu: "2"
+      memory: 4Gi
 tests:
-- as: e2e-devfile
-  steps:
-    cluster_profile: aws
-    test:
-    - as: e2e-devfile
-      commands: echo Success
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: echo Success
+  container:
+    from: src
 zz_generated_metadata:
   branch: master
   org: devfile
