@@ -1,26 +1,29 @@
-postsubmits:
-  kube-reporting/hadoop:
+presubmits:
+  openshift-priv/kubernetes:
   - agent: kubernetes
+    always_run: true
     branches:
-    - ^release-4\.3$
+    - oc-4.7-kubernetes-1.20.0-beta.2
     cluster: build02
+    context: ci/prow/unit
     decorate: true
     decoration_config:
       skip_cloning: true
+    hidden: true
     labels:
-      ci-operator.openshift.io/is-promotion: "true"
       ci-operator.openshift.io/prowgen-controlled: "true"
-    max_concurrency: 1
-    name: branch-ci-kube-reporting-hadoop-release-4.3-images
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-kubernetes-oc-4.7-kubernetes-1.20.0-beta.2-unit
+    path_alias: github.com/openshift/kubernetes
+    rerun_command: /test unit
     spec:
       containers:
       - args:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
-        - --promote
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --target=[images]
+        - --target=unit
         command:
         - ci-operator
         image: ci-operator:latest
@@ -30,23 +33,24 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
-          readOnly: true
-        - mountPath: /etc/push-secret
-          name: push-secret
           readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
-      - name: push-secret
-        secret:
-          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )unit,?($|\s.*)

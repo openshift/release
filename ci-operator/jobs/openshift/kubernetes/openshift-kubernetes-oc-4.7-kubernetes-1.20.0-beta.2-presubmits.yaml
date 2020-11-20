@@ -1,26 +1,26 @@
-postsubmits:
-  kube-reporting/metering-operator:
+presubmits:
+  openshift/kubernetes:
   - agent: kubernetes
+    always_run: true
     branches:
-    - ^release-4\.2$
-    cluster: build02
+    - oc-4.7-kubernetes-1.20.0-beta.2
+    cluster: build01
+    context: ci/prow/unit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/is-promotion: "true"
       ci-operator.openshift.io/prowgen-controlled: "true"
-    max_concurrency: 1
-    name: branch-ci-kube-reporting-metering-operator-release-4.2-images
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-kubernetes-oc-4.7-kubernetes-1.20.0-beta.2-unit
+    rerun_command: /test unit
     spec:
       containers:
       - args:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
-        - --promote
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --target=[images]
+        - --target=unit
         command:
         - ci-operator
         image: ci-operator:latest
@@ -33,9 +33,6 @@ postsubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
-        - mountPath: /etc/push-secret
-          name: push-secret
-          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
@@ -44,9 +41,7 @@ postsubmits:
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
-      - name: push-secret
-        secret:
-          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )unit,?($|\s.*)
