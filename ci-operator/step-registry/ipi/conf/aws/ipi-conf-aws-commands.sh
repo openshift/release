@@ -8,6 +8,12 @@ CONFIG="${SHARED_DIR}/install-config.yaml"
 
 expiration_date=$(date -d '4 hours' --iso=minutes --utc)
 
+if [ -z ${INSTANCE_TYPE+x} ]; then
+  instance_type="m4.large"
+else
+  instance_type="${INSTANCE_TYPE}"
+fi
+
 case "$((RANDOM % 4))" in
 0) aws_region=us-east-1
    zone_1=us-east-1b
@@ -32,6 +38,7 @@ compute:
 - name: worker
   platform:
     aws:
+      type: ${instance_type}
       zones:
       - ${zone_1:-${aws_region}a}
       - ${zone_2:-${aws_region}b}
