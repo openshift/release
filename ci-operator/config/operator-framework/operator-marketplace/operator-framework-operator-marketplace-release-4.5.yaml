@@ -57,10 +57,17 @@ tests:
     workflow: ipi-aws
 - artifact_dir: /tmp/artifacts
   as: e2e-aws-console-olm
-  commands: ./test-prow-e2e.sh olmFull
-  openshift_installer_custom_test_image:
+  steps:
     cluster_profile: aws
-    from: stable:console-tests
+    test:
+    - as: test
+      cli: latest
+      commands: ./test-prow-e2e.sh olmFull
+      from: stable:console-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: e2e-aws-upgrade
   commands: TEST_SUITE=all run-upgrade-tests
   openshift_installer:
