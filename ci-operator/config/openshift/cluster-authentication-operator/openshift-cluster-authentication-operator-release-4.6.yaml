@@ -82,10 +82,17 @@ tests:
     workflow: openshift-upgrade-gcp-loki
 - artifact_dir: /tmp/artifacts
   as: e2e-console-login
-  commands: ./test-prow-e2e.sh login
-  openshift_installer_custom_test_image:
+  steps:
     cluster_profile: gcp
-    from: stable:console-tests
+    test:
+    - as: test
+      cli: latest
+      commands: ./test-prow-e2e.sh login
+      from: stable:console-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
 - artifact_dir: /tmp/artifacts
   as: e2e-operator-encryption
   steps:

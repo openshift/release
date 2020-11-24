@@ -47,10 +47,17 @@ tests:
   container:
     from: src
 - as: e2e-gcp-operator
-  commands: make test-e2e
-  openshift_installer_custom_test_image:
+  steps:
     cluster_profile: gcp
-    from: stable:cluster-api-actuator-pkg
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: stable:cluster-api-actuator-pkg
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: release-4.2
   org: openshift-priv
