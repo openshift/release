@@ -23,7 +23,7 @@ cat >> "${CONFIG}" << EOF
 baseDomain: ci.azure.devcluster.openshift.com
 compute:
 - name: worker
-  replicas: ${COMPUTE_REPLICAS}
+  replicas: ${COMPUTE_REPLICAS:-3}
   platform:
     azure:
       type: Standard_D4s_v3

@@ -24,7 +24,7 @@ controlPlane:
         diskSizeGB: 120
 compute:
 - name: "worker"
-  replicas: ${COMPUTE_REPLICAS}
+  replicas: ${COMPUTE_REPLICAS:-3}
   platform:
     vsphere:
       cpus: 4

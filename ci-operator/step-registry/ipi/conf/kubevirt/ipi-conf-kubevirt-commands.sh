@@ -24,7 +24,7 @@ networking:
   - cidr: ${KUBEVIRT_CIDR}
 compute:
   - name: worker
-    replicas: ${COMPUTE_REPLICAS}
+    replicas: ${COMPUTE_REPLICAS:-3}
 platform:
   kubevirt:
     # TODO this section is WIP - see the installer PR

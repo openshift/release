@@ -14,7 +14,7 @@ cat >> "${CONFIG}" << EOF
 baseDomain: ${GCP_BASE_DOMAIN}
 compute:
 - name: worker
-  replicas: ${COMPUTE_REPLICAS}
+  replicas: ${COMPUTE_REPLICAS:-3}
 platform:
   gcp:
     projectID: ${GCP_PROJECT}
