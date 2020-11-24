@@ -22,6 +22,9 @@ metadata:
 networking:
   machineNetwork:
   - cidr: ${KUBEVIRT_CIDR}
+compute:
+  - name: worker
+    replicas: ${COMPUTE_REPLICAS}
 platform:
   kubevirt:
     # TODO this section is WIP - see the installer PR

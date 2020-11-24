@@ -12,6 +12,9 @@ GCP_REGION="us-east1"
 
 cat >> "${CONFIG}" << EOF
 baseDomain: ${GCP_BASE_DOMAIN}
+compute:
+- name: worker
+  replicas: ${COMPUTE_REPLICAS}
 platform:
   gcp:
     projectID: ${GCP_PROJECT}

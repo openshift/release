@@ -30,6 +30,7 @@ controlPlane:
       - ${zone_2:-${aws_region}b}
 compute:
 - name: worker
+  replicas: ${COMPUTE_REPLICAS}
   platform:
     aws:
       zones:
