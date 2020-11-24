@@ -317,24 +317,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/kubevirt-plugin-cluster-profile
         - --target=kubevirt-plugin
-        - --template=/usr/local/kubevirt-plugin
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: azure4
-        - name: JOB_NAME_SAFE
-          value: kubevirt-plugin
-        - name: TEST_COMMAND
-          value: |2
-
-            # Deploy Kubevirt
-            source ./frontend/packages/kubevirt-plugin/integration-tests/deploy-kubevirt-gating.sh
-
-            # Run kubevirt-plugin gating suite
-            ./test-prow-e2e.sh kubevirt-gating
-        - name: TEST_IMAGESTREAM_TAG
-          value: pipeline:src
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -350,9 +334,6 @@ presubmits:
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
-        - mountPath: /usr/local/kubevirt-plugin
-          name: job-definition
-          subPath: cluster-launch-installer-custom-test-image.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -375,9 +356,6 @@ presubmits:
       - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - configMap:
-          name: prow-job-cluster-launch-installer-custom-test-image
-        name: job-definition
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
