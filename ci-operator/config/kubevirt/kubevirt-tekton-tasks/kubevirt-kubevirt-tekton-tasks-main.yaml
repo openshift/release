@@ -1,0 +1,121 @@
+base_images:
+  base_fedora:
+    name: fedora
+    namespace: openshift
+    tag: "31"
+  openshift_release_golang-1.15:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+  ubi_minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+images:
+- dockerfile_path: automation/generatetasks/build/Dockerfile
+  from: base_fedora
+  to: generatetasks
+- context_dir: modules/create-vm/
+  dockerfile_path: build/create-vm/Dockerfile
+  from: openshift_release_golang-1.15
+  inputs:
+    ubi_minimal:
+      as:
+      - registry.access.redhat.com/ubi8/ubi-minimal:latest
+  to: tekton-task-create-vm
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  unit-tests:
+    requests:
+      cpu: "1"
+      memory: 2Gi
+  yaml-consistency-tests:
+    requests:
+      cpu: "1"
+      memory: 1Gi
+tag_specification:
+  name: "4.6"
+  namespace: ocp
+test_binary_build_commands: automation/build-test.sh
+tests:
+- artifact_dir: /tmp/artifacts
+  as: unit-tests
+  commands: |
+    export ARTIFACT_DIR=/tmp/artifacts
+
+    make test-with-reports
+  container:
+    from: test-bin
+- artifact_dir: /tmp/artifacts
+  as: yaml-consistency-tests
+  commands: |
+    export ARTIFACT_DIR=/tmp/artifacts
+    /usr/local/bin/entrypoint
+
+    make test-yaml-consistency
+  container:
+    from: generatetasks
+- artifact_dir: /tmp/artifacts
+  as: e2e-tests-namespace-scope
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: namespace-scope-test
+      cli: latest
+      commands: |
+        export ARTIFACT_DIR=/tmp/artifacts
+
+        # KUBECONFIG is mounted from a secret, so its immutable. We have to copy it to some writable location.
+        cp -L "${KUBECONFIG}" /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
+
+        SCOPE=namespace \
+        NUM_NODES=2 \
+          make e2e-tests
+      dependencies:
+      - env: CREATE_VM_IMAGE
+        name: tekton-task-create-vm
+      from: test-bin
+      resources:
+        requests:
+          cpu: "2"
+          memory: 4Gi
+    workflow: ipi-azure
+- artifact_dir: /tmp/artifacts
+  as: e2e-tests-cluster-scope
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: cluster-scope-test
+      cli: latest
+      commands: |
+        export ARTIFACT_DIR=/tmp/artifacts
+
+        # KUBECONFIG is mounted from a secret, so its immutable. We have to copy it to some writable location.
+        cp -L "${KUBECONFIG}" /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
+
+        SCOPE=cluster \
+        NUM_NODES=2 \
+          make e2e-tests
+      dependencies:
+      - env: CREATE_VM_IMAGE
+        name: tekton-task-create-vm
+      from: test-bin
+      resources:
+        requests:
+          cpu: "2"
+          memory: 4Gi
+    workflow: ipi-azure
+zz_generated_metadata:
+  branch: main
+  org: kubevirt
+  repo: kubevirt-tekton-tasks
