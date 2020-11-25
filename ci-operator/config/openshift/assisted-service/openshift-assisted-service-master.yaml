@@ -40,7 +40,9 @@ promotion:
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
-      INSTALL_PKGS="which tar wget hostname sysvinit-tools util-linux socat tree findutils lsof bind-utils shadow-utils"
+      BASE_OS_IMAGE=https://releases-art-rhcos.svc.ci.openshift.org/art/storage/releases/rhcos-4.6/46.82.202009222340-0/x86_64/rhcos-46.82.202009222340-0-live.x86_64.iso
+      WORK_DIR=/data
+      COMMMAND_LINE=/data/assisted-iso-create
       cat <<DOCKERFILE > /opt/Dockerfile
       FROM quay.io/coreos/coreos-installer:v0.7.0 AS installer-image
 
@@ -51,26 +53,25 @@ raw_steps:
 
       FROM registry.access.redhat.com/ubi8/ubi-minimal
 
-      ENV WORK_DIR=/data
-      ENV OS_IMAGE=https://releases-art-rhcos.svc.ci.openshift.org/art/storage/releases/rhcos-4.6/46.82.202009222340-0/x86_64/rhcos-46.82.202009222340-0-live.x86_64.iso
-      ENV COREOS_IMAGE=$WORK_DIR/livecd.iso
+      # ARG WORK_DIR=/data
+      # ARG OS_IMAGE=https://releases-art-rhcos.svc.ci.openshift.org/art/storage/releases/rhcos-4.6/46.82.202009222340-0/x86_64/rhcos-46.82.202009222340-0-live.x86_64.iso
+      # ENV COREOS_IMAGE=$WORK_DIR/livecd.iso
 
       # ENV WORK_DIR=$WORK_DIR
       # ENV BASE_OS_IMAGE=$OS_IMAGE
-      ENV BASE_OS_IMAGE=https://releases-art-rhcos.svc.ci.openshift.org/art/storage/releases/rhcos-4.6/46.82.202009222340-0/x86_64/rhcos-46.82.202009222340-0-live.x86_64.iso
 
-      RUN mkdir $WORK_DIR
-      RUN chmod 775 $WORK_DIR
+      RUN mkdir ${WORK_DIR}
+      RUN chmod 775 ${WORK_DIR}
 
-      RUN curl -L -k  --fail ${BASE_OS_IMAGE} -o $WORK_DIR/livecd.iso
-      RUN chmod 644 $WORK_DIR/livecd.iso
+      RUN curl -L -k  --fail ${BASE_OS_IMAGE} -o ${WORK_DIR}/livecd.iso
+      RUN chmod 644 ${WORK_DIR}/livecd.iso
 
-      COPY --from=installer-image /usr/sbin/coreos-installer $WORK_DIR
+      COPY --from=installer-image /usr/sbin/coreos-installer ${WORK_DIR}
 
-      COPY --from=builder /build/assisted-iso-create $WORK_DIR
+      COPY --from=builder /build/assisted-iso-create ${WORK_DIR}
 
-      ENV COMMMAND_LINE=$WORK_DIR/assisted-iso-create
-      ENTRYPOINT exec $COMMMAND_LINE
+      # ENV COMMMAND_LINE=$WORK_DIR/assisted-iso-create
+      ENTRYPOINT exec ${COMMMAND_LINE}
       DOCKERFILE
     from: src
     to: src-dockerfile
