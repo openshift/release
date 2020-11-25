@@ -42,11 +42,14 @@ promotion:
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
-      BASE_OS_IMAGE=https://releases-art-rhcos.svc.ci.openshift.org/art/storage/releases/rhcos-4.6/46.82.202009222340-0/x86_64/rhcos-46.82.202009222340-0-live.x86_64.iso
-      WORK_DIR=/data
-      COMMMAND_LINE=/data/assisted-iso-create
+      RHCOS_VERSION=46.82.202009222340-0
+      BASE_OS_IMAGE=https://releases-art-rhcos.svc.ci.openshift.org/art/storage/releases/rhcos-4.6/${RHCOS_VERSION}/x86_64/rhcos-${RHCOS_VERSION}-live.x86_64.iso
 
       curl -L -k  --fail ${BASE_OS_IMAGE} -o /opt/livecd.iso
+
+      # TODO: move to in-repo dockerfile
+      WORK_DIR=/data
+      COMMMAND_LINE=${WORK_DIR}/assisted-iso-create
 
       cat <<DOCKERFILE > /opt/Dockerfile
       FROM quay.io/coreos/coreos-installer:v0.7.0 AS installer-image
@@ -58,17 +61,12 @@ raw_steps:
 
       FROM registry.access.redhat.com/ubi8/ubi-minimal
 
-      # ARG WORK_DIR=/data
-      # ARG OS_IMAGE=https://releases-art-rhcos.svc.ci.openshift.org/art/storage/releases/rhcos-4.6/46.82.202009222340-0/x86_64/rhcos-46.82.202009222340-0-live.x86_64.iso
-      # ENV COREOS_IMAGE=$WORK_DIR/livecd.iso
-
-      # ENV WORK_DIR=$WORK_DIR
-      # ENV BASE_OS_IMAGE=$OS_IMAGE
+      # TODO: uncomment for in-repo dockerfile
+      # ENV WORK_DIR=/data
 
       RUN mkdir ${WORK_DIR}
       RUN chmod 775 ${WORK_DIR}
 
-      # RUN curl -L -k  --fail ${BASE_OS_IMAGE} -o ${WORK_DIR}/livecd.iso
       COPY ./livecd.iso ${WORK_DIR}/livecd.iso
       RUN chmod 644 ${WORK_DIR}/livecd.iso
 
@@ -76,6 +74,7 @@ raw_steps:
 
       COPY --from=builder /build/assisted-iso-create ${WORK_DIR}
 
+      # TODO: uncomment for in-repo dockerfile
       # ENV COMMMAND_LINE=$WORK_DIR/assisted-iso-create
       ENTRYPOINT exec ${COMMMAND_LINE}
       DOCKERFILE
