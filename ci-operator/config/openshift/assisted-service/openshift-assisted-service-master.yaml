@@ -43,6 +43,9 @@ raw_steps:
       BASE_OS_IMAGE=https://releases-art-rhcos.svc.ci.openshift.org/art/storage/releases/rhcos-4.6/46.82.202009222340-0/x86_64/rhcos-46.82.202009222340-0-live.x86_64.iso
       WORK_DIR=/data
       COMMMAND_LINE=/data/assisted-iso-create
+
+      curl -L -k  --fail ${BASE_OS_IMAGE} -o /opt/livecd.iso
+
       cat <<DOCKERFILE > /opt/Dockerfile
       FROM quay.io/coreos/coreos-installer:v0.7.0 AS installer-image
 
@@ -63,7 +66,8 @@ raw_steps:
       RUN mkdir ${WORK_DIR}
       RUN chmod 775 ${WORK_DIR}
 
-      RUN curl -L -k  --fail ${BASE_OS_IMAGE} -o ${WORK_DIR}/livecd.iso
+      # RUN curl -L -k  --fail ${BASE_OS_IMAGE} -o ${WORK_DIR}/livecd.iso
+      COPY /opt/livecd.iso ${WORK_DIR}/livecd.iso
       RUN chmod 644 ${WORK_DIR}/livecd.iso
 
       COPY --from=installer-image /usr/sbin/coreos-installer ${WORK_DIR}
